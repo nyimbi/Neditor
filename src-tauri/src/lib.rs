@@ -245,7 +245,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
     let glossary = collect_glossary(&interpolated);
     let citation_references = collect_citation_references(&interpolated);
     let citations = citation_keys_from_references(&citation_references);
-    let labels = collect_labels(&interpolated);
+    let labels = collect_labels(&interpolated, &headings);
     let cross_references = collect_cross_references(&interpolated, &labels, &mut diagnostics);
     let index_entries = collect_index_entries(&interpolated, &metadata, &headings, &glossary);
     let index_terms = index_entries
@@ -1418,10 +1418,14 @@ fn extract_headings(text: &str) -> Vec<Heading> {
             let trimmed = line.trim_start();
             let level = trimmed.chars().take_while(|ch| *ch == '#').count();
             if (1..=6).contains(&level) && trimmed.chars().nth(level) == Some(' ') {
-                let text = trimmed[level..].trim().to_string();
+                let raw_text = trimmed[level..].trim();
+                let text = strip_heading_attributes(raw_text).to_string();
+                if text.is_empty() {
+                    return None;
+                }
                 Some(Heading {
                     level,
-                    anchor: slugify(&text),
+                    anchor: extract_label(raw_text).unwrap_or_else(|| slugify(&text)),
                     text,
                     line: index + 1,
                 })
@@ -1430,6 +1434,10 @@ fn extract_headings(text: &str) -> Vec<Heading> {
             }
         })
         .collect()
+}
+
+fn strip_heading_attributes(text: &str) -> &str {
+    text.split("{#").next().unwrap_or(text).trim()
 }
 
 fn inject_generated_sections(
@@ -1570,8 +1578,11 @@ fn collect_glossary(text: &str) -> BTreeMap<String, String> {
     glossary
 }
 
-fn collect_labels(text: &str) -> Vec<String> {
+fn collect_labels(text: &str, headings: &[Heading]) -> Vec<String> {
     let mut labels = BTreeSet::new();
+    for heading in headings {
+        labels.insert(heading.anchor.clone());
+    }
     for segment in text.split("{#").skip(1) {
         if let Some((label, _)) = segment.split_once('}') {
             let label = label.split_whitespace().next().unwrap_or("").trim();
@@ -3928,6 +3939,31 @@ ARR: Annual recurring revenue.
                         && caption.as_deref() == Some("Revenue by region")
             )
         }));
+    }
+
+    #[test]
+    fn cross_references_resolve_heading_appendix_and_decision_anchors() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: References\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}, {@appendix-a}, and {@decision-record}.\n\n## Appendix A\nSupporting detail.\n\n## Decision Record\nUse local-first exports.\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response
+            .semantic
+            .headings
+            .iter()
+            .any(|heading| heading.text == "Strategy" && heading.anchor == "sec:strategy"));
+        for key in ["sec:strategy", "appendix-a", "decision-record"] {
+            assert!(response
+                .semantic
+                .cross_references
+                .iter()
+                .any(|reference| reference.key == key && reference.resolved));
+        }
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Broken cross reference")));
     }
 
     #[test]
