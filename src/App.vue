@@ -57,6 +57,8 @@
       <button type="button" title="Table" @click="insertBlock(tableSnippet)">Table</button>
       <button type="button" title="Calculation" @click="insertBlock(calcSnippet)">Calc</button>
       <button type="button" title="AI source" @click="insertBlock(aiSnippet)">AI</button>
+      <button type="button" title="Find and replace" @click="runEditorCommand(openSearchPanel)">Find</button>
+      <button type="button" title="Find next" @click="runEditorCommand(findNext)">Next</button>
       <span class="divider"></span>
       <select v-model="store.mode" aria-label="View mode">
         <option value="split">Split</option>
@@ -528,7 +530,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { searchKeymap } from "@codemirror/search";
+import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap } from "@codemirror/search";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { useDocumentsStore } from "./stores/documents";
@@ -619,6 +621,11 @@ const commands = computed(() => [
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
   { name: "Paste from AI chat", group: "AI", run: () => (aiPasteOpen.value = true) },
+  { name: "Find and replace", group: "Edit", run: () => runEditorCommand(openSearchPanel) },
+  { name: "Find next", group: "Edit", run: () => runEditorCommand(findNext) },
+  { name: "Find previous", group: "Edit", run: () => runEditorCommand(findPrevious) },
+  { name: "Replace next", group: "Edit", run: () => runEditorCommand(replaceNext) },
+  { name: "Replace all", group: "Edit", run: () => runEditorCommand(replaceAll) },
   { name: "Add review comment", group: "Review", run: () => (store.sidebar = "review") },
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
@@ -896,6 +903,12 @@ function buildEditor() {
     }),
     parent: editorHost.value,
   });
+}
+
+function runEditorCommand(command: (view: EditorView) => boolean) {
+  if (!editorView) return;
+  command(editorView);
+  editorView.focus();
 }
 
 function activate(id: string) {
