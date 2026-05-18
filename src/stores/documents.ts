@@ -24,6 +24,7 @@ let unwatchFileErrors: UnlistenFn | null = null;
 type AiPasteInsertMode = "insert" | "quote" | "replace" | "appendix";
 type CitationStyle = "title" | "author-year" | "key";
 type LayoutPreset = "business" | "compact" | "presentation";
+type PreviewTheme = "match" | "light" | "dark";
 type SnapshotStorage = "app-data" | "project-local";
 
 interface ExportDefaults {
@@ -60,6 +61,7 @@ interface GitIntegrationPreferences {
 
 interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
+  previewTheme?: PreviewTheme;
   wordWrap?: boolean;
   lineNumbers?: boolean;
   highContrast?: boolean;
@@ -413,6 +415,7 @@ export const useDocumentsStore = defineStore("documents", {
       | "review"
       | "settings",
     theme: "system" as "system" | "light" | "dark",
+    previewTheme: "match" as PreviewTheme,
     wordWrap: true,
     lineNumbers: true,
     highContrast: false,
@@ -500,6 +503,7 @@ export const useDocumentsStore = defineStore("documents", {
         preferencesStore = await Store.load("settings.json");
         const persisted = (await preferencesStore.get<PersistedWorkspace>("workspace")) || {};
         if (persisted.theme) this.theme = persisted.theme;
+        if (persisted.previewTheme === "match" || persisted.previewTheme === "light" || persisted.previewTheme === "dark") this.previewTheme = persisted.previewTheme;
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
         if (typeof persisted.highContrast === "boolean") this.highContrast = persisted.highContrast;
@@ -540,6 +544,7 @@ export const useDocumentsStore = defineStore("documents", {
       if (!preferencesStore) return;
       const workspace: PersistedWorkspace = {
         theme: this.theme,
+        previewTheme: this.previewTheme,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,
         highContrast: this.highContrast,

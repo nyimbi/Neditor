@@ -466,6 +466,14 @@
               <option value="dark">Dark</option>
             </select>
           </label>
+          <label>
+            Preview theme
+            <select v-model="store.previewTheme">
+              <option value="match">Match app</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
           <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
           <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
           <label><input v-model="store.highContrast" type="checkbox" /> High contrast</label>
@@ -628,6 +636,7 @@
         ref="previewPane"
         v-show="store.mode !== 'source' && store.mode !== 'focus'"
         class="preview-pane"
+        :data-preview-theme="store.previewTheme"
         aria-label="Live preview"
         @scroll="syncEditorScrollFromPreview"
       >
@@ -1077,6 +1086,7 @@ watch(
     store.wordWrap,
     store.lineNumbers,
     store.theme,
+    store.previewTheme,
     store.highContrast,
     store.reducedMotion,
     store.editorFont,
@@ -2945,6 +2955,35 @@ select:hover {
 }
 
 .preview-pane {
+  background: #ffffff;
+}
+
+.preview-pane[data-preview-theme="dark"] {
+  background: #0f172a;
+}
+
+.preview-pane[data-preview-theme="dark"] .preview-document {
+  color: #dbeafe;
+  background: #111827;
+}
+
+.preview-pane[data-preview-theme="dark"] .preview-document h1,
+.preview-pane[data-preview-theme="dark"] .preview-document h2,
+.preview-pane[data-preview-theme="dark"] .preview-document h3 {
+  color: #f8fafc;
+}
+
+.preview-pane[data-preview-theme="dark"] .preview-document pre {
+  background: #0b1220;
+  color: #e5e7eb;
+}
+
+.preview-pane[data-preview-theme="light"] {
+  background: #ffffff;
+}
+
+.preview-pane[data-preview-theme="light"] .preview-document {
+  color: #1f2937;
   background: #ffffff;
 }
 
