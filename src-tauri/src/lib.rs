@@ -154,8 +154,10 @@ struct TransformArtifact {
     name: String,
     output_kind: String,
     source_hash: String,
+    output_hash: String,
     cache_key: String,
     execution_kind: String,
+    engine_version: Option<String>,
     engine_path: Option<String>,
     input_mode: String,
     duration_ms: Option<u64>,
@@ -1382,7 +1384,15 @@ fn compile(request: CompileRequest) -> CompileResponse {
                     "id": artifact.id,
                     "name": artifact.name,
                     "outputKind": artifact.output_kind,
-                    "sourceHash": artifact.source_hash
+                    "sourceHash": artifact.source_hash,
+                    "outputHash": artifact.output_hash,
+                    "cacheKey": artifact.cache_key,
+                    "executionKind": artifact.execution_kind,
+                    "engineVersion": artifact.engine_version,
+                    "enginePath": artifact.engine_path,
+                    "inputMode": artifact.input_mode,
+                    "durationMs": artifact.duration_ms,
+                    "diagnostics": artifact.diagnostics
                 })
             })
             .collect(),
@@ -2142,12 +2152,15 @@ fn render_transform(
         }
         _ => format!("<pre>{}</pre>", escape_html(body)),
     };
+    let output_hash = sha256_hex(html.as_bytes());
     TransformArtifact {
         id: format!("{name}-{source_hash}"),
         name: name.to_string(),
         output_kind: if html.contains("<svg") { "svg" } else { "html" }.to_string(),
+        output_hash,
         cache_key: transform_cache_key(name, "embedded", "rust-native", &source_hash),
         execution_kind: "embedded".to_string(),
+        engine_version: Some(env!("CARGO_PKG_VERSION").to_string()),
         engine_path: None,
         input_mode: "embedded".to_string(),
         duration_ms: None,
@@ -4974,10 +4987,12 @@ fn execute_external_transform(
         Some("Output was captured without invoking a shell."),
     ));
 
+    let output_hash = sha256_hex(html.as_bytes());
     Ok(TransformArtifact {
         id: format!("{name}-{source_hash}"),
         name: name.to_string(),
         output_kind: if html.contains("<svg") { "svg" } else { "html" }.to_string(),
+        output_hash,
         cache_key: transform_cache_key(
             name,
             input_mode,
@@ -4985,6 +5000,7 @@ fn execute_external_transform(
             &source_hash,
         ),
         execution_kind: "external".to_string(),
+        engine_version: None,
         engine_path: Some(path_to_string(engine_path)),
         input_mode: input_mode.to_string(),
         duration_ms: Some(duration_ms),
@@ -5492,6 +5508,52 @@ ARR: Annual recurring revenue.
         assert!(response.html.contains("href=\"#test-report\""));
         assert!(response.index_terms.iter().any(|term| term == "ARR"));
         assert_eq!(response.export_manifest.document_version, "1.2.0");
+        let csv_artifact = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == "csv")
+            .expect("csv transform artifact");
+        assert!(!csv_artifact.output_hash.is_empty());
+        let manifest_csv_artifact = response
+            .export_manifest
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.get("name").and_then(Value::as_str) == Some("csv"))
+            .expect("csv manifest artifact");
+        assert_eq!(
+            manifest_csv_artifact
+                .get("sourceHash")
+                .and_then(Value::as_str),
+            Some(csv_artifact.source_hash.as_str())
+        );
+        assert_eq!(
+            manifest_csv_artifact
+                .get("outputHash")
+                .and_then(Value::as_str),
+            Some(csv_artifact.output_hash.as_str())
+        );
+        assert!(manifest_csv_artifact
+            .get("cacheKey")
+            .and_then(Value::as_str)
+            .is_some_and(|cache_key| !cache_key.is_empty()));
+        assert_eq!(
+            manifest_csv_artifact
+                .get("executionKind")
+                .and_then(Value::as_str),
+            Some("embedded")
+        );
+        assert_eq!(
+            manifest_csv_artifact
+                .get("inputMode")
+                .and_then(Value::as_str),
+            Some("embedded")
+        );
+        assert_eq!(
+            manifest_csv_artifact
+                .get("engineVersion")
+                .and_then(Value::as_str),
+            Some(env!("CARGO_PKG_VERSION"))
+        );
         assert!(response
             .formula_graph
             .iter()

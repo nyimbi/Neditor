@@ -93,8 +93,10 @@ export interface CompileResponse {
     name: string;
     output_kind: string;
     source_hash: string;
+    output_hash: string;
     cache_key: string;
     execution_kind: string;
+    engine_version?: string | null;
     engine_path?: string | null;
     input_mode: string;
     duration_ms?: number | null;
