@@ -66,6 +66,7 @@ struct SemanticDocument {
     equations: usize,
     citations: Vec<String>,
     citation_references: Vec<CitationReference>,
+    duplicate_bibliography_keys: Vec<String>,
     glossary: BTreeMap<String, String>,
     layout_directives: Vec<String>,
     comments: Vec<ReviewComment>,
@@ -1118,6 +1119,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
         root_path.as_deref(),
         &mut diagnostics,
     );
+    let duplicate_bibliography_keys = duplicate_bibliography_keys(&bibliography);
     let glossary = collect_glossary(&interpolated);
     let citation_references = collect_citation_references(&interpolated);
     let citations = citation_keys_from_references(&citation_references);
@@ -1166,6 +1168,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
         &metadata,
         &citations,
         &bibliography,
+        &duplicate_bibliography_keys,
         &comments,
         &ai_sources,
         !bibliography.is_empty(),
@@ -1213,6 +1216,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
         equations: count_equations(&transformed_markdown),
         citations,
         citation_references,
+        duplicate_bibliography_keys,
         glossary,
         layout_directives,
         comments,
@@ -2380,6 +2384,17 @@ fn collect_bibliography(
         .collect()
 }
 
+fn duplicate_bibliography_keys(bibliography: &[BibliographyEntry]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut duplicates = BTreeSet::new();
+    for entry in bibliography {
+        if !seen.insert(entry.key.as_str()) {
+            duplicates.insert(entry.key.clone());
+        }
+    }
+    duplicates.into_iter().collect()
+}
+
 fn parse_csl_json_bibliography(body: &str) -> Result<Vec<BibliographyEntry>, serde_json::Error> {
     let value = serde_json::from_str::<Value>(body)?;
     let entries = value
@@ -2679,6 +2694,7 @@ fn validate_document(
     metadata: &Value,
     citations: &[String],
     bibliography: &[BibliographyEntry],
+    duplicate_bibliography_keys: &[String],
     comments: &[ReviewComment],
     ai_sources: &[AiSource],
     has_bibliography_source: bool,
@@ -2733,6 +2749,15 @@ fn validate_document(
         .iter()
         .map(|entry| entry.key.as_str())
         .collect::<HashSet<_>>();
+    for key in duplicate_bibliography_keys {
+        diagnostics.push(diag(
+            "error",
+            format!("Duplicate bibliography key: {key}"),
+            None,
+            None,
+            Some("Keep bibliography keys unique so citations resolve deterministically."),
+        ));
+    }
     if !citations.is_empty() && !has_bibliography_source {
         diagnostics.push(diag(
             "warning",
@@ -3792,6 +3817,23 @@ ARR: Annual recurring revenue.
             .iter()
             .any(|diagnostic| diagnostic.message.contains("Broken citation")));
         fs::remove_dir_all(root).expect("clean csl test dir");
+    }
+
+    #[test]
+    fn compiler_reports_duplicate_bibliography_keys() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Duplicate Bibliography\nstatus: approved\napprovedBy: QA\n---\n# Duplicate Bibliography\nClaim [@porter1985].\n\n```bibtex\n@book{porter1985, title={Competitive Advantage}}\n@article{porter1985, title={Duplicate Entry}}\n```\n[BIBLIOGRAPHY]".to_string(),
+            file_path: None,
+        });
+
+        assert_eq!(
+            response.semantic.duplicate_bibliography_keys,
+            vec!["porter1985".to_string()]
+        );
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Duplicate bibliography key")));
     }
 
     #[test]

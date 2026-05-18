@@ -206,6 +206,10 @@
           <p v-for="citation in active.compile?.semantic.citation_references || []" :key="`${citation.key}-${citation.locator || ''}`">
             [@{{ citation.key }}<template v-if="citation.locator">, {{ citation.locator }}</template>]
           </p>
+          <template v-if="active.compile?.semantic.duplicate_bibliography_keys.length">
+            <h3>Duplicate keys</h3>
+            <p v-for="key in active.compile.semantic.duplicate_bibliography_keys" :key="key" class="error">{{ key }}</p>
+          </template>
           <h3>Glossary</h3>
           <dl>
             <template v-for="(definition, term) in active.compile?.semantic.glossary || {}" :key="term">
