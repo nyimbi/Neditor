@@ -17,7 +17,8 @@ pub(crate) fn collect_calculations(
     context: &mut HashMap<String, f64>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> Vec<FormulaValue> {
-    let mut formulas = Vec::new();
+    let mut definitions = Vec::new();
+    let mut definition_index = HashMap::new();
     for block in collect_fence_bodies(text, "calc") {
         for line in block.lines() {
             let trimmed = line.trim();
@@ -28,38 +29,118 @@ pub(crate) fn collect_calculations(
                 let name = name.trim().to_string();
                 let expression = expression.trim().to_string();
                 let dependencies = expression_dependencies(&expression);
-                match eval_expression(&expression, context) {
-                    Ok(value) => {
-                        context.insert(name.clone(), value);
-                        formulas.push(FormulaValue {
-                            name,
-                            expression,
-                            value: Some(value),
-                            error: None,
-                            dependencies,
-                        });
-                    }
-                    Err(error) => {
-                        diagnostics.push(diag(
-                            "error",
-                            format!("Formula error for {name}: {error}"),
-                            None,
-                            None,
-                            Some("Use numeric expressions, supported functions, or previously defined names."),
-                        ));
-                        formulas.push(FormulaValue {
-                            name,
-                            expression,
-                            value: None,
-                            error: Some(error),
-                            dependencies,
-                        });
-                    }
-                }
+                definition_index.insert(name.clone(), definitions.len());
+                definitions.push(FormulaDefinition {
+                    name,
+                    expression,
+                    dependencies,
+                });
+            }
+        }
+    }
+
+    let mut cache = HashMap::new();
+    let mut formulas = Vec::new();
+    for index in 0..definitions.len() {
+        let definition = &definitions[index];
+        let mut stack = Vec::new();
+        match evaluate_formula_definition(
+            index,
+            &definitions,
+            &definition_index,
+            context,
+            &mut cache,
+            &mut stack,
+        ) {
+            Ok(value) => formulas.push(FormulaValue {
+                name: definition.name.clone(),
+                expression: definition.expression.clone(),
+                value: Some(value),
+                error: None,
+                dependencies: definition.dependencies.clone(),
+            }),
+            Err(error) => {
+                diagnostics.push(diag(
+                    "error",
+                    format!("Formula error for {}: {error}", definition.name),
+                    None,
+                    None,
+                    Some("Use numeric expressions, supported functions, or acyclic named values."),
+                ));
+                formulas.push(FormulaValue {
+                    name: definition.name.clone(),
+                    expression: definition.expression.clone(),
+                    value: None,
+                    error: Some(error),
+                    dependencies: definition.dependencies.clone(),
+                });
             }
         }
     }
     formulas
+}
+
+struct FormulaDefinition {
+    name: String,
+    expression: String,
+    dependencies: Vec<String>,
+}
+
+fn evaluate_formula_definition(
+    index: usize,
+    definitions: &[FormulaDefinition],
+    definition_index: &HashMap<String, usize>,
+    context: &mut HashMap<String, f64>,
+    cache: &mut HashMap<usize, Result<f64, String>>,
+    stack: &mut Vec<usize>,
+) -> Result<f64, String> {
+    if let Some(value) = cache.get(&index).cloned() {
+        return value;
+    }
+    if let Some(cycle_start) = stack.iter().position(|candidate| *candidate == index) {
+        return Err(formula_cycle_error(
+            index,
+            &stack[cycle_start..],
+            definitions,
+        ));
+    }
+
+    stack.push(index);
+    let result = (|| {
+        for dependency in &definitions[index].dependencies {
+            if let Some(dependency_index) = definition_index.get(dependency).copied() {
+                let value = evaluate_formula_definition(
+                    dependency_index,
+                    definitions,
+                    definition_index,
+                    context,
+                    cache,
+                    stack,
+                )?;
+                context.insert(dependency.clone(), value);
+            }
+        }
+        eval_expression(&definitions[index].expression, context)
+    })();
+    stack.pop();
+    if let Ok(value) = &result {
+        context.insert(definitions[index].name.clone(), *value);
+    }
+    cache.insert(index, result.clone());
+    result
+}
+
+fn formula_cycle_error(
+    repeated_index: usize,
+    cycle_stack: &[usize],
+    definitions: &[FormulaDefinition],
+) -> String {
+    let mut names = cycle_stack
+        .iter()
+        .map(|index| definitions[*index].name.clone())
+        .collect::<Vec<_>>();
+    names.push(definitions[repeated_index].name.clone());
+    format!("#CYCLE? {}", names.join(" -> "))
 }
 
 pub(crate) fn eval_expression(

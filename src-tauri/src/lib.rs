@@ -3603,6 +3603,30 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn calc_blocks_resolve_forward_refs_and_report_cycles() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Calc Graph\nstatus: approved\napprovedBy: QA\n---\n# Calc Graph\n```calc\nprofit = revenue - cost\ncost = 40\nrevenue = 100\ncycle_a = cycle_b + 1\ncycle_b = cycle_a + 1\n```\n\nProfit: {{=profit | round}}\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response.compiled_markdown.contains("Profit: 60"));
+        assert!(response
+            .formula_graph
+            .iter()
+            .any(|formula| formula.name == "profit" && formula.value == Some(60.0)));
+        assert!(response.formula_graph.iter().any(|formula| {
+            formula.name == "cycle_a"
+                && formula
+                    .error
+                    .as_deref()
+                    .is_some_and(|error| error.contains("#CYCLE? cycle_a -> cycle_b -> cycle_a"))
+        }));
+        assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("#CYCLE? cycle_a -> cycle_b -> cycle_a")));
+    }
+
+    #[test]
     fn compiler_loads_project_level_variables_without_overriding_front_matter() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
