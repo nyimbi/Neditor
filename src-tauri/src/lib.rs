@@ -1998,8 +1998,8 @@ fn render_transform(
         "calc" => "<aside class=\"transform transform-calc\">Calculations resolved into document variables.</aside>".to_string(),
         "csv" => render_delimited_table(body, ',', &mut artifact_diags, diagnostics),
         "tsv" => render_delimited_table(body, '\t', &mut artifact_diags, diagnostics),
-        "json" => format!("<pre class=\"transform transform-json\">{}</pre>", escape_html(body)),
-        "yaml" => format!("<pre class=\"transform transform-yaml\">{}</pre>", escape_html(body)),
+        "json" => render_structured_data_html("json", body, &mut artifact_diags, diagnostics),
+        "yaml" => render_structured_data_html("yaml", body, &mut artifact_diags, diagnostics),
         "glossary" => render_glossary_html(body),
         "layout" => render_layout_block_html(body),
         "timeline" => render_timeline_svg(body),
@@ -3397,6 +3397,128 @@ fn render_delimited_table(
     }
     html.push_str("</tbody></table>");
     html
+}
+
+fn render_structured_data_html(
+    format: &str,
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let parsed = if format == "json" {
+        serde_json::from_str::<Value>(body).map_err(|err| err.to_string())
+    } else {
+        serde_yaml::from_str::<Value>(body).map_err(|err| err.to_string())
+    };
+    match parsed {
+        Ok(value) => {
+            if let Some(table) = render_structured_table(format, &value) {
+                table
+            } else {
+                format!(
+                    "<section class=\"transform transform-{format} structured-tree\">{}</section>",
+                    render_structured_tree("root", &value)
+                )
+            }
+        }
+        Err(error) => {
+            let diagnostic = diag(
+                "error",
+                format!("Invalid {} transform input: {error}", format.to_ascii_uppercase()),
+                None,
+                None,
+                Some("Check the structured data syntax."),
+            );
+            diagnostics.push(diagnostic.clone());
+            artifact_diags.push(diagnostic);
+            format!(
+                "<pre class=\"transform transform-{format} transform-error\">{}</pre>",
+                escape_html(body)
+            )
+        }
+    }
+}
+
+fn render_structured_table(format: &str, value: &Value) -> Option<String> {
+    let rows = value.as_array()?;
+    if rows.is_empty() || !rows.iter().all(Value::is_object) {
+        return None;
+    }
+    let headers = rows
+        .iter()
+        .filter_map(Value::as_object)
+        .flat_map(|object| object.keys().cloned())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    if headers.is_empty() {
+        return None;
+    }
+    let mut html = format!("<table class=\"transform-table transform-{format}\"><thead><tr>");
+    for header in &headers {
+        html.push_str(&format!("<th>{}</th>", escape_html(header)));
+    }
+    html.push_str("</tr></thead><tbody>");
+    for row in rows {
+        let object = row.as_object()?;
+        html.push_str("<tr>");
+        for header in &headers {
+            let cell = object
+                .get(header)
+                .map(structured_value_summary)
+                .unwrap_or_default();
+            html.push_str(&format!("<td>{}</td>", escape_html(&cell)));
+        }
+        html.push_str("</tr>");
+    }
+    html.push_str("</tbody></table>");
+    Some(html)
+}
+
+fn render_structured_tree(label: &str, value: &Value) -> String {
+    match value {
+        Value::Object(object) => {
+            let mut html = format!(
+                "<details open><summary>{}</summary><dl>",
+                escape_html(label)
+            );
+            for (key, value) in object {
+                html.push_str("<dt>");
+                html.push_str(&escape_html(key));
+                html.push_str("</dt><dd>");
+                html.push_str(&render_structured_tree(key, value));
+                html.push_str("</dd>");
+            }
+            html.push_str("</dl></details>");
+            html
+        }
+        Value::Array(values) => {
+            let mut html = format!(
+                "<details open><summary>{} [{}]</summary><ol>",
+                escape_html(label),
+                values.len()
+            );
+            for value in values {
+                html.push_str("<li>");
+                html.push_str(&render_structured_tree("item", value));
+                html.push_str("</li>");
+            }
+            html.push_str("</ol></details>");
+            html
+        }
+        _ => escape_html(&structured_value_summary(value)),
+    }
+}
+
+fn structured_value_summary(value: &Value) -> String {
+    match value {
+        Value::Null => "null".to_string(),
+        Value::Bool(value) => value.to_string(),
+        Value::Number(value) => value.to_string(),
+        Value::String(value) => value.clone(),
+        Value::Array(values) => format!("[{} items]", values.len()),
+        Value::Object(object) => format!("{{{} fields}}", object.len()),
+    }
 }
 
 fn render_table_cell(
@@ -5506,6 +5628,31 @@ paths:
             bibtex.get("execution").and_then(Value::as_str),
             Some("rust-native")
         );
+    }
+
+    #[test]
+    fn structured_data_transforms_render_tables_and_trees() {
+        let json_artifact = run_transform(
+            "json".to_string(),
+            r#"[{"region":"East","revenue":120},{"region":"West","revenue":98}]"#.to_string(),
+        )
+        .expect("json transform");
+        assert_eq!(json_artifact.output_kind, "html");
+        assert!(json_artifact.html.contains("transform-json"));
+        assert!(json_artifact.html.contains("<th>region</th>"));
+        assert!(json_artifact.html.contains("<td>East</td>"));
+        assert!(json_artifact.diagnostics.is_empty());
+
+        let yaml_artifact = run_transform(
+            "yaml".to_string(),
+            "api:\n  version: v1\n  endpoints:\n    - /accounts\n".to_string(),
+        )
+        .expect("yaml transform");
+        assert_eq!(yaml_artifact.output_kind, "html");
+        assert!(yaml_artifact.html.contains("structured-tree"));
+        assert!(yaml_artifact.html.contains("<dt>version</dt>"));
+        assert!(yaml_artifact.html.contains("/accounts"));
+        assert!(yaml_artifact.diagnostics.is_empty());
     }
 
     #[test]
