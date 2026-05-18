@@ -5253,6 +5253,7 @@ paths:
         let html = render_full_html(&response, &options);
         assert!(html.contains("Board Pack Fixture"));
         assert!(html.contains("APPROVED"));
+        assert!(html.contains("Competitive Advantage, p. 42"));
         assert!(html.contains("Reference architecture"));
         assert!(html.contains("Competitive Advantage"));
         assert!(html.contains("class=\"export-glossary\""));
@@ -5267,6 +5268,7 @@ paths:
         assert!(pdf.starts_with(b"%PDF-1.4"));
         assert!(pdf_text.contains("/Count 6"));
         assert!(pdf_text.contains("Export Conformance Report"));
+        assert!(pdf_text.contains("Competitive Advantage, p. 42"));
         assert!(pdf_text.contains("Reference architecture"));
         assert!(pdf_text.contains("Glossary"));
         assert!(pdf_text.contains("Review Comments"));
@@ -5291,6 +5293,7 @@ paths:
         assert!(docx_footer.contains("Page 1 of 1"));
         assert!(docx_document.contains("<w:tbl>"));
         assert!(docx_document.contains(r#"<w:br w:type="page""#));
+        assert!(docx_document.contains("Competitive Advantage, p. 42"));
         assert!(docx_document.contains("Reference architecture"));
         assert!(docx_document.contains("Competitive Advantage"));
         assert!(docx_document.contains("Annual recurring revenue"));
@@ -5313,6 +5316,7 @@ paths:
         assert!(pptx_agenda_slide.contains("Export Conformance Report"));
         assert!(pptx_agenda_slide.contains("Appendix"));
         assert!(pptx_slide_three.contains("Export Conformance Report"));
+        assert!(pptx_slide_three.contains("Competitive Advantage, p. 42"));
         assert!(pptx_slide_three.contains("Table: Region | Revenue | Margin"));
         assert!(pptx_slide_three.contains("Reference architecture"));
         assert!(pptx_slide_three.contains(r#"r:embed="rIdImage1""#));
