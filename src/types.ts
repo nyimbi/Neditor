@@ -79,6 +79,7 @@ export type DocumentBlock =
       id?: string | null;
       caption?: string | null;
       headers: string[];
+      alignments: string[];
       rows: string[][];
       source?: DocumentSourceRange | null;
     }

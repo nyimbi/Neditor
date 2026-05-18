@@ -1101,6 +1101,7 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
             id,
             caption,
             headers,
+            alignments,
             rows,
             ..
         } => {
@@ -1108,7 +1109,7 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
             if id.is_some() || caption.is_some() {
                 output.push_str(&docx_paragraph(&table_export_line(id, caption, headers)));
             }
-            output.push_str(&docx_table(headers, rows));
+            output.push_str(&docx_table(headers, alignments, rows));
             output
         }
         DocumentBlock::Figure {
@@ -1192,27 +1193,36 @@ fn docx_section_break(options: &str) -> String {
     )
 }
 
-fn docx_table(headers: &[String], rows: &[Vec<String>]) -> String {
+fn docx_table(headers: &[String], alignments: &[String], rows: &[Vec<String>]) -> String {
     let mut table = String::from(
         r#"<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>"#,
     );
-    table.push_str(&docx_table_row(headers));
+    table.push_str(&docx_table_row(headers, alignments));
     for row in rows {
-        table.push_str(&docx_table_row(row));
+        table.push_str(&docx_table_row(row, alignments));
     }
     table.push_str("</w:tbl>");
     table
 }
 
-fn docx_table_row(cells: &[String]) -> String {
-    let cells = cells.iter().map(|cell| docx_cell(cell)).collect::<String>();
+fn docx_table_row(cells: &[String], alignments: &[String]) -> String {
+    let cells = cells
+        .iter()
+        .enumerate()
+        .map(|(index, cell)| docx_cell(cell, alignments.get(index).map(String::as_str)))
+        .collect::<String>();
     format!("<w:tr>{cells}</w:tr>")
 }
 
-fn docx_cell(text: &str) -> String {
+fn docx_cell(text: &str, alignment: Option<&str>) -> String {
+    let alignment = match alignment {
+        Some("center") => r#"<w:pPr><w:jc w:val="center"/></w:pPr>"#,
+        Some("right") => r#"<w:pPr><w:jc w:val="right"/></w:pPr>"#,
+        _ => "",
+    };
     format!(
-        r#"<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr>{}</w:tc>"#,
-        docx_paragraph(text)
+        r#"<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr><w:p>{alignment}<w:r><w:t>{}</w:t></w:r></w:p></w:tc>"#,
+        escape_xml(text)
     )
 }
 
@@ -1663,6 +1673,7 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             id,
             caption,
             headers,
+            alignments: _,
             rows,
             ..
         } => {

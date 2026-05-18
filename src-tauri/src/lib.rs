@@ -5112,8 +5112,9 @@ ARR: Annual recurring revenue.
         assert!(response.document_ast.blocks.iter().any(|block| {
             matches!(
                 block,
-                DocumentBlock::Table { line, end_line, headers, rows, .. }
+                DocumentBlock::Table { line, end_line, headers, alignments, rows, .. }
                     if headers == &vec!["Metric".to_string(), "Value".to_string()]
+                        && alignments == &vec!["left".to_string(), "right".to_string()]
                         && *end_line == *line + 2
                         && rows.iter().any(|row| row == &vec!["Total".to_string(), "3".to_string()])
             )
@@ -5844,6 +5845,7 @@ paths:
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading1""#));
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading2""#));
         assert!(docx_document.contains("<w:tbl>"));
+        assert!(docx_document.contains(r#"<w:jc w:val="right"/>"#));
         assert!(docx_document.contains(r#"<w:br w:type="page""#));
         assert!(docx_document.contains(r#"<w:cols w:num="2""#));
         assert!(docx_document.contains("System diagram"));

@@ -62,6 +62,7 @@ pub(crate) enum DocumentBlock {
         id: Option<String>,
         caption: Option<String>,
         headers: Vec<String>,
+        alignments: Vec<String>,
         rows: Vec<Vec<String>>,
         source: Option<AstSourceRange>,
     },
@@ -230,6 +231,7 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 id,
                 caption,
                 headers,
+                alignments: _,
                 rows,
                 ..
             } => {
@@ -450,6 +452,10 @@ fn parse_ast_table(
         .iter()
         .map(|cell| clean_inline_text(cell))
         .collect::<Vec<_>>();
+    let alignments = split_table_row(separator)
+        .iter()
+        .map(|cell| table_alignment(cell))
+        .collect::<Vec<_>>();
     let mut rows = Vec::new();
     let mut next_index = index + 2;
     while next_index < lines.len() && is_markdown_table_row(lines[next_index].trim()) {
@@ -468,6 +474,7 @@ fn parse_ast_table(
             id: caption.as_ref().and_then(|caption| caption.id.clone()),
             caption: caption.and_then(|caption| caption.caption),
             headers,
+            alignments,
             rows,
             source: None,
         },
@@ -794,6 +801,17 @@ fn split_table_row(line: &str) -> Vec<String> {
         .split('|')
         .map(|cell| cell.trim().to_string())
         .collect()
+}
+
+fn table_alignment(cell: &str) -> String {
+    let compact = cell.replace(' ', "");
+    if compact.starts_with(':') && compact.ends_with(':') {
+        "center".to_string()
+    } else if compact.ends_with(':') {
+        "right".to_string()
+    } else {
+        "left".to_string()
+    }
 }
 
 fn extract_label(text: &str) -> Option<String> {
