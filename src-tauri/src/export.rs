@@ -1740,8 +1740,18 @@ struct PptxSlide {
     title: String,
     lines: Vec<String>,
     footer: String,
+    tables: Vec<PptxTable>,
     media_refs: Vec<MediaRef>,
     notes: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct PptxTable {
+    id: Option<String>,
+    caption: Option<String>,
+    headers: Vec<String>,
+    alignments: Vec<String>,
+    rows: Vec<Vec<String>>,
 }
 
 #[derive(Clone, Debug)]
@@ -1756,6 +1766,7 @@ impl PptxSlide {
             title: title.into(),
             lines: Vec::new(),
             footer: String::new(),
+            tables: Vec::new(),
             media_refs: Vec::new(),
             notes: Vec::new(),
         }
@@ -1766,6 +1777,7 @@ impl PptxSlide {
             title: title.into(),
             lines,
             footer: String::new(),
+            tables: Vec::new(),
             media_refs: Vec::new(),
             notes: Vec::new(),
         }
@@ -1918,6 +1930,23 @@ fn include_pptx_agenda(response: &CompileResponse, options: &Value) -> bool {
 
 fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
     slide.lines.extend(block_export_lines(block));
+    if let DocumentBlock::Table {
+        id,
+        caption,
+        headers,
+        alignments,
+        rows,
+        ..
+    } = block
+    {
+        slide.tables.push(PptxTable {
+            id: id.clone(),
+            caption: caption.clone(),
+            headers: headers.clone(),
+            alignments: alignments.clone(),
+            rows: rows.clone(),
+        });
+    }
     if let DocumentBlock::Figure {
         src: Some(src),
         source,
@@ -2338,6 +2367,12 @@ fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
         .enumerate()
         .map(|(index, item)| render_pptx_picture(item, index))
         .collect::<String>();
+    let tables = slide
+        .tables
+        .iter()
+        .enumerate()
+        .map(|(index, table)| render_pptx_table(table, index, slide.lines.len()))
+        .collect::<String>();
     let footer = if slide.footer.trim().is_empty() {
         String::new()
     } else {
@@ -2347,7 +2382,61 @@ fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
         )
     };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{pictures}{footer}</p:spTree></p:cSld></p:sld>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{tables}{pictures}{footer}</p:spTree></p:cSld></p:sld>"#
+    )
+}
+
+fn render_pptx_table(table: &PptxTable, index: usize, body_line_count: usize) -> String {
+    let shape_id = 100 + index;
+    let column_count = table.headers.len().max(1);
+    let row_count = table.rows.len() + 1;
+    let width = 8_000_000i64;
+    let height = (row_count as i64 * 280_000).clamp(560_000, 2_900_000);
+    let column_width = width / column_count as i64;
+    let y = 1_400_000 + (body_line_count.min(8) as i64 * 155_000) + (index as i64 * 1_250_000);
+    let name = table
+        .caption
+        .as_deref()
+        .or(table.id.as_deref())
+        .unwrap_or("Table");
+    let grid = (0..column_count)
+        .map(|_| format!(r#"<a:gridCol w="{column_width}"/>"#))
+        .collect::<String>();
+    let header = render_pptx_table_row(&table.headers, &table.alignments, true);
+    let rows = table
+        .rows
+        .iter()
+        .map(|row| render_pptx_table_row(row, &table.alignments, false))
+        .collect::<String>();
+
+    format!(
+        r#"<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="{shape_id}" name="{}"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="571500" y="{y}"/><a:ext cx="{width}" cy="{height}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr firstRow="1" bandRow="1"><a:tableStyleId>{{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}}</a:tableStyleId></a:tblPr><a:tblGrid>{grid}</a:tblGrid>{header}{rows}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>"#,
+        escape_xml(name)
+    )
+}
+
+fn render_pptx_table_row(cells: &[String], alignments: &[String], header: bool) -> String {
+    let height = if header { 320_000 } else { 280_000 };
+    let cells = cells
+        .iter()
+        .enumerate()
+        .map(|(index, cell)| {
+            render_pptx_table_cell(cell, alignments.get(index).map(String::as_str), header)
+        })
+        .collect::<String>();
+    format!(r#"<a:tr h="{height}">{cells}</a:tr>"#)
+}
+
+fn render_pptx_table_cell(text: &str, alignment: Option<&str>, header: bool) -> String {
+    let alignment = match alignment {
+        Some("center") => "ctr",
+        Some("right") => "r",
+        _ => "l",
+    };
+    let bold_start = header.then_some("<a:rPr b=\"1\"/>").unwrap_or("");
+    format!(
+        r#"<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="{alignment}"/><a:r>{bold_start}<a:t>{}</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc>"#,
+        escape_xml(text)
     )
 }
 

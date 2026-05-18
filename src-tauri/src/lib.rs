@@ -6134,6 +6134,10 @@ paths:
         assert!(slide_two.contains("- [x] Confirm controls"));
         assert!(slide_two.contains("- [ ] Final approval"));
         assert!(slide_two.contains("Table: Metric | Value"));
+        assert!(slide_two.contains("<a:tbl>"));
+        assert!(slide_two.contains(r#"firstRow="1""#));
+        assert!(slide_two.contains(r#"<a:pPr algn="r"/>"#));
+        assert!(slide_two.contains("<a:t>Total</a:t>"));
         assert!(slide_two.contains("System diagram"));
         assert!(slide_two.contains(r#"name="Footer""#));
         assert!(slide_two.contains("Page 1 of 1"));
@@ -6357,6 +6361,8 @@ paths:
         assert!(pptx_slide_three.contains("Export Conformance Report"));
         assert!(pptx_slide_three.contains("Competitive Advantage, p. 42"));
         assert!(pptx_slide_three.contains("Table: Region | Revenue | Margin"));
+        assert!(pptx_slide_three.contains("<a:tbl>"));
+        assert!(pptx_slide_three.contains(r#"<a:pPr algn="r"/>"#));
         assert!(pptx_slide_three.contains("Reference architecture"));
         assert!(pptx_slide_three.contains(r#"name="Footer""#));
         assert!(pptx_slide_three.contains("Page 1 of 1"));
