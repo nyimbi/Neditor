@@ -251,6 +251,18 @@
             [@{{ citation.key }}<template v-if="citation.locator">, {{ citation.locator }}</template>]
             <small>{{ bibliographyByKey.get(citation.key) || "Missing bibliography entry" }}</small>
           </p>
+          <template v-if="resolvedCitationEntries.length">
+            <h3>Resolved references</h3>
+            <article v-for="entry in resolvedCitationEntries" :key="entry.key" class="snapshot-row">
+              <p>@{{ entry.key }}</p>
+              <small>{{ entry.title }}</small>
+              <small>{{ [entry.author, entry.issued].filter(Boolean).join(" | ") }}</small>
+            </article>
+          </template>
+          <template v-if="missingCitationKeys.length">
+            <h3>Missing keys</h3>
+            <p v-for="key in missingCitationKeys" :key="key" class="error">@{{ key }}</p>
+          </template>
           <template v-if="active.compile?.semantic.duplicate_bibliography_keys.length">
             <h3>Duplicate keys</h3>
             <p v-for="key in active.compile.semantic.duplicate_bibliography_keys" :key="key" class="error">{{ key }}</p>
@@ -763,6 +775,17 @@ const wordStats = computed(() => {
 });
 const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
 const bibliographyByKey = computed(() => new Map((active.value.compile?.bibliography || []).map((entry) => [entry.key, entry.title])));
+const missingCitationKeys = computed(() => {
+  const byKey = bibliographyByKey.value;
+  const keys = (active.value.compile?.semantic.citation_references || [])
+    .map((citation) => citation.key)
+    .filter((key) => !byKey.has(key));
+  return Array.from(new Set(keys)).sort();
+});
+const resolvedCitationEntries = computed(() => {
+  const citedKeys = new Set((active.value.compile?.semantic.citation_references || []).map((citation) => citation.key));
+  return (active.value.compile?.bibliography || []).filter((entry) => citedKeys.has(entry.key));
+});
 const citationStyle = computed(() =>
   String(active.value.compile?.metadata.citationStyle || active.value.compile?.metadata.cslStyle || store.bibliographyDefaults.citationStyle),
 );
