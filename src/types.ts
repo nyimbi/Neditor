@@ -97,6 +97,7 @@ export interface CompileResponse {
     value?: number | null;
     error?: string | null;
     dependencies: string[];
+    ast?: unknown;
   }>;
   transform_artifacts: Array<{
     id: string;

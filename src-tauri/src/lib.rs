@@ -3589,6 +3589,15 @@ ARR: Annual recurring revenue.
             .formula_graph
             .iter()
             .any(|formula| formula.name == "profit" && formula.value == Some(60.0)));
+        let profit_formula = response
+            .formula_graph
+            .iter()
+            .find(|formula| formula.name == "profit")
+            .expect("profit formula");
+        assert!(matches!(
+            profit_formula.ast.as_ref(),
+            Some(calculations::FormulaAstNode::Binary { op, .. }) if op == "-"
+        ));
         assert!(response
             .formula_graph
             .iter()

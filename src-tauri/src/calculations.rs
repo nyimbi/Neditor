@@ -10,6 +10,31 @@ pub(crate) struct FormulaValue {
     pub(crate) value: Option<f64>,
     pub(crate) error: Option<String>,
     pub(crate) dependencies: Vec<String>,
+    pub(crate) ast: Option<FormulaAstNode>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum FormulaAstNode {
+    Number {
+        value: f64,
+    },
+    Name {
+        name: String,
+    },
+    Unary {
+        op: String,
+        expr: Box<FormulaAstNode>,
+    },
+    Binary {
+        op: String,
+        left: Box<FormulaAstNode>,
+        right: Box<FormulaAstNode>,
+    },
+    Function {
+        name: String,
+        args: Vec<FormulaAstNode>,
+    },
 }
 
 pub(crate) fn collect_calculations(
@@ -58,6 +83,7 @@ pub(crate) fn collect_calculations(
                 value: Some(value),
                 error: None,
                 dependencies: definition.dependencies.clone(),
+                ast: parse_formula_ast(&definition.expression).ok(),
             }),
             Err(error) => {
                 diagnostics.push(diag(
@@ -73,6 +99,7 @@ pub(crate) fn collect_calculations(
                     value: None,
                     error: Some(error),
                     dependencies: definition.dependencies.clone(),
+                    ast: parse_formula_ast(&definition.expression).ok(),
                 });
             }
         }
@@ -160,6 +187,16 @@ pub(crate) fn eval_expression(
     Ok(value)
 }
 
+pub(crate) fn parse_formula_ast(expression: &str) -> Result<FormulaAstNode, String> {
+    let tokens = tokenize_expression(expression)?;
+    let mut parser = FormulaAstParser { tokens, index: 0 };
+    let ast = parser.parse_expression()?;
+    if parser.index != parser.tokens.len() {
+        return Err("unexpected trailing input".to_string());
+    }
+    Ok(ast)
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum FormulaToken {
     Number(f64),
@@ -178,6 +215,131 @@ enum FormulaToken {
     LParen,
     RParen,
     Comma,
+}
+
+struct FormulaAstParser {
+    tokens: Vec<FormulaToken>,
+    index: usize,
+}
+
+impl FormulaAstParser {
+    fn parse_expression(&mut self) -> Result<FormulaAstNode, String> {
+        self.parse_comparison()
+    }
+
+    fn parse_comparison(&mut self) -> Result<FormulaAstNode, String> {
+        let mut node = self.parse_additive()?;
+        loop {
+            let Some(token) = self.peek().cloned() else {
+                return Ok(node);
+            };
+            let op = match token {
+                FormulaToken::Greater => ">",
+                FormulaToken::GreaterEqual => ">=",
+                FormulaToken::Less => "<",
+                FormulaToken::LessEqual => "<=",
+                FormulaToken::Equal => "=",
+                FormulaToken::NotEqual => "!=",
+                _ => return Ok(node),
+            };
+            self.index += 1;
+            let right = self.parse_additive()?;
+            node = FormulaAstNode::Binary {
+                op: op.to_string(),
+                left: Box::new(node),
+                right: Box::new(right),
+            };
+        }
+    }
+
+    fn parse_additive(&mut self) -> Result<FormulaAstNode, String> {
+        let mut node = self.parse_term()?;
+        loop {
+            let op = match self.peek() {
+                Some(FormulaToken::Plus) => "+",
+                Some(FormulaToken::Minus) => "-",
+                _ => return Ok(node),
+            };
+            self.index += 1;
+            let right = self.parse_term()?;
+            node = FormulaAstNode::Binary {
+                op: op.to_string(),
+                left: Box::new(node),
+                right: Box::new(right),
+            };
+        }
+    }
+
+    fn parse_term(&mut self) -> Result<FormulaAstNode, String> {
+        let mut node = self.parse_factor()?;
+        loop {
+            let op = match self.peek() {
+                Some(FormulaToken::Star) => "*",
+                Some(FormulaToken::Slash) => "/",
+                _ => return Ok(node),
+            };
+            self.index += 1;
+            let right = self.parse_factor()?;
+            node = FormulaAstNode::Binary {
+                op: op.to_string(),
+                left: Box::new(node),
+                right: Box::new(right),
+            };
+        }
+    }
+
+    fn parse_factor(&mut self) -> Result<FormulaAstNode, String> {
+        match self.next() {
+            Some(FormulaToken::Number(value)) => Ok(FormulaAstNode::Number { value }),
+            Some(FormulaToken::Minus) => Ok(FormulaAstNode::Unary {
+                op: "-".to_string(),
+                expr: Box::new(self.parse_factor()?),
+            }),
+            Some(FormulaToken::LParen) => {
+                let node = self.parse_expression()?;
+                self.expect(FormulaToken::RParen)?;
+                Ok(node)
+            }
+            Some(FormulaToken::Name(name)) => {
+                if matches!(self.peek(), Some(FormulaToken::LParen)) {
+                    self.index += 1;
+                    let mut args = Vec::new();
+                    if !matches!(self.peek(), Some(FormulaToken::RParen)) {
+                        loop {
+                            args.push(self.parse_expression()?);
+                            if matches!(self.peek(), Some(FormulaToken::Comma)) {
+                                self.index += 1;
+                                continue;
+                            }
+                            break;
+                        }
+                    }
+                    self.expect(FormulaToken::RParen)?;
+                    Ok(FormulaAstNode::Function { name, args })
+                } else {
+                    Ok(FormulaAstNode::Name { name })
+                }
+            }
+            other => Err(format!("unexpected token {other:?}")),
+        }
+    }
+
+    fn expect(&mut self, token: FormulaToken) -> Result<(), String> {
+        match self.next() {
+            Some(found) if found == token => Ok(()),
+            other => Err(format!("expected {token:?}, found {other:?}")),
+        }
+    }
+
+    fn peek(&self) -> Option<&FormulaToken> {
+        self.tokens.get(self.index)
+    }
+
+    fn next(&mut self) -> Option<FormulaToken> {
+        let token = self.tokens.get(self.index).cloned();
+        self.index += usize::from(token.is_some());
+        token
+    }
 }
 
 struct FormulaParser<'a> {
