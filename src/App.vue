@@ -772,6 +772,7 @@ const commands = computed(() => [
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
   { name: "Paste from AI chat", group: "AI", run: () => (aiPasteOpen.value = true) },
+  { name: "Run transforms", group: "Transforms", run: () => void store.compileActive() },
   { name: "Find and replace", group: "Edit", run: () => runEditorCommand(openSearchPanel) },
   { name: "Find next", group: "Edit", run: () => runEditorCommand(findNext) },
   { name: "Find previous", group: "Edit", run: () => runEditorCommand(findPrevious) },
