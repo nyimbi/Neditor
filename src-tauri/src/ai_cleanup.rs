@@ -65,16 +65,22 @@ pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
 
 fn normalize_markdown_lists(text: &str, issues: &mut Vec<String>) -> String {
     let mut changed = false;
+    let mut in_code_fence = false;
     let output = text
         .lines()
         .map(|line| {
             let trimmed = line.trim_start();
-            if let Some(rest) = trimmed.strip_prefix("• ") {
-                changed = true;
-                format!("{}- {}", &line[..line.len() - trimmed.len()], rest)
-            } else {
-                line.to_string()
+            if trimmed.starts_with("```") {
+                in_code_fence = !in_code_fence;
+                return line.to_string();
             }
+            if !in_code_fence {
+                if let Some(rest) = trimmed.strip_prefix("• ") {
+                    changed = true;
+                    return format!("{}- {}", &line[..line.len() - trimmed.len()], rest);
+                }
+            }
+            line.to_string()
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -89,9 +95,14 @@ fn normalize_markdown_tables(text: &str, issues: &mut Vec<String>) -> String {
     let mut output = Vec::new();
     let mut index = 0;
     let mut changed = false;
+    let mut in_code_fence = false;
     while index < lines.len() {
         let line = lines[index];
-        if line.contains('\t') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") {
+            in_code_fence = !in_code_fence;
+            output.push(line.to_string());
+        } else if !in_code_fence && line.contains('\t') {
             let cells = line.split('\t').map(str::trim).collect::<Vec<_>>();
             output.push(format!("| {} |", cells.join(" | ")));
             if index + 1 < lines.len() && lines[index + 1].contains('\t') {

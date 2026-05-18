@@ -5981,4 +5981,23 @@ paths:
         assert!(!response.cleaned_markdown.contains("TODO: citation needed"));
         assert!(response.provenance_block.is_none());
     }
+
+    #[test]
+    fn ai_cleanup_preserves_code_fence_content() {
+        let response = cleanup_ai_paste(AiCleanupRequest {
+            text: "Assistant:\n```text\n• literal bullet\nA\tB\nRevenue grew 24%.\n```\n\n• Real bullet\nA\tB\nRevenue grew 24%.".to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+            insert_citation_todos: true,
+        });
+
+        assert!(response
+            .cleaned_markdown
+            .contains("```text\n• literal bullet\nA\tB\nRevenue grew 24%.\n```"));
+        assert!(response.cleaned_markdown.contains("- Real bullet"));
+        assert!(response.cleaned_markdown.contains("| A | B |"));
+        assert!(response
+            .cleaned_markdown
+            .contains("Revenue grew 24%. <!-- TODO: citation needed -->"));
+    }
 }
