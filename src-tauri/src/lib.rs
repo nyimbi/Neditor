@@ -694,6 +694,18 @@ fn validate_export_settings(
             Some("Use a boolean includeManifest export option."),
         ));
     }
+    if options
+        .get("includeGlossary")
+        .is_some_and(|value| !value.is_boolean())
+    {
+        diagnostics.push(diag(
+            "error",
+            "includeGlossary must be true or false.",
+            None,
+            None,
+            Some("Use a boolean includeGlossary export option."),
+        ));
+    }
 }
 
 #[tauri::command]
@@ -4090,7 +4102,7 @@ paths:
             text: include_str!("../fixtures/export/business_report.md").to_string(),
             file_path: None,
         });
-        let options = json!({ "watermark": "APPROVED" });
+        let options = json!({ "watermark": "APPROVED", "includeGlossary": true });
 
         assert_eq!(response.semantic.title, "Export Conformance Report");
         assert_eq!(response.semantic.status, "approved");
@@ -4120,13 +4132,16 @@ paths:
         assert!(html.contains("APPROVED"));
         assert!(html.contains("Reference architecture"));
         assert!(html.contains("Competitive Advantage"));
+        assert!(html.contains("class=\"export-glossary\""));
+        assert!(html.contains("<dt>ARR</dt>"));
 
         let pdf = render_pdf_bytes(&response, &options);
         let pdf_text = String::from_utf8_lossy(&pdf);
         assert!(pdf.starts_with(b"%PDF-1.4"));
-        assert!(pdf_text.contains("/Count 3"));
+        assert!(pdf_text.contains("/Count 4"));
         assert!(pdf_text.contains("Export Conformance Report"));
         assert!(pdf_text.contains("Reference architecture"));
+        assert!(pdf_text.contains("Glossary"));
 
         let docx = render_docx_bytes(&response, &options).expect("docx bytes");
         let docx_document = zip_entry_text(&docx, "word/document.xml");
@@ -4135,6 +4150,7 @@ paths:
         assert!(docx_document.contains(r#"<w:br w:type="page""#));
         assert!(docx_document.contains("Reference architecture"));
         assert!(docx_document.contains("Competitive Advantage"));
+        assert!(docx_document.contains("Annual recurring revenue"));
 
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
         let pptx_presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
@@ -4144,6 +4160,15 @@ paths:
         assert!(pptx_slide_two.contains("Export Conformance Report"));
         assert!(pptx_slide_three.contains("Table: Region | Revenue | Margin"));
         assert!(pptx_slide_three.contains("Reference architecture"));
+        let pptx_glossary_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
+            .into_iter()
+            .find(|slide| slide.contains("Glossary"))
+            .expect("glossary slide");
+        assert!(pptx_glossary_slide.contains("Annual recurring revenue"));
+
+        let exported_text = export::export_text(&response, &options);
+        assert!(exported_text.contains("Glossary"));
+        assert!(exported_text.contains("ARR: Annual recurring revenue"));
 
         let bundle =
             render_markdown_bundle_bytes(&response, &response.export_manifest).expect("bundle");
@@ -4162,6 +4187,22 @@ paths:
         let mut text = String::new();
         entry.read_to_string(&mut text).expect("zip text");
         text
+    }
+
+    fn zip_entry_texts_with_prefix(bytes: &[u8], prefix: &str) -> Vec<String> {
+        let cursor = Cursor::new(bytes.to_vec());
+        let mut archive = ZipArchive::new(cursor).expect("zip archive");
+        let mut entries = Vec::new();
+        for index in 0..archive.len() {
+            let mut entry = archive.by_index(index).expect("zip entry by index");
+            if !entry.name().starts_with(prefix) || !entry.name().ends_with(".xml") {
+                continue;
+            }
+            let mut text = String::new();
+            entry.read_to_string(&mut text).expect("zip text");
+            entries.push(text);
+        }
+        entries
     }
 
     #[test]
@@ -4184,11 +4225,11 @@ paths:
             text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),
             file_path: None,
             target: "rtf".to_string(),
-            options: json!({ "watermark": 42, "includeManifest": "yes" }),
+            options: json!({ "watermark": 42, "includeManifest": "yes", "includeGlossary": "yes" }),
         });
 
         assert!(!report.ready);
-        assert_eq!(report.error_count, 3);
+        assert_eq!(report.error_count, 4);
         assert_eq!(report.manifest.export_target, "rtf");
         assert!(report
             .diagnostics
@@ -4201,6 +4242,9 @@ paths:
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("includeManifest must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("includeGlossary must be true or false")));
     }
 
     #[test]
