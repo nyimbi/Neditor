@@ -16,6 +16,7 @@
           <header class="tab-group-header" :title="group.title">
             <span>{{ group.label }}</span>
             <small>{{ group.documents.length }}</small>
+            <button type="button" aria-label="Close tab group" @click="closeTabGroup(group)">x</button>
           </header>
           <div
             v-for="document in group.documents"
@@ -1285,6 +1286,12 @@ function activate(id: string) {
   store.activeId = id;
 }
 
+function closeTabGroup(group: DocumentTabGroup) {
+  for (const document of [...group.documents]) {
+    store.closeDocument(document.id);
+  }
+}
+
 function tabGroupDescriptor(document: OpenDocument): Omit<DocumentTabGroup, "documents"> {
   if (document.pinned) {
     return {
@@ -2346,6 +2353,19 @@ select:hover {
 .tab-group-header small {
   color: #7b8794;
   font-size: 10px;
+}
+
+.tab-group-header button {
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  padding: 0;
+  border: 1px solid #c5cfdb;
+  border-radius: 4px;
+  background: #fff;
+  color: #526171;
+  font-size: 11px;
+  line-height: 1;
 }
 
 .tab {
