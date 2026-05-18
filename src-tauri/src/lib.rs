@@ -5725,6 +5725,76 @@ paths:
         fs::remove_dir_all(root).expect("clean media export fixture");
     }
 
+    #[test]
+    fn export_keeps_duplicate_relative_media_from_includes_distinct() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-include-media-export-{unique}"));
+        let chapter_a = root.join("a");
+        let chapter_b = root.join("b");
+        fs::create_dir_all(chapter_a.join("assets")).expect("create chapter a assets");
+        fs::create_dir_all(chapter_b.join("assets")).expect("create chapter b assets");
+        fs::write(
+            chapter_a.join("assets").join("diagram.svg"),
+            "<svg><text>A</text></svg>",
+        )
+        .expect("write a svg");
+        fs::write(
+            chapter_b.join("assets").join("diagram.svg"),
+            "<svg><text>B</text></svg>",
+        )
+        .expect("write b svg");
+        fs::write(
+            chapter_a.join("section.md"),
+            "## A\n![Diagram](assets/diagram.svg){#fig:a caption=\"A diagram\"}\n",
+        )
+        .expect("write a section");
+        fs::write(
+            chapter_b.join("section.md"),
+            "## B\n![Diagram](assets/diagram.svg){#fig:b caption=\"B diagram\"}\n",
+        )
+        .expect("write b section");
+        let doc = root.join("root.md");
+        fs::write(
+            &doc,
+            "---\ntitle: Include Media\nstatus: approved\napprovedBy: QA\n---\n# Include Media\n!include a/section.md\n!include b/section.md\n",
+        )
+        .expect("write root document");
+
+        let response = compile(CompileRequest {
+            text: fs::read_to_string(&doc).expect("read root document"),
+            file_path: Some(path_to_string(&doc)),
+        });
+        assert_eq!(response.semantic.figures, 2);
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == "error"));
+
+        let options = json!({});
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        assert!(zip_entry_text(&docx, "word/media/image1.svg").contains("<text>A</text>"));
+        assert!(zip_entry_text(&docx, "word/media/image2.svg").contains("<text>B</text>"));
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains(r#"r:embed="rIdImage1""#));
+        assert!(docx_document.contains(r#"r:embed="rIdImage2""#));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        assert!(zip_entry_text(&pptx, "ppt/media/image1.svg").contains("<text>A</text>"));
+        assert!(zip_entry_text(&pptx, "ppt/media/image2.svg").contains("<text>B</text>"));
+        let slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/");
+        assert!(slides
+            .iter()
+            .any(|slide| slide.contains(r#"r:embed="rIdImage1""#)));
+        assert!(slides
+            .iter()
+            .any(|slide| slide.contains(r#"r:embed="rIdImage2""#)));
+
+        fs::remove_dir_all(root).expect("clean include media export fixture");
+    }
+
     fn zip_entry_text(bytes: &[u8], path: &str) -> String {
         let cursor = Cursor::new(bytes.to_vec());
         let mut archive = ZipArchive::new(cursor).expect("zip archive");

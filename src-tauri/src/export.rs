@@ -15,6 +15,7 @@ use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 #[derive(Debug)]
 struct ExportMedia {
     source: String,
+    source_file: Option<String>,
     relationship_id: String,
     path: String,
     extension: String,
@@ -706,8 +707,9 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
             src,
             alt,
             caption,
+            source,
             ..
-        } => docx_figure(id, src, alt, caption, media),
+        } => docx_figure(id, src, alt, caption, source.as_ref(), media),
         DocumentBlock::Equation {
             id, caption, text, ..
         } => docx_paragraph(&equation_export_line(id, text, caption)),
@@ -782,17 +784,17 @@ fn docx_figure(
     src: &Option<String>,
     alt: &Option<String>,
     caption: &Option<String>,
+    source: Option<&AstSourceRange>,
     media: &[ExportMedia],
 ) -> String {
     let caption_text = figure_export_line(id, src, alt, caption);
     let Some(src) = src else {
         return docx_paragraph(&caption_text);
     };
-    let Some((media_index, item)) = media
-        .iter()
-        .enumerate()
-        .find(|(_, item)| item.source == *src)
-    else {
+    let Some((media_index, item)) = media.iter().enumerate().find(|(_, item)| {
+        item.source == *src
+            && item.source_file.as_deref() == source.map(|range| range.source_file.as_str())
+    }) else {
         return docx_paragraph(&caption_text);
     };
     let doc_pr_id = media_index + 1;
@@ -821,7 +823,11 @@ fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
         else {
             continue;
         };
-        if media.iter().any(|item: &ExportMedia| item.source == *src) {
+        let source_file = source.as_ref().map(|range| range.source_file.clone());
+        if media
+            .iter()
+            .any(|item: &ExportMedia| item.source == *src && item.source_file == source_file)
+        {
             continue;
         }
         let Some((extension, content_type, bytes)) = parse_export_image(src, source.as_ref())
@@ -831,6 +837,7 @@ fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
         let index = media.len() + 1;
         media.push(ExportMedia {
             source: src.clone(),
+            source_file,
             relationship_id: format!("rIdImage{index}"),
             path: format!("media/image{index}.{extension}"),
             extension,
@@ -985,16 +992,41 @@ fn appendix_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String
 struct PptxSlide {
     title: String,
     lines: Vec<String>,
+    media_refs: Vec<MediaRef>,
+}
+
+#[derive(Clone, Debug)]
+struct MediaRef {
+    source: String,
+    source_file: Option<String>,
+}
+
+impl PptxSlide {
+    fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            lines: Vec::new(),
+            media_refs: Vec::new(),
+        }
+    }
+
+    fn with_lines(title: impl Into<String>, lines: Vec<String>) -> Self {
+        Self {
+            title: title.into(),
+            lines,
+            media_refs: Vec::new(),
+        }
+    }
 }
 
 fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSlide> {
-    let mut slides = vec![PptxSlide {
-        title: response.semantic.title.clone(),
-        lines: export_metadata_lines(response, options)
+    let mut slides = vec![PptxSlide::with_lines(
+        response.semantic.title.clone(),
+        export_metadata_lines(response, options)
             .into_iter()
             .filter(|line| !line.starts_with("Cover: "))
             .collect(),
-    }];
+    )];
     let include_agenda = include_pptx_agenda(response, options);
     if include_agenda {
         let lines = response
@@ -1011,10 +1043,7 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
             })
             .collect::<Vec<_>>();
         if !lines.is_empty() {
-            slides.push(PptxSlide {
-                title: "Agenda".to_string(),
-                lines,
-            });
+            slides.push(PptxSlide::with_lines("Agenda", lines));
         }
     }
     let mut current: Option<PptxSlide> = None;
@@ -1038,19 +1067,13 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                         slides.push(slide);
                     }
                 }
-                current = Some(PptxSlide {
-                    title: text.clone(),
-                    lines: Vec::new(),
-                });
+                current = Some(PptxSlide::new(text.clone()));
             }
             DocumentBlock::Layout { directive, .. } if directive == "page-break" => {
                 if let Some(slide) = current.take() {
                     slides.push(slide);
                 }
-                current = Some(PptxSlide {
-                    title: "Continued".to_string(),
-                    lines: Vec::new(),
-                });
+                current = Some(PptxSlide::new("Continued"));
             }
             DocumentBlock::Layout {
                 directive, options, ..
@@ -1060,20 +1083,17 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                         slides.push(slide);
                     }
                 }
-                current = Some(PptxSlide {
-                    title: "Section".to_string(),
-                    lines: layout_export_lines(directive, options),
-                });
+                current = Some(PptxSlide::with_lines(
+                    "Section",
+                    layout_export_lines(directive, options),
+                ));
             }
             _ => {
                 if current.is_none() {
-                    current = Some(PptxSlide {
-                        title: "Document".to_string(),
-                        lines: Vec::new(),
-                    });
+                    current = Some(PptxSlide::new("Document"));
                 }
                 if let Some(slide) = current.as_mut() {
-                    slide.lines.extend(block_export_lines(block));
+                    add_block_to_pptx_slide(slide, block);
                 }
             }
         }
@@ -1095,9 +1115,9 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
             })
             .cloned()
             .unwrap_or_else(|| "Appendix".to_string());
-        slides.push(PptxSlide {
+        slides.push(PptxSlide::with_lines(
             title,
-            lines: appendix
+            appendix
                 .into_iter()
                 .filter(|line| !line.is_empty())
                 .filter(|line| {
@@ -1107,7 +1127,7 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                     )
                 })
                 .collect(),
-        });
+        ));
     }
     slides
         .into_iter()
@@ -1127,6 +1147,21 @@ fn include_pptx_agenda(response: &CompileResponse, options: &Value) -> bool {
         .and_then(Value::as_bool)
         .or_else(|| response.metadata.get("toc").and_then(Value::as_bool))
         .unwrap_or(false)
+}
+
+fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
+    slide.lines.extend(block_export_lines(block));
+    if let DocumentBlock::Figure {
+        src: Some(src),
+        source,
+        ..
+    } = block
+    {
+        slide.media_refs.push(MediaRef {
+            source: src.clone(),
+            source_file: source.as_ref().map(|range| range.source_file.clone()),
+        });
+    }
 }
 
 fn is_generated_toc_heading(block: &DocumentBlock) -> bool {
@@ -1379,7 +1414,11 @@ fn render_pptx_picture(item: &ExportMedia, index: usize) -> String {
 fn pptx_slide_media<'a>(slide: &PptxSlide, media: &'a [ExportMedia]) -> Vec<&'a ExportMedia> {
     media
         .iter()
-        .filter(|item| slide.lines.iter().any(|line| line.contains(&item.source)))
+        .filter(|item| {
+            slide.media_refs.iter().any(|media_ref| {
+                media_ref.source == item.source && media_ref.source_file == item.source_file
+            })
+        })
         .collect()
 }
 
