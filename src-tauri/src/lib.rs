@@ -5031,6 +5031,41 @@ paths:
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn external_transform_exit_errors_include_stderr() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let script = std::env::temp_dir().join(format!("neditor-stderr-exit-{unique}.sh"));
+        fs::write(&script, "#!/bin/sh\necho engine exploded >&2\nexit 7\n")
+            .expect("write stderr script");
+        let mut permissions = fs::metadata(&script)
+            .expect("script metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&script, permissions).expect("make script executable");
+
+        let error = run_external_transform(ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "digraph {}".to_string(),
+            engine_path: Some(path_to_string(&script)),
+            trusted: true,
+            input_mode: Some("file".to_string()),
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        })
+        .unwrap_err();
+
+        let _ = fs::remove_file(script);
+        assert!(error.contains("status 7"));
+        assert!(error.contains("engine exploded"));
+    }
+
     #[test]
     fn include_expansion_strips_child_front_matter() {
         let unique = SystemTime::now()

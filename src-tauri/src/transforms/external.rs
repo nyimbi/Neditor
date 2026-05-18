@@ -233,12 +233,17 @@ fn execute_external_transform(
     }
 
     if !status.success() {
+        let status_label = status
+            .code()
+            .map(|code| code.to_string())
+            .unwrap_or_else(|| "signal".to_string());
+        let stderr_detail = if stderr.is_empty() {
+            String::new()
+        } else {
+            format!(": {stderr}")
+        };
         return Err(format!(
-            "{name} external transform exited with status {}.",
-            status
-                .code()
-                .map(|code| code.to_string())
-                .unwrap_or_else(|| "signal".to_string())
+            "{name} external transform exited with status {status_label}{stderr_detail}."
         ));
     }
 
