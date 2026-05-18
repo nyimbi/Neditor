@@ -226,6 +226,9 @@ fn validate_export_settings(
     }
     for option in [
         "includeManifest",
+        "includeStyles",
+        "coverPage",
+        "pageNumbers",
         "includeGlossary",
         "includeComments",
         "includeProvenance",

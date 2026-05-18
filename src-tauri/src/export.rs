@@ -50,8 +50,9 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
     let logo = export_logo(&response.metadata);
     let header_template = metadata_string(&response.metadata, "layout.header")
         .or_else(|| Some(response.semantic.title.clone()));
-    let footer_template = metadata_string(&response.metadata, "layout.footer")
-        .or_else(|| Some("Page {{page}} of {{pages}}".to_string()));
+    let footer_template = metadata_string(&response.metadata, "layout.footer").or_else(|| {
+        include_page_numbers(options).then(|| "Page {{page}} of {{pages}}".to_string())
+    });
     let running_header = render_export_template(
         header_template.as_deref().unwrap_or(""),
         response,
@@ -68,25 +69,45 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
         .map(|value| format!("<p>{}</p>", escape_html(&value)))
         .collect::<String>();
     let appendix_sections = html_appendix_sections(response, options);
+    let style_tag = if include_styles(options) {
+        format!(
+            "<style>{}</style>",
+            export_css(
+                brand_color,
+                watermark,
+                &brand_font,
+                include_page_numbers(options)
+            )
+        )
+    } else {
+        String::new()
+    };
+    let cover_section = if include_cover_page(options) {
+        format!(
+            "<section class=\"cover\">{}<h1>{}</h1>{}<p class=\"status\">{}</p>{}</section>",
+            logo.as_ref()
+                .map(|src| format!(
+                    "<img class=\"cover-logo\" src=\"{}\" alt=\"{} logo\"/>",
+                    escape_html(src),
+                    escape_html(&response.semantic.title)
+                ))
+                .unwrap_or_default(),
+            escape_html(&response.semantic.title),
+            subtitle
+                .map(|value| format!("<p class=\"subtitle\">{}</p>", escape_html(&value)))
+                .unwrap_or_default(),
+            escape_html(&response.semantic.status),
+            cover_meta
+        )
+    } else {
+        String::new()
+    };
     format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title><style>{}</style></head><body><div class=\"running-header\">{}</div><section class=\"cover\">{}<h1>{}</h1>{}<p class=\"status\">{}</p>{}</section><main>{}{}</main><footer><strong>{}</strong><span>{}</span><small>{}</small></footer></body></html>",
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title>{}</head><body><div class=\"running-header\">{}</div>{}<main>{}{}</main><footer><strong>{}</strong><span>{}</span><small>{}</small></footer></body></html>",
         escape_html(&response.semantic.title),
-        export_css(brand_color, watermark, &brand_font),
+        style_tag,
         escape_html(&running_header),
-        logo
-            .as_ref()
-            .map(|src| format!(
-                "<img class=\"cover-logo\" src=\"{}\" alt=\"{} logo\"/>",
-                escape_html(src),
-                escape_html(&response.semantic.title)
-            ))
-            .unwrap_or_default(),
-        escape_html(&response.semantic.title),
-        subtitle
-            .map(|value| format!("<p class=\"subtitle\">{}</p>", escape_html(&value)))
-            .unwrap_or_default(),
-        escape_html(&response.semantic.status),
-        cover_meta,
+        cover_section,
         response.html,
         appendix_sections,
         escape_html(&running_footer),
@@ -469,13 +490,18 @@ fn export_metadata_lines(response: &CompileResponse, options: &Value) -> Vec<Str
         .get("watermark")
         .and_then(Value::as_str)
         .unwrap_or("");
-    let mut lines = vec![
-        format!("Cover: {}", response.semantic.title),
-        format!("Status: {}", response.semantic.status),
-        format!("Header: {header}"),
-        format!("Footer: {footer}"),
-        "Page 1 of 1".to_string(),
-    ];
+    let mut lines = Vec::new();
+    if include_cover_page(options) {
+        lines.push(format!("Cover: {}", response.semantic.title));
+    }
+    lines.push(format!("Status: {}", response.semantic.status));
+    lines.push(format!("Header: {header}"));
+    if !footer.is_empty() {
+        lines.push(format!("Footer: {footer}"));
+    }
+    if include_page_numbers(options) {
+        lines.push("Page 1 of 1".to_string());
+    }
     for path in ["subtitle", "author", "date", "version", "brand.name"] {
         if let Some(value) = metadata_string(&response.metadata, path) {
             lines.push(value);
@@ -497,15 +523,40 @@ fn export_logo(metadata: &Value) -> Option<String> {
         .filter(|value| !value.trim().is_empty())
 }
 
-fn export_header_footer(response: &CompileResponse, _options: &Value) -> (String, String) {
+fn export_header_footer(response: &CompileResponse, options: &Value) -> (String, String) {
     let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
     let header = metadata_string(&response.metadata, "layout.header")
         .map(|template| render_export_template(&template, response, &classification))
         .unwrap_or_else(|| response.semantic.title.clone());
     let footer = metadata_string(&response.metadata, "layout.footer")
         .map(|template| render_export_template(&template, response, &classification))
-        .unwrap_or_else(|| "Page 1 of 1".to_string());
+        .unwrap_or_else(|| {
+            if include_page_numbers(options) {
+                "Page 1 of 1".to_string()
+            } else {
+                String::new()
+            }
+        });
     (header, footer)
+}
+
+fn boolean_option(options: &Value, name: &str, aliases: &[&str], default: bool) -> bool {
+    std::iter::once(name)
+        .chain(aliases.iter().copied())
+        .find_map(|key| options.get(key).and_then(Value::as_bool))
+        .unwrap_or(default)
+}
+
+fn include_styles(options: &Value) -> bool {
+    boolean_option(options, "includeStyles", &[], true)
+}
+
+fn include_cover_page(options: &Value) -> bool {
+    boolean_option(options, "coverPage", &["includeCoverPage"], true)
+}
+
+fn include_page_numbers(options: &Value) -> bool {
+    boolean_option(options, "pageNumbers", &["includePageNumbers"], true)
 }
 
 fn include_glossary(options: &Value) -> bool {
@@ -1776,9 +1827,14 @@ fn pptx_slide_media<'a>(slide: &PptxSlide, media: &'a [ExportMedia]) -> Vec<&'a 
         .collect()
 }
 
-fn export_css(brand_color: &str, watermark: &str, brand_font: &str) -> String {
+fn export_css(brand_color: &str, watermark: &str, brand_font: &str, page_numbers: bool) -> String {
+    let page_counter_rule = if page_numbers {
+        "@bottom-center{content:'Page ' counter(page) ' of ' counter(pages)}"
+    } else {
+        ""
+    };
     format!(
-        "body{{font-family:{};margin:48px;color:#1f2937;line-height:1.55}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:85vh;display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:44px;margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:24mm;@top-center{{content:element(header)}}@bottom-center{{content:'Page ' counter(page) ' of ' counter(pages)}}}}",
+        "body{{font-family:{};margin:48px;color:#1f2937;line-height:1.55}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:85vh;display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:44px;margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:24mm;@top-center{{content:element(header)}}{page_counter_rule}}}",
         escape_css(brand_font),
         escape_css(watermark)
     )

@@ -27,6 +27,9 @@ type SnapshotStorage = "app-data" | "project-local";
 
 interface ExportDefaults {
   includeManifest: boolean;
+  includeStyles: boolean;
+  coverPage: boolean;
+  pageNumbers: boolean;
   includeComments: boolean;
   includeProvenance: boolean;
   includeGlossary: boolean;
@@ -68,7 +71,10 @@ interface PersistedWorkspace {
   editorLineHeight?: number;
   previewLineHeight?: number;
   exportTarget?: "html" | "pdf" | "docx" | "pptx" | "markdown-bundle";
-  exportDefaults?: Partial<ExportDefaults>;
+  exportDefaults?: Partial<ExportDefaults> & {
+    includeCoverPage?: boolean;
+    includePageNumbers?: boolean;
+  };
   bibliographyDefaults?: Partial<BibliographyDefaults>;
   brandProfileDefaults?: Partial<BrandProfileDefaults>;
   gitIntegration?: Partial<GitIntegrationPreferences>;
@@ -307,9 +313,27 @@ function clampSnapshotInterval(value: number) {
   return Math.min(Math.max(Number(value) || 300000, 30000), 3600000);
 }
 
-function normalizeExportDefaults(defaults: Partial<ExportDefaults>): ExportDefaults {
+function normalizeExportDefaults(
+  defaults: Partial<ExportDefaults> & {
+    includeCoverPage?: boolean;
+    includePageNumbers?: boolean;
+  },
+): ExportDefaults {
   return {
     includeManifest: typeof defaults.includeManifest === "boolean" ? defaults.includeManifest : true,
+    includeStyles: typeof defaults.includeStyles === "boolean" ? defaults.includeStyles : true,
+    coverPage:
+      typeof defaults.coverPage === "boolean"
+        ? defaults.coverPage
+        : typeof defaults.includeCoverPage === "boolean"
+          ? defaults.includeCoverPage
+          : true,
+    pageNumbers:
+      typeof defaults.pageNumbers === "boolean"
+        ? defaults.pageNumbers
+        : typeof defaults.includePageNumbers === "boolean"
+          ? defaults.includePageNumbers
+          : true,
     includeComments: typeof defaults.includeComments === "boolean" ? defaults.includeComments : true,
     includeProvenance: typeof defaults.includeProvenance === "boolean" ? defaults.includeProvenance : true,
     includeGlossary: typeof defaults.includeGlossary === "boolean" ? defaults.includeGlossary : true,
@@ -395,6 +419,9 @@ export const useDocumentsStore = defineStore("documents", {
     exportTarget: "html" as "html" | "pdf" | "docx" | "pptx" | "markdown-bundle",
     exportDefaults: {
       includeManifest: true,
+      includeStyles: true,
+      coverPage: true,
+      pageNumbers: true,
       includeComments: true,
       includeProvenance: true,
       includeGlossary: true,
@@ -993,6 +1020,9 @@ export const useDocumentsStore = defineStore("documents", {
       const defaults = normalizeExportDefaults(this.exportDefaults);
       return {
         includeManifest: defaults.includeManifest,
+        includeStyles: defaults.includeStyles,
+        coverPage: defaults.coverPage,
+        pageNumbers: defaults.pageNumbers,
         includeComments: defaults.includeComments,
         includeProvenance: defaults.includeProvenance,
         includeGlossary: defaults.includeGlossary,

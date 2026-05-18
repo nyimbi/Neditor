@@ -306,6 +306,9 @@
             </select>
           </label>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
+          <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Include styles</label>
+          <label><input v-model="store.exportDefaults.coverPage" type="checkbox" /> Cover page</label>
+          <label><input v-model="store.exportDefaults.pageNumbers" type="checkbox" /> Page numbers</label>
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Include comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
@@ -467,6 +470,9 @@
           </label>
           <h3>Export defaults</h3>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Manifest next to export</label>
+          <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Styles</label>
+          <label><input v-model="store.exportDefaults.coverPage" type="checkbox" /> Cover page</label>
+          <label><input v-model="store.exportDefaults.pageNumbers" type="checkbox" /> Page numbers</label>
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Glossary</label>
@@ -1074,6 +1080,9 @@ watch(
 watch(
   () => [
     store.exportDefaults.includeManifest,
+    store.exportDefaults.includeStyles,
+    store.exportDefaults.coverPage,
+    store.exportDefaults.pageNumbers,
     store.exportDefaults.includeComments,
     store.exportDefaults.includeProvenance,
     store.exportDefaults.includeGlossary,

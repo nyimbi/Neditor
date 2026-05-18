@@ -4360,6 +4360,31 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn export_options_control_cover_styles_and_page_numbers() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Export Options\nstatus: approved\napprovedBy: QA\n---\n# Export Options\n\nBody."
+                .to_string(),
+            file_path: None,
+        });
+        let options = json!({
+            "includeStyles": false,
+            "coverPage": false,
+            "pageNumbers": false
+        });
+
+        let html = render_full_html(&response, &options);
+        assert!(!html.contains("<style>"));
+        assert!(!html.contains("class=\"cover\""));
+        assert!(!html.contains("Page 1 of 1"));
+        assert!(html.contains("<main>"));
+
+        let exported_text = export::export_text(&response, &options);
+        assert!(!exported_text.contains("Cover: Export Options"));
+        assert!(!exported_text.contains("Page 1 of 1"));
+        assert!(exported_text.contains("Status: approved"));
+    }
+
+    #[test]
     fn compiler_loads_csl_json_bibliography() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -5866,6 +5891,9 @@ paths:
             options: json!({
                 "watermark": 42,
                 "includeManifest": "yes",
+                "includeStyles": "yes",
+                "coverPage": "yes",
+                "pageNumbers": "yes",
                 "includeGlossary": "yes",
                 "includeComments": "yes",
                 "includeProvenance": "yes"
@@ -5873,7 +5901,7 @@ paths:
         });
 
         assert!(!report.ready);
-        assert_eq!(report.error_count, 6);
+        assert_eq!(report.error_count, 9);
         assert_eq!(report.manifest.export_target, "rtf");
         assert!(report
             .diagnostics
@@ -5886,6 +5914,15 @@ paths:
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("includeManifest must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("includeStyles must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("coverPage must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("pageNumbers must be true or false")));
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("includeGlossary must be true or false")));
