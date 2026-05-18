@@ -6227,6 +6227,49 @@ paths:
     }
 
     #[test]
+    fn include_expansion_supports_documented_directive_forms() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-include-forms-test-{unique}"));
+        fs::create_dir_all(root.join("chapters")).expect("create include forms dirs");
+        fs::create_dir_all(root.join("appendices")).expect("create appendices dir");
+        fs::write(root.join("chapters").join("intro.md"), "## Bang Include\n")
+            .expect("write bang include");
+        fs::write(
+            root.join("chapters").join("market.md"),
+            "## Brace Include\n",
+        )
+        .expect("write brace include");
+        fs::write(
+            root.join("appendices").join("financials.md"),
+            "## Comment Include\n",
+        )
+        .expect("write comment include");
+
+        let response = compile(CompileRequest {
+            text: "!include chapters/intro.md\n{{include chapters/market.md}}\n<!-- include: appendices/financials.md -->\n".to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+        });
+
+        assert!(response.compiled_markdown.contains("## Bang Include"));
+        assert!(response.compiled_markdown.contains("## Brace Include"));
+        assert!(response.compiled_markdown.contains("## Comment Include"));
+        assert_eq!(response.include_graph.len(), 3);
+        assert!(response
+            .export_manifest
+            .included_files
+            .iter()
+            .any(|file| file.path.ends_with("chapters/market.md")));
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Missing include")));
+        fs::remove_dir_all(root).expect("clean include forms test dir");
+    }
+
+    #[test]
     fn export_renderers_return_non_empty_artifacts() {
         let response = compile(CompileRequest {
             text: sample_document(),
