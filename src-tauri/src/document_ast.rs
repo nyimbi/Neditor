@@ -60,6 +60,14 @@ pub(crate) enum DocumentBlock {
         options: String,
         source: Option<AstSourceRange>,
     },
+    Callout {
+        line: usize,
+        end_line: usize,
+        callout_type: String,
+        title: String,
+        text: String,
+        source: Option<AstSourceRange>,
+    },
     RawHtml {
         line: usize,
         end_line: usize,
@@ -167,6 +175,21 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
             DocumentBlock::Layout {
                 directive, options, ..
             } => Some(format!("Layout: {directive} {options}").trim().to_string()),
+            DocumentBlock::Callout {
+                callout_type,
+                title,
+                text,
+                ..
+            } => {
+                let mut parts = vec![format!("Callout: {callout_type}")];
+                if !title.is_empty() {
+                    parts.push(title.clone());
+                }
+                if !text.is_empty() {
+                    parts.push(text.clone());
+                }
+                Some(parts.join(": "))
+            }
             DocumentBlock::RawHtml { html, .. } => {
                 let text = clean_inline_text(html);
                 (!text.is_empty()).then_some(text)
@@ -213,6 +236,12 @@ where
                 ..
             }
             | DocumentBlock::Layout {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::Callout {
                 line,
                 end_line,
                 source,
@@ -344,6 +373,21 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
             directive: extract_quoted_attribute(line, "data-layout").unwrap_or_default(),
             options: extract_quoted_attribute(line, "data-options")
                 .map(|value| decode_html_entities(&value))
+                .unwrap_or_default(),
+            source: None,
+        };
+    }
+
+    if line.contains("class=\"callout") {
+        return DocumentBlock::Callout {
+            line: line_number,
+            end_line: line_number,
+            callout_type: extract_quoted_attribute(line, "data-callout").unwrap_or_default(),
+            title: extract_between(line, "<strong>", "</strong>")
+                .map(|value| clean_inline_text(&value))
+                .unwrap_or_default(),
+            text: extract_between(line, "<p>", "</p>")
+                .map(|value| clean_inline_text(&value))
                 .unwrap_or_default(),
             source: None,
         };

@@ -2041,6 +2041,19 @@ select:hover {
   outline-offset: 2px;
 }
 
+.preview-document .callout {
+  border-left: 4px solid #1f6f55;
+  background: #eefaf4;
+  padding: 10px 12px;
+  margin: 14px 0;
+}
+
+.preview-document .callout strong {
+  display: block;
+  color: #0f5132;
+  margin-bottom: 4px;
+}
+
 .preview-document pre,
 .sidebar pre {
   overflow: auto;

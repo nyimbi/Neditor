@@ -616,6 +616,12 @@ fn render_docx_block(block: &DocumentBlock) -> String {
         DocumentBlock::Layout {
             directive, options, ..
         } => docx_paragraph(&format!("Layout: {directive} {options}").trim().to_string()),
+        DocumentBlock::Callout {
+            callout_type,
+            title,
+            text,
+            ..
+        } => docx_paragraph(&callout_export_line(callout_type, title, text)),
         DocumentBlock::RawHtml { html, .. } => docx_paragraph(html),
     }
 }
@@ -841,6 +847,12 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
         DocumentBlock::Layout {
             directive, options, ..
         } => layout_export_lines(directive, options),
+        DocumentBlock::Callout {
+            callout_type,
+            title,
+            text,
+            ..
+        } => vec![callout_export_line(callout_type, title, text)],
         DocumentBlock::RawHtml { html, .. } => vec![html.clone()],
     }
 }
@@ -894,6 +906,17 @@ fn layout_columns(options: &str) -> Option<usize> {
 fn parse_layout_columns(value: &str) -> Option<usize> {
     let columns = value.trim().trim_matches('"').parse::<usize>().ok()?;
     (columns > 0).then_some(columns)
+}
+
+fn callout_export_line(callout_type: &str, title: &str, text: &str) -> String {
+    let mut parts = vec![format!("Callout: {callout_type}")];
+    if !title.is_empty() {
+        parts.push(title.to_string());
+    }
+    if !text.is_empty() {
+        parts.push(text.to_string());
+    }
+    parts.join(": ")
 }
 
 fn figure_export_line(
@@ -977,7 +1000,7 @@ fn render_pptx_slide(slide: &PptxSlide) -> String {
 
 fn export_css(brand_color: &str, watermark: &str) -> String {
     format!(
-        "body{{font-family:Inter,Arial,sans-serif;margin:48px;color:#1f2937;line-height:1.55}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:85vh;display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover h1{{font-size:44px;margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.export-glossary,.export-comments,.export-provenance{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:24mm;@top-center{{content:element(header)}}@bottom-center{{content:'Page ' counter(page) ' of ' counter(pages)}}}}",
+        "body{{font-family:Inter,Arial,sans-serif;margin:48px;color:#1f2937;line-height:1.55}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:85vh;display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover h1{{font-size:44px;margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.export-glossary,.export-comments,.export-provenance{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:24mm;@top-center{{content:element(header)}}@bottom-center{{content:'Page ' counter(page) ' of ' counter(pages)}}}}",
         escape_css(watermark)
     )
 }

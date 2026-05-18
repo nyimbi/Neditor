@@ -1327,7 +1327,8 @@ fn compile(request: CompileRequest) -> CompileResponse {
     );
     let figure_markdown = render_figures(&table_formula_markdown);
     let equation_markdown = render_equations(&figure_markdown);
-    let layout_markdown = render_layout_tokens(&equation_markdown);
+    let callout_markdown = render_callouts(&equation_markdown);
+    let layout_markdown = render_layout_tokens(&callout_markdown);
     let mut document_ast = build_document_ast(&layout_markdown);
     attach_source_ranges(&mut document_ast, |line, end_line| {
         ast_source_range_for_generated_lines(&source_map, line, end_line)
@@ -2566,6 +2567,73 @@ fn render_inline_math(line: &str) -> String {
     }
     output.push_str(rest);
     output
+}
+
+fn render_callouts(markdown: &str) -> String {
+    let lines = markdown.lines().collect::<Vec<_>>();
+    let mut output = Vec::new();
+    let mut index = 0;
+    while index < lines.len() {
+        let line = lines[index];
+        let trimmed = line.trim_start();
+        let Some(after_marker) = trimmed.strip_prefix("> [!") else {
+            output.push(line.to_string());
+            index += 1;
+            continue;
+        };
+        let Some(marker_end) = after_marker.find(']') else {
+            output.push(line.to_string());
+            index += 1;
+            continue;
+        };
+        let callout_type = after_marker[..marker_end].trim().to_ascii_lowercase();
+        if callout_type.is_empty()
+            || !callout_type
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
+        {
+            output.push(line.to_string());
+            index += 1;
+            continue;
+        }
+        let title = after_marker[marker_end + 1..].trim();
+        let title = if title.is_empty() {
+            callout_type.to_ascii_uppercase()
+        } else {
+            title.to_string()
+        };
+        index += 1;
+        let mut body_lines = Vec::new();
+        while index < lines.len() {
+            let quoted = lines[index].trim_start();
+            if !quoted.starts_with('>') {
+                break;
+            }
+            body_lines.push(strip_callout_quote(quoted));
+            index += 1;
+        }
+        let body = body_lines
+            .iter()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| escape_html(line.trim()))
+            .collect::<Vec<_>>()
+            .join("<br/>");
+        output.push(format!(
+            "<aside class=\"callout callout-{}\" data-callout=\"{}\"><strong>{}</strong><p>{}</p></aside>",
+            escape_html(&callout_type),
+            escape_html(&callout_type),
+            escape_html(&title),
+            body
+        ));
+    }
+    output.join("\n")
+}
+
+fn strip_callout_quote(line: &str) -> String {
+    line.strip_prefix('>')
+        .map(str::trim_start)
+        .unwrap_or(line)
+        .to_string()
 }
 
 fn render_layout_tokens(markdown: &str) -> String {
@@ -5725,6 +5793,33 @@ ARR: Annual recurring revenue.
         assert!(response.html.contains("columns=1"));
         assert!(response.html.contains("data-layout=\"layout\""));
         assert!(response.html.contains("column-count:2"));
+    }
+
+    #[test]
+    fn compiler_renders_callouts_as_semantic_blocks() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Callouts\nstatus: approved\napprovedBy: QA\n---\n# Callouts\n> [!NOTE] Board review\n> Confirm the launch criteria.\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response.html.contains("class=\"callout callout-note\""));
+        assert!(response.html.contains("Board review"));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Callout { callout_type, title, text, .. }
+                    if callout_type == "note"
+                        && title == "Board review"
+                        && text.contains("Confirm the launch criteria")
+            )
+        }));
+
+        let options = json!({});
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        assert!(zip_entry_text(&docx, "word/document.xml")
+            .contains("Callout: note: Board review: Confirm the launch criteria."));
+        let pdf = render_pdf_bytes(&response, &options);
+        assert!(String::from_utf8_lossy(&pdf).contains("Callout: note: Board review"));
     }
 
     #[test]
