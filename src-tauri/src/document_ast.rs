@@ -13,18 +13,22 @@ pub(crate) enum DocumentBlock {
         text: String,
         anchor: String,
         line: usize,
+        end_line: usize,
     },
     Paragraph {
         text: String,
         line: usize,
+        end_line: usize,
     },
     Table {
         line: usize,
+        end_line: usize,
         headers: Vec<String>,
         rows: Vec<Vec<String>>,
     },
     Figure {
         line: usize,
+        end_line: usize,
         id: Option<String>,
         src: Option<String>,
         alt: Option<String>,
@@ -32,17 +36,20 @@ pub(crate) enum DocumentBlock {
     },
     Equation {
         line: usize,
+        end_line: usize,
         id: Option<String>,
         caption: Option<String>,
         text: String,
     },
     Layout {
         line: usize,
+        end_line: usize,
         directive: String,
         options: String,
     },
     RawHtml {
         line: usize,
+        end_line: usize,
         html: String,
     },
 }
@@ -168,6 +175,7 @@ fn flush_ast_paragraph(
         blocks.push(DocumentBlock::Paragraph {
             text,
             line: paragraph_start.unwrap_or(1),
+            end_line: paragraph_start.unwrap_or(1) + paragraph_lines.len().saturating_sub(1),
         });
     }
     paragraph_lines.clear();
@@ -190,6 +198,7 @@ fn parse_ast_heading(line: &str, line_number: usize) -> Option<DocumentBlock> {
         text,
         anchor,
         line: line_number,
+        end_line: line_number,
     })
 }
 
@@ -221,6 +230,7 @@ fn parse_ast_table(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize
     Some((
         DocumentBlock::Table {
             line: index + 1,
+            end_line: next_index,
             headers,
             rows,
         },
@@ -232,6 +242,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     if line.contains("class=\"figure\"") {
         return DocumentBlock::Figure {
             line: line_number,
+            end_line: line_number,
             id: extract_quoted_attribute(line, "id"),
             src: extract_quoted_attribute(line, "src"),
             alt: extract_quoted_attribute(line, "alt").map(|value| decode_html_entities(&value)),
@@ -243,6 +254,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     if line.contains("class=\"equation\"") {
         return DocumentBlock::Equation {
             line: line_number,
+            end_line: line_number,
             id: extract_quoted_attribute(line, "id"),
             caption: extract_between(line, "<figcaption>", "</figcaption>")
                 .map(|value| clean_inline_text(&value)),
@@ -255,6 +267,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     if line.contains("data-layout=\"") {
         return DocumentBlock::Layout {
             line: line_number,
+            end_line: line_number,
             directive: extract_quoted_attribute(line, "data-layout").unwrap_or_default(),
             options: extract_quoted_attribute(line, "data-options")
                 .map(|value| decode_html_entities(&value))
@@ -264,6 +277,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
 
     DocumentBlock::RawHtml {
         line: line_number,
+        end_line: line_number,
         html: line.to_string(),
     }
 }

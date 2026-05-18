@@ -40,20 +40,21 @@ export interface SemanticDocument {
 }
 
 export type DocumentBlock =
-  | { kind: "heading"; level: number; text: string; anchor: string; line: number }
-  | { kind: "paragraph"; text: string; line: number }
-  | { kind: "table"; line: number; headers: string[]; rows: string[][] }
+  | { kind: "heading"; level: number; text: string; anchor: string; line: number; end_line: number }
+  | { kind: "paragraph"; text: string; line: number; end_line: number }
+  | { kind: "table"; line: number; end_line: number; headers: string[]; rows: string[][] }
   | {
       kind: "figure";
       line: number;
+      end_line: number;
       id?: string | null;
       src?: string | null;
       alt?: string | null;
       caption?: string | null;
     }
-  | { kind: "equation"; line: number; id?: string | null; caption?: string | null; text: string }
-  | { kind: "layout"; line: number; directive: string; options: string }
-  | { kind: "raw_html"; line: number; html: string };
+  | { kind: "equation"; line: number; end_line: number; id?: string | null; caption?: string | null; text: string }
+  | { kind: "layout"; line: number; end_line: number; directive: string; options: string }
+  | { kind: "raw_html"; line: number; end_line: number; html: string };
 
 export interface DocumentAst {
   blocks: DocumentBlock[];

@@ -3518,12 +3518,13 @@ ARR: Annual recurring revenue.
             .document_ast
             .blocks
             .iter()
-            .any(|block| matches!(block, DocumentBlock::Paragraph { text, .. } if text == "Business paragraph.")));
+            .any(|block| matches!(block, DocumentBlock::Paragraph { text, line, end_line } if text == "Business paragraph." && line == end_line)));
         assert!(response.document_ast.blocks.iter().any(|block| {
             matches!(
                 block,
-                DocumentBlock::Table { headers, rows, .. }
+                DocumentBlock::Table { line, end_line, headers, rows, .. }
                     if headers == &vec!["Metric".to_string(), "Value".to_string()]
+                        && *end_line == *line + 2
                         && rows.iter().any(|row| row == &vec!["Total".to_string(), "3".to_string()])
             )
         }));
