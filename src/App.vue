@@ -345,6 +345,10 @@
             </select>
           </label>
           <label>
+            Version
+            <input :value="String(active.compile?.metadata.version || '')" @change="setFrontMatterField('version', inputValue($event))" />
+          </label>
+          <label>
             Approved by
             <input :value="String(active.compile?.metadata.approvedBy || '')" @change="setFrontMatterField('approvedBy', inputValue($event))" />
           </label>

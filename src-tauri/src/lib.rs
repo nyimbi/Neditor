@@ -2236,6 +2236,20 @@ fn validate_document(
         ));
     }
     if metadata
+        .get("version")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .is_empty()
+    {
+        diagnostics.push(diag(
+            "warning",
+            "Missing version metadata.",
+            None,
+            None,
+            Some("Add version to YAML front matter for export traceability."),
+        ));
+    }
+    if metadata
         .get("status")
         .and_then(Value::as_str)
         .unwrap_or("draft")
@@ -5532,6 +5546,20 @@ paths:
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("missing approval metadata")));
+    }
+
+    #[test]
+    fn validation_requires_version_metadata() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Versioned\nstatus: approved\napprovedBy: QA\n---\n# Versioned\n"
+                .to_string(),
+            file_path: None,
+        });
+
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message == "Missing version metadata."));
     }
 
     #[test]
