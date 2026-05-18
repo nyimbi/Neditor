@@ -1052,6 +1052,10 @@ export const useDocumentsStore = defineStore("documents", {
         defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
         defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
         warnOnDirtyGit: this.gitIntegration.enabled && this.gitIntegration.warnOnDirtyExport,
+        transformEnginePaths: this.transformEnginePaths,
+        trustedTransformEngines: this.trustedTransformEngines,
+        transformInputModes: this.transformInputModes,
+        transformTimeoutMs: this.transformTimeoutMs,
         watermark:
           this.activeDocument.compile?.semantic.status === "draft"
             ? "DRAFT"
@@ -1062,6 +1066,10 @@ export const useDocumentsStore = defineStore("documents", {
       return {
         defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
         defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
+        transformEnginePaths: this.transformEnginePaths,
+        trustedTransformEngines: this.trustedTransformEngines,
+        transformInputModes: this.transformInputModes,
+        transformTimeoutMs: this.transformTimeoutMs,
       };
     },
     async createSnapshot(label = "manual") {

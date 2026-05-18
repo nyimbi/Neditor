@@ -71,7 +71,6 @@ use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
 use tables::{
     collect_table_summaries, evaluate_markdown_table_formulas, render_delimited_table, TableSummary,
 };
-#[cfg(test)]
 use transforms::external::ExternalTransformRequest;
 use transforms::{
     external::{list_transform_engines, run_external_transform},
@@ -236,7 +235,12 @@ fn run_transform(name: String, body: String) -> Result<TransformArtifact, String
         return Err(format!("Unknown transform: {name}"));
     }
     let mut diagnostics = Vec::new();
-    Ok(render_transform(&name, &body, &mut diagnostics))
+    Ok(render_transform(
+        &name,
+        &body,
+        &TransformExecutionOptions::default(),
+        &mut diagnostics,
+    ))
 }
 
 fn compile(request: CompileRequest) -> CompileResponse {
@@ -327,8 +331,9 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         &bibliography,
     );
     let index_marker_markdown = strip_index_markers(&with_toc);
+    let transform_options = TransformExecutionOptions::from_compile_options(options);
     let (transformed_markdown, transform_artifacts) =
-        apply_transforms(&index_marker_markdown, &mut diagnostics);
+        apply_transforms(&index_marker_markdown, &transform_options, &mut diagnostics);
     let citation_markdown = render_citations(
         &transformed_markdown,
         &bibliography,
@@ -1008,8 +1013,83 @@ fn unquote_variable_default(value: &str) -> String {
         .to_string()
 }
 
+#[derive(Debug, Default)]
+struct TransformExecutionOptions {
+    engine_paths: HashMap<String, String>,
+    trusted_engines: HashMap<String, bool>,
+    input_modes: HashMap<String, String>,
+    timeout_ms: Option<u64>,
+}
+
+impl TransformExecutionOptions {
+    fn from_compile_options(options: Option<&Value>) -> Self {
+        let Some(options) = options else {
+            return Self::default();
+        };
+        Self {
+            engine_paths: string_map_option(options, "transformEnginePaths"),
+            trusted_engines: bool_map_option(options, "trustedTransformEngines"),
+            input_modes: string_map_option(options, "transformInputModes"),
+            timeout_ms: options.get("transformTimeoutMs").and_then(Value::as_u64),
+        }
+    }
+
+    fn engine_path(&self, name: &str) -> Option<String> {
+        self.engine_paths
+            .get(name)
+            .or_else(|| {
+                if name == "graphviz" {
+                    self.engine_paths.get("dot")
+                } else {
+                    None
+                }
+            })
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    }
+
+    fn trusted(&self, name: &str) -> bool {
+        self.trusted_engines.get(name).copied().unwrap_or(false)
+    }
+
+    fn input_mode(&self, name: &str) -> Option<String> {
+        self.input_modes.get(name).cloned()
+    }
+}
+
+fn string_map_option(options: &Value, key: &str) -> HashMap<String, String> {
+    options
+        .get(key)
+        .and_then(Value::as_object)
+        .map(|fields| {
+            fields
+                .iter()
+                .filter_map(|(name, value)| {
+                    value
+                        .as_str()
+                        .map(|field| (name.clone(), field.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn bool_map_option(options: &Value, key: &str) -> HashMap<String, bool> {
+    options
+        .get(key)
+        .and_then(Value::as_object)
+        .map(|fields| {
+            fields
+                .iter()
+                .filter_map(|(name, value)| value.as_bool().map(|field| (name.clone(), field)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn apply_transforms(
     text: &str,
+    options: &TransformExecutionOptions,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> (String, Vec<TransformArtifact>) {
     let mut output = String::new();
@@ -1027,7 +1107,7 @@ fn apply_transforms(
                     body.push_str(body_line);
                     body.push('\n');
                 }
-                let artifact = render_transform(name, &body, diagnostics);
+                let artifact = render_transform(name, &body, options, diagnostics);
                 output.push_str(&artifact.html);
                 output.push('\n');
                 artifacts.push(artifact);
@@ -1043,8 +1123,15 @@ fn apply_transforms(
 fn render_transform(
     name: &str,
     body: &str,
+    options: &TransformExecutionOptions,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> TransformArtifact {
+    if external_transform_supported(name) {
+        if let Some(artifact) = render_external_transform(name, body, options, diagnostics) {
+            return artifact;
+        }
+    }
+
     let source_hash = sha256_hex(body.as_bytes());
     let mut artifact_diags = Vec::new();
     let html = match name {
@@ -1108,6 +1195,41 @@ fn render_transform(
     }
 }
 
+fn render_external_transform(
+    name: &str,
+    body: &str,
+    options: &TransformExecutionOptions,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> Option<TransformArtifact> {
+    let engine_path = options.engine_path(name)?;
+    let request = ExternalTransformRequest {
+        name: name.to_string(),
+        body: body.to_string(),
+        engine_path: Some(engine_path),
+        trusted: options.trusted(name),
+        input_mode: options.input_mode(name),
+        timeout_ms: options.timeout_ms,
+        max_input_bytes: None,
+        max_output_bytes: None,
+    };
+    match run_external_transform(request) {
+        Ok(artifact) => {
+            diagnostics.extend(artifact.diagnostics.iter().cloned());
+            Some(artifact)
+        }
+        Err(error) => {
+            diagnostics.push(diag(
+                "warning",
+                format!("{name} external transform failed: {error}"),
+                None,
+                None,
+                Some("Check transform trust, engine path, input mode, and timeout settings."),
+            ));
+            None
+        }
+    }
+}
+
 fn supported_transform(name: &str) -> bool {
     matches!(
         name,
@@ -1138,6 +1260,10 @@ fn supported_transform(name: &str) -> bool {
             | "json-schema"
             | "bibtex"
     )
+}
+
+fn external_transform_supported(name: &str) -> bool {
+    matches!(name, "pikchr" | "dot" | "graphviz" | "plantuml" | "d2")
 }
 
 fn markdown_to_html(markdown: &str, glossary: &BTreeMap<String, String>) -> String {
@@ -5694,6 +5820,75 @@ paths:
         .expect("file external transform");
         assert_eq!(file_artifact.input_mode, "file");
         assert!(file_artifact.html.contains("digraph"));
+    }
+
+    #[test]
+    fn compiler_uses_trusted_external_transform_preferences() {
+        let cat = Path::new("/bin/cat");
+        if !cat.exists() {
+            return;
+        }
+        let response = compile_with_options(
+            CompileRequest {
+                text: "---\ntitle: External Dot\n---\n# External Dot\n```dot\ndigraph { a -> b }\n```\n"
+                    .to_string(),
+                file_path: None,
+            },
+            &json!({
+                "transformEnginePaths": { "dot": path_to_string(cat) },
+                "trustedTransformEngines": { "dot": true },
+                "transformInputModes": { "dot": "stdin" },
+                "transformTimeoutMs": 1000
+            }),
+        );
+
+        let artifact = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == "dot")
+            .expect("dot artifact");
+        assert_eq!(artifact.execution_kind, "external");
+        assert_eq!(artifact.input_mode, "stdin");
+        assert!(artifact
+            .engine_path
+            .as_deref()
+            .is_some_and(|path| path == "/bin/cat"));
+        assert!(artifact.html.contains("digraph { a -&gt; b }"));
+        assert!(response.html.contains("transform-external"));
+        assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("dot external transform completed")));
+    }
+
+    #[test]
+    fn compiler_falls_back_when_external_transform_is_untrusted() {
+        let cat = Path::new("/bin/cat");
+        if !cat.exists() {
+            return;
+        }
+        let response = compile_with_options(
+            CompileRequest {
+                text: "---\ntitle: Untrusted Dot\n---\n# Untrusted Dot\n```dot\ndigraph {}\n```\n"
+                    .to_string(),
+                file_path: None,
+            },
+            &json!({
+                "transformEnginePaths": { "dot": path_to_string(cat) },
+                "trustedTransformEngines": { "dot": false }
+            }),
+        );
+
+        let artifact = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == "dot")
+            .expect("dot artifact");
+        assert_eq!(artifact.execution_kind, "embedded");
+        assert!(artifact.html.contains("transform-pending"));
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("dot external transform failed")));
     }
 
     #[cfg(unix)]
