@@ -7,25 +7,36 @@
   >
     <header class="titlebar">
       <section class="document-tabs" aria-label="Open documents">
-        <div
-          v-for="document in store.documents"
-          :key="document.id"
-          class="tab"
-          :class="{ active: document.id === store.activeId }"
+        <section
+          v-for="group in groupedDocuments"
+          :key="group.key"
+          class="tab-group"
+          :aria-label="`${group.label} tabs`"
         >
-          <button class="tab-main" type="button" @click="activate(document.id)">
-            <span>{{ document.dirty ? "*" : "" }}{{ document.title }}</span>
-          </button>
-          <button
-            class="tab-close"
-            type="button"
-            :aria-label="document.pinned ? 'Unpin document' : 'Pin document'"
-            @click="store.togglePin(document.id)"
+          <header class="tab-group-header" :title="group.title">
+            <span>{{ group.label }}</span>
+            <small>{{ group.documents.length }}</small>
+          </header>
+          <div
+            v-for="document in group.documents"
+            :key="document.id"
+            class="tab"
+            :class="{ active: document.id === store.activeId }"
           >
-            {{ document.pinned ? "!" : "^" }}
-          </button>
-          <button class="tab-close" type="button" aria-label="Close document" @click="store.closeDocument(document.id)">x</button>
-        </div>
+            <button class="tab-main" type="button" @click="activate(document.id)">
+              <span>{{ document.dirty ? "*" : "" }}{{ document.title }}</span>
+            </button>
+            <button
+              class="tab-close"
+              type="button"
+              :aria-label="document.pinned ? 'Unpin document' : 'Pin document'"
+              @click="store.togglePin(document.id)"
+            >
+              {{ document.pinned ? "!" : "^" }}
+            </button>
+            <button class="tab-close" type="button" aria-label="Close document" @click="store.closeDocument(document.id)">x</button>
+          </div>
+        </section>
       </section>
 
       <section class="window-meta" aria-label="Document status">
@@ -564,7 +575,7 @@ import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searc
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { useDocumentsStore } from "./stores/documents";
-import type { DocumentDiagnostic } from "./types";
+import type { DocumentDiagnostic, OpenDocument } from "./types";
 
 const store = useDocumentsStore();
 const editorHost = ref<HTMLElement | null>(null);
@@ -619,6 +630,13 @@ interface ConflictDiffRow {
   externalLine: number | null;
 }
 
+interface DocumentTabGroup {
+  key: string;
+  label: string;
+  title: string;
+  documents: OpenDocument[];
+}
+
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
 const aiSnippet = "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nreviewedBy: \nstatus: human-reviewed\n```\n";
@@ -638,6 +656,19 @@ const manifestPreview = computed(() => JSON.stringify(active.value.compile?.expo
 const bibliographyByKey = computed(() => new Map((active.value.compile?.bibliography || []).map((entry) => [entry.key, entry.title])));
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
 const selectedTable = computed(() => markdownTables.value[selectedTableIndex.value] || null);
+const groupedDocuments = computed<DocumentTabGroup[]>(() => {
+  const groups = new Map<string, DocumentTabGroup>();
+  for (const document of store.documents) {
+    const descriptor = tabGroupDescriptor(document);
+    let group = groups.get(descriptor.key);
+    if (!group) {
+      group = { ...descriptor, documents: [] };
+      groups.set(descriptor.key, group);
+    }
+    group.documents.push(document);
+  }
+  return Array.from(groups.values());
+});
 const rootConflictCanMerge = computed(
   () => store.externalConflict?.reason === "root" && typeof store.externalConflict.externalText === "string",
 );
@@ -1096,6 +1127,47 @@ function runEditorCommand(command: (view: EditorView) => boolean) {
 
 function activate(id: string) {
   store.activeId = id;
+}
+
+function tabGroupDescriptor(document: OpenDocument): Omit<DocumentTabGroup, "documents"> {
+  if (document.pinned) {
+    return {
+      key: "pinned",
+      label: "Pinned",
+      title: "Pinned documents",
+    };
+  }
+  if (!document.path) {
+    return {
+      key: "drafts",
+      label: "Drafts",
+      title: "Unsaved documents",
+    };
+  }
+  const folder = folderFromDocumentPath(document.path);
+  const label = folderLabel(folder);
+  return {
+    key: `folder:${folder}`,
+    label,
+    title: folder || "Workspace root",
+  };
+}
+
+function folderFromDocumentPath(path: string) {
+  const normalized = normalizeDocumentPath(path);
+  const index = normalized.lastIndexOf("/");
+  return index > 0 ? normalized.slice(0, index) : "";
+}
+
+function folderLabel(folder: string) {
+  const workspaceRoot = store.workspaceRoot ? normalizeDocumentPath(store.workspaceRoot) : "";
+  if (!folder || (workspaceRoot && folder === workspaceRoot)) return "Workspace";
+  const parts = folder.split("/").filter(Boolean);
+  return parts[parts.length - 1] || folder;
+}
+
+function normalizeDocumentPath(path: string) {
+  return path.replace(/\\/g, "/");
 }
 
 async function openDocument() {
@@ -1891,8 +1963,46 @@ select:hover {
   display: flex;
   min-width: 0;
   flex: 1;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.tab-group {
+  display: flex;
+  align-items: stretch;
+  flex: 0 0 auto;
   gap: 4px;
+  min-width: 0;
+  padding-right: 8px;
+  border-right: 1px solid #d7dee7;
+}
+
+.tab-group:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.tab-group-header {
+  display: flex;
+  min-width: 72px;
+  max-width: 140px;
+  flex-direction: column;
+  justify-content: center;
+  color: #526171;
+  font-size: 11px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.tab-group-header span {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-group-header small {
+  color: #7b8794;
+  font-size: 10px;
 }
 
 .tab {
