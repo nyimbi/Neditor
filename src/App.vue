@@ -420,7 +420,13 @@
         <div ref="editorHost" class="editor-host"></div>
       </section>
 
-      <section v-show="store.mode !== 'source' && store.mode !== 'focus'" class="preview-pane" aria-label="Live preview">
+      <section
+        ref="previewPane"
+        v-show="store.mode !== 'source' && store.mode !== 'focus'"
+        class="preview-pane"
+        aria-label="Live preview"
+        @scroll="syncEditorScrollFromPreview"
+      >
         <article class="preview-document" :style="previewDocumentStyle" @click="handlePreviewClick" v-html="active.compile?.html || ''"></article>
       </section>
     </main>
@@ -538,11 +544,13 @@ import type { DocumentDiagnostic } from "./types";
 
 const store = useDocumentsStore();
 const editorHost = ref<HTMLElement | null>(null);
+const previewPane = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
 let debounceHandle = 0;
 let autosaveHandle = 0;
 let autoSnapshotHandle = 0;
 let lastAutoSnapshotSignature = "";
+let syncingScroll = false;
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
 const aiInsertMode = ref<"insert" | "replace" | "appendix">("insert");
@@ -817,6 +825,11 @@ function editorExtensions() {
     closeBrackets(),
     EditorView.contentAttributes.of({ spellcheck: "true", autocapitalize: "sentences" }),
     keymap.of([{ key: "Enter", run: continueMarkdownList }, ...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+    EditorView.domEventHandlers({
+      scroll: () => {
+        syncPreviewScrollFromEditor();
+      },
+    }),
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
@@ -903,6 +916,30 @@ function buildEditor() {
     }),
     parent: editorHost.value,
   });
+}
+
+function syncPreviewScrollFromEditor() {
+  if (!editorView || !previewPane.value || syncingScroll) return;
+  syncingScroll = true;
+  syncScrollPosition(editorView.scrollDOM, previewPane.value);
+  window.requestAnimationFrame(() => {
+    syncingScroll = false;
+  });
+}
+
+function syncEditorScrollFromPreview() {
+  if (!editorView || !previewPane.value || syncingScroll) return;
+  syncingScroll = true;
+  syncScrollPosition(previewPane.value, editorView.scrollDOM);
+  window.requestAnimationFrame(() => {
+    syncingScroll = false;
+  });
+}
+
+function syncScrollPosition(source: HTMLElement, target: HTMLElement) {
+  const sourceRange = Math.max(1, source.scrollHeight - source.clientHeight);
+  const targetRange = Math.max(0, target.scrollHeight - target.clientHeight);
+  target.scrollTop = (source.scrollTop / sourceRange) * targetRange;
 }
 
 function runEditorCommand(command: (view: EditorView) => boolean) {
