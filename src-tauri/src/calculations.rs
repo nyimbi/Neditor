@@ -88,6 +88,12 @@ enum FormulaToken {
     Star,
     Slash,
     Percent,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+    Equal,
+    NotEqual,
     LParen,
     RParen,
     Comma,
@@ -101,6 +107,33 @@ struct FormulaParser<'a> {
 
 impl FormulaParser<'_> {
     fn parse_expression(&mut self) -> Result<f64, String> {
+        self.parse_comparison()
+    }
+
+    fn parse_comparison(&mut self) -> Result<f64, String> {
+        let mut value = self.parse_additive()?;
+        loop {
+            let Some(token) = self.peek().cloned() else {
+                return Ok(value);
+            };
+            let comparison: fn(f64, f64) -> bool = match token {
+                FormulaToken::Greater => |left: f64, right: f64| left > right,
+                FormulaToken::GreaterEqual => |left: f64, right: f64| left >= right,
+                FormulaToken::Less => |left: f64, right: f64| left < right,
+                FormulaToken::LessEqual => |left: f64, right: f64| left <= right,
+                FormulaToken::Equal => |left: f64, right: f64| (left - right).abs() < f64::EPSILON,
+                FormulaToken::NotEqual => {
+                    |left: f64, right: f64| (left - right).abs() >= f64::EPSILON
+                }
+                _ => return Ok(value),
+            };
+            self.index += 1;
+            let right = self.parse_additive()?;
+            value = if comparison(value, right) { 1.0 } else { 0.0 };
+        }
+    }
+
+    fn parse_additive(&mut self) -> Result<f64, String> {
         let mut value = self.parse_term()?;
         loop {
             match self.peek() {
@@ -222,7 +255,7 @@ fn tokenize_expression(expression: &str) -> Result<Vec<FormulaToken>, String> {
             }
             tokens.push(FormulaToken::Name(chars[start..index].iter().collect()));
         } else {
-            tokens.push(match ch {
+            let token = match ch {
                 '+' => FormulaToken::Plus,
                 '-' => FormulaToken::Minus,
                 '*' => FormulaToken::Star,
@@ -231,8 +264,29 @@ fn tokenize_expression(expression: &str) -> Result<Vec<FormulaToken>, String> {
                 '(' => FormulaToken::LParen,
                 ')' => FormulaToken::RParen,
                 ',' => FormulaToken::Comma,
+                '>' if chars.get(index + 1) == Some(&'=') => {
+                    index += 1;
+                    FormulaToken::GreaterEqual
+                }
+                '>' => FormulaToken::Greater,
+                '<' if chars.get(index + 1) == Some(&'=') => {
+                    index += 1;
+                    FormulaToken::LessEqual
+                }
+                '<' => FormulaToken::Less,
+                '=' if chars.get(index + 1) == Some(&'=') => {
+                    index += 1;
+                    FormulaToken::Equal
+                }
+                '=' => FormulaToken::Equal,
+                '!' if chars.get(index + 1) == Some(&'=') => {
+                    index += 1;
+                    FormulaToken::NotEqual
+                }
+                '!' => return Err("unsupported formula character '!'".to_string()),
                 _ => return Err(format!("unsupported formula character '{ch}'")),
-            });
+            };
+            tokens.push(token);
             index += 1;
         }
     }

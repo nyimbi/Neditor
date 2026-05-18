@@ -3337,6 +3337,10 @@ revenue = 100
 cost = 40
 profit = revenue - cost
 margin = profit / revenue
+healthy = IF(revenue > cost, 1, 0)
+target_met = IF(margin >= 0.60, 1, 0)
+cost_match = IF(cost == 40, 1, 0)
+spread = IF(revenue != cost, 1, 0)
 ```
 
 Margin: {{=margin | percent}}
@@ -3423,6 +3427,22 @@ ARR: Annual recurring revenue.
             .formula_graph
             .iter()
             .any(|formula| formula.name == "profit" && formula.value == Some(60.0)));
+        assert!(response
+            .formula_graph
+            .iter()
+            .any(|formula| formula.name == "healthy" && formula.value == Some(1.0)));
+        assert!(response
+            .formula_graph
+            .iter()
+            .any(|formula| formula.name == "target_met" && formula.value == Some(1.0)));
+        assert!(response
+            .formula_graph
+            .iter()
+            .any(|formula| formula.name == "cost_match" && formula.value == Some(1.0)));
+        assert!(response
+            .formula_graph
+            .iter()
+            .any(|formula| formula.name == "spread" && formula.value == Some(1.0)));
     }
 
     #[test]
@@ -3737,12 +3757,13 @@ ARR: Annual recurring revenue.
     #[test]
     fn csv_and_tsv_transforms_evaluate_table_formula_cells() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Formula Tables\nstatus: approved\napprovedBy: QA\n---\n# Formula Tables\n```csv\nMetric,Value\nTotal,=10+15\nRounded,=ROUND(2.6)\n```\n\n```tsv\nMetric\tValue\nAbs\t=ABS(-5)\nSum\t=SUM(2,3)\n```\n".to_string(),
+            text: "---\ntitle: Formula Tables\nstatus: approved\napprovedBy: QA\n---\n# Formula Tables\n```csv\nMetric,Value\nTotal,=10+15\nRounded,=ROUND(2.6)\n```\n\n```tsv\nMetric\tValue\nAbs\t=ABS(-5)\nSum\t=SUM(2,3)\nProfitable\t=IF(10>5,1,0)\nEqual\t=IF(ROUND(2.6)=3,1,0)\n```\n".to_string(),
             file_path: None,
         });
 
         assert!(response.html.contains("<td>25</td>"));
         assert!(response.html.contains("<td>3</td>"));
+        assert!(response.html.contains("<td>1</td>"));
         assert!(response.html.contains("<td>5</td>"));
         assert!(!response
             .diagnostics
