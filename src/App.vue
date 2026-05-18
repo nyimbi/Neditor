@@ -294,7 +294,16 @@
             <small v-for="(total, column) in table.numeric_columns" :key="column">{{ column }} total: {{ total }} </small>
           </article>
           <h3>Includes</h3>
-          <p v-for="edge in active.compile?.include_graph || []" :key="`${edge.parent}-${edge.child}`">{{ edge.child }}</p>
+          <button
+            v-for="edge in active.compile?.include_graph || []"
+            :key="`${edge.parent}-${edge.child}`"
+            class="outline-row"
+            :style="{ paddingLeft: `${edge.depth * 12 + 8}px` }"
+            type="button"
+            @click="store.openPath(edge.child)"
+          >
+            {{ edge.child }}
+          </button>
           <h3>Cross references</h3>
           <p v-for="reference in active.compile?.semantic.cross_references || []" :key="reference.key">
             {{ reference.key }}: {{ reference.resolved ? "resolved" : "missing" }}
