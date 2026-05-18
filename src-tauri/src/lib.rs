@@ -2,7 +2,6 @@ use chrono::Utc;
 use pulldown_cmark::{html, Options, Parser};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     env, fs,
@@ -24,6 +23,7 @@ mod review;
 mod snapshot;
 mod tables;
 mod transforms;
+mod utils;
 
 use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
@@ -75,6 +75,11 @@ use transforms::external::ExternalTransformRequest;
 use transforms::{
     external::{list_transform_engines, run_external_transform},
     transform_cache_key, TransformArtifact,
+};
+pub(crate) use utils::{
+    escape_css, escape_html, escape_pdf, escape_xml, format_value, metadata_lookup,
+    metadata_string, path_to_string, render_export_template, sha256_hex, sha256_uri,
+    value_to_string,
 };
 
 const MAX_INCLUDE_DEPTH: usize = 16;
@@ -4004,49 +4009,6 @@ fn parse_json_or_yaml(body: &str) -> Result<Value, String> {
         .map_err(|err| err.to_string())
 }
 
-fn metadata_lookup<'a>(metadata: &'a Value, path: &str) -> Option<&'a Value> {
-    let mut current = metadata;
-    for part in path.split('.') {
-        current = current.get(part)?;
-    }
-    Some(current)
-}
-
-fn metadata_string(metadata: &Value, path: &str) -> Option<String> {
-    metadata_lookup(metadata, path).map(value_to_string)
-}
-
-fn render_export_template(
-    template: &str,
-    response: &CompileResponse,
-    classification: &str,
-) -> String {
-    template
-        .replace("{{title}}", &response.semantic.title)
-        .replace("{{status}}", &response.semantic.status)
-        .replace("{{classification}}", classification)
-        .replace("{{page}}", "1")
-        .replace("{{pages}}", "1")
-}
-
-fn value_to_string(value: &Value) -> String {
-    match value {
-        Value::String(value) => value.clone(),
-        Value::Number(value) => value.to_string(),
-        Value::Bool(value) => value.to_string(),
-        _ => serde_json::to_string(value).unwrap_or_default(),
-    }
-}
-
-fn format_value(value: f64, filter: &str) -> String {
-    match filter {
-        "percent" => format!("{:.2}%", value * 100.0),
-        "currency" => format!("${value:.2}"),
-        "round" => format!("{value:.0}"),
-        _ => value.to_string(),
-    }
-}
-
 fn count_figures(text: &str) -> usize {
     text.matches("![").count()
 }
@@ -4063,16 +4025,6 @@ fn manifest_file(path: &str) -> Option<ManifestFile> {
     })
 }
 
-fn sha256_uri(bytes: &[u8]) -> String {
-    format!("sha256:{}", sha256_hex(bytes))
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    format!("{:x}", hasher.finalize())
-}
-
 fn slugify(text: &str) -> String {
     text.to_ascii_lowercase()
         .chars()
@@ -4082,34 +4034,6 @@ fn slugify(text: &str) -> String {
         .filter(|part| !part.is_empty())
         .collect::<Vec<_>>()
         .join("-")
-}
-
-fn path_to_string(path: &Path) -> String {
-    path.to_string_lossy().to_string()
-}
-
-fn escape_html(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
-fn escape_xml(text: &str) -> String {
-    escape_html(text).replace('\'', "&apos;")
-}
-
-fn escape_pdf(text: &str) -> String {
-    text.replace('\\', "\\\\")
-        .replace('(', "\\(")
-        .replace(')', "\\)")
-        .chars()
-        .filter(|ch| ch.is_ascii())
-        .collect()
-}
-
-fn escape_css(text: &str) -> String {
-    text.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
