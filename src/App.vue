@@ -101,7 +101,7 @@
       </select>
     </nav>
 
-    <main class="workspace" :class="`mode-${store.mode}`">
+    <main ref="workspacePane" class="workspace" :class="`mode-${store.mode}`" :style="workspaceStyle">
       <aside class="sidebar" aria-label="Document workspace">
         <template v-if="store.sidebar === 'files'">
           <h2>Workspace</h2>
@@ -670,6 +670,20 @@
         <div ref="editorHost" class="editor-host"></div>
       </section>
 
+      <button
+        v-show="paneSplitterVisible"
+        class="pane-splitter"
+        type="button"
+        role="separator"
+        aria-label="Resize editor and preview panes"
+        aria-orientation="vertical"
+        :aria-valuenow="Math.round(editorPaneRatio * 100)"
+        aria-valuemin="25"
+        aria-valuemax="75"
+        @pointerdown="startPaneResize"
+        @keydown="handlePaneSplitterKeydown"
+      ></button>
+
       <section
         ref="previewPane"
         v-show="store.mode !== 'source' && store.mode !== 'focus'"
@@ -821,6 +835,7 @@ import type { AiCleanupResponse, DocumentDiagnostic, OpenDocument } from "./type
 const store = useDocumentsStore();
 const appWindow = getCurrentWindow();
 const editorHost = ref<HTMLElement | null>(null);
+const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
 let debounceHandle = 0;
@@ -847,6 +862,7 @@ const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const isNewTableDraft = ref(false);
 const draggedTabId = ref("");
+const editorPaneRatio = ref(0.5);
 
 interface MarkdownTable {
   startLine: number;
@@ -902,6 +918,8 @@ const previewDocumentStyle = computed(() => ({
   fontFamily: store.previewFont,
   lineHeight: String(clampUiLineHeight(store.previewLineHeight)),
 }));
+const workspaceStyle = computed(() => ({ "--editor-ratio": String(editorPaneRatio.value) }));
+const paneSplitterVisible = computed(() => !["source", "focus", "preview", "export"].includes(store.mode));
 const wordStats = computed(() => {
   const text = active.value?.text || "";
   const words = text.trim().split(/\s+/).filter(Boolean).length;
@@ -1076,6 +1094,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(autosaveHandle);
   window.clearTimeout(autoSnapshotHandle);
   window.removeEventListener("keydown", handleShortcut);
+  stopPaneResize();
 });
 
 watch(
@@ -1556,6 +1575,50 @@ function syncScrollPosition(source: HTMLElement, target: HTMLElement) {
   const sourceRange = Math.max(1, source.scrollHeight - source.clientHeight);
   const targetRange = Math.max(0, target.scrollHeight - target.clientHeight);
   target.scrollTop = (source.scrollTop / sourceRange) * targetRange;
+}
+
+function startPaneResize(event: PointerEvent) {
+  event.preventDefault();
+  resizeEditorPane(event);
+  window.addEventListener("pointermove", resizeEditorPane);
+  window.addEventListener("pointerup", stopPaneResize, { once: true });
+}
+
+function stopPaneResize() {
+  window.removeEventListener("pointermove", resizeEditorPane);
+}
+
+function resizeEditorPane(event: PointerEvent) {
+  const workspace = workspacePane.value;
+  if (!workspace) return;
+  const rect = workspace.getBoundingClientRect();
+  const sidebarWidth = window.matchMedia("(max-width: 900px)").matches ? 0 : 260;
+  const splitterWidth = 8;
+  const availableWidth = rect.width - sidebarWidth - splitterWidth;
+  if (availableWidth <= 0) return;
+  const x = event.clientX - rect.left - sidebarWidth;
+  editorPaneRatio.value = clampPaneRatio(x / availableWidth);
+}
+
+function handlePaneSplitterKeydown(event: KeyboardEvent) {
+  const keyStep = event.shiftKey ? 0.1 : 0.025;
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    editorPaneRatio.value = clampPaneRatio(editorPaneRatio.value - keyStep);
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    editorPaneRatio.value = clampPaneRatio(editorPaneRatio.value + keyStep);
+  } else if (event.key === "Home") {
+    event.preventDefault();
+    editorPaneRatio.value = 0.25;
+  } else if (event.key === "End") {
+    event.preventDefault();
+    editorPaneRatio.value = 0.75;
+  }
+}
+
+function clampPaneRatio(value: number) {
+  return Math.min(0.75, Math.max(0.25, value));
 }
 
 function runEditorCommand(command: (view: EditorView) => boolean) {
@@ -2832,7 +2895,9 @@ select:hover {
 
 .workspace {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns:
+    260px minmax(260px, calc((100vw - 268px) * var(--editor-ratio, 0.5))) 8px
+    minmax(260px, 1fr);
   min-height: 0;
 }
 
@@ -2852,6 +2917,23 @@ select:hover {
   min-height: 0;
   overflow: auto;
   border-right: 1px solid #c9d2dc;
+}
+
+.pane-splitter {
+  width: 8px;
+  min-width: 8px;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid #c9d2dc;
+  border-left: 1px solid #d7dee7;
+  background: #e4eaf1;
+  cursor: col-resize;
+}
+
+.pane-splitter:hover,
+.pane-splitter:focus-visible {
+  background: #2f6f9f;
+  outline: none;
 }
 
 .sidebar {
@@ -3400,6 +3482,10 @@ select:hover {
   }
 
   .sidebar {
+    display: none;
+  }
+
+  .pane-splitter {
     display: none;
   }
 
