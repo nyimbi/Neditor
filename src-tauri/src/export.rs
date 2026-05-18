@@ -549,7 +549,9 @@ fn glossary_export_lines(response: &CompileResponse, options: &Value) -> Vec<Str
 }
 
 fn comment_export_lines(response: &CompileResponse, options: &Value) -> Vec<String> {
-    if !include_comments(options) || response.semantic.comments.is_empty() {
+    if !include_comments(options)
+        || (response.semantic.comments.is_empty() && response.semantic.change_notes.is_empty())
+    {
         return Vec::new();
     }
     let mut lines = vec![String::new(), "Review Comments".to_string()];
@@ -569,6 +571,26 @@ fn comment_export_lines(response: &CompileResponse, options: &Value) -> Vec<Stri
             comment.line, comment.state, author, created_at, comment.text
         )
     }));
+    if !response.semantic.change_notes.is_empty() {
+        lines.push(String::new());
+        lines.push("Change Notes".to_string());
+        lines.extend(response.semantic.change_notes.iter().map(|note| {
+            let created_at = if note.created_at.is_empty() {
+                "undated"
+            } else {
+                note.created_at.as_str()
+            };
+            let author = if note.author.is_empty() {
+                "local"
+            } else {
+                note.author.as_str()
+            };
+            format!(
+                "Line {} {} at {}: {}",
+                note.line, author, created_at, note.text
+            )
+        }));
+    }
     lines
 }
 
@@ -642,7 +664,9 @@ fn html_glossary_section(response: &CompileResponse, options: &Value) -> String 
 }
 
 fn html_comments_section(response: &CompileResponse, options: &Value) -> String {
-    if !include_comments(options) || response.semantic.comments.is_empty() {
+    if !include_comments(options)
+        || (response.semantic.comments.is_empty() && response.semantic.change_notes.is_empty())
+    {
         return String::new();
     }
     let entries = response
@@ -662,8 +686,29 @@ fn html_comments_section(response: &CompileResponse, options: &Value) -> String 
             )
         })
         .collect::<String>();
+    let change_entries = response
+        .semantic
+        .change_notes
+        .iter()
+        .map(|note| {
+            let created_at = empty_as(note.created_at.as_str(), "undated");
+            let author = empty_as(note.author.as_str(), "local");
+            format!(
+                "<li><strong>Line {}</strong> <em>{} at {}</em><p>{}</p></li>",
+                note.line,
+                escape_html(author),
+                escape_html(created_at),
+                escape_html(&note.text)
+            )
+        })
+        .collect::<String>();
+    let changes = if change_entries.is_empty() {
+        String::new()
+    } else {
+        format!("<h3>Change Notes</h3><ol>{change_entries}</ol>")
+    };
     format!(
-        "<section class=\"export-comments\"><h2>Review Comments</h2><ol>{entries}</ol></section>"
+        "<section class=\"export-comments\"><h2>Review Comments</h2><ol>{entries}</ol>{changes}</section>"
     )
 }
 

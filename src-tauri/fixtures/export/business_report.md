@@ -22,6 +22,7 @@ layout:
 Revenue growth follows the operating model described by Porter [@porter1985, p. 42].
 
 <!-- comment: author: QA | at: 2026-05-18 | resolved | Verify board-pack export fidelity. -->
+<!-- change: author: QA | at: 2026-05-18T13:00:00Z | Added export conformance evidence. -->
 
 | Region | Revenue | Margin |
 | --- | ---: | ---: |

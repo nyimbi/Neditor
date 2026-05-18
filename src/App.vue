@@ -382,11 +382,21 @@
             <textarea v-model="reviewCommentText" rows="4" placeholder="Review note"></textarea>
           </label>
           <button type="button" @click="insertReviewComment">Add comment</button>
+          <label>
+            Change note
+            <textarea v-model="changeNoteText" rows="3" placeholder="Change summary"></textarea>
+          </label>
+          <button type="button" @click="insertChangeNote">Add change note</button>
           <h3>Comments</h3>
           <article v-for="comment in active.compile?.semantic.comments || []" :key="String(comment.line)" class="snapshot-row">
             <p>{{ comment.text }}</p>
             <small>Line {{ comment.line }} | {{ comment.state }} | {{ comment.author || "local" }}{{ comment.created_at ? ` | ${comment.created_at}` : "" }}</small>
             <button v-if="comment.state !== 'resolved'" type="button" @click="store.resolveReviewComment(Number(comment.line))">Resolve</button>
+          </article>
+          <h3>Change notes</h3>
+          <article v-for="note in active.compile?.semantic.change_notes || []" :key="`change-${note.line}`" class="snapshot-row">
+            <p>{{ note.text }}</p>
+            <small>Line {{ note.line }} | {{ note.author || "local" }}{{ note.created_at ? ` | ${note.created_at}` : "" }}</small>
           </article>
           <h3>AI provenance</h3>
           <article v-for="source in active.compile?.semantic.ai_sources || []" :key="`ai-source-${source.line}`" class="snapshot-row">
@@ -718,6 +728,7 @@ const conflictOpen = ref(false);
 const mergedConflictText = ref("");
 const commandQuery = ref("");
 const reviewCommentText = ref("");
+const changeNoteText = ref("");
 const selectedTableIndex = ref(0);
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
@@ -1767,6 +1778,11 @@ function runCommand(run: () => unknown) {
 function insertReviewComment() {
   store.insertReviewComment(reviewCommentText.value);
   reviewCommentText.value = "";
+}
+
+function insertChangeNote() {
+  store.insertChangeNote(changeNoteText.value);
+  changeNoteText.value = "";
 }
 
 function toggleAiSectionReview(line: number, event: Event) {

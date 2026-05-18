@@ -121,6 +121,7 @@ struct SemanticDocument {
     glossary: BTreeMap<String, String>,
     layout_directives: Vec<String>,
     comments: Vec<ReviewComment>,
+    change_notes: Vec<ChangeNote>,
     ai_sources: Vec<AiSource>,
     ai_assisted_sections: Vec<AiAssistedSection>,
     labels: Vec<String>,
@@ -175,6 +176,14 @@ struct ReviewComment {
     author: String,
     created_at: String,
     state: String,
+    text: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ChangeNote {
+    line: usize,
+    author: String,
+    created_at: String,
     text: String,
 }
 
@@ -312,6 +321,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         .collect::<Vec<_>>();
     let layout_directives = collect_fence_bodies(&interpolated, "layout");
     let comments = collect_comments(&interpolated);
+    let change_notes = collect_change_notes(&interpolated);
     let ai_sources = collect_ai_sources(&interpolated);
     let ai_assisted_sections = collect_ai_assisted_sections(&interpolated, &headings);
     let with_toc = inject_generated_sections(
@@ -428,6 +438,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         glossary,
         layout_directives,
         comments,
+        change_notes,
         ai_sources,
         ai_assisted_sections,
         labels,
@@ -2159,6 +2170,19 @@ fn collect_comments(text: &str) -> Vec<ReviewComment> {
         .collect()
 }
 
+fn collect_change_notes(text: &str) -> Vec<ChangeNote> {
+    text.lines()
+        .enumerate()
+        .filter_map(|(index, line)| {
+            let content = line
+                .trim()
+                .strip_prefix("<!-- change:")?
+                .strip_suffix("-->")?;
+            Some(parse_change_note(index + 1, content))
+        })
+        .collect()
+}
+
 fn parse_review_comment(line: usize, content: &str) -> ReviewComment {
     let mut author = "local".to_string();
     let mut created_at = String::new();
@@ -2199,6 +2223,41 @@ fn parse_review_comment(line: usize, content: &str) -> ReviewComment {
         author,
         created_at,
         state,
+        text: text_parts.join(" | "),
+    }
+}
+
+fn parse_change_note(line: usize, content: &str) -> ChangeNote {
+    let mut author = "local".to_string();
+    let mut created_at = String::new();
+    let mut text_parts = Vec::new();
+
+    for part in content
+        .split('|')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+    {
+        if let Some(value) = part
+            .strip_prefix("author:")
+            .or_else(|| part.strip_prefix("author="))
+        {
+            author = value.trim().to_string();
+        } else if let Some(value) = part
+            .strip_prefix("at:")
+            .or_else(|| part.strip_prefix("at="))
+            .or_else(|| part.strip_prefix("createdAt:"))
+            .or_else(|| part.strip_prefix("createdAt="))
+        {
+            created_at = value.trim().to_string();
+        } else {
+            text_parts.push(part.to_string());
+        }
+    }
+
+    ChangeNote {
+        line,
+        author,
+        created_at,
         text: text_parts.join(" | "),
     }
 }
@@ -4185,15 +4244,19 @@ ARR: Annual recurring revenue.
     #[test]
     fn compiler_parses_review_comment_metadata() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Review\nstatus: approved\napprovedBy: QA\n---\n# Review\n<!-- comment: unresolved | author: Dana | at: 2026-05-18T10:00:00Z | Clarify the risk note. -->\n".to_string(),
+            text: "---\ntitle: Review\nstatus: approved\napprovedBy: QA\n---\n# Review\n<!-- comment: unresolved | author: Dana | at: 2026-05-18T10:00:00Z | Clarify the risk note. -->\n<!-- change: author: Dana | at: 2026-05-18T11:00:00Z | Updated the risk note. -->\n".to_string(),
             file_path: None,
         });
         let comment = response.semantic.comments.first().expect("review comment");
+        let change_note = response.semantic.change_notes.first().expect("change note");
 
         assert_eq!(comment.state, "unresolved");
         assert_eq!(comment.author, "Dana");
         assert_eq!(comment.created_at, "2026-05-18T10:00:00Z");
         assert_eq!(comment.text, "Clarify the risk note.");
+        assert_eq!(change_note.author, "Dana");
+        assert_eq!(change_note.created_at, "2026-05-18T11:00:00Z");
+        assert_eq!(change_note.text, "Updated the risk note.");
         assert!(response
             .diagnostics
             .iter()
@@ -5513,6 +5576,11 @@ paths:
             && comment.state == "resolved"));
         assert!(response
             .semantic
+            .change_notes
+            .iter()
+            .any(|note| note.text.contains("export conformance evidence")));
+        assert!(response
+            .semantic
             .ai_sources
             .iter()
             .any(|source| source.provider == "OpenAI" && source.status == "human-reviewed"));
@@ -5550,6 +5618,7 @@ paths:
         assert!(html.contains("<dt>ARR</dt>"));
         assert!(html.contains("class=\"export-comments\""));
         assert!(html.contains("Verify board-pack export fidelity."));
+        assert!(html.contains("Added export conformance evidence."));
         assert!(html.contains("class=\"export-provenance\""));
         assert!(html.contains("gpt-5.4"));
 
@@ -5562,6 +5631,7 @@ paths:
         assert!(pdf_text.contains("Reference architecture"));
         assert!(pdf_text.contains("Glossary"));
         assert!(pdf_text.contains("Review Comments"));
+        assert!(pdf_text.contains("Change Notes"));
         assert!(pdf_text.contains("AI Provenance"));
 
         let docx = render_docx_bytes(&response, &options).expect("docx bytes");
@@ -5589,6 +5659,8 @@ paths:
         assert!(docx_document.contains("Annual recurring revenue"));
         assert!(docx_document.contains("Review Comments"));
         assert!(docx_document.contains("Verify board-pack export fidelity."));
+        assert!(docx_document.contains("Change Notes"));
+        assert!(docx_document.contains("Added export conformance evidence."));
         assert!(docx_document.contains("AI Provenance"));
         assert!(docx_document.contains("gpt-5.4"));
 
@@ -5622,6 +5694,8 @@ paths:
             .find(|slide| slide.contains("Review Comments"))
             .expect("comments slide");
         assert!(pptx_comments_slide.contains("Verify board-pack export fidelity."));
+        assert!(pptx_comments_slide.contains("Change Notes"));
+        assert!(pptx_comments_slide.contains("Added export conformance evidence."));
         let pptx_provenance_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
             .into_iter()
             .find(|slide| slide.contains("AI Provenance"))
@@ -5632,6 +5706,7 @@ paths:
         assert!(exported_text.contains("Glossary"));
         assert!(exported_text.contains("ARR: Annual recurring revenue"));
         assert!(exported_text.contains("Review Comments"));
+        assert!(exported_text.contains("Change Notes"));
         assert!(exported_text.contains("AI Provenance"));
 
         let mut bundle_manifest = response.export_manifest.clone();

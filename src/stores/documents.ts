@@ -1111,6 +1111,12 @@ export const useDocumentsStore = defineStore("documents", {
       this.updateText(`${this.activeDocument.text}\n\n<!-- comment: unresolved | author: local | at: ${createdAt} | ${comment} -->\n`);
       this.statusMessage = "Inserted review comment";
     },
+    insertChangeNote(text: string) {
+      const note = (text.trim() || "Change note").replace(/-->/g, "->");
+      const createdAt = new Date().toISOString();
+      this.updateText(`${this.activeDocument.text}\n\n<!-- change: author: local | at: ${createdAt} | ${note} -->\n`);
+      this.statusMessage = "Inserted change note";
+    },
     resolveReviewComment(line: number) {
       const lines = this.activeDocument.text.split("\n");
       const index = Math.max(0, line - 1);

@@ -36,6 +36,7 @@ export interface SemanticDocument {
   glossary: Record<string, string>;
   layout_directives: string[];
   comments: Array<{ line: number; author: string; created_at?: string | null; state: string; text: string }>;
+  change_notes: Array<{ line: number; author: string; created_at?: string | null; text: string }>;
   ai_sources: Array<{
     line: number;
     provider: string;
