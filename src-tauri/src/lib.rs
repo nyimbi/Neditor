@@ -5764,6 +5764,10 @@ paths:
         assert_eq!(stdin_artifact.input_mode, "stdin");
         assert!(stdin_artifact.html.contains(&unique_body));
         assert!(!stdin_artifact.cache_key.is_empty());
+        assert!(stdin_artifact
+            .engine_version
+            .as_deref()
+            .is_some_and(|version| version.contains("file-size:")));
         let cached_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
             body: unique_body,
@@ -5777,6 +5781,10 @@ paths:
         .expect("cached stdin external transform");
         assert_eq!(cached_artifact.cache_key, stdin_artifact.cache_key);
         assert_eq!(cached_artifact.output_hash, stdin_artifact.output_hash);
+        assert_eq!(
+            cached_artifact.engine_version,
+            stdin_artifact.engine_version
+        );
         assert_eq!(cached_artifact.duration_ms, Some(0));
         assert!(cached_artifact
             .diagnostics

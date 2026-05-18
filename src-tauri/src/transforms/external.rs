@@ -127,12 +127,8 @@ pub(crate) fn run_external_transform(
         return Err("External transform input_mode must be 'stdin' or 'file'.".to_string());
     }
     let source_hash = sha256_hex(request.body.as_bytes());
-    let cache_key = transform_cache_key(
-        &request.name,
-        input_mode,
-        &path_to_string(&engine_path),
-        &source_hash,
-    );
+    let (engine_identity, engine_version) = external_engine_identity(&engine_path)?;
+    let cache_key = transform_cache_key(&request.name, input_mode, &engine_identity, &source_hash);
     if let Some(artifact) = cached_external_transform(&cache_key, &request.name, output_limit) {
         return Ok(artifact);
     }
@@ -144,6 +140,8 @@ pub(crate) fn run_external_transform(
         input_mode,
         timeout_ms,
         output_limit,
+        &engine_identity,
+        &engine_version,
     )?;
     store_external_transform(artifact.clone());
     Ok(artifact)
@@ -190,6 +188,21 @@ fn store_external_transform(artifact: TransformArtifact) {
     cache.insert(artifact.cache_key.clone(), artifact);
 }
 
+fn external_engine_identity(engine_path: &Path) -> Result<(String, String), String> {
+    let metadata = fs::metadata(engine_path).map_err(|err| err.to_string())?;
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    let version = format!("file-size:{};mtime:{modified}", metadata.len());
+    Ok((
+        format!("{};{version}", path_to_string(engine_path)),
+        version,
+    ))
+}
+
 fn execute_external_transform(
     name: &str,
     body: &str,
@@ -197,6 +210,8 @@ fn execute_external_transform(
     input_mode: &str,
     timeout_ms: u64,
     max_output_bytes: usize,
+    engine_identity: &str,
+    engine_version: &str,
 ) -> Result<TransformArtifact, String> {
     let source_hash = sha256_hex(body.as_bytes());
     let started = Instant::now();
@@ -341,14 +356,9 @@ fn execute_external_transform(
         name: name.to_string(),
         output_kind: if html.contains("<svg") { "svg" } else { "html" }.to_string(),
         output_hash,
-        cache_key: transform_cache_key(
-            name,
-            input_mode,
-            &path_to_string(engine_path),
-            &source_hash,
-        ),
+        cache_key: transform_cache_key(name, input_mode, engine_identity, &source_hash),
         execution_kind: "external".to_string(),
-        engine_version: None,
+        engine_version: Some(engine_version.to_string()),
         engine_path: Some(path_to_string(engine_path)),
         input_mode: input_mode.to_string(),
         duration_ms: Some(duration_ms),
