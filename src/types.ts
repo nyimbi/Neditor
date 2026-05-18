@@ -57,7 +57,7 @@ export interface SemanticDocument {
     prompt_summary: string;
   }>;
   labels: string[];
-  cross_references: Array<{ key: string; target_kind: string; resolved: boolean }>;
+  cross_references: Array<{ key: string; target_kind: string; resolved: boolean; line: number; source_file?: string | null }>;
 }
 
 export interface DocumentSourceRange {

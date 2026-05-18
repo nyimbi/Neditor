@@ -309,9 +309,15 @@
             {{ edge.child }}
           </button>
           <h3>Cross references</h3>
-          <p v-for="reference in active.compile?.semantic.cross_references || []" :key="reference.key">
+          <button
+            v-for="reference in active.compile?.semantic.cross_references || []"
+            :key="`${reference.key}-${reference.line}`"
+            class="outline-row"
+            type="button"
+            @click="goToCrossReference(reference)"
+          >
             {{ reference.key }}: {{ reference.resolved ? "resolved" : "missing" }}
-          </p>
+          </button>
           <h3>Labels</h3>
           <p v-for="label in active.compile?.semantic.labels || []" :key="label">{{ label }}</p>
         </template>
@@ -2489,6 +2495,14 @@ function goToSearchTerm(term: string) {
     effects: EditorView.scrollIntoView(index, { y: "center" }),
   });
   editorView.focus();
+}
+
+function goToCrossReference(reference: { line: number; source_file?: string | null }) {
+  if (reference.source_file && active.value.path && reference.source_file !== active.value.path) {
+    void store.openPath(reference.source_file);
+    return;
+  }
+  goToLine(reference.line);
 }
 
 function handlePreviewClick(event: MouseEvent) {

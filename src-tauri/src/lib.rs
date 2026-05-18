@@ -202,6 +202,8 @@ struct CrossReference {
     key: String,
     target_kind: String,
     resolved: bool,
+    line: usize,
+    source_file: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -305,7 +307,8 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     let citation_references = collect_citation_references(&interpolated);
     let citations = citation_keys_from_references(&citation_references);
     let labels = collect_labels(&interpolated, &headings);
-    let cross_references = collect_cross_references(&interpolated, &labels, &mut diagnostics);
+    let cross_references =
+        collect_cross_references(&interpolated, &labels, &source_map, &mut diagnostics);
     let index_entries = collect_index_entries(&interpolated, &metadata, &headings, &glossary);
     let index_terms = index_entries
         .iter()
@@ -1995,34 +1998,48 @@ fn collect_labels(text: &str, headings: &[Heading]) -> Vec<String> {
 fn collect_cross_references(
     text: &str,
     labels: &[String],
+    source_map: &[SourceMapEntry],
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> Vec<CrossReference> {
     let known = labels.iter().map(String::as_str).collect::<HashSet<_>>();
     let mut references = Vec::new();
-    for segment in text.split("{@").skip(1) {
-        if let Some((key, _)) = segment.split_once('}') {
-            let key = key.trim().to_string();
-            if key.is_empty() {
-                continue;
+    for (line_index, line) in text.lines().enumerate() {
+        let generated_line = line_index + 1;
+        for segment in line.split("{@").skip(1) {
+            if let Some((key, _)) = segment.split_once('}') {
+                let key = key.trim().to_string();
+                if key.is_empty() {
+                    continue;
+                }
+                let resolved = known.contains(key.as_str());
+                let (source_file, source_line) =
+                    diagnostic_location_for_generated_line(source_map, generated_line);
+                if !resolved {
+                    let mut diagnostic = diag(
+                        "error",
+                        format!("Broken cross reference: {key}"),
+                        source_file.clone(),
+                        source_line,
+                        Some(
+                            "Add a matching label such as {#fig:name}, {#tbl:name}, or {#eq:name}.",
+                        ),
+                    );
+                    diagnostic
+                        .related
+                        .push(format!("Reference syntax: {{@{key}}}"));
+                    diagnostics.push(diagnostic);
+                }
+                references.push(CrossReference {
+                    target_kind: key
+                        .split_once(':')
+                        .map(|(kind, _)| kind.to_string())
+                        .unwrap_or_else(|| "section".to_string()),
+                    key,
+                    resolved,
+                    line: source_line.unwrap_or(generated_line),
+                    source_file,
+                });
             }
-            let resolved = known.contains(key.as_str());
-            if !resolved {
-                diagnostics.push(diag(
-                    "error",
-                    format!("Broken cross reference: {key}"),
-                    None,
-                    None,
-                    Some("Add a matching label such as {#fig:name}, {#tbl:name}, or {#eq:name}."),
-                ));
-            }
-            references.push(CrossReference {
-                target_kind: key
-                    .split_once(':')
-                    .map(|(kind, _)| kind.to_string())
-                    .unwrap_or_else(|| "section".to_string()),
-                key,
-                resolved,
-            });
         }
     }
     references
@@ -4405,10 +4422,23 @@ ARR: Annual recurring revenue.
             .semantic
             .cross_references
             .iter()
-            .any(|reference| reference.key == "fig:diagram" && reference.resolved));
-        assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
-            .message
-            .contains("Broken cross reference: fig:missing")));
+            .any(|reference| reference.key == "fig:diagram"
+                && reference.resolved
+                && reference.line == 12));
+        let broken_cross_reference = response
+            .diagnostics
+            .iter()
+            .find(|diagnostic| {
+                diagnostic
+                    .message
+                    .contains("Broken cross reference: fig:missing")
+            })
+            .expect("broken cross-reference diagnostic");
+        assert_eq!(broken_cross_reference.line, Some(12));
+        assert!(broken_cross_reference
+            .related
+            .iter()
+            .any(|related| related.contains("{@fig:missing}")));
         fs::remove_dir_all(root).expect("clean bib test dir");
     }
 
