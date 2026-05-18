@@ -477,6 +477,7 @@
         </section>
         <label><input v-model="aiMarkAsDraft" type="checkbox" /> Mark as draft</label>
         <label><input v-model="aiAddProvenance" type="checkbox" /> Add provenance block</label>
+        <label><input v-model="aiInsertCitationTodos" type="checkbox" /> Insert citation TODOs</label>
         <label>
           Insert mode
           <select v-model="aiInsertMode">
@@ -591,6 +592,7 @@ const aiPasteText = ref("");
 const aiInsertMode = ref<"insert" | "replace" | "appendix">("insert");
 const aiAddProvenance = ref(true);
 const aiMarkAsDraft = ref(true);
+const aiInsertCitationTodos = ref(true);
 const aiPreviewBusy = ref(false);
 const aiPreviewSignature = ref("");
 const commandPaletteOpen = ref(false);
@@ -1332,6 +1334,7 @@ async function previewAiPaste() {
     await store.previewAiPaste(aiPasteText.value, {
       addProvenance: aiAddProvenance.value,
       markAsDraft: aiMarkAsDraft.value,
+      insertCitationTodos: aiInsertCitationTodos.value,
     });
     aiPreviewSignature.value = aiCleanupSignature();
   } finally {
@@ -1352,6 +1355,7 @@ function aiCleanupSignature() {
     text: aiPasteText.value,
     addProvenance: aiAddProvenance.value,
     markAsDraft: aiMarkAsDraft.value,
+    insertCitationTodos: aiInsertCitationTodos.value,
   });
 }
 

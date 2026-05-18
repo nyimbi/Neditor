@@ -202,6 +202,7 @@ export interface AiCleanupResponse {
 export interface AiCleanupOptions {
   addProvenance: boolean;
   markAsDraft: boolean;
+  insertCitationTodos: boolean;
 }
 
 export interface ExportReadinessReport {

@@ -6,6 +6,7 @@ pub(crate) struct AiCleanupRequest {
     pub(crate) text: String,
     pub(crate) add_provenance: bool,
     pub(crate) mark_as_draft: bool,
+    pub(crate) insert_citation_todos: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -35,6 +36,9 @@ pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
     }
     cleaned = normalize_markdown_lists(&cleaned, &mut issues);
     cleaned = normalize_markdown_tables(&cleaned, &mut issues);
+    if request.insert_citation_todos {
+        cleaned = insert_citation_todos(&cleaned, &mut issues);
+    }
     if request.mark_as_draft && !cleaned.contains("status: draft") {
         cleaned = format!("<!-- draft: AI paste cleanup review required -->\n\n{cleaned}");
         issues.push("Marked inserted content as draft.".to_string());
@@ -104,4 +108,62 @@ fn normalize_markdown_tables(text: &str, issues: &mut Vec<String>) -> String {
         issues.push("Converted tab-separated rows to Markdown table rows.".to_string());
     }
     output.join("\n")
+}
+
+fn insert_citation_todos(text: &str, issues: &mut Vec<String>) -> String {
+    let mut in_code_fence = false;
+    let mut inserted = 0usize;
+    let output = text
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with("```") {
+                in_code_fence = !in_code_fence;
+                return line.to_string();
+            }
+            if in_code_fence || !line_needs_citation_todo(trimmed) {
+                return line.to_string();
+            }
+            inserted += 1;
+            format!("{line} <!-- TODO: citation needed -->")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if inserted > 0 {
+        issues.push(format!("Inserted {inserted} citation TODO marker(s)."));
+    }
+    output
+}
+
+fn line_needs_citation_todo(line: &str) -> bool {
+    if line.is_empty()
+        || line.starts_with('#')
+        || line.starts_with('|')
+        || line.starts_with("<!--")
+        || line.starts_with('>')
+        || line.contains("[@")
+        || line.contains("http://")
+        || line.contains("https://")
+        || line.contains("TODO: citation")
+    {
+        return false;
+    }
+    let lower = line.to_ascii_lowercase();
+    let factual_signal = line.chars().any(|ch| ch.is_ascii_digit())
+        || [
+            "according to",
+            "research",
+            "study",
+            "report",
+            "market",
+            "revenue",
+            "growth",
+            "customers",
+            "users",
+            "increased",
+            "decreased",
+        ]
+        .iter()
+        .any(|signal| lower.contains(signal));
+    factual_signal && matches!(line.chars().last(), Some('.' | ')' | '%'))
 }

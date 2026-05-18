@@ -900,7 +900,12 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async previewAiPaste(text: string, options: AiCleanupOptions) {
       const response = await invoke<AiCleanupResponse>("cleanup_ai_paste", {
-        request: { text, add_provenance: options.addProvenance, mark_as_draft: options.markAsDraft },
+        request: {
+          text,
+          add_provenance: options.addProvenance,
+          mark_as_draft: options.markAsDraft,
+          insert_citation_todos: options.insertCitationTodos,
+        },
       });
       this.aiCleanupPreview = response;
       this.aiCleanupIssues = response.issues;

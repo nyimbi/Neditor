@@ -5217,27 +5217,33 @@ paths:
     #[test]
     fn ai_cleanup_normalizes_chat_artifacts() {
         let response = cleanup_ai_paste(AiCleanupRequest {
-            text: "ChatGPT said:\n• First\tSecond\nA\tB".to_string(),
+            text: "ChatGPT said:\n• First\tSecond\nA\tB\nRevenue grew 24%.".to_string(),
             add_provenance: true,
             mark_as_draft: true,
+            insert_citation_todos: true,
         });
 
         assert!(response.cleaned_markdown.contains("- First"));
         assert!(response.cleaned_markdown.contains("| A | B |"));
+        assert!(response
+            .cleaned_markdown
+            .contains("Revenue grew 24%. <!-- TODO: citation needed -->"));
         assert!(response.cleaned_markdown.contains("```ai-source"));
-        assert!(response.issues.len() >= 3);
+        assert!(response.issues.len() >= 4);
     }
 
     #[test]
     fn ai_cleanup_respects_preview_options() {
         let response = cleanup_ai_paste(AiCleanupRequest {
-            text: "Assistant:\nClean paragraph.".to_string(),
+            text: "Assistant:\nClean paragraph.\n```text\nRevenue grew 24%.\n```".to_string(),
             add_provenance: false,
             mark_as_draft: false,
+            insert_citation_todos: false,
         });
 
         assert!(!response.cleaned_markdown.contains("draft: AI paste"));
         assert!(!response.cleaned_markdown.contains("```ai-source"));
+        assert!(!response.cleaned_markdown.contains("TODO: citation needed"));
         assert!(response.provenance_block.is_none());
     }
 }
