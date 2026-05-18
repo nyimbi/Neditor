@@ -29,6 +29,7 @@ type SnapshotStorage = "app-data" | "project-local";
 interface ExportDefaults {
   includeManifest: boolean;
   includeStyles: boolean;
+  includeSyntaxHighlighting: boolean;
   coverPage: boolean;
   pageNumbers: boolean;
   layoutPreset: LayoutPreset;
@@ -324,6 +325,8 @@ function normalizeExportDefaults(
   return {
     includeManifest: typeof defaults.includeManifest === "boolean" ? defaults.includeManifest : true,
     includeStyles: typeof defaults.includeStyles === "boolean" ? defaults.includeStyles : true,
+    includeSyntaxHighlighting:
+      typeof defaults.includeSyntaxHighlighting === "boolean" ? defaults.includeSyntaxHighlighting : true,
     coverPage:
       typeof defaults.coverPage === "boolean"
         ? defaults.coverPage
@@ -427,6 +430,7 @@ export const useDocumentsStore = defineStore("documents", {
     exportDefaults: {
       includeManifest: true,
       includeStyles: true,
+      includeSyntaxHighlighting: true,
       coverPage: true,
       pageNumbers: true,
       layoutPreset: "business",
@@ -1029,6 +1033,7 @@ export const useDocumentsStore = defineStore("documents", {
       return {
         includeManifest: defaults.includeManifest,
         includeStyles: defaults.includeStyles,
+        includeSyntaxHighlighting: defaults.includeSyntaxHighlighting,
         coverPage: defaults.coverPage,
         pageNumbers: defaults.pageNumbers,
         layoutPreset: defaults.layoutPreset,

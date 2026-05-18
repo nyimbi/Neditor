@@ -4403,6 +4403,30 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn export_syntax_highlighting_can_be_included_or_omitted() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Syntax Options\nstatus: approved\napprovedBy: QA\n---\n# Syntax Options\n\n```js\nconst total = 42; // amount\n```\n"
+                .to_string(),
+            file_path: None,
+        });
+
+        let highlighted = render_full_html(&response, &json!({}));
+        assert!(highlighted.contains("class=\"syn-keyword\""));
+        assert!(highlighted.contains("class=\"syn-number\""));
+        assert!(highlighted.contains("class=\"syn-comment\""));
+        assert!(highlighted.contains(".syn-keyword"));
+
+        let plain = render_full_html(&response, &json!({ "includeSyntaxHighlighting": false }));
+        assert!(!plain.contains("class=\"syn-keyword\""));
+        assert!(!plain.contains(".syn-keyword"));
+        assert!(plain.contains("const total = 42; // amount"));
+
+        let exported_text =
+            export::export_text(&response, &json!({ "includeSyntaxHighlighting": false }));
+        assert!(exported_text.contains("Syntax highlighting: omitted"));
+    }
+
+    #[test]
     fn compiler_loads_csl_json_bibliography() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -5910,6 +5934,7 @@ paths:
                 "watermark": 42,
                 "includeManifest": "yes",
                 "includeStyles": "yes",
+                "includeSyntaxHighlighting": "yes",
                 "coverPage": "yes",
                 "pageNumbers": "yes",
                 "layoutPreset": "dense",
@@ -5920,7 +5945,7 @@ paths:
         });
 
         assert!(!report.ready);
-        assert_eq!(report.error_count, 10);
+        assert_eq!(report.error_count, 11);
         assert_eq!(report.manifest.export_target, "rtf");
         assert!(report
             .diagnostics
@@ -5936,6 +5961,9 @@ paths:
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("includeStyles must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("includeSyntaxHighlighting must be true or false")));
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("coverPage must be true or false")));

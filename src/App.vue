@@ -307,6 +307,7 @@
           </label>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Include styles</label>
+          <label><input v-model="store.exportDefaults.includeSyntaxHighlighting" type="checkbox" /> Syntax highlighting</label>
           <label><input v-model="store.exportDefaults.coverPage" type="checkbox" /> Cover page</label>
           <label><input v-model="store.exportDefaults.pageNumbers" type="checkbox" /> Page numbers</label>
           <label>
@@ -479,6 +480,7 @@
           <h3>Export defaults</h3>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Manifest next to export</label>
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Styles</label>
+          <label><input v-model="store.exportDefaults.includeSyntaxHighlighting" type="checkbox" /> Syntax highlighting</label>
           <label><input v-model="store.exportDefaults.coverPage" type="checkbox" /> Cover page</label>
           <label><input v-model="store.exportDefaults.pageNumbers" type="checkbox" /> Page numbers</label>
           <label>
@@ -1097,6 +1099,7 @@ watch(
   () => [
     store.exportDefaults.includeManifest,
     store.exportDefaults.includeStyles,
+    store.exportDefaults.includeSyntaxHighlighting,
     store.exportDefaults.coverPage,
     store.exportDefaults.pageNumbers,
     store.exportDefaults.layoutPreset,

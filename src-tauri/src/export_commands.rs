@@ -227,6 +227,7 @@ fn validate_export_settings(
     for option in [
         "includeManifest",
         "includeStyles",
+        "includeSyntaxHighlighting",
         "coverPage",
         "pageNumbers",
         "includeGlossary",
