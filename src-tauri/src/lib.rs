@@ -951,7 +951,7 @@ fn list_transform_engines() -> Vec<Value> {
         transform_engine("layout", "rust-native", true, false),
         transform_engine("timeline", "rust-native-svg", true, false),
         transform_engine("chart", "rust-native-svg", true, false),
-        transform_engine("mermaid", "static-diagnostic", true, false),
+        transform_engine("mermaid", "rust-native-svg", true, false),
         transform_engine("pikchr", "external-sidecar", false, true),
         transform_engine("dot", "external-sidecar", false, true),
         transform_engine("graphviz", "external-sidecar", false, true),
@@ -1865,7 +1865,8 @@ fn render_transform(
         "topojson" => render_topojson_svg(body, &mut artifact_diags, diagnostics),
         "stl" => render_stl_svg(body, &mut artifact_diags, diagnostics),
         "vega-lite" => render_vega_lite_svg(body, &mut artifact_diags, diagnostics),
-        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" => {
+        "mermaid" => render_mermaid_svg(body, &mut artifact_diags, diagnostics),
+        "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" => {
             let message = format!("{name} transform captured as source artifact; configure an engine for rendered output.");
             let diagnostic = diag(
                 "warning",
@@ -3409,6 +3410,172 @@ fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[(String, f64)])
     svg
 }
 
+fn render_mermaid_svg(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let graph = parse_mermaid_flowchart(body);
+    if graph.nodes.is_empty() || graph.edges.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "Mermaid native preview only supports simple flowchart edges.",
+            None,
+            None,
+            Some("Use flowchart or graph syntax with edges such as A[Start] --> B[End]."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-mermaid transform-error\">Unsupported Mermaid diagram</section>".to_string();
+    }
+    let columns = 3usize;
+    let node_width = 170usize;
+    let node_height = 54usize;
+    let x_gap = 250usize;
+    let y_gap = 120usize;
+    let rows = graph.nodes.len().div_ceil(columns);
+    let width = 120 + columns * x_gap;
+    let height = 90 + rows * y_gap;
+    let positions = graph
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| {
+            let x = 60 + (index % columns) * x_gap;
+            let y = 55 + (index / columns) * y_gap;
+            (node.id.clone(), (x, y))
+        })
+        .collect::<HashMap<_, _>>();
+    let mut svg = format!(
+        "<svg class=\"transform transform-mermaid\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><defs><marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\"><path d=\"M0,0 L0,6 L9,3 z\" fill=\"#275DA8\"/></marker></defs>"
+    );
+    for edge in &graph.edges {
+        if let (Some((from_x, from_y)), Some((to_x, to_y))) =
+            (positions.get(&edge.from), positions.get(&edge.to))
+        {
+            let x1 = from_x + node_width;
+            let y1 = from_y + node_height / 2;
+            let x2 = *to_x;
+            let y2 = to_y + node_height / 2;
+            svg.push_str(&format!(
+                "<line x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"#275DA8\" stroke-width=\"3\" marker-end=\"url(#arrow)\"/>"
+            ));
+        }
+    }
+    for node in &graph.nodes {
+        if let Some((x, y)) = positions.get(&node.id) {
+            svg.push_str(&format!(
+                "<rect x=\"{x}\" y=\"{y}\" width=\"{node_width}\" height=\"{node_height}\" rx=\"8\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/><text x=\"{}\" y=\"{}\" font-size=\"15\" text-anchor=\"middle\" fill=\"#1f2937\">{}</text>",
+                x + node_width / 2,
+                y + 33,
+                escape_html(&node.label)
+            ));
+        }
+    }
+    svg.push_str("</svg>");
+    svg
+}
+
+#[derive(Debug)]
+struct MermaidGraph {
+    nodes: Vec<MermaidNode>,
+    edges: Vec<MermaidEdge>,
+}
+
+#[derive(Debug)]
+struct MermaidNode {
+    id: String,
+    label: String,
+}
+
+#[derive(Debug)]
+struct MermaidEdge {
+    from: String,
+    to: String,
+}
+
+fn parse_mermaid_flowchart(body: &str) -> MermaidGraph {
+    let mut nodes = Vec::new();
+    let mut seen = HashSet::new();
+    let mut edges = Vec::new();
+    for line in body.lines() {
+        let line = line.trim().trim_end_matches(';').trim();
+        if line.is_empty()
+            || line.starts_with("%%")
+            || line.starts_with("graph ")
+            || line.starts_with("flowchart ")
+        {
+            continue;
+        }
+        let Some((left, right)) = split_mermaid_edge(line) else {
+            continue;
+        };
+        let from = parse_mermaid_node(left);
+        let to = parse_mermaid_node(strip_mermaid_edge_label(right));
+        add_mermaid_node(&mut nodes, &mut seen, &from);
+        add_mermaid_node(&mut nodes, &mut seen, &to);
+        edges.push(MermaidEdge {
+            from: from.id,
+            to: to.id,
+        });
+    }
+    MermaidGraph { nodes, edges }
+}
+
+fn split_mermaid_edge(line: &str) -> Option<(&str, &str)> {
+    for operator in ["-->", "==>", "-.->", "---"] {
+        if let Some((left, right)) = line.split_once(operator) {
+            return Some((left.trim(), right.trim()));
+        }
+    }
+    None
+}
+
+fn strip_mermaid_edge_label(text: &str) -> &str {
+    let text = text.trim();
+    if let Some(rest) = text.strip_prefix('|') {
+        if let Some((_, after_label)) = rest.split_once('|') {
+            return after_label.trim();
+        }
+    }
+    text
+}
+
+fn parse_mermaid_node(text: &str) -> MermaidNode {
+    let text = text.trim();
+    for (open, close) in [('[', ']'), ('(', ')'), ('{', '}')] {
+        if let Some(start) = text.find(open) {
+            if let Some(end) = text.rfind(close) {
+                let id = text[..start].trim();
+                let label = text[start + 1..end].trim().trim_matches('"');
+                return MermaidNode {
+                    id: id.to_string(),
+                    label: label.to_string(),
+                };
+            }
+        }
+    }
+    let id = text
+        .split_whitespace()
+        .next()
+        .unwrap_or(text)
+        .trim_matches('"')
+        .to_string();
+    MermaidNode {
+        label: id.clone(),
+        id,
+    }
+}
+
+fn add_mermaid_node(nodes: &mut Vec<MermaidNode>, seen: &mut HashSet<String>, node: &MermaidNode) {
+    if seen.insert(node.id.clone()) {
+        nodes.push(MermaidNode {
+            id: node.id.clone(),
+            label: node.label.clone(),
+        });
+    }
+}
+
 fn render_geojson_svg(
     body: &str,
     artifact_diags: &mut Vec<DocumentDiagnostic>,
@@ -4949,6 +5116,32 @@ paths:
             .expect("vega-lite engine metadata");
         assert_eq!(
             vega_lite.get("execution").and_then(Value::as_str),
+            Some("rust-native-svg")
+        );
+    }
+
+    #[test]
+    fn mermaid_transform_renders_simple_flowchart_svg() {
+        let artifact = run_transform(
+            "mermaid".to_string(),
+            "flowchart TD\nA[Start] --> B{Review}\nB -->|Approve| C[Publish]".to_string(),
+        )
+        .expect("mermaid transform");
+
+        assert_eq!(artifact.output_kind, "svg");
+        assert!(artifact.html.contains("transform-mermaid"));
+        assert!(artifact.html.contains("Start"));
+        assert!(artifact.html.contains("Publish"));
+        assert!(artifact.html.contains("marker-end"));
+        assert!(artifact.diagnostics.is_empty());
+
+        let engines = list_transform_engines();
+        let mermaid = engines
+            .iter()
+            .find(|engine| engine.get("name").and_then(Value::as_str) == Some("mermaid"))
+            .expect("mermaid engine metadata");
+        assert_eq!(
+            mermaid.get("execution").and_then(Value::as_str),
             Some("rust-native-svg")
         );
     }
