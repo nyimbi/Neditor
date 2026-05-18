@@ -3841,7 +3841,7 @@ ARR: Annual recurring revenue.
         fs::create_dir_all(root.join("data")).expect("create data dir");
         fs::write(
             root.join("data").join("revenue.csv"),
-            "Region,Revenue\nEast,100\nWest,=B1+80\n",
+            "Region,Revenue\nEast,100\nWest,\"=SUM(B1,80)\"\n",
         )
         .expect("write csv data source");
 

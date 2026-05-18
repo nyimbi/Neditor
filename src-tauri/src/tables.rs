@@ -23,11 +23,7 @@ pub(crate) fn render_delimited_table(
     let mut rows = body
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            line.split(delimiter)
-                .map(|cell| cell.trim().to_string())
-                .collect::<Vec<_>>()
-        })
+        .map(|line| parse_delimited_row(line, delimiter))
         .collect::<Vec<_>>();
     if rows.is_empty() {
         return "<table></table>".to_string();
@@ -57,6 +53,28 @@ pub(crate) fn render_delimited_table(
     }
     html.push_str("</tbody></table>");
     html
+}
+
+fn parse_delimited_row(line: &str, delimiter: char) -> Vec<String> {
+    let mut cells = Vec::new();
+    let mut cell = String::new();
+    let mut quoted = false;
+    let mut chars = line.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '"' && quoted && chars.peek() == Some(&'"') {
+            cell.push('"');
+            chars.next();
+        } else if ch == '"' {
+            quoted = !quoted;
+        } else if ch == delimiter && !quoted {
+            cells.push(cell.trim().to_string());
+            cell.clear();
+        } else {
+            cell.push(ch);
+        }
+    }
+    cells.push(cell.trim().to_string());
+    cells
 }
 
 pub(crate) fn evaluate_markdown_table_formulas(
