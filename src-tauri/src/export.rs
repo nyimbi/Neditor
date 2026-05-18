@@ -806,7 +806,10 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
             text,
             ..
         } => docx_paragraph(&callout_export_line(callout_type, title, text)),
-        DocumentBlock::RawHtml { html, .. } => docx_paragraph(html),
+        DocumentBlock::RawHtml { html, .. } => raw_html_export_lines(html)
+            .into_iter()
+            .map(|line| docx_paragraph(&line))
+            .collect::<String>(),
     }
 }
 
@@ -1335,8 +1338,49 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             text,
             ..
         } => vec![callout_export_line(callout_type, title, text)],
-        DocumentBlock::RawHtml { html, .. } => vec![html.clone()],
+        DocumentBlock::RawHtml { html, .. } => raw_html_export_lines(html),
     }
+}
+
+fn raw_html_export_lines(html: &str) -> Vec<String> {
+    if html.contains("role=\"doc-endnotes\"") || html.contains("class=\"footnotes\"") {
+        return vec!["Footnotes".to_string()];
+    }
+    let text = decode_export_html_entities(&strip_export_html_tags(html))
+        .trim()
+        .trim_end_matches(" back")
+        .trim()
+        .to_string();
+    if text.is_empty() {
+        Vec::new()
+    } else {
+        vec![text]
+    }
+}
+
+fn strip_export_html_tags(html: &str) -> String {
+    let mut output = String::new();
+    let mut in_tag = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => {
+                in_tag = false;
+                output.push(' ');
+            }
+            _ if !in_tag => output.push(ch),
+            _ => {}
+        }
+    }
+    output.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn decode_export_html_entities(text: &str) -> String {
+    text.replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
 }
 
 fn layout_export_lines(directive: &str, options: &str) -> Vec<String> {

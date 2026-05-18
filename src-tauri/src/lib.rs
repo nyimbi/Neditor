@@ -4397,6 +4397,25 @@ ARR: Annual recurring revenue.
         assert!(!response
             .compiled_markdown
             .contains("    Includes second-line evidence."));
+
+        let options = json!({});
+        let pdf = render_pdf_bytes(&response, &options);
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains("Footnotes"));
+        assert!(pdf_text.contains("Reviewed by compliance."));
+        assert!(!pdf_text.contains("<section"));
+
+        let docx = render_docx_bytes(&response, &options).expect("docx footnotes");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains("Footnotes"));
+        assert!(docx_document.contains("Reviewed by compliance."));
+        assert!(!docx_document.contains("&lt;section"));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx footnotes");
+        let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        assert!(pptx_slide.contains("Footnotes"));
+        assert!(pptx_slide.contains("Reviewed by compliance."));
+        assert!(!pptx_slide.contains("&lt;section"));
     }
 
     #[test]
