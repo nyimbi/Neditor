@@ -1,6 +1,7 @@
 use crate::{
+    calculations::eval_expression,
     diagnostics::{diag, DocumentDiagnostic},
-    escape_html, eval_expression, format_value,
+    escape_html, format_value,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
