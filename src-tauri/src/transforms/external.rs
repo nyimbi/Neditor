@@ -314,10 +314,17 @@ fn transform_engine(
     } else {
         vec!["embedded"]
     };
+    let installation_label = if requires_execution {
+        "User-installed optional engine; not bundled with NEditor."
+    } else {
+        "Bundled Rust-native engine."
+    };
     json!({
         "name": name,
         "execution": execution,
         "safeByDefault": safe_by_default,
+        "bundled": !requires_execution,
+        "installationLabel": installation_label,
         "requiresNetwork": false,
         "requiresExecution": requires_execution,
         "trustRequired": requires_execution,

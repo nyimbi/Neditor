@@ -597,6 +597,7 @@
           <article v-for="engine in store.externalTransformEngines" :key="engine.name" class="engine-row">
             <h4>{{ engine.name }}</h4>
             <small>{{ engine.execution }}</small>
+            <small>{{ engine.installationLabel }}</small>
             <label>
               Engine path
               <span class="path-picker">
@@ -614,7 +615,7 @@
             <button type="button" @click="store.testExternalTransform(engine.name)">Probe</button>
           </article>
           <p v-for="engine in store.transformEngines.filter((candidate) => !candidate.requiresExecution)" :key="engine.name" class="engine-summary">
-            {{ engine.name }}: {{ engine.execution }}
+            {{ engine.name }}: {{ engine.execution }} | {{ engine.installationLabel }}
           </p>
         </template>
       </aside>

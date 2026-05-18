@@ -158,6 +158,8 @@ export interface TransformEngineMetadata {
   name: string;
   execution: string;
   available: boolean;
+  bundled: boolean;
+  installationLabel: string;
   requiresExecution: boolean;
   preferenceKey: string;
   inputModes: Array<"stdin" | "file" | string>;
