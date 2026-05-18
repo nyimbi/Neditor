@@ -4518,6 +4518,21 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn compiler_loads_hayagriva_yaml_bibliography() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Hayagriva\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# Hayagriva\nClaim [@porter1985].\n\n```hayagriva\nporter1985:\n  type: book\n  title: Competitive Advantage\n  author: Porter\n  date: 1985\n```\n[BIBLIOGRAPHY]".to_string(),
+            file_path: None,
+        });
+
+        assert_eq!(response.bibliography.len(), 1);
+        assert_eq!(response.bibliography[0].key, "porter1985");
+        assert_eq!(response.bibliography[0].author.as_deref(), Some("Porter"));
+        assert_eq!(response.bibliography[0].issued.as_deref(), Some("1985"));
+        assert!(response.html.contains("Porter 1985"));
+        assert!(response.html.contains("Competitive Advantage"));
+    }
+
+    #[test]
     fn compiler_reports_duplicate_bibliography_keys() {
         let response = compile(CompileRequest {
             text: "---\ntitle: Duplicate Bibliography\nstatus: approved\napprovedBy: QA\n---\n# Duplicate Bibliography\nClaim [@porter1985].\n\n```bibtex\n@book{porter1985, title={Competitive Advantage}}\n@article{porter1985, title={Duplicate Entry}}\n```\n[BIBLIOGRAPHY]".to_string(),

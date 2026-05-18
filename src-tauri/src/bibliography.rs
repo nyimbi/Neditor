@@ -31,6 +31,8 @@ pub(crate) fn collect_bibliography(
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> Vec<BibliographyEntry> {
     let mut sources = collect_fence_bodies(text, "bibtex");
+    sources.extend(collect_fence_bodies(text, "hayagriva"));
+    sources.extend(collect_fence_bodies(text, "bibliography"));
     if let Some(path) = metadata.get("bibliography").and_then(Value::as_str) {
         let base = root_path
             .and_then(Path::parent)
@@ -62,6 +64,9 @@ pub(crate) fn parse_bibliography_source(body: &str) -> Vec<BibliographyEntry> {
     if let Ok(entries) = parse_csl_json_bibliography(body) {
         return entries;
     }
+    if let Ok(entries) = parse_hayagriva_yaml_bibliography(body) {
+        return entries;
+    }
     body.split('@')
         .filter_map(|entry| {
             let (kind_and_key, rest) = entry.split_once('{')?;
@@ -90,6 +95,32 @@ pub(crate) fn duplicate_bibliography_keys(bibliography: &[BibliographyEntry]) ->
     duplicates.into_iter().collect()
 }
 
+fn parse_hayagriva_yaml_bibliography(
+    body: &str,
+) -> Result<Vec<BibliographyEntry>, serde_yaml::Error> {
+    let value = serde_yaml::from_str::<Value>(body)?;
+    let entries = value
+        .as_object()
+        .into_iter()
+        .flat_map(|entries| entries.iter())
+        .filter_map(|(key, entry)| {
+            let title = entry
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or(key)
+                .to_string();
+            Some(BibliographyEntry {
+                key: key.to_string(),
+                title,
+                author: yaml_author(entry),
+                issued: yaml_issued_year(entry),
+                raw: serde_yaml::to_string(entry).unwrap_or_default(),
+            })
+        })
+        .collect();
+    Ok(entries)
+}
+
 fn parse_csl_json_bibliography(body: &str) -> Result<Vec<BibliographyEntry>, serde_json::Error> {
     let value = serde_json::from_str::<Value>(body)?;
     let entries = value
@@ -116,6 +147,35 @@ fn parse_csl_json_bibliography(body: &str) -> Result<Vec<BibliographyEntry>, ser
         })
         .collect();
     Ok(entries)
+}
+
+fn yaml_author(entry: &Value) -> Option<String> {
+    entry.get("author").and_then(|author| match author {
+        Value::String(value) => Some(value.clone()),
+        Value::Array(values) => values.first().and_then(|value| match value {
+            Value::String(value) => Some(value.clone()),
+            Value::Object(author) => author
+                .get("name")
+                .or_else(|| author.get("family"))
+                .or_else(|| author.get("literal"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            _ => None,
+        }),
+        _ => None,
+    })
+}
+
+fn yaml_issued_year(entry: &Value) -> Option<String> {
+    ["date", "year", "issued"]
+        .into_iter()
+        .find_map(|field| entry.get(field))
+        .and_then(|value| match value {
+            Value::String(value) => Some(value.chars().take(4).collect::<String>()),
+            Value::Number(value) => Some(value.to_string()),
+            _ => None,
+        })
+        .filter(|year| year.len() == 4 && year.chars().all(|ch| ch.is_ascii_digit()))
 }
 
 fn bibtex_field(raw: &str, field: &str) -> Option<String> {
