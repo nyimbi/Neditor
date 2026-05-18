@@ -21,6 +21,8 @@ let preferencesStore: Store | null = null;
 let unwatchFileChanges: UnlistenFn | UnwatchFn | null = null;
 let unwatchFileErrors: UnlistenFn | null = null;
 
+type AiPasteInsertMode = "insert" | "quote" | "replace" | "appendix";
+
 interface ExportDefaults {
   includeManifest: boolean;
   includeComments: boolean;
@@ -78,6 +80,13 @@ interface DocumentWatchEvent {
   kind: string;
   hash?: string | null;
   modified?: string | null;
+}
+
+function quoteMarkdown(text: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => (line ? `> ${line}` : ">"))
+    .join("\n");
 }
 
 interface BackendWatchEvent {
@@ -911,9 +920,11 @@ export const useDocumentsStore = defineStore("documents", {
       this.aiCleanupIssues = response.issues;
       return response;
     },
-    insertAiPaste(response: AiCleanupResponse, mode: "insert" | "replace" | "appendix") {
+    insertAiPaste(response: AiCleanupResponse, mode: AiPasteInsertMode) {
       if (mode === "replace") {
         this.updateText(response.cleaned_markdown);
+      } else if (mode === "quote") {
+        this.updateText(`${this.activeDocument.text}\n\n${quoteMarkdown(response.cleaned_markdown)}\n`);
       } else if (mode === "appendix") {
         this.updateText(`${this.activeDocument.text}\n\n## AI Draft Appendix\n\n${response.cleaned_markdown}\n`);
       } else {
@@ -921,7 +932,7 @@ export const useDocumentsStore = defineStore("documents", {
       }
       this.statusMessage = `Cleaned AI paste with ${response.issues.length} issue notes`;
     },
-    async cleanAiPaste(text: string, mode: "insert" | "replace" | "appendix", options: AiCleanupOptions) {
+    async cleanAiPaste(text: string, mode: AiPasteInsertMode, options: AiCleanupOptions) {
       const response = await this.previewAiPaste(text, options);
       this.insertAiPaste(response, mode);
     },

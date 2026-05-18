@@ -492,6 +492,7 @@
           Insert mode
           <select v-model="aiInsertMode">
             <option value="insert">Insert after document</option>
+            <option value="quote">Quote</option>
             <option value="appendix">Appendix</option>
             <option value="replace">Replace document</option>
           </select>
@@ -599,7 +600,7 @@ let lastAutoSnapshotSignature = "";
 let syncingScroll = false;
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
-const aiInsertMode = ref<"insert" | "replace" | "appendix">("insert");
+const aiInsertMode = ref<"insert" | "quote" | "replace" | "appendix">("insert");
 const aiAddProvenance = ref(true);
 const aiMarkAsDraft = ref(true);
 const aiInsertCitationTodos = ref(true);
