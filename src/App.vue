@@ -439,6 +439,13 @@
             Snapshot interval
             <input v-model.number="store.snapshotIntervalMs" type="number" min="30000" max="3600000" step="30000" />
           </label>
+          <label>
+            Snapshot storage
+            <select v-model="store.snapshotStorage">
+              <option value="app-data">App data</option>
+              <option value="project-local">Project local</option>
+            </select>
+          </label>
           <h3>Export defaults</h3>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Manifest next to export</label>
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Comments</label>
@@ -988,7 +995,7 @@ watch(
 );
 
 watch(
-  () => [store.autosave, store.autosaveDelayMs, store.autoSnapshot, store.snapshotIntervalMs],
+  () => [store.autosave, store.autosaveDelayMs, store.autoSnapshot, store.snapshotIntervalMs, store.snapshotStorage],
   () => {
     scheduleAutosave();
     scheduleAutoSnapshot();

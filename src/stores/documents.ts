@@ -23,6 +23,7 @@ let unwatchFileErrors: UnlistenFn | null = null;
 
 type AiPasteInsertMode = "insert" | "quote" | "replace" | "appendix";
 type CitationStyle = "title" | "author-year" | "key";
+type SnapshotStorage = "app-data" | "project-local";
 
 interface ExportDefaults {
   includeManifest: boolean;
@@ -56,6 +57,7 @@ interface PersistedWorkspace {
   autosaveDelayMs?: number;
   autoSnapshot?: boolean;
   snapshotIntervalMs?: number;
+  snapshotStorage?: SnapshotStorage;
   editorFont?: string;
   previewFont?: string;
   editorLineHeight?: number;
@@ -370,6 +372,7 @@ export const useDocumentsStore = defineStore("documents", {
     autosaveDelayMs: 1500,
     autoSnapshot: false,
     snapshotIntervalMs: 300000,
+    snapshotStorage: "app-data" as SnapshotStorage,
     editorFont: "Menlo, Consolas, monospace",
     previewFont: "Inter, Arial, sans-serif",
     editorLineHeight: 1.55,
@@ -451,6 +454,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (typeof persisted.autosaveDelayMs === "number") this.autosaveDelayMs = clampAutosaveDelay(persisted.autosaveDelayMs);
         if (typeof persisted.autoSnapshot === "boolean") this.autoSnapshot = persisted.autoSnapshot;
         if (typeof persisted.snapshotIntervalMs === "number") this.snapshotIntervalMs = clampSnapshotInterval(persisted.snapshotIntervalMs);
+        if (persisted.snapshotStorage === "project-local" || persisted.snapshotStorage === "app-data") this.snapshotStorage = persisted.snapshotStorage;
         if (persisted.editorFont) this.editorFont = persisted.editorFont;
         if (persisted.previewFont) this.previewFont = persisted.previewFont;
         if (typeof persisted.editorLineHeight === "number") this.editorLineHeight = clampLineHeight(persisted.editorLineHeight);
@@ -490,6 +494,7 @@ export const useDocumentsStore = defineStore("documents", {
         autosaveDelayMs: this.autosaveDelayMs,
         autoSnapshot: this.autoSnapshot,
         snapshotIntervalMs: this.snapshotIntervalMs,
+        snapshotStorage: this.snapshotStorage,
         editorFont: this.editorFont,
         previewFont: this.previewFont,
         editorLineHeight: this.editorLineHeight,
@@ -991,7 +996,7 @@ export const useDocumentsStore = defineStore("documents", {
     async createSnapshot(label = "manual") {
       const doc = this.activeDocument;
       return invoke<{ snapshot_path: string }>("create_snapshot", {
-        request: { text: doc.text, file_path: doc.path, label },
+        request: { text: doc.text, file_path: doc.path, label, storage: this.snapshotStorage },
       });
     },
     async snapshotActive(label = "manual") {
@@ -1004,7 +1009,9 @@ export const useDocumentsStore = defineStore("documents", {
       await this.listSnapshots();
     },
     async listSnapshots() {
-      this.snapshots = await invoke<SnapshotListItem[]>("list_snapshots", { filePath: this.activeDocument?.path });
+      this.snapshots = await invoke<SnapshotListItem[]>("list_snapshots", {
+        request: { file_path: this.activeDocument?.path, storage: this.snapshotStorage },
+      });
     },
     async restoreSnapshot(snapshotPath: string) {
       await this.snapshotBeforeDestructiveAction("pre-snapshot-restore");

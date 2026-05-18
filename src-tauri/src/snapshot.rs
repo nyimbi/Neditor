@@ -2,7 +2,10 @@ use crate::{path_to_string, read_file, sha256_hex, FileResponse};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use tauri::Manager;
 
 #[derive(Debug, Deserialize)]
@@ -10,6 +13,13 @@ pub(crate) struct SnapshotRequest {
     text: String,
     file_path: Option<String>,
     label: Option<String>,
+    storage: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SnapshotListRequest {
+    file_path: Option<String>,
+    storage: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -46,8 +56,16 @@ pub(crate) fn create_snapshot(
         .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '-' || *ch == '_')
         .collect::<String>();
     let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
-    let root = app_snapshot_root(&app, Some(&workspace_id))?;
+    let root = snapshot_root(
+        &app,
+        request.file_path.as_deref(),
+        &workspace_id,
+        request.storage.as_deref(),
+    )?;
     fs::create_dir_all(&root).map_err(|err| err.to_string())?;
+    if snapshot_storage_is_project_local(request.storage.as_deref()) {
+        ensure_project_snapshot_gitignore(request.file_path.as_deref())?;
+    }
     let snapshot_path = root.join(format!("{timestamp}-{label}.md"));
     let metadata_path = root.join(format!("{timestamp}-{label}.json"));
     fs::write(&snapshot_path, request.text.as_bytes()).map_err(|err| err.to_string())?;
@@ -77,9 +95,15 @@ pub(crate) fn create_snapshot(
 #[tauri::command]
 pub(crate) fn list_snapshots(
     app: tauri::AppHandle,
-    file_path: Option<String>,
+    request: SnapshotListRequest,
 ) -> Result<Vec<SnapshotListItem>, String> {
-    let root = app_snapshot_root(&app, file_path.as_deref())?;
+    let workspace_id = snapshot_workspace_id(request.file_path.as_deref());
+    let root = snapshot_root(
+        &app,
+        request.file_path.as_deref(),
+        &workspace_id,
+        request.storage.as_deref(),
+    )?;
     if !root.exists() {
         return Ok(Vec::new());
     }
@@ -141,6 +165,33 @@ fn snapshot_workspace_id(file_path: Option<&str>) -> String {
         .unwrap_or_else(|| "unsaved".to_string())
 }
 
+fn snapshot_root(
+    app: &tauri::AppHandle,
+    file_path: Option<&str>,
+    workspace_id: &str,
+    storage: Option<&str>,
+) -> Result<PathBuf, String> {
+    if snapshot_storage_is_project_local(storage) {
+        return project_snapshot_root(file_path, workspace_id);
+    }
+    app_snapshot_root(app, Some(workspace_id))
+}
+
+fn snapshot_storage_is_project_local(storage: Option<&str>) -> bool {
+    matches!(storage, Some("project-local"))
+}
+
+fn project_snapshot_root(file_path: Option<&str>, workspace_id: &str) -> Result<PathBuf, String> {
+    let path = file_path.ok_or_else(|| {
+        "Project-local snapshots require the document to be saved first.".to_string()
+    })?;
+    let document_path = PathBuf::from(path);
+    let folder = document_path.parent().ok_or_else(|| {
+        "Project-local snapshots require a document with a parent folder.".to_string()
+    })?;
+    Ok(folder.join(".neditor").join("snapshots").join(workspace_id))
+}
+
 fn app_snapshot_root(
     app: &tauri::AppHandle,
     file_path_or_id: Option<&str>,
@@ -156,6 +207,45 @@ fn app_snapshot_root(
         })
         .unwrap_or_else(|| snapshot_workspace_id(None));
     Ok(app_data.join("snapshots").join(workspace_id))
+}
+
+fn ensure_project_snapshot_gitignore(file_path: Option<&str>) -> Result<(), String> {
+    let Some(path) = file_path else {
+        return Ok(());
+    };
+    let Some(folder) = Path::new(path).parent() else {
+        return Ok(());
+    };
+    let root = git_root_for_path(folder).unwrap_or_else(|| folder.to_path_buf());
+    let gitignore = root.join(".gitignore");
+    let existing = fs::read_to_string(&gitignore).unwrap_or_default();
+    let Some(updated) = gitignore_with_neditor_entry(&existing) else {
+        return Ok(());
+    };
+    fs::write(gitignore, updated).map_err(|err| err.to_string())
+}
+
+fn git_root_for_path(folder: &Path) -> Option<PathBuf> {
+    folder
+        .ancestors()
+        .find(|candidate| candidate.join(".git").exists())
+        .map(Path::to_path_buf)
+}
+
+fn gitignore_with_neditor_entry(existing: &str) -> Option<String> {
+    if existing
+        .lines()
+        .map(str::trim)
+        .any(|line| line == ".neditor/" || line == ".neditor")
+    {
+        return None;
+    }
+    let mut updated = existing.to_string();
+    if !updated.is_empty() && !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    updated.push_str(".neditor/\n");
+    Some(updated)
 }
 
 struct SnapshotDocumentMetadata {
@@ -246,5 +336,19 @@ mod tests {
         assert_eq!(metadata.status.as_deref(), Some("approved"));
         assert_eq!(metadata.author.as_deref(), Some("Strategy Team"));
         assert_ne!(metadata.include_graph_hash, sha256_hex("".as_bytes()));
+    }
+
+    #[test]
+    fn project_snapshot_gitignore_entry_is_idempotent() {
+        assert_eq!(
+            gitignore_with_neditor_entry("target\n").as_deref(),
+            Some("target\n.neditor/\n")
+        );
+        assert_eq!(
+            gitignore_with_neditor_entry("target").as_deref(),
+            Some("target\n.neditor/\n")
+        );
+        assert!(gitignore_with_neditor_entry("target\n.neditor/\n").is_none());
+        assert!(gitignore_with_neditor_entry(".neditor\n").is_none());
     }
 }
