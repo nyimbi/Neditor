@@ -864,29 +864,21 @@ fn validate_export_settings(
             Some("Use a text watermark or remove the option."),
         ));
     }
-    if options
-        .get("includeManifest")
-        .is_some_and(|value| !value.is_boolean())
-    {
-        diagnostics.push(diag(
-            "error",
-            "includeManifest must be true or false.",
-            None,
-            None,
-            Some("Use a boolean includeManifest export option."),
-        ));
-    }
-    if options
-        .get("includeGlossary")
-        .is_some_and(|value| !value.is_boolean())
-    {
-        diagnostics.push(diag(
-            "error",
-            "includeGlossary must be true or false.",
-            None,
-            None,
-            Some("Use a boolean includeGlossary export option."),
-        ));
+    for option in [
+        "includeManifest",
+        "includeGlossary",
+        "includeComments",
+        "includeProvenance",
+    ] {
+        if options.get(option).is_some_and(|value| !value.is_boolean()) {
+            diagnostics.push(diag(
+                "error",
+                format!("{option} must be true or false."),
+                None,
+                None,
+                Some("Use boolean values for export options."),
+            ));
+        }
     }
 }
 
@@ -6377,11 +6369,17 @@ paths:
             text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),
             file_path: None,
             target: "rtf".to_string(),
-            options: json!({ "watermark": 42, "includeManifest": "yes", "includeGlossary": "yes" }),
+            options: json!({
+                "watermark": 42,
+                "includeManifest": "yes",
+                "includeGlossary": "yes",
+                "includeComments": "yes",
+                "includeProvenance": "yes"
+            }),
         });
 
         assert!(!report.ready);
-        assert_eq!(report.error_count, 4);
+        assert_eq!(report.error_count, 6);
         assert_eq!(report.manifest.export_target, "rtf");
         assert!(report
             .diagnostics
@@ -6397,6 +6395,12 @@ paths:
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("includeGlossary must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("includeComments must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("includeProvenance must be true or false")));
     }
 
     #[test]
