@@ -55,6 +55,7 @@
       <button type="button" @click="store.newDocument">New</button>
       <button type="button" @click="openDocument">Open</button>
       <button type="button" @click="openFolder">Open Folder</button>
+      <button type="button" @click="saveWorkspace">Save Workspace</button>
       <button type="button" @click="saveDocument">Save</button>
       <button type="button" @click="saveDocumentAs">Save As</button>
       <button type="button" @click="store.revertActive">Revert</button>
@@ -767,6 +768,7 @@ const commands = computed(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
   { name: "Open folder", group: "Workspace", run: () => void openFolder() },
+  { name: "Save workspace", group: "Workspace", run: () => void saveWorkspace() },
   { name: "Save document", group: "File", run: () => void saveDocument() },
   { name: "Save as", group: "File", run: () => void saveDocumentAs() },
   { name: "Revert to saved", group: "File", run: () => void store.revertActive() },
@@ -1359,6 +1361,11 @@ async function openFolder() {
     multiple: false,
   });
   if (typeof selected === "string") await store.openFolder(selected);
+}
+
+async function saveWorkspace() {
+  await store.persistWorkspace();
+  store.statusMessage = "Saved workspace";
 }
 
 function eventValue(event: Event) {
