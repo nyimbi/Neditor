@@ -976,6 +976,18 @@ function editorExtensions() {
         color: "#6d28d9",
         backgroundColor: "rgba(109, 40, 217, 0.08)",
       },
+      ".cm-neditor-formula": {
+        color: "#7c2d12",
+        backgroundColor: "rgba(251, 146, 60, 0.16)",
+      },
+      ".cm-neditor-unresolved-reference": {
+        color: "#991b1b",
+        textDecoration: "underline wavy #dc2626",
+      },
+      ".cm-neditor-transform-fence": {
+        color: "#1d4ed8",
+        backgroundColor: "rgba(59, 130, 246, 0.12)",
+      },
       ".cm-neditor-layout-token": {
         color: "#92400e",
         backgroundColor: "rgba(245, 158, 11, 0.14)",
@@ -1013,6 +1025,8 @@ const semanticEditorDecorations = ViewPlugin.fromClass(
 
 function buildSemanticEditorDecorations(view: EditorView) {
   const builder = new RangeSetBuilder<Decoration>();
+  const source = view.state.doc.toString();
+  const knownReferences = collectKnownReferenceAnchors(source);
   for (let lineNumber = 1; lineNumber <= view.state.doc.lines; lineNumber += 1) {
     const line = view.state.doc.line(lineNumber);
     const text = line.text;
@@ -1028,8 +1042,14 @@ function buildSemanticEditorDecorations(view: EditorView) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-ai-source" }));
       continue;
     }
+    if (/^\s*```[A-Za-z0-9_-]+\b/.test(text)) {
+      builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-transform-fence" }));
+      continue;
+    }
     const inlineDecorations: Array<{ start: number; end: number; className: string }> = [];
     collectRegexDecorations(inlineDecorations, text, /\[@[A-Za-z0-9_:-]+(?:[^\]]*)\]/g, "cm-neditor-citation");
+    collectRegexDecorations(inlineDecorations, text, /\{\{=[^}\n]+\}\}/g, "cm-neditor-formula");
+    collectReferenceDecorations(inlineDecorations, text, knownReferences);
     collectRegexDecorations(inlineDecorations, text, /\{\{[^}\n]+\}\}/g, "cm-neditor-variable");
     inlineDecorations.sort((left, right) => left.start - right.start || left.end - right.end);
     for (const decoration of inlineDecorations) {
@@ -1041,6 +1061,44 @@ function buildSemanticEditorDecorations(view: EditorView) {
     }
   }
   return builder.finish();
+}
+
+function collectKnownReferenceAnchors(text: string) {
+  const anchors = new Set<string>();
+  for (const match of text.matchAll(/\{#([^}\s]+)[^}]*\}/g)) {
+    anchors.add(match[1]);
+  }
+  for (const line of text.split("\n")) {
+    const match = line.trimStart().match(/^(#{1,6})\s+(.+)$/);
+    if (!match) continue;
+    const raw = match[2].trim();
+    const explicit = raw.match(/\{#([^}\s]+)[^}]*\}/);
+    anchors.add(explicit?.[1] || slugifyAnchor(raw.split("{#")[0].trim()));
+  }
+  return anchors;
+}
+
+function collectReferenceDecorations(
+  decorations: Array<{ start: number; end: number; className: string }>,
+  text: string,
+  knownReferences: Set<string>,
+) {
+  for (const match of text.matchAll(/\{@([^}\s]+)\}/g)) {
+    if (match.index === undefined || knownReferences.has(match[1])) continue;
+    decorations.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      className: "cm-neditor-unresolved-reference",
+    });
+  }
+}
+
+function slugifyAnchor(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
 }
 
 function collectRegexDecorations(
