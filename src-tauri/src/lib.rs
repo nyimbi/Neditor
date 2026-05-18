@@ -4535,6 +4535,59 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn citation_export_conformance_covers_required_cases() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Citation Export\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# Citation Export\nSingle [@porter1985].\nMultiple [@porter1985; @doe2026].\nLocator [@porter1985, p. 42].\nMissing [@missing2026].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}\n```\n\n[BIBLIOGRAPHY]\n".to_string(),
+            file_path: None,
+        });
+        let options = json!({});
+
+        assert_eq!(
+            response.semantic.citations,
+            vec!["doe2026", "missing2026", "porter1985"]
+        );
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Broken citation: missing2026")));
+
+        let html = render_full_html(&response, &options);
+        assert!(html.contains("Porter 1985"));
+        assert!(html.contains("Porter 1985; Doe 2026"));
+        assert!(html.contains("Porter 1985, p. 42"));
+        assert!(html.contains("missing bibliography entry"));
+        assert!(html.contains("Bibliography"));
+        assert!(html.contains("Competitive Advantage"));
+        assert!(html.contains("Evidence Based Reports"));
+
+        let docx = render_docx_bytes(&response, &options).expect("docx citation bytes");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains("Porter 1985"));
+        assert!(docx_document.contains("Porter 1985; Doe 2026"));
+        assert!(docx_document.contains("Porter 1985, p. 42"));
+        assert!(docx_document.contains("missing2026"));
+        assert!(docx_document.contains("Competitive Advantage"));
+        assert!(docx_document.contains("Evidence Based Reports"));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx citation bytes");
+        let slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/");
+        assert!(slides.iter().any(|slide| slide.contains("Porter 1985")));
+        assert!(slides
+            .iter()
+            .any(|slide| slide.contains("Porter 1985; Doe 2026")));
+        assert!(slides
+            .iter()
+            .any(|slide| slide.contains("Porter 1985, p. 42")));
+        assert!(slides.iter().any(|slide| slide.contains("missing2026")));
+        assert!(slides
+            .iter()
+            .any(|slide| slide.contains("Competitive Advantage")));
+        assert!(slides
+            .iter()
+            .any(|slide| slide.contains("Evidence Based Reports")));
+    }
+
+    #[test]
     fn compiler_renders_block_and_inline_equations() {
         let response = compile(CompileRequest {
             text: "---\ntitle: Math\nstatus: approved\napprovedBy: QA\n---\n# Math\nInline \\(ROI = x\\).\n\n$$\nROI = \\frac{Gain - Cost}{Cost}\n$$ {#eq:roi}\n\nSee {@eq:roi}.".to_string(),
