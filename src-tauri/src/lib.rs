@@ -1790,14 +1790,22 @@ fn citation_style(metadata: &Value) -> &str {
 }
 
 fn apply_compile_options(metadata: &mut Value, options: Option<&Value>) {
+    let Some(fields) = metadata.as_object_mut() else {
+        return;
+    };
+    apply_default_citation_style(fields, options);
+    apply_default_brand_profile(fields, options);
+}
+
+fn apply_default_citation_style(
+    fields: &mut serde_json::Map<String, Value>,
+    options: Option<&Value>,
+) {
     let Some(style) = options
         .and_then(|value| value.get("defaultCitationStyle"))
         .and_then(Value::as_str)
         .filter(|style| matches!(*style, "title" | "author-year" | "key"))
     else {
-        return;
-    };
-    let Some(fields) = metadata.as_object_mut() else {
         return;
     };
     if fields.contains_key("citationStyle")
@@ -1810,6 +1818,39 @@ fn apply_compile_options(metadata: &mut Value, options: Option<&Value>) {
         "citationStyle".to_string(),
         Value::String(style.to_string()),
     );
+}
+
+fn apply_default_brand_profile(
+    fields: &mut serde_json::Map<String, Value>,
+    options: Option<&Value>,
+) {
+    let Some(profile) = options
+        .and_then(|value| value.get("defaultBrandProfile"))
+        .and_then(Value::as_object)
+    else {
+        return;
+    };
+    let defaults = ["name", "color", "logo"]
+        .into_iter()
+        .filter_map(|key| {
+            profile
+                .get(key)
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| (key, Value::String(value.to_string())))
+        })
+        .collect::<Vec<_>>();
+    if defaults.is_empty() {
+        return;
+    }
+    let brand = fields.entry("brand").or_insert_with(|| json!({}));
+    let Some(brand_fields) = brand.as_object_mut() else {
+        return;
+    };
+    for (key, value) in defaults {
+        brand_fields.entry(key.to_string()).or_insert(value);
+    }
 }
 
 fn collect_labels(text: &str, headings: &[Heading]) -> Vec<String> {
@@ -4304,6 +4345,85 @@ ARR: Annual recurring revenue.
             Some("key")
         );
         assert!(response.html.contains("@porter1985"));
+    }
+
+    #[test]
+    fn compile_options_supply_brand_profile_defaults() {
+        let response = compile_with_options(
+            CompileRequest {
+                text: "# Branded\n".to_string(),
+                file_path: None,
+            },
+            &json!({
+                "defaultBrandProfile": {
+                    "name": "Acme Strategy",
+                    "color": "#0F766E",
+                    "logo": "brand/acme.svg"
+                }
+            }),
+        );
+
+        assert_eq!(
+            response
+                .metadata
+                .pointer("/brand/name")
+                .and_then(Value::as_str),
+            Some("Acme Strategy")
+        );
+        assert_eq!(
+            response
+                .metadata
+                .pointer("/brand/color")
+                .and_then(Value::as_str),
+            Some("#0F766E")
+        );
+        assert_eq!(
+            response
+                .metadata
+                .pointer("/brand/logo")
+                .and_then(Value::as_str),
+            Some("brand/acme.svg")
+        );
+    }
+
+    #[test]
+    fn compile_options_do_not_override_document_brand_profile() {
+        let response = compile_with_options(
+            CompileRequest {
+                text: "---\nbrand:\n  name: Document Brand\n  color: \"#111111\"\n---\n# Branded\n"
+                    .to_string(),
+                file_path: None,
+            },
+            &json!({
+                "defaultBrandProfile": {
+                    "name": "Acme Strategy",
+                    "color": "#0F766E",
+                    "logo": "brand/acme.svg"
+                }
+            }),
+        );
+
+        assert_eq!(
+            response
+                .metadata
+                .pointer("/brand/name")
+                .and_then(Value::as_str),
+            Some("Document Brand")
+        );
+        assert_eq!(
+            response
+                .metadata
+                .pointer("/brand/color")
+                .and_then(Value::as_str),
+            Some("#111111")
+        );
+        assert_eq!(
+            response
+                .metadata
+                .pointer("/brand/logo")
+                .and_then(Value::as_str),
+            Some("brand/acme.svg")
+        );
     }
 
     #[test]

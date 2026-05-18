@@ -441,6 +441,19 @@
               <option value="key">Key</option>
             </select>
           </label>
+          <h3>Brand profile defaults</h3>
+          <label>
+            Brand name
+            <input v-model="store.brandProfileDefaults.name" />
+          </label>
+          <label>
+            Brand color
+            <input v-model="store.brandProfileDefaults.color" type="color" />
+          </label>
+          <label>
+            Logo path
+            <input v-model="store.brandProfileDefaults.logo" />
+          </label>
           <h3>AI paste cleanup defaults</h3>
           <label><input v-model="store.aiCleanupDefaults.markAsDraft" type="checkbox" /> Mark as draft</label>
           <label><input v-model="store.aiCleanupDefaults.addProvenance" type="checkbox" /> Add provenance block</label>
@@ -978,6 +991,14 @@ watch(
 
 watch(
   () => store.bibliographyDefaults.citationStyle,
+  () => {
+    void store.compileActive();
+    void store.persistWorkspace();
+  },
+);
+
+watch(
+  () => [store.brandProfileDefaults.name, store.brandProfileDefaults.color, store.brandProfileDefaults.logo],
   () => {
     void store.compileActive();
     void store.persistWorkspace();

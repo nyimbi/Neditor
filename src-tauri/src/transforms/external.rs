@@ -7,7 +7,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 const DEFAULT_TRANSFORM_TIMEOUT_MS: u64 = 5_000;
@@ -151,7 +151,14 @@ fn execute_external_transform(
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
     if input_mode == "file" {
-        let path = std::env::temp_dir().join(format!("neditor-{name}-{source_hash}.input"));
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        let path = std::env::temp_dir().join(format!(
+            "neditor-{name}-{source_hash}-{}-{unique}.input",
+            std::process::id()
+        ));
         fs::write(&path, body.as_bytes()).map_err(|err| err.to_string())?;
         command.arg(&path);
         temp_input = Some(path);
@@ -159,7 +166,15 @@ fn execute_external_transform(
         command.stdin(Stdio::piped());
     }
 
-    let mut child = command.spawn().map_err(|err| err.to_string())?;
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            if let Some(path) = temp_input {
+                let _ = fs::remove_file(path);
+            }
+            return Err(error.to_string());
+        }
+    };
     let stdin_writer = if input_mode == "stdin" {
         child.stdin.take().map(|mut stdin| {
             let input = body.as_bytes().to_vec();

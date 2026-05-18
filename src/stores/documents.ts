@@ -35,6 +35,12 @@ interface BibliographyDefaults {
   citationStyle: CitationStyle;
 }
 
+interface BrandProfileDefaults {
+  name: string;
+  color: string;
+  logo: string;
+}
+
 interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
   wordWrap?: boolean;
@@ -52,6 +58,7 @@ interface PersistedWorkspace {
   exportTarget?: "html" | "pdf" | "docx" | "pptx" | "markdown-bundle";
   exportDefaults?: Partial<ExportDefaults>;
   bibliographyDefaults?: Partial<BibliographyDefaults>;
+  brandProfileDefaults?: Partial<BrandProfileDefaults>;
   recentFiles?: string[];
   recentFolders?: string[];
   recentlyClosed?: string[];
@@ -301,6 +308,14 @@ function normalizeBibliographyDefaults(defaults: Partial<BibliographyDefaults>):
   };
 }
 
+function normalizeBrandProfileDefaults(defaults: Partial<BrandProfileDefaults>): BrandProfileDefaults {
+  return {
+    name: typeof defaults.name === "string" ? defaults.name : "",
+    color: typeof defaults.color === "string" && defaults.color.trim() ? defaults.color.trim() : "#275DA8",
+    logo: typeof defaults.logo === "string" ? defaults.logo : "",
+  };
+}
+
 function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>): AiCleanupOptions {
   return {
     addProvenance: typeof defaults.addProvenance === "boolean" ? defaults.addProvenance : true,
@@ -354,6 +369,7 @@ export const useDocumentsStore = defineStore("documents", {
       includeGlossary: true,
     } as ExportDefaults,
     bibliographyDefaults: normalizeBibliographyDefaults({}),
+    brandProfileDefaults: normalizeBrandProfileDefaults({}),
     aiCleanupDefaults: normalizeAiCleanupDefaults({}),
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
@@ -428,6 +444,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.exportTarget) this.exportTarget = persisted.exportTarget;
         if (persisted.exportDefaults) this.exportDefaults = normalizeExportDefaults(persisted.exportDefaults);
         if (persisted.bibliographyDefaults) this.bibliographyDefaults = normalizeBibliographyDefaults(persisted.bibliographyDefaults);
+        if (persisted.brandProfileDefaults) this.brandProfileDefaults = normalizeBrandProfileDefaults(persisted.brandProfileDefaults);
         if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
         this.recentFiles = persisted.recentFiles || [];
         this.recentFolders = persisted.recentFolders || [];
@@ -465,6 +482,7 @@ export const useDocumentsStore = defineStore("documents", {
         exportTarget: this.exportTarget,
         exportDefaults: this.exportDefaults,
         bibliographyDefaults: this.bibliographyDefaults,
+        brandProfileDefaults: this.brandProfileDefaults,
         aiCleanupDefaults: this.aiCleanupDefaults,
         recentFiles: this.recentFiles.slice(0, 20),
         recentFolders: this.recentFolders.slice(0, 12),
@@ -943,12 +961,14 @@ export const useDocumentsStore = defineStore("documents", {
         includeProvenance: defaults.includeProvenance,
         includeGlossary: defaults.includeGlossary,
         defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
+        defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
         watermark: this.activeDocument.compile?.semantic.status === "draft" ? "DRAFT" : "",
       };
     },
     compileOptionsForActive() {
       return {
         defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
+        defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
       };
     },
     async createSnapshot(label = "manual") {
