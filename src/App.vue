@@ -805,6 +805,9 @@ interface DocumentTabGroup {
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
+const glossarySnippet = "```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n";
+const layoutSnippet = "```layout\ncolumns: 2\nsection: market-analysis\n```\n";
+const commentSnippet = "<!-- comment: unresolved | author: local | at: 2026-05-18T00:00:00Z | Review note. -->\n";
 const aiSnippet =
   "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\npromptSummary: \nreviewedBy: \nreviewedAt: \nstatus: needs-review\n```\n";
 const releaseStatuses = ["draft", "in-review", "approved", "published", "archived"];
@@ -907,6 +910,9 @@ const commands = computed(() => [
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
   { name: "Insert calculation", group: "Snippet", run: () => insertBlock(calcSnippet) },
+  { name: "Insert glossary", group: "Snippet", run: () => insertBlock(glossarySnippet) },
+  { name: "Insert layout directive", group: "Snippet", run: () => insertBlock(layoutSnippet) },
+  { name: "Insert review comment", group: "Snippet", run: () => insertBlock(commentSnippet) },
   { name: "Insert AI source", group: "Snippet", run: () => insertBlock(aiSnippet) },
   {
     name: active.value.pinned ? "Unpin active tab" : "Pin active tab",
