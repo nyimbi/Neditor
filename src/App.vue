@@ -1018,6 +1018,10 @@ function editorExtensions() {
         color: "#6d28d9",
         backgroundColor: "rgba(109, 40, 217, 0.08)",
       },
+      ".cm-neditor-front-matter": {
+        color: "#334155",
+        backgroundColor: "rgba(148, 163, 184, 0.16)",
+      },
       ".cm-neditor-formula": {
         color: "#7c2d12",
         backgroundColor: "rgba(251, 146, 60, 0.16)",
@@ -1073,9 +1077,14 @@ function buildSemanticEditorDecorations(view: EditorView) {
   const builder = new RangeSetBuilder<Decoration>();
   const source = view.state.doc.toString();
   const knownReferences = collectKnownReferenceAnchors(source);
+  const frontMatterEndLine = frontMatterBoundaryLine(source);
   for (let lineNumber = 1; lineNumber <= view.state.doc.lines; lineNumber += 1) {
     const line = view.state.doc.line(lineNumber);
     const text = line.text;
+    if (frontMatterEndLine && lineNumber <= frontMatterEndLine) {
+      builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-front-matter" }));
+      continue;
+    }
     if (/^\s*\{\{(?:page-break|section-break)\b/.test(text) || /^\s*```layout\b/.test(text)) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-layout-token" }));
       continue;
@@ -1111,6 +1120,13 @@ function buildSemanticEditorDecorations(view: EditorView) {
     }
   }
   return builder.finish();
+}
+
+function frontMatterBoundaryLine(source: string) {
+  if (!source.startsWith("---\n")) return 0;
+  const lines = source.split("\n");
+  const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+  return endIndex > 0 ? endIndex + 1 : 0;
 }
 
 function collectKnownReferenceAnchors(text: string) {
