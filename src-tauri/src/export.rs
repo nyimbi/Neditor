@@ -149,12 +149,20 @@ pub(crate) fn render_docx_bytes(
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     zip.start_file("[Content_Types].xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#).map_err(|err| err.to_string())?;
+    zip.write_all(render_docx_content_types().as_bytes())
+        .map_err(|err| err.to_string())?;
     zip.add_directory("_rels/", options)
         .map_err(|err| err.to_string())?;
     zip.start_file("_rels/.rels", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#).map_err(|err| err.to_string())?;
+    zip.write_all(render_root_relationships("word/document.xml").as_bytes())
+        .map_err(|err| err.to_string())?;
+    zip.add_directory("docProps/", options)
+        .map_err(|err| err.to_string())?;
+    zip.start_file("docProps/core.xml", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(render_core_properties(response).as_bytes())
+        .map_err(|err| err.to_string())?;
     zip.add_directory("word/", options)
         .map_err(|err| err.to_string())?;
     zip.start_file("word/document.xml", options)
@@ -181,7 +189,14 @@ pub(crate) fn render_pptx_bytes(
         .map_err(|err| err.to_string())?;
     zip.start_file("_rels/.rels", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>"#).map_err(|err| err.to_string())?;
+    zip.write_all(render_root_relationships("ppt/presentation.xml").as_bytes())
+        .map_err(|err| err.to_string())?;
+    zip.add_directory("docProps/", options)
+        .map_err(|err| err.to_string())?;
+    zip.start_file("docProps/core.xml", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(render_core_properties(response).as_bytes())
+        .map_err(|err| err.to_string())?;
     zip.add_directory("ppt/_rels/", options)
         .map_err(|err| err.to_string())?;
     zip.start_file("ppt/_rels/presentation.xml.rels", options)
@@ -253,6 +268,54 @@ fn safe_bundle_path(path: &str) -> String {
             }
         })
         .collect()
+}
+
+fn render_docx_content_types() -> String {
+    r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#.to_string()
+}
+
+fn render_root_relationships(office_document_target: &str) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{}"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>"#,
+        escape_xml(office_document_target)
+    )
+}
+
+fn render_core_properties(response: &CompileResponse) -> String {
+    let author = metadata_string(&response.metadata, "author")
+        .or_else(|| metadata_string(&response.metadata, "approvedBy"))
+        .unwrap_or_else(|| "NEditor".to_string());
+    let version = metadata_string(&response.metadata, "version").unwrap_or_default();
+    let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
+    let keywords = [
+        response.semantic.status.as_str(),
+        version.as_str(),
+        classification.as_str(),
+    ]
+    .into_iter()
+    .filter(|value| !value.is_empty())
+    .collect::<Vec<_>>()
+    .join("; ");
+    let description = format!(
+        "Status: {}; Version: {}",
+        response.semantic.status,
+        if version.is_empty() {
+            "unversioned"
+        } else {
+            version.as_str()
+        }
+    );
+    let timestamp = Utc::now().to_rfc3339();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>{}</dc:title><dc:creator>{}</dc:creator><dc:description>{}</dc:description><cp:keywords>{}</cp:keywords><cp:category>{}</cp:category><cp:lastModifiedBy>NEditor</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">{}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">{}</dcterms:modified></cp:coreProperties>"#,
+        escape_xml(&response.semantic.title),
+        escape_xml(&author),
+        escape_xml(&description),
+        escape_xml(&keywords),
+        escape_xml(&response.semantic.status),
+        escape_xml(&timestamp),
+        escape_xml(&timestamp)
+    )
 }
 
 pub(crate) fn export_text(response: &CompileResponse, options: &Value) -> String {
@@ -527,7 +590,7 @@ fn render_pptx_content_types(slide_count: usize) -> String {
         .map(|index| format!(r#"<Override PartName="/ppt/slides/slide{index}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>"#))
         .collect::<String>();
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}</Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}</Types>"#
     )
 }
 

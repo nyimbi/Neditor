@@ -3899,11 +3899,19 @@ paths:
         let docx_document = zip_entry_text(&docx, "word/document.xml");
         assert!(docx_document.contains("Cover: Test Report"));
         assert!(docx_document.contains("Watermark: DRAFT"));
+        let docx_core = zip_entry_text(&docx, "docProps/core.xml");
+        assert!(docx_core.contains("<dc:title>Test Report</dc:title>"));
+        assert!(docx_core.contains("<cp:category>approved</cp:category>"));
+        let docx_relationships = zip_entry_text(&docx, "_rels/.rels");
+        assert!(docx_relationships.contains("metadata/core-properties"));
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
         assert!(pptx.len() > 100);
         let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide1.xml");
         assert!(pptx_slide.contains("Test Report"));
         assert!(pptx_slide.contains("Page 1 of 1"));
+        let pptx_core = zip_entry_text(&pptx, "docProps/core.xml");
+        assert!(pptx_core.contains("<dc:title>Test Report</dc:title>"));
+        assert!(pptx_core.contains("<cp:category>approved</cp:category>"));
         assert!(
             render_markdown_bundle_bytes(&response, &response.export_manifest)
                 .expect("bundle bytes")
