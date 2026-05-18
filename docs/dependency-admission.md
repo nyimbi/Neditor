@@ -53,3 +53,4 @@ This record satisfies the dependency admission gate in `docs/specification.md`.
 | `pulldown-cmark` | `0.13` | MIT | Markdown-to-HTML preview/export | Linked library | In-house Markdown parser is not practical | HTML output must escape safely |
 | `sha2` | `0.10` | MIT/Apache-2.0 | Source/include/export hashes | Linked library | In-house SHA-256 is inappropriate | Manifest integrity |
 | `zip` | `2.4` | MIT | Minimal DOCX/PPTX package writing | Linked library | Handwriting ZIP is inappropriate | Export artifact integrity |
+| `notify` | `8.2.0` | CC0-1.0 | Future Rust watcher backend for root/include refresh when frontend watcher coverage is insufficient | Optional linked library, disabled by default | Current Tauri fs watcher covers active UI workflow; a Rust watcher avoids frontend-only event routing later | Local filesystem events only; keep disabled until watcher service owns lifecycle and tests cover platform behavior |
