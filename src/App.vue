@@ -327,6 +327,11 @@
             Autosave delay
             <input v-model.number="store.autosaveDelayMs" type="number" min="500" max="30000" step="250" />
           </label>
+          <label><input v-model="store.autoSnapshot" type="checkbox" /> Automatic snapshots</label>
+          <label>
+            Snapshot interval
+            <input v-model.number="store.snapshotIntervalMs" type="number" min="30000" max="3600000" step="30000" />
+          </label>
           <h3>Typography</h3>
           <label>
             Editor font
@@ -504,6 +509,8 @@ const editorHost = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
 let debounceHandle = 0;
 let autosaveHandle = 0;
+let autoSnapshotHandle = 0;
+let lastAutoSnapshotSignature = "";
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
 const aiInsertMode = ref<"insert" | "replace" | "appendix">("insert");
@@ -639,6 +646,8 @@ const filteredCommands = computed(() => {
 onMounted(async () => {
   await store.boot();
   buildEditor();
+  scheduleAutosave();
+  scheduleAutoSnapshot();
   document.title = store.windowTitle;
   window.addEventListener("keydown", handleShortcut);
 });
@@ -646,6 +655,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   editorView?.destroy();
   window.clearTimeout(autosaveHandle);
+  window.clearTimeout(autoSnapshotHandle);
   window.removeEventListener("keydown", handleShortcut);
 });
 
@@ -677,19 +687,25 @@ watch(
 );
 
 watch(
-  () => [
-    store.wordWrap,
-    store.lineNumbers,
-    store.theme,
-    store.autosave,
-    store.autosaveDelayMs,
-    store.editorFont,
-    store.editorLineHeight,
-    store.previewFont,
-    store.previewLineHeight,
-  ],
+  () => [active.value.id, active.value.text, active.value.dirty, store.autoSnapshot, store.snapshotIntervalMs, store.externalConflict?.externalHash],
+  () => {
+    scheduleAutoSnapshot();
+  },
+);
+
+watch(
+  () => [store.wordWrap, store.lineNumbers, store.theme, store.editorFont, store.editorLineHeight, store.previewFont, store.previewLineHeight],
   () => {
     buildEditor();
+    void store.persistWorkspace();
+  },
+);
+
+watch(
+  () => [store.autosave, store.autosaveDelayMs, store.autoSnapshot, store.snapshotIntervalMs],
+  () => {
+    scheduleAutosave();
+    scheduleAutoSnapshot();
     void store.persistWorkspace();
   },
 );
@@ -862,6 +878,10 @@ function clampAutosaveDelay(value: number) {
   return Math.min(Math.max(Number(value) || 1500, 500), 30000);
 }
 
+function clampSnapshotInterval(value: number) {
+  return Math.min(Math.max(Number(value) || 300000, 30000), 3600000);
+}
+
 function scheduleAutosave() {
   window.clearTimeout(autosaveHandle);
   const doc = active.value;
@@ -872,6 +892,28 @@ function scheduleAutosave() {
       store.statusMessage = "Autosave failed";
     });
   }, clampAutosaveDelay(store.autosaveDelayMs));
+}
+
+function scheduleAutoSnapshot() {
+  window.clearTimeout(autoSnapshotHandle);
+  const doc = active.value;
+  const signature = `${doc.id}:${doc.text}`;
+  if (!store.autoSnapshot || !doc.dirty || store.externalConflict || lastAutoSnapshotSignature === signature) return;
+  autoSnapshotHandle = window.setTimeout(() => {
+    const current = active.value;
+    const currentSignature = `${current.id}:${current.text}`;
+    if (lastAutoSnapshotSignature === currentSignature || store.externalConflict) return;
+    void store
+      .createSnapshot("auto")
+      .then(() => {
+        lastAutoSnapshotSignature = currentSignature;
+        void store.listSnapshots();
+      })
+      .catch((error) => {
+        store.lastError = error instanceof Error ? error.message : String(error);
+        store.statusMessage = "Automatic snapshot failed";
+      });
+  }, clampSnapshotInterval(store.snapshotIntervalMs));
 }
 
 async function chooseTransformEngine(name: string) {

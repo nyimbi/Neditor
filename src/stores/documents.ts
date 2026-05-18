@@ -24,6 +24,8 @@ interface PersistedWorkspace {
   lineNumbers?: boolean;
   autosave?: boolean;
   autosaveDelayMs?: number;
+  autoSnapshot?: boolean;
+  snapshotIntervalMs?: number;
   editorFont?: string;
   previewFont?: string;
   editorLineHeight?: number;
@@ -163,6 +165,10 @@ function clampAutosaveDelay(value: number) {
   return Math.min(Math.max(Number(value) || 1500, 500), 30000);
 }
 
+function clampSnapshotInterval(value: number) {
+  return Math.min(Math.max(Number(value) || 300000, 30000), 3600000);
+}
+
 function stringifyWatchEventKind(kind: WatchEvent["type"]) {
   if (typeof kind === "string") return kind;
   return Object.keys(kind)[0] || "other";
@@ -197,6 +203,8 @@ export const useDocumentsStore = defineStore("documents", {
     lineNumbers: true,
     autosave: false,
     autosaveDelayMs: 1500,
+    autoSnapshot: false,
+    snapshotIntervalMs: 300000,
     editorFont: "Menlo, Consolas, monospace",
     previewFont: "Inter, Arial, sans-serif",
     editorLineHeight: 1.55,
@@ -263,6 +271,8 @@ export const useDocumentsStore = defineStore("documents", {
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
         if (typeof persisted.autosave === "boolean") this.autosave = persisted.autosave;
         if (typeof persisted.autosaveDelayMs === "number") this.autosaveDelayMs = clampAutosaveDelay(persisted.autosaveDelayMs);
+        if (typeof persisted.autoSnapshot === "boolean") this.autoSnapshot = persisted.autoSnapshot;
+        if (typeof persisted.snapshotIntervalMs === "number") this.snapshotIntervalMs = clampSnapshotInterval(persisted.snapshotIntervalMs);
         if (persisted.editorFont) this.editorFont = persisted.editorFont;
         if (persisted.previewFont) this.previewFont = persisted.previewFont;
         if (typeof persisted.editorLineHeight === "number") this.editorLineHeight = clampLineHeight(persisted.editorLineHeight);
@@ -293,6 +303,8 @@ export const useDocumentsStore = defineStore("documents", {
         lineNumbers: this.lineNumbers,
         autosave: this.autosave,
         autosaveDelayMs: this.autosaveDelayMs,
+        autoSnapshot: this.autoSnapshot,
+        snapshotIntervalMs: this.snapshotIntervalMs,
         editorFont: this.editorFont,
         previewFont: this.previewFont,
         editorLineHeight: this.editorLineHeight,
@@ -688,6 +700,7 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async exportActive(path: string) {
       const doc = this.activeDocument;
+      await this.createSnapshot("pre-export");
       const response = await invoke<{ output_path: string; manifest_path?: string }>("export_document", {
         request: {
           text: doc.text,
@@ -704,12 +717,16 @@ export const useDocumentsStore = defineStore("documents", {
         },
       });
       this.statusMessage = `Exported ${response.output_path}${response.manifest_path ? " with manifest" : ""}`;
+      await this.listSnapshots();
     },
-    async snapshotActive(label = "manual") {
+    async createSnapshot(label = "manual") {
       const doc = this.activeDocument;
-      const response = await invoke<{ snapshot_path: string }>("create_snapshot", {
+      return invoke<{ snapshot_path: string }>("create_snapshot", {
         request: { text: doc.text, file_path: doc.path, label },
       });
+    },
+    async snapshotActive(label = "manual") {
+      const response = await this.createSnapshot(label);
       this.statusMessage = `Snapshot saved to ${response.snapshot_path}`;
       await this.listSnapshots();
     },
