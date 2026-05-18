@@ -50,6 +50,10 @@ cd src-tauri && cargo test
 pnpm tauri build --bundles app
 ```
 
+GitHub Actions also runs formatting, Rust check/test, frontend build, and a
+`pnpm tauri build --no-bundle` desktop compile on macOS, Windows, and Linux via
+`.github/workflows/ci.yml`.
+
 `cargo check` requires access to crates.io the first time dependencies are
 resolved. If network access is blocked, the frontend build and Rust formatting
 can still be verified, but backend compilation remains unverified.
