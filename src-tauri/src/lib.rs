@@ -229,6 +229,18 @@ fn compile(request: CompileRequest) -> CompileResponse {
     let (mut metadata, body, body_start_line) =
         parse_front_matter(&source, &mut diagnostics, Some(root_file.clone()));
     merge_project_variables(&mut metadata, root_path.as_deref(), &mut diagnostics);
+    let mut body = body;
+    let data_source_markdown = render_front_matter_data_sources(
+        &metadata,
+        root_path.as_deref(),
+        &root_file,
+        &mut include_graph,
+        &mut diagnostics,
+    );
+    if !data_source_markdown.is_empty() {
+        body.push_str("\n\n");
+        body.push_str(&data_source_markdown);
+    }
     normalize_source_map_after_front_matter(&mut source_map, body_start_line);
     let mut calculation_context = HashMap::new();
     let formula_graph = collect_calculations(&body, &mut calculation_context, &mut diagnostics);
@@ -625,6 +637,136 @@ fn project_variables_path(root_path: Option<&Path>) -> Option<PathBuf> {
         if !dir.pop() {
             return None;
         }
+    }
+}
+
+fn render_front_matter_data_sources(
+    metadata: &Value,
+    root_path: Option<&Path>,
+    root_file: &str,
+    include_graph: &mut Vec<IncludeEdge>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let mut specs = Vec::new();
+    collect_data_source_specs(metadata.get("dataSources"), None, &mut specs);
+    collect_data_source_specs(metadata.get("data_sources"), None, &mut specs);
+    collect_data_source_specs(metadata.get("csvFiles"), Some("csv"), &mut specs);
+    collect_data_source_specs(metadata.get("csv_files"), Some("csv"), &mut specs);
+    collect_data_source_specs(metadata.get("tsvFiles"), Some("tsv"), &mut specs);
+    collect_data_source_specs(metadata.get("tsv_files"), Some("tsv"), &mut specs);
+    if specs.is_empty() {
+        return String::new();
+    }
+
+    let base = root_path
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let mut rendered = Vec::new();
+    for spec in specs {
+        let kind = spec
+            .kind
+            .as_deref()
+            .or_else(|| data_source_kind_from_path(&spec.path))
+            .unwrap_or("csv");
+        if !matches!(kind, "csv" | "tsv") {
+            diagnostics.push(diag(
+                "warning",
+                format!("Unsupported data source type '{kind}' for {}", spec.path),
+                Some(spec.path.clone()),
+                None,
+                Some("Use csv or tsv for first-release local data sources."),
+            ));
+            continue;
+        }
+        let path = base.join(&spec.path);
+        let contents = match fs::read_to_string(&path) {
+            Ok(contents) => contents,
+            Err(err) => {
+                diagnostics.push(diag(
+                    "error",
+                    format!("Unable to read data source {}: {err}", path.display()),
+                    Some(path_to_string(&path)),
+                    None,
+                    Some("Create the data file or update front matter dataSources/csvFiles."),
+                ));
+                continue;
+            }
+        };
+        include_graph.push(IncludeEdge {
+            parent: root_file.to_string(),
+            child: path_to_string(&path),
+            depth: 0,
+        });
+        let title = spec.name.unwrap_or_else(|| {
+            path.file_stem()
+                .and_then(|name| name.to_str())
+                .unwrap_or("Data source")
+                .to_string()
+        });
+        rendered.push(format!(
+            "## Data Source: {title}\n\n```{kind}\n{}\n```",
+            contents.trim_end()
+        ));
+    }
+    rendered.join("\n\n")
+}
+
+struct DataSourceSpec {
+    name: Option<String>,
+    path: String,
+    kind: Option<String>,
+}
+
+fn collect_data_source_specs(
+    value: Option<&Value>,
+    default_kind: Option<&str>,
+    specs: &mut Vec<DataSourceSpec>,
+) {
+    match value {
+        Some(Value::String(path)) => specs.push(DataSourceSpec {
+            name: None,
+            path: path.clone(),
+            kind: default_kind.map(ToString::to_string),
+        }),
+        Some(Value::Array(items)) => {
+            for item in items {
+                collect_data_source_specs(Some(item), default_kind, specs);
+            }
+        }
+        Some(Value::Object(object)) => {
+            if let Some(path) = object
+                .get("path")
+                .or_else(|| object.get("file"))
+                .and_then(Value::as_str)
+            {
+                specs.push(DataSourceSpec {
+                    name: object
+                        .get("name")
+                        .or_else(|| object.get("title"))
+                        .and_then(Value::as_str)
+                        .map(ToString::to_string),
+                    path: path.to_string(),
+                    kind: object
+                        .get("type")
+                        .or_else(|| object.get("kind"))
+                        .and_then(Value::as_str)
+                        .map(ToString::to_string)
+                        .or_else(|| default_kind.map(ToString::to_string)),
+                });
+            }
+        }
+        _ => {}
+    }
+}
+
+fn data_source_kind_from_path(path: &str) -> Option<&'static str> {
+    if path.to_ascii_lowercase().ends_with(".tsv") {
+        Some("tsv")
+    } else if path.to_ascii_lowercase().ends_with(".csv") {
+        Some("csv")
+    } else {
+        None
     }
 }
 
@@ -3687,6 +3829,41 @@ ARR: Annual recurring revenue.
         assert_eq!(response.metadata["client"], "Front Matter Client");
         assert_eq!(response.metadata["region"], "West");
         fs::remove_dir_all(root).expect("clean project vars test dir");
+    }
+
+    #[test]
+    fn compiler_loads_front_matter_csv_data_sources() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-data-source-test-{unique}"));
+        fs::create_dir_all(root.join("data")).expect("create data dir");
+        fs::write(
+            root.join("data").join("revenue.csv"),
+            "Region,Revenue\nEast,100\nWest,=B1+80\n",
+        )
+        .expect("write csv data source");
+
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Data Source\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Revenue\n    path: data/revenue.csv\n    type: csv\n---\n# Data Source\n".to_string(),
+            file_path: Some(path_to_string(&root.join("report.md"))),
+        });
+
+        assert!(response
+            .compiled_markdown
+            .contains("## Data Source: Revenue"));
+        assert!(response.html.contains("<td>180</td>"));
+        assert!(response
+            .include_graph
+            .iter()
+            .any(|edge| edge.child.ends_with("data/revenue.csv")));
+        assert!(response
+            .export_manifest
+            .included_files
+            .iter()
+            .any(|file| file.path.ends_with("data/revenue.csv")));
+        fs::remove_dir_all(root).expect("clean data source test dir");
     }
 
     #[test]
