@@ -3916,6 +3916,25 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn table_formulas_reference_named_tables() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Named Tables\nstatus: approved\napprovedBy: QA\n---\n# Named Tables\nTable: Revenue {#tbl:revenue}\n| Region | Revenue |\n| --- | ---: |\n| East | 100 |\n| West | 180 |\n| Total | =SUM(B1:B2) |\n\nTable: Summary {#tbl:summary}\n| Metric | Value |\n| --- | ---: |\n| Revenue rollup | =SUM(tbl:revenue!B1:B3) |\n| Reported total | =revenue!B3 |\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response
+            .compiled_markdown
+            .contains("| Revenue rollup | 560 |"));
+        assert!(response
+            .compiled_markdown
+            .contains("| Reported total | 280 |"));
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("#NAME?")));
+    }
+
+    #[test]
     fn compiler_renders_layout_break_directives() {
         let response = compile(CompileRequest {
             text: "---\ntitle: Layout\nstatus: approved\napprovedBy: QA\n---\n# Layout\n{{page-break}}\n{{section-break columns=1}}\n\n```layout\ncolumns: 2\n```\n".to_string(),

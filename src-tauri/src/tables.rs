@@ -32,12 +32,14 @@ pub(crate) fn render_delimited_table(
     if rows.is_empty() {
         return "<table></table>".to_string();
     }
+    let named_tables = HashMap::new();
     evaluate_table_formula_rows(
         &mut rows,
         1,
         |row_index| row_index + 1,
         "Table formula error",
         "Use numeric formulas such as =SUM(1,2) or =SUM(A1:A3) in CSV/TSV cells.",
+        &named_tables,
         artifact_diags,
         diagnostics,
     );
@@ -64,6 +66,7 @@ pub(crate) fn evaluate_markdown_table_formulas(
     let lines = markdown.lines().collect::<Vec<_>>();
     let mut output = Vec::new();
     let mut index = 0;
+    let mut named_tables = HashMap::new();
     while index < lines.len() {
         let line = lines[index];
         if index + 1 >= lines.len()
@@ -76,6 +79,7 @@ pub(crate) fn evaluate_markdown_table_formulas(
         }
 
         let table_start = index;
+        let table_id = output.last().and_then(|line| table_id_from_caption(line));
         let header = lines[index].to_string();
         let separator = lines[index + 1].to_string();
         index += 2;
@@ -94,6 +98,7 @@ pub(crate) fn evaluate_markdown_table_formulas(
             |row_index| table_start + row_index + 1,
             "Markdown table formula error",
             "Use numeric formulas such as =10+15, =SUM(1,2), or =SUM(A1:A3).",
+            &named_tables,
             &mut Vec::new(),
             diagnostics,
         );
@@ -109,6 +114,7 @@ pub(crate) fn evaluate_markdown_table_formulas(
         } else {
             output.extend(row_lines.into_iter().map(|(_, row)| row));
         }
+        register_named_table(&mut named_tables, table_id.as_deref(), &rows);
     }
     output.join("\n")
 }
@@ -160,12 +166,13 @@ fn evaluate_table_formula_rows(
     display_line_for_row: impl Fn(usize) -> usize,
     diagnostic_prefix: &str,
     suggestion: &'static str,
+    named_tables: &HashMap<String, Vec<Vec<String>>>,
     artifact_diags: &mut Vec<DocumentDiagnostic>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> bool {
     let mut changed = false;
     let source_rows = rows.to_vec();
-    let mut context = TableFormulaContext::new(&source_rows);
+    let mut context = TableFormulaContext::new(&source_rows, named_tables);
     for row_index in data_start..rows.len() {
         for column_index in 0..rows[row_index].len() {
             if !rows[row_index][column_index].starts_with('=') {
@@ -195,14 +202,16 @@ fn evaluate_table_formula_rows(
 
 struct TableFormulaContext<'a> {
     rows: &'a [Vec<String>],
+    named_tables: &'a HashMap<String, Vec<Vec<String>>>,
     cache: HashMap<(usize, usize), Result<f64, String>>,
     stack: Vec<(usize, usize)>,
 }
 
 impl<'a> TableFormulaContext<'a> {
-    fn new(rows: &'a [Vec<String>]) -> Self {
+    fn new(rows: &'a [Vec<String>], named_tables: &'a HashMap<String, Vec<Vec<String>>>) -> Self {
         Self {
             rows,
+            named_tables,
             cache: HashMap::new(),
             stack: Vec::new(),
         }
@@ -225,6 +234,14 @@ fn expand_table_references(
     let mut output = String::new();
     let mut index = 0;
     while index < chars.len() {
+        if let Some((replacement, next_index)) =
+            expand_named_table_reference(&chars, index, context)?
+        {
+            output.push_str(&replacement);
+            index = next_index;
+            continue;
+        }
+
         if !chars[index].is_ascii_alphabetic() {
             output.push(chars[index]);
             index += 1;
@@ -273,6 +290,65 @@ fn expand_table_references(
     Ok(output)
 }
 
+fn expand_named_table_reference(
+    chars: &[char],
+    index: usize,
+    context: &mut TableFormulaContext<'_>,
+) -> Result<Option<(String, usize)>, String> {
+    if !(chars[index].is_ascii_alphabetic() || chars[index] == '_') {
+        return Ok(None);
+    }
+    let mut name_end = index;
+    while name_end < chars.len()
+        && (chars[name_end].is_ascii_alphanumeric() || matches!(chars[name_end], '_' | '-' | ':'))
+    {
+        name_end += 1;
+    }
+    if chars.get(name_end) != Some(&'!') {
+        return Ok(None);
+    }
+    let name = chars[index..name_end].iter().collect::<String>();
+    let rows = context
+        .named_tables
+        .get(&name)
+        .ok_or_else(|| format!("#NAME? {name}"))?;
+    let (first_ref, mut next_index) =
+        parse_cell_reference_at(chars, name_end + 1)?.ok_or_else(|| "#REF?".to_string())?;
+    if chars.get(next_index) == Some(&':') {
+        let (second_ref, range_end) =
+            parse_cell_reference_at(chars, next_index + 1)?.ok_or_else(|| "#REF?".to_string())?;
+        next_index = range_end;
+        return Ok(Some((
+            table_range_values_from_rows(rows, first_ref, second_ref)?.join(","),
+            next_index,
+        )));
+    }
+    Ok(Some((
+        table_cell_value_from_rows(rows, first_ref)?.to_string(),
+        next_index,
+    )))
+}
+
+fn parse_cell_reference_at(
+    chars: &[char],
+    mut index: usize,
+) -> Result<Option<((usize, usize), usize)>, String> {
+    let start = index;
+    while index < chars.len() && chars[index].is_ascii_alphabetic() {
+        index += 1;
+    }
+    let letters_end = index;
+    while index < chars.len() && chars[index].is_ascii_digit() {
+        index += 1;
+    }
+    if letters_end == start || letters_end == index {
+        return Ok(None);
+    }
+    let reference = cell_ref_from_parts(&chars[start..letters_end], &chars[letters_end..index])
+        .ok_or_else(|| "#REF?".to_string())?;
+    Ok(Some((reference, index)))
+}
+
 fn cell_ref_from_parts(column: &[char], row: &[char]) -> Option<(usize, usize)> {
     let column_index = column.iter().try_fold(0usize, |acc, ch| {
         let upper = ch.to_ascii_uppercase();
@@ -306,6 +382,24 @@ fn table_range_values(
     Ok(values)
 }
 
+fn table_range_values_from_rows(
+    rows: &[Vec<String>],
+    first: (usize, usize),
+    second: (usize, usize),
+) -> Result<Vec<String>, String> {
+    let row_start = first.0.min(second.0);
+    let row_end = first.0.max(second.0);
+    let column_start = first.1.min(second.1);
+    let column_end = first.1.max(second.1);
+    let mut values = Vec::new();
+    for row in row_start..=row_end {
+        for column in column_start..=column_end {
+            values.push(table_cell_value_from_rows(rows, (row, column))?.to_string());
+        }
+    }
+    Ok(values)
+}
+
 fn table_cell_value(
     context: &mut TableFormulaContext<'_>,
     reference: (usize, usize),
@@ -331,6 +425,15 @@ fn table_cell_value(
     };
     context.cache.insert(reference, result.clone());
     result
+}
+
+fn table_cell_value_from_rows(
+    rows: &[Vec<String>],
+    reference: (usize, usize),
+) -> Result<f64, String> {
+    let row = rows.get(reference.0).ok_or_else(|| "#REF?".to_string())?;
+    let cell = row.get(reference.1).ok_or_else(|| "#REF?".to_string())?;
+    parse_table_number(cell).ok_or_else(|| "#VALUE?".to_string())
 }
 
 fn table_cycle_error(reference: (usize, usize), stack: &[(usize, usize)]) -> String {
@@ -368,6 +471,37 @@ fn parse_table_number(value: &str) -> Option<f64> {
         .replace([',', '$', '%'], "")
         .parse::<f64>()
         .ok()
+}
+
+fn register_named_table(
+    named_tables: &mut HashMap<String, Vec<Vec<String>>>,
+    table_id: Option<&str>,
+    rows: &[Vec<String>],
+) {
+    let Some(table_id) = table_id else {
+        return;
+    };
+    named_tables.insert(table_id.to_string(), rows.to_vec());
+    if let Some((_, short_name)) = table_id.split_once(':') {
+        if !short_name.is_empty() {
+            named_tables.insert(short_name.to_string(), rows.to_vec());
+        }
+    }
+}
+
+fn table_id_from_caption(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if !trimmed.to_ascii_lowercase().starts_with("table:") {
+        return None;
+    }
+    let (_, after) = trimmed.split_once("{#")?;
+    let id = after
+        .split(['}', ' ', '\t'])
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    (!id.is_empty()).then_some(id)
 }
 
 fn is_markdown_table_row(line: &str) -> bool {
