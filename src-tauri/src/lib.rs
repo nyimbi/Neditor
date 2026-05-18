@@ -197,6 +197,7 @@ struct ManifestFile {
 struct ReviewComment {
     line: usize,
     author: String,
+    created_at: String,
     state: String,
     text: String,
 }
@@ -3213,19 +3214,46 @@ fn collect_comments(text: &str) -> Vec<ReviewComment> {
                 .trim()
                 .strip_prefix("<!-- comment:")?
                 .strip_suffix("-->")?;
-            Some(ReviewComment {
-                line: index + 1,
-                author: "local".to_string(),
-                state: if content.contains("resolved") {
-                    "resolved"
-                } else {
-                    "unresolved"
-                }
-                .to_string(),
-                text: content.trim().to_string(),
-            })
+            Some(parse_review_comment(index + 1, content))
         })
         .collect()
+}
+
+fn parse_review_comment(line: usize, content: &str) -> ReviewComment {
+    let mut author = "local".to_string();
+    let mut created_at = String::new();
+    let mut state = if content.contains("resolved") {
+        "resolved"
+    } else {
+        "unresolved"
+    }
+    .to_string();
+    let mut text_parts = Vec::new();
+
+    for part in content.split('|').map(str::trim).filter(|part| !part.is_empty()) {
+        if part == "resolved" || part == "unresolved" {
+            state = part.to_string();
+        } else if let Some(value) = part.strip_prefix("author:").or_else(|| part.strip_prefix("author=")) {
+            author = value.trim().to_string();
+        } else if let Some(value) = part
+            .strip_prefix("at:")
+            .or_else(|| part.strip_prefix("at="))
+            .or_else(|| part.strip_prefix("createdAt:"))
+            .or_else(|| part.strip_prefix("createdAt="))
+        {
+            created_at = value.trim().to_string();
+        } else {
+            text_parts.push(part.to_string());
+        }
+    }
+
+    ReviewComment {
+        line,
+        author,
+        created_at,
+        state,
+        text: text_parts.join(" | "),
+    }
 }
 
 fn collect_ai_sources(text: &str) -> Vec<AiSource> {
@@ -5236,6 +5264,28 @@ ARR: Annual recurring revenue.
         assert!(response.html.contains("Acme Strategy"));
         assert!(response.html.contains("Liquidity"));
         assert!(!response.html.contains("{#index:Liquidity}"));
+    }
+
+    #[test]
+    fn compiler_parses_review_comment_metadata() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Review\nstatus: approved\napprovedBy: QA\n---\n# Review\n<!-- comment: unresolved | author: Dana | at: 2026-05-18T10:00:00Z | Clarify the risk note. -->\n".to_string(),
+            file_path: None,
+        });
+        let comment = response
+            .semantic
+            .comments
+            .first()
+            .expect("review comment");
+
+        assert_eq!(comment.state, "unresolved");
+        assert_eq!(comment.author, "Dana");
+        assert_eq!(comment.created_at, "2026-05-18T10:00:00Z");
+        assert_eq!(comment.text, "Clarify the risk note.");
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("unresolved review comments")));
     }
 
     #[test]

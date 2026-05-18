@@ -867,8 +867,9 @@ export const useDocumentsStore = defineStore("documents", {
       this.insertAiPaste(response, mode);
     },
     insertReviewComment(text: string) {
-      const comment = text.trim() || "Review comment";
-      this.updateText(`${this.activeDocument.text}\n\n<!-- comment: unresolved | ${comment} -->\n`);
+      const comment = (text.trim() || "Review comment").replace(/-->/g, "->");
+      const createdAt = new Date().toISOString();
+      this.updateText(`${this.activeDocument.text}\n\n<!-- comment: unresolved | author: local | at: ${createdAt} | ${comment} -->\n`);
       this.statusMessage = "Inserted review comment";
     },
     resolveReviewComment(line: number) {

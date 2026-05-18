@@ -300,7 +300,7 @@
           <h3>Comments</h3>
           <article v-for="comment in active.compile?.semantic.comments || []" :key="String(comment.line)" class="snapshot-row">
             <p>{{ comment.text }}</p>
-            <small>Line {{ comment.line }} | {{ comment.state }}</small>
+            <small>Line {{ comment.line }} | {{ comment.state }} | {{ comment.author || "local" }}{{ comment.created_at ? ` | ${comment.created_at}` : "" }}</small>
             <button v-if="comment.state !== 'resolved'" type="button" @click="store.resolveReviewComment(Number(comment.line))">Resolve</button>
           </article>
           <h3>AI provenance</h3>

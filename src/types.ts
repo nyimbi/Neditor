@@ -35,7 +35,7 @@ export interface SemanticDocument {
   duplicate_bibliography_keys: string[];
   glossary: Record<string, string>;
   layout_directives: string[];
-  comments: Array<{ line: number; author: string; state: string; text: string }>;
+  comments: Array<{ line: number; author: string; created_at?: string | null; state: string; text: string }>;
   ai_sources: Array<{ provider: string; model: string; date: string; reviewed_by: string; status: string }>;
   labels: string[];
   cross_references: Array<{ key: string; target_kind: string; resolved: boolean }>;
