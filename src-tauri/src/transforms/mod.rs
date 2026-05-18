@@ -1,10 +1,10 @@
 use crate::diagnostics::DocumentDiagnostic;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub(crate) mod external;
 pub(crate) mod qr;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct TransformArtifact {
     pub(crate) id: String,
     pub(crate) name: String,

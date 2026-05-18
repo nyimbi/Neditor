@@ -17,6 +17,7 @@ const MAX_TRANSFORM_TIMEOUT_MS: u64 = 30_000;
 const MAX_TRANSFORM_INPUT_BYTES: usize = 1_048_576;
 const MAX_TRANSFORM_OUTPUT_BYTES: usize = 2_097_152;
 const MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES: usize = 64;
+const MAX_EXTERNAL_TRANSFORM_CACHE_FILE_BYTES: u64 = 4_194_304;
 
 static EXTERNAL_TRANSFORM_CACHE: OnceLock<Mutex<HashMap<String, TransformArtifact>>> =
     OnceLock::new();
@@ -160,23 +161,70 @@ fn cached_external_transform(
     name: &str,
     max_output_bytes: usize,
 ) -> Option<TransformArtifact> {
+    cached_memory_external_transform(cache_key, name, max_output_bytes)
+        .or_else(|| cached_disk_external_transform(cache_key, name, max_output_bytes))
+}
+
+fn cached_memory_external_transform(
+    cache_key: &str,
+    name: &str,
+    max_output_bytes: usize,
+) -> Option<TransformArtifact> {
     let cache = external_transform_cache().lock().ok()?;
     let mut artifact = cache.get(cache_key)?.clone();
+    prepare_cached_external_transform(&mut artifact, name, max_output_bytes, false)?;
+    Some(artifact)
+}
+
+fn cached_disk_external_transform(
+    cache_key: &str,
+    name: &str,
+    max_output_bytes: usize,
+) -> Option<TransformArtifact> {
+    let path = external_transform_disk_cache_path(cache_key);
+    let metadata = fs::metadata(&path).ok()?;
+    if metadata.len() > MAX_EXTERNAL_TRANSFORM_CACHE_FILE_BYTES {
+        let _ = fs::remove_file(path);
+        return None;
+    }
+    let text = fs::read_to_string(&path).ok()?;
+    let mut artifact: TransformArtifact = serde_json::from_str(&text).ok()?;
+    prepare_cached_external_transform(&mut artifact, name, max_output_bytes, true)?;
+    store_external_transform_memory(artifact.clone());
+    Some(artifact)
+}
+
+fn prepare_cached_external_transform(
+    artifact: &mut TransformArtifact,
+    name: &str,
+    max_output_bytes: usize,
+    persistent: bool,
+) -> Option<()> {
     if artifact.html.len() > max_output_bytes {
         return None;
     }
     artifact.duration_ms = Some(0);
+    let cache_scope = if persistent {
+        "persistent cache"
+    } else {
+        "memory cache"
+    };
     artifact.diagnostics.push(diag(
         "info",
-        format!("{name} external transform served from cache."),
+        format!("{name} external transform served from cache ({cache_scope})."),
         None,
         None,
         Some("Cache key includes transform name, engine path, input mode, and source hash."),
     ));
-    Some(artifact)
+    Some(())
 }
 
 fn store_external_transform(artifact: TransformArtifact) {
+    store_external_transform_memory(artifact.clone());
+    store_external_transform_disk(&artifact);
+}
+
+fn store_external_transform_memory(artifact: TransformArtifact) {
     let Ok(mut cache) = external_transform_cache().lock() else {
         return;
     };
@@ -186,6 +234,66 @@ fn store_external_transform(artifact: TransformArtifact) {
         }
     }
     cache.insert(artifact.cache_key.clone(), artifact);
+}
+
+fn store_external_transform_disk(artifact: &TransformArtifact) {
+    let root = external_transform_disk_cache_root();
+    if fs::create_dir_all(&root).is_err() {
+        return;
+    }
+    let path = root.join(format!("{}.json", artifact.cache_key));
+    let temp_path = root.join(format!("{}.tmp", artifact.cache_key));
+    let Ok(text) = serde_json::to_string(artifact) else {
+        return;
+    };
+    if fs::write(&temp_path, text.as_bytes()).is_ok() {
+        let _ = fs::rename(&temp_path, &path);
+    }
+    prune_external_transform_disk_cache(&root);
+}
+
+fn external_transform_disk_cache_root() -> PathBuf {
+    std::env::temp_dir().join("neditor-transform-cache-v1")
+}
+
+fn external_transform_disk_cache_path(cache_key: &str) -> PathBuf {
+    external_transform_disk_cache_root().join(format!("{cache_key}.json"))
+}
+
+fn prune_external_transform_disk_cache(root: &Path) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    let mut files = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.extension().and_then(|extension| extension.to_str()) != Some("json") {
+                return None;
+            }
+            let modified = entry
+                .metadata()
+                .ok()
+                .and_then(|metadata| metadata.modified().ok())
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+            Some((path, modified))
+        })
+        .collect::<Vec<_>>();
+    if files.len() <= MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES {
+        return;
+    }
+    files.sort_by_key(|(_, modified)| *modified);
+    let remove_count = files.len() - MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES;
+    for (path, _) in files.into_iter().take(remove_count) {
+        let _ = fs::remove_file(path);
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn clear_external_transform_memory_cache_for_tests() {
+    if let Ok(mut cache) = external_transform_cache().lock() {
+        cache.clear();
+    }
 }
 
 fn external_engine_identity(engine_path: &Path) -> Result<(String, String), String> {

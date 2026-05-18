@@ -1,6 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct DocumentDiagnostic {
     pub(crate) severity: String,
     pub(crate) message: String,

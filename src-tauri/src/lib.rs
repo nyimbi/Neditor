@@ -5770,7 +5770,7 @@ paths:
             .is_some_and(|version| version.contains("file-size:")));
         let cached_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
-            body: unique_body,
+            body: unique_body.clone(),
             engine_path: Some(cat_path.clone()),
             trusted: true,
             input_mode: Some("stdin".to_string()),
@@ -5790,6 +5790,27 @@ paths:
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("served from cache")));
+        transforms::external::clear_external_transform_memory_cache_for_tests();
+        let persistent_cached_artifact = run_external_transform(ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: unique_body,
+            engine_path: Some(cat_path.clone()),
+            trusted: true,
+            input_mode: Some("stdin".to_string()),
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        })
+        .expect("persistent cached stdin external transform");
+        assert_eq!(
+            persistent_cached_artifact.cache_key,
+            stdin_artifact.cache_key
+        );
+        assert_eq!(persistent_cached_artifact.duration_ms, Some(0));
+        assert!(persistent_cached_artifact
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("persistent cache")));
 
         let file_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
