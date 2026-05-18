@@ -82,6 +82,8 @@ interface DocumentWatchEvent {
   modified?: string | null;
 }
 
+const staleSaveConflictMessage = "File changed on disk since it was opened; resolve the external conflict before saving.";
+
 function quoteMarkdown(text: string) {
   return text
     .split(/\r?\n/)
@@ -231,6 +233,14 @@ function fallbackHash(text: string) {
     hash |= 0;
   }
   return String(hash);
+}
+
+function errorText(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isStaleSaveConflict(error: unknown) {
+  return errorText(error).includes(staleSaveConflictMessage);
 }
 
 function titleFromPath(path: string | null) {
@@ -545,9 +555,25 @@ export const useDocumentsStore = defineStore("documents", {
           return;
         }
       }
-      const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("save_file", {
-        request: { path: target, text: doc.text, expected_hash: isExistingDocumentSave ? doc.savedHash : null },
-      });
+      let response: { path: string; text: string; hash: string; modified?: string };
+      try {
+        response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("save_file", {
+          request: { path: target, text: doc.text, expected_hash: isExistingDocumentSave ? doc.savedHash : null },
+        });
+      } catch (error) {
+        if (isExistingDocumentSave && isStaleSaveConflict(error)) {
+          const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: target });
+          await this.openExternalConflict(
+            target,
+            "root",
+            "The root file changed outside NEditor during save.",
+            metadata.hash || "external-change",
+          );
+          this.statusMessage = "Save blocked; resolve external changes first";
+          return;
+        }
+        throw error;
+      }
       doc.path = response.path;
       doc.title = titleFromPath(response.path);
       doc.savedHash = response.hash;
