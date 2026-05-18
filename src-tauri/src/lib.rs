@@ -5141,7 +5141,7 @@ ARR: Annual recurring revenue.
     #[test]
     fn compiler_builds_document_ast_blocks_for_exports() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: AST\nstatus: approved\napprovedBy: QA\n---\n# AST\nBusiness paragraph.\n\n> Quoted evidence\n> with continuation\n\n```js\nconst total = 42;\n```\n\n- First decision\n- Second decision\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n".to_string(),
+            text: "---\ntitle: AST\nstatus: approved\napprovedBy: QA\n---\n# AST\nBusiness paragraph.\n\n> Quoted evidence\n> with continuation\n\n```js\nconst total = 42;\n```\n\n- First decision\n- Second decision\n\n- [x] Reviewed by finance\n- [ ] Attach signed approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n".to_string(),
             file_path: None,
         });
 
@@ -5183,6 +5183,17 @@ ARR: Annual recurring revenue.
         assert!(response.document_ast.blocks.iter().any(|block| {
             matches!(
                 block,
+                DocumentBlock::TaskList { items, .. }
+                    if items.len() == 2
+                        && items[0].checked
+                        && items[0].text == "Reviewed by finance"
+                        && !items[1].checked
+                        && items[1].text == "Attach signed approval"
+            )
+        }));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
                 DocumentBlock::Table { line, end_line, headers, alignments, rows, .. }
                     if headers == &vec!["Metric".to_string(), "Value".to_string()]
                         && alignments == &vec!["left".to_string(), "right".to_string()]
@@ -5216,6 +5227,7 @@ ARR: Annual recurring revenue.
         assert!(exported.contains("> Quoted evidence\n> with continuation"));
         assert!(exported.contains("```js\nconst total = 42;\n```"));
         assert!(exported.contains("- First decision\n- Second decision"));
+        assert!(exported.contains("- [x] Reviewed by finance\n- [ ] Attach signed approval"));
         assert!(exported.contains("Table: Metric | Value"));
         assert!(exported.contains("Figure: fig:diagram: System diagram"));
         assert!(exported.contains("Equation: eq:roi: ROI = Gain / Cost"));
@@ -5898,7 +5910,7 @@ paths:
     #[test]
     fn semantic_exporters_map_ast_blocks() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n{{slide title=\"Board Review\" notes=\"Open with risk summary\\nClose with decision ask\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
+            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n- [x] Confirm controls\n- [ ] Final approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n{{slide title=\"Board Review\" notes=\"Open with risk summary\\nClose with decision ask\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
             file_path: None,
         });
         let options = json!({ "watermark": "DRAFT" });
@@ -5917,6 +5929,8 @@ paths:
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading2""#));
         assert!(docx_document.contains("<w:tbl>"));
         assert!(docx_document.contains(r#"<w:jc w:val="right"/>"#));
+        assert!(docx_document.contains("[x] Confirm controls"));
+        assert!(docx_document.contains("[ ] Final approval"));
         assert!(docx_document.contains(r#"<w:br w:type="page""#));
         assert!(docx_document.contains(r#"<w:cols w:num="2""#));
         assert!(docx_document.contains("System diagram"));
@@ -5934,6 +5948,8 @@ paths:
         assert!(presentation.contains(r#"r:id="rId2""#));
         let slide_two = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
         assert!(slide_two.contains("Semantic Exports"));
+        assert!(slide_two.contains("- [x] Confirm controls"));
+        assert!(slide_two.contains("- [ ] Final approval"));
         assert!(slide_two.contains("Table: Metric | Value"));
         assert!(slide_two.contains("System diagram"));
         assert!(slide_two.contains(r#"r:embed="rIdImage1""#));
@@ -5955,6 +5971,8 @@ paths:
         let pdf = render_pdf_bytes(&response, &options);
         let pdf_text = String::from_utf8_lossy(&pdf);
         assert!(pdf_text.contains("/Count 3"));
+        assert!(pdf_text.contains("- [x] Confirm controls"));
+        assert!(pdf_text.contains("- [ ] Final approval"));
         assert!(pdf_text.contains("Section break: columns=2"));
         assert!(pdf_text.contains("System diagram"));
         assert!(pdf_text.contains("After the break."));

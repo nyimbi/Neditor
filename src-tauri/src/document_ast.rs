@@ -20,6 +20,12 @@ pub(crate) struct FootnoteEntry {
 }
 
 #[derive(Debug, Serialize)]
+pub(crate) struct TaskListItem {
+    pub(crate) checked: bool,
+    pub(crate) text: String,
+}
+
+#[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum DocumentBlock {
     Heading {
@@ -39,6 +45,12 @@ pub(crate) enum DocumentBlock {
     List {
         ordered: bool,
         items: Vec<String>,
+        line: usize,
+        end_line: usize,
+        source: Option<AstSourceRange>,
+    },
+    TaskList {
+        items: Vec<TaskListItem>,
         line: usize,
         end_line: usize,
         source: Option<AstSourceRange>,
@@ -216,6 +228,15 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                     .collect::<Vec<_>>()
                     .join("\n"),
             ),
+            DocumentBlock::TaskList { items, .. } => Some(
+                items
+                    .iter()
+                    .map(|item| {
+                        format!("- [{}] {}", if item.checked { "x" } else { " " }, item.text)
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
             DocumentBlock::BlockQuote { text, .. } => Some(
                 text.lines()
                     .map(|line| format!("> {line}"))
@@ -327,6 +348,12 @@ where
                 ..
             }
             | DocumentBlock::List {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::TaskList {
                 line,
                 end_line,
                 source,
@@ -483,6 +510,9 @@ fn parse_ast_table(
 }
 
 fn parse_ast_list(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize)> {
+    if let Some(task_list) = parse_ast_task_list(lines, index) {
+        return Some(task_list);
+    }
     let (ordered, first_item) = parse_ast_list_item(lines.get(index)?.trim())?;
     let mut items = vec![first_item];
     let mut next_index = index + 1;
@@ -506,6 +536,43 @@ fn parse_ast_list(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize)
         },
         next_index,
     ))
+}
+
+fn parse_ast_task_list(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize)> {
+    let first_item = parse_ast_task_list_item(lines.get(index)?.trim())?;
+    let mut items = vec![first_item];
+    let mut next_index = index + 1;
+    while next_index < lines.len() {
+        let Some(item) = parse_ast_task_list_item(lines[next_index].trim()) else {
+            break;
+        };
+        items.push(item);
+        next_index += 1;
+    }
+    Some((
+        DocumentBlock::TaskList {
+            items,
+            line: index + 1,
+            end_line: next_index,
+            source: None,
+        },
+        next_index,
+    ))
+}
+
+fn parse_ast_task_list_item(line: &str) -> Option<TaskListItem> {
+    let item = line
+        .strip_prefix("- ")
+        .or_else(|| line.strip_prefix("* "))
+        .or_else(|| line.strip_prefix("+ "))?;
+    let marker = item.get(..3)?;
+    let checked = match marker {
+        "[ ]" => false,
+        "[x]" | "[X]" => true,
+        _ => return None,
+    };
+    let text = clean_inline_text(item.get(3..)?.trim_start());
+    (!text.is_empty()).then_some(TaskListItem { checked, text })
 }
 
 fn parse_ast_list_item(line: &str) -> Option<(bool, String)> {

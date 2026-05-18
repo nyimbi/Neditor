@@ -66,10 +66,22 @@ export interface DocumentSourceRange {
   end_source_line: number;
 }
 
+export interface TaskListItem {
+  checked: boolean;
+  text: string;
+}
+
+export interface FootnoteEntry {
+  number: number;
+  key: string;
+  text: string;
+}
+
 export type DocumentBlock =
   | { kind: "heading"; level: number; text: string; anchor: string; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "paragraph"; text: string; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "list"; ordered: boolean; items: string[]; line: number; end_line: number; source?: DocumentSourceRange | null }
+  | { kind: "task_list"; items: TaskListItem[]; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "block_quote"; text: string; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "code_block"; language?: string | null; code: string; line: number; end_line: number; source?: DocumentSourceRange | null }
   | {
@@ -96,6 +108,7 @@ export type DocumentBlock =
   | { kind: "equation"; line: number; end_line: number; id?: string | null; caption?: string | null; text: string; source?: DocumentSourceRange | null }
   | { kind: "layout"; line: number; end_line: number; directive: string; options: string; source?: DocumentSourceRange | null }
   | { kind: "callout"; line: number; end_line: number; callout_type: string; title: string; text: string; source?: DocumentSourceRange | null }
+  | { kind: "footnotes"; line: number; end_line: number; entries: FootnoteEntry[]; source?: DocumentSourceRange | null }
   | { kind: "raw_html"; line: number; end_line: number; html: string; source?: DocumentSourceRange | null };
 
 export interface DocumentAst {

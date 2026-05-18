@@ -1111,6 +1111,7 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
         DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
         DocumentBlock::Paragraph { text, .. } => docx_paragraph(text),
         DocumentBlock::List { ordered, items, .. } => docx_list(*ordered, items),
+        DocumentBlock::TaskList { items, .. } => docx_task_list(items),
         DocumentBlock::BlockQuote { text, .. } => docx_paragraph(&format!("Quote: {text}")),
         DocumentBlock::CodeBlock { language, code, .. } => {
             let label = language
@@ -1201,6 +1202,19 @@ fn docx_list(ordered: bool, items: &[String]) -> String {
                 "-".to_string()
             };
             docx_paragraph(&format!("{marker} {item}"))
+        })
+        .collect::<String>()
+}
+
+fn docx_task_list(items: &[crate::document_ast::TaskListItem]) -> String {
+    items
+        .iter()
+        .map(|item| {
+            docx_paragraph(&format!(
+                "[{}] {}",
+                if item.checked { "x" } else { " " },
+                item.text
+            ))
         })
         .collect::<String>()
 }
@@ -1710,6 +1724,10 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
                     format!("- {item}")
                 }
             })
+            .collect(),
+        DocumentBlock::TaskList { items, .. } => items
+            .iter()
+            .map(|item| format!("- [{}] {}", if item.checked { "x" } else { " " }, item.text))
             .collect(),
         DocumentBlock::Table {
             id,
