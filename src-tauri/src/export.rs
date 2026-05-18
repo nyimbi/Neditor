@@ -1250,10 +1250,70 @@ fn render_docx_header(response: &CompileResponse, options: &Value) -> String {
 }
 
 fn render_docx_footer(response: &CompileResponse, options: &Value) -> String {
-    let (_, footer) = export_header_footer(response, options);
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}</w:ftr>"#,
-        docx_paragraph(&footer)
+        render_docx_footer_paragraph(response, options)
+    )
+}
+
+fn render_docx_footer_paragraph(response: &CompileResponse, options: &Value) -> String {
+    let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
+    let template = metadata_string(&response.metadata, "layout.footer").unwrap_or_else(|| {
+        if include_page_numbers(options) {
+            "Page {{page}} of {{pages}}".to_string()
+        } else {
+            String::new()
+        }
+    });
+    if template.contains("{{page}}") || template.contains("{{pages}}") {
+        let template = template
+            .replace("{{title}}", &response.semantic.title)
+            .replace("{{status}}", &response.semantic.status)
+            .replace("{{classification}}", &classification);
+        return docx_paragraph_with_page_fields(&template);
+    }
+    docx_paragraph(&render_export_template_for_page(
+        &template,
+        response,
+        &classification,
+        1,
+        1,
+    ))
+}
+
+fn docx_paragraph_with_page_fields(template: &str) -> String {
+    let mut runs = String::new();
+    let mut remaining = template;
+    while !remaining.is_empty() {
+        let page_pos = remaining.find("{{page}}");
+        let pages_pos = remaining.find("{{pages}}");
+        let next = match (page_pos, pages_pos) {
+            (Some(page), Some(pages)) if page < pages => Some((page, "PAGE", "{{page}}", "1")),
+            (Some(_), Some(pages)) => Some((pages, "NUMPAGES", "{{pages}}", "1")),
+            (Some(page), None) => Some((page, "PAGE", "{{page}}", "1")),
+            (None, Some(pages)) => Some((pages, "NUMPAGES", "{{pages}}", "1")),
+            (None, None) => None,
+        };
+        let Some((index, instruction, marker, fallback)) = next else {
+            runs.push_str(&docx_text_run(remaining));
+            break;
+        };
+        runs.push_str(&docx_text_run(&remaining[..index]));
+        runs.push_str(&format!(
+            r#"<w:fldSimple w:instr="{instruction}"><w:r><w:t>{fallback}</w:t></w:r></w:fldSimple>"#
+        ));
+        remaining = &remaining[index + marker.len()..];
+    }
+    format!("<w:p>{runs}</w:p>")
+}
+
+fn docx_text_run(text: &str) -> String {
+    if text.is_empty() {
+        return String::new();
+    }
+    format!(
+        r#"<w:r><w:t xml:space="preserve">{}</w:t></w:r>"#,
+        escape_xml(text)
     )
 }
 

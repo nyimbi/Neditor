@@ -6072,7 +6072,9 @@ paths:
         assert!(docx_document_relationships.contains("relationships/header"));
         assert!(docx_document_relationships.contains("relationships/footer"));
         assert!(zip_entry_text(&docx, "word/header1.xml").contains("Test Report"));
-        assert!(zip_entry_text(&docx, "word/footer1.xml").contains("Page 1 of 1"));
+        let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
+        assert!(docx_footer.contains(r#"w:instr="PAGE""#));
+        assert!(docx_footer.contains(r#"w:instr="NUMPAGES""#));
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
         assert!(pptx.len() > 100);
         let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide1.xml");
@@ -6324,7 +6326,8 @@ paths:
         assert!(docx_comments.contains(r#"<w:comment w:id="0" w:author="QA""#));
         assert!(docx_comments.contains("Verify board-pack export fidelity."));
         assert!(docx_header.contains("Export Conformance Report | restricted"));
-        assert!(docx_footer.contains("Page 1 of 1"));
+        assert!(docx_footer.contains(r#"w:instr="PAGE""#));
+        assert!(docx_footer.contains(r#"w:instr="NUMPAGES""#));
         assert!(docx_document.contains("<w:tbl>"));
         assert!(docx_document.contains(r#"<w:br w:type="page""#));
         assert!(docx_document.contains("Competitive Advantage, p. 42"));
