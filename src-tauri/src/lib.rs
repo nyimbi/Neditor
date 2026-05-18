@@ -4993,6 +4993,44 @@ paths:
         assert!(file_artifact.html.contains("digraph"));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn external_transform_timeout_covers_blocked_stdin() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let script = std::env::temp_dir().join(format!("neditor-blocked-stdin-{unique}.sh"));
+        fs::write(&script, "#!/bin/sh\nsleep 2\n").expect("write blocked stdin script");
+        let mut permissions = fs::metadata(&script)
+            .expect("script metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&script, permissions).expect("make script executable");
+
+        let started = std::time::Instant::now();
+        let error = run_external_transform(ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "x".repeat(512 * 1024),
+            engine_path: Some(path_to_string(&script)),
+            trusted: true,
+            input_mode: Some("stdin".to_string()),
+            timeout_ms: Some(50),
+            max_input_bytes: Some(1024 * 1024),
+            max_output_bytes: Some(1024),
+        })
+        .unwrap_err();
+
+        let _ = fs::remove_file(script);
+        assert!(error.contains("timed out"));
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(1),
+            "blocked stdin write should not bypass the timeout"
+        );
+    }
+
     #[test]
     fn include_expansion_strips_child_front_matter() {
         let unique = SystemTime::now()

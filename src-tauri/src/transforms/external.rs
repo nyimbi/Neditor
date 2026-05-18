@@ -160,13 +160,14 @@ fn execute_external_transform(
     }
 
     let mut child = command.spawn().map_err(|err| err.to_string())?;
-    if input_mode == "stdin" {
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(body.as_bytes())
-                .map_err(|err| err.to_string())?;
-        }
-    }
+    let stdin_writer = if input_mode == "stdin" {
+        child.stdin.take().map(|mut stdin| {
+            let input = body.as_bytes().to_vec();
+            std::thread::spawn(move || stdin.write_all(&input).map_err(|err| err.to_string()))
+        })
+    } else {
+        None
+    };
 
     let status = loop {
         if let Some(status) = child.try_wait().map_err(|err| err.to_string())? {
@@ -184,6 +185,22 @@ fn execute_external_transform(
         }
         std::thread::sleep(Duration::from_millis(10));
     };
+
+    if let Some(writer) = stdin_writer {
+        match writer.join() {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) if status.success() => {
+                return Err(format!(
+                    "{name} external transform stdin write failed: {error}"
+                ));
+            }
+            Ok(Err(_)) => {}
+            Err(_) if status.success() => {
+                return Err(format!("{name} external transform stdin writer panicked."));
+            }
+            Err(_) => {}
+        }
+    }
 
     let output = child.wait_with_output().map_err(|err| err.to_string())?;
     if let Some(path) = temp_input {
