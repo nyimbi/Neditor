@@ -6329,15 +6329,26 @@ paths:
         let docx_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
         let docx_header = zip_entry_text(&docx, "word/header1.xml");
         let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
+        let docx_comments = zip_entry_text(&docx, "word/comments.xml");
         let docx_svg = zip_entry_text(&docx, "word/media/image1.svg");
         assert!(docx_content_types.contains(r#"ContentType="image/svg+xml""#));
+        assert!(docx_content_types.contains(
+            r#"ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml""#
+        ));
         assert!(docx_relationships.contains(r#"Id="rIdImage1""#));
         assert!(docx_relationships.contains(r#"Target="media/image1.svg""#));
+        assert!(docx_relationships.contains(
+            r#"Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments""#
+        ));
         assert!(docx_document.contains(r#"r:embed="rIdImage1""#));
         assert_eq!(docx_svg, "<svg/>");
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading1""#));
         assert!(docx_document.contains("w:headerReference"));
         assert!(docx_document.contains("w:footerReference"));
+        assert!(docx_document.contains(r#"<w:commentRangeStart w:id="0""#));
+        assert!(docx_document.contains(r#"<w:commentReference w:id="0""#));
+        assert!(docx_comments.contains(r#"<w:comment w:id="0" w:author="QA""#));
+        assert!(docx_comments.contains("Verify board-pack export fidelity."));
         assert!(docx_header.contains("Export Conformance Report | restricted"));
         assert!(docx_footer.contains("Page 1 of 1"));
         assert!(docx_document.contains("<w:tbl>"));

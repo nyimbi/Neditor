@@ -200,12 +200,13 @@ pub(crate) fn render_docx_bytes(
     options_value: &Value,
 ) -> Result<Vec<u8>, String> {
     let media = collect_docx_media(response);
+    let include_native_comments = docx_has_native_comments(response, options_value);
     let mut cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(&mut cursor);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     zip.start_file("[Content_Types].xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_content_types(&media).as_bytes())
+    zip.write_all(render_docx_content_types(&media, include_native_comments).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.add_directory("_rels/", options)
         .map_err(|err| err.to_string())?;
@@ -225,7 +226,7 @@ pub(crate) fn render_docx_bytes(
         .map_err(|err| err.to_string())?;
     zip.start_file("word/_rels/document.xml.rels", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_document_relationships(&media).as_bytes())
+    zip.write_all(render_docx_document_relationships(&media, include_native_comments).as_bytes())
         .map_err(|err| err.to_string())?;
     if !media.is_empty() {
         zip.add_directory("word/media/", options)
@@ -244,6 +245,12 @@ pub(crate) fn render_docx_bytes(
         .map_err(|err| err.to_string())?;
     zip.write_all(render_docx_footer(response, options_value).as_bytes())
         .map_err(|err| err.to_string())?;
+    if include_native_comments {
+        zip.start_file("word/comments.xml", options)
+            .map_err(|err| err.to_string())?;
+        zip.write_all(render_docx_comments(response).as_bytes())
+            .map_err(|err| err.to_string())?;
+    }
     zip.start_file("word/document.xml", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(render_docx_document(response, options_value, &media).as_bytes())
@@ -394,7 +401,7 @@ fn safe_bundle_path(path: &str) -> String {
         .collect()
 }
 
-fn render_docx_content_types(media: &[ExportMedia]) -> String {
+fn render_docx_content_types(media: &[ExportMedia], include_comments: bool) -> String {
     let mut defaults = vec![
         (
             "rels".to_string(),
@@ -420,8 +427,13 @@ fn render_docx_content_types(media: &[ExportMedia]) -> String {
             )
         })
         .collect::<String>();
+    let comments_override = if include_comments {
+        r#"<Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/>"#
+    } else {
+        ""
+    };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>{comments_override}</Types>"#
     )
 }
 
@@ -432,7 +444,7 @@ fn render_root_relationships(office_document_target: &str) -> String {
     )
 }
 
-fn render_docx_document_relationships(media: &[ExportMedia]) -> String {
+fn render_docx_document_relationships(media: &[ExportMedia], include_comments: bool) -> String {
     let media_relationships = media
         .iter()
         .map(|item| {
@@ -443,8 +455,13 @@ fn render_docx_document_relationships(media: &[ExportMedia]) -> String {
             )
         })
         .collect::<String>();
+    let comments_relationship = if include_comments {
+        r#"<Relationship Id="rIdComments" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>"#
+    } else {
+        ""
+    };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>{media_relationships}</Relationships>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>{comments_relationship}{media_relationships}</Relationships>"#
     )
 }
 
@@ -1074,6 +1091,9 @@ fn render_docx_document(
     for block in &response.document_ast.blocks {
         body.push_str(&render_docx_block(block, media));
     }
+    if docx_has_native_comments(response, options) {
+        body.push_str(&render_docx_comment_references(response));
+    }
     for line in appendix_export_lines(response, options) {
         if matches!(
             line.as_str(),
@@ -1089,6 +1109,52 @@ fn render_docx_document(
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>{body}<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader1"/><w:footerReference w:type="default" r:id="rIdFooter1"/><w:pgSz w:w="{page_width}" w:h="{page_height}"/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/></w:sectPr></w:body></w:document>"#
     )
+}
+
+fn docx_has_native_comments(response: &CompileResponse, options: &Value) -> bool {
+    include_comments(options) && !response.semantic.comments.is_empty()
+}
+
+fn render_docx_comments(response: &CompileResponse) -> String {
+    let comments = response
+        .semantic
+        .comments
+        .iter()
+        .enumerate()
+        .map(|(index, comment)| {
+            let author = empty_as(comment.author.as_str(), "local");
+            let created_at = if comment.created_at.is_empty() {
+                Utc::now().to_rfc3339()
+            } else {
+                comment.created_at.clone()
+            };
+            format!(
+                r#"<w:comment w:id="{index}" w:author="{}" w:date="{}"><w:p><w:r><w:t>{}</w:t></w:r></w:p></w:comment>"#,
+                escape_xml(author),
+                escape_xml(&created_at),
+                escape_xml(&comment.text)
+            )
+        })
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{comments}</w:comments>"#
+    )
+}
+
+fn render_docx_comment_references(response: &CompileResponse) -> String {
+    response
+        .semantic
+        .comments
+        .iter()
+        .enumerate()
+        .map(|(index, comment)| {
+            let label = format!("Comment on source line {}", comment.line);
+            format!(
+                r#"<w:p><w:commentRangeStart w:id="{index}"/><w:r><w:t>{}</w:t></w:r><w:commentRangeEnd w:id="{index}"/><w:r><w:commentReference w:id="{index}"/></w:r></w:p>"#,
+                escape_xml(&label)
+            )
+        })
+        .collect::<String>()
 }
 
 fn render_docx_header(response: &CompileResponse, options: &Value) -> String {
