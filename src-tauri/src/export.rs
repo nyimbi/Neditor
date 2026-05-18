@@ -13,7 +13,7 @@ use std::{
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 #[derive(Debug)]
-struct DocxMedia {
+struct ExportMedia {
     source: String,
     relationship_id: String,
     path: String,
@@ -223,12 +223,13 @@ pub(crate) fn render_pptx_bytes(
     options_value: &Value,
 ) -> Result<Vec<u8>, String> {
     let slides = build_pptx_slides(response, options_value);
+    let media = collect_pptx_media(response);
     let mut cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(&mut cursor);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     zip.start_file("[Content_Types].xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_pptx_content_types(slides.len()).as_bytes())
+    zip.write_all(render_pptx_content_types(slides.len(), &media).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.add_directory("_rels/", options)
         .map_err(|err| err.to_string())?;
@@ -250,14 +251,35 @@ pub(crate) fn render_pptx_bytes(
         .map_err(|err| err.to_string())?;
     zip.add_directory("ppt/slides/", options)
         .map_err(|err| err.to_string())?;
+    if !media.is_empty() {
+        zip.add_directory("ppt/slides/_rels/", options)
+            .map_err(|err| err.to_string())?;
+        zip.add_directory("ppt/media/", options)
+            .map_err(|err| err.to_string())?;
+        for item in &media {
+            zip.start_file(format!("ppt/{}", item.path), options)
+                .map_err(|err| err.to_string())?;
+            zip.write_all(&item.bytes).map_err(|err| err.to_string())?;
+        }
+    }
     zip.start_file("ppt/presentation.xml", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(render_pptx_presentation(slides.len()).as_bytes())
         .map_err(|err| err.to_string())?;
     for (index, slide) in slides.iter().enumerate() {
+        let slide_media = pptx_slide_media(slide, &media);
+        if !slide_media.is_empty() {
+            zip.start_file(
+                format!("ppt/slides/_rels/slide{}.xml.rels", index + 1),
+                options,
+            )
+            .map_err(|err| err.to_string())?;
+            zip.write_all(render_pptx_slide_relationships(&slide_media).as_bytes())
+                .map_err(|err| err.to_string())?;
+        }
         zip.start_file(format!("ppt/slides/slide{}.xml", index + 1), options)
             .map_err(|err| err.to_string())?;
-        zip.write_all(render_pptx_slide(slide).as_bytes())
+        zip.write_all(render_pptx_slide(slide, &slide_media).as_bytes())
             .map_err(|err| err.to_string())?;
     }
     zip.finish().map_err(|err| err.to_string())?;
@@ -315,7 +337,7 @@ fn safe_bundle_path(path: &str) -> String {
         .collect()
 }
 
-fn render_docx_content_types(media: &[DocxMedia]) -> String {
+fn render_docx_content_types(media: &[ExportMedia]) -> String {
     let mut defaults = vec![
         (
             "rels".to_string(),
@@ -353,7 +375,7 @@ fn render_root_relationships(office_document_target: &str) -> String {
     )
 }
 
-fn render_docx_document_relationships(media: &[DocxMedia]) -> String {
+fn render_docx_document_relationships(media: &[ExportMedia]) -> String {
     let media_relationships = media
         .iter()
         .map(|item| {
@@ -633,7 +655,7 @@ fn html_provenance_section(response: &CompileResponse, options: &Value) -> Strin
 fn render_docx_document(
     response: &CompileResponse,
     options: &Value,
-    media: &[DocxMedia],
+    media: &[ExportMedia],
 ) -> String {
     let mut body = String::new();
     for line in export_metadata_lines(response, options) {
@@ -674,7 +696,7 @@ fn render_docx_footer(response: &CompileResponse, options: &Value) -> String {
     )
 }
 
-fn render_docx_block(block: &DocumentBlock, media: &[DocxMedia]) -> String {
+fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
     match block {
         DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
         DocumentBlock::Paragraph { text, .. } => docx_paragraph(text),
@@ -760,7 +782,7 @@ fn docx_figure(
     src: &Option<String>,
     alt: &Option<String>,
     caption: &Option<String>,
-    media: &[DocxMedia],
+    media: &[ExportMedia],
 ) -> String {
     let caption_text = figure_export_line(id, src, alt, caption);
     let Some(src) = src else {
@@ -788,20 +810,20 @@ fn docx_figure(
     format!("{drawing}{}", docx_paragraph(&caption_text))
 }
 
-fn collect_docx_media(response: &CompileResponse) -> Vec<DocxMedia> {
+fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
     let mut media = Vec::new();
     for block in &response.document_ast.blocks {
         let DocumentBlock::Figure { src: Some(src), .. } = block else {
             continue;
         };
-        if media.iter().any(|item: &DocxMedia| item.source == *src) {
+        if media.iter().any(|item: &ExportMedia| item.source == *src) {
             continue;
         }
         let Some((extension, content_type, bytes)) = parse_image_data_uri(src) else {
             continue;
         };
         let index = media.len() + 1;
-        media.push(DocxMedia {
+        media.push(ExportMedia {
             source: src.clone(),
             relationship_id: format!("rIdImage{index}"),
             path: format!("media/image{index}.{extension}"),
@@ -811,6 +833,10 @@ fn collect_docx_media(response: &CompileResponse) -> Vec<DocxMedia> {
         });
     }
     media
+}
+
+fn collect_pptx_media(response: &CompileResponse) -> Vec<ExportMedia> {
+    collect_docx_media(response)
 }
 
 fn parse_image_data_uri(src: &str) -> Option<(String, String, Vec<u8>)> {
@@ -1199,18 +1225,59 @@ fn equation_export_line(id: &Option<String>, text: &str, caption: &Option<String
     parts.join(": ")
 }
 
-fn render_pptx_content_types(slide_count: usize) -> String {
+fn render_pptx_content_types(slide_count: usize, media: &[ExportMedia]) -> String {
+    let mut defaults = vec![
+        (
+            "rels".to_string(),
+            "application/vnd.openxmlformats-package.relationships+xml".to_string(),
+        ),
+        ("xml".to_string(), "application/xml".to_string()),
+    ];
+    for item in media {
+        if !defaults
+            .iter()
+            .any(|(extension, _)| extension == &item.extension)
+        {
+            defaults.push((item.extension.clone(), item.content_type.clone()));
+        }
+    }
+    let default_xml = defaults
+        .iter()
+        .map(|(extension, content_type)| {
+            format!(
+                r#"<Default Extension="{}" ContentType="{}"/>"#,
+                escape_xml(extension),
+                escape_xml(content_type)
+            )
+        })
+        .collect::<String>();
     let slide_overrides = (1..=slide_count)
         .map(|index| format!(r#"<Override PartName="/ppt/slides/slide{index}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>"#))
         .collect::<String>();
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}</Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}</Types>"#
     )
 }
 
 fn render_pptx_relationships(slide_count: usize) -> String {
     let relationships = (1..=slide_count)
         .map(|index| format!(r#"<Relationship Id="rId{index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide{index}.xml"/>"#))
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{relationships}</Relationships>"#
+    )
+}
+
+fn render_pptx_slide_relationships(media: &[&ExportMedia]) -> String {
+    let relationships = media
+        .iter()
+        .map(|item| {
+            format!(
+                r#"<Relationship Id="{}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../{}"/>"#,
+                escape_xml(&item.relationship_id),
+                escape_xml(&item.path)
+            )
+        })
         .collect::<String>();
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{relationships}</Relationships>"#
@@ -1229,7 +1296,7 @@ fn render_pptx_presentation(slide_count: usize) -> String {
     )
 }
 
-fn render_pptx_slide(slide: &PptxSlide) -> String {
+fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
     let title = escape_xml(&slide.title);
     let body = slide
         .lines
@@ -1237,9 +1304,31 @@ fn render_pptx_slide(slide: &PptxSlide) -> String {
         .filter(|line| !line.trim().is_empty())
         .map(|line| format!(r#"<a:p><a:r><a:t>{}</a:t></a:r></a:p>"#, escape_xml(line)))
         .collect::<String>();
+    let pictures = media
+        .iter()
+        .enumerate()
+        .map(|(index, item)| render_pptx_picture(item, index))
+        .collect::<String>();
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp></p:spTree></p:cSld></p:sld>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{pictures}</p:spTree></p:cSld></p:sld>"#
     )
+}
+
+fn render_pptx_picture(item: &ExportMedia, index: usize) -> String {
+    let shape_id = 20 + index;
+    let y = 2_850_000 + (index as i64 * 1_000_000);
+    format!(
+        r#"<p:pic><p:nvPicPr><p:cNvPr id="{shape_id}" name="{}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="457200" y="{y}"/><a:ext cx="3657600" cy="1371600"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#,
+        escape_xml(&item.path),
+        escape_xml(&item.relationship_id)
+    )
+}
+
+fn pptx_slide_media<'a>(slide: &PptxSlide, media: &'a [ExportMedia]) -> Vec<&'a ExportMedia> {
+    media
+        .iter()
+        .filter(|item| slide.lines.iter().any(|line| line.contains(&item.source)))
+        .collect()
 }
 
 fn export_css(brand_color: &str, watermark: &str) -> String {

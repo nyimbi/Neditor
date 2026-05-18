@@ -5503,12 +5503,19 @@ paths:
         assert!(docx_document.contains("ROI = Gain / Cost"));
 
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let pptx_content_types = zip_entry_text(&pptx, "[Content_Types].xml");
         let presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
+        let slide_two_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide2.xml.rels");
+        let pptx_svg = zip_entry_text(&pptx, "ppt/media/image1.svg");
+        assert!(pptx_content_types.contains(r#"ContentType="image/svg+xml""#));
         assert!(presentation.contains(r#"r:id="rId2""#));
         let slide_two = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
         assert!(slide_two.contains("Semantic Exports"));
         assert!(slide_two.contains("Table: Metric | Value"));
         assert!(slide_two.contains("System diagram"));
+        assert!(slide_two.contains(r#"r:embed="rIdImage1""#));
+        assert!(slide_two_relationships.contains(r#"Target="../media/image1.svg""#));
+        assert_eq!(pptx_svg, "<svg/>");
         let slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
         assert!(slide_three.contains("Section"));
         assert!(slide_three.contains("Section break: columns=2"));
@@ -5618,9 +5625,14 @@ paths:
         assert!(docx_document.contains("gpt-5.4"));
 
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let pptx_content_types = zip_entry_text(&pptx, "[Content_Types].xml");
         let pptx_presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
         let pptx_agenda_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
         let pptx_slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
+        let pptx_slide_three_relationships =
+            zip_entry_text(&pptx, "ppt/slides/_rels/slide3.xml.rels");
+        let pptx_svg = zip_entry_text(&pptx, "ppt/media/image1.svg");
+        assert!(pptx_content_types.contains(r#"ContentType="image/svg+xml""#));
         assert!(pptx_presentation.contains(r#"r:id="rId2""#));
         assert!(pptx_agenda_slide.contains("Agenda"));
         assert!(pptx_agenda_slide.contains("Export Conformance Report"));
@@ -5628,6 +5640,9 @@ paths:
         assert!(pptx_slide_three.contains("Export Conformance Report"));
         assert!(pptx_slide_three.contains("Table: Region | Revenue | Margin"));
         assert!(pptx_slide_three.contains("Reference architecture"));
+        assert!(pptx_slide_three.contains(r#"r:embed="rIdImage1""#));
+        assert!(pptx_slide_three_relationships.contains(r#"Target="../media/image1.svg""#));
+        assert_eq!(pptx_svg, "<svg/>");
         let pptx_glossary_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
             .into_iter()
             .find(|slide| slide.contains("Glossary"))
