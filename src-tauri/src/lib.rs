@@ -6196,6 +6196,29 @@ paths:
     }
 
     #[test]
+    fn pdf_export_splits_large_tables_across_pages() {
+        let rows = (1..=60)
+            .map(|index| format!("| Row {index} | {index} |"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let response = compile(CompileRequest {
+            text: format!(
+                "---\ntitle: Large Table\nstatus: approved\napprovedBy: QA\n---\n# Large Table\n\nTable: Row audit {{#tbl:rows}}\n| Label | Value |\n| --- | ---: |\n{rows}\n"
+            ),
+            file_path: None,
+        });
+
+        let pdf = render_pdf_bytes(&response, &json!({}));
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains("/Count 3"));
+        assert!(pdf_text.contains("Row audit"));
+        assert!(pdf_text.contains("Row audit \\(continued\\)"));
+        assert!(pdf_text.contains("(Row 1) Tj"));
+        assert!(pdf_text.contains("(Row 60) Tj"));
+        assert!(pdf_text.contains("Page 3 of 3"));
+    }
+
+    #[test]
     fn pptx_export_can_include_an_agenda_from_options() {
         let response = compile(CompileRequest {
             text: "---\ntitle: Agenda Export\nstatus: approved\napprovedBy: QA\n---\n# Agenda Export\nIntro.\n\n## Market\nBody.\n\n## Finance\nBody.\n".to_string(),

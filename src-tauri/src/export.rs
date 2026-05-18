@@ -1773,35 +1773,34 @@ struct PdfTable {
 }
 
 fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<PdfPageItem>> {
-    let mut pages = vec![pdf_text_items(export_metadata_lines(response, options))];
-    let mut current = Vec::new();
+    let (_, page_height, margin_top, _) = pdf_page_layout(response, options);
+    let footer_reserved = (margin_top / 2).max(12) + 24;
+    let available_height =
+        (page_height as i32 - margin_top as i32 - footer_reserved as i32).max(120);
+    let mut paginator = PdfPaginator::new(available_height);
+    paginator.extend_text(export_metadata_lines(response, options));
+    paginator.finish_page();
+
     for block in &response.document_ast.blocks {
         match block {
             DocumentBlock::Layout { directive, .. } if directive == "page-break" => {
-                if !current.is_empty() {
-                    pages.push(current);
-                    current = Vec::new();
-                }
+                paginator.finish_page();
             }
             DocumentBlock::Layout {
                 directive, options, ..
             } if directive == "section-break" => {
-                if !current.is_empty() {
-                    pages.push(current);
-                    current = Vec::new();
-                }
-                current.extend(pdf_text_items(layout_export_lines(directive, options)));
+                paginator.finish_page();
+                paginator.extend_text(layout_export_lines(directive, options));
             }
-            _ => current.extend(block_pdf_items(block)),
+            _ => paginator.extend_items(block_pdf_items(block)),
         }
     }
-    if !current.is_empty() {
-        pages.push(current);
-    }
+    paginator.finish_page();
     for appendix in appendix_pages(response, options) {
-        pages.push(pdf_text_items(appendix));
+        paginator.extend_text(appendix);
+        paginator.finish_page();
     }
-    pages
+    paginator.into_pages()
 }
 
 fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
@@ -1827,6 +1826,150 @@ fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
 
 fn pdf_text_items(lines: Vec<String>) -> Vec<PdfPageItem> {
     lines.into_iter().map(PdfPageItem::Text).collect()
+}
+
+struct PdfPaginator {
+    pages: Vec<Vec<PdfPageItem>>,
+    current: Vec<PdfPageItem>,
+    used_height: i32,
+    available_height: i32,
+}
+
+impl PdfPaginator {
+    fn new(available_height: i32) -> Self {
+        Self {
+            pages: Vec::new(),
+            current: Vec::new(),
+            used_height: 0,
+            available_height,
+        }
+    }
+
+    fn extend_text(&mut self, lines: Vec<String>) {
+        self.extend_items(pdf_text_items(lines));
+    }
+
+    fn extend_items(&mut self, items: Vec<PdfPageItem>) {
+        for item in items {
+            match item {
+                PdfPageItem::Text(line) => self.push_text(line),
+                PdfPageItem::Table(table) => self.push_table(table),
+            }
+        }
+    }
+
+    fn push_text(&mut self, line: String) {
+        let height = pdf_text_item_height();
+        if self.used_height + height > self.available_height {
+            self.finish_page();
+        }
+        self.used_height += height;
+        self.current.push(PdfPageItem::Text(line));
+    }
+
+    fn push_table(&mut self, table: PdfTable) {
+        let mut remaining_rows = table.rows.as_slice();
+        let mut continued = false;
+        while !remaining_rows.is_empty() {
+            let available_rows = self.available_table_rows(continued);
+            if available_rows == 0 {
+                self.finish_page();
+                continue;
+            }
+            let take_count = remaining_rows.len().min(available_rows);
+            let chunk = pdf_table_chunk(&table, remaining_rows[..take_count].to_vec(), continued);
+            let height = pdf_table_height(&chunk);
+            if self.used_height + height > self.available_height && !self.current.is_empty() {
+                self.finish_page();
+                continue;
+            }
+            self.used_height += height;
+            self.current.push(PdfPageItem::Table(chunk));
+            remaining_rows = &remaining_rows[take_count..];
+            continued = true;
+        }
+
+        if table.rows.is_empty() {
+            let height = pdf_table_height(&table);
+            if self.used_height + height > self.available_height {
+                self.finish_page();
+            }
+            self.used_height += height;
+            self.current.push(PdfPageItem::Table(table));
+        }
+    }
+
+    fn available_table_rows(&self, continued: bool) -> usize {
+        let remaining = self.available_height - self.used_height;
+        let caption_height = if continued {
+            pdf_table_continued_caption_height()
+        } else {
+            pdf_table_caption_height()
+        };
+        let available_for_rows = remaining - caption_height - pdf_table_header_height() - 10;
+        if available_for_rows < pdf_table_row_height() {
+            return 0;
+        }
+        (available_for_rows / pdf_table_row_height()) as usize
+    }
+
+    fn finish_page(&mut self) {
+        if self.current.is_empty() {
+            return;
+        }
+        self.pages.push(std::mem::take(&mut self.current));
+        self.used_height = 0;
+    }
+
+    fn into_pages(mut self) -> Vec<Vec<PdfPageItem>> {
+        self.finish_page();
+        if self.pages.is_empty() {
+            self.pages.push(Vec::new());
+        }
+        self.pages
+    }
+}
+
+fn pdf_table_chunk(table: &PdfTable, rows: Vec<Vec<String>>, continued: bool) -> PdfTable {
+    let caption = if continued {
+        Some(table.caption.clone().unwrap_or_else(|| "Table".to_string()) + " (continued)")
+    } else {
+        table.caption.clone()
+    };
+    PdfTable {
+        id: table.id.clone(),
+        caption,
+        headers: table.headers.clone(),
+        alignments: table.alignments.clone(),
+        rows,
+    }
+}
+
+fn pdf_text_item_height() -> i32 {
+    12
+}
+
+fn pdf_table_caption_height() -> i32 {
+    18
+}
+
+fn pdf_table_continued_caption_height() -> i32 {
+    18
+}
+
+fn pdf_table_header_height() -> i32 {
+    18
+}
+
+fn pdf_table_row_height() -> i32 {
+    18
+}
+
+fn pdf_table_height(table: &PdfTable) -> i32 {
+    pdf_table_caption_height()
+        + pdf_table_header_height()
+        + (table.rows.len() as i32 * pdf_table_row_height())
+        + 10
 }
 
 fn pdf_page_layout(response: &CompileResponse, options: &Value) -> (u32, u32, u32, u32) {
