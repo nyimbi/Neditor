@@ -536,8 +536,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { EditorState } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers } from "@codemirror/view";
+import { EditorState, RangeSetBuilder } from "@codemirror/state";
+import { Decoration, EditorView, keymap, lineNumbers, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap } from "@codemirror/search";
@@ -834,6 +834,7 @@ function editorExtensions() {
     history(),
     markdown(),
     linter(editorDiagnostics, { delay: 150 }),
+    semanticEditorDecorations,
     closeBrackets(),
     EditorView.contentAttributes.of({ spellcheck: "true", autocapitalize: "sentences" }),
     keymap.of([{ key: "Enter", run: continueMarkdownList }, ...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
@@ -859,8 +860,94 @@ function editorExtensions() {
         fontFamily: store.editorFont,
         lineHeight: String(clampUiLineHeight(store.editorLineHeight)),
       },
+      ".cm-neditor-citation": {
+        color: "#1f6f55",
+        fontWeight: "700",
+      },
+      ".cm-neditor-variable": {
+        color: "#6d28d9",
+        backgroundColor: "rgba(109, 40, 217, 0.08)",
+      },
+      ".cm-neditor-layout-token": {
+        color: "#92400e",
+        backgroundColor: "rgba(245, 158, 11, 0.14)",
+      },
+      ".cm-neditor-review-comment": {
+        color: "#991b1b",
+        backgroundColor: "rgba(248, 113, 113, 0.14)",
+      },
+      ".cm-neditor-ai-source": {
+        color: "#155e75",
+        backgroundColor: "rgba(14, 116, 144, 0.12)",
+      },
     }),
   ];
+}
+
+const semanticEditorDecorations = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = buildSemanticEditorDecorations(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = buildSemanticEditorDecorations(update.view);
+      }
+    }
+  },
+  {
+    decorations: (plugin) => plugin.decorations,
+  },
+);
+
+function buildSemanticEditorDecorations(view: EditorView) {
+  const builder = new RangeSetBuilder<Decoration>();
+  for (let lineNumber = 1; lineNumber <= view.state.doc.lines; lineNumber += 1) {
+    const line = view.state.doc.line(lineNumber);
+    const text = line.text;
+    if (/^\s*\{\{(?:page-break|section-break)\b/.test(text) || /^\s*```layout\b/.test(text)) {
+      builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-layout-token" }));
+      continue;
+    }
+    if (/^\s*<!--\s*comment:/.test(text)) {
+      builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-review-comment" }));
+      continue;
+    }
+    if (/^\s*```ai-source\b/.test(text)) {
+      builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-ai-source" }));
+      continue;
+    }
+    const inlineDecorations: Array<{ start: number; end: number; className: string }> = [];
+    collectRegexDecorations(inlineDecorations, text, /\[@[A-Za-z0-9_:-]+(?:[^\]]*)\]/g, "cm-neditor-citation");
+    collectRegexDecorations(inlineDecorations, text, /\{\{[^}\n]+\}\}/g, "cm-neditor-variable");
+    inlineDecorations.sort((left, right) => left.start - right.start || left.end - right.end);
+    for (const decoration of inlineDecorations) {
+      builder.add(
+        line.from + decoration.start,
+        line.from + decoration.end,
+        Decoration.mark({ class: decoration.className }),
+      );
+    }
+  }
+  return builder.finish();
+}
+
+function collectRegexDecorations(
+  decorations: Array<{ start: number; end: number; className: string }>,
+  text: string,
+  pattern: RegExp,
+  className: string,
+) {
+  for (const match of text.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    if (end > start) {
+      decorations.push({ start, end, className });
+    }
+  }
 }
 
 function continueMarkdownList(view: EditorView) {
