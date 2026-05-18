@@ -3540,38 +3540,163 @@ fn render_timeline_svg(body: &str) -> String {
 }
 
 fn render_chart_svg(body: &str) -> String {
-    let values = body
-        .lines()
-        .filter_map(|line| line.split_once(':'))
-        .filter_map(|(label, value)| {
-            value
-                .trim()
-                .parse::<f64>()
-                .ok()
-                .map(|value| (label.trim(), value))
-        })
-        .collect::<Vec<_>>();
+    let chart = parse_chart_spec(body);
+    let values = chart.values;
+    let title = chart.title.unwrap_or_else(|| "Chart".to_string());
+    let chart_type = chart.chart_type.unwrap_or_else(|| "bar".to_string());
     let max = values
         .iter()
         .map(|(_, value)| *value)
         .reduce(f64::max)
         .unwrap_or(1.0)
         .max(1.0);
-    let height = 260;
+    let height = 300;
     let width = 760;
+    let mut svg = format!(
+        "<svg class=\"chart\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><title>{}</title><text x=\"80\" y=\"32\" font-size=\"18\" font-weight=\"700\" fill=\"#1f2937\">{}</text>",
+        escape_html(&title),
+        escape_html(&title)
+    );
+    if chart_type.eq_ignore_ascii_case("line") || chart_type.eq_ignore_ascii_case("area") {
+        svg.push_str(&render_line_chart_svg(&values, max));
+    } else {
+        svg.push_str(&render_bar_chart_svg(&values, max));
+    }
+    svg.push_str("</svg>");
+    svg
+}
+
+#[derive(Debug)]
+struct ChartSpec {
+    title: Option<String>,
+    chart_type: Option<String>,
+    values: Vec<(String, f64)>,
+}
+
+fn parse_chart_spec(body: &str) -> ChartSpec {
+    if let Ok(value) = serde_yaml::from_str::<serde_yaml::Value>(body) {
+        let title = yaml_get(&value, "title").and_then(yaml_scalar_string);
+        let chart_type = yaml_get(&value, "type").and_then(yaml_scalar_string);
+        let x_key = yaml_get(&value, "x")
+            .and_then(yaml_scalar_string)
+            .unwrap_or_else(|| "label".to_string());
+        let y_key = yaml_get(&value, "y")
+            .and_then(yaml_scalar_string)
+            .unwrap_or_else(|| "value".to_string());
+        let values = yaml_get(&value, "data")
+            .and_then(serde_yaml::Value::as_sequence)
+            .map(|rows| {
+                rows.iter()
+                    .filter_map(|row| {
+                        let label = yaml_get(row, &x_key).and_then(yaml_scalar_string)?;
+                        let value = yaml_get(row, &y_key).and_then(yaml_number)?;
+                        Some((label, value))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if !values.is_empty() {
+            return ChartSpec {
+                title,
+                chart_type,
+                values,
+            };
+        }
+    }
+
+    ChartSpec {
+        title: None,
+        chart_type: Some("bar".to_string()),
+        values: body
+            .lines()
+            .filter_map(|line| line.split_once(':'))
+            .filter_map(|(label, value)| {
+                value
+                    .trim()
+                    .parse::<f64>()
+                    .ok()
+                    .map(|value| (label.trim().to_string(), value))
+            })
+            .collect(),
+    }
+}
+
+fn yaml_get<'a>(value: &'a serde_yaml::Value, key: &str) -> Option<&'a serde_yaml::Value> {
+    match value {
+        serde_yaml::Value::Mapping(map) => {
+            let key = serde_yaml::Value::String(key.to_string());
+            map.get(&key)
+        }
+        _ => None,
+    }
+}
+
+fn yaml_scalar_string(value: &serde_yaml::Value) -> Option<String> {
+    match value {
+        serde_yaml::Value::String(text) => Some(text.clone()),
+        serde_yaml::Value::Number(number) => Some(number.to_string()),
+        serde_yaml::Value::Bool(value) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn yaml_number(value: &serde_yaml::Value) -> Option<f64> {
+    match value {
+        serde_yaml::Value::Number(number) => number.as_f64(),
+        serde_yaml::Value::String(text) => text.parse::<f64>().ok(),
+        _ => None,
+    }
+}
+
+fn render_bar_chart_svg(values: &[(String, f64)], max: f64) -> String {
     let bar_width = if values.is_empty() {
         1
     } else {
         600 / values.len().max(1)
     };
-    let mut svg = format!("<svg class=\"chart\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\">");
+    let mut svg = String::from("<line x1=\"70\" y1=\"240\" x2=\"710\" y2=\"240\" stroke=\"#94a3b8\"/>");
     for (index, (label, value)) in values.iter().enumerate() {
-        let bar_height = ((*value / max) * 180.0) as usize;
+        let bar_height = ((*value / max) * 170.0) as usize;
         let x = 80 + index * bar_width;
-        let y = 220 - bar_height;
-        svg.push_str(&format!("<rect x=\"{x}\" y=\"{y}\" width=\"{}\" height=\"{bar_height}\" fill=\"#275DA8\"/><text x=\"{x}\" y=\"242\" font-size=\"12\">{}</text><text x=\"{x}\" y=\"{}\" font-size=\"12\">{value}</text>", bar_width.saturating_sub(10), escape_html(label), y.saturating_sub(8)));
+        let y = 240 - bar_height;
+        svg.push_str(&format!(
+            "<rect x=\"{x}\" y=\"{y}\" width=\"{}\" height=\"{bar_height}\" fill=\"#275DA8\"/><text x=\"{x}\" y=\"264\" font-size=\"12\">{}</text><text x=\"{x}\" y=\"{}\" font-size=\"12\">{value}</text>",
+            bar_width.saturating_sub(10),
+            escape_html(label),
+            y.saturating_sub(8)
+        ));
     }
-    svg.push_str("</svg>");
+    svg
+}
+
+fn render_line_chart_svg(values: &[(String, f64)], max: f64) -> String {
+    let step = if values.len() <= 1 {
+        1.0
+    } else {
+        600.0 / (values.len() - 1) as f64
+    };
+    let points = values
+        .iter()
+        .enumerate()
+        .map(|(index, (_, value))| {
+            let x = 80.0 + index as f64 * step;
+            let y = 240.0 - ((*value / max) * 170.0);
+            format!("{x:.1},{y:.1}")
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut svg = format!(
+        "<line x1=\"70\" y1=\"240\" x2=\"710\" y2=\"240\" stroke=\"#94a3b8\"/><polyline fill=\"none\" stroke=\"#275DA8\" stroke-width=\"3\" points=\"{points}\"/>"
+    );
+    for (index, (label, value)) in values.iter().enumerate() {
+        let x = 80.0 + index as f64 * step;
+        let y = 240.0 - ((*value / max) * 170.0);
+        svg.push_str(&format!(
+            "<circle cx=\"{x:.1}\" cy=\"{y:.1}\" r=\"5\" fill=\"#275DA8\"/><text x=\"{x:.1}\" y=\"264\" font-size=\"12\">{}</text><text x=\"{x:.1}\" y=\"{:.1}\" font-size=\"12\">{value}</text>",
+            escape_html(label),
+            y - 10.0
+        ));
+    }
     svg
 }
 
@@ -5381,6 +5506,37 @@ paths:
             bibtex.get("execution").and_then(Value::as_str),
             Some("rust-native")
         );
+    }
+
+    #[test]
+    fn chart_transform_renders_yaml_business_chart_specs() {
+        let artifact = run_transform(
+            "chart".to_string(),
+            "type: bar\ntitle: Revenue by Region\ndata:\n  - region: East\n    revenue: 120\n  - region: West\n    revenue: 98\nx: region\ny: revenue\n".to_string(),
+        )
+        .expect("chart transform");
+
+        assert_eq!(artifact.output_kind, "svg");
+        assert!(artifact.html.contains("class=\"chart\""));
+        assert!(artifact.html.contains("Revenue by Region"));
+        assert!(artifact.html.contains(">East<"));
+        assert!(artifact.html.contains(">120<"));
+        assert!(artifact.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn timeline_transform_renders_static_svg_preview() {
+        let artifact = run_transform(
+            "timeline".to_string(),
+            "2026-05-18: Kickoff\n2026-06-01: Review\n2026-06-15: Release\n".to_string(),
+        )
+        .expect("timeline transform");
+
+        assert_eq!(artifact.output_kind, "svg");
+        assert!(artifact.html.contains("class=\"timeline\""));
+        assert!(artifact.html.contains("Kickoff"));
+        assert!(artifact.html.contains("Release"));
+        assert!(artifact.diagnostics.is_empty());
     }
 
     #[test]
