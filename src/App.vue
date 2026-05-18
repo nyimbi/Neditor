@@ -375,7 +375,7 @@
       </section>
 
       <section v-show="store.mode !== 'source' && store.mode !== 'focus'" class="preview-pane" aria-label="Live preview">
-        <article class="preview-document" v-html="active.compile?.html || ''"></article>
+        <article class="preview-document" @click="handlePreviewClick" v-html="active.compile?.html || ''"></article>
       </section>
     </main>
 
@@ -1202,6 +1202,19 @@ function goToLine(lineNumber: number) {
   const line = editorView.state.doc.line(Math.max(1, Math.min(lineNumber, editorView.state.doc.lines)));
   editorView.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: "center" }) });
   editorView.focus();
+}
+
+function handlePreviewClick(event: MouseEvent) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const link = target.closest("a[href^='#']");
+  const heading = target.closest("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
+  const anchor = heading?.id || link?.getAttribute("href")?.slice(1) || "";
+  if (!anchor) return;
+  const headingEntry = active.value.compile?.semantic.outline.find((item) => item.anchor === anchor);
+  if (!headingEntry) return;
+  event.preventDefault();
+  goToLine(headingEntry.line);
 }
 
 function handleShortcut(event: KeyboardEvent) {

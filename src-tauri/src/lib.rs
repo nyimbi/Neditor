@@ -1958,7 +1958,53 @@ fn markdown_to_html(markdown: &str, glossary: &BTreeMap<String, String>) -> Stri
     let parser = Parser::new_ext(markdown, options);
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
-    annotate_glossary_terms(&html_output, glossary)
+    let html_with_heading_ids = add_heading_ids(&html_output, &extract_headings(markdown));
+    annotate_glossary_terms(&html_with_heading_ids, glossary)
+}
+
+fn add_heading_ids(html: &str, headings: &[Heading]) -> String {
+    if headings.is_empty() {
+        return html.to_string();
+    }
+    let mut output = String::with_capacity(html.len());
+    let mut rest = html;
+    let mut heading_index = 0usize;
+    while let Some(start) = rest.find("<h") {
+        output.push_str(&rest[..start]);
+        let candidate = &rest[start..];
+        let Some(level) = candidate
+            .as_bytes()
+            .get(2)
+            .and_then(|byte| char::from(*byte).to_digit(10))
+            .map(|digit| digit as usize)
+        else {
+            output.push_str("<h");
+            rest = &candidate[2..];
+            continue;
+        };
+        if !(1..=6).contains(&level) {
+            output.push_str("<h");
+            rest = &candidate[2..];
+            continue;
+        }
+        let Some(tag_end) = candidate.find('>') else {
+            output.push_str(candidate);
+            return output;
+        };
+        let tag = &candidate[..=tag_end];
+        if tag.contains(" id=") {
+            output.push_str(tag);
+        } else if let Some(heading) = headings.get(heading_index) {
+            output.push_str(&tag[..tag.len() - 1]);
+            output.push_str(&format!(" id=\"{}\">", escape_html(&heading.anchor)));
+        } else {
+            output.push_str(tag);
+        }
+        heading_index += 1;
+        rest = &candidate[tag_end + 1..];
+    }
+    output.push_str(rest);
+    output
 }
 
 fn annotate_glossary_terms(html: &str, glossary: &BTreeMap<String, String>) -> String {
@@ -3708,6 +3754,8 @@ ARR: Annual recurring revenue.
         assert!(response.compiled_markdown.contains("Margin: 60.00%"));
         assert!(response.html.contains("Table of Contents"));
         assert!(response.html.contains("transform-table"));
+        assert!(response.html.contains("<h1 id=\"test-report\">"));
+        assert!(response.html.contains("href=\"#test-report\""));
         assert!(response.index_terms.iter().any(|term| term == "ARR"));
         assert_eq!(response.export_manifest.document_version, "1.2.0");
         assert!(response
