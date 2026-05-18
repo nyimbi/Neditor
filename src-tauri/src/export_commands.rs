@@ -72,6 +72,17 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
             error.message
         ));
     }
+    let mut diagnostics = compile_response.diagnostics.clone();
+    validate_export_settings(&request.target, &request.options, &mut diagnostics);
+    if let Some(error) = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.severity == "error")
+    {
+        return Err(format!(
+            "Export blocked by validation error: {}",
+            error.message
+        ));
+    }
 
     let output_path = PathBuf::from(&request.output_path);
     if let Some(parent) = output_path.parent() {
@@ -130,7 +141,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
         output_path: path_to_string(&output_path),
         manifest_path,
         manifest,
-        diagnostics: compile_response.diagnostics,
+        diagnostics,
     })
 }
 

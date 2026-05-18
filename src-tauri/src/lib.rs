@@ -6596,6 +6596,33 @@ paths:
     }
 
     #[test]
+    fn export_document_blocks_invalid_options_before_writing() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-export-options-test-{unique}"));
+        fs::create_dir_all(&root).expect("create export options dir");
+        let output = root.join("invalid.pdf");
+
+        let error = export_document(ExportRequest {
+            text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-19\n---\n# Ready\n"
+                .to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+            target: "pdf".to_string(),
+            output_path: path_to_string(&output),
+            options: json!({ "includeManifest": "yes" }),
+        })
+        .expect_err("invalid export options should block export");
+
+        assert!(error.contains("Export blocked by validation error"));
+        assert!(error.contains("includeManifest must be true or false"));
+        assert!(!output.exists());
+        assert!(!PathBuf::from(format!("{}.manifest.json", output.display())).exists());
+        fs::remove_dir_all(root).expect("clean export options dir");
+    }
+
+    #[test]
     fn prepare_for_export_validates_target_and_options() {
         let report = prepare_for_export(PrepareExportRequest {
             text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),
