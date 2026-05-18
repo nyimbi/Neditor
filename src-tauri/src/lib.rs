@@ -16,7 +16,6 @@ use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 mod document_ast;
 
-#[cfg(test)]
 use document_ast::DocumentBlock;
 use document_ast::{build_document_ast, export_body_text_from_ast, DocumentAst};
 
@@ -2045,27 +2044,51 @@ fn render_full_html(response: &CompileResponse, options: &Value) -> String {
 }
 
 fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> Vec<u8> {
-    let text = export_text(response, options);
-    let escaped = text
-        .lines()
-        .take(60)
-        .enumerate()
-        .map(|(index, line)| {
-            format!(
-                "BT /F1 10 Tf 50 {} Td ({}) Tj ET\n",
-                780 - (index as i32 * 12),
-                escape_pdf(line)
-            )
-        })
-        .collect::<String>();
-    let stream = format!("{escaped}");
-    let objects = vec![
-        "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n".to_string(),
-        "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n".to_string(),
-        "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n".to_string(),
-        "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n".to_string(),
-        format!("5 0 obj << /Length {} >> stream\n{}endstream endobj\n", stream.len(), stream),
+    let pages = build_pdf_pages(response, options);
+    let mut objects = vec![
+        String::new(),
+        String::new(),
+        "3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n".to_string(),
     ];
+    let mut page_ids = Vec::new();
+
+    for page_lines in pages {
+        let page_id = objects.len() + 1;
+        let content_id = page_id + 1;
+        page_ids.push(page_id);
+        let stream = page_lines
+            .iter()
+            .take(60)
+            .enumerate()
+            .map(|(index, line)| {
+                format!(
+                    "BT /F1 10 Tf 50 {} Td ({}) Tj ET\n",
+                    780 - (index as i32 * 12),
+                    escape_pdf(line)
+                )
+            })
+            .collect::<String>();
+        objects.push(format!(
+            "{page_id} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >> endobj\n"
+        ));
+        objects.push(format!(
+            "{content_id} 0 obj << /Length {} >> stream\n{}endstream endobj\n",
+            stream.len(),
+            stream
+        ));
+    }
+
+    let kids = page_ids
+        .iter()
+        .map(|id| format!("{id} 0 R"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    objects[0] = "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n".to_string();
+    objects[1] = format!(
+        "2 0 obj << /Type /Pages /Kids [{kids}] /Count {} >> endobj\n",
+        page_ids.len()
+    );
+
     let mut pdf = b"%PDF-1.4\n".to_vec();
     let mut offsets = Vec::new();
     for object in &objects {
@@ -2113,12 +2136,14 @@ fn render_docx_bytes(response: &CompileResponse, options_value: &Value) -> Resul
 }
 
 fn render_pptx_bytes(response: &CompileResponse, options_value: &Value) -> Result<Vec<u8>, String> {
+    let slides = build_pptx_slides(response, options_value);
     let mut cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(&mut cursor);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     zip.start_file("[Content_Types].xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>"#).map_err(|err| err.to_string())?;
+    zip.write_all(render_pptx_content_types(slides.len()).as_bytes())
+        .map_err(|err| err.to_string())?;
     zip.add_directory("_rels/", options)
         .map_err(|err| err.to_string())?;
     zip.start_file("_rels/.rels", options)
@@ -2128,16 +2153,20 @@ fn render_pptx_bytes(response: &CompileResponse, options_value: &Value) -> Resul
         .map_err(|err| err.to_string())?;
     zip.start_file("ppt/_rels/presentation.xml.rels", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>"#).map_err(|err| err.to_string())?;
+    zip.write_all(render_pptx_relationships(slides.len()).as_bytes())
+        .map_err(|err| err.to_string())?;
     zip.add_directory("ppt/slides/", options)
         .map_err(|err| err.to_string())?;
     zip.start_file("ppt/presentation.xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="5143500"/></p:presentation>"#).map_err(|err| err.to_string())?;
-    zip.start_file("ppt/slides/slide1.xml", options)
+    zip.write_all(render_pptx_presentation(slides.len()).as_bytes())
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_pptx_slide(response, options_value).as_bytes())
-        .map_err(|err| err.to_string())?;
+    for (index, slide) in slides.iter().enumerate() {
+        zip.start_file(format!("ppt/slides/slide{}.xml", index + 1), options)
+            .map_err(|err| err.to_string())?;
+        zip.write_all(render_pptx_slide(slide).as_bytes())
+            .map_err(|err| err.to_string())?;
+    }
     zip.finish().map_err(|err| err.to_string())?;
     Ok(cursor.into_inner())
 }
@@ -2152,6 +2181,10 @@ fn render_markdown_bundle_bytes(
     zip.start_file("document.md", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(response.compiled_markdown.as_bytes())
+        .map_err(|err| err.to_string())?;
+    zip.start_file("document.txt", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(export_text(response, &json!({})).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.start_file("manifest.json", options)
         .map_err(|err| err.to_string())?;
@@ -2937,6 +2970,13 @@ fn parse_json_or_yaml(body: &str) -> Result<Value, String> {
 }
 
 fn export_text(response: &CompileResponse, options: &Value) -> String {
+    let mut lines = export_metadata_lines(response, options);
+    lines.push(String::new());
+    lines.push(export_body_text_from_ast(&response.document_ast));
+    lines.join("\n")
+}
+
+fn export_metadata_lines(response: &CompileResponse, options: &Value) -> Vec<String> {
     let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
     let header = metadata_string(&response.metadata, "layout.header")
         .map(|template| render_export_template(&template, response, &classification))
@@ -2963,32 +3003,279 @@ fn export_text(response: &CompileResponse, options: &Value) -> String {
     if !watermark.is_empty() {
         lines.push(format!("Watermark: {watermark}"));
     }
-    lines.push(String::new());
-    lines.push(export_body_text_from_ast(&response.document_ast));
-    lines.join("\n")
+    lines
 }
 
 fn render_docx_document(response: &CompileResponse, options: &Value) -> String {
-    let paragraphs = export_text(response, options)
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| format!("<w:p><w:r><w:t>{}</w:t></w:r></w:p>", escape_xml(line)))
-        .collect::<String>();
+    let mut body = String::new();
+    for line in export_metadata_lines(response, options) {
+        body.push_str(&docx_paragraph(&line));
+    }
+    body.push_str(&docx_page_break());
+    for block in &response.document_ast.blocks {
+        body.push_str(&render_docx_block(block));
+    }
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{paragraphs}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>"#
     )
 }
 
-fn render_pptx_slide(response: &CompileResponse, options: &Value) -> String {
-    let title = escape_xml(&response.semantic.title);
-    let body = export_text(response, options)
-        .lines()
-        .take(12)
-        .map(escape_xml)
-        .collect::<Vec<_>>()
-        .join(" | ");
+fn render_docx_block(block: &DocumentBlock) -> String {
+    match block {
+        DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
+        DocumentBlock::Paragraph { text, .. } => docx_paragraph(text),
+        DocumentBlock::Table { headers, rows, .. } => docx_table(headers, rows),
+        DocumentBlock::Figure {
+            id,
+            src,
+            alt,
+            caption,
+            ..
+        } => docx_paragraph(&figure_export_line(id, src, alt, caption)),
+        DocumentBlock::Equation {
+            id, caption, text, ..
+        } => docx_paragraph(&equation_export_line(id, text, caption)),
+        DocumentBlock::Layout { directive, .. } if directive == "page-break" => docx_page_break(),
+        DocumentBlock::Layout {
+            directive, options, ..
+        } => docx_paragraph(&format!("Layout: {directive} {options}").trim().to_string()),
+        DocumentBlock::RawHtml { html, .. } => docx_paragraph(html),
+    }
+}
+
+fn docx_heading(level: usize, text: &str) -> String {
+    let style = format!("Heading{}", level.clamp(1, 6));
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p><a:p><a:r><a:t>{body}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>"#
+        r#"<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr><w:r><w:t>{}</w:t></w:r></w:p>"#,
+        escape_xml(text)
+    )
+}
+
+fn docx_paragraph(text: &str) -> String {
+    format!(r#"<w:p><w:r><w:t>{}</w:t></w:r></w:p>"#, escape_xml(text))
+}
+
+fn docx_page_break() -> String {
+    r#"<w:p><w:r><w:br w:type="page"/></w:r></w:p>"#.to_string()
+}
+
+fn docx_table(headers: &[String], rows: &[Vec<String>]) -> String {
+    let mut table = String::from(
+        r#"<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>"#,
+    );
+    table.push_str(&docx_table_row(headers));
+    for row in rows {
+        table.push_str(&docx_table_row(row));
+    }
+    table.push_str("</w:tbl>");
+    table
+}
+
+fn docx_table_row(cells: &[String]) -> String {
+    let cells = cells.iter().map(|cell| docx_cell(cell)).collect::<String>();
+    format!("<w:tr>{cells}</w:tr>")
+}
+
+fn docx_cell(text: &str) -> String {
+    format!(
+        r#"<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr>{}</w:tc>"#,
+        docx_paragraph(text)
+    )
+}
+
+fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String>> {
+    let mut pages = vec![export_metadata_lines(response, options)];
+    let mut current = Vec::new();
+    for block in &response.document_ast.blocks {
+        match block {
+            DocumentBlock::Layout { directive, .. } if directive == "page-break" => {
+                if !current.is_empty() {
+                    pages.push(current);
+                    current = Vec::new();
+                }
+            }
+            _ => current.extend(block_export_lines(block)),
+        }
+    }
+    if !current.is_empty() {
+        pages.push(current);
+    }
+    pages
+}
+
+#[derive(Debug)]
+struct PptxSlide {
+    title: String,
+    lines: Vec<String>,
+}
+
+fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSlide> {
+    let mut slides = vec![PptxSlide {
+        title: response.semantic.title.clone(),
+        lines: export_metadata_lines(response, options)
+            .into_iter()
+            .filter(|line| !line.starts_with("Cover: "))
+            .collect(),
+    }];
+    let mut current: Option<PptxSlide> = None;
+
+    for block in &response.document_ast.blocks {
+        match block {
+            DocumentBlock::Heading { level, text, .. } if *level <= 2 => {
+                if let Some(slide) = current.take() {
+                    if !slide.lines.is_empty() || slide.title != "Continued" {
+                        slides.push(slide);
+                    }
+                }
+                current = Some(PptxSlide {
+                    title: text.clone(),
+                    lines: Vec::new(),
+                });
+            }
+            DocumentBlock::Layout { directive, .. } if directive == "page-break" => {
+                if let Some(slide) = current.take() {
+                    slides.push(slide);
+                }
+                current = Some(PptxSlide {
+                    title: "Continued".to_string(),
+                    lines: Vec::new(),
+                });
+            }
+            _ => {
+                if current.is_none() {
+                    current = Some(PptxSlide {
+                        title: "Document".to_string(),
+                        lines: Vec::new(),
+                    });
+                }
+                if let Some(slide) = current.as_mut() {
+                    slide.lines.extend(block_export_lines(block));
+                }
+            }
+        }
+    }
+
+    if let Some(slide) = current {
+        if !slide.lines.is_empty() || slide.title != "Continued" {
+            slides.push(slide);
+        }
+    }
+    slides
+        .into_iter()
+        .map(|mut slide| {
+            if slide.lines.is_empty() {
+                slide.lines.push("No body content".to_string());
+            }
+            slide.lines.truncate(14);
+            slide
+        })
+        .collect()
+}
+
+fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
+    match block {
+        DocumentBlock::Heading { level, text, .. } => {
+            vec![format!("{} {text}", "#".repeat(*level))]
+        }
+        DocumentBlock::Paragraph { text, .. } => vec![text.clone()],
+        DocumentBlock::Table { headers, rows, .. } => {
+            let mut lines = vec![format!("Table: {}", headers.join(" | "))];
+            lines.extend(rows.iter().map(|row| row.join(" | ")));
+            lines
+        }
+        DocumentBlock::Figure {
+            id,
+            src,
+            alt,
+            caption,
+            ..
+        } => vec![figure_export_line(id, src, alt, caption)],
+        DocumentBlock::Equation {
+            id, caption, text, ..
+        } => vec![equation_export_line(id, text, caption)],
+        DocumentBlock::Layout {
+            directive, options, ..
+        } => vec![format!("Layout: {directive} {options}").trim().to_string()],
+        DocumentBlock::RawHtml { html, .. } => vec![html.clone()],
+    }
+}
+
+fn figure_export_line(
+    id: &Option<String>,
+    src: &Option<String>,
+    alt: &Option<String>,
+    caption: &Option<String>,
+) -> String {
+    let mut parts = vec!["Figure".to_string()];
+    if let Some(id) = id {
+        parts.push(id.clone());
+    }
+    if let Some(caption) = caption {
+        parts.push(caption.clone());
+    }
+    if let Some(alt) = alt {
+        parts.push(alt.clone());
+    }
+    if let Some(src) = src {
+        parts.push(format!("({src})"));
+    }
+    parts.join(": ")
+}
+
+fn equation_export_line(id: &Option<String>, text: &str, caption: &Option<String>) -> String {
+    let mut parts = vec!["Equation".to_string()];
+    if let Some(id) = id {
+        parts.push(id.clone());
+    }
+    if !text.is_empty() {
+        parts.push(text.to_string());
+    }
+    if let Some(caption) = caption {
+        parts.push(caption.clone());
+    }
+    parts.join(": ")
+}
+
+fn render_pptx_content_types(slide_count: usize) -> String {
+    let slide_overrides = (1..=slide_count)
+        .map(|index| format!(r#"<Override PartName="/ppt/slides/slide{index}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>"#))
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}</Types>"#
+    )
+}
+
+fn render_pptx_relationships(slide_count: usize) -> String {
+    let relationships = (1..=slide_count)
+        .map(|index| format!(r#"<Relationship Id="rId{index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide{index}.xml"/>"#))
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{relationships}</Relationships>"#
+    )
+}
+
+fn render_pptx_presentation(slide_count: usize) -> String {
+    let slide_ids = (1..=slide_count)
+        .map(|index| {
+            let id = 255 + index;
+            format!(r#"<p:sldId id="{id}" r:id="rId{index}"/>"#)
+        })
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst>{slide_ids}</p:sldIdLst><p:sldSz cx="9144000" cy="5143500"/></p:presentation>"#
+    )
+}
+
+fn render_pptx_slide(slide: &PptxSlide) -> String {
+    let title = escape_xml(&slide.title);
+    let body = slide
+        .lines
+        .iter()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| format!(r#"<a:p><a:r><a:t>{}</a:t></a:r></a:p>"#, escape_xml(line)))
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp></p:spTree></p:cSld></p:sld>"#
     )
 }
 
@@ -4027,13 +4314,47 @@ paths:
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
         assert!(pptx.len() > 100);
         let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide1.xml");
-        assert!(pptx_slide.contains("Cover: Test Report"));
+        assert!(pptx_slide.contains("Test Report"));
         assert!(pptx_slide.contains("Page 1 of 1"));
         assert!(
             render_markdown_bundle_bytes(&response, &response.export_manifest)
                 .expect("bundle bytes")
                 .starts_with(b"PK")
         );
+    }
+
+    #[test]
+    fn semantic_exporters_map_ast_blocks() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n\n## Appendix\nAfter the break.\n".to_string(),
+            file_path: None,
+        });
+        let options = json!({ "watermark": "DRAFT" });
+
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains(r#"<w:pStyle w:val="Heading1""#));
+        assert!(docx_document.contains(r#"<w:pStyle w:val="Heading2""#));
+        assert!(docx_document.contains("<w:tbl>"));
+        assert!(docx_document.contains(r#"<w:br w:type="page""#));
+        assert!(docx_document.contains("System diagram"));
+        assert!(docx_document.contains("ROI = Gain / Cost"));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
+        assert!(presentation.contains(r#"r:id="rId2""#));
+        let slide_two = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        assert!(slide_two.contains("Semantic Exports"));
+        assert!(slide_two.contains("Table: Metric | Value"));
+        assert!(slide_two.contains("System diagram"));
+        let slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
+        assert!(slide_three.contains("Continued") || slide_three.contains("Appendix"));
+
+        let pdf = render_pdf_bytes(&response, &options);
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains("/Count 3"));
+        assert!(pdf_text.contains("System diagram"));
+        assert!(pdf_text.contains("After the break."));
     }
 
     fn zip_entry_text(bytes: &[u8], path: &str) -> String {
