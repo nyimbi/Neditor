@@ -50,7 +50,16 @@ export interface DocumentSourceRange {
 export type DocumentBlock =
   | { kind: "heading"; level: number; text: string; anchor: string; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "paragraph"; text: string; line: number; end_line: number; source?: DocumentSourceRange | null }
-  | { kind: "table"; line: number; end_line: number; headers: string[]; rows: string[][]; source?: DocumentSourceRange | null }
+  | {
+      kind: "table";
+      line: number;
+      end_line: number;
+      id?: string | null;
+      caption?: string | null;
+      headers: string[];
+      rows: string[][];
+      source?: DocumentSourceRange | null;
+    }
   | {
       kind: "figure";
       line: number;

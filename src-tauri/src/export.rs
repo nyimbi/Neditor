@@ -701,7 +701,20 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
     match block {
         DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
         DocumentBlock::Paragraph { text, .. } => docx_paragraph(text),
-        DocumentBlock::Table { headers, rows, .. } => docx_table(headers, rows),
+        DocumentBlock::Table {
+            id,
+            caption,
+            headers,
+            rows,
+            ..
+        } => {
+            let mut output = String::new();
+            if id.is_some() || caption.is_some() {
+                output.push_str(&docx_paragraph(&table_export_line(id, caption, headers)));
+            }
+            output.push_str(&docx_table(headers, rows));
+            output
+        }
         DocumentBlock::Figure {
             id,
             src,
@@ -1186,8 +1199,14 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             vec![format!("{} {text}", "#".repeat(*level))]
         }
         DocumentBlock::Paragraph { text, .. } => vec![text.clone()],
-        DocumentBlock::Table { headers, rows, .. } => {
-            let mut lines = vec![format!("Table: {}", headers.join(" | "))];
+        DocumentBlock::Table {
+            id,
+            caption,
+            headers,
+            rows,
+            ..
+        } => {
+            let mut lines = vec![table_export_line(id, caption, headers)];
             lines.extend(rows.iter().map(|row| row.join(" | ")));
             lines
         }
@@ -1294,6 +1313,20 @@ fn figure_export_line(
     }
     if let Some(src) = src {
         parts.push(format!("({src})"));
+    }
+    parts.join(": ")
+}
+
+fn table_export_line(id: &Option<String>, caption: &Option<String>, headers: &[String]) -> String {
+    let mut parts = vec!["Table".to_string()];
+    if let Some(id) = id {
+        parts.push(id.clone());
+    }
+    if let Some(caption) = caption {
+        parts.push(caption.clone());
+    }
+    if parts.len() == 1 {
+        parts.push(headers.join(" | "));
     }
     parts.join(": ")
 }

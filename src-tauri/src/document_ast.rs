@@ -32,6 +32,8 @@ pub(crate) enum DocumentBlock {
     Table {
         line: usize,
         end_line: usize,
+        id: Option<String>,
+        caption: Option<String>,
         headers: Vec<String>,
         rows: Vec<Vec<String>>,
         source: Option<AstSourceRange>,
@@ -101,11 +103,14 @@ pub(crate) fn build_document_ast(markdown: &str) -> DocumentAst {
             continue;
         }
 
-        if let Some((table, next_index)) = parse_ast_table(&lines, index) {
-            flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
-            blocks.push(table);
-            index = next_index;
-            continue;
+        if is_ast_table_start(&lines, index) {
+            let caption = pending_table_caption(&mut paragraph_lines, &mut paragraph_start);
+            if let Some((table, next_index)) = parse_ast_table(&lines, index, caption) {
+                flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
+                blocks.push(table);
+                index = next_index;
+                continue;
+            }
         }
 
         if trimmed.starts_with('<') && trimmed.ends_with('>') {
@@ -134,9 +139,15 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 Some(format!("{} {text}", "#".repeat(*level)))
             }
             DocumentBlock::Paragraph { text, .. } => Some(text.clone()),
-            DocumentBlock::Table { headers, rows, .. } => {
+            DocumentBlock::Table {
+                id,
+                caption,
+                headers,
+                rows,
+                ..
+            } => {
                 let mut lines = Vec::new();
-                lines.push(format!("Table: {}", headers.join(" | ")));
+                lines.push(table_export_title(id, caption, headers));
                 for row in rows {
                     lines.push(format!("- {}", row.join(" | ")));
                 }
@@ -301,7 +312,11 @@ fn parse_ast_heading(line: &str, line_number: usize) -> Option<DocumentBlock> {
     })
 }
 
-fn parse_ast_table(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize)> {
+fn parse_ast_table(
+    lines: &[&str],
+    index: usize,
+    caption: Option<TableCaption>,
+) -> Option<(DocumentBlock, usize)> {
     if index + 1 >= lines.len() {
         return None;
     }
@@ -330,12 +345,86 @@ fn parse_ast_table(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize
         DocumentBlock::Table {
             line: index + 1,
             end_line: next_index,
+            id: caption.as_ref().and_then(|caption| caption.id.clone()),
+            caption: caption.and_then(|caption| caption.caption),
             headers,
             rows,
             source: None,
         },
         next_index,
     ))
+}
+
+fn is_ast_table_start(lines: &[&str], index: usize) -> bool {
+    index + 1 < lines.len()
+        && is_markdown_table_row(lines[index].trim())
+        && is_markdown_table_separator(lines[index + 1].trim())
+}
+
+struct TableCaption {
+    id: Option<String>,
+    caption: Option<String>,
+}
+
+fn pending_table_caption(
+    paragraph_lines: &mut Vec<String>,
+    paragraph_start: &mut Option<usize>,
+) -> Option<TableCaption> {
+    let caption = parse_table_caption(paragraph_lines.last()?)?;
+    paragraph_lines.pop();
+    if paragraph_lines.is_empty() {
+        *paragraph_start = None;
+    }
+    Some(caption)
+}
+
+fn parse_table_caption(line: &str) -> Option<TableCaption> {
+    let trimmed = line.trim();
+    if !trimmed.to_ascii_lowercase().starts_with("table:") {
+        return None;
+    }
+    let id = extract_table_caption_id(trimmed);
+    let caption = extract_table_caption_text(trimmed);
+    if id.is_none() && caption.is_none() {
+        return None;
+    }
+    Some(TableCaption { id, caption })
+}
+
+fn extract_table_caption_id(line: &str) -> Option<String> {
+    let (_, after) = line.split_once("{#")?;
+    let id = after
+        .split(['}', ' ', '\t'])
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    (!id.is_empty()).then_some(id)
+}
+
+fn extract_table_caption_text(line: &str) -> Option<String> {
+    if let Some(caption) = extract_quoted_attribute(line, "caption") {
+        let caption = clean_inline_text(&caption);
+        return (!caption.is_empty()).then_some(caption);
+    }
+    let without_prefix = line.trim_start_matches(|ch: char| ch != ':');
+    let without_prefix = without_prefix.trim_start_matches(':').trim();
+    let before_attrs = without_prefix.split("{#").next().unwrap_or("").trim();
+    (!before_attrs.is_empty()).then(|| clean_inline_text(before_attrs))
+}
+
+fn table_export_title(id: &Option<String>, caption: &Option<String>, headers: &[String]) -> String {
+    let mut parts = vec!["Table".to_string()];
+    if let Some(id) = id {
+        parts.push(id.clone());
+    }
+    if let Some(caption) = caption {
+        parts.push(caption.clone());
+    }
+    if parts.len() == 1 {
+        parts.push(headers.join(" | "));
+    }
+    parts.join(": ")
 }
 
 fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {

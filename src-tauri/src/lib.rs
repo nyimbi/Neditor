@@ -3851,7 +3851,7 @@ ARR: Annual recurring revenue.
     #[test]
     fn compiler_summarizes_markdown_tables() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Tables\nstatus: approved\napprovedBy: QA\n---\n# Tables\n| Region | Revenue |\n| --- | ---: |\n| East | 100 |\n| West | =SUM(B1,80) |\n| Total | =SUM(B1:B2) |\n".to_string(),
+            text: "---\ntitle: Tables\nstatus: approved\napprovedBy: QA\n---\n# Tables\nTable: Revenue by region {#tbl:revenue}\n| Region | Revenue |\n| --- | ---: |\n| East | 100 |\n| West | =SUM(B1,80) |\n| Total | =SUM(B1:B2) |\n\nSee {@tbl:revenue}.\n".to_string(),
             file_path: None,
         });
 
@@ -3866,6 +3866,19 @@ ARR: Annual recurring revenue.
                 .get("Revenue"),
             Some(&560.0)
         );
+        assert!(response
+            .semantic
+            .cross_references
+            .iter()
+            .any(|reference| reference.key == "tbl:revenue" && reference.resolved));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Table { id, caption, .. }
+                    if id.as_deref() == Some("tbl:revenue")
+                        && caption.as_deref() == Some("Revenue by region")
+            )
+        }));
     }
 
     #[test]
