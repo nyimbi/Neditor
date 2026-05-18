@@ -3641,11 +3641,13 @@ healthy = IF(revenue > cost, 1, 0)
 target_met = IF(margin >= 0.60, 1, 0)
 cost_match = IF(cost == 40, 1, 0)
 spread = IF(revenue != cost, 1, 0)
+discount = 12.5%
 ```
 
 Margin: {{=margin | percent}}
 After tax: {{=profit * 0.70 | currency}}
 Healthy score: {{=IF(revenue > cost, profit, 0) | round}}
+Discount: {{=discount | percent}}
 
 ```csv
 Region,Revenue
@@ -3675,6 +3677,7 @@ ARR: Annual recurring revenue.
         assert!(response.compiled_markdown.contains("Margin: 60.00%"));
         assert!(response.compiled_markdown.contains("After tax: $42.00"));
         assert!(response.compiled_markdown.contains("Healthy score: 60"));
+        assert!(response.compiled_markdown.contains("Discount: 12.50%"));
         assert!(response.html.contains("Table of Contents"));
         assert!(response.html.contains("transform-table"));
         assert!(response.html.contains("<h1 id=\"test-report\">"));
@@ -3756,6 +3759,10 @@ ARR: Annual recurring revenue.
             .formula_graph
             .iter()
             .any(|formula| formula.name == "spread" && formula.value == Some(1.0)));
+        assert!(response.formula_graph.iter().any(|formula| {
+            formula.name == "discount"
+                && (formula.value.unwrap_or_default() - 0.125).abs() < f64::EPSILON
+        }));
     }
 
     #[test]

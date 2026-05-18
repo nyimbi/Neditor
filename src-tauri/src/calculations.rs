@@ -289,7 +289,7 @@ impl FormulaAstParser {
     }
 
     fn parse_factor(&mut self) -> Result<FormulaAstNode, String> {
-        match self.next() {
+        let mut node = match self.next() {
             Some(FormulaToken::Number(value)) => Ok(FormulaAstNode::Number { value }),
             Some(FormulaToken::Minus) => Ok(FormulaAstNode::Unary {
                 op: "-".to_string(),
@@ -321,7 +321,15 @@ impl FormulaAstParser {
                 }
             }
             other => Err(format!("unexpected token {other:?}")),
+        }?;
+        while matches!(self.peek(), Some(FormulaToken::Percent)) {
+            self.index += 1;
+            node = FormulaAstNode::Unary {
+                op: "%".to_string(),
+                expr: Box::new(node),
+            };
         }
+        Ok(node)
     }
 
     fn expect(&mut self, token: FormulaToken) -> Result<(), String> {
@@ -415,7 +423,7 @@ impl FormulaParser<'_> {
     }
 
     fn parse_factor(&mut self) -> Result<f64, String> {
-        match self.next() {
+        let mut value = match self.next() {
             Some(FormulaToken::Number(value)) => Ok(value),
             Some(FormulaToken::Minus) => Ok(-self.parse_factor()?),
             Some(FormulaToken::LParen) => {
@@ -447,7 +455,12 @@ impl FormulaParser<'_> {
                 }
             }
             other => Err(format!("unexpected token {other:?}")),
+        }?;
+        while matches!(self.peek(), Some(FormulaToken::Percent)) {
+            self.index += 1;
+            value /= 100.0;
         }
+        Ok(value)
     }
 
     fn expect(&mut self, token: FormulaToken) -> Result<(), String> {
