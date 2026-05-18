@@ -1035,6 +1035,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
         .unwrap_or_else(|| "untitled.md".to_string());
     let mut visited = HashSet::new();
     let mut source_map = Vec::new();
+    let mut generated_line_count = 0usize;
     let source = expand_includes(
         &request.text,
         root_path.as_deref(),
@@ -1043,9 +1044,12 @@ fn compile(request: CompileRequest) -> CompileResponse {
         &mut visited,
         &mut include_graph,
         &mut source_map,
+        &mut generated_line_count,
         &mut diagnostics,
     );
-    let (metadata, body) = parse_front_matter(&source, &mut diagnostics, Some(root_file.clone()));
+    let (metadata, body, body_start_line) =
+        parse_front_matter(&source, &mut diagnostics, Some(root_file.clone()));
+    normalize_source_map_after_front_matter(&mut source_map, body_start_line);
     let mut calculation_context = HashMap::new();
     let formula_graph = collect_calculations(&body, &mut calculation_context, &mut diagnostics);
     let interpolated =
@@ -1179,6 +1183,7 @@ fn expand_includes(
     visited: &mut HashSet<PathBuf>,
     include_graph: &mut Vec<IncludeEdge>,
     source_map: &mut Vec<SourceMapEntry>,
+    generated_line_count: &mut usize,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> String {
     if depth > MAX_INCLUDE_DEPTH {
@@ -1230,10 +1235,11 @@ fn expand_includes(
                     });
                     visited.insert(canonical.clone());
                     let child_without_front_matter = strip_front_matter(&child_text);
-                    output.push_str(&format!(
-                        "\n\n<!-- begin include: {} -->\n",
-                        child.display()
-                    ));
+                    push_unmapped_expanded_text(
+                        &mut output,
+                        generated_line_count,
+                        &format!("\n\n<!-- begin include: {} -->\n", child.display()),
+                    );
                     output.push_str(&expand_includes(
                         &child_without_front_matter,
                         Some(&child),
@@ -1242,9 +1248,14 @@ fn expand_includes(
                         visited,
                         include_graph,
                         source_map,
+                        generated_line_count,
                         diagnostics,
                     ));
-                    output.push_str(&format!("\n<!-- end include: {} -->\n\n", child.display()));
+                    push_unmapped_expanded_text(
+                        &mut output,
+                        generated_line_count,
+                        &format!("\n<!-- end include: {} -->\n\n", child.display()),
+                    );
                     visited.remove(&canonical);
                 }
                 Err(err) => diagnostics.push(diag(
@@ -1256,16 +1267,23 @@ fn expand_includes(
                 )),
             }
         } else {
+            let generated_line = *generated_line_count + 1;
             source_map.push(SourceMapEntry {
-                generated_line: source_map.len() + 1,
+                generated_line,
                 source_file: source_file.to_string(),
                 source_line: line_index + 1,
             });
             output.push_str(line);
             output.push('\n');
+            *generated_line_count += 1;
         }
     }
     output
+}
+
+fn push_unmapped_expanded_text(output: &mut String, generated_line_count: &mut usize, text: &str) {
+    output.push_str(text);
+    *generated_line_count += text.chars().filter(|ch| *ch == '\n').count();
 }
 
 fn parse_include_directive(line: &str) -> Option<&str> {
@@ -1286,14 +1304,16 @@ fn parse_front_matter(
     text: &str,
     diagnostics: &mut Vec<DocumentDiagnostic>,
     source_file: Option<String>,
-) -> (Value, String) {
+) -> (Value, String, usize) {
     if !text.starts_with("---\n") {
-        return (json!({}), text.to_string());
+        return (json!({}), text.to_string(), 1);
     }
     let mut lines = text.lines();
     lines.next();
+    let mut consumed_lines = 1usize;
     let mut yaml = String::new();
     for line in &mut lines {
+        consumed_lines += 1;
         if line.trim() == "---" {
             let body = lines.collect::<Vec<_>>().join("\n");
             let metadata = serde_yaml::from_str::<Value>(&yaml).unwrap_or_else(|err| {
@@ -1306,7 +1326,7 @@ fn parse_front_matter(
                 ));
                 json!({})
             });
-            return (metadata, body);
+            return (metadata, body, consumed_lines + 1);
         }
         yaml.push_str(line);
         yaml.push('\n');
@@ -1318,7 +1338,18 @@ fn parse_front_matter(
         Some(1),
         Some("Add a closing --- marker."),
     ));
-    (json!({}), text.to_string())
+    (json!({}), text.to_string(), 1)
+}
+
+fn normalize_source_map_after_front_matter(
+    source_map: &mut Vec<SourceMapEntry>,
+    body_start_line: usize,
+) {
+    let offset = body_start_line.saturating_sub(1);
+    source_map.retain(|entry| entry.generated_line >= body_start_line);
+    for entry in source_map {
+        entry.generated_line = entry.generated_line.saturating_sub(offset);
+    }
 }
 
 fn strip_front_matter(text: &str) -> String {
@@ -3796,6 +3827,17 @@ paths:
         assert!(response.compiled_markdown.contains("## Included"));
         assert!(!response.compiled_markdown.contains("title: Child"));
         assert_eq!(response.include_graph.len(), 1);
+        let included_line = response
+            .compiled_markdown
+            .lines()
+            .position(|line| line == "## Included")
+            .map(|index| index + 1)
+            .expect("included heading line");
+        assert!(response.source_map.iter().any(|entry| {
+            entry.generated_line == included_line
+                && entry.source_file.ends_with("chapters/intro.md")
+                && entry.source_line == 2
+        }));
         fs::remove_dir_all(root).expect("clean test dirs");
     }
 
