@@ -337,6 +337,22 @@
 
         <template v-else-if="store.sidebar === 'review'">
           <h2>Review</h2>
+          <h3>Release</h3>
+          <label>
+            Status
+            <select :value="String(active.compile?.semantic.status || 'draft')" @change="setDocumentStatus(inputValue($event))">
+              <option v-for="status in releaseStatuses" :key="status" :value="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Approved by
+            <input :value="String(active.compile?.metadata.approvedBy || '')" @change="setFrontMatterField('approvedBy', inputValue($event))" />
+          </label>
+          <label>
+            Approved at
+            <input :value="String(active.compile?.metadata.approvedAt || '')" @change="setFrontMatterField('approvedAt', inputValue($event))" />
+          </label>
+          <button type="button" @click="setApprovalTimestampNow">Set approval time</button>
           <label>
             New comment
             <textarea v-model="reviewCommentText" rows="4" placeholder="Review note"></textarea>
@@ -690,6 +706,7 @@ const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
 const aiSnippet =
   "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\npromptSummary: \nreviewedBy: \nreviewedAt: \nstatus: needs-review\n```\n";
+const releaseStatuses = ["draft", "in-review", "approved", "published", "archived"];
 
 const active = computed(() => store.activeDocument);
 const previewDocumentStyle = computed(() => ({
@@ -1303,10 +1320,27 @@ function eventChecked(event: Event) {
   return event.target instanceof HTMLInputElement ? event.target.checked : false;
 }
 
+function inputValue(event: Event) {
+  return event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement ? event.target.value : "";
+}
+
 function setCitationStyle(style: string) {
   const supported = new Set(["title", "author-year", "key"]);
   if (!supported.has(style)) return;
   store.updateText(upsertFrontMatterField(active.value.text, "citationStyle", style));
+}
+
+function setFrontMatterField(key: string, value: string) {
+  store.updateText(upsertFrontMatterField(active.value.text, key, value.trim()));
+}
+
+function setDocumentStatus(status: string) {
+  if (!releaseStatuses.includes(status)) return;
+  setFrontMatterField("status", status);
+}
+
+function setApprovalTimestampNow() {
+  setFrontMatterField("approvedAt", new Date().toISOString());
 }
 
 function upsertFrontMatterField(text: string, key: string, value: string) {
