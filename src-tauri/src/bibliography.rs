@@ -104,19 +104,19 @@ fn parse_hayagriva_yaml_bibliography(
         .as_object()
         .into_iter()
         .flat_map(|entries| entries.iter())
-        .filter_map(|(key, entry)| {
+        .map(|(key, entry)| {
             let title = entry
                 .get("title")
                 .and_then(Value::as_str)
                 .unwrap_or(key)
                 .to_string();
-            Some(BibliographyEntry {
+            BibliographyEntry {
                 key: key.to_string(),
                 title,
                 author: yaml_author(entry),
                 issued: yaml_issued_year(entry),
                 raw: serde_yaml::to_string(entry).unwrap_or_default(),
-            })
+            }
         })
         .collect();
     Ok(entries)
@@ -269,7 +269,7 @@ fn citation_references_from_bracket(text: &str, line: usize) -> Vec<CitationRefe
             let locator_end = after_key.find('@').unwrap_or(after_key.len());
             let locator = after_key[..locator_end]
                 .trim()
-                .trim_start_matches(|ch| ch == ',' || ch == ';')
+                .trim_start_matches([',', ';'])
                 .trim()
                 .trim_end_matches(';')
                 .trim();

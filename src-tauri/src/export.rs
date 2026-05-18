@@ -1596,7 +1596,7 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
         }
         DocumentBlock::Layout {
             directive, options, ..
-        } => docx_paragraph(&format!("Layout: {directive} {options}").trim().to_string()),
+        } => docx_paragraph(format!("Layout: {directive} {options}").trim()),
         DocumentBlock::Callout {
             callout_type,
             title,
@@ -3002,7 +3002,7 @@ fn render_pptx_table_cell(text: &str, alignment: Option<&str>, header: bool) -> 
         Some("right") => "r",
         _ => "l",
     };
-    let bold_start = header.then_some("<a:rPr b=\"1\"/>").unwrap_or("");
+    let bold_start = if header { "<a:rPr b=\"1\"/>" } else { "" };
     format!(
         r#"<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="{alignment}"/><a:r>{bold_start}<a:t>{}</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc>"#,
         escape_xml(text)

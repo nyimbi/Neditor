@@ -46,13 +46,14 @@ pnpm tauri dev
 pnpm run build
 cd src-tauri && cargo fmt --check
 cd src-tauri && cargo check
+cd src-tauri && cargo clippy --locked --all-targets -- -D warnings
 cd src-tauri && cargo test
 pnpm tauri build --bundles app
 ```
 
-GitHub Actions also runs formatting, Rust check/test, frontend build, and a
-`pnpm tauri build --no-bundle` desktop compile on macOS, Windows, and Linux via
-`.github/workflows/ci.yml`.
+GitHub Actions also runs formatting, Rust check/test, clippy static analysis,
+frontend build, and a `pnpm tauri build --no-bundle` desktop compile on macOS,
+Windows, and Linux via `.github/workflows/ci.yml`.
 
 `cargo check` requires access to crates.io the first time dependencies are
 resolved. If network access is blocked, the frontend build and Rust formatting

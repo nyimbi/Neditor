@@ -241,9 +241,11 @@ fn qr_add_timing(modules: &mut [Vec<bool>], reserved: &mut [Vec<bool>]) {
 
 fn qr_reserve_format_areas(reserved: &mut [Vec<bool>]) {
     let size = reserved.len();
-    for index in 0..9 {
-        reserved[8][index] = true;
-        reserved[index][8] = true;
+    for cell in reserved[8].iter_mut().take(9) {
+        *cell = true;
+    }
+    for row in reserved.iter_mut().take(9) {
+        row[8] = true;
     }
     for index in 0..8 {
         reserved[8][size - 1 - index] = true;

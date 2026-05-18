@@ -1131,14 +1131,9 @@ fn strip_markdown_attributes(text: &str) -> &str {
 fn clean_inline_text(text: &str) -> String {
     let without_attrs = strip_markdown_attributes(text);
     let without_tags = strip_html_tags(without_attrs);
-    decode_html_entities(
-        &without_tags
-            .replace("**", "")
-            .replace('*', "")
-            .replace('`', ""),
-    )
-    .trim()
-    .to_string()
+    decode_html_entities(&without_tags.replace("**", "").replace(['*', '`'], ""))
+        .trim()
+        .to_string()
 }
 
 fn strip_html_tags(text: &str) -> String {

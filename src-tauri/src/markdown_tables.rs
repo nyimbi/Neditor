@@ -59,9 +59,7 @@ pub(crate) fn markdown_table_row(cells: &[String]) -> String {
 }
 
 pub(crate) fn escape_markdown_table_cell(cell: &str) -> String {
-    cell.replace('\n', " ")
-        .replace('\r', " ")
-        .replace('|', "\\|")
+    cell.replace(['\n', '\r'], " ").replace('|', "\\|")
 }
 
 fn unescaped_pipe_count(line: &str) -> usize {

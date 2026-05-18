@@ -64,13 +64,15 @@ fn evaluate_delimited_table_formula_rows(
     let named_tables = HashMap::new();
     evaluate_table_formula_rows(
         rows,
-        1,
-        |row_index| row_index + 1,
-        "Table formula error",
-        "Use numeric formulas such as =SUM(1,2) or =SUM(A1:A3) in CSV/TSV cells.",
-        &named_tables,
-        artifact_diags,
-        diagnostics,
+        TableFormulaEvaluation {
+            data_start: 1,
+            display_line_for_row: |row_index| row_index + 1,
+            diagnostic_prefix: "Table formula error",
+            suggestion: "Use numeric formulas such as =SUM(1,2) or =SUM(A1:A3) in CSV/TSV cells.",
+            named_tables: &named_tables,
+            artifact_diags,
+            diagnostics,
+        },
     );
 }
 
@@ -149,15 +151,18 @@ pub(crate) fn evaluate_markdown_table_formulas(
                 .iter()
                 .map(|(_, row)| split_markdown_table_row(row.trim())),
         );
+        let mut artifact_diags = Vec::new();
         let changed = evaluate_table_formula_rows(
             &mut rows,
-            1,
-            |row_index| table_start + row_index + 1,
-            "Markdown table formula error",
-            "Use numeric formulas such as =10+15, =SUM(1,2), or =SUM(A1:A3).",
-            &named_tables,
-            &mut Vec::new(),
-            diagnostics,
+            TableFormulaEvaluation {
+                data_start: 1,
+                display_line_for_row: |row_index| table_start + row_index + 1,
+                diagnostic_prefix: "Markdown table formula error",
+                suggestion: "Use numeric formulas such as =10+15, =SUM(1,2), or =SUM(A1:A3).",
+                named_tables: &named_tables,
+                artifact_diags: &mut artifact_diags,
+                diagnostics,
+            },
         );
 
         output.push(header);
@@ -213,39 +218,52 @@ pub(crate) fn collect_table_summaries(text: &str) -> Vec<TableSummary> {
     tables
 }
 
-fn evaluate_table_formula_rows(
-    rows: &mut [Vec<String>],
+type CellReference = (usize, usize);
+type ParsedCellReference = Option<(CellReference, usize)>;
+
+struct TableFormulaEvaluation<'a, F>
+where
+    F: Fn(usize) -> usize,
+{
     data_start: usize,
-    display_line_for_row: impl Fn(usize) -> usize,
-    diagnostic_prefix: &str,
+    display_line_for_row: F,
+    diagnostic_prefix: &'a str,
     suggestion: &'static str,
-    named_tables: &HashMap<String, Vec<Vec<String>>>,
-    artifact_diags: &mut Vec<DocumentDiagnostic>,
-    diagnostics: &mut Vec<DocumentDiagnostic>,
-) -> bool {
+    named_tables: &'a HashMap<String, Vec<Vec<String>>>,
+    artifact_diags: &'a mut Vec<DocumentDiagnostic>,
+    diagnostics: &'a mut Vec<DocumentDiagnostic>,
+}
+
+fn evaluate_table_formula_rows<F>(
+    rows: &mut [Vec<String>],
+    options: TableFormulaEvaluation<'_, F>,
+) -> bool
+where
+    F: Fn(usize) -> usize,
+{
     let mut changed = false;
     let source_rows = rows.to_vec();
-    let mut context = TableFormulaContext::new(&source_rows, named_tables);
-    for row_index in data_start..rows.len() {
-        for column_index in 0..rows[row_index].len() {
-            if !rows[row_index][column_index].starts_with('=') {
+    let mut context = TableFormulaContext::new(&source_rows, options.named_tables);
+    for (row_index, row) in rows.iter_mut().enumerate().skip(options.data_start) {
+        for (column_index, cell) in row.iter_mut().enumerate() {
+            if !cell.starts_with('=') {
                 continue;
             }
             changed = true;
             match table_cell_value(&mut context, (row_index, column_index)) {
-                Ok(value) => rows[row_index][column_index] = format_value(value, "round"),
+                Ok(value) => *cell = format_value(value, "round"),
                 Err(error) => {
-                    let line = display_line_for_row(row_index);
+                    let line = (options.display_line_for_row)(row_index);
                     let diagnostic = diag(
                         "error",
-                        format!("{diagnostic_prefix} on row {line}: {error}"),
+                        format!("{} on row {line}: {error}", options.diagnostic_prefix),
                         None,
                         Some(line),
-                        Some(suggestion),
+                        Some(options.suggestion),
                     );
-                    artifact_diags.push(diagnostic.clone());
-                    diagnostics.push(diagnostic);
-                    rows[row_index][column_index] = "#ERROR".to_string();
+                    options.artifact_diags.push(diagnostic.clone());
+                    options.diagnostics.push(diagnostic);
+                    *cell = "#ERROR".to_string();
                 }
             }
         }
@@ -385,7 +403,7 @@ fn expand_named_table_reference(
 fn parse_cell_reference_at(
     chars: &[char],
     mut index: usize,
-) -> Result<Option<((usize, usize), usize)>, String> {
+) -> Result<ParsedCellReference, String> {
     let start = index;
     while index < chars.len() && chars[index].is_ascii_alphabetic() {
         index += 1;

@@ -134,16 +134,16 @@ pub(crate) fn run_external_transform(
         return Ok(artifact);
     }
 
-    let artifact = execute_external_transform(
-        &request.name,
-        &request.body,
-        &engine_path,
+    let artifact = execute_external_transform(ExternalTransformExecution {
+        name: &request.name,
+        body: &request.body,
+        engine_path: &engine_path,
         input_mode,
         timeout_ms,
-        output_limit,
-        &engine_identity,
-        &engine_version,
-    )?;
+        max_output_bytes: output_limit,
+        engine_identity: &engine_identity,
+        engine_version: &engine_version,
+    })?;
     store_external_transform(artifact.clone());
     Ok(artifact)
 }
@@ -311,21 +311,28 @@ fn external_engine_identity(engine_path: &Path) -> Result<(String, String), Stri
     ))
 }
 
-fn execute_external_transform(
-    name: &str,
-    body: &str,
-    engine_path: &Path,
-    input_mode: &str,
+struct ExternalTransformExecution<'a> {
+    name: &'a str,
+    body: &'a str,
+    engine_path: &'a Path,
+    input_mode: &'a str,
     timeout_ms: u64,
     max_output_bytes: usize,
-    engine_identity: &str,
-    engine_version: &str,
+    engine_identity: &'a str,
+    engine_version: &'a str,
+}
+
+fn execute_external_transform(
+    request: ExternalTransformExecution<'_>,
 ) -> Result<TransformArtifact, String> {
-    let source_hash = sha256_hex(body.as_bytes());
+    let name = request.name;
+    let input_mode = request.input_mode;
+    let max_output_bytes = request.max_output_bytes;
+    let source_hash = sha256_hex(request.body.as_bytes());
     let started = Instant::now();
     let mut diagnostics = Vec::new();
     let mut temp_input = None;
-    let mut command = Command::new(engine_path);
+    let mut command = Command::new(request.engine_path);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
     if input_mode == "file" {
@@ -337,7 +344,7 @@ fn execute_external_transform(
             "neditor-{name}-{source_hash}-{}-{unique}.input",
             std::process::id()
         ));
-        fs::write(&path, body.as_bytes()).map_err(|err| err.to_string())?;
+        fs::write(&path, request.body.as_bytes()).map_err(|err| err.to_string())?;
         command.arg(&path);
         temp_input = Some(path);
     } else {
@@ -355,7 +362,7 @@ fn execute_external_transform(
     };
     let stdin_writer = if input_mode == "stdin" {
         child.stdin.take().map(|mut stdin| {
-            let input = body.as_bytes().to_vec();
+            let input = request.body.as_bytes().to_vec();
             std::thread::spawn(move || stdin.write_all(&input).map_err(|err| err.to_string()))
         })
     } else {
@@ -366,14 +373,15 @@ fn execute_external_transform(
         if let Some(status) = child.try_wait().map_err(|err| err.to_string())? {
             break status;
         }
-        if started.elapsed() >= Duration::from_millis(timeout_ms) {
+        if started.elapsed() >= Duration::from_millis(request.timeout_ms) {
             let _ = child.kill();
             let _ = child.wait();
             if let Some(path) = temp_input {
                 let _ = fs::remove_file(path);
             }
             return Err(format!(
-                "{name} external transform timed out after {timeout_ms}ms."
+                "{} external transform timed out after {}ms.",
+                name, request.timeout_ms
             ));
         }
         std::thread::sleep(Duration::from_millis(10));
@@ -464,10 +472,10 @@ fn execute_external_transform(
         name: name.to_string(),
         output_kind: if html.contains("<svg") { "svg" } else { "html" }.to_string(),
         output_hash,
-        cache_key: transform_cache_key(name, input_mode, engine_identity, &source_hash),
+        cache_key: transform_cache_key(name, input_mode, request.engine_identity, &source_hash),
         execution_kind: "external".to_string(),
-        engine_version: Some(engine_version.to_string()),
-        engine_path: Some(path_to_string(engine_path)),
+        engine_version: Some(request.engine_version.to_string()),
+        engine_path: Some(path_to_string(request.engine_path)),
         input_mode: input_mode.to_string(),
         duration_ms: Some(duration_ms),
         source_hash,

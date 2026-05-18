@@ -382,15 +382,17 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         .unwrap_or("draft")
         .to_string();
     validate_document(
-        &metadata,
-        &citation_references,
-        &bibliography,
-        &duplicate_bibliography_keys,
-        &comments,
-        &ai_sources,
-        &ai_assisted_sections,
-        !bibliography.is_empty(),
-        &source_map,
+        DocumentValidationInput {
+            metadata: &metadata,
+            citation_references: &citation_references,
+            bibliography: &bibliography,
+            duplicate_bibliography_keys: &duplicate_bibliography_keys,
+            comments: &comments,
+            ai_sources: &ai_sources,
+            ai_assisted_sections: &ai_assisted_sections,
+            has_bibliography_source: !bibliography.is_empty(),
+            source_map: &source_map,
+        },
         &mut diagnostics,
     );
     let included_files = include_graph
@@ -946,9 +948,7 @@ fn interpolate_variables(
             };
             if let Some(value) = replacement {
                 output.push_str(&value);
-            } else if matches!(token, "page" | "pages") {
-                output.push_str(&format!("{{{{{token}}}}}"));
-            } else if formula_token {
+            } else if formula_token || matches!(token, "page" | "pages") {
                 output.push_str(&format!("{{{{{token}}}}}"));
             } else {
                 let (source_file, line) =
@@ -2557,18 +2557,23 @@ fn ai_section_heading(line: usize, headings: &[Heading]) -> String {
         .unwrap_or_else(|| "Document body".to_string())
 }
 
-fn validate_document(
-    metadata: &Value,
-    citation_references: &[CitationReference],
-    bibliography: &[BibliographyEntry],
-    duplicate_bibliography_keys: &[String],
-    comments: &[ReviewComment],
-    ai_sources: &[AiSource],
-    ai_assisted_sections: &[AiAssistedSection],
+struct DocumentValidationInput<'a> {
+    metadata: &'a Value,
+    citation_references: &'a [CitationReference],
+    bibliography: &'a [BibliographyEntry],
+    duplicate_bibliography_keys: &'a [String],
+    comments: &'a [ReviewComment],
+    ai_sources: &'a [AiSource],
+    ai_assisted_sections: &'a [AiAssistedSection],
     has_bibliography_source: bool,
-    source_map: &[SourceMapEntry],
+    source_map: &'a [SourceMapEntry],
+}
+
+fn validate_document(
+    input: DocumentValidationInput<'_>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
+    let metadata = input.metadata;
     if metadata
         .get("title")
         .and_then(Value::as_str)
@@ -2654,11 +2659,12 @@ fn validate_document(
         }
     }
     validate_layout_metadata(metadata, diagnostics);
-    let known_keys = bibliography
+    let known_keys = input
+        .bibliography
         .iter()
         .map(|entry| entry.key.as_str())
         .collect::<HashSet<_>>();
-    for key in duplicate_bibliography_keys {
+    for key in input.duplicate_bibliography_keys {
         diagnostics.push(diag(
             "error",
             format!("Duplicate bibliography key: {key}"),
@@ -2667,9 +2673,10 @@ fn validate_document(
             Some("Keep bibliography keys unique so citations resolve deterministically."),
         ));
     }
-    if !citation_references.is_empty() && !has_bibliography_source {
-        let first = &citation_references[0];
-        let (source_file, line) = diagnostic_location_for_generated_line(source_map, first.line);
+    if !input.citation_references.is_empty() && !input.has_bibliography_source {
+        let first = &input.citation_references[0];
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, first.line);
         let mut diagnostic = diag(
             "warning",
             "Document contains citations but no bibliography source.",
@@ -2683,13 +2690,13 @@ fn validate_document(
         diagnostics.push(diagnostic);
     }
     let mut reported_broken_citations = HashSet::new();
-    for reference in citation_references {
+    for reference in input.citation_references {
         if !known_keys.is_empty()
             && !known_keys.contains(reference.key.as_str())
             && reported_broken_citations.insert(reference.key.as_str())
         {
             let (source_file, line) =
-                diagnostic_location_for_generated_line(source_map, reference.line);
+                diagnostic_location_for_generated_line(input.source_map, reference.line);
             let mut diagnostic = diag(
                 "error",
                 format!("Broken citation: {}", reference.key),
@@ -2703,7 +2710,11 @@ fn validate_document(
             diagnostics.push(diagnostic);
         }
     }
-    if comments.iter().any(|comment| comment.state != "resolved") {
+    if input
+        .comments
+        .iter()
+        .any(|comment| comment.state != "resolved")
+    {
         diagnostics.push(diag(
             if release_status { "error" } else { "warning" },
             "Document has unresolved review comments.",
@@ -2712,10 +2723,12 @@ fn validate_document(
             Some("Resolve comments before publishing."),
         ));
     }
-    if ai_sources
+    if input
+        .ai_sources
         .iter()
         .any(|source| source.status != "human-reviewed")
-        || ai_assisted_sections
+        || input
+            .ai_assisted_sections
             .iter()
             .any(|section| section.status != "human-reviewed")
     {
@@ -5514,16 +5527,13 @@ paths:
         let matrix = transforms::qr::render_qr_matrix(b"HELLO").expect("qr matrix");
         assert_eq!(matrix.len(), 21);
 
-        for row in 0..8 {
-            assert!(!matrix[row][13], "top-right finder separator row {row}");
+        for (row, cells) in matrix.iter().enumerate().take(8) {
+            assert!(!cells[13], "top-right finder separator row {row}");
         }
-        for column in 0..8 {
-            assert!(
-                !matrix[13][column],
-                "bottom-left finder separator column {column}"
-            );
+        for (column, cell) in matrix[13].iter().enumerate().take(8) {
+            assert!(!cell, "bottom-left finder separator column {column}");
         }
-        assert!(transforms::qr::render_qr_matrix(&vec![b'x'; 79]).is_err());
+        assert!(transforms::qr::render_qr_matrix(&[b'x'; 79]).is_err());
     }
 
     #[test]
