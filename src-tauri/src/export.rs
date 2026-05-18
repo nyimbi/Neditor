@@ -126,6 +126,7 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
 
 pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> Vec<u8> {
     let pages = build_pdf_pages(response, options);
+    let (page_width, page_height) = pdf_page_size(response);
     let mut objects = vec![
         String::new(),
         String::new(),
@@ -150,7 +151,7 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
             })
             .collect::<String>();
         objects.push(format!(
-            "{page_id} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >> endobj\n"
+            "{page_id} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_width} {page_height}] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >> endobj\n"
         ));
         objects.push(format!(
             "{content_id} 0 obj << /Length {} >> stream\n{}endstream endobj\n",
@@ -1478,6 +1479,14 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<Strin
         pages.push(appendix);
     }
     pages
+}
+
+fn pdf_page_size(response: &CompileResponse) -> (u32, u32) {
+    match layout_page_size(&response.metadata).as_str() {
+        "letter" => (612, 792),
+        "legal" => (612, 1008),
+        _ => (595, 842),
+    }
 }
 
 fn appendix_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String>> {
