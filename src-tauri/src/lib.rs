@@ -311,7 +311,8 @@ fn compile(request: CompileRequest) -> CompileResponse {
         root_path.as_deref(),
         &mut diagnostics,
     );
-    let figure_markdown = render_figures(&table_formula_markdown);
+    let footnote_markdown = render_footnotes(&table_formula_markdown);
+    let figure_markdown = render_figures(&footnote_markdown);
     let equation_markdown = render_equations(&figure_markdown);
     let callout_markdown = render_callouts(&equation_markdown);
     let layout_markdown = render_layout_tokens(&callout_markdown);
@@ -1418,6 +1419,96 @@ fn render_inline_math(line: &str) -> String {
         } else {
             output.push_str(&rest[start..]);
             rest = "";
+        }
+    }
+    output.push_str(rest);
+    output
+}
+
+fn render_footnotes(markdown: &str) -> String {
+    let mut body_lines = Vec::new();
+    let mut definitions = BTreeMap::new();
+    for line in markdown.lines() {
+        if let Some((key, text)) = parse_footnote_definition(line) {
+            definitions.insert(key, text);
+        } else {
+            body_lines.push(line.to_string());
+        }
+    }
+    if definitions.is_empty() {
+        return markdown.to_string();
+    }
+
+    let mut order = Vec::new();
+    let mut numbers = HashMap::new();
+    let body = body_lines
+        .into_iter()
+        .map(|line| replace_footnote_references(&line, &definitions, &mut order, &mut numbers))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if order.is_empty() {
+        return body;
+    }
+
+    let entries = order
+        .iter()
+        .filter_map(|key| definitions.get(key).map(|text| (key, text)))
+        .enumerate()
+        .map(|(index, (key, text))| {
+            format!(
+                "<li value=\"{}\" id=\"fn:{}\">{} <a href=\"#fnref:{}\" aria-label=\"Back to footnote reference\">back</a></li>",
+                index + 1,
+                escape_html(key),
+                escape_html(text),
+                escape_html(key)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("{body}\n\n<section class=\"footnotes\" role=\"doc-endnotes\"><ol>\n{entries}\n</ol></section>")
+}
+
+fn parse_footnote_definition(line: &str) -> Option<(String, String)> {
+    let trimmed = line.trim();
+    let rest = trimmed.strip_prefix("[^")?;
+    let (key, text) = rest.split_once("]:")?;
+    let key = key.trim();
+    if key.is_empty() {
+        return None;
+    }
+    Some((key.to_string(), text.trim().to_string()))
+}
+
+fn replace_footnote_references(
+    line: &str,
+    definitions: &BTreeMap<String, String>,
+    order: &mut Vec<String>,
+    numbers: &mut HashMap<String, usize>,
+) -> String {
+    let mut output = String::new();
+    let mut rest = line;
+    while let Some(start) = rest.find("[^") {
+        output.push_str(&rest[..start]);
+        let after_start = &rest[start + 2..];
+        let Some(end) = after_start.find(']') else {
+            output.push_str(&rest[start..]);
+            return output;
+        };
+        let key = &after_start[..end];
+        if definitions.contains_key(key) {
+            let number = *numbers.entry(key.to_string()).or_insert_with(|| {
+                order.push(key.to_string());
+                order.len()
+            });
+            output.push_str(&format!(
+                "<sup id=\"fnref:{}\"><a href=\"#fn:{}\">{number}</a></sup>",
+                escape_html(key),
+                escape_html(key)
+            ));
+            rest = &after_start[end + 1..];
+        } else {
+            output.push_str(&rest[..start + 2 + end + 1]);
+            rest = &after_start[end + 1..];
         }
     }
     output.push_str(rest);
@@ -4267,6 +4358,19 @@ ARR: Annual recurring revenue.
             .cross_references
             .iter()
             .any(|reference| reference.key == "eq:roi" && reference.resolved));
+    }
+
+    #[test]
+    fn compiler_renders_markdown_footnotes() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Footnotes\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\n---\n# Footnotes\nA governed claim.[^risk]\n\n[^risk]: Reviewed by compliance.\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response.html.contains("role=\"doc-endnotes\""));
+        assert!(response.html.contains("id=\"fn:risk\""));
+        assert!(response.html.contains("Reviewed by compliance."));
+        assert!(!response.compiled_markdown.contains("[^risk]:"));
     }
 
     #[test]
