@@ -170,6 +170,8 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
         "2 0 obj << /Type /Pages /Kids [{kids}] /Count {} >> endobj\n",
         page_ids.len()
     );
+    let info_id = objects.len() + 1;
+    objects.push(render_pdf_info_object(info_id, response));
 
     let mut pdf = b"%PDF-1.4\n".to_vec();
     let mut offsets = Vec::new();
@@ -186,13 +188,37 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
     }
     pdf.extend_from_slice(
         format!(
-            "trailer << /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF\n",
+            "trailer << /Size {} /Root 1 0 R /Info {info_id} 0 R >>\nstartxref\n{}\n%%EOF\n",
             objects.len() + 1,
             xref
         )
         .as_bytes(),
     );
     pdf
+}
+
+fn render_pdf_info_object(object_id: usize, response: &CompileResponse) -> String {
+    let author = metadata_string(&response.metadata, "author")
+        .or_else(|| metadata_string(&response.metadata, "approvedBy"))
+        .unwrap_or_else(|| "NEditor".to_string());
+    let version = metadata_string(&response.metadata, "version").unwrap_or_default();
+    let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
+    let keywords = [
+        response.semantic.status.as_str(),
+        version.as_str(),
+        classification.as_str(),
+    ]
+    .into_iter()
+    .filter(|value| !value.is_empty())
+    .collect::<Vec<_>>()
+    .join("; ");
+    format!(
+        "{object_id} 0 obj << /Title ({}) /Author ({}) /Subject ({}) /Keywords ({}) /Producer (NEditor) >> endobj\n",
+        escape_pdf(&response.semantic.title),
+        escape_pdf(&author),
+        escape_pdf(&format!("Status: {}", response.semantic.status)),
+        escape_pdf(&keywords)
+    )
 }
 
 pub(crate) fn render_docx_bytes(

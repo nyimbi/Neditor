@@ -6016,6 +6016,8 @@ paths:
         let pdf = render_pdf_bytes(&response, &options);
         assert!(pdf.starts_with(b"%PDF-1.4"));
         assert!(String::from_utf8_lossy(&pdf).contains("Page 1 of 1"));
+        assert!(String::from_utf8_lossy(&pdf).contains("/Title (Test Report)"));
+        assert!(String::from_utf8_lossy(&pdf).contains("/Info "));
         let docx = render_docx_bytes(&response, &options).expect("docx bytes");
         assert!(docx.len() > 100);
         let docx_document = zip_entry_text(&docx, "word/document.xml");
@@ -6239,6 +6241,8 @@ paths:
         let pdf_text = String::from_utf8_lossy(&pdf);
         assert!(pdf.starts_with(b"%PDF-1.4"));
         assert!(pdf_text.contains("/Count 6"));
+        assert!(pdf_text.contains("/Title (Export Conformance Report)"));
+        assert!(pdf_text.contains("/Keywords (approved; 2.0.0; restricted)"));
         assert!(pdf_text.contains("Export Conformance Report"));
         assert!(pdf_text.contains("Competitive Advantage, p. 42"));
         assert!(pdf_text.contains("Reference architecture"));
