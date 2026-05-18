@@ -79,6 +79,7 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
                 include_page_numbers(options),
                 layout_preset(options),
                 include_syntax_highlighting(options),
+                &response.metadata,
             )
         )
     } else {
@@ -587,6 +588,26 @@ fn layout_preset(options: &Value) -> &str {
     }
 }
 
+fn layout_page_size(metadata: &Value) -> String {
+    metadata_string(metadata, "layout.pageSize")
+        .or_else(|| metadata_string(metadata, "pageSize"))
+        .map(|value| value.to_ascii_lowercase().replace([' ', '-'], ""))
+        .and_then(|value| match value.as_str() {
+            "letter" | "usletter" => Some("letter".to_string()),
+            "legal" | "uslegal" => Some("legal".to_string()),
+            "a4" => Some("a4".to_string()),
+            _ => None,
+        })
+        .unwrap_or_else(|| "a4".to_string())
+}
+
+fn explicit_layout_margins(metadata: &Value) -> Option<String> {
+    metadata_string(metadata, "layout.margins")
+        .or_else(|| metadata_string(metadata, "margins"))
+        .map(|value| value.to_ascii_lowercase().replace([' ', '-'], ""))
+        .filter(|value| matches!(value.as_str(), "narrow" | "compact" | "normal" | "wide"))
+}
+
 fn highlight_code_blocks(html: &str) -> String {
     let mut output = String::with_capacity(html.len());
     let mut rest = html;
@@ -1062,8 +1083,10 @@ fn render_docx_document(
             body.push_str(&docx_paragraph(&line));
         }
     }
+    let (page_width, page_height, margin_top, margin_right, margin_bottom, margin_left) =
+        docx_page_layout(response, options);
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>{body}<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader1"/><w:footerReference w:type="default" r:id="rIdFooter1"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>{body}<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader1"/><w:footerReference w:type="default" r:id="rIdFooter1"/><w:pgSz w:w="{page_width}" w:h="{page_height}"/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/></w:sectPr></w:body></w:document>"#
     )
 }
 
@@ -1191,6 +1214,25 @@ fn docx_section_break(options: &str) -> String {
     format!(
         r#"<w:p><w:pPr><w:sectPr><w:cols w:num="{columns}" w:space="720"/></w:sectPr></w:pPr></w:p>"#
     )
+}
+
+fn docx_page_layout(response: &CompileResponse, options: &Value) -> (u32, u32, u32, u32, u32, u32) {
+    let (width, height) = match layout_page_size(&response.metadata).as_str() {
+        "letter" => (12240, 15840),
+        "legal" => (12240, 20160),
+        _ => (11906, 16838),
+    };
+    let margin = match explicit_layout_margins(&response.metadata).as_deref() {
+        Some("narrow") | Some("compact") => 720,
+        Some("wide") => 1800,
+        Some("normal") => 1440,
+        _ => match layout_preset(options) {
+            "compact" => 1080,
+            "presentation" => 1200,
+            _ => 1440,
+        },
+    };
+    (width, height, margin, margin, margin, margin)
 }
 
 fn docx_table(headers: &[String], alignments: &[String], rows: &[Vec<String>]) -> String {
@@ -2063,6 +2105,7 @@ fn export_css(
     page_numbers: bool,
     layout_preset: &str,
     syntax_highlighting: bool,
+    metadata: &Value,
 ) -> String {
     let page_counter_rule = if page_numbers {
         "@bottom-center{content:'Page ' counter(page) ' of ' counter(pages)}"
@@ -2075,13 +2118,24 @@ fn export_css(
             "presentation" => ("64px", "1.7", "78vh", "54px", "20mm"),
             _ => ("48px", "1.55", "85vh", "44px", "24mm"),
         };
+    let page_size = match layout_page_size(metadata).as_str() {
+        "letter" => "Letter",
+        "legal" => "Legal",
+        _ => "A4",
+    };
+    let page_margin = match explicit_layout_margins(metadata).as_deref() {
+        Some("narrow") | Some("compact") => "12mm",
+        Some("wide") => "32mm",
+        Some("normal") => "24mm",
+        _ => page_margin,
+    };
     let syntax_rules = if syntax_highlighting {
         ".syn-keyword{color:#7c3aed;font-weight:700}.syn-string{color:#047857}.syn-number{color:#b45309}.syn-comment{color:#64748b;font-style:italic}"
     } else {
         ""
     };
     format!(
-        "body{{font-family:{};margin:{body_margin};color:#1f2937;line-height:{body_line_height}}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:{cover_min_height};display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:{heading_size};margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.equation{{margin:18px 0}}.math-rendered{{font-family:Georgia,'Times New Roman',serif;font-size:1.08em}}.math-display{{padding:12px;border:1px solid #d8e0e8;background:#f8fafc;text-align:center}}.math-frac{{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center}}.math-frac span:first-child{{border-bottom:1px solid currentColor}}.math-sqrt::before{{content:'√'}}.math-source-inline{{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}{syntax_rules}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:{page_margin};@top-center{{content:element(header)}}{page_counter_rule}}}",
+        "body{{font-family:{};margin:{body_margin};color:#1f2937;line-height:{body_line_height}}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:{cover_min_height};display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:{heading_size};margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.equation{{margin:18px 0}}.math-rendered{{font-family:Georgia,'Times New Roman',serif;font-size:1.08em}}.math-display{{padding:12px;border:1px solid #d8e0e8;background:#f8fafc;text-align:center}}.math-frac{{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center}}.math-frac span:first-child{{border-bottom:1px solid currentColor}}.math-sqrt::before{{content:'√'}}.math-source-inline{{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}{syntax_rules}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{size:{page_size};margin:{page_margin};@top-center{{content:element(header)}}{page_counter_rule}}}",
         escape_css(brand_font),
         escape_css(watermark)
     )

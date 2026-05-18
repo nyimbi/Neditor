@@ -4694,10 +4694,28 @@ ARR: Annual recurring revenue.
         let html = render_full_html(&response, &options);
         assert!(html.contains("margin:32px"));
         assert!(html.contains("line-height:1.42"));
-        assert!(html.contains("@page{margin:18mm"));
+        assert!(html.contains("@page{size:A4;margin:18mm"));
 
         let exported_text = export::export_text(&response, &options);
         assert!(exported_text.contains("Layout preset: compact"));
+    }
+
+    #[test]
+    fn export_layout_metadata_controls_page_size_and_margins() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Page Layout\nstatus: approved\napprovedBy: QA\nlayout:\n  pageSize: Letter\n  margins: wide\n---\n# Page Layout\n\nBody.".to_string(),
+            file_path: None,
+        });
+        let options = json!({});
+
+        let html = render_full_html(&response, &options);
+        assert!(html.contains("@page{size:Letter;margin:32mm"));
+
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let document = zip_entry_text(&docx, "word/document.xml");
+        assert!(document.contains(r#"<w:pgSz w:w="12240" w:h="15840"/>"#));
+        assert!(document
+            .contains(r#"<w:pgMar w:top="1800" w:right="1800" w:bottom="1800" w:left="1800"/>"#));
     }
 
     #[test]
