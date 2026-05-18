@@ -350,6 +350,23 @@
             <strong>{{ store.exportReadiness.ready ? "Ready" : "Needs attention" }}</strong>
             <p>{{ store.exportReadiness.error_count }} errors, {{ store.exportReadiness.warning_count }} warnings, {{ store.exportReadiness.info_count }} info</p>
           </article>
+          <section v-if="store.exportReadiness?.diagnostics.length" class="export-diagnostic-report" aria-label="Export readiness diagnostics">
+            <article
+              v-for="diagnostic in store.exportReadiness.diagnostics"
+              :key="`${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.message}`"
+              class="diagnostic"
+              :class="diagnostic.severity"
+            >
+              <strong>{{ diagnostic.severity }}</strong>
+              <p>{{ diagnostic.message }}</p>
+              <small v-if="diagnosticLocation(diagnostic)">{{ diagnosticLocation(diagnostic) }}</small>
+              <small v-if="diagnostic.suggestion">{{ diagnostic.suggestion }}</small>
+              <ul v-if="diagnostic.related.length" class="diagnostic-related">
+                <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
+              </ul>
+              <button v-if="canNavigateDiagnostic(diagnostic)" type="button" @click="goToLine(Number(diagnostic.line))">Go to line</button>
+            </article>
+          </section>
           <h3>Manifest</h3>
           <pre>{{ manifestPreview }}</pre>
           <h3>Snapshots</h3>
@@ -1478,6 +1495,15 @@ function diagnosticAppliesToIncludedFile(diagnostic: DocumentDiagnostic) {
   const sourceFile = diagnostic.source_file;
   const activePath = active.value.path;
   return Boolean(sourceFile && activePath && sourceFile !== activePath);
+}
+
+function canNavigateDiagnostic(diagnostic: DocumentDiagnostic) {
+  return Boolean(diagnostic.line && !diagnosticAppliesToIncludedFile(diagnostic));
+}
+
+function diagnosticLocation(diagnostic: DocumentDiagnostic) {
+  const parts = [diagnostic.source_file, diagnostic.line ? `line ${diagnostic.line}` : ""].filter(Boolean);
+  return parts.join(": ");
 }
 
 function buildEditor() {
@@ -2859,6 +2885,12 @@ select:hover {
   padding-left: 18px;
   color: #526171;
   font-size: 12px;
+}
+
+.export-diagnostic-report {
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .readiness,
