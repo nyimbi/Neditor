@@ -322,6 +322,11 @@
           </label>
           <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
           <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
+          <label><input v-model="store.autosave" type="checkbox" /> Autosave existing files</label>
+          <label>
+            Autosave delay
+            <input v-model.number="store.autosaveDelayMs" type="number" min="500" max="30000" step="250" />
+          </label>
           <h3>Typography</h3>
           <label>
             Editor font
@@ -498,6 +503,7 @@ const store = useDocumentsStore();
 const editorHost = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
 let debounceHandle = 0;
+let autosaveHandle = 0;
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
 const aiInsertMode = ref<"insert" | "replace" | "appendix">("insert");
@@ -639,6 +645,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   editorView?.destroy();
+  window.clearTimeout(autosaveHandle);
   window.removeEventListener("keydown", handleShortcut);
 });
 
@@ -663,7 +670,24 @@ watch(
 );
 
 watch(
-  () => [store.wordWrap, store.lineNumbers, store.theme, store.editorFont, store.editorLineHeight, store.previewFont, store.previewLineHeight],
+  () => [active.value.id, active.value.text, active.value.path, active.value.dirty, store.autosave, store.autosaveDelayMs, store.externalConflict?.externalHash],
+  () => {
+    scheduleAutosave();
+  },
+);
+
+watch(
+  () => [
+    store.wordWrap,
+    store.lineNumbers,
+    store.theme,
+    store.autosave,
+    store.autosaveDelayMs,
+    store.editorFont,
+    store.editorLineHeight,
+    store.previewFont,
+    store.previewLineHeight,
+  ],
   () => {
     buildEditor();
     void store.persistWorkspace();
@@ -832,6 +856,22 @@ function eventChecked(event: Event) {
 
 function clampUiLineHeight(value: number) {
   return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
+}
+
+function clampAutosaveDelay(value: number) {
+  return Math.min(Math.max(Number(value) || 1500, 500), 30000);
+}
+
+function scheduleAutosave() {
+  window.clearTimeout(autosaveHandle);
+  const doc = active.value;
+  if (!store.autosave || !doc.path || !doc.dirty || store.externalConflict) return;
+  autosaveHandle = window.setTimeout(() => {
+    void store.saveActive().catch((error) => {
+      store.lastError = error instanceof Error ? error.message : String(error);
+      store.statusMessage = "Autosave failed";
+    });
+  }, clampAutosaveDelay(store.autosaveDelayMs));
 }
 
 async function chooseTransformEngine(name: string) {

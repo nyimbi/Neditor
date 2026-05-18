@@ -22,6 +22,8 @@ interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
   wordWrap?: boolean;
   lineNumbers?: boolean;
+  autosave?: boolean;
+  autosaveDelayMs?: number;
   editorFont?: string;
   previewFont?: string;
   editorLineHeight?: number;
@@ -157,6 +159,10 @@ function clampLineHeight(value: number) {
   return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
 }
 
+function clampAutosaveDelay(value: number) {
+  return Math.min(Math.max(Number(value) || 1500, 500), 30000);
+}
+
 function stringifyWatchEventKind(kind: WatchEvent["type"]) {
   if (typeof kind === "string") return kind;
   return Object.keys(kind)[0] || "other";
@@ -189,6 +195,8 @@ export const useDocumentsStore = defineStore("documents", {
     theme: "system" as "system" | "light" | "dark",
     wordWrap: true,
     lineNumbers: true,
+    autosave: false,
+    autosaveDelayMs: 1500,
     editorFont: "Menlo, Consolas, monospace",
     previewFont: "Inter, Arial, sans-serif",
     editorLineHeight: 1.55,
@@ -253,6 +261,8 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.theme) this.theme = persisted.theme;
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
+        if (typeof persisted.autosave === "boolean") this.autosave = persisted.autosave;
+        if (typeof persisted.autosaveDelayMs === "number") this.autosaveDelayMs = clampAutosaveDelay(persisted.autosaveDelayMs);
         if (persisted.editorFont) this.editorFont = persisted.editorFont;
         if (persisted.previewFont) this.previewFont = persisted.previewFont;
         if (typeof persisted.editorLineHeight === "number") this.editorLineHeight = clampLineHeight(persisted.editorLineHeight);
@@ -281,6 +291,8 @@ export const useDocumentsStore = defineStore("documents", {
         theme: this.theme,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,
+        autosave: this.autosave,
+        autosaveDelayMs: this.autosaveDelayMs,
         editorFont: this.editorFont,
         previewFont: this.previewFont,
         editorLineHeight: this.editorLineHeight,
