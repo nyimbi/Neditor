@@ -374,6 +374,10 @@
             <input :value="String(active.compile?.metadata.version || '')" @change="setFrontMatterField('version', inputValue($event))" />
           </label>
           <label>
+            Document set
+            <input :value="String(active.compile?.metadata.documentSet || '')" @change="setFrontMatterField('documentSet', inputValue($event))" />
+          </label>
+          <label>
             Approved by
             <input :value="String(active.compile?.metadata.approvedBy || '')" @change="setFrontMatterField('approvedBy', inputValue($event))" />
           </label>
@@ -1459,7 +1463,14 @@ function closeTabGroup(group: DocumentTabGroup) {
 
 function dropTabOnGroup(group: DocumentTabGroup) {
   if (!draggedTabId.value) return;
-  store.setPinned(draggedTabId.value, group.key === "pinned");
+  const document = store.documents.find((candidate) => candidate.id === draggedTabId.value);
+  if (group.key.startsWith("set:") && document) {
+    store.setPinned(document.id, false);
+    store.activeId = document.id;
+    store.updateText(upsertFrontMatterField(document.text, "documentSet", group.label));
+  } else {
+    store.setPinned(draggedTabId.value, group.key === "pinned");
+  }
   draggedTabId.value = "";
 }
 
@@ -1478,6 +1489,14 @@ function tabGroupDescriptor(document: OpenDocument): Omit<DocumentTabGroup, "doc
       title: "Unsaved documents",
     };
   }
+  const documentSet = documentSetName(document);
+  if (documentSet) {
+    return {
+      key: `set:${documentSet}`,
+      label: documentSet,
+      title: `Document set: ${documentSet}`,
+    };
+  }
   const folder = folderFromDocumentPath(document.path);
   const label = folderLabel(folder);
   return {
@@ -1485,6 +1504,12 @@ function tabGroupDescriptor(document: OpenDocument): Omit<DocumentTabGroup, "doc
     label,
     title: folder || "Workspace root",
   };
+}
+
+function documentSetName(document: OpenDocument) {
+  const metadata = document.compile?.metadata || {};
+  const value = metadata.documentSet || metadata.document_set || metadata.set;
+  return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
 function folderFromDocumentPath(path: string) {
