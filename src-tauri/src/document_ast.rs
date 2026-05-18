@@ -1,4 +1,9 @@
-use crate::review::{parse_change_note, parse_review_comment};
+use crate::{
+    markdown_tables::{
+        is_markdown_table_row, is_markdown_table_separator, split_markdown_table_row,
+    },
+    review::{parse_change_note, parse_review_comment},
+};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -551,18 +556,18 @@ fn parse_ast_table(
         return None;
     }
 
-    let headers = split_table_row(header)
+    let headers = split_markdown_table_row(header)
         .iter()
         .map(|cell| clean_inline_text(cell))
         .collect::<Vec<_>>();
-    let alignments = split_table_row(separator)
+    let alignments = split_markdown_table_row(separator)
         .iter()
         .map(|cell| table_alignment(cell))
         .collect::<Vec<_>>();
     let mut rows = Vec::new();
     let mut next_index = index + 2;
     while next_index < lines.len() && is_markdown_table_row(lines[next_index].trim()) {
-        let row = split_table_row(lines[next_index].trim())
+        let row = split_markdown_table_row(lines[next_index].trim())
             .iter()
             .map(|cell| clean_inline_text(cell))
             .collect::<Vec<_>>();
@@ -1021,25 +1026,6 @@ fn parse_footnote_entry(line: &str, fallback_number: usize) -> FootnoteEntry {
         .trim()
         .to_string();
     FootnoteEntry { number, key, text }
-}
-
-fn is_markdown_table_row(line: &str) -> bool {
-    line.starts_with('|') && line.ends_with('|') && line.matches('|').count() >= 2
-}
-
-fn is_markdown_table_separator(line: &str) -> bool {
-    is_markdown_table_row(line)
-        && line
-            .trim_matches('|')
-            .split('|')
-            .all(|cell| cell.trim().chars().all(|ch| matches!(ch, '-' | ':' | ' ')))
-}
-
-fn split_table_row(line: &str) -> Vec<String> {
-    line.trim_matches('|')
-        .split('|')
-        .map(|cell| cell.trim().to_string())
-        .collect()
 }
 
 fn table_alignment(cell: &str) -> String {

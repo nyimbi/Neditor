@@ -2,6 +2,10 @@ use crate::{
     calculations::eval_expression,
     diagnostics::{diag, DocumentDiagnostic},
     escape_html, format_value,
+    markdown_tables::{
+        is_markdown_table_row, is_markdown_table_separator, markdown_table_row,
+        split_markdown_table_row,
+    },
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
@@ -139,8 +143,12 @@ pub(crate) fn evaluate_markdown_table_formulas(
         }
 
         let mut rows = Vec::with_capacity(row_lines.len() + 1);
-        rows.push(split_table_row(header.trim()));
-        rows.extend(row_lines.iter().map(|(_, row)| split_table_row(row.trim())));
+        rows.push(split_markdown_table_row(header.trim()));
+        rows.extend(
+            row_lines
+                .iter()
+                .map(|(_, row)| split_markdown_table_row(row.trim())),
+        );
         let changed = evaluate_table_formula_rows(
             &mut rows,
             1,
@@ -155,11 +163,7 @@ pub(crate) fn evaluate_markdown_table_formulas(
         output.push(header);
         output.push(separator);
         if changed {
-            output.extend(
-                rows.iter()
-                    .skip(1)
-                    .map(|row| format!("| {} |", row.join(" | "))),
-            );
+            output.extend(rows.iter().skip(1).map(|row| markdown_table_row(row)));
         } else {
             output.extend(row_lines.into_iter().map(|(_, row)| row));
         }
@@ -176,7 +180,7 @@ pub(crate) fn collect_table_summaries(text: &str) -> Vec<TableSummary> {
         let header = lines[index].trim();
         let separator = lines[index + 1].trim();
         if is_markdown_table_row(header) && is_markdown_table_separator(separator) {
-            let columns = split_table_row(header);
+            let columns = split_markdown_table_row(header);
             let mut row_count = 0usize;
             let mut numeric_columns = columns
                 .iter()
@@ -184,7 +188,7 @@ pub(crate) fn collect_table_summaries(text: &str) -> Vec<TableSummary> {
                 .collect::<BTreeMap<_, _>>();
             index += 2;
             while index < lines.len() && is_markdown_table_row(lines[index].trim()) {
-                let cells = split_table_row(lines[index].trim());
+                let cells = split_markdown_table_row(lines[index].trim());
                 for (column_index, cell) in cells.iter().enumerate() {
                     if let Some(column) = columns.get(column_index) {
                         if let Ok(value) = cell.replace([',', '$', '%'], "").parse::<f64>() {
@@ -551,23 +555,4 @@ fn table_id_from_caption(line: &str) -> Option<String> {
         .trim()
         .to_string();
     (!id.is_empty()).then_some(id)
-}
-
-fn is_markdown_table_row(line: &str) -> bool {
-    line.starts_with('|') && line.ends_with('|') && line.matches('|').count() >= 2
-}
-
-fn is_markdown_table_separator(line: &str) -> bool {
-    is_markdown_table_row(line)
-        && line
-            .trim_matches('|')
-            .split('|')
-            .all(|cell| cell.trim().chars().all(|ch| matches!(ch, '-' | ':' | ' ')))
-}
-
-fn split_table_row(line: &str) -> Vec<String> {
-    line.trim_matches('|')
-        .split('|')
-        .map(|cell| cell.trim().to_string())
-        .collect()
 }

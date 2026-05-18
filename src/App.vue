@@ -2292,7 +2292,7 @@ function parseTableCaption(line: string) {
 }
 
 function isMarkdownTableRow(line: string) {
-  return line.startsWith("|") && line.endsWith("|") && (line.match(/\|/g) || []).length >= 2;
+  return line.startsWith("|") && line.endsWith("|") && unescapedPipeCount(line) >= 2;
 }
 
 function isMarkdownTableSeparator(line: string) {
@@ -2300,11 +2300,25 @@ function isMarkdownTableSeparator(line: string) {
 }
 
 function splitMarkdownTableRow(line: string) {
-  return line
-    .trim()
-    .slice(1, -1)
-    .split("|")
-    .map((cell) => cell.replace(/\\\|/g, "|").trim());
+  const cells: string[] = [];
+  let cell = "";
+  let escaped = false;
+  for (const char of line.trim().slice(1, -1)) {
+    if (escaped) {
+      cell += char === "|" ? "|" : `\\${char}`;
+      escaped = false;
+    } else if (char === "\\") {
+      escaped = true;
+    } else if (char === "|") {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  if (escaped) cell += "\\";
+  cells.push(cell.trim());
+  return cells;
 }
 
 function alignmentFromSeparator(cell: string): TableAlignment {
@@ -2312,6 +2326,21 @@ function alignmentFromSeparator(cell: string): TableAlignment {
   if (compact.startsWith(":") && compact.endsWith(":")) return "center";
   if (compact.endsWith(":")) return "right";
   return "left";
+}
+
+function unescapedPipeCount(line: string) {
+  let count = 0;
+  let escaped = false;
+  for (const char of line) {
+    if (escaped) {
+      escaped = false;
+    } else if (char === "\\") {
+      escaped = true;
+    } else if (char === "|") {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 function padAlignments(alignments: TableAlignment[], length: number) {

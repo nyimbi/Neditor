@@ -19,6 +19,7 @@ mod export_commands;
 mod filesystem;
 mod footnotes;
 mod git;
+mod markdown_tables;
 mod review;
 mod snapshot;
 mod tables;
@@ -5190,6 +5191,41 @@ ARR: Annual recurring revenue.
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("#NAME?")));
+    }
+
+    #[test]
+    fn markdown_tables_preserve_escaped_pipes_across_ast_and_formulas() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Escaped Tables\nstatus: approved\napprovedBy: QA\n---\n# Escaped Tables\nTable: Pricing notes {#tbl:pricing}\n| Product | Notes | Value |\n| --- | --- | ---: |\n| A \\| B | keep literal pipe | 10 |\n| Total | formula keeps source readable | =SUM(C1,5) |\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response.compiled_markdown.contains("| A \\| B |"));
+        assert!(response
+            .compiled_markdown
+            .contains("| Total | formula keeps source readable | 15 |"));
+        assert_eq!(response.semantic.table_summaries[0].columns.len(), 3);
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Table { headers, rows, .. }
+                    if headers == &vec![
+                        "Product".to_string(),
+                        "Notes".to_string(),
+                        "Value".to_string()
+                    ]
+                    && rows.iter().any(|row| row == &vec![
+                        "A | B".to_string(),
+                        "keep literal pipe".to_string(),
+                        "10".to_string()
+                    ])
+                    && rows.iter().any(|row| row == &vec![
+                        "Total".to_string(),
+                        "formula keeps source readable".to_string(),
+                        "15".to_string()
+                    ])
+            )
+        }));
     }
 
     #[test]
