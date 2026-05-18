@@ -4510,6 +4510,22 @@ ARR: Annual recurring revenue.
         assert_eq!(change_note.author, "Dana");
         assert_eq!(change_note.created_at, "2026-05-18T11:00:00Z");
         assert_eq!(change_note.text, "Updated the risk note.");
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::ReviewComment { comment, .. }
+                    if comment.author == "Dana"
+                        && comment.state == "unresolved"
+                        && comment.text == "Clarify the risk note."
+            )
+        }));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::ChangeNote { note, .. }
+                    if note.author == "Dana" && note.text == "Updated the risk note."
+            )
+        }));
         assert!(response
             .diagnostics
             .iter()
@@ -6243,6 +6259,30 @@ paths:
             .ai_sources
             .iter()
             .any(|source| source.line > 0 && source.reviewed_at == "2026-05-18T12:00:00Z"));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::ReviewComment { comment, .. }
+                    if comment.text.contains("board-pack export fidelity")
+                        && comment.state == "resolved"
+            )
+        }));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::ChangeNote { note, .. }
+                    if note.text.contains("export conformance evidence")
+            )
+        }));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::AiSource { provenance, .. }
+                    if provenance.provider == "OpenAI"
+                        && provenance.model == "gpt-5.4"
+                        && provenance.status == "human-reviewed"
+            )
+        }));
         assert_eq!(response.semantic.tables, 1);
         assert_eq!(response.semantic.figures, 1);
         assert_eq!(response.semantic.equations, 1);

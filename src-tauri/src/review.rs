@@ -43,7 +43,7 @@ pub(crate) fn collect_change_notes(text: &str) -> Vec<ChangeNote> {
         .collect()
 }
 
-fn parse_review_comment(line: usize, content: &str) -> ReviewComment {
+pub(crate) fn parse_review_comment(line: usize, content: &str) -> ReviewComment {
     let mut author = "local".to_string();
     let mut created_at = String::new();
     let mut state = if content.contains("resolved") {
@@ -87,7 +87,7 @@ fn parse_review_comment(line: usize, content: &str) -> ReviewComment {
     }
 }
 
-fn parse_change_note(line: usize, content: &str) -> ChangeNote {
+pub(crate) fn parse_change_note(line: usize, content: &str) -> ChangeNote {
     let mut author = "local".to_string();
     let mut created_at = String::new();
     let mut text_parts = Vec::new();

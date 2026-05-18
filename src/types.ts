@@ -77,6 +77,29 @@ export interface FootnoteEntry {
   text: string;
 }
 
+export interface AstReviewComment {
+  author: string;
+  created_at: string;
+  state: string;
+  text: string;
+}
+
+export interface AstChangeNote {
+  author: string;
+  created_at: string;
+  text: string;
+}
+
+export interface AstAiSource {
+  provider: string;
+  model: string;
+  date: string;
+  prompt_summary: string;
+  reviewed_by: string;
+  reviewed_at: string;
+  status: string;
+}
+
 export type DocumentBlock =
   | { kind: "heading"; level: number; text: string; anchor: string; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "paragraph"; text: string; line: number; end_line: number; source?: DocumentSourceRange | null }
@@ -109,6 +132,9 @@ export type DocumentBlock =
   | { kind: "layout"; line: number; end_line: number; directive: string; options: string; source?: DocumentSourceRange | null }
   | { kind: "callout"; line: number; end_line: number; callout_type: string; title: string; text: string; source?: DocumentSourceRange | null }
   | { kind: "footnotes"; line: number; end_line: number; entries: FootnoteEntry[]; source?: DocumentSourceRange | null }
+  | { kind: "review_comment"; line: number; end_line: number; comment: AstReviewComment; source?: DocumentSourceRange | null }
+  | { kind: "change_note"; line: number; end_line: number; note: AstChangeNote; source?: DocumentSourceRange | null }
+  | { kind: "ai_source"; line: number; end_line: number; provenance: AstAiSource; source?: DocumentSourceRange | null }
   | { kind: "raw_html"; line: number; end_line: number; html: string; source?: DocumentSourceRange | null };
 
 export interface DocumentAst {

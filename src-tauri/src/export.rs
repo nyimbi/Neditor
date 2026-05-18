@@ -1173,6 +1173,19 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
             }
             output
         }
+        DocumentBlock::ReviewComment { comment, .. } => docx_paragraph(&format!(
+            "Review comment: {} | {} | {}",
+            comment.state, comment.author, comment.text
+        )),
+        DocumentBlock::ChangeNote { note, .. } => {
+            docx_paragraph(&format!("Change note: {} | {}", note.author, note.text))
+        }
+        DocumentBlock::AiSource { provenance, .. } => docx_paragraph(&format!(
+            "AI source: {} / {} | {}",
+            empty_as(&provenance.provider, "unknown"),
+            empty_as(&provenance.model, "unknown"),
+            empty_as(&provenance.status, "unreviewed")
+        )),
         DocumentBlock::RawHtml { html, .. } => raw_html_export_lines(html)
             .into_iter()
             .map(|line| docx_paragraph(&line))
@@ -1789,6 +1802,19 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             );
             lines
         }
+        DocumentBlock::ReviewComment { comment, .. } => vec![format!(
+            "Review comment: {} | {} | {}",
+            comment.state, comment.author, comment.text
+        )],
+        DocumentBlock::ChangeNote { note, .. } => {
+            vec![format!("Change note: {} | {}", note.author, note.text)]
+        }
+        DocumentBlock::AiSource { provenance, .. } => vec![format!(
+            "AI source: {} / {} | {}",
+            empty_as(&provenance.provider, "unknown"),
+            empty_as(&provenance.model, "unknown"),
+            empty_as(&provenance.status, "unreviewed")
+        )],
         DocumentBlock::RawHtml { html, .. } => raw_html_export_lines(html),
     }
 }

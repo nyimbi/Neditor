@@ -1,3 +1,4 @@
+use crate::review::{parse_change_note, parse_review_comment};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -23,6 +24,32 @@ pub(crate) struct FootnoteEntry {
 pub(crate) struct TaskListItem {
     pub(crate) checked: bool,
     pub(crate) text: String,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct AstReviewComment {
+    pub(crate) author: String,
+    pub(crate) created_at: String,
+    pub(crate) state: String,
+    pub(crate) text: String,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct AstChangeNote {
+    pub(crate) author: String,
+    pub(crate) created_at: String,
+    pub(crate) text: String,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct AstAiSource {
+    pub(crate) provider: String,
+    pub(crate) model: String,
+    pub(crate) date: String,
+    pub(crate) prompt_summary: String,
+    pub(crate) reviewed_by: String,
+    pub(crate) reviewed_at: String,
+    pub(crate) status: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -114,6 +141,24 @@ pub(crate) enum DocumentBlock {
         line: usize,
         end_line: usize,
         entries: Vec<FootnoteEntry>,
+        source: Option<AstSourceRange>,
+    },
+    ReviewComment {
+        line: usize,
+        end_line: usize,
+        comment: AstReviewComment,
+        source: Option<AstSourceRange>,
+    },
+    ChangeNote {
+        line: usize,
+        end_line: usize,
+        note: AstChangeNote,
+        source: Option<AstSourceRange>,
+    },
+    AiSource {
+        line: usize,
+        end_line: usize,
+        provenance: AstAiSource,
         source: Option<AstSourceRange>,
     },
     RawHtml {
@@ -320,6 +365,19 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 );
                 Some(lines.join("\n"))
             }
+            DocumentBlock::ReviewComment { comment, .. } => Some(format!(
+                "Review comment: {} | {} | {}",
+                comment.state, comment.author, comment.text
+            )),
+            DocumentBlock::ChangeNote { note, .. } => {
+                Some(format!("Change note: {} | {}", note.author, note.text))
+            }
+            DocumentBlock::AiSource { provenance, .. } => Some(format!(
+                "AI source: {} / {} | {}",
+                empty_as(&provenance.provider, "unknown"),
+                empty_as(&provenance.model, "unknown"),
+                empty_as(&provenance.status, "unreviewed")
+            )),
             DocumentBlock::RawHtml { html, .. } => {
                 let text = clean_inline_text(html);
                 (!text.is_empty()).then_some(text)
@@ -402,6 +460,24 @@ where
                 ..
             }
             | DocumentBlock::Footnotes {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::ReviewComment {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::ChangeNote {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::AiSource {
                 line,
                 end_line,
                 source,
@@ -619,6 +695,18 @@ fn parse_ast_code_block(lines: &[&str], index: usize) -> Option<(DocumentBlock, 
     while next_index < lines.len() {
         let line = lines[next_index];
         if line.trim_start().starts_with(marker) {
+            if language.as_deref() == Some("ai-source") {
+                let code = code_lines.join("\n");
+                return Some((
+                    DocumentBlock::AiSource {
+                        provenance: parse_ast_ai_source(&code),
+                        line: index + 1,
+                        end_line: next_index + 1,
+                        source: None,
+                    },
+                    next_index + 1,
+                ));
+            }
             return Some((
                 DocumentBlock::CodeBlock {
                     language,
@@ -632,6 +720,18 @@ fn parse_ast_code_block(lines: &[&str], index: usize) -> Option<(DocumentBlock, 
         }
         code_lines.push(line.to_string());
         next_index += 1;
+    }
+    if language.as_deref() == Some("ai-source") {
+        let code = code_lines.join("\n");
+        return Some((
+            DocumentBlock::AiSource {
+                provenance: parse_ast_ai_source(&code),
+                line: index + 1,
+                end_line: next_index,
+                source: None,
+            },
+            next_index,
+        ));
     }
     Some((
         DocumentBlock::CodeBlock {
@@ -747,6 +847,47 @@ fn table_export_title(id: &Option<String>, caption: &Option<String>, headers: &[
 }
 
 fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
+    if let Some(content) = line
+        .trim()
+        .strip_prefix("<!-- comment:")
+        .and_then(|value| value.strip_suffix("-->"))
+    {
+        return DocumentBlock::ReviewComment {
+            line: line_number,
+            end_line: line_number,
+            comment: {
+                let parsed = parse_review_comment(line_number, content);
+                AstReviewComment {
+                    author: parsed.author,
+                    created_at: parsed.created_at,
+                    state: parsed.state,
+                    text: parsed.text,
+                }
+            },
+            source: None,
+        };
+    }
+
+    if let Some(content) = line
+        .trim()
+        .strip_prefix("<!-- change:")
+        .and_then(|value| value.strip_suffix("-->"))
+    {
+        return DocumentBlock::ChangeNote {
+            line: line_number,
+            end_line: line_number,
+            note: {
+                let parsed = parse_change_note(line_number, content);
+                AstChangeNote {
+                    author: parsed.author,
+                    created_at: parsed.created_at,
+                    text: parsed.text,
+                }
+            },
+            source: None,
+        };
+    }
+
     if line.contains("class=\"figure\"") {
         return DocumentBlock::Figure {
             line: line_number,
@@ -807,6 +948,37 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
         html: line.to_string(),
         source: None,
     }
+}
+
+fn parse_ast_ai_source(content: &str) -> AstAiSource {
+    let mut provenance = AstAiSource {
+        provider: String::new(),
+        model: String::new(),
+        date: String::new(),
+        prompt_summary: String::new(),
+        reviewed_by: String::new(),
+        reviewed_at: String::new(),
+        status: "needs-review".to_string(),
+    };
+
+    for line in content.lines() {
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
+        let value = value.trim().to_string();
+        match key.trim() {
+            "provider" => provenance.provider = value,
+            "model" => provenance.model = value,
+            "date" => provenance.date = value,
+            "promptSummary" | "prompt_summary" => provenance.prompt_summary = value,
+            "reviewedBy" | "reviewed_by" => provenance.reviewed_by = value,
+            "reviewedAt" | "reviewed_at" => provenance.reviewed_at = value,
+            "status" => provenance.status = value,
+            _ => {}
+        }
+    }
+
+    provenance
 }
 
 fn is_footnotes_start(line: &str) -> bool {
@@ -939,6 +1111,14 @@ fn decode_html_entities(text: &str) -> String {
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&amp;", "&")
+}
+
+fn empty_as<'a>(value: &'a str, fallback: &'a str) -> &'a str {
+    if value.trim().is_empty() {
+        fallback
+    } else {
+        value
+    }
 }
 
 fn extract_between(text: &str, start: &str, end: &str) -> Option<String> {
