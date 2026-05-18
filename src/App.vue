@@ -454,6 +454,9 @@
             Logo path
             <input v-model="store.brandProfileDefaults.logo" />
           </label>
+          <h3>Git integration</h3>
+          <label><input v-model="store.gitIntegration.enabled" type="checkbox" /> Enable Git status</label>
+          <label><input v-model="store.gitIntegration.warnOnDirtyExport" type="checkbox" /> Warn on dirty export</label>
           <h3>AI paste cleanup defaults</h3>
           <label><input v-model="store.aiCleanupDefaults.markAsDraft" type="checkbox" /> Mark as draft</label>
           <label><input v-model="store.aiCleanupDefaults.addProvenance" type="checkbox" /> Add provenance block</label>
@@ -1001,6 +1004,14 @@ watch(
   () => [store.brandProfileDefaults.name, store.brandProfileDefaults.color, store.brandProfileDefaults.logo],
   () => {
     void store.compileActive();
+    void store.persistWorkspace();
+  },
+);
+
+watch(
+  () => [store.gitIntegration.enabled, store.gitIntegration.warnOnDirtyExport],
+  () => {
+    void store.refreshGitStatus();
     void store.persistWorkspace();
   },
 );

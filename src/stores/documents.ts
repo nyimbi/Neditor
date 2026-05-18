@@ -41,6 +41,11 @@ interface BrandProfileDefaults {
   logo: string;
 }
 
+interface GitIntegrationPreferences {
+  enabled: boolean;
+  warnOnDirtyExport: boolean;
+}
+
 interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
   wordWrap?: boolean;
@@ -59,6 +64,7 @@ interface PersistedWorkspace {
   exportDefaults?: Partial<ExportDefaults>;
   bibliographyDefaults?: Partial<BibliographyDefaults>;
   brandProfileDefaults?: Partial<BrandProfileDefaults>;
+  gitIntegration?: Partial<GitIntegrationPreferences>;
   recentFiles?: string[];
   recentFolders?: string[];
   recentlyClosed?: string[];
@@ -316,6 +322,13 @@ function normalizeBrandProfileDefaults(defaults: Partial<BrandProfileDefaults>):
   };
 }
 
+function normalizeGitIntegrationPreferences(defaults: Partial<GitIntegrationPreferences>): GitIntegrationPreferences {
+  return {
+    enabled: typeof defaults.enabled === "boolean" ? defaults.enabled : true,
+    warnOnDirtyExport: typeof defaults.warnOnDirtyExport === "boolean" ? defaults.warnOnDirtyExport : true,
+  };
+}
+
 function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>): AiCleanupOptions {
   return {
     addProvenance: typeof defaults.addProvenance === "boolean" ? defaults.addProvenance : true,
@@ -370,6 +383,7 @@ export const useDocumentsStore = defineStore("documents", {
     } as ExportDefaults,
     bibliographyDefaults: normalizeBibliographyDefaults({}),
     brandProfileDefaults: normalizeBrandProfileDefaults({}),
+    gitIntegration: normalizeGitIntegrationPreferences({}),
     aiCleanupDefaults: normalizeAiCleanupDefaults({}),
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
@@ -445,6 +459,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.exportDefaults) this.exportDefaults = normalizeExportDefaults(persisted.exportDefaults);
         if (persisted.bibliographyDefaults) this.bibliographyDefaults = normalizeBibliographyDefaults(persisted.bibliographyDefaults);
         if (persisted.brandProfileDefaults) this.brandProfileDefaults = normalizeBrandProfileDefaults(persisted.brandProfileDefaults);
+        if (persisted.gitIntegration) this.gitIntegration = normalizeGitIntegrationPreferences(persisted.gitIntegration);
         if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
         this.recentFiles = persisted.recentFiles || [];
         this.recentFolders = persisted.recentFolders || [];
@@ -483,6 +498,7 @@ export const useDocumentsStore = defineStore("documents", {
         exportDefaults: this.exportDefaults,
         bibliographyDefaults: this.bibliographyDefaults,
         brandProfileDefaults: this.brandProfileDefaults,
+        gitIntegration: this.gitIntegration,
         aiCleanupDefaults: this.aiCleanupDefaults,
         recentFiles: this.recentFiles.slice(0, 20),
         recentFolders: this.recentFolders.slice(0, 12),
@@ -962,6 +978,7 @@ export const useDocumentsStore = defineStore("documents", {
         includeGlossary: defaults.includeGlossary,
         defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
         defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
+        warnOnDirtyGit: this.gitIntegration.enabled && this.gitIntegration.warnOnDirtyExport,
         watermark: this.activeDocument.compile?.semantic.status === "draft" ? "DRAFT" : "",
       };
     },
@@ -1113,6 +1130,12 @@ export const useDocumentsStore = defineStore("documents", {
       this.statusMessage = reviewed ? "Marked AI source as human-reviewed" : "Marked AI source as needing review";
     },
     async refreshGitStatus() {
+      if (!this.gitIntegration.enabled) {
+        this.gitStatus = null;
+        this.gitHistory = [];
+        this.gitDiffText = "";
+        return;
+      }
       try {
         this.gitStatus = await invoke<GitStatus>("get_git_status", { path: this.activeDocument?.path });
         if (this.activeDocument?.path) {

@@ -134,7 +134,9 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
     response.export_manifest.export_target = request.target.clone();
     response.export_manifest.export_options = request.options.clone();
     validate_export_settings(&request.target, &request.options, &mut response.diagnostics);
-    validate_git_export_cleanliness(request.file_path.as_deref(), &mut response.diagnostics);
+    if git_export_warnings_enabled(&request.options) {
+        validate_git_export_cleanliness(request.file_path.as_deref(), &mut response.diagnostics);
+    }
     let error_count = response
         .diagnostics
         .iter()
@@ -158,6 +160,13 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
         diagnostics: response.diagnostics,
         manifest: response.export_manifest,
     }
+}
+
+fn git_export_warnings_enabled(options: &Value) -> bool {
+    options
+        .get("warnOnDirtyGit")
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
 }
 
 fn validate_git_export_cleanliness(

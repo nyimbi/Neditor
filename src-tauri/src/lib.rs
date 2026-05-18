@@ -5911,6 +5911,16 @@ paths:
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("Git working tree is dirty before export")));
+
+        let suppressed = prepare_for_export(PrepareExportRequest {
+            text: fs::read_to_string(&doc).expect("read doc"),
+            file_path: Some(path_to_string(&doc)),
+            target: "pdf".to_string(),
+            options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+        });
+        assert!(!suppressed.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("Git working tree is dirty before export")));
         fs::remove_dir_all(root).expect("clean export git test dir");
     }
 
