@@ -562,9 +562,10 @@ fn provenance_export_lines(response: &CompileResponse, options: &Value) -> Vec<S
         let model = empty_as(source.model.as_str(), "unknown model");
         let date = empty_as(source.date.as_str(), "undated");
         let reviewer = empty_as(source.reviewed_by.as_str(), "unreviewed");
+        let reviewed_at = empty_as(source.reviewed_at.as_str(), "undated");
         let summary = empty_as(source.prompt_summary.as_str(), "no prompt summary");
         format!(
-            "{provider} / {model} on {date}; status: {}; reviewed by: {reviewer}; prompt: {summary}",
+            "{provider} / {model} on {date}; status: {}; reviewed by: {reviewer} on {reviewed_at}; prompt: {summary}",
             source.status
         )
     }));
@@ -656,11 +657,12 @@ fn html_provenance_section(response: &CompileResponse, options: &Value) -> Strin
         .iter()
         .map(|source| {
             format!(
-                "<li><strong>{}</strong> <span>{}</span><p>{}; reviewed by {}; {}; prompt: {}</p></li>",
+                "<li><strong>{}</strong> <span>{}</span><p>{}; reviewed by {} on {}; {}; prompt: {}</p></li>",
                 escape_html(empty_as(source.provider.as_str(), "unknown provider")),
                 escape_html(empty_as(source.model.as_str(), "unknown model")),
                 escape_html(empty_as(source.date.as_str(), "undated")),
                 escape_html(empty_as(source.reviewed_by.as_str(), "unreviewed")),
+                escape_html(empty_as(source.reviewed_at.as_str(), "undated")),
                 escape_html(&source.status),
                 escape_html(empty_as(
                     source.prompt_summary.as_str(),

@@ -37,11 +37,13 @@ export interface SemanticDocument {
   layout_directives: string[];
   comments: Array<{ line: number; author: string; created_at?: string | null; state: string; text: string }>;
   ai_sources: Array<{
+    line: number;
     provider: string;
     model: string;
     date: string;
     prompt_summary: string;
     reviewed_by: string;
+    reviewed_at: string;
     status: string;
   }>;
   ai_assisted_sections: Array<{

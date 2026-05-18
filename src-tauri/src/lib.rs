@@ -171,11 +171,13 @@ struct ReviewComment {
 
 #[derive(Debug, Serialize)]
 struct AiSource {
+    line: usize,
     provider: String,
     model: String,
     date: String,
     prompt_summary: String,
     reviewed_by: String,
+    reviewed_at: String,
     status: String,
 }
 
@@ -2012,9 +2014,16 @@ fn strip_index_markers(text: &str) -> String {
 }
 
 fn collect_fence_bodies(text: &str, target: &str) -> Vec<String> {
+    collect_fence_bodies_with_lines(text, target)
+        .into_iter()
+        .map(|(_, body)| body)
+        .collect()
+}
+
+fn collect_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(usize, String)> {
     let mut bodies = Vec::new();
-    let mut lines = text.lines();
-    while let Some(line) = lines.next() {
+    let mut lines = text.lines().enumerate();
+    while let Some((line_index, line)) = lines.next() {
         if line
             .trim()
             .strip_prefix("```")
@@ -2022,14 +2031,14 @@ fn collect_fence_bodies(text: &str, target: &str) -> Vec<String> {
             .unwrap_or(false)
         {
             let mut body = String::new();
-            for body_line in lines.by_ref() {
+            for (_, body_line) in lines.by_ref() {
                 if body_line.trim() == "```" {
                     break;
                 }
                 body.push_str(body_line);
                 body.push('\n');
             }
-            bodies.push(body);
+            bodies.push((line_index + 1, body));
         }
     }
     bodies
@@ -2093,15 +2102,16 @@ fn parse_review_comment(line: usize, content: &str) -> ReviewComment {
 }
 
 fn collect_ai_sources(text: &str) -> Vec<AiSource> {
-    collect_fence_bodies(text, "ai-source")
+    collect_fence_bodies_with_lines(text, "ai-source")
         .into_iter()
-        .map(|body| {
+        .map(|(line, body)| {
             let map = body
                 .lines()
                 .filter_map(|line| line.split_once(':'))
                 .map(|(key, value)| (key.trim().to_string(), value.trim().to_string()))
                 .collect::<HashMap<_, _>>();
             AiSource {
+                line,
                 provider: map.get("provider").cloned().unwrap_or_default(),
                 model: map.get("model").cloned().unwrap_or_default(),
                 date: map.get("date").cloned().unwrap_or_default(),
@@ -2111,6 +2121,7 @@ fn collect_ai_sources(text: &str) -> Vec<AiSource> {
                     .cloned()
                     .unwrap_or_default(),
                 reviewed_by: map.get("reviewedBy").cloned().unwrap_or_default(),
+                reviewed_at: map.get("reviewedAt").cloned().unwrap_or_default(),
                 status: map
                     .get("status")
                     .cloned()
@@ -5121,6 +5132,11 @@ paths:
             .ai_sources
             .iter()
             .any(|source| source.prompt_summary == "board-pack synthesis"));
+        assert!(response
+            .semantic
+            .ai_sources
+            .iter()
+            .any(|source| source.line > 0 && source.reviewed_at == "2026-05-18T12:00:00Z"));
         assert_eq!(response.semantic.tables, 1);
         assert_eq!(response.semantic.figures, 1);
         assert_eq!(response.semantic.equations, 1);

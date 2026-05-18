@@ -54,6 +54,7 @@ model: gpt-5.4
 date: 2026-05-18
 promptSummary: board-pack synthesis
 reviewedBy: QA
+reviewedAt: 2026-05-18T12:00:00Z
 status: human-reviewed
 ```
 

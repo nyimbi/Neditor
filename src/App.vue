@@ -349,9 +349,17 @@
             <button v-if="comment.state !== 'resolved'" type="button" @click="store.resolveReviewComment(Number(comment.line))">Resolve</button>
           </article>
           <h3>AI provenance</h3>
-          <article v-for="source in active.compile?.semantic.ai_sources || []" :key="`${source.provider}-${source.model}-${source.date}`" class="snapshot-row">
+          <article v-for="source in active.compile?.semantic.ai_sources || []" :key="`ai-source-${source.line}`" class="snapshot-row">
             <p>{{ source.provider || "unknown" }} / {{ source.model || "unknown" }}</p>
-            <small>{{ source.status }} | {{ source.reviewed_by || "unreviewed" }}{{ source.prompt_summary ? ` | ${source.prompt_summary}` : "" }}</small>
+            <small>{{ source.status }} | {{ source.reviewed_by || "unreviewed" }}{{ source.reviewed_at ? ` | ${source.reviewed_at}` : "" }}{{ source.prompt_summary ? ` | ${source.prompt_summary}` : "" }}</small>
+            <label>
+              <input
+                type="checkbox"
+                :checked="source.status === 'human-reviewed'"
+                @change="toggleAiSourceReview(Number(source.line), $event)"
+              />
+              Human reviewed
+            </label>
           </article>
           <article v-for="section in active.compile?.semantic.ai_assisted_sections || []" :key="`ai-section-${section.line}`" class="snapshot-row">
             <p>{{ section.heading || "Document body" }}</p>
@@ -680,7 +688,8 @@ interface DocumentTabGroup {
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
-const aiSnippet = "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nreviewedBy: \nstatus: human-reviewed\n```\n";
+const aiSnippet =
+  "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\npromptSummary: \nreviewedBy: \nreviewedAt: \nstatus: needs-review\n```\n";
 
 const active = computed(() => store.activeDocument);
 const previewDocumentStyle = computed(() => ({
@@ -1564,6 +1573,10 @@ function insertReviewComment() {
 
 function toggleAiSectionReview(line: number, event: Event) {
   store.setAiAssistedSectionReviewed(line, Boolean((event.target as HTMLInputElement | null)?.checked));
+}
+
+function toggleAiSourceReview(line: number, event: Event) {
+  store.setAiSourceReviewed(line, Boolean((event.target as HTMLInputElement | null)?.checked));
 }
 
 function wrapSelection(prefix: string, suffix = prefix) {

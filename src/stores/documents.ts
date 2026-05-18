@@ -132,6 +132,27 @@ function rewriteAiAssistedMarker(line: string, reviewed: boolean) {
   return serializeAiAssistedMarker(fields);
 }
 
+function rewriteYamlLikeField(lines: string[], key: string, value: string) {
+  const index = lines.findIndex((line) => line.trimStart().startsWith(`${key}:`));
+  const replacement = `${key}: ${value}`;
+  if (index >= 0) {
+    lines[index] = replacement;
+  } else {
+    lines.push(replacement);
+  }
+}
+
+function rewriteAiSourceBlock(lines: string[], startIndex: number, reviewed: boolean) {
+  const endIndex = lines.findIndex((line, index) => index > startIndex && line.trim() === "```");
+  if (endIndex < 0) return false;
+  const body = lines.slice(startIndex + 1, endIndex);
+  rewriteYamlLikeField(body, "status", reviewed ? "human-reviewed" : "needs-review");
+  rewriteYamlLikeField(body, "reviewedBy", reviewed ? "local" : "");
+  rewriteYamlLikeField(body, "reviewedAt", reviewed ? new Date().toISOString() : "");
+  lines.splice(startIndex + 1, endIndex - startIndex - 1, ...body);
+  return true;
+}
+
 interface BackendWatchEvent {
   paths: string[];
   kind: string;
@@ -999,6 +1020,14 @@ export const useDocumentsStore = defineStore("documents", {
       lines[index] = rewriteAiAssistedMarker(marker, reviewed);
       this.updateText(lines.join("\n"));
       this.statusMessage = reviewed ? "Marked AI-assisted section as human-reviewed" : "Marked AI-assisted section as needing review";
+    },
+    setAiSourceReviewed(line: number, reviewed: boolean) {
+      const lines = this.activeDocument.text.split("\n");
+      const index = Math.max(0, line - 1);
+      if (!lines[index]?.trimStart().startsWith("```ai-source")) return;
+      if (!rewriteAiSourceBlock(lines, index, reviewed)) return;
+      this.updateText(lines.join("\n"));
+      this.statusMessage = reviewed ? "Marked AI source as human-reviewed" : "Marked AI source as needing review";
     },
     async refreshGitStatus() {
       try {
