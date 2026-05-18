@@ -1428,11 +1428,25 @@ fn render_inline_math(line: &str) -> String {
 fn render_footnotes(markdown: &str) -> String {
     let mut body_lines = Vec::new();
     let mut definitions = BTreeMap::new();
-    for line in markdown.lines() {
+    let lines = markdown.lines().collect::<Vec<_>>();
+    let mut index = 0;
+    while index < lines.len() {
+        let line = lines[index];
         if let Some((key, text)) = parse_footnote_definition(line) {
-            definitions.insert(key, text);
+            let mut parts = vec![text];
+            index += 1;
+            while index < lines.len() {
+                if let Some(continuation) = footnote_continuation_line(lines[index]) {
+                    parts.push(continuation);
+                    index += 1;
+                } else {
+                    break;
+                }
+            }
+            definitions.insert(key, parts.join(" "));
         } else {
             body_lines.push(line.to_string());
+            index += 1;
         }
     }
     if definitions.is_empty() {
@@ -1477,6 +1491,14 @@ fn parse_footnote_definition(line: &str) -> Option<(String, String)> {
         return None;
     }
     Some((key.to_string(), text.trim().to_string()))
+}
+
+fn footnote_continuation_line(line: &str) -> Option<String> {
+    line.strip_prefix("    ")
+        .or_else(|| line.strip_prefix('\t'))
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToString::to_string)
 }
 
 fn replace_footnote_references(
@@ -4363,14 +4385,18 @@ ARR: Annual recurring revenue.
     #[test]
     fn compiler_renders_markdown_footnotes() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Footnotes\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\n---\n# Footnotes\nA governed claim.[^risk]\n\n[^risk]: Reviewed by compliance.\n".to_string(),
+            text: "---\ntitle: Footnotes\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\n---\n# Footnotes\nA governed claim.[^risk]\n\n[^risk]: Reviewed by compliance.\n    Includes second-line evidence.\n".to_string(),
             file_path: None,
         });
 
         assert!(response.html.contains("role=\"doc-endnotes\""));
         assert!(response.html.contains("id=\"fn:risk\""));
         assert!(response.html.contains("Reviewed by compliance."));
+        assert!(response.html.contains("Includes second-line evidence."));
         assert!(!response.compiled_markdown.contains("[^risk]:"));
+        assert!(!response
+            .compiled_markdown
+            .contains("    Includes second-line evidence."));
     }
 
     #[test]
