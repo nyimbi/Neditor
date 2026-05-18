@@ -12,6 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod diagnostics;
 mod document_ast;
 mod export;
 mod filesystem;
@@ -19,6 +20,7 @@ mod git;
 mod snapshot;
 mod transforms;
 
+use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
 use document_ast::{attach_source_ranges, build_document_ast, AstSourceRange, DocumentAst};
@@ -101,16 +103,6 @@ struct Heading {
     text: String,
     anchor: String,
     line: usize,
-}
-
-#[derive(Debug, Serialize, Clone)]
-struct DocumentDiagnostic {
-    severity: String,
-    message: String,
-    source_file: Option<String>,
-    line: Option<usize>,
-    suggestion: Option<String>,
-    related: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -4568,23 +4560,6 @@ fn slugify(text: &str) -> String {
 
 fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().to_string()
-}
-
-fn diag(
-    severity: impl Into<String>,
-    message: impl Into<String>,
-    source_file: Option<String>,
-    line: Option<usize>,
-    suggestion: Option<&str>,
-) -> DocumentDiagnostic {
-    DocumentDiagnostic {
-        severity: severity.into(),
-        message: message.into(),
-        source_file,
-        line,
-        suggestion: suggestion.map(ToString::to_string),
-        related: Vec::new(),
-    }
 }
 
 fn escape_html(text: &str) -> String {

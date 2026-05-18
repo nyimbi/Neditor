@@ -1,4 +1,7 @@
-use crate::{diag, escape_html, DocumentDiagnostic};
+use crate::{
+    diagnostics::{diag, DocumentDiagnostic},
+    escape_html,
+};
 
 #[derive(Clone, Copy)]
 struct QrVersionSpec {
