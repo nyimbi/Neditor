@@ -495,6 +495,7 @@
             <option value="quote">Quote</option>
             <option value="appendix">Appendix</option>
             <option value="selection">Replace selection</option>
+            <option value="section">Merge into section</option>
             <option value="replace">Replace document</option>
           </select>
         </label>
@@ -601,7 +602,7 @@ let lastAutoSnapshotSignature = "";
 let syncingScroll = false;
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
-const aiInsertMode = ref<"insert" | "quote" | "replace" | "appendix" | "selection">("insert");
+const aiInsertMode = ref<"insert" | "quote" | "replace" | "appendix" | "selection" | "section">("insert");
 const aiAddProvenance = ref(true);
 const aiMarkAsDraft = ref(true);
 const aiInsertCitationTodos = ref(true);
@@ -1342,6 +1343,8 @@ async function cleanAiPaste() {
   if (!store.aiCleanupPreview) return;
   if (aiInsertMode.value === "selection") {
     replaceSelectionWithAiPaste(store.aiCleanupPreview);
+  } else if (aiInsertMode.value === "section") {
+    mergeAiPasteIntoCurrentSection(store.aiCleanupPreview);
   } else {
     store.insertAiPaste(store.aiCleanupPreview, aiInsertMode.value);
   }
@@ -1362,6 +1365,53 @@ function replaceSelectionWithAiPaste(response: AiCleanupResponse) {
   store.updateText(editorView.state.doc.toString());
   editorView.focus();
   store.statusMessage = "Inserted cleaned AI paste into selection";
+}
+
+function mergeAiPasteIntoCurrentSection(response: AiCleanupResponse) {
+  if (!editorView) {
+    store.insertAiPaste(response, "insert");
+    return;
+  }
+  const doc = editorView.state.doc;
+  const position = findCurrentSectionEnd(doc, editorView.state.selection.main.from);
+  const insertion = formatSectionInsertion(doc.toString(), position, response.cleaned_markdown);
+  editorView.dispatch({
+    changes: { from: position, insert: insertion },
+    selection: { anchor: position + insertion.length },
+  });
+  store.updateText(editorView.state.doc.toString());
+  editorView.focus();
+  store.statusMessage = `Merged cleaned AI paste into current section with ${response.issues.length} issue notes`;
+}
+
+function findCurrentSectionEnd(doc: EditorState["doc"], position: number) {
+  const cursorLine = doc.lineAt(position);
+  let headingLevel = 0;
+  for (let lineNumber = cursorLine.number; lineNumber >= 1; lineNumber -= 1) {
+    const match = doc.line(lineNumber).text.match(/^(#{1,6})\s+\S/);
+    if (match) {
+      headingLevel = match[1].length;
+      break;
+    }
+  }
+  for (let lineNumber = cursorLine.number + 1; lineNumber <= doc.lines; lineNumber += 1) {
+    const line = doc.line(lineNumber);
+    const match = line.text.match(/^(#{1,6})\s+\S/);
+    if (match && (!headingLevel || match[1].length <= headingLevel)) {
+      return line.from;
+    }
+  }
+  return doc.length;
+}
+
+function formatSectionInsertion(text: string, position: number, markdown: string) {
+  const cleaned = markdown.trim();
+  if (!cleaned) return "";
+  const before = text.slice(0, position);
+  const after = text.slice(position);
+  const prefix = before.length ? (before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n") : "";
+  const suffix = after.length ? (after.startsWith("\n\n") ? "" : after.startsWith("\n") ? "\n" : "\n\n") : "\n";
+  return `${prefix}${cleaned}${suffix}`;
 }
 
 async function previewAiPaste() {
