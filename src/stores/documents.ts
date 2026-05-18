@@ -786,12 +786,10 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async openExternalConflict(path: string, reason: "root" | "include", message: string, externalHash: string) {
       let externalText = "";
-      if (reason === "root") {
-        try {
-          externalText = (await invoke<{ text: string }>("read_file", { path })).text;
-        } catch {
-          externalText = "";
-        }
+      try {
+        externalText = (await invoke<{ text: string }>("read_file", { path })).text;
+      } catch {
+        externalText = reason === "include" ? "The changed included file could not be read. It may have been deleted or moved." : "";
       }
       this.externalConflict = {
         path,

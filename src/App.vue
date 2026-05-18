@@ -539,6 +539,7 @@
           <button type="button" @click="conflictOpen = false">x</button>
         </header>
         <p>{{ store.externalConflict.message }}</p>
+        <p class="conflict-path">{{ store.externalConflict.path }}</p>
         <section v-if="rootConflictCanMerge" class="conflict-merge">
           <div class="conflict-toolbar">
             <button type="button" @click="seedConflictMerge('local')">Use local as merge base</button>
@@ -560,11 +561,11 @@
         </section>
         <section v-else class="compare-grid">
           <article>
-            <h3>Local</h3>
+            <h3>Local document</h3>
             <pre>{{ active.text }}</pre>
           </article>
           <article>
-            <h3>External</h3>
+            <h3>Changed file</h3>
             <pre>{{ store.externalConflict.externalText || "Included file changed. Recompile to update the preview." }}</pre>
           </article>
         </section>
@@ -2567,6 +2568,14 @@ select:hover {
 
 .conflict-modal {
   width: min(1100px, 100%);
+}
+
+.conflict-path {
+  margin: -4px 0 0;
+  overflow-wrap: anywhere;
+  color: #526171;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
 }
 
 .compare-grid {
