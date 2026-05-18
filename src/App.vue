@@ -149,7 +149,7 @@
             Table
             <select v-model.number="selectedTableIndex" @change="loadSelectedTable">
               <option v-for="(table, index) in markdownTables" :key="`${table.startLine}-${index}`" :value="index">
-                Line {{ table.startLine }} - {{ table.headers.join(", ") }}
+                Line {{ table.startLine }} - {{ table.caption || table.headers.join(", ") }}
               </option>
             </select>
           </label>
@@ -160,6 +160,16 @@
               <button type="button" @click="addTableRow">Add row</button>
               <button type="button" @click="addTableColumn">Add column</button>
               <button type="button" @click="addTableTotalsRow">Add totals row</button>
+            </div>
+            <div class="table-metadata">
+              <label>
+                Table id
+                <input v-model="tableDraft.id" placeholder="tbl:revenue" />
+              </label>
+              <label>
+                Caption
+                <input v-model="tableDraft.caption" placeholder="Revenue by region" />
+              </label>
             </div>
             <label>
               CSV/TSV paste
@@ -608,6 +618,9 @@ const isNewTableDraft = ref(false);
 interface MarkdownTable {
   startLine: number;
   endLine: number;
+  captionLine?: number;
+  id: string;
+  caption: string;
   headers: string[];
   alignments: TableAlignment[];
   rows: string[][];
@@ -617,6 +630,8 @@ type TableAlignment = "left" | "center" | "right";
 type TableFormat = "text" | "number" | "currency" | "percent" | "date";
 
 interface TableDraft {
+  id: string;
+  caption: string;
   headers: string[];
   alignments: TableAlignment[];
   formats: TableFormat[];
@@ -1409,6 +1424,8 @@ function loadSelectedTable() {
     return;
   }
   tableDraft.value = {
+    id: table.id,
+    caption: table.caption,
     headers: [...table.headers],
     alignments: [...table.alignments],
     formats: table.headers.map((_, columnIndex) => inferTableFormat(table.rows.map((row) => row[columnIndex] || ""))),
@@ -1419,6 +1436,8 @@ function loadSelectedTable() {
 function createTableDraft() {
   isNewTableDraft.value = true;
   tableDraft.value = {
+    id: "",
+    caption: "",
     headers: ["Item", "Value"],
     alignments: ["left", "right"],
     formats: ["text", "number"],
@@ -1437,7 +1456,8 @@ function applyTableDraft() {
   const serialized = serializeMarkdownTable(normalizedDraft);
   if (table && !isNewTableDraft.value) {
     const lines = active.value.text.split("\n");
-    lines.splice(table.startLine - 1, table.endLine - table.startLine + 1, ...serialized);
+    const replaceStart = table.captionLine || table.startLine;
+    lines.splice(replaceStart - 1, table.endLine - replaceStart + 1, ...serialized);
     store.updateText(lines.join("\n"));
   } else {
     insertTableAtCursor(serialized);
@@ -1504,9 +1524,12 @@ function addTableTotalsRow() {
 function replaceTableFromPaste() {
   const rows = parseDelimitedRows(tablePasteText.value);
   if (!rows.length) return;
+  const current = tableDraft.value;
   const headers = rows[0].map((cell, index) => cell.trim() || `Column ${index + 1}`);
   const bodyRows = rows.slice(1).map((row) => padTableRow(row, headers.length));
   tableDraft.value = {
+    id: current?.id || "",
+    caption: current?.caption || "",
     headers,
     alignments: headers.map(() => "left"),
     formats: headers.map((_, columnIndex) => inferTableFormat(bodyRows.map((row) => row[columnIndex] || ""))),
@@ -1608,6 +1631,7 @@ function parseMarkdownTables(text: string): MarkdownTable[] {
       index += 1;
       continue;
     }
+    const caption = index > 0 ? parseTableCaption(lines[index - 1].trim()) : null;
     const headers = splitMarkdownTableRow(header);
     const alignments = splitMarkdownTableRow(separator).map(alignmentFromSeparator);
     const rows: string[][] = [];
@@ -1619,6 +1643,9 @@ function parseMarkdownTables(text: string): MarkdownTable[] {
     tables.push({
       startLine: index + 1,
       endLine: nextIndex,
+      captionLine: caption ? index : undefined,
+      id: caption?.id || "",
+      caption: caption?.caption || "",
       headers,
       alignments: padAlignments(alignments, headers.length),
       rows,
@@ -1626,6 +1653,19 @@ function parseMarkdownTables(text: string): MarkdownTable[] {
     index = nextIndex;
   }
   return tables;
+}
+
+function parseTableCaption(line: string) {
+  if (!line.toLowerCase().startsWith("table:")) return null;
+  const id = line.match(/\{#([^}\s]+)(?:\s+[^}]*)?\}/)?.[1] || "";
+  const captionAttribute = line.match(/\bcaption="([^"]*)"/)?.[1] || "";
+  const captionText = line
+    .replace(/^table:/i, "")
+    .replace(/\{#[^}]+\}/g, "")
+    .trim();
+  const caption = captionAttribute || captionText;
+  if (!id && !caption) return null;
+  return { id, caption };
 }
 
 function isMarkdownTableRow(line: string) {
@@ -1662,6 +1702,8 @@ function padTableRow(row: string[], length: number) {
 function normalizeTableDraft(draft: TableDraft): TableDraft {
   const headers = draft.headers.map((header, index) => header.trim() || `Column ${index + 1}`);
   return {
+    id: normalizeTableId(draft.id),
+    caption: draft.caption.trim(),
     headers,
     alignments: padAlignments(draft.alignments, headers.length),
     formats: Array.from({ length: headers.length }, (_, index) => draft.formats[index] || "text"),
@@ -1675,7 +1717,20 @@ function serializeMarkdownTable(draft: TableDraft) {
   const rows = draft.rows.map((row) =>
     row.map((cell, columnIndex) => escapeTableCell(formatTableCell(cell, draft.formats[columnIndex]))),
   );
-  return [`| ${headers.join(" | ")} |`, `| ${separator.join(" | ")} |`, ...rows.map((row) => `| ${row.join(" | ")} |`)];
+  const table = [`| ${headers.join(" | ")} |`, `| ${separator.join(" | ")} |`, ...rows.map((row) => `| ${row.join(" | ")} |`)];
+  const caption = serializeTableCaption(draft);
+  return caption ? [caption, ...table] : table;
+}
+
+function normalizeTableId(id: string) {
+  return id.trim().replace(/^\{?#?/, "").replace(/\}?$/, "");
+}
+
+function serializeTableCaption(draft: TableDraft) {
+  if (!draft.id && !draft.caption) return "";
+  const caption = draft.caption || "Untitled table";
+  const id = draft.id ? ` {#${draft.id}}` : "";
+  return `Table: ${caption}${id}`;
 }
 
 function separatorForAlignment(alignment: TableAlignment) {
@@ -2230,6 +2285,12 @@ select:hover {
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.table-metadata {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(220px, 1fr);
+  gap: 8px;
 }
 
 .table-editor-grid {
