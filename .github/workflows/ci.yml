@@ -69,6 +69,10 @@ jobs:
         run: cargo check --locked
         working-directory: src-tauri
 
+      - name: Check native file watcher feature
+        run: cargo check --locked --features native-watch
+        working-directory: src-tauri
+
       - name: Test Rust backend
         run: cargo test --locked
         working-directory: src-tauri
