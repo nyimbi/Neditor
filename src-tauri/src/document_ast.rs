@@ -13,6 +13,13 @@ pub(crate) struct AstSourceRange {
 }
 
 #[derive(Debug, Serialize)]
+pub(crate) struct FootnoteEntry {
+    pub(crate) number: usize,
+    pub(crate) key: String,
+    pub(crate) text: String,
+}
+
+#[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum DocumentBlock {
     Heading {
@@ -77,6 +84,12 @@ pub(crate) enum DocumentBlock {
         text: String,
         source: Option<AstSourceRange>,
     },
+    Footnotes {
+        line: usize,
+        end_line: usize,
+        entries: Vec<FootnoteEntry>,
+        source: Option<AstSourceRange>,
+    },
     RawHtml {
         line: usize,
         end_line: usize,
@@ -123,6 +136,14 @@ pub(crate) fn build_document_ast(markdown: &str) -> DocumentAst {
         if let Some((list, next_index)) = parse_ast_list(&lines, index) {
             flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
             blocks.push(list);
+            index = next_index;
+            continue;
+        }
+
+        if is_footnotes_start(trimmed) {
+            flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
+            let (footnotes, next_index) = parse_ast_footnotes(&lines, index);
+            blocks.push(footnotes);
             index = next_index;
             continue;
         }
@@ -229,6 +250,15 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 }
                 Some(parts.join(": "))
             }
+            DocumentBlock::Footnotes { entries, .. } => {
+                let mut lines = vec!["Footnotes".to_string()];
+                lines.extend(
+                    entries
+                        .iter()
+                        .map(|entry| format!("{}. {}", entry.number, entry.text)),
+                );
+                Some(lines.join("\n"))
+            }
             DocumentBlock::RawHtml { html, .. } => {
                 let text = clean_inline_text(html);
                 (!text.is_empty()).then_some(text)
@@ -287,6 +317,12 @@ where
                 ..
             }
             | DocumentBlock::Callout {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::Footnotes {
                 line,
                 end_line,
                 source,
@@ -573,6 +609,48 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
         html: line.to_string(),
         source: None,
     }
+}
+
+fn is_footnotes_start(line: &str) -> bool {
+    line.contains("class=\"footnotes\"") || line.contains("role=\"doc-endnotes\"")
+}
+
+fn parse_ast_footnotes(lines: &[&str], start_index: usize) -> (DocumentBlock, usize) {
+    let mut entries = Vec::new();
+    let mut index = start_index;
+    while index < lines.len() {
+        let line = lines[index].trim();
+        if line.starts_with("<li ") || line.starts_with("<li>") {
+            entries.push(parse_footnote_entry(line, entries.len() + 1));
+        }
+        index += 1;
+        if line.contains("</section>") {
+            break;
+        }
+    }
+    (
+        DocumentBlock::Footnotes {
+            line: start_index + 1,
+            end_line: index,
+            entries,
+            source: None,
+        },
+        index,
+    )
+}
+
+fn parse_footnote_entry(line: &str, fallback_number: usize) -> FootnoteEntry {
+    let number = extract_quoted_attribute(line, "value")
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(fallback_number);
+    let key = extract_quoted_attribute(line, "id")
+        .and_then(|value| value.strip_prefix("fn:").map(ToString::to_string))
+        .unwrap_or_else(|| number.to_string());
+    let text = clean_inline_text(line)
+        .trim_end_matches(" back")
+        .trim()
+        .to_string();
+    FootnoteEntry { number, key, text }
 }
 
 fn is_markdown_table_row(line: &str) -> bool {

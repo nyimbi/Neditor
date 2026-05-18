@@ -4287,6 +4287,15 @@ ARR: Annual recurring revenue.
         assert!(!response
             .compiled_markdown
             .contains("    Includes second-line evidence."));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Footnotes { entries, .. }
+                    if entries.len() == 1
+                        && entries[0].key == "risk"
+                        && entries[0].text.contains("Reviewed by compliance.")
+            )
+        }));
 
         let options = json!({});
         let pdf = render_pdf_bytes(&response, &options);

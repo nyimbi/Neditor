@@ -806,6 +806,16 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
             text,
             ..
         } => docx_paragraph(&callout_export_line(callout_type, title, text)),
+        DocumentBlock::Footnotes { entries, .. } => {
+            let mut output = docx_heading(1, "Footnotes");
+            for entry in entries {
+                output.push_str(&docx_paragraph(&format!(
+                    "{}. {}",
+                    entry.number, entry.text
+                )));
+            }
+            output
+        }
         DocumentBlock::RawHtml { html, .. } => raw_html_export_lines(html)
             .into_iter()
             .map(|line| docx_paragraph(&line))
@@ -1338,6 +1348,15 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             text,
             ..
         } => vec![callout_export_line(callout_type, title, text)],
+        DocumentBlock::Footnotes { entries, .. } => {
+            let mut lines = vec!["Footnotes".to_string()];
+            lines.extend(
+                entries
+                    .iter()
+                    .map(|entry| format!("{}. {}", entry.number, entry.text)),
+            );
+            lines
+        }
         DocumentBlock::RawHtml { html, .. } => raw_html_export_lines(html),
     }
 }
