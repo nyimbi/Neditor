@@ -6163,6 +6163,9 @@ paths:
         assert!(pdf_text.contains("Page 1 of 3"));
         assert!(pdf_text.contains("Page 2 of 3"));
         assert!(pdf_text.contains("Page 3 of 3"));
+        assert!(pdf_text.contains(" re S"));
+        assert!(pdf_text.contains("(Metric) Tj"));
+        assert!(pdf_text.contains("(Total) Tj"));
         assert!(pdf_text.contains("- [x] Confirm controls"));
         assert!(pdf_text.contains("- [ ] Final approval"));
         assert!(pdf_text.contains("Section break: columns=2"));
@@ -6297,6 +6300,8 @@ paths:
         assert!(pdf_text.contains("Page 6 of 6"));
         assert!(pdf_text.contains("Export Conformance Report"));
         assert!(pdf_text.contains("Competitive Advantage, p. 42"));
+        assert!(pdf_text.contains(" re S"));
+        assert!(pdf_text.contains("(Region) Tj"));
         assert!(pdf_text.contains("Reference architecture"));
         assert!(pdf_text.contains("Glossary"));
         assert!(pdf_text.contains("Review Comments"));

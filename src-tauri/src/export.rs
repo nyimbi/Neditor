@@ -135,13 +135,14 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
     ];
     let mut page_ids = Vec::new();
 
-    for (page_index, page_lines) in pages.iter().enumerate() {
+    for (page_index, page_items) in pages.iter().enumerate() {
         let page_id = objects.len() + 1;
         let content_id = page_id + 1;
         page_ids.push(page_id);
         let (header, footer) =
             export_header_footer_for_page(response, options, page_index + 1, total_pages);
         let mut stream = String::new();
+        let mut y = page_height.saturating_sub(margin_top) as i32;
         if !header.trim().is_empty() {
             stream.push_str(&pdf_text_line(
                 9,
@@ -150,21 +151,20 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
                 &header,
             ));
         }
-        stream.push_str(
-            &page_lines
-                .iter()
-                .take(60)
-                .enumerate()
-                .map(|(index, line)| {
-                    pdf_text_line(
-                        10,
-                        margin_left,
-                        page_height.saturating_sub(margin_top) as i32 - (index as i32 * 12),
-                        line,
-                    )
-                })
-                .collect::<String>(),
-        );
+        for item in page_items.iter().take(60) {
+            match item {
+                PdfPageItem::Text(line) => {
+                    stream.push_str(&pdf_text_line(10, margin_left, y, line));
+                    y -= 12;
+                }
+                PdfPageItem::Table(table) => {
+                    let (table_stream, consumed_height) =
+                        pdf_table_stream(table, margin_left, y, page_width - margin_left * 2);
+                    stream.push_str(&table_stream);
+                    y -= consumed_height;
+                }
+            }
+        }
         if !footer.trim().is_empty() {
             stream.push_str(&pdf_text_line(
                 9,
@@ -225,6 +225,91 @@ fn pdf_text_line(font_size: u8, x: u32, y: i32, text: &str) -> String {
         "BT /F1 {font_size} Tf {x} {y} Td ({}) Tj ET\n",
         escape_pdf(text)
     )
+}
+
+fn pdf_table_stream(table: &PdfTable, x: u32, top_y: i32, width: u32) -> (String, i32) {
+    let mut stream = String::new();
+    let caption = table_export_line(&table.id, &table.caption, &table.headers);
+    stream.push_str(&pdf_text_line(10, x, top_y, &caption));
+    let mut current_y = top_y - 18;
+    let column_count = table.headers.len().max(1);
+    let column_width = (width / column_count as u32).max(48);
+    let row_height = 18i32;
+
+    stream.push_str(&pdf_table_row_stream(
+        &table.headers,
+        &table.alignments,
+        x,
+        current_y,
+        column_width,
+        row_height,
+    ));
+    current_y -= row_height;
+    for row in &table.rows {
+        stream.push_str(&pdf_table_row_stream(
+            row,
+            &table.alignments,
+            x,
+            current_y,
+            column_width,
+            row_height,
+        ));
+        current_y -= row_height;
+    }
+
+    let consumed = (top_y - current_y + 10).max(28);
+    (stream, consumed)
+}
+
+fn pdf_table_row_stream(
+    cells: &[String],
+    alignments: &[String],
+    x: u32,
+    y: i32,
+    column_width: u32,
+    row_height: i32,
+) -> String {
+    let mut stream = String::new();
+    let column_count = cells.len().max(1);
+    for index in 0..column_count {
+        let cell_x = x + (index as u32 * column_width);
+        let cell = cells.get(index).map(String::as_str).unwrap_or("");
+        stream.push_str(&format!("{cell_x} {y} {column_width} {row_height} re S\n"));
+        let text_x = pdf_table_cell_text_x(
+            cell_x,
+            column_width,
+            cell,
+            alignments.get(index).map(String::as_str),
+        );
+        stream.push_str(&pdf_text_line(8, text_x, y + 6, cell));
+    }
+    stream
+}
+
+fn pdf_table_cell_text_x(
+    cell_x: u32,
+    column_width: u32,
+    text: &str,
+    alignment: Option<&str>,
+) -> u32 {
+    match alignment {
+        Some("center") => {
+            let text_width = approximate_pdf_text_width(text, 8);
+            cell_x + column_width.saturating_sub(text_width) / 2
+        }
+        Some("right") => {
+            let text_width = approximate_pdf_text_width(text, 8);
+            cell_x + column_width.saturating_sub(text_width + 4)
+        }
+        _ => cell_x + 4,
+    }
+}
+
+fn approximate_pdf_text_width(text: &str, font_size: u32) -> u32 {
+    (text.chars().count() as u32)
+        .saturating_mul(font_size)
+        .saturating_div(2)
+        .max(4)
 }
 
 fn render_pdf_info_object(object_id: usize, response: &CompileResponse) -> String {
@@ -1672,8 +1757,23 @@ fn base64_value(byte: u8) -> Option<u8> {
     }
 }
 
-fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String>> {
-    let mut pages = vec![export_metadata_lines(response, options)];
+#[derive(Clone, Debug)]
+enum PdfPageItem {
+    Text(String),
+    Table(PdfTable),
+}
+
+#[derive(Clone, Debug)]
+struct PdfTable {
+    id: Option<String>,
+    caption: Option<String>,
+    headers: Vec<String>,
+    alignments: Vec<String>,
+    rows: Vec<Vec<String>>,
+}
+
+fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<PdfPageItem>> {
+    let mut pages = vec![pdf_text_items(export_metadata_lines(response, options))];
     let mut current = Vec::new();
     for block in &response.document_ast.blocks {
         match block {
@@ -1690,18 +1790,43 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<Strin
                     pages.push(current);
                     current = Vec::new();
                 }
-                current.extend(layout_export_lines(directive, options));
+                current.extend(pdf_text_items(layout_export_lines(directive, options)));
             }
-            _ => current.extend(block_export_lines(block)),
+            _ => current.extend(block_pdf_items(block)),
         }
     }
     if !current.is_empty() {
         pages.push(current);
     }
     for appendix in appendix_pages(response, options) {
-        pages.push(appendix);
+        pages.push(pdf_text_items(appendix));
     }
     pages
+}
+
+fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
+    if let DocumentBlock::Table {
+        id,
+        caption,
+        headers,
+        alignments,
+        rows,
+        ..
+    } = block
+    {
+        return vec![PdfPageItem::Table(PdfTable {
+            id: id.clone(),
+            caption: caption.clone(),
+            headers: headers.clone(),
+            alignments: alignments.clone(),
+            rows: rows.clone(),
+        })];
+    }
+    pdf_text_items(block_export_lines(block))
+}
+
+fn pdf_text_items(lines: Vec<String>) -> Vec<PdfPageItem> {
+    lines.into_iter().map(PdfPageItem::Text).collect()
 }
 
 fn pdf_page_layout(response: &CompileResponse, options: &Value) -> (u32, u32, u32, u32) {
