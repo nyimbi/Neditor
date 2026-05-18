@@ -260,6 +260,17 @@ struct FileMetadata {
 }
 
 #[derive(Debug, Deserialize)]
+struct WatchFileRequest {
+    root: String,
+    included: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct WatchFileResponse {
+    paths: Vec<FileMetadata>,
+}
+
+#[derive(Debug, Deserialize)]
 struct WorkspaceFileRequest {
     root: String,
 }
@@ -374,6 +385,11 @@ fn read_file(path: String) -> Result<FileResponse, String> {
 }
 
 #[tauri::command]
+fn open_file(path: String) -> Result<FileResponse, String> {
+    read_file(path)
+}
+
+#[tauri::command]
 fn save_file(request: SaveFileRequest) -> Result<FileResponse, String> {
     let path = PathBuf::from(&request.path);
     if let Some(expected_hash) = &request.expected_hash {
@@ -398,6 +414,14 @@ fn save_file(request: SaveFileRequest) -> Result<FileResponse, String> {
         hash: sha256_hex(request.text.as_bytes()),
         modified: metadata.and_then(modified_time),
         text: request.text,
+    })
+}
+
+#[tauri::command]
+fn save_file_as(request: SaveFileRequest) -> Result<FileResponse, String> {
+    save_file(SaveFileRequest {
+        expected_hash: None,
+        ..request
     })
 }
 
@@ -479,6 +503,19 @@ fn file_metadata(path: String) -> Result<FileMetadata, String> {
         hash: Some(sha256_hex(&text)),
         modified: metadata.and_then(modified_time),
     })
+}
+
+#[tauri::command]
+fn watch_file(request: WatchFileRequest) -> Result<WatchFileResponse, String> {
+    let mut paths = Vec::new();
+    let mut seen = HashSet::new();
+    for path in std::iter::once(request.root).chain(request.included.into_iter()) {
+        let metadata = file_metadata(path)?;
+        if seen.insert(metadata.path.clone()) {
+            paths.push(metadata);
+        }
+    }
+    Ok(WatchFileResponse { paths })
 }
 
 #[tauri::command]
@@ -3375,8 +3412,11 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
+            open_file,
             read_file,
+            save_file_as,
             save_file,
+            watch_file,
             rename_file,
             duplicate_file,
             reveal_path,
@@ -4137,6 +4177,45 @@ paths:
             .contains("File changed on disk"));
         assert_eq!(fs::read_to_string(&doc).expect("read doc"), "external");
         fs::remove_dir_all(root).expect("clean save conflict test dir");
+    }
+
+    #[test]
+    fn stable_file_ipc_aliases_open_save_as_and_watch_paths() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-ipc-alias-test-{unique}"));
+        fs::create_dir_all(root.join("chapters")).expect("create chapters");
+        let doc = root.join("doc.md");
+        let included = root.join("chapters").join("intro.md");
+        let copy = root.join("copy.md");
+        fs::write(&doc, "# Root").expect("write root");
+        fs::write(&included, "# Intro").expect("write include");
+
+        let opened = open_file(path_to_string(&doc)).expect("open file alias");
+        assert_eq!(opened.text, "# Root");
+
+        let saved = save_file_as(SaveFileRequest {
+            path: path_to_string(&copy),
+            text: "# Copy".to_string(),
+            expected_hash: Some("stale-hash-ignored-for-save-as".to_string()),
+        })
+        .expect("save file as alias");
+        assert_eq!(saved.text, "# Copy");
+
+        let watched = watch_file(WatchFileRequest {
+            root: path_to_string(&doc),
+            included: vec![path_to_string(&included), path_to_string(&included)],
+        })
+        .expect("watch file command");
+        assert_eq!(watched.paths.len(), 2);
+        assert!(watched.paths.iter().all(|metadata| metadata.exists));
+        assert!(watched
+            .paths
+            .iter()
+            .any(|metadata| metadata.path.ends_with("chapters/intro.md")));
+        fs::remove_dir_all(root).expect("clean ipc alias test dir");
     }
 
     #[test]

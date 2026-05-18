@@ -11,6 +11,7 @@ import type {
   OpenDocument,
   SnapshotListItem,
   TransformEngineMetadata,
+  WatchFileResponse,
   WorkspaceFileEntry,
 } from "../types";
 
@@ -502,10 +503,18 @@ export const useDocumentsStore = defineStore("documents", {
         return;
       }
       const includedPaths = (doc.compile?.export_manifest.included_files || []).map((file) => file.path);
-      const watchPaths = [doc.path, ...includedPaths];
+      const watchSnapshot = await invoke<WatchFileResponse>("watch_file", {
+        request: { root: doc.path, included: includedPaths },
+      });
+      const watchPaths = watchSnapshot.paths.filter((file) => file.exists).map((file) => file.path);
       const signature = watchPaths.join("\n");
       if (signature === this.watchSignature) return;
       stopCurrentWatcher();
+      if (!watchPaths.length) {
+        this.watchSignature = "";
+        this.watchedPaths = [];
+        return;
+      }
       unwatchFileChanges = await watchFs(
         watchPaths,
         (event) => {

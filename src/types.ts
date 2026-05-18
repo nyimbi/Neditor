@@ -177,6 +177,15 @@ export interface WorkspaceFileEntry {
   depth: number;
 }
 
+export interface WatchFileResponse {
+  paths: Array<{
+    path: string;
+    exists: boolean;
+    hash?: string | null;
+    modified?: string | null;
+  }>;
+}
+
 export interface AiCleanupResponse {
   cleaned_markdown: string;
   issues: string[];
