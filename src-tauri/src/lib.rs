@@ -1417,10 +1417,13 @@ fn render_equations(markdown: &str) -> String {
             } else {
                 label
             };
+            let latex = body.trim();
             output.push_str(&format!(
-                "<figure class=\"equation\" id=\"{}\"><pre><code>{}</code></pre><figcaption>Equation {}</figcaption></figure>\n",
+                "<figure class=\"equation\" id=\"{}\"><div class=\"math-rendered math-display\" role=\"math\" aria-label=\"{}\">{}</div><details class=\"math-source\"><summary>LaTeX</summary><pre><code>{}</code></pre></details><figcaption>Equation {}</figcaption></figure>\n",
                 escape_html(&id),
-                escape_html(body.trim()),
+                escape_html(latex),
+                render_latex_visual(latex),
+                escape_html(latex),
                 equation_number
             ));
             equation_number += 1;
@@ -1441,7 +1444,9 @@ fn render_inline_math(line: &str) -> String {
         if let Some(end) = after_start.find("\\)") {
             let math = &after_start[..end];
             output.push_str(&format!(
-                "<span class=\"math\"><code>{}</code></span>",
+                "<span class=\"math math-inline\" role=\"math\" aria-label=\"{}\"><span class=\"math-rendered\">{}</span><code class=\"math-source-inline\">{}</code></span>",
+                escape_html(math),
+                render_latex_visual(math),
                 escape_html(math)
             ));
             rest = &after_start[end + 2..];
@@ -1452,6 +1457,161 @@ fn render_inline_math(line: &str) -> String {
     }
     output.push_str(rest);
     output
+}
+
+fn render_latex_visual(input: &str) -> String {
+    render_latex_expr(input.trim())
+}
+
+fn render_latex_expr(input: &str) -> String {
+    let mut output = String::new();
+    let mut index = 0usize;
+    while index < input.len() {
+        let rest = &input[index..];
+        if rest.starts_with("\\frac") {
+            if let Some((numerator, after_numerator)) =
+                parse_latex_braced(input, index + "\\frac".len())
+            {
+                if let Some((denominator, after_denominator)) =
+                    parse_latex_braced(input, after_numerator)
+                {
+                    output.push_str("<span class=\"math-frac\"><span>");
+                    output.push_str(&render_latex_expr(&numerator));
+                    output.push_str("</span><span>");
+                    output.push_str(&render_latex_expr(&denominator));
+                    output.push_str("</span></span>");
+                    index = after_denominator;
+                    continue;
+                }
+            }
+        } else if rest.starts_with("\\sqrt") {
+            if let Some((radicand, after_radicand)) =
+                parse_latex_braced(input, index + "\\sqrt".len())
+            {
+                output.push_str("<span class=\"math-sqrt\">");
+                output.push_str(&render_latex_expr(&radicand));
+                output.push_str("</span>");
+                index = after_radicand;
+                continue;
+            }
+        } else if let Some(command) = rest.strip_prefix('\\').and_then(latex_command) {
+            output.push_str(&escape_html(command.symbol));
+            index += command.consumed + 1;
+            continue;
+        }
+
+        let Some(ch) = rest.chars().next() else {
+            break;
+        };
+        if ch == '^' || ch == '_' {
+            if let Some((script, after_script)) = parse_latex_script(input, index + ch.len_utf8()) {
+                output.push_str(if ch == '^' { "<sup>" } else { "<sub>" });
+                output.push_str(&render_latex_expr(&script));
+                output.push_str(if ch == '^' { "</sup>" } else { "</sub>" });
+                index = after_script;
+                continue;
+            }
+        }
+        output.push_str(&escape_html(&ch.to_string()));
+        index += ch.len_utf8();
+    }
+    output
+}
+
+struct LatexCommand<'a> {
+    symbol: &'a str,
+    consumed: usize,
+}
+
+fn latex_command(input: &str) -> Option<LatexCommand<'_>> {
+    let name = input
+        .chars()
+        .take_while(|ch| ch.is_ascii_alphabetic())
+        .collect::<String>();
+    let symbol = match name.as_str() {
+        "alpha" => "α",
+        "beta" => "β",
+        "gamma" => "γ",
+        "delta" => "δ",
+        "epsilon" => "ε",
+        "lambda" => "λ",
+        "mu" => "μ",
+        "pi" => "π",
+        "sigma" => "σ",
+        "theta" => "θ",
+        "times" => "×",
+        "cdot" => "·",
+        "le" => "≤",
+        "ge" => "≥",
+        "neq" => "≠",
+        _ => return None,
+    };
+    Some(LatexCommand {
+        symbol,
+        consumed: name.len(),
+    })
+}
+
+fn parse_latex_braced(input: &str, start: usize) -> Option<(String, usize)> {
+    let mut index = skip_latex_whitespace(input, start);
+    if input[index..].chars().next()? != '{' {
+        return None;
+    }
+    index += 1;
+    let content_start = index;
+    let mut depth = 1usize;
+    while index < input.len() {
+        let ch = input[index..].chars().next()?;
+        if ch == '{' {
+            depth += 1;
+        } else if ch == '}' {
+            depth = depth.saturating_sub(1);
+            if depth == 0 {
+                return Some((
+                    input[content_start..index].to_string(),
+                    index + ch.len_utf8(),
+                ));
+            }
+        }
+        index += ch.len_utf8();
+    }
+    None
+}
+
+fn parse_latex_script(input: &str, start: usize) -> Option<(String, usize)> {
+    let index = skip_latex_whitespace(input, start);
+    if input[index..].starts_with('{') {
+        return parse_latex_braced(input, index);
+    }
+    let ch = input[index..].chars().next()?;
+    if ch == '\\' {
+        let command_len = input[index + 1..]
+            .chars()
+            .take_while(|candidate| candidate.is_ascii_alphabetic())
+            .map(char::len_utf8)
+            .sum::<usize>();
+        if command_len > 0 {
+            return Some((
+                input[index..index + 1 + command_len].to_string(),
+                index + 1 + command_len,
+            ));
+        }
+    }
+    Some((ch.to_string(), index + ch.len_utf8()))
+}
+
+fn skip_latex_whitespace(input: &str, start: usize) -> usize {
+    let mut index = start.min(input.len());
+    while index < input.len() {
+        let Some(ch) = input[index..].chars().next() else {
+            break;
+        };
+        if !ch.is_whitespace() {
+            break;
+        }
+        index += ch.len_utf8();
+    }
+    index
 }
 
 fn render_callouts(markdown: &str) -> String {
@@ -4549,7 +4709,16 @@ ARR: Annual recurring revenue.
         assert!(response.html.contains("class=\"equation\""));
         assert!(response.html.contains("id=\"eq:roi\""));
         assert!(response.html.contains("Equation 1"));
-        assert!(response.html.contains("class=\"math\""));
+        assert!(response.html.contains("class=\"math math-inline\""));
+        assert!(response.html.contains("class=\"math-frac\""));
+        assert!(response.html.contains("role=\"math\""));
+        assert!(response.html.contains("<summary>LaTeX</summary>"));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Equation { text, .. } if text.contains("\\frac")
+            )
+        }));
         assert!(response
             .semantic
             .cross_references

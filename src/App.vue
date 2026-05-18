@@ -3064,6 +3064,45 @@ select:hover {
   margin-bottom: 4px;
 }
 
+.preview-document .equation {
+  margin: 18px 0;
+}
+
+.preview-document .math-rendered {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.08em;
+}
+
+.preview-document .math-display {
+  padding: 12px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.preview-document .math-frac {
+  display: inline-grid;
+  grid-template-rows: auto auto;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.preview-document .math-frac span:first-child {
+  border-bottom: 1px solid currentColor;
+}
+
+.preview-document .math-sqrt::before {
+  content: "√";
+}
+
+.preview-document .math-source-inline {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
 .preview-document pre,
 .sidebar pre {
   overflow: auto;
