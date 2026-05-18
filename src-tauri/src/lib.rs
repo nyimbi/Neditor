@@ -265,7 +265,11 @@ fn compile(request: CompileRequest) -> CompileResponse {
     let index_marker_markdown = strip_index_markers(&with_toc);
     let (transformed_markdown, transform_artifacts) =
         apply_transforms(&index_marker_markdown, &mut diagnostics);
-    let citation_markdown = render_citations(&transformed_markdown, &bibliography);
+    let citation_markdown = render_citations(
+        &transformed_markdown,
+        &bibliography,
+        citation_style(&metadata),
+    );
     let table_formula_markdown =
         evaluate_markdown_table_formulas(&citation_markdown, &mut diagnostics);
     validate_image_paths(
@@ -1576,6 +1580,15 @@ fn collect_glossary(text: &str) -> BTreeMap<String, String> {
         }
     }
     glossary
+}
+
+fn citation_style(metadata: &Value) -> &str {
+    metadata
+        .get("citationStyle")
+        .or_else(|| metadata.get("cslStyle"))
+        .or_else(|| metadata.get("citation_style"))
+        .and_then(Value::as_str)
+        .unwrap_or("title")
 }
 
 fn collect_labels(text: &str, headings: &[Heading]) -> Vec<String> {
@@ -3800,13 +3813,13 @@ ARR: Annual recurring revenue.
         fs::create_dir_all(&root).expect("create bib test dir");
         fs::write(
             root.join("refs.bib"),
-            "@book{porter1985, title={Competitive Advantage}}\n@article{doe2026, title={Evidence Based Reports}}",
+            "@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}",
         )
         .expect("write bibliography");
         fs::write(root.join("diagram.svg"), "<svg></svg>").expect("write figure");
 
         let response = compile(CompileRequest {
-            text: "---\ntitle: Cited\nstatus: approved\napprovedBy: QA\nbibliography: refs.bib\n---\n# Cited\nClaim [@porter1985, p. 42; @doe2026].\n\n![Diagram](diagram.svg){#fig:diagram caption=\"System diagram\"}\nSee {@fig:diagram} and {@fig:missing}.\n\n![Missing](missing.png){#fig:missing-image caption=\"Missing image\"}".to_string(),
+            text: "---\ntitle: Cited\nstatus: approved\napprovedBy: QA\nbibliography: refs.bib\ncitationStyle: author-year\n---\n# Cited\nClaim [@porter1985, p. 42; @doe2026].\n\n![Diagram](diagram.svg){#fig:diagram caption=\"System diagram\"}\nSee {@fig:diagram} and {@fig:missing}.\n\n![Missing](missing.png){#fig:missing-image caption=\"Missing image\"}".to_string(),
             file_path: Some(path_to_string(&root.join("root.md"))),
         });
 
@@ -3819,9 +3832,7 @@ ARR: Annual recurring revenue.
             .any(|citation| {
                 citation.key == "porter1985" && citation.locator.as_deref() == Some("p. 42")
             }));
-        assert!(response
-            .html
-            .contains("Competitive Advantage, p. 42; Evidence Based Reports"));
+        assert!(response.html.contains("Porter 1985, p. 42; Doe 2026"));
         assert!(response
             .html
             .contains("title=\"@porter1985 (p. 42): Competitive Advantage; @doe2026: Evidence Based Reports\""));

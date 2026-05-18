@@ -231,6 +231,14 @@
 
         <template v-else-if="store.sidebar === 'references'">
           <h2>References</h2>
+          <label>
+            Citation style
+            <select :value="citationStyle" @change="setCitationStyle(eventValue($event))">
+              <option value="title">Title</option>
+              <option value="author-year">Author-year</option>
+              <option value="key">Key</option>
+            </select>
+          </label>
           <h3>Citations</h3>
           <p v-for="citation in active.compile?.semantic.citation_references || []" :key="`${citation.key}-${citation.locator || ''}`">
             [@{{ citation.key }}<template v-if="citation.locator">, {{ citation.locator }}</template>]
@@ -675,6 +683,7 @@ const wordStats = computed(() => {
 });
 const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
 const bibliographyByKey = computed(() => new Map((active.value.compile?.bibliography || []).map((entry) => [entry.key, entry.title])));
+const citationStyle = computed(() => String(active.value.compile?.metadata.citationStyle || active.value.compile?.metadata.cslStyle || "title"));
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
 const selectedTable = computed(() => markdownTables.value[selectedTableIndex.value] || null);
 const groupedDocuments = computed<DocumentTabGroup[]>(() => {
@@ -1213,6 +1222,31 @@ function eventValue(event: Event) {
 
 function eventChecked(event: Event) {
   return event.target instanceof HTMLInputElement ? event.target.checked : false;
+}
+
+function setCitationStyle(style: string) {
+  const supported = new Set(["title", "author-year", "key"]);
+  if (!supported.has(style)) return;
+  store.updateText(upsertFrontMatterField(active.value.text, "citationStyle", style));
+}
+
+function upsertFrontMatterField(text: string, key: string, value: string) {
+  const line = `${key}: ${value}`;
+  if (!text.startsWith("---\n")) {
+    return `---\n${line}\n---\n\n${text}`;
+  }
+  const lines = text.split("\n");
+  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
+  if (endIndex <= 0) {
+    return `---\n${line}\n---\n\n${text}`;
+  }
+  const existingIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
+  if (existingIndex > 0) {
+    lines[existingIndex] = line;
+  } else {
+    lines.splice(endIndex, 0, line);
+  }
+  return lines.join("\n");
 }
 
 function clampUiLineHeight(value: number) {

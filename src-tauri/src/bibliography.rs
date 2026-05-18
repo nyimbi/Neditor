@@ -12,6 +12,8 @@ use std::{
 pub(crate) struct BibliographyEntry {
     pub(crate) key: String,
     pub(crate) title: String,
+    pub(crate) author: Option<String>,
+    pub(crate) issued: Option<String>,
     pub(crate) raw: String,
 }
 
@@ -64,20 +66,13 @@ pub(crate) fn parse_bibliography_source(body: &str) -> Vec<BibliographyEntry> {
         .filter_map(|entry| {
             let (kind_and_key, rest) = entry.split_once('{')?;
             let (key, raw) = rest.split_once(',')?;
-            let title = raw
-                .lines()
-                .find(|line| line.trim_start().starts_with("title"))
-                .and_then(|line| line.split_once('='))
-                .map(|(_, value)| {
-                    value
-                        .trim()
-                        .trim_matches(&['{', '}', ',', '"'][..])
-                        .to_string()
-                })
-                .unwrap_or_else(|| kind_and_key.trim().to_string());
+            let title =
+                bibtex_field(raw, "title").unwrap_or_else(|| kind_and_key.trim().to_string());
             Some(BibliographyEntry {
                 key: key.trim().to_string(),
                 title,
+                author: bibtex_field(raw, "author"),
+                issued: bibtex_field(raw, "year"),
                 raw: raw.to_string(),
             })
         })
@@ -114,11 +109,56 @@ fn parse_csl_json_bibliography(body: &str) -> Result<Vec<BibliographyEntry>, ser
             Some(BibliographyEntry {
                 key: key.to_string(),
                 title,
+                author: csl_author(entry),
+                issued: csl_issued_year(entry),
                 raw: entry.to_string(),
             })
         })
         .collect();
     Ok(entries)
+}
+
+fn bibtex_field(raw: &str, field: &str) -> Option<String> {
+    raw.lines()
+        .find(|line| line.trim_start().starts_with(field))
+        .and_then(|line| line.split_once('='))
+        .map(|(_, value)| clean_bibliography_value(value))
+        .filter(|value| !value.is_empty())
+}
+
+fn clean_bibliography_value(value: &str) -> String {
+    value
+        .trim()
+        .trim_matches(&['{', '}', ',', '"'][..])
+        .trim()
+        .to_string()
+}
+
+fn csl_author(entry: &Value) -> Option<String> {
+    entry
+        .get("author")
+        .and_then(Value::as_array)
+        .and_then(|authors| authors.first())
+        .and_then(|author| {
+            author
+                .get("literal")
+                .and_then(Value::as_str)
+                .or_else(|| author.get("family").and_then(Value::as_str))
+                .or_else(|| author.get("name").and_then(Value::as_str))
+        })
+        .map(ToString::to_string)
+}
+
+fn csl_issued_year(entry: &Value) -> Option<String> {
+    entry
+        .get("issued")
+        .and_then(|issued| issued.get("date-parts"))
+        .and_then(Value::as_array)
+        .and_then(|date_parts| date_parts.first())
+        .and_then(Value::as_array)
+        .and_then(|first_date| first_date.first())
+        .and_then(Value::as_i64)
+        .map(|year| year.to_string())
 }
 
 pub(crate) fn collect_citation_references(text: &str) -> Vec<CitationReference> {
@@ -172,10 +212,14 @@ fn citation_references_from_bracket(text: &str) -> Vec<CitationReference> {
     references
 }
 
-pub(crate) fn render_citations(markdown: &str, bibliography: &[BibliographyEntry]) -> String {
-    let titles = bibliography
+pub(crate) fn render_citations(
+    markdown: &str,
+    bibliography: &[BibliographyEntry],
+    style: &str,
+) -> String {
+    let entries = bibliography
         .iter()
-        .map(|entry| (entry.key.as_str(), entry.title.as_str()))
+        .map(|entry| (entry.key.as_str(), entry))
         .collect::<HashMap<_, _>>();
     let mut output = String::with_capacity(markdown.len());
     let mut rest = markdown;
@@ -189,7 +233,7 @@ pub(crate) fn render_citations(markdown: &str, bibliography: &[BibliographyEntry
         let inside = &after_start[..end];
         if inside.contains('@') {
             let references = citation_references_from_bracket(inside);
-            output.push_str(&render_citation_span(&references, &titles));
+            output.push_str(&render_citation_span(&references, &entries, style));
         } else {
             output.push('[');
             output.push_str(inside);
@@ -201,7 +245,11 @@ pub(crate) fn render_citations(markdown: &str, bibliography: &[BibliographyEntry
     output
 }
 
-fn render_citation_span(references: &[CitationReference], titles: &HashMap<&str, &str>) -> String {
+fn render_citation_span(
+    references: &[CitationReference],
+    entries: &HashMap<&str, &BibliographyEntry>,
+    style: &str,
+) -> String {
     if references.is_empty() {
         return String::new();
     }
@@ -213,11 +261,11 @@ fn render_citation_span(references: &[CitationReference], titles: &HashMap<&str,
     let label = references
         .iter()
         .map(|reference| {
-            let mut label = titles
-                .get(reference.key.as_str())
-                .copied()
-                .unwrap_or(reference.key.as_str())
-                .to_string();
+            let mut label = citation_label(
+                reference,
+                entries.get(reference.key.as_str()).copied(),
+                style,
+            );
             if let Some(locator) = &reference.locator {
                 label.push_str(", ");
                 label.push_str(locator);
@@ -229,9 +277,9 @@ fn render_citation_span(references: &[CitationReference], titles: &HashMap<&str,
     let details = references
         .iter()
         .map(|reference| {
-            let title = titles
+            let title = entries
                 .get(reference.key.as_str())
-                .copied()
+                .map(|entry| entry.title.as_str())
                 .unwrap_or("missing bibliography entry");
             match &reference.locator {
                 Some(locator) => format!("@{} ({locator}): {title}", reference.key),
@@ -247,4 +295,24 @@ fn render_citation_span(references: &[CitationReference], titles: &HashMap<&str,
         escape_html(&keys),
         escape_html(&label)
     )
+}
+
+fn citation_label(
+    reference: &CitationReference,
+    entry: Option<&BibliographyEntry>,
+    style: &str,
+) -> String {
+    let Some(entry) = entry else {
+        return reference.key.clone();
+    };
+    match style {
+        "key" => format!("@{}", reference.key),
+        "author-year" => match (&entry.author, &entry.issued) {
+            (Some(author), Some(year)) => format!("{author} {year}"),
+            (Some(author), None) => author.clone(),
+            (None, Some(year)) => year.clone(),
+            (None, None) => entry.title.clone(),
+        },
+        _ => entry.title.clone(),
+    }
 }
