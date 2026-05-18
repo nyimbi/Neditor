@@ -1,6 +1,7 @@
 use crate::{
     document_ast::{export_body_text_from_ast, AstSourceRange, DocumentBlock},
     escape_css, escape_html, escape_pdf, escape_xml, metadata_string, render_export_template,
+    tables::delimited_rows_for_export,
     CompileResponse, ExportManifest,
 };
 use chrono::Utc;
@@ -740,6 +741,104 @@ fn export_logo(metadata: &Value) -> Option<String> {
         .filter(|value| !value.trim().is_empty())
 }
 
+#[derive(Clone, Debug)]
+struct ExportTable {
+    headers: Vec<String>,
+    alignments: Vec<String>,
+    rows: Vec<Vec<String>>,
+}
+
+fn export_table_from_delimited_code(language: Option<&str>, code: &str) -> Option<ExportTable> {
+    let delimiter = match language.unwrap_or("").trim().to_ascii_lowercase().as_str() {
+        "csv" => ',',
+        "tsv" => '\t',
+        _ => return None,
+    };
+    let mut rows = delimited_rows_for_export(code, delimiter);
+    if rows.is_empty() {
+        return None;
+    }
+    let headers = rows.remove(0);
+    if headers.is_empty() {
+        return None;
+    }
+    let alignments = headers.iter().map(|_| "left".to_string()).collect();
+    let rows = rows
+        .into_iter()
+        .map(|row| {
+            (0..headers.len())
+                .map(|index| row.get(index).cloned().unwrap_or_default())
+                .collect()
+        })
+        .collect();
+    Some(ExportTable {
+        headers,
+        alignments,
+        rows,
+    })
+}
+
+fn export_table_from_transform_html(html: &str) -> Option<ExportTable> {
+    if !html.contains("<table") || !html.contains("transform-table") {
+        return None;
+    }
+    let header_section = html_between(html, "<thead", "</thead>")?;
+    let headers = html_table_cells(header_section, "th");
+    if headers.is_empty() {
+        return None;
+    }
+    let body_section = html_between(html, "<tbody", "</tbody>").unwrap_or("");
+    let mut rows = Vec::new();
+    let mut rest = body_section;
+    while let Some((row_html, next)) = next_html_tag_block(rest, "tr") {
+        let row = html_table_cells(row_html, "td");
+        if !row.is_empty() {
+            rows.push(
+                (0..headers.len())
+                    .map(|index| row.get(index).cloned().unwrap_or_default())
+                    .collect(),
+            );
+        }
+        rest = next;
+    }
+    let alignments = headers.iter().map(|_| "left".to_string()).collect();
+    Some(ExportTable {
+        headers,
+        alignments,
+        rows,
+    })
+}
+
+fn html_between<'a>(html: &'a str, open_prefix: &str, close_tag: &str) -> Option<&'a str> {
+    let open_start = html.find(open_prefix)?;
+    let open_end = html[open_start..].find('>')? + open_start + 1;
+    let close_start = html[open_end..].find(close_tag)? + open_end;
+    Some(&html[open_end..close_start])
+}
+
+fn next_html_tag_block<'a>(html: &'a str, tag: &str) -> Option<(&'a str, &'a str)> {
+    let open = format!("<{tag}");
+    let close = format!("</{tag}>");
+    let open_start = html.find(&open)?;
+    let open_end = html[open_start..].find('>')? + open_start + 1;
+    let close_start = html[open_end..].find(&close)? + open_end;
+    let close_end = close_start + close.len();
+    Some((&html[open_end..close_start], &html[close_end..]))
+}
+
+fn html_table_cells(row_html: &str, tag: &str) -> Vec<String> {
+    let mut cells = Vec::new();
+    let mut rest = row_html;
+    while let Some((cell_html, next)) = next_html_tag_block(rest, tag) {
+        let text = decode_export_html_entities(&strip_export_html_tags(cell_html))
+            .trim()
+            .to_string();
+        cells.push(text);
+        rest = next;
+    }
+    cells
+}
+
 fn export_header_footer(response: &CompileResponse, options: &Value) -> (String, String) {
     export_header_footer_for_page(response, options, 1, 1)
 }
@@ -1451,6 +1550,11 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
         DocumentBlock::TaskList { items, .. } => docx_task_list(items),
         DocumentBlock::BlockQuote { text, .. } => docx_paragraph(&format!("Quote: {text}")),
         DocumentBlock::CodeBlock { language, code, .. } => {
+            if let Some(table) = export_table_from_delimited_code(language.as_deref(), code) {
+                let mut output = docx_paragraph(&table_export_line(&None, &None, &table.headers));
+                output.push_str(&docx_table(&table.headers, &table.alignments, &table.rows));
+                return output;
+            }
             let label = language
                 .as_deref()
                 .filter(|value| !value.is_empty())
@@ -1522,10 +1626,17 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
             empty_as(&provenance.model, "unknown"),
             empty_as(&provenance.status, "unreviewed")
         )),
-        DocumentBlock::RawHtml { html, .. } => raw_html_export_lines(html)
-            .into_iter()
-            .map(|line| docx_paragraph(&line))
-            .collect::<String>(),
+        DocumentBlock::RawHtml { html, .. } => {
+            if let Some(table) = export_table_from_transform_html(html) {
+                let mut output = docx_paragraph(&table_export_line(&None, &None, &table.headers));
+                output.push_str(&docx_table(&table.headers, &table.alignments, &table.rows));
+                return output;
+            }
+            raw_html_export_lines(html)
+                .into_iter()
+                .map(|line| docx_paragraph(&line))
+                .collect::<String>()
+        }
     }
 }
 
@@ -1845,6 +1956,28 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<PdfPa
 }
 
 fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
+    if let DocumentBlock::RawHtml { html, .. } = block {
+        if let Some(table) = export_table_from_transform_html(html) {
+            return vec![PdfPageItem::Table(PdfTable {
+                id: None,
+                caption: None,
+                headers: table.headers,
+                alignments: table.alignments,
+                rows: table.rows,
+            })];
+        }
+    }
+    if let DocumentBlock::CodeBlock { language, code, .. } = block {
+        if let Some(table) = export_table_from_delimited_code(language.as_deref(), code) {
+            return vec![PdfPageItem::Table(PdfTable {
+                id: None,
+                caption: None,
+                headers: table.headers,
+                alignments: table.alignments,
+                rows: table.rows,
+            })];
+        }
+    }
     if let DocumentBlock::Table {
         id,
         caption,
@@ -2324,6 +2457,28 @@ fn include_pptx_agenda(response: &CompileResponse, options: &Value) -> bool {
 
 fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
     slide.lines.extend(block_export_lines(block));
+    if let DocumentBlock::RawHtml { html, .. } = block {
+        if let Some(table) = export_table_from_transform_html(html) {
+            slide.tables.push(PptxTable {
+                id: None,
+                caption: None,
+                headers: table.headers,
+                alignments: table.alignments,
+                rows: table.rows,
+            });
+        }
+    }
+    if let DocumentBlock::CodeBlock { language, code, .. } = block {
+        if let Some(table) = export_table_from_delimited_code(language.as_deref(), code) {
+            slide.tables.push(PptxTable {
+                id: None,
+                caption: None,
+                headers: table.headers,
+                alignments: table.alignments,
+                rows: table.rows,
+            });
+        }
+    }
     if let DocumentBlock::Table {
         id,
         caption,
@@ -2380,6 +2535,11 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             text.lines().map(|line| format!("> {line}")).collect()
         }
         DocumentBlock::CodeBlock { language, code, .. } => {
+            if let Some(table) = export_table_from_delimited_code(language.as_deref(), code) {
+                let mut lines = vec![table_export_line(&None, &None, &table.headers)];
+                lines.extend(table.rows.iter().map(|row| row.join(" | ")));
+                return lines;
+            }
             let mut lines = vec![format!("```{}", language.as_deref().unwrap_or(""))];
             lines.extend(code.lines().map(ToString::to_string));
             lines.push("```".to_string());
@@ -2453,7 +2613,14 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             empty_as(&provenance.model, "unknown"),
             empty_as(&provenance.status, "unreviewed")
         )],
-        DocumentBlock::RawHtml { html, .. } => raw_html_export_lines(html),
+        DocumentBlock::RawHtml { html, .. } => {
+            if let Some(table) = export_table_from_transform_html(html) {
+                let mut lines = vec![table_export_line(&None, &None, &table.headers)];
+                lines.extend(table.rows.iter().map(|row| row.join(" | ")));
+                return lines;
+            }
+            raw_html_export_lines(html)
+        }
     }
 }
 

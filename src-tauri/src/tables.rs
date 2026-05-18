@@ -24,17 +24,7 @@ pub(crate) fn render_delimited_table(
     if rows.is_empty() {
         return "<table></table>".to_string();
     }
-    let named_tables = HashMap::new();
-    evaluate_table_formula_rows(
-        &mut rows,
-        1,
-        |row_index| row_index + 1,
-        "Table formula error",
-        "Use numeric formulas such as =SUM(1,2) or =SUM(A1:A3) in CSV/TSV cells.",
-        &named_tables,
-        artifact_diags,
-        diagnostics,
-    );
+    evaluate_delimited_table_formula_rows(&mut rows, artifact_diags, diagnostics);
     let mut html = String::from("<table class=\"transform-table\"><thead><tr>");
     for cell in &rows[0] {
         html.push_str(&format!("<th>{}</th>", escape_html(cell)));
@@ -49,6 +39,35 @@ pub(crate) fn render_delimited_table(
     }
     html.push_str("</tbody></table>");
     html
+}
+
+pub(crate) fn delimited_rows_for_export(body: &str, delimiter: char) -> Vec<Vec<String>> {
+    let mut rows = parse_delimited_rows(body, delimiter);
+    let mut artifact_diags = Vec::new();
+    let mut diagnostics = Vec::new();
+    evaluate_delimited_table_formula_rows(&mut rows, &mut artifact_diags, &mut diagnostics);
+    rows
+}
+
+fn evaluate_delimited_table_formula_rows(
+    rows: &mut [Vec<String>],
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if rows.is_empty() {
+        return;
+    }
+    let named_tables = HashMap::new();
+    evaluate_table_formula_rows(
+        rows,
+        1,
+        |row_index| row_index + 1,
+        "Table formula error",
+        "Use numeric formulas such as =SUM(1,2) or =SUM(A1:A3) in CSV/TSV cells.",
+        &named_tables,
+        artifact_diags,
+        diagnostics,
+    );
 }
 
 fn parse_delimited_rows(body: &str, delimiter: char) -> Vec<Vec<String>> {

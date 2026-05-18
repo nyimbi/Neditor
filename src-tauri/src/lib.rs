@@ -5138,6 +5138,24 @@ ARR: Annual recurring revenue.
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("Table formula error")));
+
+        let options = json!({});
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains("<w:tbl>"));
+        assert!(docx_document.contains(">25<"));
+        assert!(!docx_document.contains("```csv"));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        assert!(pptx_slide.contains("<a:tbl>"));
+        assert!(pptx_slide.contains("25"));
+        assert!(!pptx_slide.contains("```csv"));
+
+        let pdf = render_pdf_bytes(&response, &options);
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains(" re S"));
+        assert!(pdf_text.contains("(25) Tj"));
     }
 
     #[test]
