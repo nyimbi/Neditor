@@ -5216,7 +5216,7 @@ paths:
     #[test]
     fn semantic_exporters_map_ast_blocks() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n{{slide title=\"Board Review\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
+            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n{{slide title=\"Board Review\" notes=\"Open with risk summary\\nClose with decision ask\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
             file_path: None,
         });
         let options = json!({ "watermark": "DRAFT" });
@@ -5243,8 +5243,11 @@ paths:
         let pptx_content_types = zip_entry_text(&pptx, "[Content_Types].xml");
         let presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
         let slide_two_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide2.xml.rels");
+        let slide_four_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide4.xml.rels");
+        let slide_four_notes = zip_entry_text(&pptx, "ppt/notesSlides/notesSlide4.xml");
         let pptx_svg = zip_entry_text(&pptx, "ppt/media/image1.svg");
         assert!(pptx_content_types.contains(r#"ContentType="image/svg+xml""#));
+        assert!(pptx_content_types.contains("presentationml.notesSlide+xml"));
         assert!(presentation.contains(r#"r:id="rId2""#));
         let slide_two = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
         assert!(slide_two.contains("Semantic Exports"));
@@ -5259,6 +5262,10 @@ paths:
         let slide_four = zip_entry_text(&pptx, "ppt/slides/slide4.xml");
         assert!(slide_four.contains("Board Review"));
         assert!(slide_four.contains("Slide-specific body."));
+        assert!(slide_four_relationships.contains(r#"Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide""#));
+        assert!(slide_four_relationships.contains(r#"Target="../notesSlides/notesSlide4.xml""#));
+        assert!(slide_four_notes.contains("Open with risk summary"));
+        assert!(slide_four_notes.contains("Close with decision ask"));
         let slide_five = zip_entry_text(&pptx, "ppt/slides/slide5.xml");
         assert!(slide_five.contains("Appendix"));
 

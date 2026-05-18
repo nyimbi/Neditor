@@ -230,7 +230,7 @@ pub(crate) fn render_pptx_bytes(
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     zip.start_file("[Content_Types].xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_pptx_content_types(slides.len(), &media).as_bytes())
+    zip.write_all(render_pptx_content_types(&slides, &media).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.add_directory("_rels/", options)
         .map_err(|err| err.to_string())?;
@@ -252,9 +252,17 @@ pub(crate) fn render_pptx_bytes(
         .map_err(|err| err.to_string())?;
     zip.add_directory("ppt/slides/", options)
         .map_err(|err| err.to_string())?;
-    if !media.is_empty() {
+    let has_slide_relationships =
+        !media.is_empty() || slides.iter().any(|slide| !slide.notes.is_empty());
+    if has_slide_relationships {
         zip.add_directory("ppt/slides/_rels/", options)
             .map_err(|err| err.to_string())?;
+    }
+    if slides.iter().any(|slide| !slide.notes.is_empty()) {
+        zip.add_directory("ppt/notesSlides/", options)
+            .map_err(|err| err.to_string())?;
+    }
+    if !media.is_empty() {
         zip.add_directory("ppt/media/", options)
             .map_err(|err| err.to_string())?;
         for item in &media {
@@ -269,19 +277,34 @@ pub(crate) fn render_pptx_bytes(
         .map_err(|err| err.to_string())?;
     for (index, slide) in slides.iter().enumerate() {
         let slide_media = pptx_slide_media(slide, &media);
-        if !slide_media.is_empty() {
+        if !slide_media.is_empty() || !slide.notes.is_empty() {
             zip.start_file(
                 format!("ppt/slides/_rels/slide{}.xml.rels", index + 1),
                 options,
             )
             .map_err(|err| err.to_string())?;
-            zip.write_all(render_pptx_slide_relationships(&slide_media).as_bytes())
-                .map_err(|err| err.to_string())?;
+            zip.write_all(
+                render_pptx_slide_relationships(
+                    &slide_media,
+                    (!slide.notes.is_empty()).then_some(index + 1),
+                )
+                .as_bytes(),
+            )
+            .map_err(|err| err.to_string())?;
         }
         zip.start_file(format!("ppt/slides/slide{}.xml", index + 1), options)
             .map_err(|err| err.to_string())?;
         zip.write_all(render_pptx_slide(slide, &slide_media).as_bytes())
             .map_err(|err| err.to_string())?;
+        if !slide.notes.is_empty() {
+            zip.start_file(
+                format!("ppt/notesSlides/notesSlide{}.xml", index + 1),
+                options,
+            )
+            .map_err(|err| err.to_string())?;
+            zip.write_all(render_pptx_notes_slide(slide).as_bytes())
+                .map_err(|err| err.to_string())?;
+        }
     }
     zip.finish().map_err(|err| err.to_string())?;
     Ok(cursor.into_inner())
@@ -1063,6 +1086,7 @@ struct PptxSlide {
     title: String,
     lines: Vec<String>,
     media_refs: Vec<MediaRef>,
+    notes: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1077,6 +1101,7 @@ impl PptxSlide {
             title: title.into(),
             lines: Vec::new(),
             media_refs: Vec::new(),
+            notes: Vec::new(),
         }
     }
 
@@ -1085,6 +1110,7 @@ impl PptxSlide {
             title: title.into(),
             lines,
             media_refs: Vec::new(),
+            notes: Vec::new(),
         }
     }
 }
@@ -1166,7 +1192,9 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                         slides.push(slide);
                     }
                 }
-                current = Some(PptxSlide::new(slide_title_from_options(options)));
+                let mut slide = PptxSlide::new(slide_title_from_options(options));
+                slide.notes = slide_notes_from_options(options);
+                current = Some(slide);
             }
             _ => {
                 if current.is_none() {
@@ -1351,6 +1379,22 @@ fn slide_title_from_options(options: &str) -> String {
     })
 }
 
+fn slide_notes_from_options(options: &str) -> Vec<String> {
+    ["notes", "speakerNotes", "speaker_notes"]
+        .iter()
+        .find_map(|key| layout_option_text(options, key))
+        .map(|value| {
+            value
+                .replace("\\n", "\n")
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .map(ToString::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn layout_option_text(text: &str, key: &str) -> Option<String> {
     for line in text.lines() {
         if let Some((candidate, value)) = line.split_once(':') {
@@ -1456,7 +1500,7 @@ fn equation_export_line(id: &Option<String>, text: &str, caption: &Option<String
     parts.join(": ")
 }
 
-fn render_pptx_content_types(slide_count: usize, media: &[ExportMedia]) -> String {
+fn render_pptx_content_types(slides: &[PptxSlide], media: &[ExportMedia]) -> String {
     let mut defaults = vec![
         (
             "rels".to_string(),
@@ -1482,11 +1526,20 @@ fn render_pptx_content_types(slide_count: usize, media: &[ExportMedia]) -> Strin
             )
         })
         .collect::<String>();
-    let slide_overrides = (1..=slide_count)
+    let slide_overrides = (1..=slides.len())
         .map(|index| format!(r#"<Override PartName="/ppt/slides/slide{index}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>"#))
         .collect::<String>();
+    let notes_overrides = slides
+        .iter()
+        .enumerate()
+        .filter(|(_, slide)| !slide.notes.is_empty())
+        .map(|(index, _)| {
+            let note_index = index + 1;
+            format!(r#"<Override PartName="/ppt/notesSlides/notesSlide{note_index}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>"#)
+        })
+        .collect::<String>();
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}</Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}{notes_overrides}</Types>"#
     )
 }
 
@@ -1499,8 +1552,11 @@ fn render_pptx_relationships(slide_count: usize) -> String {
     )
 }
 
-fn render_pptx_slide_relationships(media: &[&ExportMedia]) -> String {
-    let relationships = media
+fn render_pptx_slide_relationships(
+    media: &[&ExportMedia],
+    notes_slide_index: Option<usize>,
+) -> String {
+    let mut relationships = media
         .iter()
         .map(|item| {
             format!(
@@ -1509,9 +1565,15 @@ fn render_pptx_slide_relationships(media: &[&ExportMedia]) -> String {
                 escape_xml(&item.path)
             )
         })
-        .collect::<String>();
+        .collect::<Vec<_>>();
+    if let Some(index) = notes_slide_index {
+        relationships.push(format!(
+            r#"<Relationship Id="rIdNotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide{index}.xml"/>"#
+        ));
+    }
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{relationships}</Relationships>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{}</Relationships>"#,
+        relationships.join("")
     )
 }
 
@@ -1542,6 +1604,19 @@ fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
         .collect::<String>();
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{pictures}</p:spTree></p:cSld></p:sld>"#
+    )
+}
+
+fn render_pptx_notes_slide(slide: &PptxSlide) -> String {
+    let title = escape_xml(&format!("Notes: {}", slide.title));
+    let notes = slide
+        .notes
+        .iter()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| format!(r#"<a:p><a:r><a:t>{}</a:t></a:r></a:p>"#, escape_xml(line)))
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Notes"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{notes}</p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:notes>"#
     )
 }
 
