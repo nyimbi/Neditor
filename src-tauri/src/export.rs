@@ -571,6 +571,11 @@ fn render_docx_block(block: &DocumentBlock) -> String {
         DocumentBlock::Layout { directive, .. } if directive == "page-break" => docx_page_break(),
         DocumentBlock::Layout {
             directive, options, ..
+        } if directive == "section-break" || layout_columns(options).is_some() => {
+            docx_section_break(options)
+        }
+        DocumentBlock::Layout {
+            directive, options, ..
         } => docx_paragraph(&format!("Layout: {directive} {options}").trim().to_string()),
         DocumentBlock::RawHtml { html, .. } => docx_paragraph(html),
     }
@@ -590,6 +595,13 @@ fn docx_paragraph(text: &str) -> String {
 
 fn docx_page_break() -> String {
     r#"<w:p><w:r><w:br w:type="page"/></w:r></w:p>"#.to_string()
+}
+
+fn docx_section_break(options: &str) -> String {
+    let columns = layout_columns(options).unwrap_or(1);
+    format!(
+        r#"<w:p><w:pPr><w:sectPr><w:cols w:num="{columns}" w:space="720"/></w:sectPr></w:pPr></w:p>"#
+    )
 }
 
 fn docx_table(headers: &[String], rows: &[Vec<String>]) -> String {
@@ -626,6 +638,15 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<Strin
                     pages.push(current);
                     current = Vec::new();
                 }
+            }
+            DocumentBlock::Layout {
+                directive, options, ..
+            } if directive == "section-break" => {
+                if !current.is_empty() {
+                    pages.push(current);
+                    current = Vec::new();
+                }
+                current.extend(layout_export_lines(directive, options));
             }
             _ => current.extend(block_export_lines(block)),
         }
@@ -686,6 +707,19 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                 current = Some(PptxSlide {
                     title: "Continued".to_string(),
                     lines: Vec::new(),
+                });
+            }
+            DocumentBlock::Layout {
+                directive, options, ..
+            } if directive == "section-break" => {
+                if let Some(slide) = current.take() {
+                    if !slide.lines.is_empty() || slide.title != "Continued" {
+                        slides.push(slide);
+                    }
+                }
+                current = Some(PptxSlide {
+                    title: "Section".to_string(),
+                    lines: layout_export_lines(directive, options),
                 });
             }
             _ => {
@@ -767,9 +801,60 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
         } => vec![equation_export_line(id, text, caption)],
         DocumentBlock::Layout {
             directive, options, ..
-        } => vec![format!("Layout: {directive} {options}").trim().to_string()],
+        } => layout_export_lines(directive, options),
         DocumentBlock::RawHtml { html, .. } => vec![html.clone()],
     }
+}
+
+fn layout_export_lines(directive: &str, options: &str) -> Vec<String> {
+    let summary = layout_summary(options);
+    let label = match directive {
+        "section-break" => "Section break",
+        "layout" => "Layout",
+        "page-break" => "Page break",
+        _ => "Layout directive",
+    };
+    vec![format!("{label}{summary}")]
+}
+
+fn layout_summary(options: &str) -> String {
+    let mut parts = Vec::new();
+    if let Some(columns) = layout_columns(options) {
+        parts.push(format!("columns={columns}"));
+    }
+    if parts.is_empty() {
+        let trimmed = options.trim();
+        if trimmed.is_empty() {
+            String::new()
+        } else {
+            format!(": {trimmed}")
+        }
+    } else {
+        format!(": {}", parts.join(", "))
+    }
+}
+
+fn layout_columns(options: &str) -> Option<usize> {
+    for line in options.lines() {
+        if let Some((key, value)) = line.split_once(':') {
+            if key.trim() == "columns" {
+                return parse_layout_columns(value);
+            }
+        }
+    }
+    for part in options.split_whitespace() {
+        if let Some((key, value)) = part.split_once('=') {
+            if key.trim() == "columns" {
+                return parse_layout_columns(value);
+            }
+        }
+    }
+    None
+}
+
+fn parse_layout_columns(value: &str) -> Option<usize> {
+    let columns = value.trim().trim_matches('"').parse::<usize>().ok()?;
+    (columns > 0).then_some(columns)
 }
 
 fn figure_export_line(

@@ -6173,7 +6173,7 @@ paths:
     #[test]
     fn semantic_exporters_map_ast_blocks() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n\n## Appendix\nAfter the break.\n".to_string(),
+            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n## Appendix\nAfter the break.\n".to_string(),
             file_path: None,
         });
         let options = json!({ "watermark": "DRAFT" });
@@ -6184,6 +6184,7 @@ paths:
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading2""#));
         assert!(docx_document.contains("<w:tbl>"));
         assert!(docx_document.contains(r#"<w:br w:type="page""#));
+        assert!(docx_document.contains(r#"<w:cols w:num="2""#));
         assert!(docx_document.contains("System diagram"));
         assert!(docx_document.contains("ROI = Gain / Cost"));
 
@@ -6195,11 +6196,15 @@ paths:
         assert!(slide_two.contains("Table: Metric | Value"));
         assert!(slide_two.contains("System diagram"));
         let slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
-        assert!(slide_three.contains("Continued") || slide_three.contains("Appendix"));
+        assert!(slide_three.contains("Section"));
+        assert!(slide_three.contains("Section break: columns=2"));
+        let slide_four = zip_entry_text(&pptx, "ppt/slides/slide4.xml");
+        assert!(slide_four.contains("Appendix"));
 
         let pdf = render_pdf_bytes(&response, &options);
         let pdf_text = String::from_utf8_lossy(&pdf);
         assert!(pdf_text.contains("/Count 3"));
+        assert!(pdf_text.contains("Section break: columns=2"));
         assert!(pdf_text.contains("System diagram"));
         assert!(pdf_text.contains("After the break."));
     }
