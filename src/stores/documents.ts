@@ -1133,8 +1133,14 @@ export const useDocumentsStore = defineStore("documents", {
     togglePin(id: string) {
       const document = this.documents.find((item) => item.id === id);
       if (!document) return;
-      document.pinned = !document.pinned;
+      this.setPinned(id, !document.pinned);
+    },
+    setPinned(id: string, pinned: boolean) {
+      const document = this.documents.find((item) => item.id === id);
+      if (!document) return;
+      document.pinned = pinned;
       this.documents.sort((left, right) => Number(Boolean(right.pinned)) - Number(Boolean(left.pinned)));
+      this.statusMessage = pinned ? `Pinned ${document.title}` : `Unpinned ${document.title}`;
       void this.persistWorkspace();
     },
     rememberFile(path: string | null) {

@@ -12,6 +12,8 @@
           :key="group.key"
           class="tab-group"
           :aria-label="`${group.label} tabs`"
+          @dragover.prevent
+          @drop="dropTabOnGroup(group)"
         >
           <header class="tab-group-header" :title="group.title">
             <span>{{ group.label }}</span>
@@ -23,6 +25,9 @@
             :key="document.id"
             class="tab"
             :class="{ active: document.id === store.activeId }"
+            draggable="true"
+            @dragstart="draggedTabId = document.id"
+            @dragend="draggedTabId = ''"
           >
             <button class="tab-main" type="button" @click="activate(document.id)">
               <span>{{ document.dirty ? "*" : "" }}{{ document.title }}</span>
@@ -668,6 +673,7 @@ const selectedTableIndex = ref(0);
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const isNewTableDraft = ref(false);
+const draggedTabId = ref("");
 
 interface MarkdownTable {
   startLine: number;
@@ -1290,6 +1296,12 @@ function closeTabGroup(group: DocumentTabGroup) {
   for (const document of [...group.documents]) {
     store.closeDocument(document.id);
   }
+}
+
+function dropTabOnGroup(group: DocumentTabGroup) {
+  if (!draggedTabId.value) return;
+  store.setPinned(draggedTabId.value, group.key === "pinned");
+  draggedTabId.value = "";
 }
 
 function tabGroupDescriptor(document: OpenDocument): Omit<DocumentTabGroup, "documents"> {
@@ -2377,6 +2389,10 @@ select:hover {
   border: 1px solid #bac4d1;
   border-radius: 6px;
   background: #edf1f5;
+}
+
+.tab[draggable="true"] {
+  cursor: grab;
 }
 
 .tab.active {
