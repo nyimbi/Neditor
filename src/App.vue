@@ -516,7 +516,8 @@ const active = computed(() => store.activeDocument);
 const wordStats = computed(() => {
   const text = active.value?.text || "";
   const words = text.trim().split(/\s+/).filter(Boolean).length;
-  return `${words} words | ${text.length} characters`;
+  const minutes = words ? Math.max(1, Math.ceil(words / 220)) : 0;
+  return `${words} words | ${text.length} characters | ${minutes} min read`;
 });
 const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
@@ -686,6 +687,7 @@ function editorExtensions() {
     history(),
     markdown(),
     linter(editorDiagnostics, { delay: 150 }),
+    EditorView.contentAttributes.of({ spellcheck: "true", autocapitalize: "sentences" }),
     keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
