@@ -3901,6 +3901,21 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn table_formulas_resolve_forward_refs_and_report_cycles() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Formula Cycles\nstatus: approved\napprovedBy: QA\n---\n# Formula Cycles\n| Metric | Value |\n| --- | ---: |\n| Forward | =B2 |\n| Source | 42 |\n| Cycle A | =B4 |\n| Cycle B | =B3 |\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response.compiled_markdown.contains("| Forward | 42 |"));
+        assert!(response.compiled_markdown.contains("| Cycle A | #ERROR |"));
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("#CYCLE? B3 -> B4 -> B3")));
+    }
+
+    #[test]
     fn compiler_renders_layout_break_directives() {
         let response = compile(CompileRequest {
             text: "---\ntitle: Layout\nstatus: approved\napprovedBy: QA\n---\n# Layout\n{{page-break}}\n{{section-break columns=1}}\n\n```layout\ncolumns: 2\n```\n".to_string(),

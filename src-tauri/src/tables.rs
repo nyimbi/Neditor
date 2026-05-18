@@ -164,15 +164,16 @@ fn evaluate_table_formula_rows(
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> bool {
     let mut changed = false;
+    let source_rows = rows.to_vec();
+    let mut context = TableFormulaContext::new(&source_rows);
     for row_index in data_start..rows.len() {
         for column_index in 0..rows[row_index].len() {
-            let cell = rows[row_index][column_index].clone();
-            let Some(expression) = cell.strip_prefix('=') else {
+            if !rows[row_index][column_index].starts_with('=') {
                 continue;
-            };
+            }
             changed = true;
-            match evaluate_table_formula(expression, rows) {
-                Ok(value) => rows[row_index][column_index] = value,
+            match table_cell_value(&mut context, (row_index, column_index)) {
+                Ok(value) => rows[row_index][column_index] = format_value(value, "round"),
                 Err(error) => {
                     let line = display_line_for_row(row_index);
                     let diagnostic = diag(
@@ -192,12 +193,34 @@ fn evaluate_table_formula_rows(
     changed
 }
 
-fn evaluate_table_formula(expression: &str, rows: &[Vec<String>]) -> Result<String, String> {
-    let expanded = expand_table_references(expression, rows)?;
-    eval_expression(&expanded, &HashMap::new()).map(|value| format_value(value, "round"))
+struct TableFormulaContext<'a> {
+    rows: &'a [Vec<String>],
+    cache: HashMap<(usize, usize), Result<f64, String>>,
+    stack: Vec<(usize, usize)>,
 }
 
-fn expand_table_references(expression: &str, rows: &[Vec<String>]) -> Result<String, String> {
+impl<'a> TableFormulaContext<'a> {
+    fn new(rows: &'a [Vec<String>]) -> Self {
+        Self {
+            rows,
+            cache: HashMap::new(),
+            stack: Vec::new(),
+        }
+    }
+}
+
+fn evaluate_table_formula_number(
+    expression: &str,
+    context: &mut TableFormulaContext<'_>,
+) -> Result<f64, String> {
+    let expanded = expand_table_references(expression, context)?;
+    eval_expression(&expanded, &HashMap::new())
+}
+
+fn expand_table_references(
+    expression: &str,
+    context: &mut TableFormulaContext<'_>,
+) -> Result<String, String> {
     let chars = expression.chars().collect::<Vec<_>>();
     let mut output = String::new();
     let mut index = 0;
@@ -241,10 +264,10 @@ fn expand_table_references(expression: &str, rows: &[Vec<String>]) -> Result<Str
                 &chars[range_letters_end..range_index],
             )
             .ok_or_else(|| "#REF?".to_string())?;
-            output.push_str(&table_range_values(rows, first_ref, second_ref)?.join(","));
+            output.push_str(&table_range_values(context, first_ref, second_ref)?.join(","));
             index = range_index;
         } else {
-            output.push_str(&table_cell_value(rows, first_ref)?.to_string());
+            output.push_str(&table_cell_value(context, first_ref)?.to_string());
         }
     }
     Ok(output)
@@ -266,7 +289,7 @@ fn cell_ref_from_parts(column: &[char], row: &[char]) -> Option<(usize, usize)> 
 }
 
 fn table_range_values(
-    rows: &[Vec<String>],
+    context: &mut TableFormulaContext<'_>,
     first: (usize, usize),
     second: (usize, usize),
 ) -> Result<Vec<String>, String> {
@@ -277,16 +300,65 @@ fn table_range_values(
     let mut values = Vec::new();
     for row in row_start..=row_end {
         for column in column_start..=column_end {
-            values.push(table_cell_value(rows, (row, column))?.to_string());
+            values.push(table_cell_value(context, (row, column))?.to_string());
         }
     }
     Ok(values)
 }
 
-fn table_cell_value(rows: &[Vec<String>], reference: (usize, usize)) -> Result<f64, String> {
-    let row = rows.get(reference.0).ok_or_else(|| "#REF?".to_string())?;
+fn table_cell_value(
+    context: &mut TableFormulaContext<'_>,
+    reference: (usize, usize),
+) -> Result<f64, String> {
+    if let Some(value) = context.cache.get(&reference).cloned() {
+        return value;
+    }
+    if context.stack.contains(&reference) {
+        return Err(table_cycle_error(reference, &context.stack));
+    }
+    let row = context
+        .rows
+        .get(reference.0)
+        .ok_or_else(|| "#REF?".to_string())?;
     let cell = row.get(reference.1).ok_or_else(|| "#REF?".to_string())?;
-    parse_table_number(cell).ok_or_else(|| "#VALUE?".to_string())
+    let result = if let Some(expression) = cell.trim().strip_prefix('=') {
+        context.stack.push(reference);
+        let result = evaluate_table_formula_number(expression, context);
+        context.stack.pop();
+        result
+    } else {
+        parse_table_number(cell).ok_or_else(|| "#VALUE?".to_string())
+    };
+    context.cache.insert(reference, result.clone());
+    result
+}
+
+fn table_cycle_error(reference: (usize, usize), stack: &[(usize, usize)]) -> String {
+    let start = stack
+        .iter()
+        .position(|candidate| *candidate == reference)
+        .unwrap_or(0);
+    let mut path = stack[start..]
+        .iter()
+        .map(|candidate| table_cell_label(*candidate))
+        .collect::<Vec<_>>();
+    path.push(table_cell_label(reference));
+    format!("#CYCLE? {}", path.join(" -> "))
+}
+
+fn table_cell_label(reference: (usize, usize)) -> String {
+    format!("{}{}", table_column_label(reference.1), reference.0)
+}
+
+fn table_column_label(mut column: usize) -> String {
+    column += 1;
+    let mut label = String::new();
+    while column > 0 {
+        let remainder = (column - 1) % 26;
+        label.insert(0, (b'A' + remainder as u8) as char);
+        column = (column - 1) / 26;
+    }
+    label
 }
 
 fn parse_table_number(value: &str) -> Option<f64> {
