@@ -6356,6 +6356,21 @@ paths:
         assert!(docx_document.contains(r#"<w:commentReference w:id="0""#));
         assert!(docx_comments.contains(r#"<w:comment w:id="0" w:author="QA""#));
         assert!(docx_comments.contains("Verify board-pack export fidelity."));
+        let docx_without_comments = render_docx_bytes(
+            &response,
+            &json!({
+                "watermark": "APPROVED",
+                "includeGlossary": true,
+                "includeComments": false,
+                "includeProvenance": true
+            }),
+        )
+        .expect("docx bytes without comments");
+        assert!(!zip_has_entry(&docx_without_comments, "word/comments.xml"));
+        assert!(
+            !zip_entry_text(&docx_without_comments, "[Content_Types].xml")
+                .contains("wordprocessingml.comments+xml")
+        );
         assert!(docx_header.contains("Export Conformance Report | restricted"));
         assert!(docx_footer.contains(r#"w:instr="PAGE""#));
         assert!(docx_footer.contains(r#"w:instr="NUMPAGES""#));
@@ -6610,6 +6625,13 @@ paths:
         let mut text = String::new();
         entry.read_to_string(&mut text).expect("zip text");
         text
+    }
+
+    fn zip_has_entry(bytes: &[u8], path: &str) -> bool {
+        let cursor = Cursor::new(bytes.to_vec());
+        let mut archive = ZipArchive::new(cursor).expect("zip archive");
+        let result = archive.by_name(path).is_ok();
+        result
     }
 
     fn zip_entry_texts_with_prefix(bytes: &[u8], prefix: &str) -> Vec<String> {
