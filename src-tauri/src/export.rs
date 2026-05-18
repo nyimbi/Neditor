@@ -1,5 +1,5 @@
 use crate::{
-    document_ast::{export_body_text_from_ast, DocumentBlock},
+    document_ast::{export_body_text_from_ast, AstSourceRange, DocumentBlock},
     escape_css, escape_html, escape_pdf, escape_xml, metadata_string, render_export_template,
     CompileResponse, ExportManifest,
 };
@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::{
     fs,
     io::{Cursor, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
@@ -813,13 +813,19 @@ fn docx_figure(
 fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
     let mut media = Vec::new();
     for block in &response.document_ast.blocks {
-        let DocumentBlock::Figure { src: Some(src), .. } = block else {
+        let DocumentBlock::Figure {
+            src: Some(src),
+            source,
+            ..
+        } = block
+        else {
             continue;
         };
         if media.iter().any(|item: &ExportMedia| item.source == *src) {
             continue;
         }
-        let Some((extension, content_type, bytes)) = parse_image_data_uri(src) else {
+        let Some((extension, content_type, bytes)) = parse_export_image(src, source.as_ref())
+        else {
             continue;
         };
         let index = media.len() + 1;
@@ -839,6 +845,13 @@ fn collect_pptx_media(response: &CompileResponse) -> Vec<ExportMedia> {
     collect_docx_media(response)
 }
 
+fn parse_export_image(
+    src: &str,
+    source: Option<&AstSourceRange>,
+) -> Option<(String, String, Vec<u8>)> {
+    parse_image_data_uri(src).or_else(|| read_local_export_image(src, source))
+}
+
 fn parse_image_data_uri(src: &str) -> Option<(String, String, Vec<u8>)> {
     let data = src.strip_prefix("data:")?;
     let (metadata, payload) = data.split_once(',')?;
@@ -847,13 +860,52 @@ fn parse_image_data_uri(src: &str) -> Option<(String, String, Vec<u8>)> {
     if !parts.any(|part| part.eq_ignore_ascii_case("base64")) {
         return None;
     }
-    let extension = match content_type.as_str() {
-        "image/svg+xml" => "svg",
-        "image/png" => "png",
-        "image/jpeg" | "image/jpg" => "jpg",
-        _ => return None,
-    };
+    let extension = image_extension_for_content_type(&content_type)?;
     Some((extension.to_string(), content_type, decode_base64(payload)?))
+}
+
+fn read_local_export_image(
+    src: &str,
+    source: Option<&AstSourceRange>,
+) -> Option<(String, String, Vec<u8>)> {
+    if src.starts_with("data:") || src.contains("://") || src.starts_with('#') {
+        return None;
+    }
+    let path = local_export_image_path(src, source)?;
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.to_ascii_lowercase())?;
+    let content_type = image_content_type_for_extension(&extension)?;
+    let bytes = fs::read(path).ok()?;
+    Some((extension, content_type.to_string(), bytes))
+}
+
+fn local_export_image_path(src: &str, source: Option<&AstSourceRange>) -> Option<PathBuf> {
+    let path = PathBuf::from(src);
+    if path.is_absolute() {
+        return Some(path);
+    }
+    let source_file = source?.source_file.as_str();
+    Some(Path::new(source_file).parent()?.join(path))
+}
+
+fn image_extension_for_content_type(content_type: &str) -> Option<&'static str> {
+    match content_type {
+        "image/svg+xml" => Some("svg"),
+        "image/png" => Some("png"),
+        "image/jpeg" | "image/jpg" => Some("jpg"),
+        _ => None,
+    }
+}
+
+fn image_content_type_for_extension(extension: &str) -> Option<&'static str> {
+    match extension {
+        "svg" => Some("image/svg+xml"),
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        _ => None,
+    }
 }
 
 fn decode_base64(input: &str) -> Option<Vec<u8>> {

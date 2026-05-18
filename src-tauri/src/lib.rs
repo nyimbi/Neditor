@@ -5678,6 +5678,53 @@ paths:
         assert!(bundled_manifest.contains("\"document_title\": \"Export Conformance Report\""));
     }
 
+    #[test]
+    fn export_packages_local_figure_media_relative_to_source_file() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-local-media-export-{unique}"));
+        let assets = root.join("assets");
+        fs::create_dir_all(&assets).expect("create media fixture dir");
+        let image = assets.join("diagram.svg");
+        fs::write(&image, "<svg><rect width=\"10\" height=\"10\"/></svg>").expect("write svg");
+        let doc = root.join("report.md");
+        fs::write(
+            &doc,
+            "---\ntitle: Local Media\nstatus: approved\napprovedBy: QA\n---\n# Local Media\n![Diagram](assets/diagram.svg){#fig:local caption=\"Local diagram\"}\n",
+        )
+        .expect("write document");
+
+        let response = compile(CompileRequest {
+            text: fs::read_to_string(&doc).expect("read document"),
+            file_path: Some(path_to_string(&doc)),
+        });
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == "error"));
+
+        let options = json!({});
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        let docx_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
+        let docx_svg = zip_entry_text(&docx, "word/media/image1.svg");
+        assert!(docx_document.contains(r#"r:embed="rIdImage1""#));
+        assert!(docx_relationships.contains(r#"Target="media/image1.svg""#));
+        assert!(docx_svg.contains("<rect"));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        let pptx_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide2.xml.rels");
+        let pptx_svg = zip_entry_text(&pptx, "ppt/media/image1.svg");
+        assert!(pptx_slide.contains(r#"r:embed="rIdImage1""#));
+        assert!(pptx_relationships.contains(r#"Target="../media/image1.svg""#));
+        assert!(pptx_svg.contains("<rect"));
+
+        fs::remove_dir_all(root).expect("clean media export fixture");
+    }
+
     fn zip_entry_text(bytes: &[u8], path: &str) -> String {
         let cursor = Cursor::new(bytes.to_vec());
         let mut archive = ZipArchive::new(cursor).expect("zip archive");
