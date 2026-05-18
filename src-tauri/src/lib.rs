@@ -4166,7 +4166,7 @@ ARR: Annual recurring revenue.
         fs::create_dir_all(&root).expect("create bib test dir");
         fs::write(
             root.join("refs.bib"),
-            "@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}",
+            "@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n date={2026-04-01}\n}",
         )
         .expect("write bibliography");
         fs::write(root.join("diagram.svg"), "<svg></svg>").expect("write figure");
@@ -4177,6 +4177,10 @@ ARR: Annual recurring revenue.
         });
 
         assert_eq!(response.bibliography.len(), 2);
+        assert!(response
+            .bibliography
+            .iter()
+            .any(|entry| entry.key == "doe2026" && entry.issued.as_deref() == Some("2026")));
         assert_eq!(response.semantic.citations, vec!["doe2026", "porter1985"]);
         assert!(response
             .semantic

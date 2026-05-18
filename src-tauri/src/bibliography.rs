@@ -72,7 +72,7 @@ pub(crate) fn parse_bibliography_source(body: &str) -> Vec<BibliographyEntry> {
                 key: key.trim().to_string(),
                 title,
                 author: bibtex_field(raw, "author"),
-                issued: bibtex_field(raw, "year"),
+                issued: bibtex_issued_year(raw),
                 raw: raw.to_string(),
             })
         })
@@ -132,6 +132,15 @@ fn clean_bibliography_value(value: &str) -> String {
         .trim_matches(&['{', '}', ',', '"'][..])
         .trim()
         .to_string()
+}
+
+fn bibtex_issued_year(raw: &str) -> Option<String> {
+    bibtex_field(raw, "year").or_else(|| {
+        bibtex_field(raw, "date").and_then(|date| {
+            let year = date.chars().take(4).collect::<String>();
+            (year.len() == 4 && year.chars().all(|ch| ch.is_ascii_digit())).then_some(year)
+        })
+    })
 }
 
 fn csl_author(entry: &Value) -> Option<String> {
