@@ -39,13 +39,15 @@ pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
     if request.insert_citation_todos {
         cleaned = insert_citation_todos(&cleaned, &mut issues);
     }
-    if request.mark_as_draft && !cleaned.contains("status: draft") {
-        cleaned = format!("<!-- draft: AI paste cleanup review required -->\n\n{cleaned}");
+    if request.mark_as_draft && !cleaned.contains("ai-assisted:") {
+        cleaned = format!(
+            "<!-- ai-assisted: status=needs-review | reviewedBy= | reviewedAt= | source=AI paste cleanup | promptSummary=AI paste cleanup review required -->\n\n{cleaned}"
+        );
         issues.push("Marked inserted content as draft.".to_string());
     }
     let provenance_block = if request.add_provenance {
         Some(format!(
-            "```ai-source\nprovider: unknown\nmodel: unknown\ndate: {}\nreviewedBy: \nstatus: needs-review\n```",
+            "```ai-source\nprovider: unknown\nmodel: unknown\ndate: {}\npromptSummary: AI paste cleanup\nreviewedBy: \nstatus: needs-review\n```",
             Utc::now().date_naive()
         ))
     } else {

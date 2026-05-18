@@ -52,6 +52,7 @@ NDR: Net dollar retention.
 provider: OpenAI
 model: gpt-5.4
 date: 2026-05-18
+promptSummary: board-pack synthesis
 reviewedBy: QA
 status: human-reviewed
 ```

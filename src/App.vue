@@ -351,7 +351,11 @@
           <h3>AI provenance</h3>
           <article v-for="source in active.compile?.semantic.ai_sources || []" :key="`${source.provider}-${source.model}-${source.date}`" class="snapshot-row">
             <p>{{ source.provider || "unknown" }} / {{ source.model || "unknown" }}</p>
-            <small>{{ source.status }} | {{ source.reviewed_by || "unreviewed" }}</small>
+            <small>{{ source.status }} | {{ source.reviewed_by || "unreviewed" }}{{ source.prompt_summary ? ` | ${source.prompt_summary}` : "" }}</small>
+          </article>
+          <article v-for="section in active.compile?.semantic.ai_assisted_sections || []" :key="`ai-section-${section.line}`" class="snapshot-row">
+            <p>{{ section.heading || "Document body" }}</p>
+            <small>Line {{ section.line }} | {{ section.status }} | {{ section.reviewed_by || "unreviewed" }}{{ section.reviewed_at ? ` | ${section.reviewed_at}` : "" }}</small>
           </article>
         </template>
 

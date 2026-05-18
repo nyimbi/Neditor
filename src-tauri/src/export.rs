@@ -550,7 +550,10 @@ fn comment_export_lines(response: &CompileResponse, options: &Value) -> Vec<Stri
 }
 
 fn provenance_export_lines(response: &CompileResponse, options: &Value) -> Vec<String> {
-    if !include_provenance(options) || response.semantic.ai_sources.is_empty() {
+    if !include_provenance(options)
+        || (response.semantic.ai_sources.is_empty()
+            && response.semantic.ai_assisted_sections.is_empty())
+    {
         return Vec::new();
     }
     let mut lines = vec![String::new(), "AI Provenance".to_string()];
@@ -559,9 +562,20 @@ fn provenance_export_lines(response: &CompileResponse, options: &Value) -> Vec<S
         let model = empty_as(source.model.as_str(), "unknown model");
         let date = empty_as(source.date.as_str(), "undated");
         let reviewer = empty_as(source.reviewed_by.as_str(), "unreviewed");
+        let summary = empty_as(source.prompt_summary.as_str(), "no prompt summary");
         format!(
-            "{provider} / {model} on {date}; status: {}; reviewed by: {reviewer}",
+            "{provider} / {model} on {date}; status: {}; reviewed by: {reviewer}; prompt: {summary}",
             source.status
+        )
+    }));
+    lines.extend(response.semantic.ai_assisted_sections.iter().map(|section| {
+        let reviewer = empty_as(section.reviewed_by.as_str(), "unreviewed");
+        let reviewed_at = empty_as(section.reviewed_at.as_str(), "undated");
+        let source = empty_as(section.source.as_str(), "unspecified source");
+        let summary = empty_as(section.prompt_summary.as_str(), "no prompt summary");
+        format!(
+            "Section '{}' at line {}: status {}; reviewed by {reviewer} on {reviewed_at}; source: {source}; prompt: {summary}",
+            section.heading, section.line, section.status
         )
     }));
     lines
@@ -630,24 +644,49 @@ fn html_comments_section(response: &CompileResponse, options: &Value) -> String 
 }
 
 fn html_provenance_section(response: &CompileResponse, options: &Value) -> String {
-    if !include_provenance(options) || response.semantic.ai_sources.is_empty() {
+    if !include_provenance(options)
+        || (response.semantic.ai_sources.is_empty()
+            && response.semantic.ai_assisted_sections.is_empty())
+    {
         return String::new();
     }
-    let entries = response
+    let source_entries = response
         .semantic
         .ai_sources
         .iter()
         .map(|source| {
             format!(
-                "<li><strong>{}</strong> <span>{}</span><p>{}; reviewed by {}; {}</p></li>",
+                "<li><strong>{}</strong> <span>{}</span><p>{}; reviewed by {}; {}; prompt: {}</p></li>",
                 escape_html(empty_as(source.provider.as_str(), "unknown provider")),
                 escape_html(empty_as(source.model.as_str(), "unknown model")),
                 escape_html(empty_as(source.date.as_str(), "undated")),
                 escape_html(empty_as(source.reviewed_by.as_str(), "unreviewed")),
-                escape_html(&source.status)
+                escape_html(&source.status),
+                escape_html(empty_as(
+                    source.prompt_summary.as_str(),
+                    "no prompt summary"
+                ))
             )
         })
         .collect::<String>();
+    let section_entries = response
+        .semantic
+        .ai_assisted_sections
+        .iter()
+        .map(|section| {
+            format!(
+                "<li><strong>{}</strong> <span>line {}</span><p>{}; reviewed by {} on {}; source: {}; prompt: {}</p></li>",
+                escape_html(&section.heading),
+                section.line,
+                escape_html(&section.status),
+                escape_html(empty_as(section.reviewed_by.as_str(), "unreviewed")),
+                escape_html(empty_as(section.reviewed_at.as_str(), "undated")),
+                escape_html(empty_as(section.source.as_str(), "unspecified source")),
+                escape_html(empty_as(section.prompt_summary.as_str(), "no prompt summary"))
+            )
+        })
+        .collect::<String>();
+    let entries = format!("{source_entries}{section_entries}");
     format!(
         "<section class=\"export-provenance\"><h2>AI Provenance</h2><ol>{entries}</ol></section>"
     )

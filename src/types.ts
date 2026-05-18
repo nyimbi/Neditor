@@ -36,7 +36,23 @@ export interface SemanticDocument {
   glossary: Record<string, string>;
   layout_directives: string[];
   comments: Array<{ line: number; author: string; created_at?: string | null; state: string; text: string }>;
-  ai_sources: Array<{ provider: string; model: string; date: string; reviewed_by: string; status: string }>;
+  ai_sources: Array<{
+    provider: string;
+    model: string;
+    date: string;
+    prompt_summary: string;
+    reviewed_by: string;
+    status: string;
+  }>;
+  ai_assisted_sections: Array<{
+    line: number;
+    heading: string;
+    status: string;
+    reviewed_by: string;
+    reviewed_at: string;
+    source: string;
+    prompt_summary: string;
+  }>;
   labels: string[];
   cross_references: Array<{ key: string; target_kind: string; resolved: boolean }>;
 }

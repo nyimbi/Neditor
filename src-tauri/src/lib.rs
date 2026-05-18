@@ -113,6 +113,7 @@ struct SemanticDocument {
     layout_directives: Vec<String>,
     comments: Vec<ReviewComment>,
     ai_sources: Vec<AiSource>,
+    ai_assisted_sections: Vec<AiAssistedSection>,
     labels: Vec<String>,
     cross_references: Vec<CrossReference>,
 }
@@ -173,8 +174,20 @@ struct AiSource {
     provider: String,
     model: String,
     date: String,
+    prompt_summary: String,
     reviewed_by: String,
     status: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AiAssistedSection {
+    line: usize,
+    heading: String,
+    status: String,
+    reviewed_by: String,
+    reviewed_at: String,
+    source: String,
+    prompt_summary: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -267,6 +280,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
     let layout_directives = collect_fence_bodies(&interpolated, "layout");
     let comments = collect_comments(&interpolated);
     let ai_sources = collect_ai_sources(&interpolated);
+    let ai_assisted_sections = collect_ai_assisted_sections(&interpolated, &headings);
     let with_toc = inject_generated_sections(
         &interpolated,
         &metadata,
@@ -322,6 +336,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
         &duplicate_bibliography_keys,
         &comments,
         &ai_sources,
+        &ai_assisted_sections,
         !bibliography.is_empty(),
         &mut diagnostics,
     );
@@ -380,6 +395,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
         layout_directives,
         comments,
         ai_sources,
+        ai_assisted_sections,
         labels,
         cross_references,
     };
@@ -2089,6 +2105,11 @@ fn collect_ai_sources(text: &str) -> Vec<AiSource> {
                 provider: map.get("provider").cloned().unwrap_or_default(),
                 model: map.get("model").cloned().unwrap_or_default(),
                 date: map.get("date").cloned().unwrap_or_default(),
+                prompt_summary: map
+                    .get("promptSummary")
+                    .or_else(|| map.get("prompt"))
+                    .cloned()
+                    .unwrap_or_default(),
                 reviewed_by: map.get("reviewedBy").cloned().unwrap_or_default(),
                 status: map
                     .get("status")
@@ -2099,6 +2120,85 @@ fn collect_ai_sources(text: &str) -> Vec<AiSource> {
         .collect()
 }
 
+fn collect_ai_assisted_sections(text: &str, headings: &[Heading]) -> Vec<AiAssistedSection> {
+    text.lines()
+        .enumerate()
+        .filter_map(|(index, line)| {
+            let line_number = index + 1;
+            let trimmed = line.trim();
+            if let Some(content) = trimmed
+                .strip_prefix("<!-- ai-assisted:")
+                .and_then(|content| content.strip_suffix("-->"))
+            {
+                return Some(parse_ai_assisted_section(line_number, content, headings));
+            }
+            if trimmed == "<!-- draft: AI paste cleanup review required -->" {
+                return Some(AiAssistedSection {
+                    line: line_number,
+                    heading: ai_section_heading(line_number, headings),
+                    status: "needs-review".to_string(),
+                    reviewed_by: String::new(),
+                    reviewed_at: String::new(),
+                    source: "AI paste cleanup".to_string(),
+                    prompt_summary: "AI paste cleanup review required".to_string(),
+                });
+            }
+            None
+        })
+        .collect()
+}
+
+fn parse_ai_assisted_section(
+    line: usize,
+    content: &str,
+    headings: &[Heading],
+) -> AiAssistedSection {
+    let mut status = "needs-review".to_string();
+    let mut reviewed_by = String::new();
+    let mut reviewed_at = String::new();
+    let mut source = String::new();
+    let mut prompt_summary = String::new();
+
+    for part in content
+        .split('|')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+    {
+        if matches!(part, "human-reviewed" | "needs-review" | "unreviewed") {
+            status = part.to_string();
+        } else if let Some((key, value)) = part.split_once(':').or_else(|| part.split_once('=')) {
+            let key = key.trim();
+            let value = value.trim().to_string();
+            match key {
+                "status" => status = value,
+                "reviewedBy" | "reviewer" => reviewed_by = value,
+                "reviewedAt" | "reviewDate" => reviewed_at = value,
+                "source" => source = value,
+                "promptSummary" | "prompt" => prompt_summary = value,
+                _ => {}
+            }
+        }
+    }
+
+    AiAssistedSection {
+        line,
+        heading: ai_section_heading(line, headings),
+        status,
+        reviewed_by,
+        reviewed_at,
+        source,
+        prompt_summary,
+    }
+}
+
+fn ai_section_heading(line: usize, headings: &[Heading]) -> String {
+    headings
+        .iter()
+        .min_by_key(|heading| heading.line.abs_diff(line))
+        .map(|heading| heading.text.clone())
+        .unwrap_or_else(|| "Document body".to_string())
+}
+
 fn validate_document(
     metadata: &Value,
     citations: &[String],
@@ -2106,6 +2206,7 @@ fn validate_document(
     duplicate_bibliography_keys: &[String],
     comments: &[ReviewComment],
     ai_sources: &[AiSource],
+    ai_assisted_sections: &[AiAssistedSection],
     has_bibliography_source: bool,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
@@ -2199,13 +2300,16 @@ fn validate_document(
     if ai_sources
         .iter()
         .any(|source| source.status != "human-reviewed")
+        || ai_assisted_sections
+            .iter()
+            .any(|section| section.status != "human-reviewed")
     {
         diagnostics.push(diag(
             "warning",
             "Document has AI-assisted sections that are not human-reviewed.",
             None,
             None,
-            Some("Mark AI source blocks as human-reviewed after review."),
+            Some("Mark AI source blocks and AI-assisted section markers as human-reviewed after review."),
         ));
     }
 }
@@ -5012,6 +5116,11 @@ paths:
             .ai_sources
             .iter()
             .any(|source| source.provider == "OpenAI" && source.status == "human-reviewed"));
+        assert!(response
+            .semantic
+            .ai_sources
+            .iter()
+            .any(|source| source.prompt_summary == "board-pack synthesis"));
         assert_eq!(response.semantic.tables, 1);
         assert_eq!(response.semantic.figures, 1);
         assert_eq!(response.semantic.equations, 1);
@@ -5127,6 +5236,47 @@ paths:
         assert!(bundled_text.contains("Verify board-pack export fidelity."));
         assert!(bundled_text.contains("OpenAI / gpt-5.4"));
         assert!(bundled_manifest.contains("\"document_title\": \"Export Conformance Report\""));
+    }
+
+    #[test]
+    fn compiler_tracks_ai_assisted_section_review_status() {
+        let source = "---\ntitle: AI Review\nstatus: approved\napprovedBy: QA\n---\n<!-- ai-assisted: status=needs-review | source=ChatGPT | promptSummary=Drafted risk language -->\n# Risk Review\nBody.\n\n<!-- ai-assisted: status=human-reviewed | reviewedBy=Jane Doe | reviewedAt=2026-05-18 | source=Claude | promptSummary=Edited executive summary -->\n## Executive Summary\nReviewed body.\n";
+        let response = compile(CompileRequest {
+            text: source.to_string(),
+            file_path: None,
+        });
+
+        assert_eq!(response.semantic.ai_assisted_sections.len(), 2);
+        assert_eq!(
+            response.semantic.ai_assisted_sections[0].heading,
+            "Risk Review"
+        );
+        assert_eq!(
+            response.semantic.ai_assisted_sections[0].prompt_summary,
+            "Drafted risk language"
+        );
+        assert_eq!(
+            response.semantic.ai_assisted_sections[1].reviewed_by,
+            "Jane Doe"
+        );
+        assert_eq!(
+            response.semantic.ai_assisted_sections[1].heading,
+            "Executive Summary"
+        );
+        assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("AI-assisted sections that are not human-reviewed")));
+
+        let report = prepare_for_export(PrepareExportRequest {
+            text: source.to_string(),
+            file_path: None,
+            target: "pdf".to_string(),
+            options: json!({ "includeProvenance": true }),
+        });
+        assert!(!report.ready);
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("AI-assisted sections that are not human-reviewed")));
     }
 
     #[test]
@@ -5578,6 +5728,12 @@ paths:
             .cleaned_markdown
             .contains("Revenue grew 24%. <!-- TODO: citation needed -->"));
         assert!(response.cleaned_markdown.contains("```ai-source"));
+        assert!(response
+            .cleaned_markdown
+            .contains("ai-assisted: status=needs-review"));
+        assert!(response
+            .cleaned_markdown
+            .contains("promptSummary: AI paste cleanup"));
         assert!(response.issues.len() >= 4);
     }
 
