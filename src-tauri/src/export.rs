@@ -431,7 +431,11 @@ pub(crate) fn render_pptx_bytes(
         .map_err(|err| err.to_string())?;
     zip.start_file("docProps/app.xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_pptx_app_properties(response, slides.len()).as_bytes())
+    let notes_count = slides
+        .iter()
+        .filter(|slide| !slide.notes.is_empty())
+        .count();
+    zip.write_all(render_pptx_app_properties(response, slides.len(), notes_count).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.add_directory("ppt/_rels/", options)
         .map_err(|err| err.to_string())?;
@@ -665,12 +669,16 @@ fn render_docx_app_properties(response: &CompileResponse) -> String {
     )
 }
 
-fn render_pptx_app_properties(response: &CompileResponse, slide_count: usize) -> String {
+fn render_pptx_app_properties(
+    response: &CompileResponse,
+    slide_count: usize,
+    notes_count: usize,
+) -> String {
     let company = metadata_string(&response.metadata, "brand.name")
         .or_else(|| metadata_string(&response.metadata, "client"))
         .unwrap_or_else(|| "NEditor".to_string());
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>NEditor</Application><PresentationFormat>On-screen Show (16:9)</PresentationFormat><Slides>{slide_count}</Slides><Notes>0</Notes><HiddenSlides>0</HiddenSlides><Company>{}</Company><AppVersion>{}</AppVersion></Properties>"#,
+        r#"<?xml version="1.0" encoding="UTF-8"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>NEditor</Application><PresentationFormat>On-screen Show (16:9)</PresentationFormat><Slides>{slide_count}</Slides><Notes>{notes_count}</Notes><HiddenSlides>0</HiddenSlides><Company>{}</Company><AppVersion>{}</AppVersion></Properties>"#,
         escape_xml(&company),
         escape_xml(env!("CARGO_PKG_VERSION"))
     )

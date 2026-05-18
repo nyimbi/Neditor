@@ -6113,6 +6113,7 @@ paths:
         assert!(pptx_core.contains("<cp:category>approved</cp:category>"));
         assert!(pptx_app.contains("<Application>NEditor</Application>"));
         assert!(pptx_app.contains("<Slides>"));
+        assert!(pptx_app.contains("<Notes>0</Notes>"));
         assert!(
             render_markdown_bundle_bytes(&response, &response.export_manifest)
                 .expect("bundle bytes")
@@ -6151,6 +6152,7 @@ paths:
 
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
         let pptx_content_types = zip_entry_text(&pptx, "[Content_Types].xml");
+        let pptx_app = zip_entry_text(&pptx, "docProps/app.xml");
         let presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
         let slide_two_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide2.xml.rels");
         let slide_four_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide4.xml.rels");
@@ -6158,6 +6160,7 @@ paths:
         let pptx_svg = zip_entry_text(&pptx, "ppt/media/image1.svg");
         assert!(pptx_content_types.contains(r#"ContentType="image/svg+xml""#));
         assert!(pptx_content_types.contains("presentationml.notesSlide+xml"));
+        assert!(pptx_app.contains("<Notes>1</Notes>"));
         assert!(presentation.contains(r#"r:id="rId2""#));
         let slide_two = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
         assert!(slide_two.contains("Semantic Exports"));
