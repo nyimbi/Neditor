@@ -322,7 +322,39 @@
             {{ path }}
           </button>
           <h3>Transform engines</h3>
-          <p v-for="engine in store.transformEngines" :key="String(engine.name)">{{ engine.name }}: {{ engine.execution }}</p>
+          <label>
+            Timeout
+            <input
+              :value="store.transformTimeoutMs"
+              type="number"
+              min="1"
+              max="30000"
+              step="250"
+              @change="store.setTransformTimeout(Number(eventValue($event)))"
+            />
+          </label>
+          <article v-for="engine in store.externalTransformEngines" :key="engine.name" class="engine-row">
+            <h4>{{ engine.name }}</h4>
+            <small>{{ engine.execution }}</small>
+            <label>
+              Engine path
+              <span class="path-picker">
+                <input :value="store.transformEnginePaths[engine.name] || ''" @change="store.setTransformEnginePath(engine.name, eventValue($event))" />
+                <button type="button" @click="chooseTransformEngine(engine.name)">Choose</button>
+              </span>
+            </label>
+            <label><input :checked="Boolean(store.trustedTransformEngines[engine.name])" type="checkbox" @change="store.setTransformTrust(engine.name, eventChecked($event))" /> Trusted</label>
+            <label>
+              Input
+              <select :value="store.transformInputModes[engine.name] || 'stdin'" @change="store.setTransformInputMode(engine.name, eventValue($event) === 'file' ? 'file' : 'stdin')">
+                <option v-for="mode in engine.inputModes" :key="mode" :value="mode">{{ mode }}</option>
+              </select>
+            </label>
+            <button type="button" @click="store.testExternalTransform(engine.name)">Probe</button>
+          </article>
+          <p v-for="engine in store.transformEngines.filter((candidate) => !candidate.requiresExecution)" :key="engine.name" class="engine-summary">
+            {{ engine.name }}: {{ engine.execution }}
+          </p>
         </template>
       </aside>
 
@@ -676,6 +708,21 @@ async function openFolder() {
     multiple: false,
   });
   if (typeof selected === "string") await store.openFolder(selected);
+}
+
+function eventValue(event: Event) {
+  return event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement ? event.target.value : "";
+}
+
+function eventChecked(event: Event) {
+  return event.target instanceof HTMLInputElement ? event.target.checked : false;
+}
+
+async function chooseTransformEngine(name: string) {
+  const selected = await open({
+    multiple: false,
+  });
+  if (typeof selected === "string") await store.setTransformEnginePath(name, selected);
 }
 
 async function saveDocument() {
@@ -1326,6 +1373,36 @@ select:hover {
 
 .snapshot-row p {
   margin: 0 0 4px;
+}
+
+.engine-row {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid #c9d2dc;
+  background: #ffffff;
+}
+
+.engine-row h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.path-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.path-picker input {
+  min-width: 0;
+}
+
+.engine-summary {
+  margin: 4px 0;
+  color: #526171;
+  font-size: 12px;
 }
 
 .table-actions {

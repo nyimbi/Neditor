@@ -111,6 +111,22 @@ export interface ExportManifest {
   app_version: string;
 }
 
+export interface TransformEngineMetadata {
+  name: string;
+  execution: string;
+  available: boolean;
+  requiresExecution: boolean;
+  preferenceKey: string;
+  inputModes: Array<"stdin" | "file" | string>;
+  limits: {
+    timeoutMs: number;
+    maxTimeoutMs: number;
+    maxInputBytes: number;
+  };
+  cacheScope: string;
+  exportTargets: string[];
+}
+
 export interface OpenDocument {
   id: string;
   path: string | null;

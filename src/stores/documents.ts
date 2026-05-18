@@ -10,6 +10,7 @@ import type {
   GitStatus,
   OpenDocument,
   SnapshotListItem,
+  TransformEngineMetadata,
   WorkspaceFileEntry,
 } from "../types";
 
@@ -28,6 +29,10 @@ interface PersistedWorkspace {
   workspaceRoot?: string | null;
   openFiles?: string[];
   activePath?: string | null;
+  transformEnginePaths?: Record<string, string>;
+  trustedTransformEngines?: Record<string, boolean>;
+  transformInputModes?: Record<string, "stdin" | "file">;
+  transformTimeoutMs?: number;
 }
 
 interface FileMetadataResponse {
@@ -184,7 +189,11 @@ export const useDocumentsStore = defineStore("documents", {
     ignoredConflictHash: "",
     watchSignature: "",
     watchedPaths: [] as string[],
-    transformEngines: [] as Array<Record<string, unknown>>,
+    transformEngines: [] as TransformEngineMetadata[],
+    transformEnginePaths: {} as Record<string, string>,
+    trustedTransformEngines: {} as Record<string, boolean>,
+    transformInputModes: {} as Record<string, "stdin" | "file">,
+    transformTimeoutMs: 5000,
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
     aiCleanupIssues: [] as string[],
@@ -206,6 +215,9 @@ export const useDocumentsStore = defineStore("documents", {
       const doc = this.activeDocument;
       return `${doc.dirty ? "* " : ""}${doc.title} - NEditor`;
     },
+    externalTransformEngines(state): TransformEngineMetadata[] {
+      return state.transformEngines.filter((engine) => engine.requiresExecution);
+    },
   },
   actions: {
     async boot() {
@@ -216,7 +228,7 @@ export const useDocumentsStore = defineStore("documents", {
       await this.refreshGitStatus();
       await this.listSnapshots();
       try {
-        this.transformEngines = await invoke("list_transform_engines");
+        this.transformEngines = await invoke<TransformEngineMetadata[]>("list_transform_engines");
       } catch {
         this.transformEngines = [];
       }
@@ -233,6 +245,12 @@ export const useDocumentsStore = defineStore("documents", {
         this.recentFolders = persisted.recentFolders || [];
         this.recentlyClosed = persisted.recentlyClosed || [];
         this.workspaceRoot = persisted.workspaceRoot || null;
+        this.transformEnginePaths = persisted.transformEnginePaths || {};
+        this.trustedTransformEngines = persisted.trustedTransformEngines || {};
+        this.transformInputModes = persisted.transformInputModes || {};
+        if (typeof persisted.transformTimeoutMs === "number") {
+          this.transformTimeoutMs = Math.min(Math.max(persisted.transformTimeoutMs, 1), 30000);
+        }
         if (persisted.openFiles?.length) {
           await this.restoreWorkspace(persisted.openFiles, persisted.activePath || null, persisted.pinnedFiles || []);
         }
@@ -256,6 +274,10 @@ export const useDocumentsStore = defineStore("documents", {
           .filter((document) => document.pinned && document.path)
           .map((document) => document.path as string),
         activePath: this.activeDocument?.path || null,
+        transformEnginePaths: this.transformEnginePaths,
+        trustedTransformEngines: this.trustedTransformEngines,
+        transformInputModes: this.transformInputModes,
+        transformTimeoutMs: this.transformTimeoutMs,
       };
       await preferencesStore.set("workspace", workspace);
       await preferencesStore.save();
@@ -670,6 +692,43 @@ export const useDocumentsStore = defineStore("documents", {
       this.statusMessage = this.exportReadiness.ready
         ? "Document is ready for export"
         : `${this.exportReadiness.error_count} errors, ${this.exportReadiness.warning_count} warnings before export`;
+    },
+    async setTransformEnginePath(name: string, path: string) {
+      this.transformEnginePaths = { ...this.transformEnginePaths, [name]: path };
+      await this.persistWorkspace();
+    },
+    async setTransformTrust(name: string, trusted: boolean) {
+      this.trustedTransformEngines = { ...this.trustedTransformEngines, [name]: trusted };
+      await this.persistWorkspace();
+    },
+    async setTransformInputMode(name: string, mode: "stdin" | "file") {
+      this.transformInputModes = { ...this.transformInputModes, [name]: mode };
+      await this.persistWorkspace();
+    },
+    async setTransformTimeout(timeoutMs: number) {
+      this.transformTimeoutMs = Math.min(Math.max(Number(timeoutMs) || 1, 1), 30000);
+      await this.persistWorkspace();
+    },
+    async testExternalTransform(name: string) {
+      const engine = this.transformEngines.find((candidate) => candidate.name === name);
+      try {
+        const response = await invoke<{ diagnostics: Array<{ message: string }>; cache_key: string }>("run_external_transform", {
+          request: {
+            name,
+            body: "neditor transform probe\n",
+            engine_path: this.transformEnginePaths[name] || "",
+            trusted: Boolean(this.trustedTransformEngines[name]),
+            input_mode: this.transformInputModes[name] || "stdin",
+            timeout_ms: this.transformTimeoutMs,
+            max_input_bytes: engine?.limits.maxInputBytes,
+          },
+        });
+        const detail = response.diagnostics[0]?.message || response.cache_key;
+        this.statusMessage = `${name} transform probe succeeded: ${detail}`;
+      } catch (error) {
+        this.lastError = error instanceof Error ? error.message : String(error);
+        this.statusMessage = `${name} transform probe failed`;
+      }
     },
     async cleanAiPaste(text: string, mode: "insert" | "replace" | "appendix") {
       const response = await invoke<AiCleanupResponse>("cleanup_ai_paste", {
