@@ -37,6 +37,7 @@ interface ExportDefaults {
   includeComments: boolean;
   includeProvenance: boolean;
   includeGlossary: boolean;
+  includeAgenda: boolean;
 }
 
 interface BibliographyDefaults {
@@ -345,6 +346,7 @@ function normalizeExportDefaults(
     includeComments: typeof defaults.includeComments === "boolean" ? defaults.includeComments : true,
     includeProvenance: typeof defaults.includeProvenance === "boolean" ? defaults.includeProvenance : true,
     includeGlossary: typeof defaults.includeGlossary === "boolean" ? defaults.includeGlossary : true,
+    includeAgenda: typeof defaults.includeAgenda === "boolean" ? defaults.includeAgenda : true,
   };
 }
 
@@ -440,6 +442,7 @@ export const useDocumentsStore = defineStore("documents", {
       includeComments: true,
       includeProvenance: true,
       includeGlossary: true,
+      includeAgenda: true,
     } as ExportDefaults,
     bibliographyDefaults: normalizeBibliographyDefaults({}),
     brandProfileDefaults: normalizeBrandProfileDefaults({}),
@@ -1045,6 +1048,7 @@ export const useDocumentsStore = defineStore("documents", {
         includeComments: defaults.includeComments,
         includeProvenance: defaults.includeProvenance,
         includeGlossary: defaults.includeGlossary,
+        includeAgenda: defaults.includeAgenda,
         defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
         defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
         warnOnDirtyGit: this.gitIntegration.enabled && this.gitIntegration.warnOnDirtyExport,

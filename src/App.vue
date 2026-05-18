@@ -350,6 +350,7 @@
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Include comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
+          <label><input v-model="store.exportDefaults.includeAgenda" type="checkbox" /> PPTX agenda</label>
           <button type="button" @click="store.prepareForExport">Prepare for export</button>
           <button type="button" @click="exportDocument">Export document</button>
           <article v-if="store.exportReadiness" class="readiness" :class="{ ready: store.exportReadiness.ready }">
@@ -548,6 +549,7 @@
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Glossary</label>
+          <label><input v-model="store.exportDefaults.includeAgenda" type="checkbox" /> PPTX agenda</label>
           <h3>Bibliography defaults</h3>
           <label>
             Citation style
@@ -1165,6 +1167,7 @@ watch(
     store.exportDefaults.includeComments,
     store.exportDefaults.includeProvenance,
     store.exportDefaults.includeGlossary,
+    store.exportDefaults.includeAgenda,
   ],
   () => {
     void store.persistWorkspace();

@@ -233,6 +233,7 @@ fn validate_export_settings(
         "includeGlossary",
         "includeComments",
         "includeProvenance",
+        "includeAgenda",
     ] {
         if options.get(option).is_some_and(|value| !value.is_boolean()) {
             diagnostics.push(diag(

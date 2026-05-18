@@ -5890,6 +5890,25 @@ paths:
     }
 
     #[test]
+    fn pptx_export_can_include_an_agenda_from_options() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Agenda Export\nstatus: approved\napprovedBy: QA\n---\n# Agenda Export\nIntro.\n\n## Market\nBody.\n\n## Finance\nBody.\n".to_string(),
+            file_path: None,
+        });
+
+        let pptx =
+            render_pptx_bytes(&response, &json!({ "includeAgenda": true })).expect("pptx bytes");
+        let agenda_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        let body_slide = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
+
+        assert!(agenda_slide.contains("Agenda"));
+        assert!(agenda_slide.contains("Agenda Export"));
+        assert!(agenda_slide.contains("Market"));
+        assert!(agenda_slide.contains("Finance"));
+        assert!(body_slide.contains("Agenda Export"));
+    }
+
+    #[test]
     fn export_conformance_fixture_maps_business_features() {
         let response = compile(CompileRequest {
             text: include_str!("../fixtures/export/business_report.md").to_string(),
@@ -6276,12 +6295,13 @@ paths:
                 "layoutPreset": "dense",
                 "includeGlossary": "yes",
                 "includeComments": "yes",
-                "includeProvenance": "yes"
+                "includeProvenance": "yes",
+                "includeAgenda": "yes"
             }),
         });
 
         assert!(!report.ready);
-        assert_eq!(report.error_count, 11);
+        assert_eq!(report.error_count, 12);
         assert_eq!(report.manifest.export_target, "rtf");
         assert!(report
             .diagnostics
@@ -6318,6 +6338,9 @@ paths:
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("includeProvenance must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("includeAgenda must be true or false")));
     }
 
     #[test]
