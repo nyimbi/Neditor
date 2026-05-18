@@ -806,7 +806,8 @@ fn render_transform(
         "stl" => render_stl_svg(body, &mut artifact_diags, diagnostics),
         "vega-lite" => render_vega_lite_svg(body, &mut artifact_diags, diagnostics),
         "mermaid" => render_mermaid_svg(body, &mut artifact_diags, diagnostics),
-        "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" => {
+        "pikchr" => render_pikchr_svg(body, &mut artifact_diags, diagnostics),
+        "dot" | "graphviz" | "plantuml" | "d2" => {
             let message = format!("{name} transform captured as source artifact; configure an engine for rendered output.");
             let diagnostic = diag(
                 "warning",
@@ -2678,6 +2679,118 @@ fn render_mermaid_svg(
     svg
 }
 
+fn render_pikchr_svg(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let nodes = parse_pikchr_nodes(body);
+    if nodes.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "Pikchr native preview did not find any box or circle nodes.",
+            None,
+            None,
+            Some("Use simple lines such as box \"Start\"; arrow; box \"Done\", or configure an external Pikchr engine."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-pikchr transform-error\">No Pikchr nodes found</section>".to_string();
+    }
+    let has_arrows = body
+        .lines()
+        .any(|line| line.trim_start().starts_with("arrow"))
+        || nodes.len() > 1;
+    let width = nodes.len().max(1) * 190 + 60;
+    let mut svg = format!(
+        "<svg class=\"transform transform-pikchr\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} 180\" role=\"img\"><defs><marker id=\"pikchr-arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\"><path d=\"M0,0 L0,6 L9,3 z\" fill=\"#275DA8\"/></marker></defs>"
+    );
+    for (index, node) in nodes.iter().enumerate() {
+        let x = 40 + index * 190;
+        let y = 62;
+        if has_arrows && index + 1 < nodes.len() {
+            svg.push_str(&format!(
+                "<line x1=\"{}\" y1=\"90\" x2=\"{}\" y2=\"90\" stroke=\"#275DA8\" stroke-width=\"3\" marker-end=\"url(#pikchr-arrow)\"/>",
+                x + 120,
+                x + 180
+            ));
+        }
+        match node.shape {
+            PikchrShape::Circle => {
+                svg.push_str(&format!(
+                    "<ellipse cx=\"{}\" cy=\"90\" rx=\"60\" ry=\"34\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
+                    x + 60
+                ));
+            }
+            PikchrShape::Box => {
+                svg.push_str(&format!(
+                    "<rect x=\"{x}\" y=\"{y}\" width=\"120\" height=\"56\" rx=\"6\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>"
+                ));
+            }
+        }
+        svg.push_str(&format!(
+            "<text x=\"{}\" y=\"95\" text-anchor=\"middle\" font-size=\"14\" fill=\"#111827\">{}</text>",
+            x + 60,
+            escape_html(&node.label)
+        ));
+    }
+    svg.push_str("</svg>");
+    svg
+}
+
+#[derive(Clone, Copy)]
+enum PikchrShape {
+    Box,
+    Circle,
+}
+
+struct PikchrNode {
+    shape: PikchrShape,
+    label: String,
+}
+
+fn parse_pikchr_nodes(body: &str) -> Vec<PikchrNode> {
+    body.lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with("box") {
+                Some(PikchrNode {
+                    shape: PikchrShape::Box,
+                    label: pikchr_label(trimmed, "box"),
+                })
+            } else if trimmed.starts_with("circle") || trimmed.starts_with("ellipse") {
+                let command = if trimmed.starts_with("circle") {
+                    "circle"
+                } else {
+                    "ellipse"
+                };
+                Some(PikchrNode {
+                    shape: PikchrShape::Circle,
+                    label: pikchr_label(trimmed, command),
+                })
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn pikchr_label(line: &str, command: &str) -> String {
+    extract_first_quoted(line)
+        .or_else(|| {
+            let rest = line.trim_start_matches(command).trim();
+            (!rest.is_empty()).then(|| rest.to_string())
+        })
+        .unwrap_or_else(|| command.to_string())
+}
+
+fn extract_first_quoted(text: &str) -> Option<String> {
+    let start = text.find('"')?;
+    let after_start = &text[start + 1..];
+    let end = after_start.find('"')?;
+    Some(after_start[..end].to_string())
+}
+
 #[derive(Debug)]
 struct MermaidGraph {
     nodes: Vec<MermaidNode>,
@@ -3963,14 +4076,17 @@ paths:
         }
 
         let response = compile(CompileRequest {
-            text: "---\ntitle: Diagram\n---\n# Diagram\n```pikchr\nbox \"A\"\n```\n".to_string(),
+            text:
+                "---\ntitle: Diagram\n---\n# Diagram\n```pikchr\nbox \"A\"\narrow\nbox \"B\"\n```\n"
+                    .to_string(),
             file_path: None,
         });
-        assert!(response.html.contains("transform-pending"));
-        assert!(response
+        assert!(response.html.contains("transform-pikchr"));
+        assert!(response.html.contains("pikchr-arrow"));
+        assert!(!response
             .diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.message.contains("pikchr transform captured")));
+            .any(|diagnostic| diagnostic.message.contains("Pikchr native preview")));
     }
 
     #[test]
