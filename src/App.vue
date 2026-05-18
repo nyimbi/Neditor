@@ -225,6 +225,10 @@
               <dd>{{ definition }}</dd>
             </template>
           </dl>
+          <h3>Index</h3>
+          <button v-for="term in active.compile?.index_terms || []" :key="term" class="outline-row" type="button" @click="goToSearchTerm(term)">
+            {{ term }}
+          </button>
           <h3>Tables</h3>
           <article v-for="table in active.compile?.semantic.table_summaries || []" :key="table.line" class="snapshot-row">
             <p>{{ table.rows }} rows | {{ table.columns.join(", ") }}</p>
@@ -488,7 +492,7 @@
           <h2>Command Palette</h2>
           <button type="button" @click="commandPaletteOpen = false">x</button>
         </header>
-        <input v-model="commandQuery" autofocus placeholder="Search commands, headings, citations, glossary terms" />
+        <input v-model="commandQuery" autofocus placeholder="Search commands, headings, citations, glossary, index terms" />
         <button
           v-for="command in filteredCommands"
           :key="command.name"
@@ -677,6 +681,14 @@ const commands = computed(() => [
       store.sidebar = "references";
     },
   })),
+  ...((active.value.compile?.index_terms || []).map((term) => ({
+    name: term,
+    group: "Index",
+    run: () => {
+      store.sidebar = "references";
+      goToSearchTerm(term);
+    },
+  }))),
   ...((active.value.compile?.diagnostics || []).map((diagnostic) => ({
     name: diagnostic.message,
     group: `Diagnostic ${diagnostic.severity}`,
@@ -1449,6 +1461,18 @@ function goToLine(lineNumber: number) {
   if (!editorView) return;
   const line = editorView.state.doc.line(Math.max(1, Math.min(lineNumber, editorView.state.doc.lines)));
   editorView.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: "center" }) });
+  editorView.focus();
+}
+
+function goToSearchTerm(term: string) {
+  if (!editorView || !term.trim()) return;
+  const text = editorView.state.doc.toString();
+  const index = text.toLowerCase().indexOf(term.toLowerCase());
+  if (index < 0) return;
+  editorView.dispatch({
+    selection: { anchor: index, head: index + term.length },
+    effects: EditorView.scrollIntoView(index, { y: "center" }),
+  });
   editorView.focus();
 }
 
