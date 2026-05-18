@@ -2003,7 +2003,9 @@ fn appendix_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String
     .collect()
 }
 
-#[derive(Debug)]
+const PPTX_TABLE_ROWS_PER_SLIDE: usize = 8;
+
+#[derive(Clone, Debug)]
 struct PptxSlide {
     title: String,
     lines: Vec<String>,
@@ -2178,6 +2180,7 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
         ));
     }
     let (header, footer) = export_header_footer(response, options);
+    let slides = expand_pptx_table_slides(slides);
     slides
         .into_iter()
         .map(|mut slide| {
@@ -2190,6 +2193,84 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
             slide
         })
         .collect()
+}
+
+fn expand_pptx_table_slides(slides: Vec<PptxSlide>) -> Vec<PptxSlide> {
+    let mut expanded = Vec::new();
+    for slide in slides {
+        if slide
+            .tables
+            .iter()
+            .all(|table| table.rows.len() <= PPTX_TABLE_ROWS_PER_SLIDE)
+        {
+            expanded.push(slide);
+            continue;
+        }
+
+        let mut base = slide.clone();
+        base.tables.clear();
+        let mut emitted_any = false;
+        for table in &slide.tables {
+            for (chunk_index, table_chunk) in pptx_table_chunks(table).into_iter().enumerate() {
+                let mut next_slide = if !emitted_any {
+                    let mut slide = base.clone();
+                    slide.lines = vec![table_export_line(
+                        &table_chunk.id,
+                        &table_chunk.caption,
+                        &table_chunk.headers,
+                    )];
+                    slide
+                } else {
+                    PptxSlide::with_lines(
+                        format!("{} (continued)", slide.title),
+                        vec![table_export_line(
+                            &table_chunk.id,
+                            &table_chunk.caption,
+                            &table_chunk.headers,
+                        )],
+                    )
+                };
+                if chunk_index > 0 && next_slide.lines.is_empty() {
+                    next_slide.lines.push(table_export_line(
+                        &table_chunk.id,
+                        &table_chunk.caption,
+                        &table_chunk.headers,
+                    ));
+                }
+                next_slide.tables.push(table_chunk);
+                expanded.push(next_slide);
+                emitted_any = true;
+            }
+        }
+    }
+    expanded
+}
+
+fn pptx_table_chunks(table: &PptxTable) -> Vec<PptxTable> {
+    if table.rows.len() <= PPTX_TABLE_ROWS_PER_SLIDE {
+        return vec![table.clone()];
+    }
+    table
+        .rows
+        .chunks(PPTX_TABLE_ROWS_PER_SLIDE)
+        .enumerate()
+        .map(|(index, rows)| pptx_table_chunk(table, rows.to_vec(), index > 0))
+        .collect()
+}
+
+fn pptx_table_chunk(table: &PptxTable, rows: Vec<Vec<String>>, continued: bool) -> PptxTable {
+    let caption = if continued {
+        Some(table.caption.clone().unwrap_or_else(|| "Table".to_string()) + " (continued)")
+    } else {
+        table.caption.clone()
+    };
+    PptxTable {
+        id: table.id.clone(),
+        caption,
+        headers: table.headers.clone(),
+        alignments: table.alignments.clone(),
+        rows,
+    }
 }
 
 fn include_pptx_agenda(response: &CompileResponse, options: &Value) -> bool {

@@ -6238,6 +6238,36 @@ paths:
     }
 
     #[test]
+    fn pptx_export_splits_large_tables_across_slides() {
+        let rows = (1..=20)
+            .map(|index| format!("| Row {index} | {index} |"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let response = compile(CompileRequest {
+            text: format!(
+                "---\ntitle: Large Table Deck\nstatus: approved\napprovedBy: QA\n---\n# Large Table Deck\n\nTable: Row audit {{#tbl:rows}}\n| Label | Value |\n| --- | ---: |\n{rows}\n"
+            ),
+            file_path: None,
+        });
+
+        let pptx = render_pptx_bytes(&response, &json!({})).expect("pptx bytes");
+        let presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
+        let slide_two = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        let slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
+        let slide_four = zip_entry_text(&pptx, "ppt/slides/slide4.xml");
+        assert!(presentation.contains(r#"r:id="rId4""#));
+        assert!(slide_two.contains("<a:tbl>"));
+        assert!(slide_two.contains("Row 1"));
+        assert!(slide_two.contains("Row 8"));
+        assert!(!slide_two.contains("Row 9"));
+        assert!(slide_three.contains("Row audit (continued)"));
+        assert!(slide_three.contains("Row 9"));
+        assert!(slide_three.contains("Row 16"));
+        assert!(slide_four.contains("Row audit (continued)"));
+        assert!(slide_four.contains("Row 20"));
+    }
+
+    #[test]
     fn export_conformance_fixture_maps_business_features() {
         let response = compile(CompileRequest {
             text: include_str!("../fixtures/export/business_report.md").to_string(),
