@@ -1086,7 +1086,7 @@ function buildSemanticEditorDecorations(view: EditorView) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-front-matter" }));
       continue;
     }
-    if (/^\s*\{\{(?:page-break|section-break)\b/.test(text) || /^\s*```layout\b/.test(text)) {
+    if (/^\s*\{\{(?:page-break|section-break|slide)\b/.test(text) || /^\s*```layout\b/.test(text)) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-layout-token" }));
       continue;
     }

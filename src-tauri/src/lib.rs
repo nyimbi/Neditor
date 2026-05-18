@@ -1506,6 +1506,12 @@ fn render_layout_tokens(markdown: &str) -> String {
                     escape_html(attributes),
                     style_attribute(&style)
                 )
+            } else if let Some(rest) = trimmed.strip_prefix("{{slide") {
+                let attributes = rest.trim_end_matches("}}").trim();
+                format!(
+                    "<section class=\"slide-break\" data-layout=\"slide\" data-options=\"{}\"></section>",
+                    escape_html(attributes)
+                )
             } else {
                 line.to_string()
             }
@@ -5080,7 +5086,7 @@ paths:
     #[test]
     fn semantic_exporters_map_ast_blocks() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n## Appendix\nAfter the break.\n".to_string(),
+            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n{{slide title=\"Board Review\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
             file_path: None,
         });
         let options = json!({ "watermark": "DRAFT" });
@@ -5121,7 +5127,10 @@ paths:
         assert!(slide_three.contains("Section"));
         assert!(slide_three.contains("Section break: columns=2"));
         let slide_four = zip_entry_text(&pptx, "ppt/slides/slide4.xml");
-        assert!(slide_four.contains("Appendix"));
+        assert!(slide_four.contains("Board Review"));
+        assert!(slide_four.contains("Slide-specific body."));
+        let slide_five = zip_entry_text(&pptx, "ppt/slides/slide5.xml");
+        assert!(slide_five.contains("Appendix"));
 
         let pdf = render_pdf_bytes(&response, &options);
         let pdf_text = String::from_utf8_lossy(&pdf);

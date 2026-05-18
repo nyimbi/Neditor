@@ -1158,6 +1158,16 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                     layout_export_lines(directive, options),
                 ));
             }
+            DocumentBlock::Layout {
+                directive, options, ..
+            } if directive == "slide" => {
+                if let Some(slide) = current.take() {
+                    if !slide.lines.is_empty() || slide.title != "Continued" {
+                        slides.push(slide);
+                    }
+                }
+                current = Some(PptxSlide::new(slide_title_from_options(options)));
+            }
             _ => {
                 if current.is_none() {
                     current = Some(PptxSlide::new("Document"));
@@ -1305,6 +1315,7 @@ fn layout_export_lines(directive: &str, options: &str) -> Vec<String> {
     let summary = layout_summary(options);
     let label = match directive {
         "section-break" => "Section break",
+        "slide" => "Slide",
         "layout" => "Layout",
         "page-break" => "Page break",
         _ => "Layout directive",
@@ -1327,6 +1338,38 @@ fn layout_summary(options: &str) -> String {
     } else {
         format!(": {}", parts.join(", "))
     }
+}
+
+fn slide_title_from_options(options: &str) -> String {
+    layout_option_text(options, "title").unwrap_or_else(|| {
+        let trimmed = options.trim();
+        if trimmed.is_empty() {
+            "Slide".to_string()
+        } else {
+            trimmed.to_string()
+        }
+    })
+}
+
+fn layout_option_text(text: &str, key: &str) -> Option<String> {
+    for line in text.lines() {
+        if let Some((candidate, value)) = line.split_once(':') {
+            if candidate.trim() == key {
+                return Some(value.trim().trim_matches('"').to_string());
+            }
+        }
+    }
+    let prefix = format!("{key}=");
+    let start = text.find(&prefix)? + prefix.len();
+    let value = &text[start..];
+    if let Some(quoted) = value.strip_prefix('"') {
+        return quoted.split_once('"').map(|(title, _)| title.to_string());
+    }
+    value
+        .split_whitespace()
+        .next()
+        .filter(|value| !value.is_empty())
+        .map(|value| value.trim_matches('"').to_string())
 }
 
 fn layout_columns(options: &str) -> Option<usize> {
