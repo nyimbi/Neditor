@@ -1320,6 +1320,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
         root_path.as_deref(),
         &mut diagnostics,
     );
+    validate_logo_path(&metadata, root_path.as_deref(), &mut diagnostics);
     validate_link_paths(
         &table_formula_markdown,
         root_path.as_deref(),
@@ -2434,6 +2435,36 @@ fn validate_image_paths(
                 Some("Create the image file or update the image path."),
             ));
         }
+    }
+}
+
+fn validate_logo_path(
+    metadata: &Value,
+    root_path: Option<&Path>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(logo) = metadata_string(metadata, "brand.logo")
+        .or_else(|| metadata_string(metadata, "layout.logo"))
+        .or_else(|| metadata_string(metadata, "logo"))
+    else {
+        return;
+    };
+    if logo.trim().is_empty() || !should_validate_local_link(&logo) {
+        return;
+    }
+    let base_dir = root_path
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let path = base_dir.join(&logo);
+    if !path.exists() {
+        diagnostics.push(diag(
+            "warning",
+            format!("Broken logo path: {}", path.display()),
+            Some(path_to_string(&path)),
+            None,
+            Some("Create the logo file or update the logo metadata path."),
+        ));
     }
 }
 
@@ -5405,6 +5436,9 @@ status: approved
 approvedBy: QA
 toc: true
 client: Acme
+brand:
+  name: Acme
+  logo: "data:image/svg+xml;base64,PHN2Zy8+"
 ---
 
 # Test Report
@@ -5605,7 +5639,7 @@ ARR: Annual recurring revenue.
         fs::write(root.join("docs").join("existing.md"), "# Existing").expect("write linked doc");
 
         let response = compile(CompileRequest {
-            text: "---\ntitle: Links\nstatus: approved\napprovedBy: QA\n---\n# Links\nRead [existing](docs/existing.md), [missing](docs/missing.md), [section](#links), and [web](https://example.com).\n![Missing image](docs/missing.png)\n".to_string(),
+            text: "---\ntitle: Links\nstatus: approved\napprovedBy: QA\nbrand:\n  logo: docs/missing-logo.svg\n---\n# Links\nRead [existing](docs/existing.md), [missing](docs/missing.md), [section](#links), and [web](https://example.com).\n![Missing image](docs/missing.png)\n".to_string(),
             file_path: Some(path_to_string(&root.join("root.md"))),
         });
 
@@ -5625,6 +5659,10 @@ ARR: Annual recurring revenue.
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("Broken image path")));
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Broken logo path")));
         fs::remove_dir_all(root).expect("clean link test dir");
     }
 
@@ -6374,6 +6412,7 @@ paths:
         let html = render_full_html(&response, &json!({ "watermark": "DRAFT" }));
         assert!(html.contains("<!doctype html>"));
         assert!(html.contains("class=\"cover\""));
+        assert!(html.contains("class=\"cover-logo\""));
         assert!(html.contains("Page {{page}} of {{pages}}") || html.contains("Page 1 of 1"));
         assert!(html.contains("DRAFT"));
         let options = json!({ "watermark": "DRAFT" });
@@ -6384,6 +6423,7 @@ paths:
         assert!(docx.len() > 100);
         let docx_document = zip_entry_text(&docx, "word/document.xml");
         assert!(docx_document.contains("Cover: Test Report"));
+        assert!(docx_document.contains("Logo: data:image/svg+xml"));
         assert!(docx_document.contains("Watermark: DRAFT"));
         let docx_core = zip_entry_text(&docx, "docProps/core.xml");
         assert!(docx_core.contains("<dc:title>Test Report</dc:title>"));

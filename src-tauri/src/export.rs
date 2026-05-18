@@ -33,6 +33,7 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
     let version = metadata_string(&response.metadata, "version");
     let classification = metadata_string(&response.metadata, "classification");
     let brand = metadata_string(&response.metadata, "brand.name");
+    let logo = export_logo(&response.metadata);
     let header_template = metadata_string(&response.metadata, "layout.header")
         .or_else(|| Some(response.semantic.title.clone()));
     let footer_template = metadata_string(&response.metadata, "layout.footer")
@@ -54,10 +55,18 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
         .collect::<String>();
     let appendix_sections = html_appendix_sections(response, options);
     format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title><style>{}</style></head><body><div class=\"running-header\">{}</div><section class=\"cover\"><h1>{}</h1>{}<p class=\"status\">{}</p>{}</section><main>{}{}</main><footer><strong>{}</strong><span>{}</span><small>{}</small></footer></body></html>",
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title><style>{}</style></head><body><div class=\"running-header\">{}</div><section class=\"cover\">{}<h1>{}</h1>{}<p class=\"status\">{}</p>{}</section><main>{}{}</main><footer><strong>{}</strong><span>{}</span><small>{}</small></footer></body></html>",
         escape_html(&response.semantic.title),
         export_css(brand_color, watermark),
         escape_html(&running_header),
+        logo
+            .as_ref()
+            .map(|src| format!(
+                "<img class=\"cover-logo\" src=\"{}\" alt=\"{} logo\"/>",
+                escape_html(src),
+                escape_html(&response.semantic.title)
+            ))
+            .unwrap_or_default(),
         escape_html(&response.semantic.title),
         subtitle
             .map(|value| format!("<p class=\"subtitle\">{}</p>", escape_html(&value)))
@@ -364,10 +373,20 @@ fn export_metadata_lines(response: &CompileResponse, options: &Value) -> Vec<Str
             lines.push(value);
         }
     }
+    if let Some(logo) = export_logo(&response.metadata) {
+        lines.push(format!("Logo: {logo}"));
+    }
     if !watermark.is_empty() {
         lines.push(format!("Watermark: {watermark}"));
     }
     lines
+}
+
+fn export_logo(metadata: &Value) -> Option<String> {
+    metadata_string(metadata, "brand.logo")
+        .or_else(|| metadata_string(metadata, "layout.logo"))
+        .or_else(|| metadata_string(metadata, "logo"))
+        .filter(|value| !value.trim().is_empty())
 }
 
 fn export_header_footer(response: &CompileResponse, _options: &Value) -> (String, String) {
@@ -1000,7 +1019,7 @@ fn render_pptx_slide(slide: &PptxSlide) -> String {
 
 fn export_css(brand_color: &str, watermark: &str) -> String {
     format!(
-        "body{{font-family:Inter,Arial,sans-serif;margin:48px;color:#1f2937;line-height:1.55}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:85vh;display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover h1{{font-size:44px;margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.export-glossary,.export-comments,.export-provenance{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:24mm;@top-center{{content:element(header)}}@bottom-center{{content:'Page ' counter(page) ' of ' counter(pages)}}}}",
+        "body{{font-family:Inter,Arial,sans-serif;margin:48px;color:#1f2937;line-height:1.55}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:85vh;display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:44px;margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.export-glossary,.export-comments,.export-provenance{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:24mm;@top-center{{content:element(header)}}@bottom-center{{content:'Page ' counter(page) ' of ' counter(pages)}}}}",
         escape_css(watermark)
     )
 }
