@@ -958,7 +958,7 @@ fn list_transform_engines() -> Vec<Value> {
         transform_engine("plantuml", "external-sidecar", false, true),
         transform_engine("d2", "external-sidecar", false, true),
         transform_engine("vega-lite", "static-diagnostic", true, false),
-        transform_engine("geojson", "static-diagnostic", true, false),
+        transform_engine("geojson", "rust-native-svg", true, false),
         transform_engine("topojson", "static-diagnostic", true, false),
         transform_engine("stl", "static-diagnostic", true, false),
         transform_engine("openapi", "rust-native", true, false),
@@ -1861,7 +1861,8 @@ fn render_transform(
         "openapi" => render_openapi_html(body, &mut artifact_diags, diagnostics),
         "json-schema" => render_json_schema_html(body, &mut artifact_diags, diagnostics),
         "bibtex" => render_bibtex_html(body, &mut artifact_diags, diagnostics),
-        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" | "vega-lite" | "geojson" | "topojson" | "stl" => {
+        "geojson" => render_geojson_svg(body, &mut artifact_diags, diagnostics),
+        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" | "vega-lite" | "topojson" | "stl" => {
             let message = format!("{name} transform captured as source artifact; configure an engine for rendered output.");
             let diagnostic = diag(
                 "warning",
@@ -3227,6 +3228,114 @@ fn render_chart_svg(body: &str) -> String {
     svg
 }
 
+fn render_geojson_svg(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let value = match serde_json::from_str::<Value>(body) {
+        Ok(value) => value,
+        Err(err) => {
+            let diagnostic = diag(
+                "error",
+                format!("Invalid GeoJSON document: {err}"),
+                None,
+                None,
+                Some("Provide valid GeoJSON Feature, FeatureCollection, or Geometry JSON."),
+            );
+            artifact_diags.push(diagnostic.clone());
+            diagnostics.push(diagnostic);
+            return "<section class=\"transform transform-geojson transform-error\">Invalid GeoJSON document</section>".to_string();
+        }
+    };
+    let mut positions = Vec::new();
+    collect_geojson_positions(&value, &mut positions);
+    if positions.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "GeoJSON transform did not contain drawable coordinates.",
+            None,
+            None,
+            Some("Add Point, LineString, Polygon, or Multi* coordinates."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-geojson transform-error\">No GeoJSON coordinates found</section>".to_string();
+    }
+    let positions = positions.into_iter().take(2000).collect::<Vec<_>>();
+    let (min_x, max_x, min_y, max_y) = geojson_bounds(&positions);
+    let points = positions
+        .iter()
+        .map(|position| {
+            let (x, y) = project_geojson_position(*position, min_x, max_x, min_y, max_y);
+            format!("{x:.2},{y:.2}")
+        })
+        .collect::<Vec<_>>();
+    let markers = points
+        .iter()
+        .map(|point| {
+            let (x, y) = point.split_once(',').unwrap_or(("0", "0"));
+            format!("<circle cx=\"{x}\" cy=\"{y}\" r=\"3\" fill=\"#0f766e\"/>")
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    format!(
+        "<svg class=\"transform transform-geojson\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#ecfeff\" stroke=\"#67e8f9\"/><polyline points=\"{}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"3\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>{markers}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#134e4a\">{} coordinates</text></svg>",
+        points.join(" "),
+        positions.len()
+    )
+}
+
+fn collect_geojson_positions(value: &Value, positions: &mut Vec<(f64, f64)>) {
+    match value {
+        Value::Array(items) => {
+            if items.len() >= 2 {
+                if let (Some(x), Some(y)) = (items[0].as_f64(), items[1].as_f64()) {
+                    positions.push((x, y));
+                    return;
+                }
+            }
+            for item in items {
+                collect_geojson_positions(item, positions);
+            }
+        }
+        Value::Object(map) => {
+            for value in map.values() {
+                collect_geojson_positions(value, positions);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn geojson_bounds(positions: &[(f64, f64)]) -> (f64, f64, f64, f64) {
+    positions.iter().fold(
+        (
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+        ),
+        |(min_x, max_x, min_y, max_y), (x, y)| {
+            (min_x.min(*x), max_x.max(*x), min_y.min(*y), max_y.max(*y))
+        },
+    )
+}
+
+fn project_geojson_position(
+    (x, y): (f64, f64),
+    min_x: f64,
+    max_x: f64,
+    min_y: f64,
+    max_y: f64,
+) -> (f64, f64) {
+    let width = (max_x - min_x).abs().max(0.000_001);
+    let height = (max_y - min_y).abs().max(0.000_001);
+    let projected_x = 48.0 + ((x - min_x) / width) * 804.0;
+    let projected_y = 412.0 - ((y - min_y) / height) * 364.0;
+    (projected_x, projected_y)
+}
+
 fn render_openapi_html(
     body: &str,
     artifact_diags: &mut Vec<DocumentDiagnostic>,
@@ -4398,6 +4507,31 @@ paths:
         assert_eq!(
             bibtex.get("execution").and_then(Value::as_str),
             Some("rust-native")
+        );
+    }
+
+    #[test]
+    fn geojson_transform_renders_static_svg_preview() {
+        let artifact = run_transform(
+            "geojson".to_string(),
+            r#"{"type":"Feature","geometry":{"type":"LineString","coordinates":[[36.80,-1.30],[36.85,-1.26],[36.90,-1.28]]}}"#.to_string(),
+        )
+        .expect("geojson transform");
+
+        assert_eq!(artifact.output_kind, "svg");
+        assert!(artifact.html.contains("transform-geojson"));
+        assert!(artifact.html.contains("<polyline"));
+        assert!(artifact.html.contains("3 coordinates"));
+        assert!(artifact.diagnostics.is_empty());
+
+        let engines = list_transform_engines();
+        let geojson = engines
+            .iter()
+            .find(|engine| engine.get("name").and_then(Value::as_str) == Some("geojson"))
+            .expect("geojson engine metadata");
+        assert_eq!(
+            geojson.get("execution").and_then(Value::as_str),
+            Some("rust-native-svg")
         );
     }
 
