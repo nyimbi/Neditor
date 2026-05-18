@@ -1042,6 +1042,10 @@ function editorExtensions() {
         color: "#155e75",
         backgroundColor: "rgba(14, 116, 144, 0.12)",
       },
+      ".cm-neditor-ai-assisted": {
+        color: "#166534",
+        backgroundColor: "rgba(34, 197, 94, 0.12)",
+      },
     }),
   ];
 }
@@ -1078,6 +1082,10 @@ function buildSemanticEditorDecorations(view: EditorView) {
     }
     if (/^\s*<!--\s*comment:/.test(text)) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-review-comment" }));
+      continue;
+    }
+    if (/^\s*<!--\s*(?:ai-assisted:|draft:\s*AI paste cleanup review required)/.test(text)) {
+      builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-ai-assisted" }));
       continue;
     }
     if (/^\s*```ai-source\b/.test(text)) {
