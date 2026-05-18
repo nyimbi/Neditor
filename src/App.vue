@@ -205,6 +205,7 @@
           <h3>Citations</h3>
           <p v-for="citation in active.compile?.semantic.citation_references || []" :key="`${citation.key}-${citation.locator || ''}`">
             [@{{ citation.key }}<template v-if="citation.locator">, {{ citation.locator }}</template>]
+            <small>{{ bibliographyByKey.get(citation.key) || "Missing bibliography entry" }}</small>
           </p>
           <template v-if="active.compile?.semantic.duplicate_bibliography_keys.length">
             <h3>Duplicate keys</h3>
@@ -521,6 +522,7 @@ const wordStats = computed(() => {
   return `${words} words | ${text.length} characters | ${minutes} min read`;
 });
 const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
+const bibliographyByKey = computed(() => new Map((active.value.compile?.bibliography || []).map((entry) => [entry.key, entry.title])));
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
 const selectedTable = computed(() => markdownTables.value[selectedTableIndex.value] || null);
 const tableColumnTotals = computed(() => {
@@ -1633,7 +1635,13 @@ select:hover {
 
 .preview-document .citation {
   color: #174a8c;
+  cursor: help;
   font-weight: 600;
+}
+
+.preview-document .citation:focus {
+  outline: 2px solid #275da8;
+  outline-offset: 2px;
 }
 
 .preview-document pre,

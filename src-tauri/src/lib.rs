@@ -2584,8 +2584,24 @@ fn render_citation_span(references: &[CitationReference], titles: &HashMap<&str,
         })
         .collect::<Vec<_>>()
         .join("; ");
+    let details = references
+        .iter()
+        .map(|reference| {
+            let title = titles
+                .get(reference.key.as_str())
+                .copied()
+                .unwrap_or("missing bibliography entry");
+            match &reference.locator {
+                Some(locator) => format!("@{} ({locator}): {title}", reference.key),
+                None => format!("@{}: {title}", reference.key),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
     format!(
-        "<span class=\"citation\" data-citation-keys=\"{}\">({})</span>",
+        "<span class=\"citation\" tabindex=\"0\" title=\"{}\" aria-label=\"Citation: {}\" data-citation-keys=\"{}\">({})</span>",
+        escape_html(&details),
+        escape_html(&details),
         escape_html(&keys),
         escape_html(&label)
     )
@@ -3822,6 +3838,12 @@ ARR: Annual recurring revenue.
         assert!(response
             .html
             .contains("Competitive Advantage, p. 42; Evidence Based Reports"));
+        assert!(response
+            .html
+            .contains("title=\"@porter1985 (p. 42): Competitive Advantage; @doe2026: Evidence Based Reports\""));
+        assert!(response
+            .html
+            .contains("aria-label=\"Citation: @porter1985 (p. 42): Competitive Advantage; @doe2026: Evidence Based Reports\""));
         assert!(response.html.contains("<figure"));
         assert!(response.html.contains("System diagram"));
         assert!(response
