@@ -245,6 +245,10 @@
               <option value="markdown-bundle">Markdown bundle</option>
             </select>
           </label>
+          <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
+          <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Include comments</label>
+          <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
+          <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
           <button type="button" @click="store.prepareForExport">Prepare for export</button>
           <button type="button" @click="exportDocument">Export document</button>
           <article v-if="store.exportReadiness" class="readiness" :class="{ ready: store.exportReadiness.ready }">
@@ -332,6 +336,11 @@
             Snapshot interval
             <input v-model.number="store.snapshotIntervalMs" type="number" min="30000" max="3600000" step="30000" />
           </label>
+          <h3>Export defaults</h3>
+          <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Manifest next to export</label>
+          <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Comments</label>
+          <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> AI provenance</label>
+          <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Glossary</label>
           <h3>Typography</h3>
           <label>
             Editor font
@@ -730,6 +739,18 @@ watch(
 
 watch(
   () => store.exportTarget,
+  () => {
+    void store.persistWorkspace();
+  },
+);
+
+watch(
+  () => [
+    store.exportDefaults.includeManifest,
+    store.exportDefaults.includeComments,
+    store.exportDefaults.includeProvenance,
+    store.exportDefaults.includeGlossary,
+  ],
   () => {
     void store.persistWorkspace();
   },

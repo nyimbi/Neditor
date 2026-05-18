@@ -21,6 +21,13 @@ let preferencesStore: Store | null = null;
 let unwatchFileChanges: UnlistenFn | UnwatchFn | null = null;
 let unwatchFileErrors: UnlistenFn | null = null;
 
+interface ExportDefaults {
+  includeManifest: boolean;
+  includeComments: boolean;
+  includeProvenance: boolean;
+  includeGlossary: boolean;
+}
+
 interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
   wordWrap?: boolean;
@@ -34,6 +41,7 @@ interface PersistedWorkspace {
   editorLineHeight?: number;
   previewLineHeight?: number;
   exportTarget?: "html" | "pdf" | "docx" | "pptx" | "markdown-bundle";
+  exportDefaults?: Partial<ExportDefaults>;
   recentFiles?: string[];
   recentFolders?: string[];
   recentlyClosed?: string[];
@@ -182,6 +190,15 @@ function clampSnapshotInterval(value: number) {
   return Math.min(Math.max(Number(value) || 300000, 30000), 3600000);
 }
 
+function normalizeExportDefaults(defaults: Partial<ExportDefaults>): ExportDefaults {
+  return {
+    includeManifest: typeof defaults.includeManifest === "boolean" ? defaults.includeManifest : true,
+    includeComments: typeof defaults.includeComments === "boolean" ? defaults.includeComments : true,
+    includeProvenance: typeof defaults.includeProvenance === "boolean" ? defaults.includeProvenance : true,
+    includeGlossary: typeof defaults.includeGlossary === "boolean" ? defaults.includeGlossary : true,
+  };
+}
+
 export const useDocumentsStore = defineStore("documents", {
   state: () => ({
     documents: [
@@ -218,6 +235,12 @@ export const useDocumentsStore = defineStore("documents", {
     editorLineHeight: 1.55,
     previewLineHeight: 1.65,
     exportTarget: "html" as "html" | "pdf" | "docx" | "pptx" | "markdown-bundle",
+    exportDefaults: {
+      includeManifest: true,
+      includeComments: true,
+      includeProvenance: true,
+      includeGlossary: true,
+    } as ExportDefaults,
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
     lastError: "",
@@ -287,6 +310,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (typeof persisted.editorLineHeight === "number") this.editorLineHeight = clampLineHeight(persisted.editorLineHeight);
         if (typeof persisted.previewLineHeight === "number") this.previewLineHeight = clampLineHeight(persisted.previewLineHeight);
         if (persisted.exportTarget) this.exportTarget = persisted.exportTarget;
+        if (persisted.exportDefaults) this.exportDefaults = normalizeExportDefaults(persisted.exportDefaults);
         this.recentFiles = persisted.recentFiles || [];
         this.recentFolders = persisted.recentFolders || [];
         this.recentlyClosed = persisted.recentlyClosed || [];
@@ -319,6 +343,7 @@ export const useDocumentsStore = defineStore("documents", {
         editorLineHeight: this.editorLineHeight,
         previewLineHeight: this.previewLineHeight,
         exportTarget: this.exportTarget,
+        exportDefaults: this.exportDefaults,
         recentFiles: this.recentFiles.slice(0, 20),
         recentFolders: this.recentFolders.slice(0, 12),
         recentlyClosed: this.recentlyClosed.slice(0, 20),
@@ -753,17 +778,21 @@ export const useDocumentsStore = defineStore("documents", {
           file_path: doc.path,
           target: this.exportTarget,
           output_path: path,
-          options: {
-            includeManifest: true,
-            includeComments: true,
-            includeProvenance: true,
-            includeGlossary: true,
-            watermark: doc.compile?.semantic.status === "draft" ? "DRAFT" : "",
-          },
+          options: this.exportOptionsForActive(),
         },
       });
       this.statusMessage = `Exported ${response.output_path}${response.manifest_path ? " with manifest" : ""}`;
       await this.listSnapshots();
+    },
+    exportOptionsForActive() {
+      const defaults = normalizeExportDefaults(this.exportDefaults);
+      return {
+        includeManifest: defaults.includeManifest,
+        includeComments: defaults.includeComments,
+        includeProvenance: defaults.includeProvenance,
+        includeGlossary: defaults.includeGlossary,
+        watermark: this.activeDocument.compile?.semantic.status === "draft" ? "DRAFT" : "",
+      };
     },
     async createSnapshot(label = "manual") {
       const doc = this.activeDocument;
@@ -801,13 +830,7 @@ export const useDocumentsStore = defineStore("documents", {
           text: doc.text,
           file_path: doc.path,
           target: this.exportTarget,
-          options: {
-            includeManifest: true,
-            includeComments: true,
-            includeProvenance: true,
-            includeGlossary: true,
-            watermark: doc.compile?.semantic.status === "draft" ? "DRAFT" : "",
-          },
+          options: this.exportOptionsForActive(),
         },
       });
       this.statusMessage = this.exportReadiness.ready
