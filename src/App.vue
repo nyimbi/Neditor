@@ -465,7 +465,9 @@ import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { searchKeymap } from "@codemirror/search";
+import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { useDocumentsStore } from "./stores/documents";
+import type { DocumentDiagnostic } from "./types";
 
 const store = useDocumentsStore();
 const editorHost = ref<HTMLElement | null>(null);
@@ -518,6 +520,11 @@ const tableColumnTotals = computed(() => {
   if (!draft) return [];
   return draft.headers.map((_, columnIndex) => formatTableTotal(draft, columnIndex));
 });
+const diagnosticSignature = computed(() =>
+  (active.value.compile?.diagnostics || [])
+    .map((diagnostic) => [diagnostic.severity, diagnostic.source_file || "", diagnostic.line || "", diagnostic.message].join(":"))
+    .join("\n"),
+);
 const commands = computed(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
@@ -646,6 +653,10 @@ watch(
   },
 );
 
+watch(diagnosticSignature, () => {
+  if (editorView) forceLinting(editorView);
+});
+
 watch(
   markdownTables,
   (tables) => {
@@ -665,8 +676,10 @@ watch(
 function editorExtensions() {
   return [
     ...(store.lineNumbers ? [lineNumbers()] : []),
+    lintGutter(),
     history(),
     markdown(),
+    linter(editorDiagnostics, { delay: 150 }),
     keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
@@ -687,6 +700,31 @@ function editorExtensions() {
       },
     }),
   ];
+}
+
+function editorDiagnostics(view: EditorView): CodeMirrorDiagnostic[] {
+  return (active.value.compile?.diagnostics || []).flatMap((diagnostic) => codeMirrorDiagnostic(view, diagnostic));
+}
+
+function codeMirrorDiagnostic(view: EditorView, diagnostic: DocumentDiagnostic): CodeMirrorDiagnostic[] {
+  if (!diagnostic.line || diagnosticAppliesToIncludedFile(diagnostic)) return [];
+  const line = view.state.doc.line(Math.max(1, Math.min(diagnostic.line, view.state.doc.lines)));
+  const message = diagnostic.suggestion ? `${diagnostic.message}\n${diagnostic.suggestion}` : diagnostic.message;
+  return [
+    {
+      from: line.from,
+      to: Math.max(line.from, line.to),
+      severity: diagnostic.severity,
+      message,
+      source: diagnostic.source_file || "compiler",
+    },
+  ];
+}
+
+function diagnosticAppliesToIncludedFile(diagnostic: DocumentDiagnostic) {
+  const sourceFile = diagnostic.source_file;
+  const activePath = active.value.path;
+  return Boolean(sourceFile && activePath && sourceFile !== activePath);
 }
 
 function buildEditor() {
