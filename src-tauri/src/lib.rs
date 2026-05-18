@@ -959,7 +959,7 @@ fn list_transform_engines() -> Vec<Value> {
         transform_engine("d2", "external-sidecar", false, true),
         transform_engine("vega-lite", "static-diagnostic", true, false),
         transform_engine("geojson", "rust-native-svg", true, false),
-        transform_engine("topojson", "static-diagnostic", true, false),
+        transform_engine("topojson", "rust-native-svg", true, false),
         transform_engine("stl", "static-diagnostic", true, false),
         transform_engine("openapi", "rust-native", true, false),
         transform_engine("json-schema", "rust-native", true, false),
@@ -1862,7 +1862,8 @@ fn render_transform(
         "json-schema" => render_json_schema_html(body, &mut artifact_diags, diagnostics),
         "bibtex" => render_bibtex_html(body, &mut artifact_diags, diagnostics),
         "geojson" => render_geojson_svg(body, &mut artifact_diags, diagnostics),
-        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" | "vega-lite" | "topojson" | "stl" => {
+        "topojson" => render_topojson_svg(body, &mut artifact_diags, diagnostics),
+        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" | "vega-lite" | "stl" => {
             let message = format!("{name} transform captured as source artifact; configure an engine for rendered output.");
             let diagnostic = diag(
                 "warning",
@@ -3286,6 +3287,106 @@ fn render_geojson_svg(
     )
 }
 
+fn render_topojson_svg(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let value = match serde_json::from_str::<Value>(body) {
+        Ok(value) => value,
+        Err(err) => {
+            let diagnostic = diag(
+                "error",
+                format!("Invalid TopoJSON document: {err}"),
+                None,
+                None,
+                Some("Provide valid TopoJSON with an arcs array."),
+            );
+            artifact_diags.push(diagnostic.clone());
+            diagnostics.push(diagnostic);
+            return "<section class=\"transform transform-topojson transform-error\">Invalid TopoJSON document</section>".to_string();
+        }
+    };
+    let arcs = decode_topojson_arcs(&value);
+    if arcs.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "TopoJSON transform did not contain drawable arcs.",
+            None,
+            None,
+            Some("Add a Topology arcs array or verify the TopoJSON source."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-topojson transform-error\">No TopoJSON arcs found</section>".to_string();
+    }
+    let positions = arcs
+        .iter()
+        .flatten()
+        .copied()
+        .take(4000)
+        .collect::<Vec<_>>();
+    let (min_x, max_x, min_y, max_y) = geojson_bounds(&positions);
+    let polylines = arcs
+        .iter()
+        .map(|arc| {
+            let points = arc
+                .iter()
+                .map(|position| {
+                    let (x, y) = project_geojson_position(*position, min_x, max_x, min_y, max_y);
+                    format!("{x:.2},{y:.2}")
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!(
+                "<polyline points=\"{points}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"3\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>"
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    format!(
+        "<svg class=\"transform transform-topojson\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#94a3b8\"/>{polylines}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#334155\">{} arcs</text></svg>",
+        arcs.len()
+    )
+}
+
+fn decode_topojson_arcs(value: &Value) -> Vec<Vec<(f64, f64)>> {
+    let scale = value
+        .pointer("/transform/scale")
+        .and_then(Value::as_array)
+        .and_then(|items| Some((items.first()?.as_f64()?, items.get(1)?.as_f64()?)))
+        .unwrap_or((1.0, 1.0));
+    let translate = value
+        .pointer("/transform/translate")
+        .and_then(Value::as_array)
+        .and_then(|items| Some((items.first()?.as_f64()?, items.get(1)?.as_f64()?)))
+        .unwrap_or((0.0, 0.0));
+    value
+        .get("arcs")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|arc| decode_topojson_arc(arc, scale, translate))
+        .collect()
+}
+
+fn decode_topojson_arc(
+    arc: &Value,
+    (scale_x, scale_y): (f64, f64),
+    (translate_x, translate_y): (f64, f64),
+) -> Option<Vec<(f64, f64)>> {
+    let mut x = 0.0;
+    let mut y = 0.0;
+    let mut positions = Vec::new();
+    for point in arc.as_array()? {
+        let coordinates = point.as_array()?;
+        x += coordinates.first()?.as_f64()?;
+        y += coordinates.get(1)?.as_f64()?;
+        positions.push((x * scale_x + translate_x, y * scale_y + translate_y));
+    }
+    (!positions.is_empty()).then_some(positions)
+}
+
 fn collect_geojson_positions(value: &Value, positions: &mut Vec<(f64, f64)>) {
     match value {
         Value::Array(items) => {
@@ -4531,6 +4632,31 @@ paths:
             .expect("geojson engine metadata");
         assert_eq!(
             geojson.get("execution").and_then(Value::as_str),
+            Some("rust-native-svg")
+        );
+    }
+
+    #[test]
+    fn topojson_transform_renders_static_svg_preview() {
+        let artifact = run_transform(
+            "topojson".to_string(),
+            r#"{"type":"Topology","transform":{"scale":[0.01,0.01],"translate":[36.8,-1.3]},"objects":{},"arcs":[[[0,0],[5,4],[5,-2]]]}"#.to_string(),
+        )
+        .expect("topojson transform");
+
+        assert_eq!(artifact.output_kind, "svg");
+        assert!(artifact.html.contains("transform-topojson"));
+        assert!(artifact.html.contains("<polyline"));
+        assert!(artifact.html.contains("1 arcs"));
+        assert!(artifact.diagnostics.is_empty());
+
+        let engines = list_transform_engines();
+        let topojson = engines
+            .iter()
+            .find(|engine| engine.get("name").and_then(Value::as_str) == Some("topojson"))
+            .expect("topojson engine metadata");
+        assert_eq!(
+            topojson.get("execution").and_then(Value::as_str),
             Some("rust-native-svg")
         );
     }
