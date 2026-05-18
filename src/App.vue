@@ -2364,20 +2364,27 @@ function handleShortcut(event: KeyboardEvent) {
   if (!(event.metaKey || event.ctrlKey)) return;
   if (event.key === "s") {
     event.preventDefault();
-    void saveDocument();
+    if (event.shiftKey) {
+      void saveDocumentAs();
+    } else {
+      void saveDocument();
+    }
   } else if (event.key === "o") {
     event.preventDefault();
     void openDocument();
   } else if (event.key === "n") {
     event.preventDefault();
     store.newDocument();
+  } else if (event.key.toLowerCase() === "e") {
+    event.preventDefault();
+    void exportDocument();
   } else if (event.key === "b") {
     event.preventDefault();
     wrapSelection("**");
   } else if (event.key === "i") {
     event.preventDefault();
     wrapSelection("*");
-  } else if (event.key.toLowerCase() === "p" && event.shiftKey) {
+  } else if (event.key.toLowerCase() === "k" || (event.key.toLowerCase() === "p" && event.shiftKey)) {
     event.preventDefault();
     commandPaletteOpen.value = true;
   }
