@@ -22,6 +22,10 @@ interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
   wordWrap?: boolean;
   lineNumbers?: boolean;
+  editorFont?: string;
+  previewFont?: string;
+  editorLineHeight?: number;
+  previewLineHeight?: number;
   exportTarget?: "html" | "pdf" | "docx" | "pptx" | "markdown-bundle";
   recentFiles?: string[];
   recentFolders?: string[];
@@ -149,6 +153,10 @@ function watchEventIsAccessOnly(event: WatchEvent) {
   return typeof event.type === "object" && "access" in event.type;
 }
 
+function clampLineHeight(value: number) {
+  return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
+}
+
 function stringifyWatchEventKind(kind: WatchEvent["type"]) {
   if (typeof kind === "string") return kind;
   return Object.keys(kind)[0] || "other";
@@ -181,6 +189,10 @@ export const useDocumentsStore = defineStore("documents", {
     theme: "system" as "system" | "light" | "dark",
     wordWrap: true,
     lineNumbers: true,
+    editorFont: "Menlo, Consolas, monospace",
+    previewFont: "Inter, Arial, sans-serif",
+    editorLineHeight: 1.55,
+    previewLineHeight: 1.65,
     exportTarget: "html" as "html" | "pdf" | "docx" | "pptx" | "markdown-bundle",
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
@@ -241,6 +253,10 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.theme) this.theme = persisted.theme;
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
+        if (persisted.editorFont) this.editorFont = persisted.editorFont;
+        if (persisted.previewFont) this.previewFont = persisted.previewFont;
+        if (typeof persisted.editorLineHeight === "number") this.editorLineHeight = clampLineHeight(persisted.editorLineHeight);
+        if (typeof persisted.previewLineHeight === "number") this.previewLineHeight = clampLineHeight(persisted.previewLineHeight);
         if (persisted.exportTarget) this.exportTarget = persisted.exportTarget;
         this.recentFiles = persisted.recentFiles || [];
         this.recentFolders = persisted.recentFolders || [];
@@ -265,6 +281,10 @@ export const useDocumentsStore = defineStore("documents", {
         theme: this.theme,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,
+        editorFont: this.editorFont,
+        previewFont: this.previewFont,
+        editorLineHeight: this.editorLineHeight,
+        previewLineHeight: this.previewLineHeight,
         exportTarget: this.exportTarget,
         recentFiles: this.recentFiles.slice(0, 20),
         recentFolders: this.recentFolders.slice(0, 12),

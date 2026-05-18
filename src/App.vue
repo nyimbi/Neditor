@@ -322,6 +322,23 @@
           </label>
           <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
           <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
+          <h3>Typography</h3>
+          <label>
+            Editor font
+            <input v-model="store.editorFont" />
+          </label>
+          <label>
+            Editor line height
+            <input v-model.number="store.editorLineHeight" type="number" min="1" max="2.4" step="0.05" />
+          </label>
+          <label>
+            Preview font
+            <input v-model="store.previewFont" />
+          </label>
+          <label>
+            Preview line height
+            <input v-model.number="store.previewLineHeight" type="number" min="1" max="2.4" step="0.05" />
+          </label>
           <h3>Recent files</h3>
           <button v-for="path in store.recentFiles" :key="path" class="outline-row" type="button" @click="store.openPath(path)">
             {{ path }}
@@ -376,7 +393,7 @@
       </section>
 
       <section v-show="store.mode !== 'source' && store.mode !== 'focus'" class="preview-pane" aria-label="Live preview">
-        <article class="preview-document" @click="handlePreviewClick" v-html="active.compile?.html || ''"></article>
+        <article class="preview-document" :style="previewDocumentStyle" @click="handlePreviewClick" v-html="active.compile?.html || ''"></article>
       </section>
     </main>
 
@@ -515,6 +532,10 @@ const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue -
 const aiSnippet = "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nreviewedBy: \nstatus: human-reviewed\n```\n";
 
 const active = computed(() => store.activeDocument);
+const previewDocumentStyle = computed(() => ({
+  fontFamily: store.previewFont,
+  lineHeight: String(clampUiLineHeight(store.previewLineHeight)),
+}));
 const wordStats = computed(() => {
   const text = active.value?.text || "";
   const words = text.trim().split(/\s+/).filter(Boolean).length;
@@ -642,7 +663,7 @@ watch(
 );
 
 watch(
-  () => [store.wordWrap, store.lineNumbers, store.theme],
+  () => [store.wordWrap, store.lineNumbers, store.theme, store.editorFont, store.editorLineHeight, store.previewFont, store.previewLineHeight],
   () => {
     buildEditor();
     void store.persistWorkspace();
@@ -707,8 +728,8 @@ function editorExtensions() {
         fontSize: "14px",
       },
       ".cm-scroller": {
-        fontFamily: "Menlo, Consolas, monospace",
-        lineHeight: "1.55",
+        fontFamily: store.editorFont,
+        lineHeight: String(clampUiLineHeight(store.editorLineHeight)),
       },
     }),
   ];
@@ -807,6 +828,10 @@ function eventValue(event: Event) {
 
 function eventChecked(event: Event) {
   return event.target instanceof HTMLInputElement ? event.target.checked : false;
+}
+
+function clampUiLineHeight(value: number) {
+  return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
 }
 
 async function chooseTransformEngine(name: string) {
