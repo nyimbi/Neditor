@@ -963,7 +963,7 @@ fn list_transform_engines() -> Vec<Value> {
         transform_engine("stl", "static-diagnostic", true, false),
         transform_engine("openapi", "rust-native", true, false),
         transform_engine("json-schema", "rust-native", true, false),
-        transform_engine("bibtex", "static-diagnostic", true, false),
+        transform_engine("bibtex", "rust-native", true, false),
     ]
 }
 
@@ -1860,7 +1860,8 @@ fn render_transform(
         "chart" => render_chart_svg(body),
         "openapi" => render_openapi_html(body, &mut artifact_diags, diagnostics),
         "json-schema" => render_json_schema_html(body, &mut artifact_diags, diagnostics),
-        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" | "vega-lite" | "geojson" | "topojson" | "stl" | "bibtex" => {
+        "bibtex" => render_bibtex_html(body, &mut artifact_diags, diagnostics),
+        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" | "vega-lite" | "geojson" | "topojson" | "stl" => {
             let message = format!("{name} transform captured as source artifact; configure an engine for rendered output.");
             let diagnostic = diag(
                 "warning",
@@ -2548,32 +2549,34 @@ fn collect_bibliography(
 
     sources
         .into_iter()
-        .flat_map(|body| {
-            if let Ok(entries) = parse_csl_json_bibliography(&body) {
-                return entries;
-            }
-            body.split('@')
-                .filter_map(|entry| {
-                    let (kind_and_key, rest) = entry.split_once('{')?;
-                    let (key, raw) = rest.split_once(',')?;
-                    let title = raw
-                        .lines()
-                        .find(|line| line.trim_start().starts_with("title"))
-                        .and_then(|line| line.split_once('='))
-                        .map(|(_, value)| {
-                            value
-                                .trim()
-                                .trim_matches(&['{', '}', ',', '"'][..])
-                                .to_string()
-                        })
-                        .unwrap_or_else(|| kind_and_key.trim().to_string());
-                    Some(BibliographyEntry {
-                        key: key.trim().to_string(),
-                        title,
-                        raw: raw.to_string(),
-                    })
+        .flat_map(|body| parse_bibliography_source(&body))
+        .collect()
+}
+
+fn parse_bibliography_source(body: &str) -> Vec<BibliographyEntry> {
+    if let Ok(entries) = parse_csl_json_bibliography(body) {
+        return entries;
+    }
+    body.split('@')
+        .filter_map(|entry| {
+            let (kind_and_key, rest) = entry.split_once('{')?;
+            let (key, raw) = rest.split_once(',')?;
+            let title = raw
+                .lines()
+                .find(|line| line.trim_start().starts_with("title"))
+                .and_then(|line| line.split_once('='))
+                .map(|(_, value)| {
+                    value
+                        .trim()
+                        .trim_matches(&['{', '}', ',', '"'][..])
+                        .to_string()
                 })
-                .collect::<Vec<_>>()
+                .unwrap_or_else(|| kind_and_key.trim().to_string());
+            Some(BibliographyEntry {
+                key: key.trim().to_string(),
+                title,
+                raw: raw.to_string(),
+            })
         })
         .collect()
 }
@@ -3138,6 +3141,36 @@ fn render_glossary_html(body: &str) -> String {
                 escape_html(definition.trim())
             ));
         }
+    }
+    html.push_str("</dl>");
+    html
+}
+
+fn render_bibtex_html(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let entries = parse_bibliography_source(body);
+    if entries.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "BibTeX transform did not contain any bibliography entries.",
+            None,
+            None,
+            Some("Add BibTeX entries such as @book{key, title={Title}}."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-bibtex transform-error\">No bibliography entries found.</section>".to_string();
+    }
+    let mut html = String::from("<dl class=\"transform transform-bibtex\">");
+    for entry in entries {
+        html.push_str(&format!(
+            "<dt>{}</dt><dd>{}</dd>",
+            escape_html(&entry.key),
+            escape_html(&entry.title)
+        ));
     }
     html.push_str("</dl>");
     html
@@ -4341,6 +4374,31 @@ paths:
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("pikchr transform captured")));
+    }
+
+    #[test]
+    fn bibtex_transform_renders_bibliography_preview() {
+        let artifact = run_transform(
+            "bibtex".to_string(),
+            "@book{porter1985, title={Competitive Advantage}}".to_string(),
+        )
+        .expect("bibtex transform");
+
+        assert_eq!(artifact.output_kind, "html");
+        assert!(artifact.html.contains("transform-bibtex"));
+        assert!(artifact.html.contains("<dt>porter1985</dt>"));
+        assert!(artifact.html.contains("<dd>Competitive Advantage</dd>"));
+        assert!(artifact.diagnostics.is_empty());
+
+        let engines = list_transform_engines();
+        let bibtex = engines
+            .iter()
+            .find(|engine| engine.get("name").and_then(Value::as_str) == Some("bibtex"))
+            .expect("bibtex engine metadata");
+        assert_eq!(
+            bibtex.get("execution").and_then(Value::as_str),
+            Some("rust-native")
+        );
     }
 
     #[test]
