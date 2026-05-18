@@ -3959,7 +3959,7 @@ ARR: Annual recurring revenue.
     #[test]
     fn compiler_builds_document_ast_blocks_for_exports() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: AST\nstatus: approved\napprovedBy: QA\n---\n# AST\nBusiness paragraph.\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n".to_string(),
+            text: "---\ntitle: AST\nstatus: approved\napprovedBy: QA\n---\n# AST\nBusiness paragraph.\n\n- First decision\n- Second decision\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n".to_string(),
             file_path: None,
         });
 
@@ -3973,6 +3973,17 @@ ARR: Annual recurring revenue.
             .blocks
             .iter()
             .any(|block| matches!(block, DocumentBlock::Paragraph { text, line, end_line, .. } if text == "Business paragraph." && line == end_line)));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::List { ordered, items, .. }
+                    if !ordered
+                        && items == &vec![
+                            "First decision".to_string(),
+                            "Second decision".to_string()
+                        ]
+            )
+        }));
         assert!(response.document_ast.blocks.iter().any(|block| {
             matches!(
                 block,
@@ -4005,6 +4016,7 @@ ARR: Annual recurring revenue.
         }));
 
         let exported = export::export_text(&response, &json!({}));
+        assert!(exported.contains("- First decision\n- Second decision"));
         assert!(exported.contains("Table: Metric | Value"));
         assert!(exported.contains("Figure: fig:diagram: System diagram"));
         assert!(exported.contains("Equation: eq:roi: ROI = Gain / Cost"));

@@ -701,6 +701,7 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
     match block {
         DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
         DocumentBlock::Paragraph { text, .. } => docx_paragraph(text),
+        DocumentBlock::List { ordered, items, .. } => docx_list(*ordered, items),
         DocumentBlock::Table {
             id,
             caption,
@@ -755,6 +756,21 @@ fn docx_heading(level: usize, text: &str) -> String {
 
 fn docx_paragraph(text: &str) -> String {
     format!(r#"<w:p><w:r><w:t>{}</w:t></w:r></w:p>"#, escape_xml(text))
+}
+
+fn docx_list(ordered: bool, items: &[String]) -> String {
+    items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let marker = if ordered {
+                format!("{}.", index + 1)
+            } else {
+                "-".to_string()
+            };
+            docx_paragraph(&format!("{marker} {item}"))
+        })
+        .collect::<String>()
 }
 
 fn docx_page_break() -> String {
@@ -1199,6 +1215,17 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             vec![format!("{} {text}", "#".repeat(*level))]
         }
         DocumentBlock::Paragraph { text, .. } => vec![text.clone()],
+        DocumentBlock::List { ordered, items, .. } => items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                if *ordered {
+                    format!("{}. {item}", index + 1)
+                } else {
+                    format!("- {item}")
+                }
+            })
+            .collect(),
         DocumentBlock::Table {
             id,
             caption,

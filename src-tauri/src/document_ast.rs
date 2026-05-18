@@ -29,6 +29,13 @@ pub(crate) enum DocumentBlock {
         end_line: usize,
         source: Option<AstSourceRange>,
     },
+    List {
+        ordered: bool,
+        items: Vec<String>,
+        line: usize,
+        end_line: usize,
+        source: Option<AstSourceRange>,
+    },
     Table {
         line: usize,
         end_line: usize,
@@ -113,6 +120,13 @@ pub(crate) fn build_document_ast(markdown: &str) -> DocumentAst {
             }
         }
 
+        if let Some((list, next_index)) = parse_ast_list(&lines, index) {
+            flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
+            blocks.push(list);
+            index = next_index;
+            continue;
+        }
+
         if trimmed.starts_with('<') && trimmed.ends_with('>') {
             flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
             blocks.push(parse_ast_html_block(trimmed, line_number));
@@ -139,6 +153,20 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 Some(format!("{} {text}", "#".repeat(*level)))
             }
             DocumentBlock::Paragraph { text, .. } => Some(text.clone()),
+            DocumentBlock::List { ordered, items, .. } => Some(
+                items
+                    .iter()
+                    .enumerate()
+                    .map(|(index, item)| {
+                        if *ordered {
+                            format!("{}. {item}", index + 1)
+                        } else {
+                            format!("- {item}")
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
             DocumentBlock::Table {
                 id,
                 caption,
@@ -223,6 +251,12 @@ where
                 ..
             }
             | DocumentBlock::Paragraph {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::List {
                 line,
                 end_line,
                 source,
@@ -353,6 +387,57 @@ fn parse_ast_table(
         },
         next_index,
     ))
+}
+
+fn parse_ast_list(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize)> {
+    let (ordered, first_item) = parse_ast_list_item(lines.get(index)?.trim())?;
+    let mut items = vec![first_item];
+    let mut next_index = index + 1;
+    while next_index < lines.len() {
+        let Some((candidate_ordered, item)) = parse_ast_list_item(lines[next_index].trim()) else {
+            break;
+        };
+        if candidate_ordered != ordered {
+            break;
+        }
+        items.push(item);
+        next_index += 1;
+    }
+    Some((
+        DocumentBlock::List {
+            ordered,
+            items,
+            line: index + 1,
+            end_line: next_index,
+            source: None,
+        },
+        next_index,
+    ))
+}
+
+fn parse_ast_list_item(line: &str) -> Option<(bool, String)> {
+    if let Some(item) = line
+        .strip_prefix("- ")
+        .or_else(|| line.strip_prefix("* "))
+        .or_else(|| line.strip_prefix("+ "))
+    {
+        let item = clean_inline_text(item);
+        return (!item.is_empty()).then_some((false, item));
+    }
+
+    let marker_end = line
+        .char_indices()
+        .take_while(|(_, ch)| ch.is_ascii_digit())
+        .last()
+        .map(|(index, ch)| index + ch.len_utf8())?;
+    if marker_end == 0 || !matches!(line.as_bytes().get(marker_end), Some(b'.' | b')')) {
+        return None;
+    }
+    if line.as_bytes().get(marker_end + 1).copied() != Some(b' ') {
+        return None;
+    }
+    let item = clean_inline_text(&line[marker_end + 2..]);
+    (!item.is_empty()).then_some((true, item))
 }
 
 fn is_ast_table_start(lines: &[&str], index: usize) -> bool {
