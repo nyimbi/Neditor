@@ -604,7 +604,11 @@ fn start_file_watcher(
                     return;
                 }
                 let payload = FileWatchEventPayload {
-                    paths: event.paths.iter().map(|path| path_to_string(path)).collect(),
+                    paths: event
+                        .paths
+                        .iter()
+                        .map(|path| path_to_string(path))
+                        .collect(),
                     kind: format!("{:?}", event.kind),
                 };
                 let _ = event_app.emit("neditor-file-watch-event", payload);
@@ -771,13 +775,15 @@ fn export_document(request: ExportRequest) -> Result<ExportResponse, String> {
 
 #[tauri::command]
 fn prepare_for_export(request: PrepareExportRequest) -> ExportReadinessReport {
+    let file_path = request.file_path.clone();
     let mut response = compile(CompileRequest {
         text: request.text,
-        file_path: request.file_path,
+        file_path,
     });
     response.export_manifest.export_target = request.target.clone();
     response.export_manifest.export_options = request.options.clone();
     validate_export_settings(&request.target, &request.options, &mut response.diagnostics);
+    validate_git_export_cleanliness(request.file_path.as_deref(), &mut response.diagnostics);
     let error_count = response
         .diagnostics
         .iter()
@@ -800,6 +806,32 @@ fn prepare_for_export(request: PrepareExportRequest) -> ExportReadinessReport {
         info_count,
         diagnostics: response.diagnostics,
         manifest: response.export_manifest,
+    }
+}
+
+fn validate_git_export_cleanliness(
+    file_path: Option<&str>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(path) = file_path else {
+        return;
+    };
+    let Ok(status) = get_git_status(Some(path.to_string())) else {
+        return;
+    };
+    if status.inside_repo && status.dirty {
+        let summary = if status.summary.is_empty() {
+            "working tree has uncommitted changes".to_string()
+        } else {
+            status.summary.join("; ")
+        };
+        diagnostics.push(diag(
+            "warning",
+            format!("Git working tree is dirty before export: {summary}"),
+            Some(path.to_string()),
+            None,
+            Some("Commit, stash, or intentionally document the dirty state before exporting."),
+        ));
     }
 }
 
@@ -2620,7 +2652,11 @@ fn render_index_entries(entries: &[IndexEntry]) -> String {
         .iter()
         .map(|entry| {
             if let Some(anchor) = &entry.anchor {
-                format!("- [{}](#{})", escape_markdown_link_text(&entry.term), anchor)
+                format!(
+                    "- [{}](#{})",
+                    escape_markdown_link_text(&entry.term),
+                    anchor
+                )
             } else {
                 format!("- {}", entry.term)
             }
@@ -3093,7 +3129,11 @@ fn index_exclude_terms(metadata: &Value) -> BTreeSet<String> {
 fn explicit_index_terms(line: &str) -> Vec<String> {
     line.split("{#index:")
         .skip(1)
-        .filter_map(|segment| segment.split_once('}').map(|(term, _)| term.trim().to_string()))
+        .filter_map(|segment| {
+            segment
+                .split_once('}')
+                .map(|(term, _)| term.trim().to_string())
+        })
         .collect()
 }
 
@@ -3230,10 +3270,17 @@ fn parse_review_comment(line: usize, content: &str) -> ReviewComment {
     .to_string();
     let mut text_parts = Vec::new();
 
-    for part in content.split('|').map(str::trim).filter(|part| !part.is_empty()) {
+    for part in content
+        .split('|')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+    {
         if part == "resolved" || part == "unresolved" {
             state = part.to_string();
-        } else if let Some(value) = part.strip_prefix("author:").or_else(|| part.strip_prefix("author=")) {
+        } else if let Some(value) = part
+            .strip_prefix("author:")
+            .or_else(|| part.strip_prefix("author="))
+        {
             author = value.trim().to_string();
         } else if let Some(value) = part
             .strip_prefix("at:")
@@ -3452,7 +3499,10 @@ fn render_structured_data_html(
         Err(error) => {
             let diagnostic = diag(
                 "error",
-                format!("Invalid {} transform input: {error}", format.to_ascii_uppercase()),
+                format!(
+                    "Invalid {} transform input: {error}",
+                    format.to_ascii_uppercase()
+                ),
                 None,
                 None,
                 Some("Check the structured data syntax."),
@@ -3804,7 +3854,8 @@ fn render_bar_chart_svg(values: &[(String, f64)], max: f64) -> String {
     } else {
         600 / values.len().max(1)
     };
-    let mut svg = String::from("<line x1=\"70\" y1=\"240\" x2=\"710\" y2=\"240\" stroke=\"#94a3b8\"/>");
+    let mut svg =
+        String::from("<line x1=\"70\" y1=\"240\" x2=\"710\" y2=\"240\" stroke=\"#94a3b8\"/>");
     for (index, (label, value)) in values.iter().enumerate() {
         let bar_height = ((*value / max) * 170.0) as usize;
         let x = 80 + index * bar_width;
@@ -5256,10 +5307,19 @@ ARR: Annual recurring revenue.
             file_path: None,
         });
 
-        assert!(response.index_terms.iter().any(|term| term == "Acme Strategy"));
+        assert!(response
+            .index_terms
+            .iter()
+            .any(|term| term == "Acme Strategy"));
         assert!(response.index_terms.iter().any(|term| term == "Liquidity"));
-        assert!(response.index_terms.iter().any(|term| term == "Working Capital"));
-        assert!(!response.index_terms.iter().any(|term| term == "Internal Draft"));
+        assert!(response
+            .index_terms
+            .iter()
+            .any(|term| term == "Working Capital"));
+        assert!(!response
+            .index_terms
+            .iter()
+            .any(|term| term == "Internal Draft"));
         assert!(response.html.contains("href=\"#market-analysis\""));
         assert!(response.html.contains("Acme Strategy"));
         assert!(response.html.contains("Liquidity"));
@@ -5272,11 +5332,7 @@ ARR: Annual recurring revenue.
             text: "---\ntitle: Review\nstatus: approved\napprovedBy: QA\n---\n# Review\n<!-- comment: unresolved | author: Dana | at: 2026-05-18T10:00:00Z | Clarify the risk note. -->\n".to_string(),
             file_path: None,
         });
-        let comment = response
-            .semantic
-            .comments
-            .first()
-            .expect("review comment");
+        let comment = response.semantic.comments.first().expect("review comment");
 
         assert_eq!(comment.state, "unresolved");
         assert_eq!(comment.author, "Dana");
@@ -6193,6 +6249,36 @@ paths:
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("includeGlossary must be true or false")));
+    }
+
+    #[test]
+    fn prepare_for_export_warns_on_dirty_git_tree() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-export-git-test-{unique}"));
+        fs::create_dir_all(&root).expect("create export git test dir");
+        run_git(&root, &["init"]).expect("init git repo");
+        let doc = root.join("doc.md");
+        fs::write(
+            &doc,
+            "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready",
+        )
+        .expect("write doc");
+
+        let report = prepare_for_export(PrepareExportRequest {
+            text: fs::read_to_string(&doc).expect("read doc"),
+            file_path: Some(path_to_string(&doc)),
+            target: "pdf".to_string(),
+            options: json!({ "includeManifest": true }),
+        });
+
+        assert!(!report.ready);
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("Git working tree is dirty before export")));
+        fs::remove_dir_all(root).expect("clean export git test dir");
     }
 
     #[test]
