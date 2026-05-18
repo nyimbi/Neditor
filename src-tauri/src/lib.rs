@@ -1480,7 +1480,10 @@ fn interpolate_variables(
                     calculations.get(expr).map(|value| value.to_string())
                 }
             } else {
-                metadata_lookup(metadata, token).map(value_to_string)
+                let (path, default_value) = variable_path_and_default(token);
+                metadata_lookup(metadata, path)
+                    .map(value_to_string)
+                    .or(default_value)
             };
             if let Some(value) = replacement {
                 output.push_str(&value);
@@ -1504,6 +1507,26 @@ fn interpolate_variables(
     }
     output.push_str(rest);
     output
+}
+
+fn variable_path_and_default(token: &str) -> (&str, Option<String>) {
+    let Some((path, filter)) = token.split_once('|') else {
+        return (token.trim(), None);
+    };
+    let filter = filter.trim();
+    let default = filter
+        .strip_prefix("default:")
+        .or_else(|| filter.strip_prefix("default="))
+        .or_else(|| filter.strip_prefix("default "))
+        .map(unquote_variable_default);
+    (path.trim(), default)
+}
+
+fn unquote_variable_default(value: &str) -> String {
+    value
+        .trim()
+        .trim_matches(|ch| ch == '"' || ch == '\'')
+        .to_string()
 }
 
 fn collect_calculations(
@@ -3778,6 +3801,25 @@ ARR: Annual recurring revenue.
             .formula_graph
             .iter()
             .any(|formula| formula.name == "profit" && formula.value == Some(60.0)));
+    }
+
+    #[test]
+    fn compiler_supports_default_document_variables() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Defaults\nstatus: approved\napprovedBy: QA\nclient: Acme\n---\n# Defaults\nPrepared for {{client | default:Fallback}} in {{region | default:\"East Africa\"}}.\nStill missing {{owner}}.\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response
+            .compiled_markdown
+            .contains("Prepared for Acme in East Africa."));
+        assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("Missing document variable: owner")));
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("region")));
     }
 
     #[test]
