@@ -135,6 +135,7 @@ export interface TransformEngineMetadata {
     timeoutMs: number;
     maxTimeoutMs: number;
     maxInputBytes: number;
+    maxOutputBytes: number;
   };
   cacheScope: string;
   exportTargets: string[];

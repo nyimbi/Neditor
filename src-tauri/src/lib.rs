@@ -52,6 +52,7 @@ const MAX_INCLUDE_DEPTH: usize = 16;
 const DEFAULT_TRANSFORM_TIMEOUT_MS: u64 = 5_000;
 const MAX_TRANSFORM_TIMEOUT_MS: u64 = 30_000;
 const MAX_TRANSFORM_INPUT_BYTES: usize = 1_048_576;
+const MAX_TRANSFORM_OUTPUT_BYTES: usize = 2_097_152;
 
 #[derive(Debug, Deserialize)]
 struct CompileRequest {
@@ -168,6 +169,7 @@ struct ExternalTransformRequest {
     input_mode: Option<String>,
     timeout_ms: Option<u64>,
     max_input_bytes: Option<usize>,
+    max_output_bytes: Option<usize>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -550,6 +552,10 @@ fn run_external_transform(request: ExternalTransformRequest) -> Result<Transform
             input_limit
         ));
     }
+    let output_limit = request
+        .max_output_bytes
+        .unwrap_or(MAX_TRANSFORM_OUTPUT_BYTES)
+        .min(MAX_TRANSFORM_OUTPUT_BYTES);
 
     let timeout_ms = request
         .timeout_ms
@@ -566,6 +572,7 @@ fn run_external_transform(request: ExternalTransformRequest) -> Result<Transform
         &engine_path,
         input_mode,
         timeout_ms,
+        output_limit,
     )
 }
 
@@ -4243,6 +4250,7 @@ fn execute_external_transform(
     engine_path: &Path,
     input_mode: &str,
     timeout_ms: u64,
+    max_output_bytes: usize,
 ) -> Result<TransformArtifact, String> {
     let source_hash = sha256_hex(body.as_bytes());
     let started = Instant::now();
@@ -4289,6 +4297,20 @@ fn execute_external_transform(
     let output = child.wait_with_output().map_err(|err| err.to_string())?;
     if let Some(path) = temp_input {
         let _ = fs::remove_file(path);
+    }
+    if output.stdout.len() > max_output_bytes {
+        return Err(format!(
+            "{name} external transform output is {} bytes, above the {} byte limit.",
+            output.stdout.len(),
+            max_output_bytes
+        ));
+    }
+    if output.stderr.len() > max_output_bytes {
+        return Err(format!(
+            "{name} external transform diagnostics are {} bytes, above the {} byte limit.",
+            output.stderr.len(),
+            max_output_bytes
+        ));
     }
 
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -4377,7 +4399,8 @@ fn transform_engine(
         "limits": {
             "timeoutMs": DEFAULT_TRANSFORM_TIMEOUT_MS,
             "maxTimeoutMs": MAX_TRANSFORM_TIMEOUT_MS,
-            "maxInputBytes": MAX_TRANSFORM_INPUT_BYTES
+            "maxInputBytes": MAX_TRANSFORM_INPUT_BYTES,
+            "maxOutputBytes": MAX_TRANSFORM_OUTPUT_BYTES
         },
         "cacheScope": "name+enginePath+inputMode+sourceHash",
         "exportTargets": ["html", "pdf", "docx", "pptx"]
@@ -5557,6 +5580,7 @@ paths:
             input_mode: Some("stdin".to_string()),
             timeout_ms: Some(1000),
             max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
         })
         .unwrap_err();
         assert!(trust_error.contains("explicit trust"));
@@ -5574,9 +5598,23 @@ paths:
             input_mode: Some("stdin".to_string()),
             timeout_ms: Some(1000),
             max_input_bytes: Some(3),
+            max_output_bytes: Some(1024),
         })
         .unwrap_err();
         assert!(limit_error.contains("above the 3 byte limit"));
+
+        let output_limit_error = run_external_transform(ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "1234".to_string(),
+            engine_path: Some(cat_path.clone()),
+            trusted: true,
+            input_mode: Some("stdin".to_string()),
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(3),
+        })
+        .unwrap_err();
+        assert!(output_limit_error.contains("output is 4 bytes"));
 
         let stdin_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
@@ -5586,6 +5624,7 @@ paths:
             input_mode: Some("stdin".to_string()),
             timeout_ms: Some(1000),
             max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
         })
         .expect("stdin external transform");
         assert_eq!(stdin_artifact.execution_kind, "external");
@@ -5601,6 +5640,7 @@ paths:
             input_mode: Some("file".to_string()),
             timeout_ms: Some(1000),
             max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
         })
         .expect("file external transform");
         assert_eq!(file_artifact.input_mode, "file");

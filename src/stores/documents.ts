@@ -888,6 +888,7 @@ export const useDocumentsStore = defineStore("documents", {
             input_mode: this.transformInputModes[name] || "stdin",
             timeout_ms: this.transformTimeoutMs,
             max_input_bytes: engine?.limits.maxInputBytes,
+            max_output_bytes: engine?.limits.maxOutputBytes,
           },
         });
         const detail = response.diagnostics[0]?.message || response.cache_key;
