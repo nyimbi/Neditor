@@ -44,9 +44,9 @@ use export::{
     render_docx_bytes, render_full_html, render_markdown_bundle_bytes, render_pdf_bytes,
     render_pptx_bytes,
 };
-#[cfg(test)]
-use export_commands::PrepareExportRequest;
 use export_commands::{export_document, prepare_for_export};
+#[cfg(test)]
+use export_commands::{ExportRequest, PrepareExportRequest};
 #[cfg(feature = "native-watch")]
 use filesystem::notify_event_should_emit;
 use filesystem::{
@@ -6549,6 +6549,34 @@ paths:
         assert!(!report.ready);
         assert_eq!(report.error_count, 0);
         assert!(report.warning_count > 0);
+    }
+
+    #[test]
+    fn export_document_blocks_compiler_errors_before_writing() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-export-block-test-{unique}"));
+        fs::create_dir_all(&root).expect("create export block dir");
+        let output = root.join("broken.pdf");
+
+        let error = export_document(ExportRequest {
+            text:
+                "---\ntitle: Broken\nstatus: approved\napprovedBy: QA\n---\n!include missing.md\n"
+                    .to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+            target: "pdf".to_string(),
+            output_path: path_to_string(&output),
+            options: json!({ "includeManifest": true }),
+        })
+        .expect_err("compiler errors should block export");
+
+        assert!(error.contains("Export blocked by compiler error"));
+        assert!(error.contains("Missing include"));
+        assert!(!output.exists());
+        assert!(!PathBuf::from(format!("{}.manifest.json", output.display())).exists());
+        fs::remove_dir_all(root).expect("clean export block dir");
     }
 
     #[test]

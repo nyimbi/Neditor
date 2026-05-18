@@ -17,11 +17,11 @@ use std::{
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ExportRequest {
-    text: String,
-    file_path: Option<String>,
-    target: String,
-    output_path: String,
-    options: Value,
+    pub(crate) text: String,
+    pub(crate) file_path: Option<String>,
+    pub(crate) target: String,
+    pub(crate) output_path: String,
+    pub(crate) options: Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,6 +62,16 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
     let mut manifest = compile_response.export_manifest.clone();
     manifest.export_target = request.target.clone();
     manifest.export_options = request.options.clone();
+    if let Some(error) = compile_response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.severity == "error")
+    {
+        return Err(format!(
+            "Export blocked by compiler error: {}",
+            error.message
+        ));
+    }
 
     let output_path = PathBuf::from(&request.output_path);
     if let Some(parent) = output_path.parent() {
