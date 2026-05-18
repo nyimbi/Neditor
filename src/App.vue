@@ -74,6 +74,7 @@
       <button type="button" title="Link" @click="wrapSelection('[', '](https://)')">Link</button>
       <button type="button" title="Table" @click="insertBlock(tableSnippet)">Table</button>
       <button type="button" title="Calculation" @click="insertBlock(calcSnippet)">Calc</button>
+      <button type="button" title="Equation" @click="insertBlock(equationSnippet)">Equation</button>
       <button type="button" title="AI source" @click="insertBlock(aiSnippet)">AI</button>
       <button type="button" title="Find and replace" @click="runEditorCommand(openSearchPanel)">Find</button>
       <button type="button" title="Find next" @click="runEditorCommand(findNext)">Next</button>
@@ -858,6 +859,7 @@ interface DocumentTabGroup {
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
+const equationSnippet = "$$\nE = mc^2\n$$ {#eq:energy}\n";
 const glossarySnippet = "```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n";
 const layoutSnippet = "```layout\ncolumns: 2\nsection: market-analysis\n```\n";
 const commentSnippet = "<!-- comment: unresolved | author: local | at: 2026-05-18T00:00:00Z | Review note. -->\n";
@@ -963,6 +965,7 @@ const commands = computed(() => [
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
   { name: "Insert calculation", group: "Snippet", run: () => insertBlock(calcSnippet) },
+  { name: "Insert equation", group: "Snippet", run: () => insertBlock(equationSnippet) },
   { name: "Insert glossary", group: "Snippet", run: () => insertBlock(glossarySnippet) },
   { name: "Insert layout directive", group: "Snippet", run: () => insertBlock(layoutSnippet) },
   { name: "Insert review comment", group: "Snippet", run: () => insertBlock(commentSnippet) },
