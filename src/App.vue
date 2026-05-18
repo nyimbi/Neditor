@@ -140,6 +140,7 @@
               <button type="button" @click="applyTableDraft">Apply</button>
               <button type="button" @click="addTableRow">Add row</button>
               <button type="button" @click="addTableColumn">Add column</button>
+              <button type="button" @click="addTableTotalsRow">Add totals row</button>
             </div>
             <label>
               CSV/TSV paste
@@ -184,6 +185,11 @@
                 />
                 <span></span>
               </template>
+              <span>Totals</span>
+              <output v-for="(total, columnIndex) in tableColumnTotals" :key="`total-${columnIndex}`">
+                {{ total || "-" }}
+              </output>
+              <span></span>
               <span>Remove column</span>
               <button v-for="(_, columnIndex) in tableDraft.headers" :key="`remove-col-${columnIndex}`" type="button" @click="removeTableColumn(columnIndex)">
                 Remove
@@ -507,6 +513,11 @@ const wordStats = computed(() => {
 const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
 const selectedTable = computed(() => markdownTables.value[selectedTableIndex.value] || null);
+const tableColumnTotals = computed(() => {
+  const draft = tableDraft.value;
+  if (!draft) return [];
+  return draft.headers.map((_, columnIndex) => formatTableTotal(draft, columnIndex));
+});
 const commands = computed(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
@@ -884,6 +895,18 @@ function removeTableColumn(columnIndex: number) {
   for (const row of tableDraft.value.rows) row.splice(columnIndex, 1);
 }
 
+function addTableTotalsRow() {
+  const draft = tableDraft.value;
+  if (!draft) return;
+  const totals = draft.headers.map((_, columnIndex) => {
+    if (columnIndex === 0) return "Total";
+    const values = numericColumnValues(draft, columnIndex);
+    if (!values.length) return "";
+    return `=SUM(${values.map(formatFormulaNumber).join(",")})`;
+  });
+  draft.rows.push(totals);
+}
+
 function replaceTableFromPaste() {
   const rows = parseDelimitedRows(tablePasteText.value);
   if (!rows.length) return;
@@ -1063,6 +1086,29 @@ function formatTableCell(value: string, format: TableFormat) {
     return `${trimFixed(percent, 2)}%`;
   }
   return trimFixed(number, 2);
+}
+
+function formatTableTotal(draft: TableDraft, columnIndex: number) {
+  const values = numericColumnValues(draft, columnIndex);
+  if (!values.length) return "";
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return formatTableCell(String(total), draft.formats[columnIndex]);
+}
+
+function numericColumnValues(draft: TableDraft, columnIndex: number) {
+  return draft.rows
+    .map((row) => parseEditableTableNumber(row[columnIndex] || ""))
+    .filter((value): value is number => Number.isFinite(value));
+}
+
+function parseEditableTableNumber(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.startsWith("=")) return Number.NaN;
+  return parseCellNumber(trimmed);
+}
+
+function formatFormulaNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : trimFixed(value, 6);
 }
 
 function parseCellNumber(value: string) {
@@ -1421,9 +1467,19 @@ select:hover {
 
 .table-editor-grid input,
 .table-editor-grid select,
-.table-editor-grid button {
+.table-editor-grid button,
+.table-editor-grid output {
   width: 100%;
   min-width: 0;
+}
+
+.table-editor-grid output {
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 1px solid #d8e0e8;
+  background: #f5f7fa;
+  color: #1b2733;
+  font-variant-numeric: tabular-nums;
 }
 
 .table-editor-grid span {
