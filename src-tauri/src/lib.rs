@@ -960,7 +960,7 @@ fn list_transform_engines() -> Vec<Value> {
         transform_engine("vega-lite", "static-diagnostic", true, false),
         transform_engine("geojson", "rust-native-svg", true, false),
         transform_engine("topojson", "rust-native-svg", true, false),
-        transform_engine("stl", "static-diagnostic", true, false),
+        transform_engine("stl", "rust-native-svg", true, false),
         transform_engine("openapi", "rust-native", true, false),
         transform_engine("json-schema", "rust-native", true, false),
         transform_engine("bibtex", "rust-native", true, false),
@@ -1863,7 +1863,8 @@ fn render_transform(
         "bibtex" => render_bibtex_html(body, &mut artifact_diags, diagnostics),
         "geojson" => render_geojson_svg(body, &mut artifact_diags, diagnostics),
         "topojson" => render_topojson_svg(body, &mut artifact_diags, diagnostics),
-        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" | "vega-lite" | "stl" => {
+        "stl" => render_stl_svg(body, &mut artifact_diags, diagnostics),
+        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" | "vega-lite" => {
             let message = format!("{name} transform captured as source artifact; configure an engine for rendered output.");
             let diagnostic = diag(
                 "warning",
@@ -3387,6 +3388,68 @@ fn decode_topojson_arc(
     (!positions.is_empty()).then_some(positions)
 }
 
+fn render_stl_svg(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let vertices = parse_ascii_stl_vertices(body);
+    if vertices.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "STL transform did not contain ASCII vertex data.",
+            None,
+            None,
+            Some("Use ASCII STL fences for static previews, or configure an external STL renderer later."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-stl transform-error\">No ASCII STL vertices found</section>".to_string();
+    }
+    let positions = vertices
+        .iter()
+        .map(|(x, y, _)| (*x, *y))
+        .collect::<Vec<_>>();
+    let (min_x, max_x, min_y, max_y) = geojson_bounds(&positions);
+    let triangles = vertices
+        .chunks(3)
+        .filter(|triangle| triangle.len() == 3)
+        .map(|triangle| {
+            let points = triangle
+                .iter()
+                .map(|(x, y, _)| {
+                    let (x, y) = project_geojson_position((*x, *y), min_x, max_x, min_y, max_y);
+                    format!("{x:.2},{y:.2}")
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("<polygon points=\"{points}\" fill=\"rgba(39,93,168,.18)\" stroke=\"#275DA8\" stroke-width=\"2\"/>")
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    format!(
+        "<svg class=\"transform transform-stl\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#cbd5e1\"/>{triangles}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#334155\">{} triangles / {} vertices</text></svg>",
+        vertices.len() / 3,
+        vertices.len()
+    )
+}
+
+fn parse_ascii_stl_vertices(body: &str) -> Vec<(f64, f64, f64)> {
+    body.lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            if parts.next()? != "vertex" {
+                return None;
+            }
+            Some((
+                parts.next()?.parse().ok()?,
+                parts.next()?.parse().ok()?,
+                parts.next()?.parse().ok()?,
+            ))
+        })
+        .collect()
+}
+
 fn collect_geojson_positions(value: &Value, positions: &mut Vec<(f64, f64)>) {
     match value {
         Value::Array(items) => {
@@ -4657,6 +4720,31 @@ paths:
             .expect("topojson engine metadata");
         assert_eq!(
             topojson.get("execution").and_then(Value::as_str),
+            Some("rust-native-svg")
+        );
+    }
+
+    #[test]
+    fn stl_transform_renders_ascii_static_svg_preview() {
+        let artifact = run_transform(
+            "stl".to_string(),
+            "solid test\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 10 0 0\nvertex 0 10 0\nendloop\nendfacet\nendsolid test".to_string(),
+        )
+        .expect("stl transform");
+
+        assert_eq!(artifact.output_kind, "svg");
+        assert!(artifact.html.contains("transform-stl"));
+        assert!(artifact.html.contains("<polygon"));
+        assert!(artifact.html.contains("1 triangles / 3 vertices"));
+        assert!(artifact.diagnostics.is_empty());
+
+        let engines = list_transform_engines();
+        let stl = engines
+            .iter()
+            .find(|engine| engine.get("name").and_then(Value::as_str) == Some("stl"))
+            .expect("stl engine metadata");
+        assert_eq!(
+            stl.get("execution").and_then(Value::as_str),
             Some("rust-native-svg")
         );
     }
