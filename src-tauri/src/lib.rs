@@ -339,12 +339,14 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     validate_image_paths(
         &table_formula_markdown,
         root_path.as_deref(),
+        &source_map,
         &mut diagnostics,
     );
     validate_logo_path(&metadata, root_path.as_deref(), &mut diagnostics);
     validate_link_paths(
         &table_formula_markdown,
         root_path.as_deref(),
+        &source_map,
         &mut diagnostics,
     );
     let footnote_markdown = render_footnotes(&table_formula_markdown);
@@ -1291,6 +1293,7 @@ fn render_figure_line(line: &str) -> Option<String> {
 fn validate_image_paths(
     markdown: &str,
     root_path: Option<&Path>,
+    source_map: &[SourceMapEntry],
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
     let base_dir = root_path
@@ -1313,13 +1316,19 @@ fn validate_image_paths(
         }
         let path = base_dir.join(src);
         if !path.exists() {
-            diagnostics.push(diag(
+            let (source_file, line) =
+                diagnostic_location_for_generated_line(source_map, line_index + 1);
+            let mut diagnostic = diag(
                 "warning",
                 format!("Broken image path: {}", path.display()),
-                Some(path_to_string(&path)),
-                Some(line_index + 1),
+                source_file,
+                line,
                 Some("Create the image file or update the image path."),
-            ));
+            );
+            diagnostic
+                .related
+                .push(format!("Image target: {}", path.display()));
+            diagnostics.push(diagnostic);
         }
     }
 }
@@ -1357,6 +1366,7 @@ fn validate_logo_path(
 fn validate_link_paths(
     markdown: &str,
     root_path: Option<&Path>,
+    source_map: &[SourceMapEntry],
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
     let base_dir = root_path
@@ -1388,13 +1398,19 @@ fn validate_link_paths(
                     if !path_part.is_empty() {
                         let path = base_dir.join(path_part);
                         if !path.exists() {
-                            diagnostics.push(diag(
+                            let (source_file, line) =
+                                diagnostic_location_for_generated_line(source_map, line_index + 1);
+                            let mut diagnostic = diag(
                                 "warning",
                                 format!("Broken link path: {}", path.display()),
-                                Some(path_to_string(&path)),
-                                Some(line_index + 1),
+                                source_file,
+                                line,
                                 Some("Create the linked file or update the Markdown link."),
-                            ));
+                            );
+                            diagnostic
+                                .related
+                                .push(format!("Link target: {}", path.display()));
+                            diagnostics.push(diagnostic);
                         }
                     }
                 }
@@ -4348,11 +4364,19 @@ ARR: Annual recurring revenue.
             text: "---\ntitle: Links\nstatus: approved\napprovedBy: QA\nbrand:\n  logo: docs/missing-logo.svg\n---\n# Links\nRead [existing](docs/existing.md), [missing](docs/missing.md), [section](#links), and [web](https://example.com).\n![Missing image](docs/missing.png)\n".to_string(),
             file_path: Some(path_to_string(&root.join("root.md"))),
         });
+        let root_doc = path_to_string(&root.join("root.md"));
 
-        assert!(response
+        let broken_link = response
             .diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.message.contains("Broken link path")));
+            .find(|diagnostic| diagnostic.message.contains("Broken link path"))
+            .expect("broken link diagnostic");
+        assert_eq!(broken_link.line, Some(9));
+        assert_eq!(broken_link.source_file.as_deref(), Some(root_doc.as_str()));
+        assert!(broken_link
+            .related
+            .iter()
+            .any(|related| related.contains("docs/missing.md")));
         assert_eq!(
             response
                 .diagnostics
@@ -4361,10 +4385,17 @@ ARR: Annual recurring revenue.
                 .count(),
             1
         );
-        assert!(response
+        let broken_image = response
             .diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.message.contains("Broken image path")));
+            .find(|diagnostic| diagnostic.message.contains("Broken image path"))
+            .expect("broken image diagnostic");
+        assert_eq!(broken_image.line, Some(10));
+        assert_eq!(broken_image.source_file.as_deref(), Some(root_doc.as_str()));
+        assert!(broken_image
+            .related
+            .iter()
+            .any(|related| related.contains("docs/missing.png")));
         assert!(response
             .diagnostics
             .iter()
