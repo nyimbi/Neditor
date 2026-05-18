@@ -807,6 +807,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorState, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, keymap, lineNumbers, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
@@ -818,6 +819,7 @@ import { useDocumentsStore } from "./stores/documents";
 import type { AiCleanupResponse, DocumentDiagnostic, OpenDocument } from "./types";
 
 const store = useDocumentsStore();
+const appWindow = getCurrentWindow();
 const editorHost = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
@@ -1065,7 +1067,7 @@ onMounted(async () => {
   buildEditor();
   scheduleAutosave();
   scheduleAutoSnapshot();
-  document.title = store.windowTitle;
+  setWindowTitle(store.windowTitle);
   window.addEventListener("keydown", handleShortcut);
 });
 
@@ -1221,9 +1223,14 @@ watch(
 watch(
   () => store.windowTitle,
   (title) => {
-    document.title = title;
+    setWindowTitle(title);
   },
 );
+
+function setWindowTitle(title: string) {
+  document.title = title;
+  void appWindow.setTitle(title).catch(() => undefined);
+}
 
 watch(diagnosticSignature, () => {
   if (editorView) forceLinting(editorView);
