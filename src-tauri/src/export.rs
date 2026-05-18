@@ -126,7 +126,7 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
 
 pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> Vec<u8> {
     let pages = build_pdf_pages(response, options);
-    let (page_width, page_height) = pdf_page_size(response);
+    let (page_width, page_height, margin_top, margin_left) = pdf_page_layout(response, options);
     let mut objects = vec![
         String::new(),
         String::new(),
@@ -144,8 +144,8 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
             .enumerate()
             .map(|(index, line)| {
                 format!(
-                    "BT /F1 10 Tf 50 {} Td ({}) Tj ET\n",
-                    780 - (index as i32 * 12),
+                    "BT /F1 10 Tf {margin_left} {} Td ({}) Tj ET\n",
+                    page_height.saturating_sub(margin_top) as i32 - (index as i32 * 12),
                     escape_pdf(line)
                 )
             })
@@ -1481,12 +1481,23 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<Strin
     pages
 }
 
-fn pdf_page_size(response: &CompileResponse) -> (u32, u32) {
-    match layout_page_size(&response.metadata).as_str() {
+fn pdf_page_layout(response: &CompileResponse, options: &Value) -> (u32, u32, u32, u32) {
+    let (width, height) = match layout_page_size(&response.metadata).as_str() {
         "letter" => (612, 792),
         "legal" => (612, 1008),
         _ => (595, 842),
-    }
+    };
+    let margin = match explicit_layout_margins(&response.metadata).as_deref() {
+        Some("narrow") | Some("compact") => 34,
+        Some("wide") => 91,
+        Some("normal") => 68,
+        _ => match layout_preset(options) {
+            "compact" => 51,
+            "presentation" => 57,
+            _ => 68,
+        },
+    };
+    (width, height, margin, margin)
 }
 
 fn appendix_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String>> {

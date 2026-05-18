@@ -4882,7 +4882,9 @@ ARR: Annual recurring revenue.
             .contains(r#"<w:pgMar w:top="1800" w:right="1800" w:bottom="1800" w:left="1800"/>"#));
 
         let pdf = render_pdf_bytes(&response, &options);
-        assert!(String::from_utf8_lossy(&pdf).contains("/MediaBox [0 0 612 792]"));
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains("/MediaBox [0 0 612 792]"));
+        assert!(pdf_text.contains("BT /F1 10 Tf 91 701 Td"));
     }
 
     #[test]
