@@ -852,6 +852,10 @@ fn table_export_title(id: &Option<String>, caption: &Option<String>, headers: &[
 }
 
 fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
+    if let Some(table) = parse_ast_transform_table(line, line_number) {
+        return table;
+    }
+
     if let Some(content) = line
         .trim()
         .strip_prefix("<!-- comment:")
@@ -953,6 +957,69 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
         html: line.to_string(),
         source: None,
     }
+}
+
+fn parse_ast_transform_table(html: &str, line_number: usize) -> Option<DocumentBlock> {
+    if !html.contains("<table") || !html.contains("transform-table") {
+        return None;
+    }
+    let header_section = html_between(html, "<thead", "</thead>")?;
+    let headers = html_table_cells(header_section, "th");
+    if headers.is_empty() {
+        return None;
+    }
+    let body_section = html_between(html, "<tbody", "</tbody>").unwrap_or("");
+    let mut rows = Vec::new();
+    let mut rest = body_section;
+    while let Some((row_html, next)) = next_html_tag_block(rest, "tr") {
+        let row = html_table_cells(row_html, "td");
+        if !row.is_empty() {
+            rows.push(
+                (0..headers.len())
+                    .map(|index| row.get(index).cloned().unwrap_or_default())
+                    .collect(),
+            );
+        }
+        rest = next;
+    }
+    Some(DocumentBlock::Table {
+        line: line_number,
+        end_line: line_number,
+        id: None,
+        caption: None,
+        headers: headers.clone(),
+        alignments: headers.iter().map(|_| "left".to_string()).collect(),
+        rows,
+        source: None,
+    })
+}
+
+fn html_between<'a>(html: &'a str, open_prefix: &str, close_tag: &str) -> Option<&'a str> {
+    let open_start = html.find(open_prefix)?;
+    let open_end = html[open_start..].find('>')? + open_start + 1;
+    let close_start = html[open_end..].find(close_tag)? + open_end;
+    Some(&html[open_end..close_start])
+}
+
+fn next_html_tag_block<'a>(html: &'a str, tag: &str) -> Option<(&'a str, &'a str)> {
+    let open = format!("<{tag}");
+    let close = format!("</{tag}>");
+    let open_start = html.find(&open)?;
+    let open_end = html[open_start..].find('>')? + open_start + 1;
+    let close_start = html[open_end..].find(&close)? + open_end;
+    let close_end = close_start + close.len();
+    Some((&html[open_end..close_start], &html[close_end..]))
+}
+
+fn html_table_cells(row_html: &str, tag: &str) -> Vec<String> {
+    let mut cells = Vec::new();
+    let mut rest = row_html;
+    while let Some((cell_html, next)) = next_html_tag_block(rest, tag) {
+        let text = clean_inline_text(cell_html).trim().to_string();
+        cells.push(text);
+        rest = next;
+    }
+    cells
 }
 
 fn parse_ast_ai_source(content: &str) -> AstAiSource {

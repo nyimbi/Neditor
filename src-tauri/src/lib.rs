@@ -5139,6 +5139,17 @@ ARR: Annual recurring revenue.
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("Table formula error")));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Table { headers, rows, .. }
+                    if headers == &vec!["Metric".to_string(), "Value".to_string()]
+                        && rows.iter().any(|row| row == &vec![
+                            "Total".to_string(),
+                            "25".to_string()
+                        ])
+            )
+        }));
 
         let options = json!({});
         let docx = render_docx_bytes(&response, &options).expect("docx bytes");
