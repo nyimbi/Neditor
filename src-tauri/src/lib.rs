@@ -2517,6 +2517,7 @@ fn validate_document(
             ));
         }
     }
+    validate_layout_metadata(metadata, diagnostics);
     let known_keys = bibliography
         .iter()
         .map(|entry| entry.key.as_str())
@@ -2589,6 +2590,43 @@ fn validate_document(
             None,
             Some("Mark AI source blocks and AI-assisted section markers as human-reviewed after review."),
         ));
+    }
+}
+
+fn validate_layout_metadata(metadata: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {
+    if let Some(page_size) = metadata_string(metadata, "layout.pageSize")
+        .or_else(|| metadata_string(metadata, "pageSize"))
+    {
+        let normalized = page_size.to_ascii_lowercase().replace([' ', '-'], "");
+        if !matches!(
+            normalized.as_str(),
+            "a4" | "letter" | "usletter" | "legal" | "uslegal"
+        ) {
+            diagnostics.push(diag(
+                "warning",
+                format!("Unsupported layout pageSize: {page_size}"),
+                None,
+                None,
+                Some("Use A4, Letter, or Legal."),
+            ));
+        }
+    }
+    if let Some(margins) =
+        metadata_string(metadata, "layout.margins").or_else(|| metadata_string(metadata, "margins"))
+    {
+        let normalized = margins.to_ascii_lowercase().replace([' ', '-'], "");
+        if !matches!(
+            normalized.as_str(),
+            "narrow" | "compact" | "normal" | "wide"
+        ) {
+            diagnostics.push(diag(
+                "warning",
+                format!("Unsupported layout margins: {margins}"),
+                None,
+                None,
+                Some("Use narrow, normal, wide, or compact."),
+            ));
+        }
     }
 }
 
@@ -4716,6 +4754,21 @@ ARR: Annual recurring revenue.
         assert!(document.contains(r#"<w:pgSz w:w="12240" w:h="15840"/>"#));
         assert!(document
             .contains(r#"<w:pgMar w:top="1800" w:right="1800" w:bottom="1800" w:left="1800"/>"#));
+    }
+
+    #[test]
+    fn compiler_validates_layout_page_metadata() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Bad Layout\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\nlayout:\n  pageSize: Tabloid\n  margins: huge\n---\n# Bad Layout\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("Unsupported layout pageSize: Tabloid")));
+        assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("Unsupported layout margins: huge")));
     }
 
     #[test]
