@@ -747,6 +747,21 @@ export const useDocumentsStore = defineStore("documents", {
       this.ignoredConflictHash = "";
       this.statusMessage = "Saved local edits as a copy";
     },
+    async applyConflictMerge(text: string) {
+      const conflict = this.externalConflict;
+      if (!conflict || conflict.reason !== "root") return;
+      await this.snapshotBeforeDestructiveAction("pre-conflict-merge");
+      const doc = this.activeDocument;
+      doc.text = text;
+      doc.savedHash = conflict.externalHash;
+      doc.dirty = text !== (conflict.externalText || "");
+      this.externalHash = conflict.externalHash;
+      this.externalConflict = null;
+      this.ignoredConflictHash = "";
+      this.statusMessage = "Merged external changes into the working document";
+      await this.compileActive();
+      await this.refreshGitStatus();
+    },
     async hasChangedIncludedFiles(doc: OpenDocument) {
       const includedFiles = doc.compile?.export_manifest.included_files || [];
       if (!includedFiles.length) return false;

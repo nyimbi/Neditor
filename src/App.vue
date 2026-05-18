@@ -513,7 +513,26 @@
           <button type="button" @click="conflictOpen = false">x</button>
         </header>
         <p>{{ store.externalConflict.message }}</p>
-        <section class="compare-grid">
+        <section v-if="rootConflictCanMerge" class="conflict-merge">
+          <div class="conflict-toolbar">
+            <button type="button" @click="seedConflictMerge('local')">Use local as merge base</button>
+            <button type="button" @click="seedConflictMerge('external')">Use external as merge base</button>
+            <button type="button" :disabled="!mergedConflictText.trim()" @click="applyConflictMerge">Apply merged text</button>
+          </div>
+          <section class="conflict-diff" aria-label="Conflict line diff">
+            <div class="conflict-diff-head">Local</div>
+            <div class="conflict-diff-head">External</div>
+            <template v-for="row in conflictDiffRows" :key="row.key">
+              <pre :class="['conflict-diff-cell', `is-${row.kind}`]"><span>{{ row.localLine || "" }}</span>{{ row.local }}</pre>
+              <pre :class="['conflict-diff-cell', `is-${row.kind}`]"><span>{{ row.externalLine || "" }}</span>{{ row.external }}</pre>
+            </template>
+          </section>
+          <label class="merge-editor">
+            Merged result
+            <textarea v-model="mergedConflictText" rows="12"></textarea>
+          </label>
+        </section>
+        <section v-else class="compare-grid">
           <article>
             <h3>Local</h3>
             <pre>{{ active.text }}</pre>
@@ -564,6 +583,7 @@ const aiPreviewBusy = ref(false);
 const aiPreviewSignature = ref("");
 const commandPaletteOpen = ref(false);
 const conflictOpen = ref(false);
+const mergedConflictText = ref("");
 const commandQuery = ref("");
 const reviewCommentText = ref("");
 const selectedTableIndex = ref(0);
@@ -588,6 +608,15 @@ interface TableDraft {
   rows: string[][];
 }
 
+interface ConflictDiffRow {
+  key: string;
+  kind: "equal" | "local" | "external";
+  local: string;
+  external: string;
+  localLine: number | null;
+  externalLine: number | null;
+}
+
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
 const aiSnippet = "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nreviewedBy: \nstatus: human-reviewed\n```\n";
@@ -607,6 +636,10 @@ const manifestPreview = computed(() => JSON.stringify(active.value.compile?.expo
 const bibliographyByKey = computed(() => new Map((active.value.compile?.bibliography || []).map((entry) => [entry.key, entry.title])));
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
 const selectedTable = computed(() => markdownTables.value[selectedTableIndex.value] || null);
+const rootConflictCanMerge = computed(
+  () => store.externalConflict?.reason === "root" && typeof store.externalConflict.externalText === "string",
+);
+const conflictDiffRows = computed(() => buildConflictDiff(active.value.text, store.externalConflict?.externalText || ""));
 const tableColumnTotals = computed(() => {
   const draft = tableDraft.value;
   if (!draft) return [];
@@ -751,6 +784,17 @@ watch(
   () => [active.value.id, active.value.text, active.value.dirty, store.autoSnapshot, store.snapshotIntervalMs, store.externalConflict?.externalHash],
   () => {
     scheduleAutoSnapshot();
+  },
+);
+
+watch(
+  () => [active.value.id, store.externalConflict?.externalHash, store.externalConflict?.externalText],
+  () => {
+    if (store.externalConflict?.reason === "root") {
+      mergedConflictText.value = active.value.text;
+    } else {
+      mergedConflictText.value = "";
+    }
   },
 );
 
@@ -1171,6 +1215,15 @@ async function saveConflictCopy() {
   }
 }
 
+function seedConflictMerge(source: "local" | "external") {
+  mergedConflictText.value = source === "external" ? store.externalConflict?.externalText || "" : active.value.text;
+}
+
+async function applyConflictMerge() {
+  await store.applyConflictMerge(mergedConflictText.value);
+  conflictOpen.value = false;
+}
+
 async function exportDocument() {
   const extensions: Record<typeof store.exportTarget, string> = {
     html: "html",
@@ -1349,6 +1402,83 @@ function sortTableRows(columnIndex: number) {
   if (!tableDraft.value) return;
   const format = tableDraft.value.formats[columnIndex];
   tableDraft.value.rows.sort((left, right) => compareTableCells(left[columnIndex] || "", right[columnIndex] || "", format));
+}
+
+function buildConflictDiff(localText: string, externalText: string): ConflictDiffRow[] {
+  const localLines = localText.split(/\r?\n/);
+  const externalLines = externalText.split(/\r?\n/);
+  if (localLines.length * externalLines.length > 250_000) {
+    return [
+      {
+        key: "large-conflict",
+        kind: "local",
+        local: `${localLines.length} local lines`,
+        external: `${externalLines.length} external lines`,
+        localLine: null,
+        externalLine: null,
+      },
+    ];
+  }
+
+  const scores = Array.from({ length: localLines.length + 1 }, () => Array(externalLines.length + 1).fill(0));
+  for (let localIndex = localLines.length - 1; localIndex >= 0; localIndex -= 1) {
+    for (let externalIndex = externalLines.length - 1; externalIndex >= 0; externalIndex -= 1) {
+      scores[localIndex][externalIndex] =
+        localLines[localIndex] === externalLines[externalIndex]
+          ? scores[localIndex + 1][externalIndex + 1] + 1
+          : Math.max(scores[localIndex + 1][externalIndex], scores[localIndex][externalIndex + 1]);
+    }
+  }
+
+  const rows: ConflictDiffRow[] = [];
+  let localIndex = 0;
+  let externalIndex = 0;
+  while (localIndex < localLines.length || externalIndex < externalLines.length) {
+    const key = `${localIndex}:${externalIndex}:${rows.length}`;
+    if (localIndex < localLines.length && externalIndex < externalLines.length && localLines[localIndex] === externalLines[externalIndex]) {
+      rows.push({
+        key,
+        kind: "equal",
+        local: localLines[localIndex],
+        external: externalLines[externalIndex],
+        localLine: localIndex + 1,
+        externalLine: externalIndex + 1,
+      });
+      localIndex += 1;
+      externalIndex += 1;
+    } else if (localIndex >= localLines.length) {
+      rows.push({
+        key,
+        kind: "external",
+        local: "",
+        external: externalLines[externalIndex],
+        localLine: null,
+        externalLine: externalIndex + 1,
+      });
+      externalIndex += 1;
+    } else if (externalIndex >= externalLines.length || scores[localIndex + 1][externalIndex] >= scores[localIndex][externalIndex + 1]) {
+      rows.push({
+        key,
+        kind: "local",
+        local: localLines[localIndex],
+        external: "",
+        localLine: localIndex + 1,
+        externalLine: null,
+      });
+      localIndex += 1;
+    } else {
+      rows.push({
+        key,
+        kind: "external",
+        local: "",
+        external: externalLines[externalIndex],
+        localLine: null,
+        externalLine: externalIndex + 1,
+      });
+      externalIndex += 1;
+    }
+  }
+  return rows;
 }
 
 function parseMarkdownTables(text: string): MarkdownTable[] {
@@ -2164,6 +2294,72 @@ select:hover {
   overflow: auto;
   padding: 10px;
   background: #edf1f5;
+}
+
+.conflict-merge {
+  display: grid;
+  gap: 12px;
+}
+
+.conflict-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.conflict-diff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #c9d2dc;
+  background: #ffffff;
+}
+
+.conflict-diff-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 10px;
+  border-bottom: 1px solid #c9d2dc;
+  background: #edf1f5;
+  font-weight: 700;
+}
+
+.conflict-diff-cell {
+  min-height: 26px;
+  margin: 0;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.conflict-diff-cell span {
+  display: inline-block;
+  width: 36px;
+  margin-right: 8px;
+  color: #64748b;
+  user-select: none;
+}
+
+.conflict-diff-cell.is-local {
+  background: #fff3e8;
+}
+
+.conflict-diff-cell.is-external {
+  background: #eaf6f0;
+}
+
+.merge-editor {
+  display: grid;
+  gap: 6px;
+}
+
+.merge-editor textarea {
+  min-height: 240px;
+  resize: vertical;
+  font-family: Menlo, Consolas, monospace;
 }
 
 @media (max-width: 900px) {
