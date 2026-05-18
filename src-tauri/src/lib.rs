@@ -2263,6 +2263,20 @@ fn validate_document(
             Some("Set status to approved or published before final export."),
         ));
     }
+    if let Some(status) = metadata.get("status").and_then(Value::as_str) {
+        if !matches!(
+            status,
+            "draft" | "in-review" | "approved" | "published" | "archived"
+        ) {
+            diagnostics.push(diag(
+                "warning",
+                format!("Invalid document status: {status}"),
+                None,
+                None,
+                Some("Use draft, in-review, approved, published, or archived."),
+            ));
+        }
+    }
     if matches!(
         metadata.get("status").and_then(Value::as_str),
         Some("approved" | "published")
@@ -5560,6 +5574,19 @@ paths:
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message == "Missing version metadata."));
+    }
+
+    #[test]
+    fn validation_rejects_unknown_release_status() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Status\nversion: 1.0.0\nstatus: final\n---\n# Status\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message == "Invalid document status: final"));
     }
 
     #[test]
