@@ -64,7 +64,7 @@
       <button type="button" @click="store.revealActive">Reveal</button>
       <button type="button" @click="store.snapshotActive()">Snapshot</button>
       <button type="button" @click="exportDocument">Export</button>
-      <button type="button" @click="aiPasteOpen = true">AI Paste</button>
+      <button type="button" @click="openAiPaste">AI Paste</button>
       <button type="button" @click="commandPaletteOpen = true">Commands</button>
       <span class="divider"></span>
       <button type="button" title="Bold" @click="wrapSelection('**')"><strong>B</strong></button>
@@ -432,6 +432,10 @@
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Glossary</label>
+          <h3>AI paste cleanup defaults</h3>
+          <label><input v-model="store.aiCleanupDefaults.markAsDraft" type="checkbox" /> Mark as draft</label>
+          <label><input v-model="store.aiCleanupDefaults.addProvenance" type="checkbox" /> Add provenance block</label>
+          <label><input v-model="store.aiCleanupDefaults.insertCitationTodos" type="checkbox" /> Insert citation TODOs</label>
           <h3>Typography</h3>
           <label>
             Editor font
@@ -780,7 +784,7 @@ const commands = computed(() => [
   { name: "Refresh Git diff", group: "Versioning", run: () => void store.refreshGitDiff() },
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
-  { name: "Paste from AI chat", group: "AI", run: () => (aiPasteOpen.value = true) },
+  { name: "Paste from AI chat", group: "AI", run: () => openAiPaste() },
   { name: "Run transforms", group: "Transforms", run: () => void store.compileActive() },
   { name: "Find and replace", group: "Edit", run: () => runEditorCommand(openSearchPanel) },
   { name: "Find next", group: "Edit", run: () => runEditorCommand(findNext) },
@@ -855,6 +859,7 @@ const filteredCommands = computed(() => {
 
 onMounted(async () => {
   await store.boot();
+  applyAiPasteDefaults();
   buildEditor();
   scheduleAutosave();
   scheduleAutoSnapshot();
@@ -954,6 +959,17 @@ watch(
     store.exportDefaults.includeComments,
     store.exportDefaults.includeProvenance,
     store.exportDefaults.includeGlossary,
+  ],
+  () => {
+    void store.persistWorkspace();
+  },
+);
+
+watch(
+  () => [
+    store.aiCleanupDefaults.addProvenance,
+    store.aiCleanupDefaults.markAsDraft,
+    store.aiCleanupDefaults.insertCitationTodos,
   ],
   () => {
     void store.persistWorkspace();
@@ -1631,6 +1647,17 @@ async function previewAiPaste() {
   } finally {
     aiPreviewBusy.value = false;
   }
+}
+
+function applyAiPasteDefaults() {
+  aiAddProvenance.value = store.aiCleanupDefaults.addProvenance;
+  aiMarkAsDraft.value = store.aiCleanupDefaults.markAsDraft;
+  aiInsertCitationTodos.value = store.aiCleanupDefaults.insertCitationTodos;
+}
+
+function openAiPaste() {
+  applyAiPasteDefaults();
+  aiPasteOpen.value = true;
 }
 
 function closeAiPaste() {

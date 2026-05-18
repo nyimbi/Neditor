@@ -57,6 +57,7 @@ interface PersistedWorkspace {
   trustedTransformEngines?: Record<string, boolean>;
   transformInputModes?: Record<string, "stdin" | "file">;
   transformTimeoutMs?: number;
+  aiCleanupDefaults?: Partial<AiCleanupOptions>;
 }
 
 interface FileMetadataResponse {
@@ -284,6 +285,14 @@ function normalizeExportDefaults(defaults: Partial<ExportDefaults>): ExportDefau
   };
 }
 
+function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>): AiCleanupOptions {
+  return {
+    addProvenance: typeof defaults.addProvenance === "boolean" ? defaults.addProvenance : true,
+    markAsDraft: typeof defaults.markAsDraft === "boolean" ? defaults.markAsDraft : true,
+    insertCitationTodos: typeof defaults.insertCitationTodos === "boolean" ? defaults.insertCitationTodos : true,
+  };
+}
+
 export const useDocumentsStore = defineStore("documents", {
   state: () => ({
     documents: [
@@ -328,6 +337,7 @@ export const useDocumentsStore = defineStore("documents", {
       includeProvenance: true,
       includeGlossary: true,
     } as ExportDefaults,
+    aiCleanupDefaults: normalizeAiCleanupDefaults({}),
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
     lastError: "",
@@ -400,6 +410,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (typeof persisted.previewLineHeight === "number") this.previewLineHeight = clampLineHeight(persisted.previewLineHeight);
         if (persisted.exportTarget) this.exportTarget = persisted.exportTarget;
         if (persisted.exportDefaults) this.exportDefaults = normalizeExportDefaults(persisted.exportDefaults);
+        if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
         this.recentFiles = persisted.recentFiles || [];
         this.recentFolders = persisted.recentFolders || [];
         this.recentlyClosed = persisted.recentlyClosed || [];
@@ -435,6 +446,7 @@ export const useDocumentsStore = defineStore("documents", {
         previewLineHeight: this.previewLineHeight,
         exportTarget: this.exportTarget,
         exportDefaults: this.exportDefaults,
+        aiCleanupDefaults: this.aiCleanupDefaults,
         recentFiles: this.recentFiles.slice(0, 20),
         recentFolders: this.recentFolders.slice(0, 12),
         recentlyClosed: this.recentlyClosed.slice(0, 20),
