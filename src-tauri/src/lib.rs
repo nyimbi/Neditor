@@ -3738,26 +3738,27 @@ ARR: Annual recurring revenue.
     #[test]
     fn compiler_summarizes_markdown_tables() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Tables\nstatus: approved\napprovedBy: QA\n---\n# Tables\n| Region | Revenue |\n| --- | ---: |\n| East | 100 |\n| West | =SUM(70,10) |\n".to_string(),
+            text: "---\ntitle: Tables\nstatus: approved\napprovedBy: QA\n---\n# Tables\n| Region | Revenue |\n| --- | ---: |\n| East | 100 |\n| West | =SUM(B1,80) |\n| Total | =SUM(B1:B2) |\n".to_string(),
             file_path: None,
         });
 
-        assert!(response.compiled_markdown.contains("| West | 80 |"));
-        assert!(response.html.contains(">80</td>"));
+        assert!(response.compiled_markdown.contains("| West | 180 |"));
+        assert!(response.compiled_markdown.contains("| Total | 280 |"));
+        assert!(response.html.contains(">280</td>"));
         assert_eq!(response.semantic.tables, 1);
-        assert_eq!(response.semantic.table_summaries[0].rows, 2);
+        assert_eq!(response.semantic.table_summaries[0].rows, 3);
         assert_eq!(
             response.semantic.table_summaries[0]
                 .numeric_columns
                 .get("Revenue"),
-            Some(&180.0)
+            Some(&560.0)
         );
     }
 
     #[test]
     fn csv_and_tsv_transforms_evaluate_table_formula_cells() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Formula Tables\nstatus: approved\napprovedBy: QA\n---\n# Formula Tables\n```csv\nMetric,Value\nTotal,=10+15\nRounded,=ROUND(2.6)\n```\n\n```tsv\nMetric\tValue\nAbs\t=ABS(-5)\nSum\t=SUM(2,3)\nProfitable\t=IF(10>5,1,0)\nEqual\t=IF(ROUND(2.6)=3,1,0)\n```\n".to_string(),
+            text: "---\ntitle: Formula Tables\nstatus: approved\napprovedBy: QA\n---\n# Formula Tables\n```csv\nMetric,Value\nTotal,=10+15\nRounded,=ROUND(2.6)\nRange,=SUM(B1:B2)\n```\n\n```tsv\nMetric\tValue\nAbs\t=ABS(-5)\nSum\t=SUM(2,3)\nProfitable\t=IF(10>5,1,0)\nEqual\t=IF(ROUND(2.6)=3,1,0)\nRange\t=SUM(B1:B4)\n```\n".to_string(),
             file_path: None,
         });
 
@@ -3765,6 +3766,8 @@ ARR: Annual recurring revenue.
         assert!(response.html.contains("<td>3</td>"));
         assert!(response.html.contains("<td>1</td>"));
         assert!(response.html.contains("<td>5</td>"));
+        assert!(response.html.contains("<td>28</td>"));
+        assert!(response.html.contains("<td>12</td>"));
         assert!(!response
             .diagnostics
             .iter()
