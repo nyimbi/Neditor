@@ -4,6 +4,7 @@ subtitle: Board Pack Fixture
 version: 2.0.0
 status: approved
 approvedBy: QA
+approvedAt: 2026-05-18T12:00:00Z
 classification: restricted
 toc: true
 brand:

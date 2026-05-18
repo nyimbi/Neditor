@@ -2280,19 +2280,26 @@ fn validate_document(
     if matches!(
         metadata.get("status").and_then(Value::as_str),
         Some("approved" | "published")
-    ) && metadata
-        .get("approvedBy")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .is_empty()
-    {
-        diagnostics.push(diag(
-            "warning",
-            "Approved or published document is missing approval metadata.",
-            None,
-            None,
-            Some("Add approvedBy and approvedAt front matter for release auditability."),
-        ));
+    ) {
+        let approved_by_missing = metadata
+            .get("approvedBy")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .is_empty();
+        let approved_at_missing = metadata
+            .get("approvedAt")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .is_empty();
+        if approved_by_missing || approved_at_missing {
+            diagnostics.push(diag(
+                "warning",
+                "Approved or published document is missing approval metadata.",
+                None,
+                None,
+                Some("Add approvedBy and approvedAt front matter for release auditability."),
+            ));
+        }
     }
     let known_keys = bibliography
         .iter()
@@ -5587,6 +5594,19 @@ paths:
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message == "Invalid document status: final"));
+    }
+
+    #[test]
+    fn approved_documents_require_approval_timestamp() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Approved\nversion: 1.0.0\nstatus: published\napprovedBy: QA\n---\n# Approved\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("missing approval metadata")));
     }
 
     #[test]
