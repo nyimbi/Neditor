@@ -4,7 +4,7 @@ use serde::Serialize;
 pub(crate) mod external;
 pub(crate) mod qr;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct TransformArtifact {
     pub(crate) id: String,
     pub(crate) name: String,

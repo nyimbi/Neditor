@@ -3,10 +3,12 @@ use crate::{diagnostics::diag, escape_html, path_to_string, sha256_hex};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
+    collections::HashMap,
     fs,
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::{Mutex, OnceLock},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -14,6 +16,10 @@ const DEFAULT_TRANSFORM_TIMEOUT_MS: u64 = 5_000;
 const MAX_TRANSFORM_TIMEOUT_MS: u64 = 30_000;
 const MAX_TRANSFORM_INPUT_BYTES: usize = 1_048_576;
 const MAX_TRANSFORM_OUTPUT_BYTES: usize = 2_097_152;
+const MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES: usize = 64;
+
+static EXTERNAL_TRANSFORM_CACHE: OnceLock<Mutex<HashMap<String, TransformArtifact>>> =
+    OnceLock::new();
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ExternalTransformRequest {
@@ -120,19 +126,68 @@ pub(crate) fn run_external_transform(
     if !matches!(input_mode, "stdin" | "file") {
         return Err("External transform input_mode must be 'stdin' or 'file'.".to_string());
     }
+    let source_hash = sha256_hex(request.body.as_bytes());
+    let cache_key = transform_cache_key(
+        &request.name,
+        input_mode,
+        &path_to_string(&engine_path),
+        &source_hash,
+    );
+    if let Some(artifact) = cached_external_transform(&cache_key, &request.name, output_limit) {
+        return Ok(artifact);
+    }
 
-    execute_external_transform(
+    let artifact = execute_external_transform(
         &request.name,
         &request.body,
         &engine_path,
         input_mode,
         timeout_ms,
         output_limit,
-    )
+    )?;
+    store_external_transform(artifact.clone());
+    Ok(artifact)
 }
 
 fn external_transform_supported(name: &str) -> bool {
     matches!(name, "pikchr" | "dot" | "graphviz" | "plantuml" | "d2")
+}
+
+fn external_transform_cache() -> &'static Mutex<HashMap<String, TransformArtifact>> {
+    EXTERNAL_TRANSFORM_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn cached_external_transform(
+    cache_key: &str,
+    name: &str,
+    max_output_bytes: usize,
+) -> Option<TransformArtifact> {
+    let cache = external_transform_cache().lock().ok()?;
+    let mut artifact = cache.get(cache_key)?.clone();
+    if artifact.html.len() > max_output_bytes {
+        return None;
+    }
+    artifact.duration_ms = Some(0);
+    artifact.diagnostics.push(diag(
+        "info",
+        format!("{name} external transform served from cache."),
+        None,
+        None,
+        Some("Cache key includes transform name, engine path, input mode, and source hash."),
+    ));
+    Some(artifact)
+}
+
+fn store_external_transform(artifact: TransformArtifact) {
+    let Ok(mut cache) = external_transform_cache().lock() else {
+        return;
+    };
+    if cache.len() >= MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES {
+        if let Some(key) = cache.keys().next().cloned() {
+            cache.remove(&key);
+        }
+    }
+    cache.insert(artifact.cache_key.clone(), artifact);
 }
 
 fn execute_external_transform(

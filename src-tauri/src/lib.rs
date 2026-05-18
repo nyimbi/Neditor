@@ -5716,6 +5716,13 @@ paths:
             return;
         }
         let cat_path = path_to_string(cat);
+        let unique_body = format!(
+            "<svg>{}</svg>",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after epoch")
+                .as_nanos()
+        );
         let limit_error = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
             body: "1234".to_string(),
@@ -5744,7 +5751,7 @@ paths:
 
         let stdin_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
-            body: "<svg>ok</svg>".to_string(),
+            body: unique_body.clone(),
             engine_path: Some(cat_path.clone()),
             trusted: true,
             input_mode: Some("stdin".to_string()),
@@ -5755,8 +5762,26 @@ paths:
         .expect("stdin external transform");
         assert_eq!(stdin_artifact.execution_kind, "external");
         assert_eq!(stdin_artifact.input_mode, "stdin");
-        assert!(stdin_artifact.html.contains("<svg>ok</svg>"));
+        assert!(stdin_artifact.html.contains(&unique_body));
         assert!(!stdin_artifact.cache_key.is_empty());
+        let cached_artifact = run_external_transform(ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: unique_body,
+            engine_path: Some(cat_path.clone()),
+            trusted: true,
+            input_mode: Some("stdin".to_string()),
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        })
+        .expect("cached stdin external transform");
+        assert_eq!(cached_artifact.cache_key, stdin_artifact.cache_key);
+        assert_eq!(cached_artifact.output_hash, stdin_artifact.output_hash);
+        assert_eq!(cached_artifact.duration_ms, Some(0));
+        assert!(cached_artifact
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("served from cache")));
 
         let file_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
