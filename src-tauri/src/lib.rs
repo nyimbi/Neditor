@@ -4385,6 +4385,24 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn export_layout_preset_controls_html_css_and_metadata() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Layout Options\nstatus: approved\napprovedBy: QA\n---\n# Layout Options\n\nBody."
+                .to_string(),
+            file_path: None,
+        });
+        let options = json!({ "layoutPreset": "compact" });
+
+        let html = render_full_html(&response, &options);
+        assert!(html.contains("margin:32px"));
+        assert!(html.contains("line-height:1.42"));
+        assert!(html.contains("@page{margin:18mm"));
+
+        let exported_text = export::export_text(&response, &options);
+        assert!(exported_text.contains("Layout preset: compact"));
+    }
+
+    #[test]
     fn compiler_loads_csl_json_bibliography() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -5894,6 +5912,7 @@ paths:
                 "includeStyles": "yes",
                 "coverPage": "yes",
                 "pageNumbers": "yes",
+                "layoutPreset": "dense",
                 "includeGlossary": "yes",
                 "includeComments": "yes",
                 "includeProvenance": "yes"
@@ -5901,7 +5920,7 @@ paths:
         });
 
         assert!(!report.ready);
-        assert_eq!(report.error_count, 9);
+        assert_eq!(report.error_count, 10);
         assert_eq!(report.manifest.export_target, "rtf");
         assert!(report
             .diagnostics
@@ -5923,6 +5942,9 @@ paths:
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("pageNumbers must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("layoutPreset must be business, compact, or presentation")));
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("includeGlossary must be true or false")));

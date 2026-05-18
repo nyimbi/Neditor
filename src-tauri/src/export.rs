@@ -76,7 +76,8 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
                 brand_color,
                 watermark,
                 &brand_font,
-                include_page_numbers(options)
+                include_page_numbers(options),
+                layout_preset(options)
             )
         )
     } else {
@@ -502,6 +503,7 @@ fn export_metadata_lines(response: &CompileResponse, options: &Value) -> Vec<Str
     if include_page_numbers(options) {
         lines.push("Page 1 of 1".to_string());
     }
+    lines.push(format!("Layout preset: {}", layout_preset(options)));
     for path in ["subtitle", "author", "date", "version", "brand.name"] {
         if let Some(value) = metadata_string(&response.metadata, path) {
             lines.push(value);
@@ -557,6 +559,14 @@ fn include_cover_page(options: &Value) -> bool {
 
 fn include_page_numbers(options: &Value) -> bool {
     boolean_option(options, "pageNumbers", &["includePageNumbers"], true)
+}
+
+fn layout_preset(options: &Value) -> &str {
+    match options.get("layoutPreset").and_then(Value::as_str) {
+        Some("compact") => "compact",
+        Some("presentation") => "presentation",
+        _ => "business",
+    }
 }
 
 fn include_glossary(options: &Value) -> bool {
@@ -1827,14 +1837,26 @@ fn pptx_slide_media<'a>(slide: &PptxSlide, media: &'a [ExportMedia]) -> Vec<&'a 
         .collect()
 }
 
-fn export_css(brand_color: &str, watermark: &str, brand_font: &str, page_numbers: bool) -> String {
+fn export_css(
+    brand_color: &str,
+    watermark: &str,
+    brand_font: &str,
+    page_numbers: bool,
+    layout_preset: &str,
+) -> String {
     let page_counter_rule = if page_numbers {
         "@bottom-center{content:'Page ' counter(page) ' of ' counter(pages)}"
     } else {
         ""
     };
+    let (body_margin, body_line_height, cover_min_height, heading_size, page_margin) =
+        match layout_preset {
+            "compact" => ("32px", "1.42", "72vh", "36px", "18mm"),
+            "presentation" => ("64px", "1.7", "78vh", "54px", "20mm"),
+            _ => ("48px", "1.55", "85vh", "44px", "24mm"),
+        };
     format!(
-        "body{{font-family:{};margin:48px;color:#1f2937;line-height:1.55}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:85vh;display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:44px;margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:24mm;@top-center{{content:element(header)}}{page_counter_rule}}}",
+        "body{{font-family:{};margin:{body_margin};color:#1f2937;line-height:{body_line_height}}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:{cover_min_height};display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:{heading_size};margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:{page_margin};@top-center{{content:element(header)}}{page_counter_rule}}}",
         escape_css(brand_font),
         escape_css(watermark)
     )

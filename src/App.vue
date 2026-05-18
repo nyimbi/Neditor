@@ -309,6 +309,14 @@
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Include styles</label>
           <label><input v-model="store.exportDefaults.coverPage" type="checkbox" /> Cover page</label>
           <label><input v-model="store.exportDefaults.pageNumbers" type="checkbox" /> Page numbers</label>
+          <label>
+            Layout preset
+            <select v-model="store.exportDefaults.layoutPreset">
+              <option value="business">Business</option>
+              <option value="compact">Compact</option>
+              <option value="presentation">Presentation</option>
+            </select>
+          </label>
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Include comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
@@ -473,6 +481,14 @@
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Styles</label>
           <label><input v-model="store.exportDefaults.coverPage" type="checkbox" /> Cover page</label>
           <label><input v-model="store.exportDefaults.pageNumbers" type="checkbox" /> Page numbers</label>
+          <label>
+            Layout preset
+            <select v-model="store.exportDefaults.layoutPreset">
+              <option value="business">Business</option>
+              <option value="compact">Compact</option>
+              <option value="presentation">Presentation</option>
+            </select>
+          </label>
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Glossary</label>
@@ -1083,6 +1099,7 @@ watch(
     store.exportDefaults.includeStyles,
     store.exportDefaults.coverPage,
     store.exportDefaults.pageNumbers,
+    store.exportDefaults.layoutPreset,
     store.exportDefaults.includeComments,
     store.exportDefaults.includeProvenance,
     store.exportDefaults.includeGlossary,

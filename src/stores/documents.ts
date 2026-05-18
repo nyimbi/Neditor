@@ -23,6 +23,7 @@ let unwatchFileErrors: UnlistenFn | null = null;
 
 type AiPasteInsertMode = "insert" | "quote" | "replace" | "appendix";
 type CitationStyle = "title" | "author-year" | "key";
+type LayoutPreset = "business" | "compact" | "presentation";
 type SnapshotStorage = "app-data" | "project-local";
 
 interface ExportDefaults {
@@ -30,6 +31,7 @@ interface ExportDefaults {
   includeStyles: boolean;
   coverPage: boolean;
   pageNumbers: boolean;
+  layoutPreset: LayoutPreset;
   includeComments: boolean;
   includeProvenance: boolean;
   includeGlossary: boolean;
@@ -334,6 +336,7 @@ function normalizeExportDefaults(
         : typeof defaults.includePageNumbers === "boolean"
           ? defaults.includePageNumbers
           : true,
+    layoutPreset: normalizeLayoutPreset(defaults.layoutPreset),
     includeComments: typeof defaults.includeComments === "boolean" ? defaults.includeComments : true,
     includeProvenance: typeof defaults.includeProvenance === "boolean" ? defaults.includeProvenance : true,
     includeGlossary: typeof defaults.includeGlossary === "boolean" ? defaults.includeGlossary : true,
@@ -342,6 +345,10 @@ function normalizeExportDefaults(
 
 function normalizeCitationStyle(value: unknown): CitationStyle {
   return value === "author-year" || value === "key" || value === "title" ? value : "title";
+}
+
+function normalizeLayoutPreset(value: unknown): LayoutPreset {
+  return value === "compact" || value === "presentation" || value === "business" ? value : "business";
 }
 
 function normalizeBibliographyDefaults(defaults: Partial<BibliographyDefaults>): BibliographyDefaults {
@@ -422,6 +429,7 @@ export const useDocumentsStore = defineStore("documents", {
       includeStyles: true,
       coverPage: true,
       pageNumbers: true,
+      layoutPreset: "business",
       includeComments: true,
       includeProvenance: true,
       includeGlossary: true,
@@ -1023,6 +1031,7 @@ export const useDocumentsStore = defineStore("documents", {
         includeStyles: defaults.includeStyles,
         coverPage: defaults.coverPage,
         pageNumbers: defaults.pageNumbers,
+        layoutPreset: defaults.layoutPreset,
         includeComments: defaults.includeComments,
         includeProvenance: defaults.includeProvenance,
         includeGlossary: defaults.includeGlossary,

@@ -243,4 +243,18 @@ fn validate_export_settings(
             ));
         }
     }
+    if let Some(layout_preset) = options.get("layoutPreset") {
+        let valid = layout_preset
+            .as_str()
+            .is_some_and(|value| matches!(value, "business" | "compact" | "presentation"));
+        if !valid {
+            diagnostics.push(diag(
+                "error",
+                "layoutPreset must be business, compact, or presentation.",
+                None,
+                None,
+                Some("Use one of the supported layout preset names."),
+            ));
+        }
+    }
 }
