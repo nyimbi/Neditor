@@ -494,6 +494,7 @@
             <option value="insert">Insert after document</option>
             <option value="quote">Quote</option>
             <option value="appendix">Appendix</option>
+            <option value="selection">Replace selection</option>
             <option value="replace">Replace document</option>
           </select>
         </label>
@@ -587,7 +588,7 @@ import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searc
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { useDocumentsStore } from "./stores/documents";
-import type { DocumentDiagnostic, OpenDocument } from "./types";
+import type { AiCleanupResponse, DocumentDiagnostic, OpenDocument } from "./types";
 
 const store = useDocumentsStore();
 const editorHost = ref<HTMLElement | null>(null);
@@ -600,7 +601,7 @@ let lastAutoSnapshotSignature = "";
 let syncingScroll = false;
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
-const aiInsertMode = ref<"insert" | "quote" | "replace" | "appendix">("insert");
+const aiInsertMode = ref<"insert" | "quote" | "replace" | "appendix" | "selection">("insert");
 const aiAddProvenance = ref(true);
 const aiMarkAsDraft = ref(true);
 const aiInsertCitationTodos = ref(true);
@@ -1339,8 +1340,28 @@ async function cleanAiPaste() {
     await previewAiPaste();
   }
   if (!store.aiCleanupPreview) return;
-  store.insertAiPaste(store.aiCleanupPreview, aiInsertMode.value);
+  if (aiInsertMode.value === "selection") {
+    replaceSelectionWithAiPaste(store.aiCleanupPreview);
+  } else {
+    store.insertAiPaste(store.aiCleanupPreview, aiInsertMode.value);
+  }
   closeAiPaste();
+}
+
+function replaceSelectionWithAiPaste(response: AiCleanupResponse) {
+  if (!editorView) {
+    store.insertAiPaste(response, "insert");
+    return;
+  }
+  const markdown = response.cleaned_markdown;
+  const range = editorView.state.selection.main;
+  editorView.dispatch({
+    changes: { from: range.from, to: range.to, insert: markdown },
+    selection: { anchor: range.from + markdown.length },
+  });
+  store.updateText(editorView.state.doc.toString());
+  editorView.focus();
+  store.statusMessage = "Inserted cleaned AI paste into selection";
 }
 
 async function previewAiPaste() {
