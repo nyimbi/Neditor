@@ -20,11 +20,7 @@ pub(crate) fn render_delimited_table(
     artifact_diags: &mut Vec<DocumentDiagnostic>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> String {
-    let mut rows = body
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| parse_delimited_row(line, delimiter))
-        .collect::<Vec<_>>();
+    let mut rows = parse_delimited_rows(body, delimiter);
     if rows.is_empty() {
         return "<table></table>".to_string();
     }
@@ -55,11 +51,12 @@ pub(crate) fn render_delimited_table(
     html
 }
 
-fn parse_delimited_row(line: &str, delimiter: char) -> Vec<String> {
-    let mut cells = Vec::new();
+fn parse_delimited_rows(body: &str, delimiter: char) -> Vec<Vec<String>> {
+    let mut rows = Vec::new();
+    let mut row = Vec::new();
     let mut cell = String::new();
     let mut quoted = false;
-    let mut chars = line.chars().peekable();
+    let mut chars = body.chars().peekable();
     while let Some(ch) = chars.next() {
         if ch == '"' && quoted && chars.peek() == Some(&'"') {
             cell.push('"');
@@ -67,14 +64,29 @@ fn parse_delimited_row(line: &str, delimiter: char) -> Vec<String> {
         } else if ch == '"' {
             quoted = !quoted;
         } else if ch == delimiter && !quoted {
-            cells.push(cell.trim().to_string());
+            row.push(cell.trim().to_string());
             cell.clear();
+        } else if matches!(ch, '\n' | '\r') && !quoted {
+            if ch == '\r' && chars.peek() == Some(&'\n') {
+                chars.next();
+            }
+            push_delimited_row(&mut rows, &mut row, &mut cell);
         } else {
             cell.push(ch);
         }
     }
-    cells.push(cell.trim().to_string());
-    cells
+    push_delimited_row(&mut rows, &mut row, &mut cell);
+    rows
+}
+
+fn push_delimited_row(rows: &mut Vec<Vec<String>>, row: &mut Vec<String>, cell: &mut String) {
+    row.push(cell.trim().to_string());
+    cell.clear();
+    if row.iter().any(|value| !value.trim().is_empty()) {
+        rows.push(std::mem::take(row));
+    } else {
+        row.clear();
+    }
 }
 
 pub(crate) fn evaluate_markdown_table_formulas(

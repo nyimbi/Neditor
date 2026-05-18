@@ -3841,7 +3841,7 @@ ARR: Annual recurring revenue.
         fs::create_dir_all(root.join("data")).expect("create data dir");
         fs::write(
             root.join("data").join("revenue.csv"),
-            "Region,Revenue\nEast,100\nWest,\"=SUM(B1,80)\"\n",
+            "Region,Revenue\n\"East\nCoast\",100\nWest,\"=SUM(B1,80)\"\n",
         )
         .expect("write csv data source");
 
@@ -3854,6 +3854,7 @@ ARR: Annual recurring revenue.
             .compiled_markdown
             .contains("## Data Source: Revenue"));
         assert!(response.html.contains("<td>180</td>"));
+        assert!(response.html.contains("East\nCoast"));
         assert!(response
             .include_graph
             .iter()
