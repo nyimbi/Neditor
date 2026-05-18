@@ -1909,36 +1909,62 @@ function escapeTableCell(cell: string) {
 }
 
 function parseDelimitedRows(text: string) {
-  const rows = text
-    .trim()
-    .split(/\r?\n/)
-    .filter((line) => line.trim().length)
-    .map((line) => (line.includes("\t") ? line.split("\t").map((cell) => cell.trim()) : parseCsvLine(line)));
+  const source = text.trim();
+  const rows = parseDelimitedText(source, detectDelimitedPasteDelimiter(source));
   const width = Math.max(0, ...rows.map((row) => row.length));
   return rows.map((row) => padTableRow(row, width));
 }
 
-function parseCsvLine(line: string) {
-  const cells: string[] = [];
+function parseDelimitedText(text: string, delimiter: "," | "\t") {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let cell = "";
   let quoted = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    const next = line[index + 1];
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
     if (char === '"' && quoted && next === '"') {
       cell += '"';
       index += 1;
     } else if (char === '"') {
       quoted = !quoted;
-    } else if (char === "," && !quoted) {
-      cells.push(cell.trim());
+    } else if (char === delimiter && !quoted) {
+      row.push(cell.trim());
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      pushDelimitedPasteRow(rows, row, cell);
+      row = [];
       cell = "";
     } else {
       cell += char;
     }
   }
-  cells.push(cell.trim());
-  return cells;
+  pushDelimitedPasteRow(rows, row, cell);
+  return rows;
+}
+
+function pushDelimitedPasteRow(rows: string[][], row: string[], cell: string) {
+  const nextRow = [...row, cell.trim()];
+  if (nextRow.some((value) => value.trim())) rows.push(nextRow);
+}
+
+function detectDelimitedPasteDelimiter(text: string): "," | "\t" {
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "\t" && !quoted) {
+      return "\t";
+    } else if (char === "," && !quoted) {
+      return ",";
+    }
+  }
+  return ",";
 }
 
 function inferTableFormat(values: string[]): TableFormat {
