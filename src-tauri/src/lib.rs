@@ -2624,6 +2624,10 @@ fn validate_document(
             ));
         }
     }
+    let release_status = matches!(
+        metadata.get("status").and_then(Value::as_str),
+        Some("approved" | "published")
+    );
     if matches!(
         metadata.get("status").and_then(Value::as_str),
         Some("approved" | "published")
@@ -2700,7 +2704,7 @@ fn validate_document(
     }
     if comments.iter().any(|comment| comment.state != "resolved") {
         diagnostics.push(diag(
-            "warning",
+            if release_status { "error" } else { "warning" },
             "Document has unresolved review comments.",
             None,
             None,
@@ -2715,7 +2719,7 @@ fn validate_document(
             .any(|section| section.status != "human-reviewed")
     {
         diagnostics.push(diag(
-            "warning",
+            if release_status { "error" } else { "warning" },
             "Document has AI-assisted sections that are not human-reviewed.",
             None,
             None,
@@ -4450,10 +4454,12 @@ ARR: Annual recurring revenue.
                     if note.author == "Dana" && note.text == "Updated the risk note."
             )
         }));
-        assert!(response
+        let unresolved_comment_diagnostic = response
             .diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.message.contains("unresolved review comments")));
+            .find(|diagnostic| diagnostic.message.contains("unresolved review comments"))
+            .expect("unresolved comment diagnostic");
+        assert_eq!(unresolved_comment_diagnostic.severity, "error");
     }
 
     #[test]
@@ -6382,6 +6388,16 @@ paths:
         assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("AI-assisted sections that are not human-reviewed")));
+        let ai_review_diagnostic = response
+            .diagnostics
+            .iter()
+            .find(|diagnostic| {
+                diagnostic
+                    .message
+                    .contains("AI-assisted sections that are not human-reviewed")
+            })
+            .expect("AI review diagnostic");
+        assert_eq!(ai_review_diagnostic.severity, "error");
 
         let report = prepare_for_export(PrepareExportRequest {
             text: source.to_string(),
