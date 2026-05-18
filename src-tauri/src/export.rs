@@ -1621,6 +1621,7 @@ fn appendix_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String
 struct PptxSlide {
     title: String,
     lines: Vec<String>,
+    footer: String,
     media_refs: Vec<MediaRef>,
     notes: Vec<String>,
 }
@@ -1636,6 +1637,7 @@ impl PptxSlide {
         Self {
             title: title.into(),
             lines: Vec::new(),
+            footer: String::new(),
             media_refs: Vec::new(),
             notes: Vec::new(),
         }
@@ -1645,6 +1647,7 @@ impl PptxSlide {
         Self {
             title: title.into(),
             lines,
+            footer: String::new(),
             media_refs: Vec::new(),
             notes: Vec::new(),
         }
@@ -1773,12 +1776,14 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                 .collect(),
         ));
     }
+    let (_, footer) = export_header_footer(response, options);
     slides
         .into_iter()
         .map(|mut slide| {
             if slide.lines.is_empty() {
                 slide.lines.push("No body content".to_string());
             }
+            slide.footer = footer.clone();
             slide.lines.truncate(14);
             slide
         })
@@ -2215,8 +2220,16 @@ fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
         .enumerate()
         .map(|(index, item)| render_pptx_picture(item, index))
         .collect::<String>();
+    let footer = if slide.footer.trim().is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"<p:sp><p:nvSpPr><p:cNvPr id="98" name="Footer"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{}</a:t></a:r></a:p></p:txBody></p:sp>"#,
+            escape_xml(&slide.footer)
+        )
+    };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{pictures}</p:spTree></p:cSld></p:sld>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{pictures}{footer}</p:spTree></p:cSld></p:sld>"#
     )
 }
 

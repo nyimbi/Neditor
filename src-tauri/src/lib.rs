@@ -6094,6 +6094,8 @@ paths:
         assert!(slide_two.contains("- [ ] Final approval"));
         assert!(slide_two.contains("Table: Metric | Value"));
         assert!(slide_two.contains("System diagram"));
+        assert!(slide_two.contains(r#"name="Footer""#));
+        assert!(slide_two.contains("Page 1 of 1"));
         assert!(slide_two.contains(r#"r:embed="rIdImage1""#));
         assert!(slide_two_relationships.contains(r#"Target="../media/image1.svg""#));
         assert_eq!(pptx_svg, "<svg/>");
@@ -6309,6 +6311,8 @@ paths:
         assert!(pptx_slide_three.contains("Competitive Advantage, p. 42"));
         assert!(pptx_slide_three.contains("Table: Region | Revenue | Margin"));
         assert!(pptx_slide_three.contains("Reference architecture"));
+        assert!(pptx_slide_three.contains(r#"name="Footer""#));
+        assert!(pptx_slide_three.contains("Page 1 of 1"));
         assert!(pptx_slide_three.contains(r#"r:embed="rIdImage1""#));
         assert!(pptx_slide_three_relationships.contains(r#"Target="../media/image1.svg""#));
         assert_eq!(pptx_svg, "<svg/>");
