@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
+import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/plugin-fs";
 import { Store } from "@tauri-apps/plugin-store";
 import type {
   AiCleanupResponse,
@@ -13,6 +14,7 @@ import type {
 } from "../types";
 
 let preferencesStore: Store | null = null;
+let unwatchFileChanges: UnwatchFn | null = null;
 
 interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
@@ -41,6 +43,14 @@ interface ExternalConflict {
   message: string;
   externalHash: string;
   externalText?: string;
+}
+
+interface DocumentWatchEvent {
+  path: string;
+  reason: "root" | "include";
+  kind: string;
+  hash?: string | null;
+  modified?: string | null;
 }
 
 const starterDocument = `---
@@ -129,6 +139,15 @@ function folderFromPath(path: string | null) {
   return separator > 0 ? path.slice(0, separator) : null;
 }
 
+function watchEventIsAccessOnly(event: WatchEvent) {
+  return typeof event.type === "object" && "access" in event.type;
+}
+
+function stringifyWatchEventKind(kind: WatchEvent["type"]) {
+  if (typeof kind === "string") return kind;
+  return Object.keys(kind)[0] || "other";
+}
+
 export const useDocumentsStore = defineStore("documents", {
   state: () => ({
     documents: [
@@ -163,6 +182,8 @@ export const useDocumentsStore = defineStore("documents", {
     externalHash: "",
     externalConflict: null as ExternalConflict | null,
     ignoredConflictHash: "",
+    watchSignature: "",
+    watchedPaths: [] as string[],
     transformEngines: [] as Array<Record<string, unknown>>,
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
@@ -439,26 +460,82 @@ export const useDocumentsStore = defineStore("documents", {
         doc.title = String(doc.compile.semantic.title || titleFromPath(doc.path));
         this.statusMessage = `${doc.compile.diagnostics.length} diagnostics`;
         this.lastError = "";
+        await this.syncFileWatcher();
       } catch (error) {
         this.lastError = error instanceof Error ? error.message : String(error);
       }
     },
-    async refreshExternalState() {
+    async syncFileWatcher() {
+      const doc = this.activeDocument;
+      const stopCurrentWatcher = () => {
+        unwatchFileChanges?.();
+        unwatchFileChanges = null;
+      };
+      if (!doc?.path) {
+        if (this.watchSignature) {
+          stopCurrentWatcher();
+        }
+        this.watchSignature = "";
+        this.watchedPaths = [];
+        return;
+      }
+      const includedPaths = (doc.compile?.export_manifest.included_files || []).map((file) => file.path);
+      const watchPaths = [doc.path, ...includedPaths];
+      const signature = watchPaths.join("\n");
+      if (signature === this.watchSignature) return;
+      stopCurrentWatcher();
+      unwatchFileChanges = await watchFs(
+        watchPaths,
+        (event) => {
+          void this.handleFsWatchEvent(event, doc.path as string, includedPaths);
+        },
+        { delayMs: 250 },
+      );
+      this.watchSignature = signature;
+      this.watchedPaths = watchPaths;
+    },
+    async handleFsWatchEvent(event: WatchEvent, rootPath: string, includedPaths: string[]) {
+      const paths = event.paths.length ? event.paths : [rootPath];
+      for (const path of paths) {
+        const reason = path === rootPath ? "root" : includedPaths.includes(path) ? "include" : null;
+        if (!reason || watchEventIsAccessOnly(event)) continue;
+        const metadata = await invoke<FileMetadataResponse>("file_metadata", { path });
+        await this.handleWatchedFileChange({
+          path,
+          reason,
+          kind: stringifyWatchEventKind(event.type),
+          hash: metadata.hash,
+          modified: metadata.modified,
+        });
+      }
+    },
+    async handleWatchedFileChange(event: DocumentWatchEvent) {
+      const doc = this.activeDocument;
+      if (!doc?.path) return;
+      const watched = this.watchedPaths.length
+        ? this.watchedPaths
+        : [doc.path, ...(doc.compile?.export_manifest.included_files || []).map((file) => file.path)];
+      if (!watched.includes(event.path)) return;
+      await this.refreshExternalState(event);
+    },
+    async refreshExternalState(event?: DocumentWatchEvent) {
       const doc = this.activeDocument;
       if (!doc.path) return;
       const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: doc.path });
       this.externalHash = metadata.hash || "";
-      const mainChanged = metadata.exists && metadata.hash && metadata.hash !== doc.savedHash;
-      const includeChanged = await this.hasChangedIncludedFiles(doc);
+      const rootEventIsRealChange = event?.reason === "root" && (!event.hash || event.hash !== doc.savedHash);
+      const mainChanged =
+        rootEventIsRealChange || Boolean(metadata.exists && metadata.hash && metadata.hash !== doc.savedHash);
+      const includeChanged = event?.reason === "include" || (await this.hasChangedIncludedFiles(doc));
       if (metadata.hash && this.ignoredConflictHash === metadata.hash && doc.dirty) return;
       if ((mainChanged || includeChanged) && doc.dirty) {
         await this.openExternalConflict(
-          doc.path,
+          event?.path || doc.path,
           mainChanged ? "root" : "include",
           mainChanged
             ? "The root file changed outside NEditor while local edits are unsaved."
             : "An included file changed while local edits are unsaved.",
-          metadata.hash || "include-change",
+          (mainChanged ? metadata.hash : event?.hash) || "include-change",
         );
         this.statusMessage = mainChanged
           ? "External changes detected; compare before overwriting"
@@ -477,7 +554,9 @@ export const useDocumentsStore = defineStore("documents", {
       } else if (includeChanged) {
         this.externalConflict = null;
         await this.compileActive();
-        this.statusMessage = "Recompiled after included file changes";
+        this.statusMessage = event?.path
+          ? `Recompiled after included file changed: ${titleFromPath(event.path)}`
+          : "Recompiled after included file changes";
       }
     },
     async acceptExternalChanges() {

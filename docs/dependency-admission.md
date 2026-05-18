@@ -41,7 +41,7 @@ This record satisfies the dependency admission gate in `docs/specification.md`.
 | `tauri` | `2` | MIT/Apache-2.0 | Native desktop runtime | Linked application core | Required by specification | Main IPC/security boundary |
 | `tauri-build` | `2` | MIT/Apache-2.0 | Tauri build integration | Build dependency | Required by Tauri | Build-time only |
 | `tauri-plugin-dialog` | `2` | MIT/Apache-2.0 | Native dialogs | Linked plugin | Required for native dialogs | User-triggered file paths |
-| `tauri-plugin-fs` | `2` | MIT/Apache-2.0 | Scoped filesystem support | Linked plugin | Rust commands cover complex flows | Scope carefully |
+| `tauri-plugin-fs` | `2` | MIT/Apache-2.0 | Scoped filesystem support and native file watching for root/include refresh | Linked plugin | Rust commands cover complex flows; polling is less responsive for watch workflows | Scope carefully; watcher events stay local |
 | `tauri-plugin-opener` | `2` | MIT/Apache-2.0 | Open/reveal artifacts | Linked plugin | Platform-specific code possible | User-triggered only |
 | `tauri-plugin-shell` | `2` | MIT/Apache-2.0 | Scoped external engine support | Linked plugin | Rust `Command` possible | Requires no shell interpolation |
 | `tauri-plugin-store` | `2` | MIT/Apache-2.0 | Preferences storage | Linked plugin | JSON store possible | Local app data only |

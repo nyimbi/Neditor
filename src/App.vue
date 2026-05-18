@@ -554,7 +554,6 @@ onMounted(async () => {
   buildEditor();
   document.title = store.windowTitle;
   window.addEventListener("keydown", handleShortcut);
-  window.setInterval(() => void store.refreshExternalState(), 5000);
 });
 
 onBeforeUnmount(() => {
