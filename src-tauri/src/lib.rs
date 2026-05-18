@@ -6366,4 +6366,17 @@ paths:
         assert!(response.cleaned_markdown.contains("```ai-source"));
         assert!(response.issues.len() >= 3);
     }
+
+    #[test]
+    fn ai_cleanup_respects_preview_options() {
+        let response = cleanup_ai_paste(AiCleanupRequest {
+            text: "Assistant:\nClean paragraph.".to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+        });
+
+        assert!(!response.cleaned_markdown.contains("draft: AI paste"));
+        assert!(!response.cleaned_markdown.contains("```ai-source"));
+        assert!(response.provenance_block.is_none());
+    }
 }

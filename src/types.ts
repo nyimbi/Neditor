@@ -195,6 +195,11 @@ export interface AiCleanupResponse {
   provenance_block?: string | null;
 }
 
+export interface AiCleanupOptions {
+  addProvenance: boolean;
+  markAsDraft: boolean;
+}
+
 export interface ExportReadinessReport {
   ready: boolean;
   error_count: number;

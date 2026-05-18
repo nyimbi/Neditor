@@ -5,6 +5,7 @@ import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/p
 import { Store } from "@tauri-apps/plugin-store";
 import type {
   AiCleanupResponse,
+  AiCleanupOptions,
   CompileResponse,
   ExportReadinessReport,
   GitHistoryEntry,
@@ -233,6 +234,7 @@ export const useDocumentsStore = defineStore("documents", {
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
     aiCleanupIssues: [] as string[],
+    aiCleanupPreview: null as AiCleanupResponse | null,
     recentFiles: [] as string[],
     recentFolders: [] as string[],
     recentlyClosed: [] as string[],
@@ -842,11 +844,15 @@ export const useDocumentsStore = defineStore("documents", {
         this.statusMessage = `${name} transform probe failed`;
       }
     },
-    async cleanAiPaste(text: string, mode: "insert" | "replace" | "appendix") {
+    async previewAiPaste(text: string, options: AiCleanupOptions) {
       const response = await invoke<AiCleanupResponse>("cleanup_ai_paste", {
-        request: { text, add_provenance: true, mark_as_draft: true },
+        request: { text, add_provenance: options.addProvenance, mark_as_draft: options.markAsDraft },
       });
+      this.aiCleanupPreview = response;
       this.aiCleanupIssues = response.issues;
+      return response;
+    },
+    insertAiPaste(response: AiCleanupResponse, mode: "insert" | "replace" | "appendix") {
       if (mode === "replace") {
         this.updateText(response.cleaned_markdown);
       } else if (mode === "appendix") {
@@ -855,6 +861,10 @@ export const useDocumentsStore = defineStore("documents", {
         this.updateText(`${this.activeDocument.text}\n\n${response.cleaned_markdown}\n`);
       }
       this.statusMessage = `Cleaned AI paste with ${response.issues.length} issue notes`;
+    },
+    async cleanAiPaste(text: string, mode: "insert" | "replace" | "appendix", options: AiCleanupOptions) {
+      const response = await this.previewAiPaste(text, options);
+      this.insertAiPaste(response, mode);
     },
     insertReviewComment(text: string) {
       const comment = text.trim() || "Review comment";

@@ -423,9 +423,20 @@
       <form class="modal" @submit.prevent="cleanAiPaste">
         <header>
           <h2>Paste from AI Chat</h2>
-          <button type="button" @click="aiPasteOpen = false">x</button>
+          <button type="button" @click="closeAiPaste">x</button>
         </header>
-        <textarea v-model="aiPasteText" rows="12" placeholder="Paste AI chat output here"></textarea>
+        <section class="compare-grid ai-paste-grid">
+          <label>
+            Original
+            <textarea v-model="aiPasteText" rows="12" placeholder="Paste AI chat output here"></textarea>
+          </label>
+          <label>
+            Cleaned preview
+            <textarea :value="store.aiCleanupPreview?.cleaned_markdown || ''" rows="12" readonly placeholder="Preview cleaned Markdown"></textarea>
+          </label>
+        </section>
+        <label><input v-model="aiMarkAsDraft" type="checkbox" /> Mark as draft</label>
+        <label><input v-model="aiAddProvenance" type="checkbox" /> Add provenance block</label>
         <label>
           Insert mode
           <select v-model="aiInsertMode">
@@ -438,8 +449,11 @@
           <p v-for="issue in store.aiCleanupIssues" :key="issue">{{ issue }}</p>
         </section>
         <footer>
-          <button type="button" @click="aiPasteOpen = false">Cancel</button>
-          <button type="submit">Clean and insert</button>
+          <button type="button" @click="closeAiPaste">Cancel</button>
+          <button type="button" :disabled="aiPreviewBusy || !aiPasteText.trim()" @click="previewAiPaste">
+            {{ aiPreviewBusy ? "Cleaning" : "Preview cleanup" }}
+          </button>
+          <button type="submit" :disabled="aiPreviewBusy || !aiPasteText.trim()">Insert cleaned</button>
         </footer>
       </form>
     </section>
@@ -514,6 +528,10 @@ let lastAutoSnapshotSignature = "";
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
 const aiInsertMode = ref<"insert" | "replace" | "appendix">("insert");
+const aiAddProvenance = ref(true);
+const aiMarkAsDraft = ref(true);
+const aiPreviewBusy = ref(false);
+const aiPreviewSignature = ref("");
 const commandPaletteOpen = ref(false);
 const conflictOpen = ref(false);
 const commandQuery = ref("");
@@ -984,9 +1002,42 @@ async function exportDocument() {
 
 async function cleanAiPaste() {
   if (!aiPasteText.value.trim()) return;
-  await store.cleanAiPaste(aiPasteText.value, aiInsertMode.value);
+  if (aiPreviewSignature.value !== aiCleanupSignature() || !store.aiCleanupPreview) {
+    await previewAiPaste();
+  }
+  if (!store.aiCleanupPreview) return;
+  store.insertAiPaste(store.aiCleanupPreview, aiInsertMode.value);
+  closeAiPaste();
+}
+
+async function previewAiPaste() {
+  if (!aiPasteText.value.trim()) return;
+  aiPreviewBusy.value = true;
+  try {
+    await store.previewAiPaste(aiPasteText.value, {
+      addProvenance: aiAddProvenance.value,
+      markAsDraft: aiMarkAsDraft.value,
+    });
+    aiPreviewSignature.value = aiCleanupSignature();
+  } finally {
+    aiPreviewBusy.value = false;
+  }
+}
+
+function closeAiPaste() {
   aiPasteText.value = "";
+  aiPreviewSignature.value = "";
+  store.aiCleanupPreview = null;
+  store.aiCleanupIssues = [];
   aiPasteOpen.value = false;
+}
+
+function aiCleanupSignature() {
+  return JSON.stringify({
+    text: aiPasteText.value,
+    addProvenance: aiAddProvenance.value,
+    markAsDraft: aiMarkAsDraft.value,
+  });
 }
 
 function runCommand(run: () => unknown) {
