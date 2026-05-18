@@ -471,6 +471,7 @@ import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { searchKeymap } from "@codemirror/search";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { useDocumentsStore } from "./stores/documents";
 import type { DocumentDiagnostic } from "./types";
@@ -687,8 +688,9 @@ function editorExtensions() {
     history(),
     markdown(),
     linter(editorDiagnostics, { delay: 150 }),
+    closeBrackets(),
     EditorView.contentAttributes.of({ spellcheck: "true", autocapitalize: "sentences" }),
-    keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
