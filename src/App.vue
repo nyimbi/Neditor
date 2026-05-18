@@ -203,7 +203,9 @@
         <template v-else-if="store.sidebar === 'references'">
           <h2>References</h2>
           <h3>Citations</h3>
-          <p v-for="citation in active.compile?.semantic.citations || []" :key="citation">[@{{ citation }}]</p>
+          <p v-for="citation in active.compile?.semantic.citation_references || []" :key="`${citation.key}-${citation.locator || ''}`">
+            [@{{ citation.key }}<template v-if="citation.locator">, {{ citation.locator }}</template>]
+          </p>
           <h3>Glossary</h3>
           <dl>
             <template v-for="(definition, term) in active.compile?.semantic.glossary || {}" :key="term">
@@ -1576,6 +1578,11 @@ select:hover {
 .preview-document .glossary-term:focus {
   outline: 2px solid #275da8;
   outline-offset: 2px;
+}
+
+.preview-document .citation {
+  color: #174a8c;
+  font-weight: 600;
 }
 
 .preview-document pre,

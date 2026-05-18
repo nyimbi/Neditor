@@ -65,6 +65,7 @@ struct SemanticDocument {
     figures: usize,
     equations: usize,
     citations: Vec<String>,
+    citation_references: Vec<CitationReference>,
     glossary: BTreeMap<String, String>,
     layout_directives: Vec<String>,
     comments: Vec<ReviewComment>,
@@ -109,6 +110,13 @@ struct SourceMapEntry {
 struct BibliographyEntry {
     key: String,
     title: String,
+    raw: String,
+}
+
+#[derive(Debug, Serialize)]
+struct CitationReference {
+    key: String,
+    locator: Option<String>,
     raw: String,
 }
 
@@ -1111,7 +1119,8 @@ fn compile(request: CompileRequest) -> CompileResponse {
         &mut diagnostics,
     );
     let glossary = collect_glossary(&interpolated);
-    let citations = collect_citations(&interpolated);
+    let citation_references = collect_citation_references(&interpolated);
+    let citations = citation_keys_from_references(&citation_references);
     let labels = collect_labels(&interpolated);
     let cross_references = collect_cross_references(&interpolated, &labels, &mut diagnostics);
     let index_terms = collect_index_terms(&interpolated, &headings, &glossary);
@@ -1126,8 +1135,9 @@ fn compile(request: CompileRequest) -> CompileResponse {
         &bibliography,
     );
     let (transformed_markdown, transform_artifacts) = apply_transforms(&with_toc, &mut diagnostics);
+    let citation_markdown = render_citations(&transformed_markdown, &bibliography);
     let table_formula_markdown =
-        evaluate_markdown_table_formulas(&transformed_markdown, &mut diagnostics);
+        evaluate_markdown_table_formulas(&citation_markdown, &mut diagnostics);
     validate_image_paths(
         &table_formula_markdown,
         root_path.as_deref(),
@@ -1202,6 +1212,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
         figures: count_figures(&transformed_markdown),
         equations: count_equations(&transformed_markdown),
         citations,
+        citation_references,
         glossary,
         layout_directives,
         comments,
@@ -2407,23 +2418,29 @@ fn collect_glossary(text: &str) -> BTreeMap<String, String> {
     glossary
 }
 
-fn collect_citations(text: &str) -> Vec<String> {
-    let mut citations = BTreeSet::new();
+fn collect_citation_references(text: &str) -> Vec<CitationReference> {
+    let mut citations = Vec::new();
     for segment in text.split('[').skip(1) {
         if let Some((inside, _)) = segment.split_once(']') {
             if !inside.contains('@') {
                 continue;
             }
-            for key in citation_keys_from_bracket(inside) {
-                citations.insert(key);
-            }
+            citations.extend(citation_references_from_bracket(inside));
         }
+    }
+    citations
+}
+
+fn citation_keys_from_references(references: &[CitationReference]) -> Vec<String> {
+    let mut citations = BTreeSet::new();
+    for reference in references {
+        citations.insert(reference.key.clone());
     }
     citations.into_iter().collect()
 }
 
-fn citation_keys_from_bracket(text: &str) -> Vec<String> {
-    let mut keys = Vec::new();
+fn citation_references_from_bracket(text: &str) -> Vec<CitationReference> {
+    let mut references = Vec::new();
     let mut rest = text;
     while let Some(index) = rest.find('@') {
         let after_at = &rest[index + 1..];
@@ -2431,12 +2448,86 @@ fn citation_keys_from_bracket(text: &str) -> Vec<String> {
             .chars()
             .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | ':'))
             .collect::<String>();
+        let key_len = key.len();
         if !key.is_empty() {
-            keys.push(key);
+            let after_key = &after_at[key_len..];
+            let locator_end = after_key.find('@').unwrap_or(after_key.len());
+            let locator = after_key[..locator_end]
+                .trim()
+                .trim_start_matches(|ch| ch == ',' || ch == ';')
+                .trim()
+                .trim_end_matches(';')
+                .trim();
+            references.push(CitationReference {
+                key,
+                locator: (!locator.is_empty()).then(|| locator.to_string()),
+                raw: text.to_string(),
+            });
         }
-        rest = &after_at[keys.last().map(String::len).unwrap_or(0)..];
+        rest = &after_at[key_len..];
     }
-    keys
+    references
+}
+
+fn render_citations(markdown: &str, bibliography: &[BibliographyEntry]) -> String {
+    let titles = bibliography
+        .iter()
+        .map(|entry| (entry.key.as_str(), entry.title.as_str()))
+        .collect::<HashMap<_, _>>();
+    let mut output = String::with_capacity(markdown.len());
+    let mut rest = markdown;
+    while let Some(start) = rest.find('[') {
+        output.push_str(&rest[..start]);
+        let after_start = &rest[start + 1..];
+        let Some(end) = after_start.find(']') else {
+            output.push_str(&rest[start..]);
+            return output;
+        };
+        let inside = &after_start[..end];
+        if inside.contains('@') {
+            let references = citation_references_from_bracket(inside);
+            output.push_str(&render_citation_span(&references, &titles));
+        } else {
+            output.push('[');
+            output.push_str(inside);
+            output.push(']');
+        }
+        rest = &after_start[end + 1..];
+    }
+    output.push_str(rest);
+    output
+}
+
+fn render_citation_span(references: &[CitationReference], titles: &HashMap<&str, &str>) -> String {
+    if references.is_empty() {
+        return String::new();
+    }
+    let keys = references
+        .iter()
+        .map(|reference| reference.key.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let label = references
+        .iter()
+        .map(|reference| {
+            let mut label = titles
+                .get(reference.key.as_str())
+                .copied()
+                .unwrap_or(reference.key.as_str())
+                .to_string();
+            if let Some(locator) = &reference.locator {
+                label.push_str(", ");
+                label.push_str(locator);
+            }
+            label
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    format!(
+        "<span class=\"citation\" data-citation-keys=\"{}\">({})</span>",
+        escape_html(&keys),
+        escape_html(&label)
+    )
 }
 
 fn collect_labels(text: &str) -> Vec<String> {
@@ -3648,6 +3739,16 @@ ARR: Annual recurring revenue.
 
         assert_eq!(response.bibliography.len(), 2);
         assert_eq!(response.semantic.citations, vec!["doe2026", "porter1985"]);
+        assert!(response
+            .semantic
+            .citation_references
+            .iter()
+            .any(|citation| {
+                citation.key == "porter1985" && citation.locator.as_deref() == Some("p. 42")
+            }));
+        assert!(response
+            .html
+            .contains("Competitive Advantage, p. 42; Evidence Based Reports"));
         assert!(response.html.contains("<figure"));
         assert!(response.html.contains("System diagram"));
         assert!(response
