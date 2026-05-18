@@ -6210,7 +6210,12 @@ paths:
             text: include_str!("../fixtures/export/business_report.md").to_string(),
             file_path: None,
         });
-        let options = json!({ "watermark": "APPROVED", "includeGlossary": true });
+        let options = json!({
+            "watermark": "APPROVED",
+            "includeGlossary": true,
+            "includeComments": true,
+            "includeProvenance": true
+        });
 
         assert_eq!(response.semantic.title, "Export Conformance Report");
         assert_eq!(response.semantic.status, "approved");
@@ -6221,6 +6226,15 @@ paths:
             .iter()
             .any(|citation| citation == "porter1985"));
         assert!(response.semantic.glossary.contains_key("ARR"));
+        assert!(response.semantic.comments.iter().any(|comment| comment
+            .text
+            .contains("board-pack export fidelity")
+            && comment.state == "resolved"));
+        assert!(response
+            .semantic
+            .ai_sources
+            .iter()
+            .any(|source| source.provider == "OpenAI" && source.status == "human-reviewed"));
         assert_eq!(response.semantic.tables, 1);
         assert_eq!(response.semantic.figures, 1);
         assert_eq!(response.semantic.equations, 1);
@@ -6242,14 +6256,20 @@ paths:
         assert!(html.contains("Competitive Advantage"));
         assert!(html.contains("class=\"export-glossary\""));
         assert!(html.contains("<dt>ARR</dt>"));
+        assert!(html.contains("class=\"export-comments\""));
+        assert!(html.contains("Verify board-pack export fidelity."));
+        assert!(html.contains("class=\"export-provenance\""));
+        assert!(html.contains("gpt-5.4"));
 
         let pdf = render_pdf_bytes(&response, &options);
         let pdf_text = String::from_utf8_lossy(&pdf);
         assert!(pdf.starts_with(b"%PDF-1.4"));
-        assert!(pdf_text.contains("/Count 4"));
+        assert!(pdf_text.contains("/Count 6"));
         assert!(pdf_text.contains("Export Conformance Report"));
         assert!(pdf_text.contains("Reference architecture"));
         assert!(pdf_text.contains("Glossary"));
+        assert!(pdf_text.contains("Review Comments"));
+        assert!(pdf_text.contains("AI Provenance"));
 
         let docx = render_docx_bytes(&response, &options).expect("docx bytes");
         let docx_document = zip_entry_text(&docx, "word/document.xml");
@@ -6259,6 +6279,10 @@ paths:
         assert!(docx_document.contains("Reference architecture"));
         assert!(docx_document.contains("Competitive Advantage"));
         assert!(docx_document.contains("Annual recurring revenue"));
+        assert!(docx_document.contains("Review Comments"));
+        assert!(docx_document.contains("Verify board-pack export fidelity."));
+        assert!(docx_document.contains("AI Provenance"));
+        assert!(docx_document.contains("gpt-5.4"));
 
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
         let pptx_presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
@@ -6273,18 +6297,33 @@ paths:
             .find(|slide| slide.contains("Glossary"))
             .expect("glossary slide");
         assert!(pptx_glossary_slide.contains("Annual recurring revenue"));
+        let pptx_comments_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
+            .into_iter()
+            .find(|slide| slide.contains("Review Comments"))
+            .expect("comments slide");
+        assert!(pptx_comments_slide.contains("Verify board-pack export fidelity."));
+        let pptx_provenance_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
+            .into_iter()
+            .find(|slide| slide.contains("AI Provenance"))
+            .expect("provenance slide");
+        assert!(pptx_provenance_slide.contains("gpt-5.4"));
 
         let exported_text = export::export_text(&response, &options);
         assert!(exported_text.contains("Glossary"));
         assert!(exported_text.contains("ARR: Annual recurring revenue"));
+        assert!(exported_text.contains("Review Comments"));
+        assert!(exported_text.contains("AI Provenance"));
 
-        let bundle =
-            render_markdown_bundle_bytes(&response, &response.export_manifest).expect("bundle");
+        let mut bundle_manifest = response.export_manifest.clone();
+        bundle_manifest.export_options = options.clone();
+        let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
         let bundled_markdown = zip_entry_text(&bundle, "document.md");
         let bundled_text = zip_entry_text(&bundle, "document.txt");
         let bundled_manifest = zip_entry_text(&bundle, "manifest.json");
         assert!(bundled_markdown.contains("Competitive Advantage"));
         assert!(bundled_text.contains("Figure: fig:architecture: Reference architecture"));
+        assert!(bundled_text.contains("Verify board-pack export fidelity."));
+        assert!(bundled_text.contains("OpenAI / gpt-5.4"));
         assert!(bundled_manifest.contains("\"document_title\": \"Export Conformance Report\""));
     }
 

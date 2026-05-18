@@ -20,6 +20,8 @@ layout:
 
 Revenue growth follows the operating model described by Porter [@porter1985, p. 42].
 
+<!-- comment: author: QA | at: 2026-05-18 | resolved | Verify board-pack export fidelity. -->
+
 | Region | Revenue | Margin |
 | --- | ---: | ---: |
 | East | 120 | 30 |
@@ -44,6 +46,14 @@ NDR: Net dollar retention.
 
 ```bibtex
 @book{porter1985, title={Competitive Advantage}}
+```
+
+```ai-source
+provider: OpenAI
+model: gpt-5.4
+date: 2026-05-18
+reviewedBy: QA
+status: human-reviewed
 ```
 
 [BIBLIOGRAPHY]
