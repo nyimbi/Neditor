@@ -70,6 +70,8 @@ export type DocumentBlock =
   | { kind: "heading"; level: number; text: string; anchor: string; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "paragraph"; text: string; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "list"; ordered: boolean; items: string[]; line: number; end_line: number; source?: DocumentSourceRange | null }
+  | { kind: "block_quote"; text: string; line: number; end_line: number; source?: DocumentSourceRange | null }
+  | { kind: "code_block"; language?: string | null; code: string; line: number; end_line: number; source?: DocumentSourceRange | null }
   | {
       kind: "table";
       line: number;

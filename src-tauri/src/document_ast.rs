@@ -43,6 +43,19 @@ pub(crate) enum DocumentBlock {
         end_line: usize,
         source: Option<AstSourceRange>,
     },
+    BlockQuote {
+        text: String,
+        line: usize,
+        end_line: usize,
+        source: Option<AstSourceRange>,
+    },
+    CodeBlock {
+        language: Option<String>,
+        code: String,
+        line: usize,
+        end_line: usize,
+        source: Option<AstSourceRange>,
+    },
     Table {
         line: usize,
         end_line: usize,
@@ -140,6 +153,20 @@ pub(crate) fn build_document_ast(markdown: &str) -> DocumentAst {
             continue;
         }
 
+        if let Some((code_block, next_index)) = parse_ast_code_block(&lines, index) {
+            flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
+            blocks.push(code_block);
+            index = next_index;
+            continue;
+        }
+
+        if let Some((quote, next_index)) = parse_ast_block_quote(&lines, index) {
+            flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
+            blocks.push(quote);
+            index = next_index;
+            continue;
+        }
+
         if is_footnotes_start(trimmed) {
             flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
             let (footnotes, next_index) = parse_ast_footnotes(&lines, index);
@@ -188,6 +215,17 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                     .collect::<Vec<_>>()
                     .join("\n"),
             ),
+            DocumentBlock::BlockQuote { text, .. } => Some(
+                text.lines()
+                    .map(|line| format!("> {line}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+            DocumentBlock::CodeBlock { language, code, .. } => Some(format!(
+                "```{}\n{}\n```",
+                language.as_deref().unwrap_or(""),
+                code.trim_end()
+            )),
             DocumentBlock::Table {
                 id,
                 caption,
@@ -287,6 +325,18 @@ where
                 ..
             }
             | DocumentBlock::List {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::BlockQuote {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::CodeBlock {
                 line,
                 end_line,
                 source,
@@ -474,6 +524,80 @@ fn parse_ast_list_item(line: &str) -> Option<(bool, String)> {
     }
     let item = clean_inline_text(&line[marker_end + 2..]);
     (!item.is_empty()).then_some((true, item))
+}
+
+fn parse_ast_code_block(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize)> {
+    let opener = lines.get(index)?.trim();
+    let marker = if opener.starts_with("```") {
+        "```"
+    } else if opener.starts_with("~~~") {
+        "~~~"
+    } else {
+        return None;
+    };
+    let language = opener[marker.len()..]
+        .split_whitespace()
+        .next()
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string);
+    let mut code_lines = Vec::new();
+    let mut next_index = index + 1;
+    while next_index < lines.len() {
+        let line = lines[next_index];
+        if line.trim_start().starts_with(marker) {
+            return Some((
+                DocumentBlock::CodeBlock {
+                    language,
+                    code: code_lines.join("\n"),
+                    line: index + 1,
+                    end_line: next_index + 1,
+                    source: None,
+                },
+                next_index + 1,
+            ));
+        }
+        code_lines.push(line.to_string());
+        next_index += 1;
+    }
+    Some((
+        DocumentBlock::CodeBlock {
+            language,
+            code: code_lines.join("\n"),
+            line: index + 1,
+            end_line: next_index,
+            source: None,
+        },
+        next_index,
+    ))
+}
+
+fn parse_ast_block_quote(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize)> {
+    if !lines.get(index)?.trim_start().starts_with('>') {
+        return None;
+    }
+    let mut quote_lines = Vec::new();
+    let mut next_index = index;
+    while next_index < lines.len() {
+        let line = lines[next_index].trim_start();
+        if !line.starts_with('>') {
+            break;
+        }
+        quote_lines.push(clean_inline_text(line.trim_start_matches('>').trim_start()));
+        next_index += 1;
+    }
+    let text = quote_lines.join("\n").trim().to_string();
+    if text.is_empty() {
+        return None;
+    }
+    Some((
+        DocumentBlock::BlockQuote {
+            text,
+            line: index + 1,
+            end_line: next_index,
+            source: None,
+        },
+        next_index,
+    ))
 }
 
 fn is_ast_table_start(lines: &[&str], index: usize) -> bool {

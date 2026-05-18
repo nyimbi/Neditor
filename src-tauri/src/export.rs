@@ -1088,6 +1088,15 @@ fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
         DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
         DocumentBlock::Paragraph { text, .. } => docx_paragraph(text),
         DocumentBlock::List { ordered, items, .. } => docx_list(*ordered, items),
+        DocumentBlock::BlockQuote { text, .. } => docx_paragraph(&format!("Quote: {text}")),
+        DocumentBlock::CodeBlock { language, code, .. } => {
+            let label = language
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .map(|value| format!("Code ({value})"))
+                .unwrap_or_else(|| "Code".to_string());
+            format!("{}{}", docx_paragraph(&label), docx_paragraph(code))
+        }
         DocumentBlock::Table {
             id,
             caption,
@@ -1630,6 +1639,15 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             vec![format!("{} {text}", "#".repeat(*level))]
         }
         DocumentBlock::Paragraph { text, .. } => vec![text.clone()],
+        DocumentBlock::BlockQuote { text, .. } => {
+            text.lines().map(|line| format!("> {line}")).collect()
+        }
+        DocumentBlock::CodeBlock { language, code, .. } => {
+            let mut lines = vec![format!("```{}", language.as_deref().unwrap_or(""))];
+            lines.extend(code.lines().map(ToString::to_string));
+            lines.push("```".to_string());
+            lines
+        }
         DocumentBlock::List { ordered, items, .. } => items
             .iter()
             .enumerate()
