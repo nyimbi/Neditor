@@ -6085,10 +6085,15 @@ paths:
         assert!(docx_document.contains("Logo: data:image/svg+xml"));
         assert!(docx_document.contains("Watermark: DRAFT"));
         let docx_core = zip_entry_text(&docx, "docProps/core.xml");
+        let docx_app = zip_entry_text(&docx, "docProps/app.xml");
         assert!(docx_core.contains("<dc:title>Test Report</dc:title>"));
         assert!(docx_core.contains("<cp:category>approved</cp:category>"));
+        assert!(docx_app.contains("<Application>NEditor</Application>"));
+        assert!(docx_app.contains("<Words>"));
+        assert!(docx_app.contains("<AppVersion>"));
         let docx_relationships = zip_entry_text(&docx, "_rels/.rels");
         assert!(docx_relationships.contains("metadata/core-properties"));
+        assert!(docx_relationships.contains("extended-properties"));
         let docx_document_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
         assert!(docx_document_relationships.contains("relationships/header"));
         assert!(docx_document_relationships.contains("relationships/footer"));
@@ -6103,8 +6108,11 @@ paths:
         assert!(pptx_slide.contains(r#"name="Header""#));
         assert!(pptx_slide.contains("Page 1 of 1"));
         let pptx_core = zip_entry_text(&pptx, "docProps/core.xml");
+        let pptx_app = zip_entry_text(&pptx, "docProps/app.xml");
         assert!(pptx_core.contains("<dc:title>Test Report</dc:title>"));
         assert!(pptx_core.contains("<cp:category>approved</cp:category>"));
+        assert!(pptx_app.contains("<Application>NEditor</Application>"));
+        assert!(pptx_app.contains("<Slides>"));
         assert!(
             render_markdown_bundle_bytes(&response, &response.export_manifest)
                 .expect("bundle bytes")
@@ -6390,8 +6398,12 @@ paths:
         let docx_header = zip_entry_text(&docx, "word/header1.xml");
         let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
         let docx_comments = zip_entry_text(&docx, "word/comments.xml");
+        let docx_app = zip_entry_text(&docx, "docProps/app.xml");
         let docx_svg = zip_entry_text(&docx, "word/media/image1.svg");
         assert!(docx_content_types.contains(r#"ContentType="image/svg+xml""#));
+        assert!(docx_content_types.contains(
+            r#"ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml""#
+        ));
         assert!(docx_content_types.contains(
             r#"ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml""#
         ));
@@ -6409,6 +6421,8 @@ paths:
         assert!(docx_document.contains(r#"<w:commentReference w:id="0""#));
         assert!(docx_comments.contains(r#"<w:comment w:id="0" w:author="QA""#));
         assert!(docx_comments.contains("Verify board-pack export fidelity."));
+        assert!(docx_app.contains("<Application>NEditor</Application>"));
+        assert!(docx_app.contains("<Company>Acme Strategy</Company>"));
         let docx_without_comments = render_docx_bytes(
             &response,
             &json!({
@@ -6443,13 +6457,19 @@ paths:
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
         let pptx_content_types = zip_entry_text(&pptx, "[Content_Types].xml");
         let pptx_presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
+        let pptx_app = zip_entry_text(&pptx, "docProps/app.xml");
         let pptx_agenda_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
         let pptx_slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
         let pptx_slide_three_relationships =
             zip_entry_text(&pptx, "ppt/slides/_rels/slide3.xml.rels");
         let pptx_svg = zip_entry_text(&pptx, "ppt/media/image1.svg");
         assert!(pptx_content_types.contains(r#"ContentType="image/svg+xml""#));
+        assert!(pptx_content_types.contains(
+            r#"ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml""#
+        ));
         assert!(pptx_presentation.contains(r#"r:id="rId2""#));
+        assert!(pptx_app.contains("<Application>NEditor</Application>"));
+        assert!(pptx_app.contains("<Slides>"));
         assert!(pptx_agenda_slide.contains("Agenda"));
         assert!(pptx_agenda_slide.contains("Export Conformance Report"));
         assert!(pptx_agenda_slide.contains("Appendix"));
