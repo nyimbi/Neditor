@@ -142,9 +142,10 @@
               </option>
             </select>
           </label>
-          <template v-if="tableDraft && selectedTable">
+          <button type="button" @click="createTableDraft">New table</button>
+          <template v-if="tableDraft">
             <div class="table-actions">
-              <button type="button" @click="applyTableDraft">Apply</button>
+              <button type="button" @click="applyTableDraft">{{ isNewTableDraft ? "Insert table" : "Apply" }}</button>
               <button type="button" @click="addTableRow">Add row</button>
               <button type="button" @click="addTableColumn">Add column</button>
               <button type="button" @click="addTableTotalsRow">Add totals row</button>
@@ -589,6 +590,7 @@ const reviewCommentText = ref("");
 const selectedTableIndex = ref(0);
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
+const isNewTableDraft = ref(false);
 
 interface MarkdownTable {
   startLine: number;
@@ -859,10 +861,11 @@ watch(
   markdownTables,
   (tables) => {
     if (!tables.length) {
-      tableDraft.value = null;
+      if (!isNewTableDraft.value) tableDraft.value = null;
       selectedTableIndex.value = 0;
       return;
     }
+    if (isNewTableDraft.value) return;
     if (selectedTableIndex.value >= tables.length) {
       selectedTableIndex.value = tables.length - 1;
     }
@@ -1319,10 +1322,12 @@ function insertBlock(block: string) {
 function openTableEditor() {
   store.sidebar = "tables";
   if (markdownTables.value.length && !tableDraft.value) loadSelectedTable();
+  if (!markdownTables.value.length && !tableDraft.value) createTableDraft();
 }
 
 function loadSelectedTable() {
   const table = selectedTable.value;
+  isNewTableDraft.value = false;
   if (!table) {
     tableDraft.value = null;
     return;
@@ -1335,15 +1340,50 @@ function loadSelectedTable() {
   };
 }
 
+function createTableDraft() {
+  isNewTableDraft.value = true;
+  tableDraft.value = {
+    headers: ["Item", "Value"],
+    alignments: ["left", "right"],
+    formats: ["text", "number"],
+    rows: [
+      ["Revenue", "125000"],
+      ["Cost", "74000"],
+    ],
+  };
+}
+
 function applyTableDraft() {
   const table = selectedTable.value;
   const draft = tableDraft.value;
-  if (!table || !draft) return;
+  if (!draft) return;
   const normalizedDraft = normalizeTableDraft(draft);
-  const lines = active.value.text.split("\n");
-  lines.splice(table.startLine - 1, table.endLine - table.startLine + 1, ...serializeMarkdownTable(normalizedDraft));
-  store.updateText(lines.join("\n"));
+  const serialized = serializeMarkdownTable(normalizedDraft);
+  if (table && !isNewTableDraft.value) {
+    const lines = active.value.text.split("\n");
+    lines.splice(table.startLine - 1, table.endLine - table.startLine + 1, ...serialized);
+    store.updateText(lines.join("\n"));
+  } else {
+    insertTableAtCursor(serialized);
+    const nextTableIndex = markdownTables.value.length;
+    void nextTick().then(() => {
+      selectedTableIndex.value = Math.min(nextTableIndex, Math.max(0, markdownTables.value.length - 1));
+      loadSelectedTable();
+    });
+  }
+  isNewTableDraft.value = false;
   tableDraft.value = normalizedDraft;
+}
+
+function insertTableAtCursor(lines: string[]) {
+  const text = active.value.text;
+  const position = editorView?.state.selection.main.to ?? text.length;
+  const before = text.slice(0, position);
+  const after = text.slice(position);
+  const block = lines.join("\n");
+  const prefix = !before ? "" : before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
+  const suffix = !after ? "\n" : after.startsWith("\n") ? "\n" : "\n\n";
+  store.updateText(`${before}${prefix}${block}${suffix}${after}`);
 }
 
 function addTableRow() {
