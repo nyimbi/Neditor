@@ -6295,6 +6295,11 @@ paths:
         assert!(docx_core.contains("<cp:category>approved</cp:category>"));
         let docx_relationships = zip_entry_text(&docx, "_rels/.rels");
         assert!(docx_relationships.contains("metadata/core-properties"));
+        let docx_document_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
+        assert!(docx_document_relationships.contains("relationships/header"));
+        assert!(docx_document_relationships.contains("relationships/footer"));
+        assert!(zip_entry_text(&docx, "word/header1.xml").contains("Test Report"));
+        assert!(zip_entry_text(&docx, "word/footer1.xml").contains("Page 1 of 1"));
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
         assert!(pptx.len() > 100);
         let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide1.xml");
@@ -6418,7 +6423,13 @@ paths:
 
         let docx = render_docx_bytes(&response, &options).expect("docx bytes");
         let docx_document = zip_entry_text(&docx, "word/document.xml");
+        let docx_header = zip_entry_text(&docx, "word/header1.xml");
+        let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading1""#));
+        assert!(docx_document.contains("w:headerReference"));
+        assert!(docx_document.contains("w:footerReference"));
+        assert!(docx_header.contains("Export Conformance Report | restricted"));
+        assert!(docx_footer.contains("Page 1 of 1"));
         assert!(docx_document.contains("<w:tbl>"));
         assert!(docx_document.contains(r#"<w:br w:type="page""#));
         assert!(docx_document.contains("Reference architecture"));

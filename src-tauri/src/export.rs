@@ -167,6 +167,20 @@ pub(crate) fn render_docx_bytes(
         .map_err(|err| err.to_string())?;
     zip.add_directory("word/", options)
         .map_err(|err| err.to_string())?;
+    zip.add_directory("word/_rels/", options)
+        .map_err(|err| err.to_string())?;
+    zip.start_file("word/_rels/document.xml.rels", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(render_docx_document_relationships().as_bytes())
+        .map_err(|err| err.to_string())?;
+    zip.start_file("word/header1.xml", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(render_docx_header(response, options_value).as_bytes())
+        .map_err(|err| err.to_string())?;
+    zip.start_file("word/footer1.xml", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(render_docx_footer(response, options_value).as_bytes())
+        .map_err(|err| err.to_string())?;
     zip.start_file("word/document.xml", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(render_docx_document(response, options_value).as_bytes())
@@ -273,7 +287,7 @@ fn safe_bundle_path(path: &str) -> String {
 }
 
 fn render_docx_content_types() -> String {
-    r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#.to_string()
+    r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>"#.to_string()
 }
 
 fn render_root_relationships(office_document_target: &str) -> String {
@@ -281,6 +295,10 @@ fn render_root_relationships(office_document_target: &str) -> String {
         r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{}"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>"#,
         escape_xml(office_document_target)
     )
+}
+
+fn render_docx_document_relationships() -> String {
+    r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/></Relationships>"#.to_string()
 }
 
 fn render_core_properties(response: &CompileResponse) -> String {
@@ -329,13 +347,7 @@ pub(crate) fn export_text(response: &CompileResponse, options: &Value) -> String
 }
 
 fn export_metadata_lines(response: &CompileResponse, options: &Value) -> Vec<String> {
-    let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
-    let header = metadata_string(&response.metadata, "layout.header")
-        .map(|template| render_export_template(&template, response, &classification))
-        .unwrap_or_else(|| response.semantic.title.clone());
-    let footer = metadata_string(&response.metadata, "layout.footer")
-        .map(|template| render_export_template(&template, response, &classification))
-        .unwrap_or_else(|| "Page 1 of 1".to_string());
+    let (header, footer) = export_header_footer(response, options);
     let watermark = options
         .get("watermark")
         .and_then(Value::as_str)
@@ -356,6 +368,17 @@ fn export_metadata_lines(response: &CompileResponse, options: &Value) -> Vec<Str
         lines.push(format!("Watermark: {watermark}"));
     }
     lines
+}
+
+fn export_header_footer(response: &CompileResponse, _options: &Value) -> (String, String) {
+    let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
+    let header = metadata_string(&response.metadata, "layout.header")
+        .map(|template| render_export_template(&template, response, &classification))
+        .unwrap_or_else(|| response.semantic.title.clone());
+    let footer = metadata_string(&response.metadata, "layout.footer")
+        .map(|template| render_export_template(&template, response, &classification))
+        .unwrap_or_else(|| "Page 1 of 1".to_string());
+    (header, footer)
 }
 
 fn include_glossary(options: &Value) -> bool {
@@ -549,7 +572,23 @@ fn render_docx_document(response: &CompileResponse, options: &Value) -> String {
         }
     }
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>{body}<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader1"/><w:footerReference w:type="default" r:id="rIdFooter1"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>"#
+    )
+}
+
+fn render_docx_header(response: &CompileResponse, options: &Value) -> String {
+    let (header, _) = export_header_footer(response, options);
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}</w:hdr>"#,
+        docx_paragraph(&header)
+    )
+}
+
+fn render_docx_footer(response: &CompileResponse, options: &Value) -> String {
+    let (_, footer) = export_header_footer(response, options);
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}</w:ftr>"#,
+        docx_paragraph(&footer)
     )
 }
 
