@@ -1128,7 +1128,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
     attach_source_ranges(&mut document_ast, |line, end_line| {
         ast_source_range_for_generated_lines(&source_map, line, end_line)
     });
-    let html = markdown_to_html(&layout_markdown);
+    let html = markdown_to_html(&layout_markdown, &glossary);
     let title = metadata
         .get("title")
         .and_then(Value::as_str)
@@ -1921,7 +1921,7 @@ fn external_transform_supported(name: &str) -> bool {
     matches!(name, "pikchr" | "dot" | "graphviz" | "plantuml" | "d2")
 }
 
-fn markdown_to_html(markdown: &str) -> String {
+fn markdown_to_html(markdown: &str, glossary: &BTreeMap<String, String>) -> String {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_FOOTNOTES);
@@ -1931,7 +1931,84 @@ fn markdown_to_html(markdown: &str) -> String {
     let parser = Parser::new_ext(markdown, options);
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
-    html_output
+    annotate_glossary_terms(&html_output, glossary)
+}
+
+fn annotate_glossary_terms(html: &str, glossary: &BTreeMap<String, String>) -> String {
+    if glossary.is_empty() {
+        return html.to_string();
+    }
+    let terms = glossary
+        .iter()
+        .filter(|(term, _)| !term.trim().is_empty())
+        .map(|(term, definition)| (term.as_str(), definition.as_str()))
+        .collect::<Vec<_>>();
+    if terms.is_empty() {
+        return html.to_string();
+    }
+
+    let mut output = String::with_capacity(html.len());
+    let mut text_segment = String::new();
+    let mut in_tag = false;
+    for ch in html.chars() {
+        if ch == '<' {
+            if !text_segment.is_empty() {
+                output.push_str(&annotate_glossary_text_segment(&text_segment, &terms));
+                text_segment.clear();
+            }
+            in_tag = true;
+            output.push(ch);
+        } else if ch == '>' {
+            in_tag = false;
+            output.push(ch);
+        } else if in_tag {
+            output.push(ch);
+        } else {
+            text_segment.push(ch);
+        }
+    }
+    if !text_segment.is_empty() {
+        output.push_str(&annotate_glossary_text_segment(&text_segment, &terms));
+    }
+    output
+}
+
+fn annotate_glossary_text_segment(segment: &str, terms: &[(&str, &str)]) -> String {
+    let mut output = String::with_capacity(segment.len());
+    let mut index = 0;
+    while index < segment.len() {
+        if let Some((term, definition)) = terms
+            .iter()
+            .filter(|(term, _)| segment[index..].starts_with(*term))
+            .filter(|(term, _)| glossary_term_has_boundaries(segment, index, index + term.len()))
+            .max_by_key(|(term, _)| term.len())
+        {
+            let matched = &segment[index..index + term.len()];
+            output.push_str(&format!(
+                "<span class=\"glossary-term\" tabindex=\"0\" title=\"{}\" data-definition=\"{}\">{}</span>",
+                escape_html(definition),
+                escape_html(definition),
+                matched
+            ));
+            index += term.len();
+        } else if let Some(ch) = segment[index..].chars().next() {
+            output.push(ch);
+            index += ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+    output
+}
+
+fn glossary_term_has_boundaries(segment: &str, start: usize, end: usize) -> bool {
+    let before = segment[..start].chars().next_back();
+    let after = segment[end..].chars().next();
+    !before.is_some_and(is_word_char) && !after.is_some_and(is_word_char)
+}
+
+fn is_word_char(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '_'
 }
 
 fn render_figures(markdown: &str) -> String {
@@ -3509,6 +3586,20 @@ ARR: Annual recurring revenue.
             .formula_graph
             .iter()
             .any(|formula| formula.name == "profit" && formula.value == Some(60.0)));
+    }
+
+    #[test]
+    fn compiler_adds_glossary_hover_terms_to_preview_html() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Glossary Hover\nstatus: approved\napprovedBy: QA\n---\n# Glossary Hover\nARR informs planning.\n\n```glossary\nARR: Annual recurring revenue.\n```\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response.html.contains("class=\"glossary-term\""));
+        assert!(response
+            .html
+            .contains("title=\"Annual recurring revenue.\""));
+        assert!(response.html.contains(">ARR</span> informs planning"));
     }
 
     #[test]

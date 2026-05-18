@@ -1566,6 +1566,18 @@ select:hover {
   padding: 6px 8px;
 }
 
+.preview-document .glossary-term {
+  border-bottom: 1px dotted #275da8;
+  color: #174a8c;
+  cursor: help;
+  text-decoration: none;
+}
+
+.preview-document .glossary-term:focus {
+  outline: 2px solid #275da8;
+  outline-offset: 2px;
+}
+
 .preview-document pre,
 .sidebar pre {
   overflow: auto;
