@@ -1864,6 +1864,7 @@ fn appendix_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String
 struct PptxSlide {
     title: String,
     lines: Vec<String>,
+    header: String,
     footer: String,
     tables: Vec<PptxTable>,
     media_refs: Vec<MediaRef>,
@@ -1890,6 +1891,7 @@ impl PptxSlide {
         Self {
             title: title.into(),
             lines: Vec::new(),
+            header: String::new(),
             footer: String::new(),
             tables: Vec::new(),
             media_refs: Vec::new(),
@@ -1901,6 +1903,7 @@ impl PptxSlide {
         Self {
             title: title.into(),
             lines,
+            header: String::new(),
             footer: String::new(),
             tables: Vec::new(),
             media_refs: Vec::new(),
@@ -2031,13 +2034,14 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                 .collect(),
         ));
     }
-    let (_, footer) = export_header_footer(response, options);
+    let (header, footer) = export_header_footer(response, options);
     slides
         .into_iter()
         .map(|mut slide| {
             if slide.lines.is_empty() {
                 slide.lines.push("No body content".to_string());
             }
+            slide.header = header.clone();
             slide.footer = footer.clone();
             slide.lines.truncate(14);
             slide
@@ -2498,16 +2502,24 @@ fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
         .enumerate()
         .map(|(index, table)| render_pptx_table(table, index, slide.lines.len()))
         .collect::<String>();
+    let header = if slide.header.trim().is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"<p:sp><p:nvSpPr><p:cNvPr id="97" name="Header"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="457200" y="171450"/><a:ext cx="8229600" cy="274320"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="900"/><a:t>{}</a:t></a:r></a:p></p:txBody></p:sp>"#,
+            escape_xml(&slide.header)
+        )
+    };
     let footer = if slide.footer.trim().is_empty() {
         String::new()
     } else {
         format!(
-            r#"<p:sp><p:nvSpPr><p:cNvPr id="98" name="Footer"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{}</a:t></a:r></a:p></p:txBody></p:sp>"#,
+            r#"<p:sp><p:nvSpPr><p:cNvPr id="98" name="Footer"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="457200" y="4800600"/><a:ext cx="8229600" cy="274320"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="900"/><a:t>{}</a:t></a:r></a:p></p:txBody></p:sp>"#,
             escape_xml(&slide.footer)
         )
     };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{tables}{pictures}{footer}</p:spTree></p:cSld></p:sld>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{header}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{tables}{pictures}{footer}</p:spTree></p:cSld></p:sld>"#
     )
 }
 

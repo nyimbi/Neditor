@@ -6079,6 +6079,7 @@ paths:
         assert!(pptx.len() > 100);
         let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide1.xml");
         assert!(pptx_slide.contains("Test Report"));
+        assert!(pptx_slide.contains(r#"name="Header""#));
         assert!(pptx_slide.contains("Page 1 of 1"));
         let pptx_core = zip_entry_text(&pptx, "docProps/core.xml");
         assert!(pptx_core.contains("<dc:title>Test Report</dc:title>"));
@@ -6369,6 +6370,7 @@ paths:
         assert!(pptx_slide_three.contains("<a:tbl>"));
         assert!(pptx_slide_three.contains(r#"<a:pPr algn="r"/>"#));
         assert!(pptx_slide_three.contains("Reference architecture"));
+        assert!(pptx_slide_three.contains(r#"name="Header""#));
         assert!(pptx_slide_three.contains(r#"name="Footer""#));
         assert!(pptx_slide_three.contains("Page 1 of 1"));
         assert!(pptx_slide_three.contains(r#"r:embed="rIdImage1""#));
