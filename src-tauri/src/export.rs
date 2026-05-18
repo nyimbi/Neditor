@@ -749,9 +749,42 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
             .filter(|line| !line.starts_with("Cover: "))
             .collect(),
     }];
+    let include_agenda = include_pptx_agenda(response, options);
+    if include_agenda {
+        let lines = response
+            .semantic
+            .outline
+            .iter()
+            .filter(|heading| heading.level <= 2)
+            .map(|heading| {
+                format!(
+                    "{}{}",
+                    "  ".repeat(heading.level.saturating_sub(1)),
+                    heading.text
+                )
+            })
+            .collect::<Vec<_>>();
+        if !lines.is_empty() {
+            slides.push(PptxSlide {
+                title: "Agenda".to_string(),
+                lines,
+            });
+        }
+    }
     let mut current: Option<PptxSlide> = None;
+    let mut skip_next_toc_body = false;
 
     for block in &response.document_ast.blocks {
+        if skip_next_toc_body {
+            skip_next_toc_body = false;
+            if is_generated_toc_body(block) {
+                continue;
+            }
+        }
+        if include_agenda && is_generated_toc_heading(block) {
+            skip_next_toc_body = true;
+            continue;
+        }
         match block {
             DocumentBlock::Heading { level, text, .. } if *level <= 2 => {
                 if let Some(slide) = current.take() {
@@ -840,6 +873,30 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
             slide
         })
         .collect()
+}
+
+fn include_pptx_agenda(response: &CompileResponse, options: &Value) -> bool {
+    options
+        .get("includeAgenda")
+        .and_then(Value::as_bool)
+        .or_else(|| response.metadata.get("toc").and_then(Value::as_bool))
+        .unwrap_or(false)
+}
+
+fn is_generated_toc_heading(block: &DocumentBlock) -> bool {
+    matches!(
+        block,
+        DocumentBlock::Heading { level, text, .. }
+            if *level == 2 && text == "Table of Contents"
+    )
+}
+
+fn is_generated_toc_body(block: &DocumentBlock) -> bool {
+    matches!(
+        block,
+        DocumentBlock::Paragraph { text, .. }
+            if text.trim_start().starts_with("- [") && text.contains("](#")
+    )
 }
 
 fn block_export_lines(block: &DocumentBlock) -> Vec<String> {

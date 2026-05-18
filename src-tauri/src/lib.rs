@@ -6577,10 +6577,13 @@ paths:
 
         let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
         let pptx_presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
-        let pptx_slide_two = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        let pptx_agenda_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
         let pptx_slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
         assert!(pptx_presentation.contains(r#"r:id="rId2""#));
-        assert!(pptx_slide_two.contains("Export Conformance Report"));
+        assert!(pptx_agenda_slide.contains("Agenda"));
+        assert!(pptx_agenda_slide.contains("Export Conformance Report"));
+        assert!(pptx_agenda_slide.contains("Appendix"));
+        assert!(pptx_slide_three.contains("Export Conformance Report"));
         assert!(pptx_slide_three.contains("Table: Region | Revenue | Margin"));
         assert!(pptx_slide_three.contains("Reference architecture"));
         let pptx_glossary_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
