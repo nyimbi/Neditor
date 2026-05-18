@@ -30,7 +30,7 @@ use bibliography::{
     duplicate_bibliography_keys, parse_bibliography_source, render_citations, BibliographyEntry,
     CitationReference,
 };
-use calculations::{collect_calculations, FormulaValue};
+use calculations::{collect_calculations, eval_expression, FormulaValue};
 use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
@@ -686,14 +686,21 @@ fn interpolate_variables(
         output.push_str(before);
         if let Some(end) = after_start.find("}}") {
             let token = after_start[2..end].trim();
+            let mut formula_token = false;
             let replacement = if let Some(expr) = token.strip_prefix('=') {
-                let expr = expr.trim();
-                if let Some((name, filter)) = expr.split_once('|') {
-                    calculations
-                        .get(name.trim())
-                        .map(|value| format_value(*value, filter.trim()))
-                } else {
-                    calculations.get(expr).map(|value| value.to_string())
+                formula_token = true;
+                match evaluate_inline_formula(expr, calculations) {
+                    Ok(value) => Some(value),
+                    Err(error) => {
+                        diagnostics.push(diag(
+                            "error",
+                            format!("Inline formula error for {{{{{token}}}}}: {error}"),
+                            None,
+                            None,
+                            Some("Use numeric expressions, supported functions, and names defined in calc blocks."),
+                        ));
+                        None
+                    }
                 }
             } else {
                 let (path, default_value) = variable_path_and_default(token);
@@ -704,6 +711,8 @@ fn interpolate_variables(
             if let Some(value) = replacement {
                 output.push_str(&value);
             } else if matches!(token, "page" | "pages") {
+                output.push_str(&format!("{{{{{token}}}}}"));
+            } else if formula_token {
                 output.push_str(&format!("{{{{{token}}}}}"));
             } else {
                 diagnostics.push(diag(
@@ -723,6 +732,18 @@ fn interpolate_variables(
     }
     output.push_str(rest);
     output
+}
+
+fn evaluate_inline_formula(
+    expression: &str,
+    calculations: &HashMap<String, f64>,
+) -> Result<String, String> {
+    let expression = expression.trim();
+    let (formula, filter) = expression
+        .split_once('|')
+        .map(|(formula, filter)| (formula.trim(), filter.trim()))
+        .unwrap_or((expression, ""));
+    eval_expression(formula, calculations).map(|value| format_value(value, filter))
 }
 
 fn variable_path_and_default(token: &str) -> (&str, Option<String>) {
@@ -3457,6 +3478,8 @@ spread = IF(revenue != cost, 1, 0)
 ```
 
 Margin: {{=margin | percent}}
+After tax: {{=profit * 0.70 | currency}}
+Healthy score: {{=IF(revenue > cost, profit, 0) | round}}
 
 ```csv
 Region,Revenue
@@ -3484,6 +3507,8 @@ ARR: Annual recurring revenue.
         assert_eq!(response.semantic.status, "approved");
         assert!(response.compiled_markdown.contains("Prepared for Acme."));
         assert!(response.compiled_markdown.contains("Margin: 60.00%"));
+        assert!(response.compiled_markdown.contains("After tax: $42.00"));
+        assert!(response.compiled_markdown.contains("Healthy score: 60"));
         assert!(response.html.contains("Table of Contents"));
         assert!(response.html.contains("transform-table"));
         assert!(response.html.contains("<h1 id=\"test-report\">"));
