@@ -208,6 +208,14 @@ struct ExportRequest {
     options: Value,
 }
 
+#[derive(Debug, Deserialize)]
+struct PrepareExportRequest {
+    text: String,
+    file_path: Option<String>,
+    target: String,
+    options: Value,
+}
+
 #[derive(Debug, Serialize)]
 struct ExportResponse {
     output_path: String,
@@ -575,8 +583,14 @@ fn export_document(request: ExportRequest) -> Result<ExportResponse, String> {
 }
 
 #[tauri::command]
-fn prepare_for_export(request: CompileRequest) -> ExportReadinessReport {
-    let response = compile(request);
+fn prepare_for_export(request: PrepareExportRequest) -> ExportReadinessReport {
+    let mut response = compile(CompileRequest {
+        text: request.text,
+        file_path: request.file_path,
+    });
+    response.export_manifest.export_target = request.target.clone();
+    response.export_manifest.export_options = request.options.clone();
+    validate_export_settings(&request.target, &request.options, &mut response.diagnostics);
     let error_count = response
         .diagnostics
         .iter()
@@ -599,6 +613,49 @@ fn prepare_for_export(request: CompileRequest) -> ExportReadinessReport {
         info_count,
         diagnostics: response.diagnostics,
         manifest: response.export_manifest,
+    }
+}
+
+fn validate_export_settings(
+    target: &str,
+    options: &Value,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if !matches!(
+        target,
+        "html" | "pdf" | "docx" | "pptx" | "markdown-bundle" | "markdown"
+    ) {
+        diagnostics.push(diag(
+            "error",
+            format!("Unsupported export target: {target}"),
+            None,
+            None,
+            Some("Use html, pdf, docx, pptx, or markdown-bundle."),
+        ));
+    }
+    if options
+        .get("watermark")
+        .is_some_and(|value| !value.is_string())
+    {
+        diagnostics.push(diag(
+            "error",
+            "Export watermark must be a string.",
+            None,
+            None,
+            Some("Use a text watermark or remove the option."),
+        ));
+    }
+    if options
+        .get("includeManifest")
+        .is_some_and(|value| !value.is_boolean())
+    {
+        diagnostics.push(diag(
+            "error",
+            "includeManifest must be true or false.",
+            None,
+            None,
+            Some("Use a boolean includeManifest export option."),
+        ));
     }
 }
 
@@ -3891,14 +3948,41 @@ paths:
 
     #[test]
     fn prepare_for_export_blocks_warning_cleanliness() {
-        let report = prepare_for_export(CompileRequest {
+        let report = prepare_for_export(PrepareExportRequest {
             text: "---\ntitle: Draft\nstatus: draft\n---\n# Draft".to_string(),
             file_path: None,
+            target: "pdf".to_string(),
+            options: json!({ "watermark": "DRAFT", "includeManifest": true }),
         });
 
         assert!(!report.ready);
         assert_eq!(report.error_count, 0);
         assert!(report.warning_count > 0);
+    }
+
+    #[test]
+    fn prepare_for_export_validates_target_and_options() {
+        let report = prepare_for_export(PrepareExportRequest {
+            text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),
+            file_path: None,
+            target: "rtf".to_string(),
+            options: json!({ "watermark": 42, "includeManifest": "yes" }),
+        });
+
+        assert!(!report.ready);
+        assert_eq!(report.error_count, 3);
+        assert_eq!(report.manifest.export_target, "rtf");
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Unsupported export target")));
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("watermark must be a string")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("includeManifest must be true or false")));
     }
 
     #[test]

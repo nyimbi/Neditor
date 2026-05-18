@@ -687,7 +687,17 @@ export const useDocumentsStore = defineStore("documents", {
     async prepareForExport() {
       const doc = this.activeDocument;
       this.exportReadiness = await invoke<ExportReadinessReport>("prepare_for_export", {
-        request: { text: doc.text, file_path: doc.path },
+        request: {
+          text: doc.text,
+          file_path: doc.path,
+          target: this.exportTarget,
+          options: {
+            includeManifest: true,
+            includeComments: true,
+            includeProvenance: true,
+            watermark: doc.compile?.semantic.status === "draft" ? "DRAFT" : "",
+          },
+        },
       });
       this.statusMessage = this.exportReadiness.ready
         ? "Document is ready for export"
