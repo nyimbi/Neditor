@@ -690,7 +690,7 @@ function editorExtensions() {
     linter(editorDiagnostics, { delay: 150 }),
     closeBrackets(),
     EditorView.contentAttributes.of({ spellcheck: "true", autocapitalize: "sentences" }),
-    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+    keymap.of([{ key: "Enter", run: continueMarkdownList }, ...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
@@ -710,6 +710,36 @@ function editorExtensions() {
       },
     }),
   ];
+}
+
+function continueMarkdownList(view: EditorView) {
+  const selection = view.state.selection.main;
+  if (!selection.empty) return false;
+  const line = view.state.doc.lineAt(selection.head);
+  const beforeCursor = line.text.slice(0, selection.head - line.from);
+  const bullet = beforeCursor.match(/^(\s*)([-+*])\s+(.*)$/);
+  const numbered = beforeCursor.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
+  if (!bullet && !numbered) return false;
+
+  const indent = (bullet?.[1] || numbered?.[1] || "");
+  const marker = bullet ? bullet[2] : `${Number(numbered?.[2] || "0") + 1}${numbered?.[3] || "."}`;
+  const content = (bullet?.[3] || numbered?.[4] || "").trim();
+  if (!content) {
+    view.dispatch({
+      changes: { from: line.from, to: selection.head, insert: indent },
+      selection: { anchor: line.from + indent.length },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  const insert = `\n${indent}${marker} `;
+  view.dispatch({
+    changes: { from: selection.head, insert },
+    selection: { anchor: selection.head + insert.length },
+    scrollIntoView: true,
+  });
+  return true;
 }
 
 function editorDiagnostics(view: EditorView): CodeMirrorDiagnostic[] {
