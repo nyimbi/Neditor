@@ -4,9 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.neditor.desktop",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
   },
   "app": {

@@ -37,7 +37,7 @@ overwriting user changes.
 ```sh
 pnpm install
 pnpm run build
-pnpm tauri dev
+./node_modules/.bin/tauri dev
 ```
 
 ## Verification
@@ -48,12 +48,16 @@ cd src-tauri && cargo fmt --check
 cd src-tauri && cargo check
 cd src-tauri && cargo clippy --locked --all-targets -- -D warnings
 cd src-tauri && cargo test
-pnpm tauri build --bundles app
+./node_modules/.bin/tauri build --bundles app
 ```
 
+Run `pnpm run build` before desktop packaging; the Tauri build consumes the
+generated project-local `dist` path instead of launching a nested package
+manager command.
+
 GitHub Actions also runs formatting, Rust check/test, clippy static analysis,
-frontend build, and a `pnpm tauri build --no-bundle` desktop compile on macOS,
-Windows, and Linux via `.github/workflows/ci.yml`.
+frontend build, and a `./node_modules/.bin/tauri build --no-bundle` desktop
+compile on macOS, Windows, and Linux via `.github/workflows/ci.yml`.
 
 `cargo check` requires access to crates.io the first time dependencies are
 resolved. If network access is blocked, the frontend build and Rust formatting
@@ -61,9 +65,9 @@ can still be verified, but backend compilation remains unverified.
 
 ## Current Packaging Note
 
-`pnpm tauri build --bundles app` succeeds on macOS and produces
+`./node_modules/.bin/tauri build --bundles app` succeeds on macOS and produces
 `src-tauri/target/release/bundle/macos/NEditor.app`.
 
-`pnpm tauri build --bundles dmg` currently reaches the `.app` bundle step and
+`./node_modules/.bin/tauri build --bundles dmg` currently reaches the `.app` bundle step and
 then fails inside Tauri's generated `bundle_dmg.sh` without surfacing a useful
 `hdiutil` sub-error in this environment.
