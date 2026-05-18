@@ -183,7 +183,7 @@
               <textarea v-model="tablePasteText" rows="4"></textarea>
             </label>
             <button type="button" @click="replaceTableFromPaste">Replace from paste</button>
-            <div class="table-editor-grid" :style="{ gridTemplateColumns: `110px repeat(${tableDraft.headers.length}, minmax(120px, 1fr)) 44px` }">
+            <div class="table-editor-grid" :style="{ gridTemplateColumns: `168px repeat(${tableDraft.headers.length}, minmax(132px, 1fr)) 44px` }">
               <span></span>
               <input
                 v-for="(_, columnIndex) in tableDraft.headers"
@@ -212,7 +212,11 @@
               <button v-for="(_, columnIndex) in tableDraft.headers" :key="`sort-${columnIndex}`" type="button" @click="sortTableRows(columnIndex)">Sort</button>
               <span></span>
               <template v-for="(row, rowIndex) in tableDraft.rows" :key="`row-${rowIndex}`">
-                <button type="button" @click="removeTableRow(rowIndex)">Remove</button>
+                <span class="row-actions">
+                  <button type="button" :disabled="rowIndex === 0" @click="moveTableRow(rowIndex, -1)">Up</button>
+                  <button type="button" :disabled="rowIndex === tableDraft.rows.length - 1" @click="moveTableRow(rowIndex, 1)">Down</button>
+                  <button type="button" @click="removeTableRow(rowIndex)">Remove</button>
+                </span>
                 <input
                   v-for="(_, columnIndex) in tableDraft.headers"
                   :key="`cell-${rowIndex}-${columnIndex}`"
@@ -225,6 +229,12 @@
               <output v-for="(total, columnIndex) in tableColumnTotals" :key="`total-${columnIndex}`">
                 {{ total || "-" }}
               </output>
+              <span></span>
+              <span>Move column</span>
+              <span v-for="(_, columnIndex) in tableDraft.headers" :key="`move-col-${columnIndex}`" class="column-actions">
+                <button type="button" :disabled="columnIndex === 0" @click="moveTableColumn(columnIndex, -1)">Left</button>
+                <button type="button" :disabled="columnIndex === tableDraft.headers.length - 1" @click="moveTableColumn(columnIndex, 1)">Right</button>
+              </span>
               <span></span>
               <span>Remove column</span>
               <button v-for="(_, columnIndex) in tableDraft.headers" :key="`remove-col-${columnIndex}`" type="button" @click="removeTableColumn(columnIndex)">
@@ -2009,6 +2019,12 @@ function removeTableRow(rowIndex: number) {
   tableDraft.value.rows.splice(rowIndex, 1);
 }
 
+function moveTableRow(rowIndex: number, direction: -1 | 1) {
+  const draft = tableDraft.value;
+  if (!draft) return;
+  moveArrayItem(draft.rows, rowIndex, rowIndex + direction);
+}
+
 function addTableColumn() {
   if (!tableDraft.value) return;
   const nextColumn = tableDraft.value.headers.length + 1;
@@ -2024,6 +2040,22 @@ function removeTableColumn(columnIndex: number) {
   tableDraft.value.alignments.splice(columnIndex, 1);
   tableDraft.value.formats.splice(columnIndex, 1);
   for (const row of tableDraft.value.rows) row.splice(columnIndex, 1);
+}
+
+function moveTableColumn(columnIndex: number, direction: -1 | 1) {
+  const draft = tableDraft.value;
+  if (!draft) return;
+  const targetIndex = columnIndex + direction;
+  moveArrayItem(draft.headers, columnIndex, targetIndex);
+  moveArrayItem(draft.alignments, columnIndex, targetIndex);
+  moveArrayItem(draft.formats, columnIndex, targetIndex);
+  for (const row of draft.rows) moveArrayItem(row, columnIndex, targetIndex);
+}
+
+function moveArrayItem<T>(items: T[], from: number, to: number) {
+  if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return;
+  const [item] = items.splice(from, 1);
+  items.splice(to, 0, item);
 }
 
 function addTableTotalsRow() {
@@ -2887,6 +2919,20 @@ select:hover {
 .table-editor-grid span {
   color: #526171;
   font-size: 12px;
+}
+
+.table-editor-grid .row-actions,
+.table-editor-grid .column-actions {
+  display: grid;
+  gap: 4px;
+}
+
+.table-editor-grid .row-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.table-editor-grid .column-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .editor-pane {
