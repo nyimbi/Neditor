@@ -357,6 +357,11 @@
 
         <template v-else-if="store.sidebar === 'review'">
           <h2>Review</h2>
+          <h3>Summary</h3>
+          <article class="snapshot-row">
+            <p>{{ reviewSummary.status }} | {{ reviewSummary.unresolved }} unresolved | {{ reviewSummary.resolved }} resolved</p>
+            <small>{{ reviewSummary.changeNotes }} change notes | {{ reviewSummary.aiPending }} AI review pending | {{ reviewSummary.aiReviewed }} AI reviewed</small>
+          </article>
           <h3>Release</h3>
           <label>
             Status
@@ -823,6 +828,21 @@ const missingCitationKeys = computed(() => {
 const resolvedCitationEntries = computed(() => {
   const citedKeys = new Set((active.value.compile?.semantic.citation_references || []).map((citation) => citation.key));
   return (active.value.compile?.bibliography || []).filter((entry) => citedKeys.has(entry.key));
+});
+const reviewSummary = computed(() => {
+  const semantic = active.value.compile?.semantic;
+  const comments = semantic?.comments || [];
+  const aiSources = semantic?.ai_sources || [];
+  const aiSections = semantic?.ai_assisted_sections || [];
+  const aiItems = [...aiSources, ...aiSections];
+  return {
+    status: semantic?.status || "draft",
+    unresolved: comments.filter((comment) => comment.state !== "resolved").length,
+    resolved: comments.filter((comment) => comment.state === "resolved").length,
+    changeNotes: semantic?.change_notes.length || 0,
+    aiPending: aiItems.filter((item) => item.status !== "human-reviewed").length,
+    aiReviewed: aiItems.filter((item) => item.status === "human-reviewed").length,
+  };
 });
 const citationStyle = computed(() =>
   String(active.value.compile?.metadata.citationStyle || active.value.compile?.metadata.cslStyle || store.bibliographyDefaults.citationStyle),
