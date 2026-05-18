@@ -19,6 +19,10 @@ pub(crate) struct SnapshotListItem {
     hash: Option<String>,
     created_at: Option<String>,
     label: Option<String>,
+    document_version: Option<String>,
+    status: Option<String>,
+    author: Option<String>,
+    include_graph_hash: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -47,11 +51,16 @@ pub(crate) fn create_snapshot(
     let snapshot_path = root.join(format!("{timestamp}-{label}.md"));
     let metadata_path = root.join(format!("{timestamp}-{label}.json"));
     fs::write(&snapshot_path, request.text.as_bytes()).map_err(|err| err.to_string())?;
+    let document_metadata = snapshot_document_metadata(&request.text);
     let metadata = json!({
         "hash": source_hash,
         "createdAt": Utc::now().to_rfc3339(),
         "sourcePath": request.file_path,
-        "label": label
+        "label": label,
+        "documentVersion": document_metadata.document_version,
+        "status": document_metadata.status,
+        "author": document_metadata.author,
+        "includeGraphHash": document_metadata.include_graph_hash
     });
     fs::write(
         &metadata_path,
@@ -99,6 +108,22 @@ pub(crate) fn list_snapshots(
                 .get("label")
                 .and_then(Value::as_str)
                 .map(ToString::to_string),
+            document_version: metadata
+                .get("documentVersion")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            status: metadata
+                .get("status")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            author: metadata
+                .get("author")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            include_graph_hash: metadata
+                .get("includeGraphHash")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
         });
     }
     items.sort_by(|left, right| right.created_at.cmp(&left.created_at));
@@ -131,4 +156,95 @@ fn app_snapshot_root(
         })
         .unwrap_or_else(|| snapshot_workspace_id(None));
     Ok(app_data.join("snapshots").join(workspace_id))
+}
+
+struct SnapshotDocumentMetadata {
+    document_version: Option<String>,
+    status: Option<String>,
+    author: Option<String>,
+    include_graph_hash: String,
+}
+
+fn snapshot_document_metadata(text: &str) -> SnapshotDocumentMetadata {
+    let metadata = snapshot_front_matter(text);
+    SnapshotDocumentMetadata {
+        document_version: metadata
+            .as_ref()
+            .and_then(|value| metadata_string(value, "version")),
+        status: metadata
+            .as_ref()
+            .and_then(|value| metadata_string(value, "status")),
+        author: metadata
+            .as_ref()
+            .and_then(|value| metadata_string(value, "author")),
+        include_graph_hash: include_graph_hash(text),
+    }
+}
+
+fn snapshot_front_matter(text: &str) -> Option<Value> {
+    if !text.starts_with("---\n") {
+        return None;
+    }
+    let lines = text.lines().collect::<Vec<_>>();
+    let end_index = lines
+        .iter()
+        .enumerate()
+        .skip(1)
+        .find_map(|(index, line)| (line.trim() == "---").then_some(index))?;
+    let yaml = lines[1..end_index].join("\n");
+    serde_yaml::from_str::<Value>(&yaml).ok()
+}
+
+fn metadata_string(metadata: &Value, key: &str) -> Option<String> {
+    metadata.get(key).and_then(|value| match value {
+        Value::String(value) => Some(value.clone()),
+        Value::Number(value) => Some(value.to_string()),
+        Value::Bool(value) => Some(value.to_string()),
+        _ => None,
+    })
+}
+
+fn include_graph_hash(text: &str) -> String {
+    let mut includes = text
+        .lines()
+        .filter_map(snapshot_include_target)
+        .collect::<Vec<_>>();
+    includes.sort();
+    sha256_hex(includes.join("\n").as_bytes())
+}
+
+fn snapshot_include_target(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if let Some(path) = trimmed.strip_prefix("!include ") {
+        return Some(path.trim().to_string());
+    }
+    if let Some(path) = trimmed
+        .strip_prefix("{{include ")
+        .and_then(|value| value.strip_suffix("}}"))
+    {
+        return Some(path.trim().to_string());
+    }
+    if let Some(path) = trimmed
+        .strip_prefix("<!-- include:")
+        .and_then(|value| value.strip_suffix("-->"))
+    {
+        return Some(path.trim().to_string());
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snapshot_metadata_captures_release_fields_and_include_hash() {
+        let text = "---\ntitle: Report\nversion: 2.0.0\nstatus: approved\nauthor: Strategy Team\n---\n# Report\n!include chapters/a.md\n{{include chapters/b.md}}\n<!-- include: chapters/c.md -->\n";
+        let metadata = snapshot_document_metadata(text);
+
+        assert_eq!(metadata.document_version.as_deref(), Some("2.0.0"));
+        assert_eq!(metadata.status.as_deref(), Some("approved"));
+        assert_eq!(metadata.author.as_deref(), Some("Strategy Team"));
+        assert_ne!(metadata.include_graph_hash, sha256_hex("".as_bytes()));
+    }
 }

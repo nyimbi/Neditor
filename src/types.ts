@@ -202,6 +202,10 @@ export interface SnapshotListItem {
   hash?: string | null;
   created_at?: string | null;
   label?: string | null;
+  document_version?: string | null;
+  status?: string | null;
+  author?: string | null;
+  include_graph_hash?: string | null;
 }
 
 export interface WorkspaceFileEntry {

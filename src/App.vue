@@ -303,6 +303,7 @@
           <article v-for="snapshot in store.snapshots" :key="snapshot.snapshot_path" class="snapshot-row">
             <p>{{ snapshot.label || "snapshot" }}</p>
             <small>{{ snapshot.created_at || snapshot.snapshot_path }}</small>
+            <small>{{ snapshot.document_version || "unversioned" }} | {{ snapshot.status || "unknown" }} | {{ snapshot.author || "unknown author" }}</small>
             <button type="button" @click="store.restoreSnapshot(snapshot.snapshot_path)">Restore</button>
           </article>
         </template>
