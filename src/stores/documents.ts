@@ -89,6 +89,49 @@ function quoteMarkdown(text: string) {
     .join("\n");
 }
 
+function parseAiAssistedMarker(line: string) {
+  const content = line.match(/<!--\s*ai-assisted:(.*?)-->/)?.[1] || "";
+  const fields = new Map<string, string>();
+  for (const part of content
+    .split("|")
+    .map((entry) => entry.trim())
+    .filter(Boolean)) {
+    const pair = part.match(/^([^:=]+)\s*[:=]\s*(.*)$/);
+    if (pair) {
+      fields.set(pair[1].trim(), pair[2].trim());
+    } else if (["human-reviewed", "needs-review", "unreviewed"].includes(part)) {
+      fields.set("status", part);
+    }
+  }
+  return fields;
+}
+
+function serializeAiAssistedMarker(fields: Map<string, string>) {
+  const orderedKeys = ["status", "reviewedBy", "reviewedAt", "source", "promptSummary"];
+  const parts = orderedKeys
+    .filter((key) => fields.has(key))
+    .map((key) => `${key}=${fields.get(key) || ""}`);
+  for (const [key, value] of fields) {
+    if (!orderedKeys.includes(key)) {
+      parts.push(`${key}=${value}`);
+    }
+  }
+  return `<!-- ai-assisted: ${parts.join(" | ")} -->`;
+}
+
+function rewriteAiAssistedMarker(line: string, reviewed: boolean) {
+  const fields = line.includes("<!-- ai-assisted:")
+    ? parseAiAssistedMarker(line)
+    : new Map<string, string>([
+        ["source", "AI paste cleanup"],
+        ["promptSummary", "AI paste cleanup review required"],
+      ]);
+  fields.set("status", reviewed ? "human-reviewed" : "needs-review");
+  fields.set("reviewedBy", reviewed ? "local" : "");
+  fields.set("reviewedAt", reviewed ? new Date().toISOString() : "");
+  return serializeAiAssistedMarker(fields);
+}
+
 interface BackendWatchEvent {
   paths: string[];
   kind: string;
@@ -947,6 +990,15 @@ export const useDocumentsStore = defineStore("documents", {
       lines[index] = lines[index].replace("unresolved", "resolved");
       this.updateText(lines.join("\n"));
       this.statusMessage = "Resolved review comment";
+    },
+    setAiAssistedSectionReviewed(line: number, reviewed: boolean) {
+      const lines = this.activeDocument.text.split("\n");
+      const index = Math.max(0, line - 1);
+      const marker = lines[index] || "";
+      if (!marker.includes("<!-- ai-assisted:") && !marker.includes("<!-- draft: AI paste cleanup review required -->")) return;
+      lines[index] = rewriteAiAssistedMarker(marker, reviewed);
+      this.updateText(lines.join("\n"));
+      this.statusMessage = reviewed ? "Marked AI-assisted section as human-reviewed" : "Marked AI-assisted section as needing review";
     },
     async refreshGitStatus() {
       try {

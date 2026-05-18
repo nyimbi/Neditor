@@ -356,6 +356,14 @@
           <article v-for="section in active.compile?.semantic.ai_assisted_sections || []" :key="`ai-section-${section.line}`" class="snapshot-row">
             <p>{{ section.heading || "Document body" }}</p>
             <small>Line {{ section.line }} | {{ section.status }} | {{ section.reviewed_by || "unreviewed" }}{{ section.reviewed_at ? ` | ${section.reviewed_at}` : "" }}</small>
+            <label>
+              <input
+                type="checkbox"
+                :checked="section.status === 'human-reviewed'"
+                @change="toggleAiSectionReview(Number(section.line), $event)"
+              />
+              Human reviewed
+            </label>
           </article>
         </template>
 
@@ -1552,6 +1560,10 @@ function runCommand(run: () => unknown) {
 function insertReviewComment() {
   store.insertReviewComment(reviewCommentText.value);
   reviewCommentText.value = "";
+}
+
+function toggleAiSectionReview(line: number, event: Event) {
+  store.setAiAssistedSectionReviewed(line, Boolean((event.target as HTMLInputElement | null)?.checked));
 }
 
 function wrapSelection(prefix: string, suffix = prefix) {
