@@ -455,6 +455,7 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async revertActive() {
       const doc = this.activeDocument;
+      await this.snapshotBeforeDestructiveAction("pre-revert");
       if (!doc.path) {
         doc.text = starterDocument;
         doc.savedHash = fallbackHash(starterDocument);
@@ -682,6 +683,7 @@ export const useDocumentsStore = defineStore("documents", {
       const conflict = this.externalConflict;
       if (!conflict) return;
       if (conflict.reason === "root") {
+        await this.snapshotBeforeDestructiveAction("pre-accept-external");
         const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", {
           path: conflict.path,
         });
@@ -774,10 +776,15 @@ export const useDocumentsStore = defineStore("documents", {
       this.statusMessage = `Snapshot saved to ${response.snapshot_path}`;
       await this.listSnapshots();
     },
+    async snapshotBeforeDestructiveAction(label: string) {
+      await this.createSnapshot(label);
+      await this.listSnapshots();
+    },
     async listSnapshots() {
       this.snapshots = await invoke<SnapshotListItem[]>("list_snapshots", { filePath: this.activeDocument?.path });
     },
     async restoreSnapshot(snapshotPath: string) {
+      await this.snapshotBeforeDestructiveAction("pre-snapshot-restore");
       const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("restore_snapshot", {
         snapshotPath,
       });
@@ -930,6 +937,7 @@ export const useDocumentsStore = defineStore("documents", {
     async restoreGitRevision(revision: string) {
       const path = this.activeDocument?.path;
       if (!path) throw new Error("Save the document before restoring a revision.");
+      await this.snapshotBeforeDestructiveAction("pre-git-restore");
       const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("restore_git_revision", {
         request: { path, revision },
       });
