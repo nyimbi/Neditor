@@ -18,7 +18,7 @@ mod export;
 
 #[cfg(test)]
 use document_ast::DocumentBlock;
-use document_ast::{build_document_ast, DocumentAst};
+use document_ast::{attach_source_ranges, build_document_ast, AstSourceRange, DocumentAst};
 use export::{
     render_docx_bytes, render_full_html, render_markdown_bundle_bytes, render_pdf_bytes,
     render_pptx_bytes,
@@ -1087,7 +1087,10 @@ fn compile(request: CompileRequest) -> CompileResponse {
     let figure_markdown = render_figures(&table_formula_markdown);
     let equation_markdown = render_equations(&figure_markdown);
     let layout_markdown = render_layout_tokens(&equation_markdown);
-    let document_ast = build_document_ast(&layout_markdown);
+    let mut document_ast = build_document_ast(&layout_markdown);
+    attach_source_ranges(&mut document_ast, |line, end_line| {
+        ast_source_range_for_generated_lines(&source_map, line, end_line)
+    });
     let html = markdown_to_html(&layout_markdown);
     let title = metadata
         .get("title")
@@ -1350,6 +1353,30 @@ fn normalize_source_map_after_front_matter(
     for entry in source_map {
         entry.generated_line = entry.generated_line.saturating_sub(offset);
     }
+}
+
+fn ast_source_range_for_generated_lines(
+    source_map: &[SourceMapEntry],
+    line: usize,
+    end_line: usize,
+) -> Option<AstSourceRange> {
+    let start = source_map
+        .iter()
+        .find(|entry| entry.generated_line == line)?;
+    let end = source_map
+        .iter()
+        .rev()
+        .find(|entry| {
+            entry.generated_line >= line
+                && entry.generated_line <= end_line
+                && entry.source_file == start.source_file
+        })
+        .unwrap_or(start);
+    Some(AstSourceRange {
+        source_file: start.source_file.clone(),
+        source_line: start.source_line,
+        end_source_line: end.source_line,
+    })
 }
 
 fn strip_front_matter(text: &str) -> String {
@@ -3606,7 +3633,7 @@ ARR: Annual recurring revenue.
             .document_ast
             .blocks
             .iter()
-            .any(|block| matches!(block, DocumentBlock::Paragraph { text, line, end_line } if text == "Business paragraph." && line == end_line)));
+            .any(|block| matches!(block, DocumentBlock::Paragraph { text, line, end_line, .. } if text == "Business paragraph." && line == end_line)));
         assert!(response.document_ast.blocks.iter().any(|block| {
             matches!(
                 block,
@@ -3837,6 +3864,16 @@ paths:
             entry.generated_line == included_line
                 && entry.source_file.ends_with("chapters/intro.md")
                 && entry.source_line == 2
+        }));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Heading { text, source: Some(source), .. }
+                    if text == "Included"
+                        && source.source_file.ends_with("chapters/intro.md")
+                        && source.source_line == 2
+                        && source.end_source_line == 2
+            )
         }));
         fs::remove_dir_all(root).expect("clean test dirs");
     }

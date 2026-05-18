@@ -5,6 +5,13 @@ pub(crate) struct DocumentAst {
     pub(crate) blocks: Vec<DocumentBlock>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct AstSourceRange {
+    pub(crate) source_file: String,
+    pub(crate) source_line: usize,
+    pub(crate) end_source_line: usize,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum DocumentBlock {
@@ -14,17 +21,20 @@ pub(crate) enum DocumentBlock {
         anchor: String,
         line: usize,
         end_line: usize,
+        source: Option<AstSourceRange>,
     },
     Paragraph {
         text: String,
         line: usize,
         end_line: usize,
+        source: Option<AstSourceRange>,
     },
     Table {
         line: usize,
         end_line: usize,
         headers: Vec<String>,
         rows: Vec<Vec<String>>,
+        source: Option<AstSourceRange>,
     },
     Figure {
         line: usize,
@@ -33,6 +43,7 @@ pub(crate) enum DocumentBlock {
         src: Option<String>,
         alt: Option<String>,
         caption: Option<String>,
+        source: Option<AstSourceRange>,
     },
     Equation {
         line: usize,
@@ -40,17 +51,20 @@ pub(crate) enum DocumentBlock {
         id: Option<String>,
         caption: Option<String>,
         text: String,
+        source: Option<AstSourceRange>,
     },
     Layout {
         line: usize,
         end_line: usize,
         directive: String,
         options: String,
+        source: Option<AstSourceRange>,
     },
     RawHtml {
         line: usize,
         end_line: usize,
         html: String,
+        source: Option<AstSourceRange>,
     },
 }
 
@@ -162,6 +176,60 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
         .join("\n")
 }
 
+pub(crate) fn attach_source_ranges<F>(ast: &mut DocumentAst, mut resolve: F)
+where
+    F: FnMut(usize, usize) -> Option<AstSourceRange>,
+{
+    for block in &mut ast.blocks {
+        match block {
+            DocumentBlock::Heading {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::Paragraph {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::Table {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::Figure {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::Equation {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::Layout {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::RawHtml {
+                line,
+                end_line,
+                source,
+                ..
+            } => {
+                *source = resolve(*line, *end_line);
+            }
+        }
+    }
+}
+
 fn flush_ast_paragraph(
     blocks: &mut Vec<DocumentBlock>,
     paragraph_lines: &mut Vec<String>,
@@ -176,6 +244,7 @@ fn flush_ast_paragraph(
             text,
             line: paragraph_start.unwrap_or(1),
             end_line: paragraph_start.unwrap_or(1) + paragraph_lines.len().saturating_sub(1),
+            source: None,
         });
     }
     paragraph_lines.clear();
@@ -199,6 +268,7 @@ fn parse_ast_heading(line: &str, line_number: usize) -> Option<DocumentBlock> {
         anchor,
         line: line_number,
         end_line: line_number,
+        source: None,
     })
 }
 
@@ -233,6 +303,7 @@ fn parse_ast_table(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize
             end_line: next_index,
             headers,
             rows,
+            source: None,
         },
         next_index,
     ))
@@ -248,6 +319,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
             alt: extract_quoted_attribute(line, "alt").map(|value| decode_html_entities(&value)),
             caption: extract_between(line, "<figcaption>", "</figcaption>")
                 .map(|value| clean_inline_text(&value)),
+            source: None,
         };
     }
 
@@ -261,6 +333,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
             text: extract_between(line, "<code>", "</code>")
                 .map(|value| clean_inline_text(&value))
                 .unwrap_or_default(),
+            source: None,
         };
     }
 
@@ -272,6 +345,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
             options: extract_quoted_attribute(line, "data-options")
                 .map(|value| decode_html_entities(&value))
                 .unwrap_or_default(),
+            source: None,
         };
     }
 
@@ -279,6 +353,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
         line: line_number,
         end_line: line_number,
         html: line.to_string(),
+        source: None,
     }
 }
 

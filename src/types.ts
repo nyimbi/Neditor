@@ -39,10 +39,16 @@ export interface SemanticDocument {
   cross_references: Array<{ key: string; target_kind: string; resolved: boolean }>;
 }
 
+export interface DocumentSourceRange {
+  source_file: string;
+  source_line: number;
+  end_source_line: number;
+}
+
 export type DocumentBlock =
-  | { kind: "heading"; level: number; text: string; anchor: string; line: number; end_line: number }
-  | { kind: "paragraph"; text: string; line: number; end_line: number }
-  | { kind: "table"; line: number; end_line: number; headers: string[]; rows: string[][] }
+  | { kind: "heading"; level: number; text: string; anchor: string; line: number; end_line: number; source?: DocumentSourceRange | null }
+  | { kind: "paragraph"; text: string; line: number; end_line: number; source?: DocumentSourceRange | null }
+  | { kind: "table"; line: number; end_line: number; headers: string[]; rows: string[][]; source?: DocumentSourceRange | null }
   | {
       kind: "figure";
       line: number;
@@ -51,10 +57,11 @@ export type DocumentBlock =
       src?: string | null;
       alt?: string | null;
       caption?: string | null;
+      source?: DocumentSourceRange | null;
     }
-  | { kind: "equation"; line: number; end_line: number; id?: string | null; caption?: string | null; text: string }
-  | { kind: "layout"; line: number; end_line: number; directive: string; options: string }
-  | { kind: "raw_html"; line: number; end_line: number; html: string };
+  | { kind: "equation"; line: number; end_line: number; id?: string | null; caption?: string | null; text: string; source?: DocumentSourceRange | null }
+  | { kind: "layout"; line: number; end_line: number; directive: string; options: string; source?: DocumentSourceRange | null }
+  | { kind: "raw_html"; line: number; end_line: number; html: string; source?: DocumentSourceRange | null };
 
 export interface DocumentAst {
   blocks: DocumentBlock[];
