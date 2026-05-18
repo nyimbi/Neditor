@@ -6154,6 +6154,9 @@ paths:
         let pdf = render_pdf_bytes(&response, &options);
         let pdf_text = String::from_utf8_lossy(&pdf);
         assert!(pdf_text.contains("/Count 3"));
+        assert!(pdf_text.contains("Page 1 of 3"));
+        assert!(pdf_text.contains("Page 2 of 3"));
+        assert!(pdf_text.contains("Page 3 of 3"));
         assert!(pdf_text.contains("- [x] Confirm controls"));
         assert!(pdf_text.contains("- [ ] Final approval"));
         assert!(pdf_text.contains("Section break: columns=2"));
@@ -6284,6 +6287,8 @@ paths:
         assert!(pdf_text.contains("/Count 6"));
         assert!(pdf_text.contains("/Title (Export Conformance Report)"));
         assert!(pdf_text.contains("/Keywords (approved; 2.0.0; restricted)"));
+        assert!(pdf_text.contains("Export Conformance Report | restricted"));
+        assert!(pdf_text.contains("Page 6 of 6"));
         assert!(pdf_text.contains("Export Conformance Report"));
         assert!(pdf_text.contains("Competitive Advantage, p. 42"));
         assert!(pdf_text.contains("Reference architecture"));

@@ -127,6 +127,7 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
 pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> Vec<u8> {
     let pages = build_pdf_pages(response, options);
     let (page_width, page_height, margin_top, margin_left) = pdf_page_layout(response, options);
+    let total_pages = pages.len().max(1);
     let mut objects = vec![
         String::new(),
         String::new(),
@@ -134,22 +135,44 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
     ];
     let mut page_ids = Vec::new();
 
-    for page_lines in pages {
+    for (page_index, page_lines) in pages.iter().enumerate() {
         let page_id = objects.len() + 1;
         let content_id = page_id + 1;
         page_ids.push(page_id);
-        let stream = page_lines
-            .iter()
-            .take(60)
-            .enumerate()
-            .map(|(index, line)| {
-                format!(
-                    "BT /F1 10 Tf {margin_left} {} Td ({}) Tj ET\n",
-                    page_height.saturating_sub(margin_top) as i32 - (index as i32 * 12),
-                    escape_pdf(line)
-                )
-            })
-            .collect::<String>();
+        let (header, footer) =
+            export_header_footer_for_page(response, options, page_index + 1, total_pages);
+        let mut stream = String::new();
+        if !header.trim().is_empty() {
+            stream.push_str(&pdf_text_line(
+                9,
+                margin_left,
+                page_height.saturating_sub((margin_top / 2).max(12)) as i32,
+                &header,
+            ));
+        }
+        stream.push_str(
+            &page_lines
+                .iter()
+                .take(60)
+                .enumerate()
+                .map(|(index, line)| {
+                    pdf_text_line(
+                        10,
+                        margin_left,
+                        page_height.saturating_sub(margin_top) as i32 - (index as i32 * 12),
+                        line,
+                    )
+                })
+                .collect::<String>(),
+        );
+        if !footer.trim().is_empty() {
+            stream.push_str(&pdf_text_line(
+                9,
+                margin_left,
+                (margin_top / 2).max(12) as i32,
+                &footer,
+            ));
+        }
         objects.push(format!(
             "{page_id} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_width} {page_height}] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >> endobj\n"
         ));
@@ -195,6 +218,13 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
         .as_bytes(),
     );
     pdf
+}
+
+fn pdf_text_line(font_size: u8, x: u32, y: i32, text: &str) -> String {
+    format!(
+        "BT /F1 {font_size} Tf {x} {y} Td ({}) Tj ET\n",
+        escape_pdf(text)
+    )
 }
 
 fn render_pdf_info_object(object_id: usize, response: &CompileResponse) -> String {
@@ -585,20 +615,48 @@ fn export_logo(metadata: &Value) -> Option<String> {
 }
 
 fn export_header_footer(response: &CompileResponse, options: &Value) -> (String, String) {
+    export_header_footer_for_page(response, options, 1, 1)
+}
+
+fn export_header_footer_for_page(
+    response: &CompileResponse,
+    options: &Value,
+    page: usize,
+    pages: usize,
+) -> (String, String) {
     let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
     let header = metadata_string(&response.metadata, "layout.header")
-        .map(|template| render_export_template(&template, response, &classification))
+        .map(|template| {
+            render_export_template_for_page(&template, response, &classification, page, pages)
+        })
         .unwrap_or_else(|| response.semantic.title.clone());
     let footer = metadata_string(&response.metadata, "layout.footer")
-        .map(|template| render_export_template(&template, response, &classification))
+        .map(|template| {
+            render_export_template_for_page(&template, response, &classification, page, pages)
+        })
         .unwrap_or_else(|| {
             if include_page_numbers(options) {
-                "Page 1 of 1".to_string()
+                format!("Page {page} of {pages}")
             } else {
                 String::new()
             }
         });
     (header, footer)
+}
+
+fn render_export_template_for_page(
+    template: &str,
+    response: &CompileResponse,
+    classification: &str,
+    page: usize,
+    pages: usize,
+) -> String {
+    template
+        .replace("{{title}}", &response.semantic.title)
+        .replace("{{status}}", &response.semantic.status)
+        .replace("{{classification}}", classification)
+        .replace("{{page}}", &page.to_string())
+        .replace("{{pages}}", &pages.to_string())
 }
 
 fn boolean_option(options: &Value, name: &str, aliases: &[&str], default: bool) -> bool {
