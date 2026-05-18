@@ -270,6 +270,11 @@ function isStaleSaveConflict(error: unknown) {
   return errorText(error).includes(staleSaveConflictMessage);
 }
 
+function equivalentSha256Hash(left?: string | null, right?: string | null) {
+  const normalize = (value?: string | null) => (value || "").replace(/^sha256:/, "");
+  return Boolean(left && right && normalize(left) === normalize(right));
+}
+
 function titleFromPath(path: string | null) {
   if (!path) return "Untitled";
   return path.split(/[\\/]/).pop() || path;
@@ -947,7 +952,7 @@ export const useDocumentsStore = defineStore("documents", {
       for (const included of includedFiles) {
         try {
           const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: included.path });
-          if (!metadata.exists || metadata.hash !== included.hash) return true;
+          if (!metadata.exists || !equivalentSha256Hash(metadata.hash, included.hash)) return true;
         } catch {
           return true;
         }
