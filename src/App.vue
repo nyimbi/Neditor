@@ -1819,6 +1819,12 @@ async function applyConflictMerge() {
 }
 
 async function exportDocument() {
+  await store.prepareForExport();
+  if (store.exportReadiness && store.exportReadiness.error_count > 0) {
+    store.sidebar = "exports";
+    store.statusMessage = `${store.exportReadiness.error_count} errors block export`;
+    return;
+  }
   const extensions: Record<typeof store.exportTarget, string> = {
     html: "html",
     pdf: "pdf",
