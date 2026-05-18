@@ -10,7 +10,10 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ExportRequest {
@@ -258,5 +261,134 @@ fn validate_export_settings(
                 Some("Use one of the supported layout preset names."),
             ));
         }
+    }
+    validate_transform_export_settings(options, diagnostics);
+}
+
+fn validate_transform_export_settings(options: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {
+    if let Some(timeout) = options.get("transformTimeoutMs") {
+        let valid = timeout
+            .as_u64()
+            .is_some_and(|value| (1..=30_000).contains(&value));
+        if !valid {
+            diagnostics.push(diag(
+                "error",
+                "transformTimeoutMs must be between 1 and 30000.",
+                None,
+                None,
+                Some("Use a millisecond timeout within the supported external engine limit."),
+            ));
+        }
+    }
+    validate_string_map(
+        options,
+        "transformEnginePaths",
+        diagnostics,
+        Some(validate_transform_engine_path),
+    );
+    validate_bool_map(options, "trustedTransformEngines", diagnostics);
+    validate_string_map(
+        options,
+        "transformInputModes",
+        diagnostics,
+        Some(validate_transform_input_mode),
+    );
+}
+
+fn validate_string_map(
+    options: &Value,
+    key: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+    entry_validator: Option<fn(&str, &str, &mut Vec<DocumentDiagnostic>)>,
+) {
+    let Some(value) = options.get(key) else {
+        return;
+    };
+    let Some(fields) = value.as_object() else {
+        diagnostics.push(diag(
+            "error",
+            format!("{key} must be an object."),
+            None,
+            None,
+            Some("Use transform names as keys."),
+        ));
+        return;
+    };
+    for (name, field) in fields {
+        let Some(field) = field.as_str() else {
+            diagnostics.push(diag(
+                "error",
+                format!("{key}.{name} must be a string."),
+                None,
+                None,
+                Some("Use string values for transform engine settings."),
+            ));
+            continue;
+        };
+        if let Some(validator) = entry_validator {
+            validator(name, field, diagnostics);
+        }
+    }
+}
+
+fn validate_bool_map(options: &Value, key: &str, diagnostics: &mut Vec<DocumentDiagnostic>) {
+    let Some(value) = options.get(key) else {
+        return;
+    };
+    let Some(fields) = value.as_object() else {
+        diagnostics.push(diag(
+            "error",
+            format!("{key} must be an object."),
+            None,
+            None,
+            Some("Use transform names as keys."),
+        ));
+        return;
+    };
+    for (name, field) in fields {
+        if !field.is_boolean() {
+            diagnostics.push(diag(
+                "error",
+                format!("{key}.{name} must be true or false."),
+                None,
+                None,
+                Some("Use boolean trust values for each transform engine."),
+            ));
+        }
+    }
+}
+
+fn validate_transform_engine_path(
+    name: &str,
+    path: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if path.trim().is_empty() {
+        return;
+    }
+    if !Path::new(path).is_absolute() {
+        diagnostics.push(diag(
+            "error",
+            format!("transformEnginePaths.{name} must be an absolute path."),
+            None,
+            None,
+            Some("Use an absolute executable path; shell lookup is disabled."),
+        ));
+    }
+}
+
+fn validate_transform_input_mode(
+    name: &str,
+    mode: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if !matches!(mode, "stdin" | "file") {
+        diagnostics.push(diag(
+            "error",
+            format!("transformInputModes.{name} must be stdin or file."),
+            None,
+            None,
+            Some("Choose one of the supported external transform input modes."),
+        ));
     }
 }

@@ -6633,6 +6633,36 @@ paths:
     }
 
     #[test]
+    fn prepare_for_export_validates_transform_engine_options() {
+        let report = prepare_for_export(PrepareExportRequest {
+            text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),
+            file_path: None,
+            target: "pdf".to_string(),
+            options: json!({
+                "transformTimeoutMs": 50000,
+                "transformEnginePaths": { "dot": "dot" },
+                "trustedTransformEngines": { "dot": "yes" },
+                "transformInputModes": { "dot": "pipe" }
+            }),
+        });
+
+        assert!(!report.ready);
+        assert_eq!(report.error_count, 4);
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("transformTimeoutMs must be between 1 and 30000")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("transformEnginePaths.dot must be an absolute path")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("trustedTransformEngines.dot must be true or false")));
+        assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("transformInputModes.dot must be stdin or file")));
+    }
+
+    #[test]
     fn prepare_for_export_warns_on_dirty_git_tree() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
