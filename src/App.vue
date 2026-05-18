@@ -148,6 +148,9 @@
             <strong>{{ diagnostic.severity }}</strong>
             <p>{{ diagnostic.message }}</p>
             <small v-if="diagnostic.suggestion">{{ diagnostic.suggestion }}</small>
+            <ul v-if="diagnostic.related.length" class="diagnostic-related">
+              <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
+            </ul>
           </article>
         </template>
 
@@ -935,7 +938,7 @@ const tableColumnTotals = computed(() => {
 });
 const diagnosticSignature = computed(() =>
   (active.value.compile?.diagnostics || [])
-    .map((diagnostic) => [diagnostic.severity, diagnostic.source_file || "", diagnostic.line || "", diagnostic.message].join(":"))
+    .map((diagnostic) => [diagnostic.severity, diagnostic.source_file || "", diagnostic.line || "", diagnostic.message, diagnostic.related.join("|")].join(":"))
     .join("\n"),
 );
 const commands = computed(() => [
@@ -1459,7 +1462,7 @@ function editorDiagnostics(view: EditorView): CodeMirrorDiagnostic[] {
 function codeMirrorDiagnostic(view: EditorView, diagnostic: DocumentDiagnostic): CodeMirrorDiagnostic[] {
   if (!diagnostic.line || diagnosticAppliesToIncludedFile(diagnostic)) return [];
   const line = view.state.doc.line(Math.max(1, Math.min(diagnostic.line, view.state.doc.lines)));
-  const message = diagnostic.suggestion ? `${diagnostic.message}\n${diagnostic.suggestion}` : diagnostic.message;
+  const message = [diagnostic.message, diagnostic.suggestion, ...diagnostic.related].filter(Boolean).join("\n");
   return [
     {
       from: line.from,
@@ -2849,6 +2852,13 @@ select:hover {
 
 .diagnostic p {
   margin: 4px 0;
+}
+
+.diagnostic-related {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: #526171;
+  font-size: 12px;
 }
 
 .readiness,

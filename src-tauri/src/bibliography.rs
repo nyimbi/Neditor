@@ -22,6 +22,7 @@ pub(crate) struct CitationReference {
     pub(crate) key: String,
     pub(crate) locator: Option<String>,
     pub(crate) raw: String,
+    pub(crate) line: usize,
 }
 
 pub(crate) fn collect_bibliography(
@@ -232,12 +233,14 @@ fn csl_issued_year(entry: &Value) -> Option<String> {
 
 pub(crate) fn collect_citation_references(text: &str) -> Vec<CitationReference> {
     let mut citations = Vec::new();
-    for segment in text.split('[').skip(1) {
-        if let Some((inside, _)) = segment.split_once(']') {
-            if !inside.contains('@') {
-                continue;
+    for (index, line) in text.lines().enumerate() {
+        for segment in line.split('[').skip(1) {
+            if let Some((inside, _)) = segment.split_once(']') {
+                if !inside.contains('@') {
+                    continue;
+                }
+                citations.extend(citation_references_from_bracket(inside, index + 1));
             }
-            citations.extend(citation_references_from_bracket(inside));
         }
     }
     citations
@@ -251,7 +254,7 @@ pub(crate) fn citation_keys_from_references(references: &[CitationReference]) ->
     citations.into_iter().collect()
 }
 
-fn citation_references_from_bracket(text: &str) -> Vec<CitationReference> {
+fn citation_references_from_bracket(text: &str, line: usize) -> Vec<CitationReference> {
     let mut references = Vec::new();
     let mut rest = text;
     while let Some(index) = rest.find('@') {
@@ -274,6 +277,7 @@ fn citation_references_from_bracket(text: &str) -> Vec<CitationReference> {
                 key,
                 locator: (!locator.is_empty()).then(|| locator.to_string()),
                 raw: text.to_string(),
+                line,
             });
         }
         rest = &after_at[key_len..];
@@ -301,7 +305,7 @@ pub(crate) fn render_citations(
         };
         let inside = &after_start[..end];
         if inside.contains('@') {
-            let references = citation_references_from_bracket(inside);
+            let references = citation_references_from_bracket(inside, 0);
             output.push_str(&render_citation_span(&references, &entries, style));
         } else {
             output.push('[');

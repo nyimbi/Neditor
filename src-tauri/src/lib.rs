@@ -286,8 +286,13 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     normalize_source_map_after_front_matter(&mut source_map, body_start_line);
     let mut calculation_context = HashMap::new();
     let formula_graph = collect_calculations(&body, &mut calculation_context, &mut diagnostics);
-    let interpolated =
-        interpolate_variables(&body, &metadata, &calculation_context, &mut diagnostics);
+    let interpolated = interpolate_variables(
+        &body,
+        &metadata,
+        &calculation_context,
+        &source_map,
+        &mut diagnostics,
+    );
     let headings = extract_headings(&interpolated);
     let bibliography = collect_bibliography(
         &interpolated,
@@ -362,13 +367,14 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         .to_string();
     validate_document(
         &metadata,
-        &citations,
+        &citation_references,
         &bibliography,
         &duplicate_bibliography_keys,
         &comments,
         &ai_sources,
         &ai_assisted_sections,
         !bibliography.is_empty(),
+        &source_map,
         &mut diagnostics,
     );
     let included_files = include_graph
@@ -871,26 +877,32 @@ fn interpolate_variables(
     text: &str,
     metadata: &Value,
     calculations: &HashMap<String, f64>,
+    source_map: &[SourceMapEntry],
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> String {
     let mut output = String::new();
     let mut rest = text;
+    let mut generated_line = 1usize;
     while let Some(start) = rest.find("{{") {
         let (before, after_start) = rest.split_at(start);
         output.push_str(before);
+        generated_line += before.chars().filter(|ch| *ch == '\n').count();
         if let Some(end) = after_start.find("}}") {
             let token = after_start[2..end].trim();
+            let token_line = generated_line;
             let mut formula_token = false;
             let replacement = if let Some(expr) = token.strip_prefix('=') {
                 formula_token = true;
                 match evaluate_inline_formula(expr, calculations) {
                     Ok(value) => Some(value),
                     Err(error) => {
+                        let (source_file, line) =
+                            diagnostic_location_for_generated_line(source_map, token_line);
                         diagnostics.push(diag(
                             "error",
                             format!("Inline formula error for {{{{{token}}}}}: {error}"),
-                            None,
-                            None,
+                            source_file,
+                            line,
                             Some("Use numeric expressions, supported functions, and names defined in calc blocks."),
                         ));
                         None
@@ -909,15 +921,21 @@ fn interpolate_variables(
             } else if formula_token {
                 output.push_str(&format!("{{{{{token}}}}}"));
             } else {
+                let (source_file, line) =
+                    diagnostic_location_for_generated_line(source_map, token_line);
                 diagnostics.push(diag(
                     "warning",
                     format!("Missing document variable: {token}"),
-                    None,
-                    None,
+                    source_file,
+                    line,
                     Some("Define the variable in front matter or a calc block."),
                 ));
                 output.push_str(&format!("{{{{{token}}}}}"));
             }
+            generated_line += after_start[..end + 2]
+                .chars()
+                .filter(|ch| *ch == '\n')
+                .count();
             rest = &after_start[end + 2..];
         } else {
             output.push_str(after_start);
@@ -926,6 +944,17 @@ fn interpolate_variables(
     }
     output.push_str(rest);
     output
+}
+
+fn diagnostic_location_for_generated_line(
+    source_map: &[SourceMapEntry],
+    generated_line: usize,
+) -> (Option<String>, Option<usize>) {
+    source_map
+        .iter()
+        .find(|entry| entry.generated_line == generated_line)
+        .map(|entry| (Some(entry.source_file.clone()), Some(entry.source_line)))
+        .unwrap_or((None, Some(generated_line)))
 }
 
 fn evaluate_inline_formula(
@@ -2351,13 +2380,14 @@ fn ai_section_heading(line: usize, headings: &[Heading]) -> String {
 
 fn validate_document(
     metadata: &Value,
-    citations: &[String],
+    citation_references: &[CitationReference],
     bibliography: &[BibliographyEntry],
     duplicate_bibliography_keys: &[String],
     comments: &[ReviewComment],
     ai_sources: &[AiSource],
     ai_assisted_sections: &[AiAssistedSection],
     has_bibliography_source: bool,
+    source_map: &[SourceMapEntry],
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
     if metadata
@@ -2453,24 +2483,40 @@ fn validate_document(
             Some("Keep bibliography keys unique so citations resolve deterministically."),
         ));
     }
-    if !citations.is_empty() && !has_bibliography_source {
-        diagnostics.push(diag(
+    if !citation_references.is_empty() && !has_bibliography_source {
+        let first = &citation_references[0];
+        let (source_file, line) = diagnostic_location_for_generated_line(source_map, first.line);
+        let mut diagnostic = diag(
             "warning",
             "Document contains citations but no bibliography source.",
-            None,
-            None,
+            source_file,
+            line,
             Some("Add bibliography front matter, a bibtex fence, or a bibliography marker."),
-        ));
+        );
+        diagnostic
+            .related
+            .push(format!("First citation: {}", first.raw));
+        diagnostics.push(diagnostic);
     }
-    for citation in citations {
-        if !known_keys.is_empty() && !known_keys.contains(citation.as_str()) {
-            diagnostics.push(diag(
+    let mut reported_broken_citations = HashSet::new();
+    for reference in citation_references {
+        if !known_keys.is_empty()
+            && !known_keys.contains(reference.key.as_str())
+            && reported_broken_citations.insert(reference.key.as_str())
+        {
+            let (source_file, line) =
+                diagnostic_location_for_generated_line(source_map, reference.line);
+            let mut diagnostic = diag(
                 "error",
-                format!("Broken citation: {citation}"),
-                None,
-                None,
+                format!("Broken citation: {}", reference.key),
+                source_file,
+                line,
                 Some("Add the key to a BibTeX or CSL bibliography source."),
-            ));
+            );
+            diagnostic
+                .related
+                .push(format!("Citation syntax: {}", reference.raw));
+            diagnostics.push(diagnostic);
         }
     }
     if comments.iter().any(|comment| comment.state != "resolved") {
@@ -4069,9 +4115,17 @@ ARR: Annual recurring revenue.
         assert!(response
             .compiled_markdown
             .contains("Prepared for Acme in East Africa."));
-        assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
-            .message
-            .contains("Missing document variable: owner")));
+        let missing_owner = response
+            .diagnostics
+            .iter()
+            .find(|diagnostic| {
+                diagnostic
+                    .message
+                    .contains("Missing document variable: owner")
+            })
+            .expect("missing owner diagnostic");
+        assert_eq!(missing_owner.line, Some(9));
+        assert_eq!(missing_owner.source_file.as_deref(), Some("untitled.md"));
         assert!(!response
             .diagnostics
             .iter()
@@ -4658,10 +4712,16 @@ ARR: Annual recurring revenue.
             response.semantic.citations,
             vec!["doe2026", "missing2026", "porter1985"]
         );
-        assert!(response
+        let broken_citation = response
             .diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.message.contains("Broken citation: missing2026")));
+            .find(|diagnostic| diagnostic.message.contains("Broken citation: missing2026"))
+            .expect("broken citation diagnostic");
+        assert_eq!(broken_citation.line, Some(11));
+        assert!(broken_citation
+            .related
+            .iter()
+            .any(|related| related.contains("@missing2026")));
 
         let html = render_full_html(&response, &options);
         assert!(html.contains("Porter 1985"));

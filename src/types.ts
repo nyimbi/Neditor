@@ -31,7 +31,7 @@ export interface SemanticDocument {
   figures: number;
   equations: number;
   citations: string[];
-  citation_references: Array<{ key: string; locator?: string | null; raw: string }>;
+  citation_references: Array<{ key: string; locator?: string | null; raw: string; line: number }>;
   duplicate_bibliography_keys: string[];
   glossary: Record<string, string>;
   layout_directives: string[];
