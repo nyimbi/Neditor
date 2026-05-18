@@ -1841,7 +1841,7 @@ fn apply_default_brand_profile(
     else {
         return;
     };
-    let defaults = ["name", "color", "logo"]
+    let defaults = ["name", "color", "logo", "font"]
         .into_iter()
         .filter_map(|key| {
             profile
@@ -1862,6 +1862,49 @@ fn apply_default_brand_profile(
     for (key, value) in defaults {
         brand_fields.entry(key.to_string()).or_insert(value);
     }
+    apply_default_layout_template(fields, profile, "header");
+    apply_default_layout_template(fields, profile, "footer");
+    apply_default_scalar_metadata(fields, profile, "legalDisclaimer");
+}
+
+fn apply_default_layout_template(
+    fields: &mut serde_json::Map<String, Value>,
+    profile: &serde_json::Map<String, Value>,
+    key: &str,
+) {
+    let Some(value) = profile
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return;
+    };
+    let layout = fields.entry("layout").or_insert_with(|| json!({}));
+    let Some(layout_fields) = layout.as_object_mut() else {
+        return;
+    };
+    layout_fields
+        .entry(key.to_string())
+        .or_insert_with(|| Value::String(value.to_string()));
+}
+
+fn apply_default_scalar_metadata(
+    fields: &mut serde_json::Map<String, Value>,
+    profile: &serde_json::Map<String, Value>,
+    key: &str,
+) {
+    let Some(value) = profile
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return;
+    };
+    fields
+        .entry(key.to_string())
+        .or_insert_with(|| Value::String(value.to_string()));
 }
 
 fn collect_labels(text: &str, headings: &[Heading]) -> Vec<String> {
@@ -4421,7 +4464,11 @@ ARR: Annual recurring revenue.
                 "defaultBrandProfile": {
                     "name": "Acme Strategy",
                     "color": "#0F766E",
-                    "logo": "brand/acme.svg"
+                    "logo": "brand/acme.svg",
+                    "font": "Aptos",
+                    "header": "{{title}}",
+                    "footer": "Confidential | Page {{page}}",
+                    "legalDisclaimer": "Internal use only."
                 }
             }),
         );
@@ -4447,6 +4494,44 @@ ARR: Annual recurring revenue.
                 .and_then(Value::as_str),
             Some("brand/acme.svg")
         );
+        assert_eq!(
+            response
+                .metadata
+                .pointer("/brand/font")
+                .and_then(Value::as_str),
+            Some("Aptos")
+        );
+        assert_eq!(
+            response
+                .metadata
+                .pointer("/layout/header")
+                .and_then(Value::as_str),
+            Some("{{title}}")
+        );
+        assert_eq!(
+            response
+                .metadata
+                .pointer("/layout/footer")
+                .and_then(Value::as_str),
+            Some("Confidential | Page {{page}}")
+        );
+        assert_eq!(
+            response
+                .metadata
+                .get("legalDisclaimer")
+                .and_then(Value::as_str),
+            Some("Internal use only.")
+        );
+        let options = json!({ "watermark": "BOARD" });
+        let html = render_full_html(&response, &options);
+        assert!(html.contains("font-family:Aptos"));
+        assert!(html.contains("Legal Disclaimer"));
+        assert!(html.contains("Internal use only."));
+        let exported_text = export::export_text(&response, &options);
+        assert!(exported_text.contains("Header: Branded"));
+        assert!(exported_text.contains("Footer: Confidential | Page 1"));
+        assert!(exported_text.contains("Watermark: BOARD"));
+        assert!(exported_text.contains("Legal Disclaimer"));
     }
 
     #[test]

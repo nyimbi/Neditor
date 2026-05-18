@@ -40,6 +40,11 @@ interface BrandProfileDefaults {
   name: string;
   color: string;
   logo: string;
+  font: string;
+  header: string;
+  footer: string;
+  watermark: string;
+  legalDisclaimer: string;
 }
 
 interface GitIntegrationPreferences {
@@ -321,6 +326,11 @@ function normalizeBrandProfileDefaults(defaults: Partial<BrandProfileDefaults>):
     name: typeof defaults.name === "string" ? defaults.name : "",
     color: typeof defaults.color === "string" && defaults.color.trim() ? defaults.color.trim() : "#275DA8",
     logo: typeof defaults.logo === "string" ? defaults.logo : "",
+    font: typeof defaults.font === "string" ? defaults.font : "",
+    header: typeof defaults.header === "string" ? defaults.header : "",
+    footer: typeof defaults.footer === "string" ? defaults.footer : "",
+    watermark: typeof defaults.watermark === "string" ? defaults.watermark : "",
+    legalDisclaimer: typeof defaults.legalDisclaimer === "string" ? defaults.legalDisclaimer : "",
   };
 }
 
@@ -984,7 +994,10 @@ export const useDocumentsStore = defineStore("documents", {
         defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
         defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
         warnOnDirtyGit: this.gitIntegration.enabled && this.gitIntegration.warnOnDirtyExport,
-        watermark: this.activeDocument.compile?.semantic.status === "draft" ? "DRAFT" : "",
+        watermark:
+          this.activeDocument.compile?.semantic.status === "draft"
+            ? "DRAFT"
+            : normalizeBrandProfileDefaults(this.brandProfileDefaults).watermark,
       };
     },
     compileOptionsForActive() {

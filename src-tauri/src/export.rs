@@ -38,6 +38,9 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
         .get("watermark")
         .and_then(Value::as_str)
         .unwrap_or("");
+    let brand_font = metadata_string(&response.metadata, "brand.font")
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "Inter,Arial,sans-serif".to_string());
     let subtitle = metadata_string(&response.metadata, "subtitle");
     let author = metadata_string(&response.metadata, "author");
     let date = metadata_string(&response.metadata, "date");
@@ -68,7 +71,7 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title><style>{}</style></head><body><div class=\"running-header\">{}</div><section class=\"cover\">{}<h1>{}</h1>{}<p class=\"status\">{}</p>{}</section><main>{}{}</main><footer><strong>{}</strong><span>{}</span><small>{}</small></footer></body></html>",
         escape_html(&response.semantic.title),
-        export_css(brand_color, watermark),
+        export_css(brand_color, watermark, &brand_font),
         escape_html(&running_header),
         logo
             .as_ref()
@@ -530,6 +533,7 @@ fn appendix_export_lines(response: &CompileResponse, options: &Value) -> Vec<Str
     let mut lines = glossary_export_lines(response, options);
     lines.extend(comment_export_lines(response, options));
     lines.extend(provenance_export_lines(response, options));
+    lines.extend(legal_disclaimer_export_lines(response));
     lines
 }
 
@@ -627,6 +631,15 @@ fn provenance_export_lines(response: &CompileResponse, options: &Value) -> Vec<S
     lines
 }
 
+fn legal_disclaimer_export_lines(response: &CompileResponse) -> Vec<String> {
+    let Some(disclaimer) = metadata_string(&response.metadata, "legalDisclaimer")
+        .filter(|value| !value.trim().is_empty())
+    else {
+        return Vec::new();
+    };
+    vec![String::new(), "Legal Disclaimer".to_string(), disclaimer]
+}
+
 fn empty_as<'a>(value: &'a str, fallback: &'a str) -> &'a str {
     if value.is_empty() {
         fallback
@@ -640,6 +653,7 @@ fn html_appendix_sections(response: &CompileResponse, options: &Value) -> String
         html_glossary_section(response, options),
         html_comments_section(response, options),
         html_provenance_section(response, options),
+        html_legal_disclaimer_section(response),
     ]
     .join("")
 }
@@ -762,6 +776,18 @@ fn html_provenance_section(response: &CompileResponse, options: &Value) -> Strin
     )
 }
 
+fn html_legal_disclaimer_section(response: &CompileResponse) -> String {
+    let Some(disclaimer) = metadata_string(&response.metadata, "legalDisclaimer")
+        .filter(|value| !value.trim().is_empty())
+    else {
+        return String::new();
+    };
+    format!(
+        "<section class=\"export-legal\"><h2>Legal Disclaimer</h2><p>{}</p></section>",
+        escape_html(&disclaimer)
+    )
+}
+
 fn render_docx_document(
     response: &CompileResponse,
     options: &Value,
@@ -778,7 +804,7 @@ fn render_docx_document(
     for line in appendix_export_lines(response, options) {
         if matches!(
             line.as_str(),
-            "Glossary" | "Review Comments" | "AI Provenance"
+            "Glossary" | "Review Comments" | "AI Provenance" | "Legal Disclaimer"
         ) {
             body.push_str(&docx_heading(1, &line));
         } else {
@@ -1133,6 +1159,7 @@ fn appendix_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String
         glossary_export_lines(response, options),
         comment_export_lines(response, options),
         provenance_export_lines(response, options),
+        legal_disclaimer_export_lines(response),
     ]
     .into_iter()
     .filter(|lines| !lines.is_empty())
@@ -1749,9 +1776,10 @@ fn pptx_slide_media<'a>(slide: &PptxSlide, media: &'a [ExportMedia]) -> Vec<&'a 
         .collect()
 }
 
-fn export_css(brand_color: &str, watermark: &str) -> String {
+fn export_css(brand_color: &str, watermark: &str, brand_font: &str) -> String {
     format!(
-        "body{{font-family:Inter,Arial,sans-serif;margin:48px;color:#1f2937;line-height:1.55}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:85vh;display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:44px;margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.export-glossary,.export-comments,.export-provenance{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:24mm;@top-center{{content:element(header)}}@bottom-center{{content:'Page ' counter(page) ' of ' counter(pages)}}}}",
+        "body{{font-family:{};margin:48px;color:#1f2937;line-height:1.55}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:85vh;display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:44px;margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{margin:24mm;@top-center{{content:element(header)}}@bottom-center{{content:'Page ' counter(page) ' of ' counter(pages)}}}}",
+        escape_css(brand_font),
         escape_css(watermark)
     )
 }

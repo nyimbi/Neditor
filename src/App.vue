@@ -483,6 +483,26 @@
             Logo path
             <input v-model="store.brandProfileDefaults.logo" />
           </label>
+          <label>
+            Brand font
+            <input v-model="store.brandProfileDefaults.font" />
+          </label>
+          <label>
+            Header template
+            <input v-model="store.brandProfileDefaults.header" />
+          </label>
+          <label>
+            Footer template
+            <input v-model="store.brandProfileDefaults.footer" />
+          </label>
+          <label>
+            Watermark preset
+            <input v-model="store.brandProfileDefaults.watermark" />
+          </label>
+          <label>
+            Legal disclaimer
+            <textarea v-model="store.brandProfileDefaults.legalDisclaimer" rows="3"></textarea>
+          </label>
           <h3>Git integration</h3>
           <label><input v-model="store.gitIntegration.enabled" type="checkbox" /> Enable Git status</label>
           <label><input v-model="store.gitIntegration.warnOnDirtyExport" type="checkbox" /> Warn on dirty export</label>
@@ -1042,7 +1062,16 @@ watch(
 );
 
 watch(
-  () => [store.brandProfileDefaults.name, store.brandProfileDefaults.color, store.brandProfileDefaults.logo],
+  () => [
+    store.brandProfileDefaults.name,
+    store.brandProfileDefaults.color,
+    store.brandProfileDefaults.logo,
+    store.brandProfileDefaults.font,
+    store.brandProfileDefaults.header,
+    store.brandProfileDefaults.footer,
+    store.brandProfileDefaults.watermark,
+    store.brandProfileDefaults.legalDisclaimer,
+  ],
   () => {
     void store.compileActive();
     void store.persistWorkspace();
