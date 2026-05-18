@@ -22,12 +22,17 @@ let unwatchFileChanges: UnlistenFn | UnwatchFn | null = null;
 let unwatchFileErrors: UnlistenFn | null = null;
 
 type AiPasteInsertMode = "insert" | "quote" | "replace" | "appendix";
+type CitationStyle = "title" | "author-year" | "key";
 
 interface ExportDefaults {
   includeManifest: boolean;
   includeComments: boolean;
   includeProvenance: boolean;
   includeGlossary: boolean;
+}
+
+interface BibliographyDefaults {
+  citationStyle: CitationStyle;
 }
 
 interface PersistedWorkspace {
@@ -46,6 +51,7 @@ interface PersistedWorkspace {
   previewLineHeight?: number;
   exportTarget?: "html" | "pdf" | "docx" | "pptx" | "markdown-bundle";
   exportDefaults?: Partial<ExportDefaults>;
+  bibliographyDefaults?: Partial<BibliographyDefaults>;
   recentFiles?: string[];
   recentFolders?: string[];
   recentlyClosed?: string[];
@@ -285,6 +291,16 @@ function normalizeExportDefaults(defaults: Partial<ExportDefaults>): ExportDefau
   };
 }
 
+function normalizeCitationStyle(value: unknown): CitationStyle {
+  return value === "author-year" || value === "key" || value === "title" ? value : "title";
+}
+
+function normalizeBibliographyDefaults(defaults: Partial<BibliographyDefaults>): BibliographyDefaults {
+  return {
+    citationStyle: normalizeCitationStyle(defaults.citationStyle),
+  };
+}
+
 function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>): AiCleanupOptions {
   return {
     addProvenance: typeof defaults.addProvenance === "boolean" ? defaults.addProvenance : true,
@@ -337,6 +353,7 @@ export const useDocumentsStore = defineStore("documents", {
       includeProvenance: true,
       includeGlossary: true,
     } as ExportDefaults,
+    bibliographyDefaults: normalizeBibliographyDefaults({}),
     aiCleanupDefaults: normalizeAiCleanupDefaults({}),
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
@@ -410,6 +427,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (typeof persisted.previewLineHeight === "number") this.previewLineHeight = clampLineHeight(persisted.previewLineHeight);
         if (persisted.exportTarget) this.exportTarget = persisted.exportTarget;
         if (persisted.exportDefaults) this.exportDefaults = normalizeExportDefaults(persisted.exportDefaults);
+        if (persisted.bibliographyDefaults) this.bibliographyDefaults = normalizeBibliographyDefaults(persisted.bibliographyDefaults);
         if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
         this.recentFiles = persisted.recentFiles || [];
         this.recentFolders = persisted.recentFolders || [];
@@ -446,6 +464,7 @@ export const useDocumentsStore = defineStore("documents", {
         previewLineHeight: this.previewLineHeight,
         exportTarget: this.exportTarget,
         exportDefaults: this.exportDefaults,
+        bibliographyDefaults: this.bibliographyDefaults,
         aiCleanupDefaults: this.aiCleanupDefaults,
         recentFiles: this.recentFiles.slice(0, 20),
         recentFolders: this.recentFolders.slice(0, 12),
@@ -675,8 +694,8 @@ export const useDocumentsStore = defineStore("documents", {
       const doc = this.activeDocument;
       if (!doc) return;
       try {
-        doc.compile = await invoke<CompileResponse>("compile_document", {
-          request: { text: doc.text, file_path: doc.path },
+        doc.compile = await invoke<CompileResponse>("compile_document_with_options", {
+          request: { text: doc.text, file_path: doc.path, options: this.compileOptionsForActive() },
         });
         doc.title = String(doc.compile.semantic.title || titleFromPath(doc.path));
         this.statusMessage = `${doc.compile.diagnostics.length} diagnostics`;
@@ -923,7 +942,13 @@ export const useDocumentsStore = defineStore("documents", {
         includeComments: defaults.includeComments,
         includeProvenance: defaults.includeProvenance,
         includeGlossary: defaults.includeGlossary,
+        defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
         watermark: this.activeDocument.compile?.semantic.status === "draft" ? "DRAFT" : "",
+      };
+    },
+    compileOptionsForActive() {
+      return {
+        defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
       };
     },
     async createSnapshot(label = "manual") {

@@ -432,6 +432,15 @@
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Glossary</label>
+          <h3>Bibliography defaults</h3>
+          <label>
+            Citation style
+            <select v-model="store.bibliographyDefaults.citationStyle">
+              <option value="title">Title</option>
+              <option value="author-year">Author-year</option>
+              <option value="key">Key</option>
+            </select>
+          </label>
           <h3>AI paste cleanup defaults</h3>
           <label><input v-model="store.aiCleanupDefaults.markAsDraft" type="checkbox" /> Mark as draft</label>
           <label><input v-model="store.aiCleanupDefaults.addProvenance" type="checkbox" /> Add provenance block</label>
@@ -738,7 +747,9 @@ const wordStats = computed(() => {
 });
 const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
 const bibliographyByKey = computed(() => new Map((active.value.compile?.bibliography || []).map((entry) => [entry.key, entry.title])));
-const citationStyle = computed(() => String(active.value.compile?.metadata.citationStyle || active.value.compile?.metadata.cslStyle || "title"));
+const citationStyle = computed(() =>
+  String(active.value.compile?.metadata.citationStyle || active.value.compile?.metadata.cslStyle || store.bibliographyDefaults.citationStyle),
+);
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
 const selectedTable = computed(() => markdownTables.value[selectedTableIndex.value] || null);
 const groupedDocuments = computed<DocumentTabGroup[]>(() => {
@@ -961,6 +972,14 @@ watch(
     store.exportDefaults.includeGlossary,
   ],
   () => {
+    void store.persistWorkspace();
+  },
+);
+
+watch(
+  () => store.bibliographyDefaults.citationStyle,
+  () => {
+    void store.compileActive();
     void store.persistWorkspace();
   },
 );

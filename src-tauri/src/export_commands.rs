@@ -1,5 +1,5 @@
 use crate::{
-    compile,
+    compile_with_options,
     diagnostics::{diag, DocumentDiagnostic},
     export::{
         render_docx_bytes, render_full_html, render_markdown_bundle_bytes, render_pdf_bytes,
@@ -49,10 +49,13 @@ pub(crate) struct ExportReadinessReport {
 
 #[tauri::command]
 pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, String> {
-    let compile_response = compile(CompileRequest {
-        text: request.text,
-        file_path: request.file_path,
-    });
+    let compile_response = compile_with_options(
+        CompileRequest {
+            text: request.text,
+            file_path: request.file_path,
+        },
+        &request.options,
+    );
     let mut manifest = compile_response.export_manifest.clone();
     manifest.export_target = request.target.clone();
     manifest.export_options = request.options.clone();
@@ -121,10 +124,13 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
 #[tauri::command]
 pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadinessReport {
     let file_path = request.file_path.clone();
-    let mut response = compile(CompileRequest {
-        text: request.text,
-        file_path,
-    });
+    let mut response = compile_with_options(
+        CompileRequest {
+            text: request.text,
+            file_path,
+        },
+        &request.options,
+    );
     response.export_manifest.export_target = request.target.clone();
     response.export_manifest.export_options = request.options.clone();
     validate_export_settings(&request.target, &request.options, &mut response.diagnostics);

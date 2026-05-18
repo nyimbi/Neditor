@@ -81,6 +81,13 @@ struct CompileRequest {
     file_path: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct CompileWithOptionsRequest {
+    text: String,
+    file_path: Option<String>,
+    options: Value,
+}
+
 #[derive(Debug, Serialize)]
 struct CompileResponse {
     compiled_markdown: String,
@@ -213,6 +220,19 @@ fn compile_document(request: CompileRequest) -> Result<CompileResponse, String> 
 }
 
 #[tauri::command]
+fn compile_document_with_options(
+    request: CompileWithOptionsRequest,
+) -> Result<CompileResponse, String> {
+    Ok(compile_with_options(
+        CompileRequest {
+            text: request.text,
+            file_path: request.file_path,
+        },
+        &request.options,
+    ))
+}
+
+#[tauri::command]
 fn run_transform(name: String, body: String) -> Result<TransformArtifact, String> {
     if !supported_transform(&name) {
         return Err(format!("Unknown transform: {name}"));
@@ -222,6 +242,14 @@ fn run_transform(name: String, body: String) -> Result<TransformArtifact, String
 }
 
 fn compile(request: CompileRequest) -> CompileResponse {
+    compile_inner(request, None)
+}
+
+pub(crate) fn compile_with_options(request: CompileRequest, options: &Value) -> CompileResponse {
+    compile_inner(request, Some(options))
+}
+
+fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileResponse {
     let mut diagnostics = Vec::new();
     let mut include_graph = Vec::new();
     let root_path = request.file_path.as_deref().map(PathBuf::from);
@@ -246,6 +274,7 @@ fn compile(request: CompileRequest) -> CompileResponse {
     let (mut metadata, body, body_start_line) =
         parse_front_matter(&source, &mut diagnostics, Some(root_file.clone()));
     merge_project_variables(&mut metadata, root_path.as_deref(), &mut diagnostics);
+    apply_compile_options(&mut metadata, options);
     let mut body = body;
     let data_source_markdown = render_front_matter_data_sources(
         &metadata,
@@ -1758,6 +1787,29 @@ fn citation_style(metadata: &Value) -> &str {
         .or_else(|| metadata.get("citation_style"))
         .and_then(Value::as_str)
         .unwrap_or("title")
+}
+
+fn apply_compile_options(metadata: &mut Value, options: Option<&Value>) {
+    let Some(style) = options
+        .and_then(|value| value.get("defaultCitationStyle"))
+        .and_then(Value::as_str)
+        .filter(|style| matches!(*style, "title" | "author-year" | "key"))
+    else {
+        return;
+    };
+    let Some(fields) = metadata.as_object_mut() else {
+        return;
+    };
+    if fields.contains_key("citationStyle")
+        || fields.contains_key("cslStyle")
+        || fields.contains_key("citation_style")
+    {
+        return;
+    }
+    fields.insert(
+        "citationStyle".to_string(),
+        Value::String(style.to_string()),
+    );
 }
 
 fn collect_labels(text: &str, headings: &[Heading]) -> Vec<String> {
@@ -3745,6 +3797,7 @@ pub fn run() {
             file_metadata,
             list_workspace_files,
             compile_document,
+            compile_document_with_options,
             export_document,
             prepare_for_export,
             create_snapshot,
@@ -4211,6 +4264,46 @@ ARR: Annual recurring revenue.
             .message
             .contains("Broken cross reference: fig:missing")));
         fs::remove_dir_all(root).expect("clean bib test dir");
+    }
+
+    #[test]
+    fn compile_options_supply_default_citation_style() {
+        let response = compile_with_options(
+            CompileRequest {
+                text: "Claim [@porter1985].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n```".to_string(),
+                file_path: None,
+            },
+            &json!({ "defaultCitationStyle": "author-year" }),
+        );
+
+        assert_eq!(
+            response
+                .metadata
+                .get("citationStyle")
+                .and_then(Value::as_str),
+            Some("author-year")
+        );
+        assert!(response.html.contains("Porter 1985"));
+    }
+
+    #[test]
+    fn compile_options_do_not_override_document_citation_style() {
+        let response = compile_with_options(
+            CompileRequest {
+                text: "---\ncitationStyle: key\n---\nClaim [@porter1985].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n```".to_string(),
+                file_path: None,
+            },
+            &json!({ "defaultCitationStyle": "author-year" }),
+        );
+
+        assert_eq!(
+            response
+                .metadata
+                .get("citationStyle")
+                .and_then(Value::as_str),
+            Some("key")
+        );
+        assert!(response.html.contains("@porter1985"));
     }
 
     #[test]
