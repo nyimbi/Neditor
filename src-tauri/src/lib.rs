@@ -957,7 +957,7 @@ fn list_transform_engines() -> Vec<Value> {
         transform_engine("graphviz", "external-sidecar", false, true),
         transform_engine("plantuml", "external-sidecar", false, true),
         transform_engine("d2", "external-sidecar", false, true),
-        transform_engine("vega-lite", "static-diagnostic", true, false),
+        transform_engine("vega-lite", "rust-native-svg", true, false),
         transform_engine("geojson", "rust-native-svg", true, false),
         transform_engine("topojson", "rust-native-svg", true, false),
         transform_engine("stl", "rust-native-svg", true, false),
@@ -1864,7 +1864,8 @@ fn render_transform(
         "geojson" => render_geojson_svg(body, &mut artifact_diags, diagnostics),
         "topojson" => render_topojson_svg(body, &mut artifact_diags, diagnostics),
         "stl" => render_stl_svg(body, &mut artifact_diags, diagnostics),
-        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" | "vega-lite" => {
+        "vega-lite" => render_vega_lite_svg(body, &mut artifact_diags, diagnostics),
+        "mermaid" | "pikchr" | "dot" | "graphviz" | "plantuml" | "d2" => {
             let message = format!("{name} transform captured as source artifact; configure an engine for rendered output.");
             let diagnostic = diag(
                 "warning",
@@ -3225,6 +3226,184 @@ fn render_chart_svg(body: &str) -> String {
         let x = 80 + index * bar_width;
         let y = 220 - bar_height;
         svg.push_str(&format!("<rect x=\"{x}\" y=\"{y}\" width=\"{}\" height=\"{bar_height}\" fill=\"#275DA8\"/><text x=\"{x}\" y=\"242\" font-size=\"12\">{}</text><text x=\"{x}\" y=\"{}\" font-size=\"12\">{value}</text>", bar_width.saturating_sub(10), escape_html(label), y.saturating_sub(8)));
+    }
+    svg.push_str("</svg>");
+    svg
+}
+
+fn render_vega_lite_svg(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let spec = match serde_json::from_str::<Value>(body) {
+        Ok(value) => value,
+        Err(err) => {
+            let diagnostic = diag(
+                "error",
+                format!("Invalid Vega-Lite JSON: {err}"),
+                None,
+                None,
+                Some("Provide a JSON Vega-Lite spec with data.values and x/y encodings."),
+            );
+            artifact_diags.push(diagnostic.clone());
+            diagnostics.push(diagnostic);
+            return "<section class=\"transform transform-vega-lite transform-error\">Invalid Vega-Lite JSON</section>".to_string();
+        }
+    };
+    let mark = vega_lite_mark(&spec);
+    if !matches!(mark.as_str(), "bar" | "line" | "point") {
+        let diagnostic = diag(
+            "warning",
+            format!("Unsupported Vega-Lite mark for native preview: {mark}"),
+            None,
+            None,
+            Some("Use bar, line, or point marks for the native static preview."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-vega-lite transform-error\">Unsupported Vega-Lite mark</section>".to_string();
+    }
+    let Some(x_field) = vega_lite_encoding_field(&spec, "x") else {
+        return vega_lite_missing_field("x", artifact_diags, diagnostics);
+    };
+    let Some(y_field) = vega_lite_encoding_field(&spec, "y") else {
+        return vega_lite_missing_field("y", artifact_diags, diagnostics);
+    };
+    let values = vega_lite_values(&spec, &x_field, &y_field);
+    if values.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "Vega-Lite native preview did not find numeric data.values rows.",
+            None,
+            None,
+            Some("Use inline data.values with a numeric y encoding."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-vega-lite transform-error\">No drawable Vega-Lite rows</section>".to_string();
+    }
+    let title = spec
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or("Vega-Lite chart");
+    render_vega_lite_chart_svg(title, &mark, &values)
+}
+
+fn vega_lite_mark(spec: &Value) -> String {
+    spec.get("mark")
+        .and_then(|mark| {
+            mark.as_str().map(ToString::to_string).or_else(|| {
+                mark.get("type")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+        })
+        .unwrap_or_else(|| "bar".to_string())
+}
+
+fn vega_lite_encoding_field(spec: &Value, channel: &str) -> Option<String> {
+    spec.pointer(&format!("/encoding/{channel}/field"))
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+}
+
+fn vega_lite_values(spec: &Value, x_field: &str, y_field: &str) -> Vec<(String, f64)> {
+    spec.pointer("/data/values")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|row| {
+            let x = row.get(x_field).map(value_to_axis_label)?;
+            let y = row
+                .get(y_field)
+                .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))?;
+            Some((x, y))
+        })
+        .collect()
+}
+
+fn value_to_axis_label(value: &Value) -> String {
+    value
+        .as_str()
+        .map(ToString::to_string)
+        .unwrap_or_else(|| value_to_string(value))
+}
+
+fn vega_lite_missing_field(
+    channel: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let diagnostic = diag(
+        "warning",
+        format!("Vega-Lite native preview is missing {channel} field encoding."),
+        None,
+        None,
+        Some("Set encoding.x.field and encoding.y.field."),
+    );
+    artifact_diags.push(diagnostic.clone());
+    diagnostics.push(diagnostic);
+    format!(
+        "<section class=\"transform transform-vega-lite transform-error\">Missing {channel} encoding</section>"
+    )
+}
+
+fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[(String, f64)]) -> String {
+    let max = values
+        .iter()
+        .map(|(_, value)| *value)
+        .reduce(f64::max)
+        .unwrap_or(1.0)
+        .max(1.0);
+    let width = 820usize;
+    let height = 320usize;
+    let plot_left = 72usize;
+    let plot_bottom = 262usize;
+    let plot_width = 680usize;
+    let step = plot_width / values.len().max(1);
+    let mut svg = format!(
+        "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><text x=\"72\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><line x1=\"72\" y1=\"262\" x2=\"770\" y2=\"262\" stroke=\"#94a3b8\"/><line x1=\"72\" y1=\"54\" x2=\"72\" y2=\"262\" stroke=\"#94a3b8\"/>",
+        escape_html(title)
+    );
+    let points = values
+        .iter()
+        .enumerate()
+        .map(|(index, (_, value))| {
+            let x = plot_left + index * step + step / 2;
+            let y = plot_bottom - ((*value / max) * 190.0) as usize;
+            (x, y)
+        })
+        .collect::<Vec<_>>();
+    if mark == "bar" {
+        for (index, (label, value)) in values.iter().enumerate() {
+            let bar_height = ((*value / max) * 190.0) as usize;
+            let x = plot_left + index * step + 8;
+            let y = plot_bottom - bar_height;
+            svg.push_str(&format!(
+                "<rect x=\"{x}\" y=\"{y}\" width=\"{}\" height=\"{bar_height}\" fill=\"#275DA8\"/><text x=\"{x}\" y=\"286\" font-size=\"12\">{}</text>",
+                step.saturating_sub(16),
+                escape_html(label)
+            ));
+        }
+    } else {
+        if mark == "line" {
+            let polyline = points
+                .iter()
+                .map(|(x, y)| format!("{x},{y}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            svg.push_str(&format!(
+                "<polyline points=\"{polyline}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"3\"/>"
+            ));
+        }
+        for ((x, y), (label, _)) in points.iter().zip(values.iter()) {
+            svg.push_str(&format!(
+                "<circle cx=\"{x}\" cy=\"{y}\" r=\"5\" fill=\"#275DA8\"/><text x=\"{}\" y=\"286\" font-size=\"12\">{}</text>",
+                x.saturating_sub(12),
+                escape_html(label)
+            ));
+        }
     }
     svg.push_str("</svg>");
     svg
@@ -4745,6 +4924,31 @@ paths:
             .expect("stl engine metadata");
         assert_eq!(
             stl.get("execution").and_then(Value::as_str),
+            Some("rust-native-svg")
+        );
+    }
+
+    #[test]
+    fn vega_lite_transform_renders_static_svg_preview() {
+        let artifact = run_transform(
+            "vega-lite".to_string(),
+            r#"{"mark":"bar","title":"Revenue","data":{"values":[{"region":"East","revenue":120},{"region":"West","revenue":98}]},"encoding":{"x":{"field":"region","type":"nominal"},"y":{"field":"revenue","type":"quantitative"}}}"#.to_string(),
+        )
+        .expect("vega-lite transform");
+
+        assert_eq!(artifact.output_kind, "svg");
+        assert!(artifact.html.contains("transform-vega-lite"));
+        assert!(artifact.html.contains("Revenue"));
+        assert!(artifact.html.contains("<rect"));
+        assert!(artifact.diagnostics.is_empty());
+
+        let engines = list_transform_engines();
+        let vega_lite = engines
+            .iter()
+            .find(|engine| engine.get("name").and_then(Value::as_str) == Some("vega-lite"))
+            .expect("vega-lite engine metadata");
+        assert_eq!(
+            vega_lite.get("execution").and_then(Value::as_str),
             Some("rust-native-svg")
         );
     }
