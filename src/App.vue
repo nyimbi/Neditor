@@ -1,5 +1,10 @@
 <template>
-  <div class="app-shell" :data-theme="store.theme">
+  <div
+    class="app-shell"
+    :data-theme="store.theme"
+    :data-high-contrast="store.highContrast ? 'true' : 'false'"
+    :data-reduced-motion="store.reducedMotion ? 'true' : 'false'"
+  >
     <header class="titlebar">
       <section class="document-tabs" aria-label="Open documents">
         <div
@@ -326,6 +331,8 @@
           </label>
           <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
           <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
+          <label><input v-model="store.highContrast" type="checkbox" /> High contrast</label>
+          <label><input v-model="store.reducedMotion" type="checkbox" /> Reduced motion</label>
           <label><input v-model="store.autosave" type="checkbox" /> Autosave existing files</label>
           <label>
             Autosave delay
@@ -721,7 +728,17 @@ watch(
 );
 
 watch(
-  () => [store.wordWrap, store.lineNumbers, store.theme, store.editorFont, store.editorLineHeight, store.previewFont, store.previewLineHeight],
+  () => [
+    store.wordWrap,
+    store.lineNumbers,
+    store.theme,
+    store.highContrast,
+    store.reducedMotion,
+    store.editorFont,
+    store.editorLineHeight,
+    store.previewFont,
+    store.previewLineHeight,
+  ],
   () => {
     buildEditor();
     void store.persistWorkspace();
@@ -1485,6 +1502,46 @@ select:hover {
   .app-shell[data-theme="system"] {
     color: #e6edf5;
     background: #111821;
+  }
+}
+
+.app-shell[data-high-contrast="true"] {
+  color: #000000;
+  background: #ffffff;
+}
+
+.app-shell[data-high-contrast="true"] .titlebar,
+.app-shell[data-high-contrast="true"] .command-bar,
+.app-shell[data-high-contrast="true"] .status-bar,
+.app-shell[data-high-contrast="true"] .sidebar,
+.app-shell[data-high-contrast="true"] button,
+.app-shell[data-high-contrast="true"] select,
+.app-shell[data-high-contrast="true"] input,
+.app-shell[data-high-contrast="true"] textarea {
+  border-color: #000000;
+  color: #000000;
+  background: #ffffff;
+}
+
+.app-shell[data-high-contrast="true"] .tab.active,
+.app-shell[data-high-contrast="true"] .file-row.active {
+  outline: 2px solid #000000;
+  background: #fff6a3;
+}
+
+.app-shell[data-reduced-motion="true"] * {
+  scroll-behavior: auto;
+  transition-duration: 0s;
+  animation-duration: 0s;
+  animation-iteration-count: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell * {
+    scroll-behavior: auto;
+    transition-duration: 0s;
+    animation-duration: 0s;
+    animation-iteration-count: 1;
   }
 }
 

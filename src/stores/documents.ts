@@ -32,6 +32,8 @@ interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
   wordWrap?: boolean;
   lineNumbers?: boolean;
+  highContrast?: boolean;
+  reducedMotion?: boolean;
   autosave?: boolean;
   autosaveDelayMs?: number;
   autoSnapshot?: boolean;
@@ -226,6 +228,8 @@ export const useDocumentsStore = defineStore("documents", {
     theme: "system" as "system" | "light" | "dark",
     wordWrap: true,
     lineNumbers: true,
+    highContrast: false,
+    reducedMotion: false,
     autosave: false,
     autosaveDelayMs: 1500,
     autoSnapshot: false,
@@ -301,6 +305,8 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.theme) this.theme = persisted.theme;
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
+        if (typeof persisted.highContrast === "boolean") this.highContrast = persisted.highContrast;
+        if (typeof persisted.reducedMotion === "boolean") this.reducedMotion = persisted.reducedMotion;
         if (typeof persisted.autosave === "boolean") this.autosave = persisted.autosave;
         if (typeof persisted.autosaveDelayMs === "number") this.autosaveDelayMs = clampAutosaveDelay(persisted.autosaveDelayMs);
         if (typeof persisted.autoSnapshot === "boolean") this.autoSnapshot = persisted.autoSnapshot;
@@ -334,6 +340,8 @@ export const useDocumentsStore = defineStore("documents", {
         theme: this.theme,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,
+        highContrast: this.highContrast,
+        reducedMotion: this.reducedMotion,
         autosave: this.autosave,
         autosaveDelayMs: this.autosaveDelayMs,
         autoSnapshot: this.autoSnapshot,
