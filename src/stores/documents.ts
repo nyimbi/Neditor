@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/plugin-fs";
 import { Store } from "@tauri-apps/plugin-store";
 import type {
@@ -16,7 +17,8 @@ import type {
 } from "../types";
 
 let preferencesStore: Store | null = null;
-let unwatchFileChanges: UnwatchFn | null = null;
+let unwatchFileChanges: UnlistenFn | UnwatchFn | null = null;
+let unwatchFileErrors: UnlistenFn | null = null;
 
 interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
@@ -65,6 +67,11 @@ interface DocumentWatchEvent {
   kind: string;
   hash?: string | null;
   modified?: string | null;
+}
+
+interface BackendWatchEvent {
+  paths: string[];
+  kind: string;
 }
 
 const starterDocument = `---
@@ -157,6 +164,11 @@ function watchEventIsAccessOnly(event: WatchEvent) {
   return typeof event.type === "object" && "access" in event.type;
 }
 
+function stringifyWatchEventKind(kind: WatchEvent["type"]) {
+  if (typeof kind === "string") return kind;
+  return Object.keys(kind)[0] || "other";
+}
+
 function clampLineHeight(value: number) {
   return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
 }
@@ -167,11 +179,6 @@ function clampAutosaveDelay(value: number) {
 
 function clampSnapshotInterval(value: number) {
   return Math.min(Math.max(Number(value) || 300000, 30000), 3600000);
-}
-
-function stringifyWatchEventKind(kind: WatchEvent["type"]) {
-  if (typeof kind === "string") return kind;
-  return Object.keys(kind)[0] || "other";
 }
 
 export const useDocumentsStore = defineStore("documents", {
@@ -534,40 +541,60 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async syncFileWatcher() {
       const doc = this.activeDocument;
-      const stopCurrentWatcher = () => {
-        unwatchFileChanges?.();
-        unwatchFileChanges = null;
-      };
       if (!doc?.path) {
         if (this.watchSignature) {
-          stopCurrentWatcher();
+          await this.stopFileWatcher();
         }
         this.watchSignature = "";
         this.watchedPaths = [];
         return;
       }
       const includedPaths = (doc.compile?.export_manifest.included_files || []).map((file) => file.path);
-      const watchSnapshot = await invoke<WatchFileResponse>("watch_file", {
+      const watchSnapshot = await invoke<WatchFileResponse>("start_file_watcher", {
         request: { root: doc.path, included: includedPaths },
       });
       const watchPaths = watchSnapshot.paths.filter((file) => file.exists).map((file) => file.path);
-      const signature = watchPaths.join("\n");
+      const driver = watchSnapshot.native_watcher ? "native" : "plugin";
+      const signature = `${driver}\n${watchPaths.join("\n")}`;
       if (signature === this.watchSignature) return;
-      stopCurrentWatcher();
+      this.detachFileWatchListeners();
       if (!watchPaths.length) {
         this.watchSignature = "";
         this.watchedPaths = [];
         return;
       }
-      unwatchFileChanges = await watchFs(
-        watchPaths,
-        (event) => {
-          void this.handleFsWatchEvent(event, doc.path as string, includedPaths);
-        },
-        { delayMs: 250 },
-      );
+      if (watchSnapshot.native_watcher) {
+        await this.attachBackendFileWatchListeners(doc.path, includedPaths);
+      } else {
+        unwatchFileChanges = await watchFs(
+          watchPaths,
+          (event) => {
+            void this.handleFsWatchEvent(event, doc.path as string, includedPaths);
+          },
+          { delayMs: 250 },
+        );
+      }
       this.watchSignature = signature;
       this.watchedPaths = watchPaths;
+    },
+    detachFileWatchListeners() {
+      unwatchFileChanges?.();
+      unwatchFileChanges = null;
+      unwatchFileErrors?.();
+      unwatchFileErrors = null;
+    },
+    async stopFileWatcher() {
+      this.detachFileWatchListeners();
+      await invoke("stop_file_watcher").catch(() => undefined);
+    },
+    async attachBackendFileWatchListeners(rootPath: string, includedPaths: string[]) {
+      unwatchFileChanges = await listen<BackendWatchEvent>("neditor-file-watch-event", (event) => {
+        void this.handleBackendWatchEvent(event.payload, rootPath, includedPaths);
+      });
+      unwatchFileErrors = await listen<string>("neditor-file-watch-error", (event) => {
+        this.lastError = event.payload;
+        this.statusMessage = "File watcher failed";
+      });
     },
     async handleFsWatchEvent(event: WatchEvent, rootPath: string, includedPaths: string[]) {
       const paths = event.paths.length ? event.paths : [rootPath];
@@ -579,6 +606,21 @@ export const useDocumentsStore = defineStore("documents", {
           path,
           reason,
           kind: stringifyWatchEventKind(event.type),
+          hash: metadata.hash,
+          modified: metadata.modified,
+        });
+      }
+    },
+    async handleBackendWatchEvent(event: BackendWatchEvent, rootPath: string, includedPaths: string[]) {
+      const paths = event.paths.length ? event.paths : [rootPath];
+      for (const path of paths) {
+        const reason = path === rootPath ? "root" : includedPaths.includes(path) ? "include" : null;
+        if (!reason) continue;
+        const metadata = await invoke<FileMetadataResponse>("file_metadata", { path });
+        await this.handleWatchedFileChange({
+          path,
+          reason,
+          kind: event.kind,
           hash: metadata.hash,
           modified: metadata.modified,
         });

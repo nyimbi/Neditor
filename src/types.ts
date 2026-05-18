@@ -186,6 +186,7 @@ export interface WatchFileResponse {
     hash?: string | null;
     modified?: string | null;
   }>;
+  native_watcher?: boolean;
 }
 
 export interface AiCleanupResponse {

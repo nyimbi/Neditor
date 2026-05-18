@@ -1,4 +1,6 @@
 use chrono::Utc;
+#[cfg(feature = "native-watch")]
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use pulldown_cmark::{html, Options, Parser};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -9,9 +11,12 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::Mutex,
     time::{Duration, Instant},
 };
-use tauri::Manager;
+#[cfg(feature = "native-watch")]
+use tauri::Emitter;
+use tauri::{Manager, State};
 
 mod document_ast;
 mod export;
@@ -30,6 +35,18 @@ const MAX_WORKSPACE_SCAN_ITEMS: usize = 2000;
 const DEFAULT_TRANSFORM_TIMEOUT_MS: u64 = 5_000;
 const MAX_TRANSFORM_TIMEOUT_MS: u64 = 30_000;
 const MAX_TRANSFORM_INPUT_BYTES: usize = 1_048_576;
+
+#[derive(Default)]
+struct FileWatcherState {
+    watcher: Mutex<Option<ActiveFileWatcher>>,
+}
+
+struct ActiveFileWatcher {
+    #[cfg(feature = "native-watch")]
+    _watcher: RecommendedWatcher,
+    #[allow(dead_code)]
+    signature: String,
+}
 
 #[derive(Debug, Deserialize)]
 struct CompileRequest {
@@ -277,6 +294,14 @@ struct WatchFileRequest {
 #[derive(Debug, Serialize)]
 struct WatchFileResponse {
     paths: Vec<FileMetadata>,
+    native_watcher: bool,
+}
+
+#[cfg(feature = "native-watch")]
+#[derive(Clone, Debug, Serialize)]
+struct FileWatchEventPayload {
+    paths: Vec<String>,
+    kind: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -524,7 +549,116 @@ fn watch_file(request: WatchFileRequest) -> Result<WatchFileResponse, String> {
             paths.push(metadata);
         }
     }
-    Ok(WatchFileResponse { paths })
+    Ok(WatchFileResponse {
+        paths,
+        native_watcher: false,
+    })
+}
+
+#[tauri::command]
+#[cfg(feature = "native-watch")]
+fn start_file_watcher(
+    app: tauri::AppHandle,
+    state: State<FileWatcherState>,
+    request: WatchFileRequest,
+) -> Result<WatchFileResponse, String> {
+    let mut response = watch_file(request)?;
+    let watch_paths = response
+        .paths
+        .iter()
+        .filter(|metadata| metadata.exists)
+        .map(|metadata| metadata.path.clone())
+        .collect::<Vec<_>>();
+    let signature = watch_paths.join("\n");
+    let mut active = state
+        .watcher
+        .lock()
+        .map_err(|_| "File watcher state lock poisoned.".to_string())?;
+
+    if active
+        .as_ref()
+        .map(|watcher| watcher.signature.as_str() == signature.as_str())
+        .unwrap_or(false)
+    {
+        response.native_watcher = !watch_paths.is_empty();
+        return Ok(response);
+    }
+
+    *active = None;
+    if watch_paths.is_empty() {
+        return Ok(response);
+    }
+
+    let event_app = app.clone();
+    let mut watcher = RecommendedWatcher::new(
+        move |result: notify::Result<Event>| match result {
+            Ok(event) => {
+                if !notify_event_should_emit(&event.kind) {
+                    return;
+                }
+                let payload = FileWatchEventPayload {
+                    paths: event.paths.iter().map(|path| path_to_string(path)).collect(),
+                    kind: format!("{:?}", event.kind),
+                };
+                let _ = event_app.emit("neditor-file-watch-event", payload);
+            }
+            Err(error) => {
+                let _ = event_app.emit("neditor-file-watch-error", error.to_string());
+            }
+        },
+        Config::default(),
+    )
+    .map_err(|err| err.to_string())?;
+
+    for path in &watch_paths {
+        watcher
+            .watch(Path::new(path), RecursiveMode::NonRecursive)
+            .map_err(|err| err.to_string())?;
+    }
+
+    *active = Some(ActiveFileWatcher {
+        _watcher: watcher,
+        signature,
+    });
+    response.native_watcher = true;
+    Ok(response)
+}
+
+#[tauri::command]
+#[cfg(not(feature = "native-watch"))]
+fn start_file_watcher(
+    state: State<FileWatcherState>,
+    request: WatchFileRequest,
+) -> Result<WatchFileResponse, String> {
+    let response = watch_file(request)?;
+    let signature = response
+        .paths
+        .iter()
+        .filter(|metadata| metadata.exists)
+        .map(|metadata| metadata.path.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut active = state
+        .watcher
+        .lock()
+        .map_err(|_| "File watcher state lock poisoned.".to_string())?;
+    *active = Some(ActiveFileWatcher { signature });
+    Ok(response)
+}
+
+#[tauri::command]
+fn stop_file_watcher(state: State<FileWatcherState>) -> Result<(), String> {
+    let mut active = state
+        .watcher
+        .lock()
+        .map_err(|_| "File watcher state lock poisoned.".to_string())?;
+    *active = None;
+    Ok(())
+}
+
+#[cfg(feature = "native-watch")]
+fn notify_event_should_emit(kind: &EventKind) -> bool {
+    !matches!(kind, EventKind::Access(_))
 }
 
 #[tauri::command]
@@ -4472,6 +4606,7 @@ fn escape_css(text: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(FileWatcherState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -4484,6 +4619,8 @@ pub fn run() {
             save_file_as,
             save_file,
             watch_file,
+            start_file_watcher,
+            stop_file_watcher,
             rename_file,
             duplicate_file,
             reveal_path,
@@ -5583,6 +5720,17 @@ paths:
             .iter()
             .any(|metadata| metadata.path.ends_with("chapters/intro.md")));
         fs::remove_dir_all(root).expect("clean ipc alias test dir");
+    }
+
+    #[cfg(feature = "native-watch")]
+    #[test]
+    fn notify_watcher_ignores_access_only_events() {
+        assert!(!notify_event_should_emit(&notify::EventKind::Access(
+            notify::event::AccessKind::Any
+        )));
+        assert!(notify_event_should_emit(&notify::EventKind::Modify(
+            notify::event::ModifyKind::Any
+        )));
     }
 
     #[test]
