@@ -1145,6 +1145,11 @@ fn compile(request: CompileRequest) -> CompileResponse {
         root_path.as_deref(),
         &mut diagnostics,
     );
+    validate_link_paths(
+        &table_formula_markdown,
+        root_path.as_deref(),
+        &mut diagnostics,
+    );
     let figure_markdown = render_figures(&table_formula_markdown);
     let equation_markdown = render_equations(&figure_markdown);
     let layout_markdown = render_layout_tokens(&equation_markdown);
@@ -2169,6 +2174,78 @@ fn validate_image_paths(
             ));
         }
     }
+}
+
+fn validate_link_paths(
+    markdown: &str,
+    root_path: Option<&Path>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let base_dir = root_path
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+    for (line_index, line) in markdown.lines().enumerate() {
+        let mut search_from = 0usize;
+        while let Some(relative_close) = line[search_from..].find("](") {
+            let close_index = search_from + relative_close;
+            let Some(open_index) = line[..close_index].rfind('[') else {
+                search_from = close_index + 2;
+                continue;
+            };
+            if open_index > 0 && line.as_bytes().get(open_index - 1) == Some(&b'!') {
+                search_from = close_index + 2;
+                continue;
+            }
+            let target_start = close_index + 2;
+            let Some(relative_end) = line[target_start..].find(')') else {
+                break;
+            };
+            let target_end = target_start + relative_end;
+            if let Some(destination) = markdown_link_destination(&line[target_start..target_end]) {
+                if should_validate_local_link(&destination) {
+                    let path_part = destination
+                        .split_once('#')
+                        .map_or(destination.as_str(), |(path, _)| path);
+                    if !path_part.is_empty() {
+                        let path = base_dir.join(path_part);
+                        if !path.exists() {
+                            diagnostics.push(diag(
+                                "warning",
+                                format!("Broken link path: {}", path.display()),
+                                Some(path_to_string(&path)),
+                                Some(line_index + 1),
+                                Some("Create the linked file or update the Markdown link."),
+                            ));
+                        }
+                    }
+                }
+            }
+            search_from = target_end + 1;
+        }
+    }
+}
+
+fn markdown_link_destination(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(stripped) = trimmed.strip_prefix('<') {
+        return stripped
+            .split_once('>')
+            .map(|(destination, _)| destination.to_string());
+    }
+    Some(trimmed.split_whitespace().next()?.to_string())
+}
+
+fn should_validate_local_link(destination: &str) -> bool {
+    !destination.starts_with('#')
+        && !destination.starts_with("mailto:")
+        && !destination.starts_with("tel:")
+        && !destination.starts_with("data:")
+        && !destination.starts_with("{{")
+        && !destination.contains("://")
 }
 
 fn render_equations(markdown: &str) -> String {
@@ -3846,6 +3923,40 @@ ARR: Annual recurring revenue.
         assert!(response.diagnostics.iter().any(|diagnostic| {
             diagnostic.severity == "error" && diagnostic.message.contains("Missing include file")
         }));
+    }
+
+    #[test]
+    fn compiler_reports_broken_local_markdown_links() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-link-test-{unique}"));
+        fs::create_dir_all(root.join("docs")).expect("create link test dir");
+        fs::write(root.join("docs").join("existing.md"), "# Existing").expect("write linked doc");
+
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Links\nstatus: approved\napprovedBy: QA\n---\n# Links\nRead [existing](docs/existing.md), [missing](docs/missing.md), [section](#links), and [web](https://example.com).\n![Missing image](docs/missing.png)\n".to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+        });
+
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Broken link path")));
+        assert_eq!(
+            response
+                .diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.message.contains("Broken link path"))
+                .count(),
+            1
+        );
+        assert!(response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Broken image path")));
+        fs::remove_dir_all(root).expect("clean link test dir");
     }
 
     #[test]
