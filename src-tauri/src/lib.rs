@@ -492,23 +492,37 @@ fn expand_includes(
             let child = base_dir.join(include_target);
             let canonical = child.canonicalize().unwrap_or(child.clone());
             if visited.contains(&canonical) {
-                diagnostics.push(diag(
+                let mut diagnostic = diag(
                     "error",
                     "Circular include detected.",
                     Some(source_file.to_string()),
                     Some(line_index + 1),
                     Some("Remove the cycle or include a different file."),
-                ));
+                );
+                diagnostic
+                    .related
+                    .push(format!("Include target: {}", child.display()));
+                diagnostic
+                    .related
+                    .push(format!("Canonical path: {}", canonical.display()));
+                diagnostics.push(diagnostic);
                 continue;
             }
             if !child.exists() {
-                diagnostics.push(diag(
+                let mut diagnostic = diag(
                     "error",
                     format!("Missing include file: {}", child.display()),
                     Some(source_file.to_string()),
                     Some(line_index + 1),
                     Some("Create the file or update the include path."),
-                ));
+                );
+                diagnostic
+                    .related
+                    .push(format!("Include target: {include_target}"));
+                diagnostic
+                    .related
+                    .push(format!("Resolved path: {}", child.display()));
+                diagnostics.push(diagnostic);
                 continue;
             }
             match fs::read_to_string(&child) {
@@ -4345,9 +4359,18 @@ ARR: Annual recurring revenue.
             file_path: None,
         });
 
-        assert!(response.diagnostics.iter().any(|diagnostic| {
-            diagnostic.severity == "error" && diagnostic.message.contains("Missing include file")
-        }));
+        let diagnostic = response
+            .diagnostics
+            .iter()
+            .find(|diagnostic| {
+                diagnostic.severity == "error"
+                    && diagnostic.message.contains("Missing include file")
+            })
+            .expect("missing include diagnostic");
+        assert!(diagnostic
+            .related
+            .iter()
+            .any(|related| related.contains("missing/chapter.md")));
     }
 
     #[test]
