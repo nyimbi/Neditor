@@ -384,7 +384,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
             .to_string(),
         status: status.clone(),
         exported_at: Utc::now().to_rfc3339(),
-        source_hash: sha256_hex(source.as_bytes()),
+        source_hash: sha256_uri(source.as_bytes()),
         included_files,
         export_target: "preview".to_string(),
         export_options: json!({}),
@@ -3642,8 +3642,12 @@ fn manifest_file(path: &str) -> Option<ManifestFile> {
     let bytes = fs::read(path).ok()?;
     Some(ManifestFile {
         path: path.to_string(),
-        hash: sha256_hex(&bytes),
+        hash: sha256_uri(&bytes),
     })
+}
+
+fn sha256_uri(bytes: &[u8]) -> String {
+    format!("sha256:{}", sha256_hex(bytes))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -4001,6 +4005,12 @@ ARR: Annual recurring revenue.
             .included_files
             .iter()
             .any(|file| file.path.ends_with("data/revenue.csv")));
+        assert!(response.export_manifest.source_hash.starts_with("sha256:"));
+        assert!(response
+            .export_manifest
+            .included_files
+            .iter()
+            .all(|file| file.hash.starts_with("sha256:")));
         fs::remove_dir_all(root).expect("clean data source test dir");
     }
 
