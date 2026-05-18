@@ -5485,7 +5485,15 @@ paths:
         let options = json!({ "watermark": "DRAFT" });
 
         let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let docx_content_types = zip_entry_text(&docx, "[Content_Types].xml");
         let docx_document = zip_entry_text(&docx, "word/document.xml");
+        let docx_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
+        let docx_svg = zip_entry_text(&docx, "word/media/image1.svg");
+        assert!(docx_content_types.contains(r#"ContentType="image/svg+xml""#));
+        assert!(docx_relationships.contains(r#"Id="rIdImage1""#));
+        assert!(docx_relationships.contains(r#"Target="media/image1.svg""#));
+        assert!(docx_document.contains(r#"r:embed="rIdImage1""#));
+        assert_eq!(docx_svg, "<svg/>");
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading1""#));
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading2""#));
         assert!(docx_document.contains("<w:tbl>"));
@@ -5583,9 +5591,17 @@ paths:
         assert!(pdf_text.contains("AI Provenance"));
 
         let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let docx_content_types = zip_entry_text(&docx, "[Content_Types].xml");
         let docx_document = zip_entry_text(&docx, "word/document.xml");
+        let docx_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
         let docx_header = zip_entry_text(&docx, "word/header1.xml");
         let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
+        let docx_svg = zip_entry_text(&docx, "word/media/image1.svg");
+        assert!(docx_content_types.contains(r#"ContentType="image/svg+xml""#));
+        assert!(docx_relationships.contains(r#"Id="rIdImage1""#));
+        assert!(docx_relationships.contains(r#"Target="media/image1.svg""#));
+        assert!(docx_document.contains(r#"r:embed="rIdImage1""#));
+        assert_eq!(docx_svg, "<svg/>");
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading1""#));
         assert!(docx_document.contains("w:headerReference"));
         assert!(docx_document.contains("w:footerReference"));

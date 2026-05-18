@@ -12,6 +12,16 @@ use std::{
 };
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
+#[derive(Debug)]
+struct DocxMedia {
+    source: String,
+    relationship_id: String,
+    path: String,
+    extension: String,
+    content_type: String,
+    bytes: Vec<u8>,
+}
+
 pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> String {
     let brand_color = options
         .get("brandColor")
@@ -155,12 +165,13 @@ pub(crate) fn render_docx_bytes(
     response: &CompileResponse,
     options_value: &Value,
 ) -> Result<Vec<u8>, String> {
+    let media = collect_docx_media(response);
     let mut cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(&mut cursor);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     zip.start_file("[Content_Types].xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_content_types().as_bytes())
+    zip.write_all(render_docx_content_types(&media).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.add_directory("_rels/", options)
         .map_err(|err| err.to_string())?;
@@ -180,8 +191,17 @@ pub(crate) fn render_docx_bytes(
         .map_err(|err| err.to_string())?;
     zip.start_file("word/_rels/document.xml.rels", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_document_relationships().as_bytes())
+    zip.write_all(render_docx_document_relationships(&media).as_bytes())
         .map_err(|err| err.to_string())?;
+    if !media.is_empty() {
+        zip.add_directory("word/media/", options)
+            .map_err(|err| err.to_string())?;
+        for item in &media {
+            zip.start_file(format!("word/{}", item.path), options)
+                .map_err(|err| err.to_string())?;
+            zip.write_all(&item.bytes).map_err(|err| err.to_string())?;
+        }
+    }
     zip.start_file("word/header1.xml", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(render_docx_header(response, options_value).as_bytes())
@@ -192,7 +212,7 @@ pub(crate) fn render_docx_bytes(
         .map_err(|err| err.to_string())?;
     zip.start_file("word/document.xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_document(response, options_value).as_bytes())
+    zip.write_all(render_docx_document(response, options_value, &media).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.finish().map_err(|err| err.to_string())?;
     Ok(cursor.into_inner())
@@ -295,8 +315,35 @@ fn safe_bundle_path(path: &str) -> String {
         .collect()
 }
 
-fn render_docx_content_types() -> String {
-    r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>"#.to_string()
+fn render_docx_content_types(media: &[DocxMedia]) -> String {
+    let mut defaults = vec![
+        (
+            "rels".to_string(),
+            "application/vnd.openxmlformats-package.relationships+xml".to_string(),
+        ),
+        ("xml".to_string(), "application/xml".to_string()),
+    ];
+    for item in media {
+        if !defaults
+            .iter()
+            .any(|(extension, _)| extension == &item.extension)
+        {
+            defaults.push((item.extension.clone(), item.content_type.clone()));
+        }
+    }
+    let default_xml = defaults
+        .iter()
+        .map(|(extension, content_type)| {
+            format!(
+                r#"<Default Extension="{}" ContentType="{}"/>"#,
+                escape_xml(extension),
+                escape_xml(content_type)
+            )
+        })
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>"#
+    )
 }
 
 fn render_root_relationships(office_document_target: &str) -> String {
@@ -306,8 +353,20 @@ fn render_root_relationships(office_document_target: &str) -> String {
     )
 }
 
-fn render_docx_document_relationships() -> String {
-    r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/></Relationships>"#.to_string()
+fn render_docx_document_relationships(media: &[DocxMedia]) -> String {
+    let media_relationships = media
+        .iter()
+        .map(|item| {
+            format!(
+                r#"<Relationship Id="{}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="{}"/>"#,
+                escape_xml(&item.relationship_id),
+                escape_xml(&item.path)
+            )
+        })
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>{media_relationships}</Relationships>"#
+    )
 }
 
 fn render_core_properties(response: &CompileResponse) -> String {
@@ -571,14 +630,18 @@ fn html_provenance_section(response: &CompileResponse, options: &Value) -> Strin
     )
 }
 
-fn render_docx_document(response: &CompileResponse, options: &Value) -> String {
+fn render_docx_document(
+    response: &CompileResponse,
+    options: &Value,
+    media: &[DocxMedia],
+) -> String {
     let mut body = String::new();
     for line in export_metadata_lines(response, options) {
         body.push_str(&docx_paragraph(&line));
     }
     body.push_str(&docx_page_break());
     for block in &response.document_ast.blocks {
-        body.push_str(&render_docx_block(block));
+        body.push_str(&render_docx_block(block, media));
     }
     for line in appendix_export_lines(response, options) {
         if matches!(
@@ -591,7 +654,7 @@ fn render_docx_document(response: &CompileResponse, options: &Value) -> String {
         }
     }
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>{body}<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader1"/><w:footerReference w:type="default" r:id="rIdFooter1"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>{body}<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader1"/><w:footerReference w:type="default" r:id="rIdFooter1"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>"#
     )
 }
 
@@ -611,7 +674,7 @@ fn render_docx_footer(response: &CompileResponse, options: &Value) -> String {
     )
 }
 
-fn render_docx_block(block: &DocumentBlock) -> String {
+fn render_docx_block(block: &DocumentBlock, media: &[DocxMedia]) -> String {
     match block {
         DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
         DocumentBlock::Paragraph { text, .. } => docx_paragraph(text),
@@ -622,7 +685,7 @@ fn render_docx_block(block: &DocumentBlock) -> String {
             alt,
             caption,
             ..
-        } => docx_paragraph(&figure_export_line(id, src, alt, caption)),
+        } => docx_figure(id, src, alt, caption, media),
         DocumentBlock::Equation {
             id, caption, text, ..
         } => docx_paragraph(&equation_export_line(id, text, caption)),
@@ -690,6 +753,111 @@ fn docx_cell(text: &str) -> String {
         r#"<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr>{}</w:tc>"#,
         docx_paragraph(text)
     )
+}
+
+fn docx_figure(
+    id: &Option<String>,
+    src: &Option<String>,
+    alt: &Option<String>,
+    caption: &Option<String>,
+    media: &[DocxMedia],
+) -> String {
+    let caption_text = figure_export_line(id, src, alt, caption);
+    let Some(src) = src else {
+        return docx_paragraph(&caption_text);
+    };
+    let Some((media_index, item)) = media
+        .iter()
+        .enumerate()
+        .find(|(_, item)| item.source == *src)
+    else {
+        return docx_paragraph(&caption_text);
+    };
+    let doc_pr_id = media_index + 1;
+    let name = caption
+        .as_deref()
+        .or(alt.as_deref())
+        .or(id.as_deref())
+        .unwrap_or("Figure");
+    let drawing = format!(
+        r#"<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="4320000" cy="2430000"/><wp:docPr id="{doc_pr_id}" name="{}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="{doc_pr_id}" name="{}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="4320000" cy="2430000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"#,
+        escape_xml(name),
+        escape_xml(name),
+        escape_xml(&item.relationship_id)
+    );
+    format!("{drawing}{}", docx_paragraph(&caption_text))
+}
+
+fn collect_docx_media(response: &CompileResponse) -> Vec<DocxMedia> {
+    let mut media = Vec::new();
+    for block in &response.document_ast.blocks {
+        let DocumentBlock::Figure { src: Some(src), .. } = block else {
+            continue;
+        };
+        if media.iter().any(|item: &DocxMedia| item.source == *src) {
+            continue;
+        }
+        let Some((extension, content_type, bytes)) = parse_image_data_uri(src) else {
+            continue;
+        };
+        let index = media.len() + 1;
+        media.push(DocxMedia {
+            source: src.clone(),
+            relationship_id: format!("rIdImage{index}"),
+            path: format!("media/image{index}.{extension}"),
+            extension,
+            content_type,
+            bytes,
+        });
+    }
+    media
+}
+
+fn parse_image_data_uri(src: &str) -> Option<(String, String, Vec<u8>)> {
+    let data = src.strip_prefix("data:")?;
+    let (metadata, payload) = data.split_once(',')?;
+    let mut parts = metadata.split(';');
+    let content_type = parts.next()?.to_ascii_lowercase();
+    if !parts.any(|part| part.eq_ignore_ascii_case("base64")) {
+        return None;
+    }
+    let extension = match content_type.as_str() {
+        "image/svg+xml" => "svg",
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" => "jpg",
+        _ => return None,
+    };
+    Some((extension.to_string(), content_type, decode_base64(payload)?))
+}
+
+fn decode_base64(input: &str) -> Option<Vec<u8>> {
+    let mut bits = 0u32;
+    let mut bit_count = 0u8;
+    let mut output = Vec::new();
+    for byte in input.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
+        if byte == b'=' {
+            break;
+        }
+        let value = base64_value(byte)? as u32;
+        bits = (bits << 6) | value;
+        bit_count += 6;
+        while bit_count >= 8 {
+            bit_count -= 8;
+            output.push(((bits >> bit_count) & 0xff) as u8);
+        }
+    }
+    Some(output)
+}
+
+fn base64_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'A'..=b'Z' => Some(byte - b'A'),
+        b'a'..=b'z' => Some(byte - b'a' + 26),
+        b'0'..=b'9' => Some(byte - b'0' + 52),
+        b'+' => Some(62),
+        b'/' => Some(63),
+        _ => None,
+    }
 }
 
 fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<String>> {
