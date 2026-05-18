@@ -1115,6 +1115,9 @@ fn list_transform_engines() -> Vec<Value> {
         transform_engine("glossary", "rust-native", true, false),
         transform_engine("layout", "rust-native", true, false),
         transform_engine("timeline", "rust-native-svg", true, false),
+        transform_engine("roadmap", "rust-native", true, false),
+        transform_engine("adr", "rust-native", true, false),
+        transform_engine("diff", "rust-native", true, false),
         transform_engine("chart", "rust-native-svg", true, false),
         transform_engine("mermaid", "rust-native-svg", true, false),
         transform_engine("pikchr", "external-sidecar", false, true),
@@ -2102,6 +2105,9 @@ fn render_transform(
         "glossary" => render_glossary_html(body),
         "layout" => render_layout_block_html(body),
         "timeline" => render_timeline_svg(body),
+        "roadmap" => render_roadmap_html(body),
+        "adr" => render_adr_html(body),
+        "diff" => render_diff_html(body),
         "chart" => render_chart_svg(body),
         "openapi" => render_openapi_html(body, &mut artifact_diags, diagnostics),
         "json-schema" => render_json_schema_html(body, &mut artifact_diags, diagnostics),
@@ -2206,6 +2212,9 @@ fn supported_transform(name: &str) -> bool {
             | "glossary"
             | "layout"
             | "timeline"
+            | "roadmap"
+            | "adr"
+            | "diff"
             | "chart"
             | "mermaid"
             | "pikchr"
@@ -3803,6 +3812,71 @@ fn render_timeline_svg(body: &str) -> String {
     }
     svg.push_str("</svg>");
     svg
+}
+
+fn render_roadmap_html(body: &str) -> String {
+    let items = body
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            let (stage, text) = line
+                .split_once(':')
+                .or_else(|| line.split_once('-'))
+                .map(|(stage, text)| (stage.trim(), text.trim()))
+                .unwrap_or(("Item", line));
+            format!(
+                "<article><strong>{}</strong><p>{}</p></article>",
+                escape_html(stage),
+                escape_html(text)
+            )
+        })
+        .collect::<String>();
+    format!(
+        "<section class=\"transform transform-roadmap\"><h3>Roadmap</h3><div>{items}</div></section>"
+    )
+}
+
+fn render_adr_html(body: &str) -> String {
+    let rows = body
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            let (key, value) = line
+                .split_once(':')
+                .map(|(key, value)| (key.trim(), value.trim()))
+                .unwrap_or(("Note", line));
+            format!(
+                "<tr><th>{}</th><td>{}</td></tr>",
+                escape_html(key),
+                escape_html(value)
+            )
+        })
+        .collect::<String>();
+    format!(
+        "<section class=\"transform transform-adr\"><h3>Architecture Decision Record</h3><table><tbody>{rows}</tbody></table></section>"
+    )
+}
+
+fn render_diff_html(body: &str) -> String {
+    let lines = body
+        .lines()
+        .map(|line| {
+            let class = if line.starts_with('+') && !line.starts_with("+++") {
+                "add"
+            } else if line.starts_with('-') && !line.starts_with("---") {
+                "del"
+            } else if line.starts_with("@@") {
+                "hunk"
+            } else {
+                "ctx"
+            };
+            format!("<code class=\"diff-{class}\">{}</code>", escape_html(line))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("<pre class=\"transform transform-diff\">{lines}</pre>")
 }
 
 fn render_chart_svg(body: &str) -> String {
@@ -5788,6 +5862,9 @@ paths:
             "glossary",
             "layout",
             "timeline",
+            "roadmap",
+            "adr",
+            "diff",
         ] {
             assert!(
                 names.contains(name),
@@ -5886,6 +5963,34 @@ paths:
         assert!(artifact.html.contains("Kickoff"));
         assert!(artifact.html.contains("Release"));
         assert!(artifact.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn business_workflow_transforms_render_static_html() {
+        let roadmap = run_transform(
+            "roadmap".to_string(),
+            "Now: Drafting\nNext: Review\nLater: Publish".to_string(),
+        )
+        .expect("roadmap transform");
+        assert_eq!(roadmap.output_kind, "html");
+        assert!(roadmap.html.contains("transform-roadmap"));
+        assert!(roadmap.html.contains("Review"));
+
+        let adr = run_transform(
+            "adr".to_string(),
+            "Status: accepted\nDecision: Use local-first exports".to_string(),
+        )
+        .expect("adr transform");
+        assert_eq!(adr.output_kind, "html");
+        assert!(adr.html.contains("transform-adr"));
+        assert!(adr.html.contains("Use local-first exports"));
+
+        let diff = run_transform("diff".to_string(), "@@ -1 +1 @@\n-old\n+new".to_string())
+            .expect("diff transform");
+        assert_eq!(diff.output_kind, "html");
+        assert!(diff.html.contains("transform-diff"));
+        assert!(diff.html.contains("diff-del"));
+        assert!(diff.html.contains("diff-add"));
     }
 
     #[test]
