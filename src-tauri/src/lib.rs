@@ -3808,6 +3808,77 @@ paths:
         assert!(pdf_text.contains("After the break."));
     }
 
+    #[test]
+    fn export_conformance_fixture_maps_business_features() {
+        let response = compile(CompileRequest {
+            text: include_str!("../fixtures/export/business_report.md").to_string(),
+            file_path: None,
+        });
+        let options = json!({ "watermark": "APPROVED" });
+
+        assert_eq!(response.semantic.title, "Export Conformance Report");
+        assert_eq!(response.semantic.status, "approved");
+        assert_eq!(response.export_manifest.document_version, "2.0.0");
+        assert!(response
+            .semantic
+            .citations
+            .iter()
+            .any(|citation| citation == "porter1985"));
+        assert!(response.semantic.glossary.contains_key("ARR"));
+        assert_eq!(response.semantic.tables, 1);
+        assert_eq!(response.semantic.figures, 1);
+        assert_eq!(response.semantic.equations, 1);
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Layout { directive, .. } if directive == "page-break"
+            )
+        }));
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == "error"));
+
+        let html = render_full_html(&response, &options);
+        assert!(html.contains("Board Pack Fixture"));
+        assert!(html.contains("APPROVED"));
+        assert!(html.contains("Reference architecture"));
+        assert!(html.contains("Competitive Advantage"));
+
+        let pdf = render_pdf_bytes(&response, &options);
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf.starts_with(b"%PDF-1.4"));
+        assert!(pdf_text.contains("/Count 3"));
+        assert!(pdf_text.contains("Export Conformance Report"));
+        assert!(pdf_text.contains("Reference architecture"));
+
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains(r#"<w:pStyle w:val="Heading1""#));
+        assert!(docx_document.contains("<w:tbl>"));
+        assert!(docx_document.contains(r#"<w:br w:type="page""#));
+        assert!(docx_document.contains("Reference architecture"));
+        assert!(docx_document.contains("Competitive Advantage"));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let pptx_presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
+        let pptx_slide_two = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        let pptx_slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
+        assert!(pptx_presentation.contains(r#"r:id="rId2""#));
+        assert!(pptx_slide_two.contains("Export Conformance Report"));
+        assert!(pptx_slide_three.contains("Table: Region | Revenue | Margin"));
+        assert!(pptx_slide_three.contains("Reference architecture"));
+
+        let bundle =
+            render_markdown_bundle_bytes(&response, &response.export_manifest).expect("bundle");
+        let bundled_markdown = zip_entry_text(&bundle, "document.md");
+        let bundled_text = zip_entry_text(&bundle, "document.txt");
+        let bundled_manifest = zip_entry_text(&bundle, "manifest.json");
+        assert!(bundled_markdown.contains("Competitive Advantage"));
+        assert!(bundled_text.contains("Figure: fig:architecture: Reference architecture"));
+        assert!(bundled_manifest.contains("\"document_title\": \"Export Conformance Report\""));
+    }
+
     fn zip_entry_text(bytes: &[u8], path: &str) -> String {
         let cursor = Cursor::new(bytes.to_vec());
         let mut archive = ZipArchive::new(cursor).expect("zip archive");
