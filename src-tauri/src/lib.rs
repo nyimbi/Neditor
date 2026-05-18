@@ -1278,8 +1278,9 @@ fn compile(request: CompileRequest) -> CompileResponse {
         &mut generated_line_count,
         &mut diagnostics,
     );
-    let (metadata, body, body_start_line) =
+    let (mut metadata, body, body_start_line) =
         parse_front_matter(&source, &mut diagnostics, Some(root_file.clone()));
+    merge_project_variables(&mut metadata, root_path.as_deref(), &mut diagnostics);
     normalize_source_map_after_front_matter(&mut source_map, body_start_line);
     let mut calculation_context = HashMap::new();
     let formula_graph = collect_calculations(&body, &mut calculation_context, &mut diagnostics);
@@ -1590,6 +1591,79 @@ fn parse_front_matter(
         Some("Add a closing --- marker."),
     ));
     (json!({}), text.to_string(), 1)
+}
+
+fn merge_project_variables(
+    metadata: &mut Value,
+    root_path: Option<&Path>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(path) = project_variables_path(root_path) else {
+        return;
+    };
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(err) => {
+            diagnostics.push(diag(
+                "warning",
+                format!("Unable to read project variables {}: {err}", path.display()),
+                Some(path_to_string(&path)),
+                None,
+                Some("Check permissions or remove the project variables file."),
+            ));
+            return;
+        }
+    };
+    let mut variables = match serde_yaml::from_str::<Value>(&text) {
+        Ok(value) => value,
+        Err(err) => {
+            diagnostics.push(diag(
+                "error",
+                format!("Invalid project variables YAML {}: {err}", path.display()),
+                Some(path_to_string(&path)),
+                None,
+                Some("Fix .neditor/variables.yaml or variables.yml."),
+            ));
+            return;
+        }
+    };
+    if let Some(inner) = variables.get("variables").cloned() {
+        variables = inner;
+    }
+    let (Some(target), Some(source)) = (metadata.as_object_mut(), variables.as_object()) else {
+        diagnostics.push(diag(
+            "warning",
+            format!(
+                "Project variables {} must be a YAML mapping.",
+                path.display()
+            ),
+            Some(path_to_string(&path)),
+            None,
+            Some("Use key-value YAML such as client: Acme."),
+        ));
+        return;
+    };
+    for (key, value) in source {
+        target.entry(key.clone()).or_insert_with(|| value.clone());
+    }
+}
+
+fn project_variables_path(root_path: Option<&Path>) -> Option<PathBuf> {
+    let mut dir = root_path
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .or_else(|| std::env::current_dir().ok())?;
+    loop {
+        for name in ["variables.yaml", "variables.yml"] {
+            let candidate = dir.join(".neditor").join(name);
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
 }
 
 fn normalize_source_map_after_front_matter(
@@ -5269,6 +5343,36 @@ ARR: Annual recurring revenue.
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("region")));
+    }
+
+    #[test]
+    fn compiler_loads_project_level_variables_without_overriding_front_matter() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-project-vars-test-{unique}"));
+        fs::create_dir_all(root.join(".neditor")).expect("create project vars dir");
+        fs::write(
+            root.join(".neditor").join("variables.yaml"),
+            "client: Project Client\nregion: West\nowner: Strategy Office\n",
+        )
+        .expect("write project variables");
+        let doc = root.join("docs").join("report.md");
+        fs::create_dir_all(doc.parent().expect("doc parent")).expect("create docs dir");
+        fs::write(&doc, "# Report").expect("write doc");
+
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Project Vars\nstatus: approved\napprovedBy: QA\nclient: Front Matter Client\n---\n# Project Vars\nPrepared for {{client}} in {{region}} by {{owner}}.\n".to_string(),
+            file_path: Some(path_to_string(&doc)),
+        });
+
+        assert!(response
+            .compiled_markdown
+            .contains("Prepared for Front Matter Client in West by Strategy Office."));
+        assert_eq!(response.metadata["client"], "Front Matter Client");
+        assert_eq!(response.metadata["region"], "West");
+        fs::remove_dir_all(root).expect("clean project vars test dir");
     }
 
     #[test]
