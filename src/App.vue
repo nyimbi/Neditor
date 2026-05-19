@@ -297,6 +297,15 @@
             <p>{{ table.rows }} rows | {{ table.columns.join(", ") }}</p>
             <small v-for="(total, column) in table.numeric_columns" :key="column">{{ column }} total: {{ total }} </small>
           </article>
+          <h3>Formula graph</h3>
+          <article v-for="formula in active.compile?.formula_graph || []" :key="formula.name" class="snapshot-row">
+            <p>{{ formula.name }} = {{ formula.expression }}</p>
+            <small>{{ formula.error || (formula.value ?? "unresolved") }}</small>
+            <small v-if="formula.dependencies.length">depends on {{ formula.dependencies.join(", ") }}</small>
+          </article>
+          <p v-for="edge in active.compile?.formula_dependency_edges || []" :key="`${edge.from}-${edge.to}`">
+            {{ edge.from }} -> {{ edge.to }}
+          </p>
           <h3>Includes</h3>
           <button
             v-for="edge in active.compile?.include_graph || []"

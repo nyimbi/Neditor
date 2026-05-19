@@ -172,6 +172,7 @@ export interface CompileResponse {
     dependencies: string[];
     ast?: unknown;
   }>;
+  formula_dependency_edges: Array<{ from: string; to: string }>;
   transform_artifacts: Array<{
     id: string;
     name: string;

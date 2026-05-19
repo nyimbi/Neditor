@@ -45,7 +45,10 @@ use bibliography::{
     duplicate_bibliography_keys, parse_bibliography_source, render_citations, BibliographyEntry,
     CitationReference,
 };
-use calculations::{collect_calculations, eval_expression, FormulaValue};
+use calculations::{
+    collect_calculations, eval_expression, formula_dependency_edges, FormulaDependencyEdge,
+    FormulaValue,
+};
 use compile_options::apply_compile_options;
 use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
@@ -137,6 +140,7 @@ struct CompileResponse {
     bibliography: Vec<BibliographyEntry>,
     index_terms: Vec<String>,
     formula_graph: Vec<FormulaValue>,
+    formula_dependency_edges: Vec<FormulaDependencyEdge>,
     transform_artifacts: Vec<TransformArtifact>,
     export_manifest: ExportManifest,
 }
@@ -287,6 +291,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     normalize_source_map_after_front_matter(&mut source_map, body_start_line);
     let mut calculation_context = HashMap::new();
     let formula_graph = collect_calculations(&body, &mut calculation_context, &mut diagnostics);
+    let formula_edges = formula_dependency_edges(&formula_graph);
     let interpolated = interpolate_variables(
         &body,
         &metadata,
@@ -466,6 +471,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         bibliography,
         index_terms,
         formula_graph,
+        formula_dependency_edges: formula_edges,
         transform_artifacts,
         export_manifest: manifest,
     }
@@ -2452,6 +2458,14 @@ ARR: Annual recurring revenue.
             .formula_graph
             .iter()
             .any(|formula| formula.name == "profit" && formula.value == Some(60.0)));
+        assert!(response
+            .formula_dependency_edges
+            .iter()
+            .any(|edge| edge.from == "profit" && edge.to == "revenue"));
+        assert!(response
+            .formula_dependency_edges
+            .iter()
+            .any(|edge| edge.from == "profit" && edge.to == "cost"));
         assert!(response.formula_graph.iter().any(|formula| {
             formula.name == "cycle_a"
                 && formula

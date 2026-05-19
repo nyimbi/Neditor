@@ -13,6 +13,12 @@ pub(crate) struct FormulaValue {
     pub(crate) ast: Option<FormulaAstNode>,
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct FormulaDependencyEdge {
+    pub(crate) from: String,
+    pub(crate) to: String,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum FormulaAstNode {
@@ -105,6 +111,21 @@ pub(crate) fn collect_calculations(
         }
     }
     formulas
+}
+
+pub(crate) fn formula_dependency_edges(formulas: &[FormulaValue]) -> Vec<FormulaDependencyEdge> {
+    formulas
+        .iter()
+        .flat_map(|formula| {
+            formula
+                .dependencies
+                .iter()
+                .map(|dependency| FormulaDependencyEdge {
+                    from: formula.name.clone(),
+                    to: dependency.clone(),
+                })
+        })
+        .collect()
 }
 
 struct FormulaDefinition {
