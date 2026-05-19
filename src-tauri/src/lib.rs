@@ -419,142 +419,15 @@ fn apply_transforms(
     options: &TransformExecutionOptions,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> (String, Vec<TransformArtifact>) {
-    let mut output = String::new();
-    let mut artifacts = Vec::new();
-    let mut lines = text.lines().enumerate().peekable();
-    while let Some((line_index, line)) = lines.next() {
-        if let Some(info) = line.trim().strip_prefix("```") {
-            let name = info.split_whitespace().next().unwrap_or("");
-            if supported_transform(name) {
-                let source_line = line_index + 1;
-                let mut end_source_line = source_line;
-                let fence_options = transform_fence_options(info);
-                let mut body = String::new();
-                for (body_line_index, body_line) in lines.by_ref() {
-                    if body_line.trim() == "```" {
-                        end_source_line = body_line_index + 1;
-                        break;
-                    }
-                    body.push_str(body_line);
-                    body.push('\n');
-                    end_source_line = body_line_index + 1;
-                }
-                let diagnostic_start = diagnostics.len();
-                let mut artifact =
-                    render_transform(name, &body, &fence_options, options, diagnostics);
-                attach_transform_source(
-                    &mut artifact,
-                    source_map,
-                    source_line,
-                    end_source_line,
-                    &mut diagnostics[diagnostic_start..],
-                );
-                output.push_str(&artifact.html);
-                output.push('\n');
-                artifacts.push(artifact);
-                continue;
-            }
-        }
-        output.push_str(line);
-        output.push('\n');
-    }
-    (output, artifacts)
-}
-
-fn attach_transform_source(
-    artifact: &mut TransformArtifact,
-    source_map: &[SourceMapEntry],
-    generated_start_line: usize,
-    generated_end_line: usize,
-    diagnostics: &mut [DocumentDiagnostic],
-) {
-    if let Some(source) =
-        ast_source_range_for_generated_lines(source_map, generated_start_line, generated_end_line)
-    {
-        artifact.source_file = Some(source.source_file);
-        artifact.source_line = Some(source.source_line);
-        artifact.end_source_line = Some(source.end_source_line);
-    } else {
-        artifact.source_line = Some(generated_start_line);
-        artifact.end_source_line = Some(generated_end_line);
-    }
-
-    let source_file = artifact.source_file.clone();
-    let source_line = artifact.source_line;
-    let end_source_line = artifact.end_source_line;
-    for diagnostic in &mut artifact.diagnostics {
-        attach_transform_diagnostic_source(
-            diagnostic,
-            source_file.as_deref(),
-            source_line,
-            end_source_line,
-        );
-    }
-    for diagnostic in diagnostics {
-        attach_transform_diagnostic_source(
-            diagnostic,
-            source_file.as_deref(),
-            source_line,
-            end_source_line,
-        );
-    }
-}
-
-fn attach_transform_diagnostic_source(
-    diagnostic: &mut DocumentDiagnostic,
-    source_file: Option<&str>,
-    source_line: Option<usize>,
-    end_source_line: Option<usize>,
-) {
-    if diagnostic.source_file.is_none() {
-        diagnostic.source_file = source_file.map(ToString::to_string);
-    }
-    if diagnostic.line.is_none() {
-        diagnostic.line = source_line;
-    }
-    if diagnostic.end_line.is_none() {
-        diagnostic.end_line = end_source_line;
-    }
-}
-
-fn transform_fence_options(info: &str) -> Value {
-    let mut fields = serde_json::Map::new();
-    for token in transform_info_tokens(info).into_iter().skip(1) {
-        if let Some((key, value)) = token.split_once('=') {
-            let value = value.trim_matches(|ch| ch == '"' || ch == '\'');
-            fields.insert(key.to_string(), Value::String(value.to_string()));
-        } else if !token.is_empty() {
-            fields.insert(token.to_string(), Value::Bool(true));
-        }
-    }
-    Value::Object(fields)
-}
-
-fn transform_info_tokens(info: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut token = String::new();
-    let mut quote = None::<char>;
-    for ch in info.chars() {
-        if let Some(quote_ch) = quote {
-            if ch == quote_ch {
-                quote = None;
-            } else {
-                token.push(ch);
-            }
-        } else if ch == '"' || ch == '\'' {
-            quote = Some(ch);
-        } else if ch.is_whitespace() {
-            if !token.is_empty() {
-                tokens.push(std::mem::take(&mut token));
-            }
-        } else {
-            token.push(ch);
-        }
-    }
-    if !token.is_empty() {
-        tokens.push(token);
-    }
-    tokens
+    transforms::pipeline::apply_transform_fences(
+        text,
+        source_map,
+        diagnostics,
+        supported_transform,
+        |name, body, fence_options, diagnostics| {
+            render_transform(name, body, fence_options, options, diagnostics)
+        },
+    )
 }
 
 fn render_transform(

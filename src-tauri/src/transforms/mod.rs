@@ -6,6 +6,7 @@ pub(crate) mod chart;
 pub(crate) mod diagram;
 pub(crate) mod external;
 pub(crate) mod options;
+pub(crate) mod pipeline;
 pub(crate) mod qr;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
