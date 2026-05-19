@@ -903,6 +903,20 @@ interface ConflictDiffRow {
   externalLine: number | null;
 }
 
+type ClipboardItemLike = {
+  types: string[];
+  getType: (type: string) => Promise<Blob>;
+};
+
+type RichClipboard = Clipboard & {
+  read?: () => Promise<ClipboardItemLike[]>;
+};
+
+interface ClipboardTextRead {
+  text: string;
+  kind: "rich" | "plain";
+}
+
 interface DocumentTabGroup {
   key: string;
   label: string;
@@ -2014,13 +2028,32 @@ function applyAiPasteDefaults() {
   aiInsertCitationTodos.value = store.aiCleanupDefaults.insertCitationTodos;
 }
 
-async function readClipboardPlainText() {
-  const clipboard = navigator.clipboard;
-  if (!clipboard?.readText) return "";
+async function readClipboardText(): Promise<ClipboardTextRead | null> {
+  const clipboard = navigator.clipboard as RichClipboard | undefined;
+  if (!clipboard) return null;
+
+  if (clipboard.read) {
+    try {
+      const items = await clipboard.read();
+      for (const item of items) {
+        const preferredType = ["text/html", "text/plain"].find((type) => item.types.includes(type));
+        if (!preferredType) continue;
+        const text = await (await item.getType(preferredType)).text();
+        if (text.trim()) {
+          return { text, kind: preferredType === "text/html" ? "rich" : "plain" };
+        }
+      }
+    } catch {
+      // WebViews may expose readText but deny rich clipboard reads.
+    }
+  }
+
+  if (!clipboard.readText) return null;
   try {
-    return await clipboard.readText();
+    const text = await clipboard.readText();
+    return text.trim() ? { text, kind: "plain" } : null;
   } catch {
-    return "";
+    return null;
   }
 }
 
@@ -2028,10 +2061,11 @@ async function openAiPaste() {
   applyAiPasteDefaults();
   aiPasteOpen.value = true;
   if (aiPasteText.value.trim()) return;
-  const clipboardText = await readClipboardPlainText();
-  if (clipboardText.trim()) {
-    aiPasteText.value = clipboardText;
-    store.statusMessage = "Loaded clipboard text for AI cleanup";
+  const clipboardText = await readClipboardText();
+  if (clipboardText) {
+    aiPasteText.value = clipboardText.text;
+    store.statusMessage =
+      clipboardText.kind === "rich" ? "Loaded rich clipboard text for AI cleanup" : "Loaded clipboard text for AI cleanup";
   } else {
     store.statusMessage = "Paste AI chat text to preview cleanup";
   }

@@ -5464,6 +5464,30 @@ paths:
     }
 
     #[test]
+    fn ai_cleanup_normalizes_rich_html_clipboard_content() {
+        let response = cleanup_ai_paste(AiCleanupRequest {
+            text: "<h2>Board Update</h2><p>Revenue grew 24%.</p><ul><li>Approve budget</li></ul><table><tr><th>Region</th><th>Revenue</th></tr><tr><td>EMEA</td><td>24</td></tr></table>"
+                .to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+            insert_citation_todos: true,
+        });
+
+        assert!(response.cleaned_markdown.contains("## Board Update"));
+        assert!(response
+            .cleaned_markdown
+            .contains("Revenue grew 24%. <!-- TODO: citation needed -->"));
+        assert!(response.cleaned_markdown.contains("- Approve budget"));
+        assert!(response.cleaned_markdown.contains("| Region | Revenue |"));
+        assert!(response.cleaned_markdown.contains("| --- | --- |"));
+        assert!(response.cleaned_markdown.contains("| EMEA | 24 |"));
+        assert!(response
+            .issues
+            .iter()
+            .any(|issue| issue.contains("Converted rich HTML clipboard")));
+    }
+
+    #[test]
     fn ai_cleanup_preserves_code_fence_content() {
         let response = cleanup_ai_paste(AiCleanupRequest {
             text: "Assistant:\n```text\n• literal bullet\nA\tB\nRevenue grew 24%.\n```\n\n• Real bullet\nA\tB\nRevenue grew 24%.".to_string(),
