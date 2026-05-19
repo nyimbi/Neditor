@@ -1,6 +1,7 @@
 use crate::{
     document_ast::{extract_label, extract_quoted_attribute},
     escape_html,
+    layout::layout_css_style,
 };
 
 pub(crate) fn render_figures(markdown: &str) -> String {
@@ -393,7 +394,7 @@ pub(crate) fn render_layout_tokens(markdown: &str) -> String {
                 "<div class=\"page-break\" data-layout=\"page-break\"></div>".to_string()
             } else if let Some(rest) = trimmed.strip_prefix("{{section-break") {
                 let attributes = rest.trim_end_matches("}}").trim();
-                let style = layout_style_from_text(attributes);
+                let style = layout_css_style(attributes);
                 format!(
                     "<section class=\"section-break\" data-layout=\"section-break\" data-options=\"{}\"{}></section>",
                     escape_html(attributes),
@@ -414,41 +415,12 @@ pub(crate) fn render_layout_tokens(markdown: &str) -> String {
 }
 
 pub(crate) fn render_layout_block_html(body: &str) -> String {
-    let style = layout_style_from_text(body);
+    let style = layout_css_style(body);
     format!(
         "<section class=\"layout-directive\" data-layout=\"layout\" data-options=\"{}\"{}></section>",
         escape_html(body.trim()),
         style_attribute(&style)
     )
-}
-
-fn layout_style_from_text(text: &str) -> String {
-    let mut styles = Vec::new();
-    if let Some(columns) = layout_option(text, "columns") {
-        if columns.chars().all(|ch| ch.is_ascii_digit()) && columns != "0" {
-            styles.push(format!("column-count:{columns}"));
-            styles.push("column-gap:32px".to_string());
-        }
-    }
-    styles.join(";")
-}
-
-fn layout_option(text: &str, key: &str) -> Option<String> {
-    for line in text.lines() {
-        if let Some((candidate, value)) = line.split_once(':') {
-            if candidate.trim() == key {
-                return Some(value.trim().trim_matches('"').to_string());
-            }
-        }
-    }
-    for part in text.split_whitespace() {
-        if let Some((candidate, value)) = part.split_once('=') {
-            if candidate.trim() == key {
-                return Some(value.trim().trim_matches('"').to_string());
-            }
-        }
-    }
-    None
 }
 
 fn style_attribute(style: &str) -> String {

@@ -5,6 +5,7 @@ use crate::{
         drawingml_source_crop, export_dimensions_emu_size, normalized_fit, normalized_position,
         parse_export_image, safe_bundle_path, ExportImageDimensions,
     },
+    layout::{matches_layout_break, LayoutSettings},
     metadata_string, render_export_template, sha256_uri,
     tables::delimited_rows_for_export,
     CompileResponse, ExportManifest,
@@ -1087,15 +1088,17 @@ fn collect_docx_section_overrides(response: &CompileResponse) -> Vec<DocxSection
         .iter()
         .filter_map(|block| {
             let DocumentBlock::Layout {
-                directive, options, ..
+                directive,
+                settings,
+                ..
             } = block
             else {
                 return None;
             };
-            if !is_docx_section_layout(directive, options) {
+            if !is_docx_section_layout(directive, settings) {
                 return None;
             }
-            let header = layout_option_text(options, "header").map(|template| {
+            let header = settings.header.clone().map(|template| {
                 let part = DocxHeaderFooterPart {
                     kind: DocxHeaderFooterKind::Header,
                     relationship_id: format!("rIdHeader{header_index}"),
@@ -1105,7 +1108,7 @@ fn collect_docx_section_overrides(response: &CompileResponse) -> Vec<DocxSection
                 header_index += 1;
                 part
             });
-            let footer = layout_option_text(options, "footer").map(|template| {
+            let footer = settings.footer.clone().map(|template| {
                 let part = DocxHeaderFooterPart {
                     kind: DocxHeaderFooterKind::Footer,
                     relationship_id: format!("rIdFooter{footer_index}"),
@@ -1134,11 +1137,11 @@ fn docx_section_parts(section_overrides: &[DocxSectionOverride]) -> Vec<&DocxHea
         .collect()
 }
 
-fn is_docx_section_layout(directive: &str, options: &str) -> bool {
+fn is_docx_section_layout(directive: &str, settings: &LayoutSettings) -> bool {
     directive == "section-break"
-        || layout_columns(options).is_some()
-        || layout_option_text(options, "header").is_some()
-        || layout_option_text(options, "footer").is_some()
+        || settings.columns.is_some()
+        || settings.header.is_some()
+        || settings.footer.is_some()
 }
 
 fn render_pptx_app_properties(
@@ -1936,6 +1939,7 @@ fn render_docx_document(
     let page_layout = docx_page_layout(response, options);
     let mut section_index = 0;
     let mut current_section = DocxSectionProperties::default();
+    let mut pending_flow: Option<LayoutSettings> = None;
     for block in &response.document_ast.blocks {
         if skip_next_toc_body {
             skip_next_toc_body = false;
@@ -1960,25 +1964,36 @@ fn render_docx_document(
             next_list_is_bibliography = true;
         }
         if let DocumentBlock::Layout {
-            directive, options, ..
+            directive,
+            settings,
+            ..
         } = block
         {
-            if is_docx_section_layout(directive, options) {
+            if matches_layout_break(settings.break_before.as_deref()) {
+                pending_flow = Some(settings.clone());
+            }
+            if is_docx_section_layout(directive, settings) {
                 body.push_str(&docx_section_break(&current_section, page_layout));
                 if let Some(section_override) = section_overrides.get(section_index) {
                     current_section.apply_override(section_override);
                 }
-                current_section.columns = layout_columns(options);
+                current_section.columns = settings.columns;
                 section_index += 1;
+                if matches_layout_break(settings.break_after.as_deref()) {
+                    body.push_str(&docx_page_break());
+                }
+                if settings.has_pagination_controls() {
+                    pending_flow = Some(settings.clone());
+                }
                 continue;
             }
         }
-        body.push_str(&render_docx_block(
-            block,
-            media,
-            hyperlinks,
-            &bibliography_keys,
-        ));
+        let block_xml = render_docx_block(block, media, hyperlinks, &bibliography_keys);
+        if let Some(flow) = pending_flow.take() {
+            body.push_str(&docx_apply_flow_properties(block_xml, &flow));
+        } else {
+            body.push_str(&block_xml);
+        }
     }
     if docx_has_native_comments(response, options) {
         body.push_str(&render_docx_comment_references(response));
@@ -2277,8 +2292,10 @@ fn render_docx_block(
         } => docx_bookmarked_paragraph(&equation_export_line(id, text, caption), id.as_deref()),
         DocumentBlock::Layout { directive, .. } if directive == "page-break" => docx_page_break(),
         DocumentBlock::Layout {
-            directive, options, ..
-        } if is_docx_section_layout(directive, options) => String::new(),
+            directive,
+            settings,
+            ..
+        } if is_docx_section_layout(directive, settings) => String::new(),
         DocumentBlock::Layout {
             directive, options, ..
         } => docx_paragraph(format!("Layout: {directive} {options}").trim()),
@@ -2360,6 +2377,46 @@ fn docx_bookmarked_paragraph(text: &str, bookmark: Option<&str>) -> String {
         r#"<w:p><w:pPr><w:widowControl/></w:pPr>{bookmark_start}<w:r><w:t>{}</w:t></w:r>{bookmark_end}</w:p>"#,
         escape_xml(text)
     )
+}
+
+fn docx_apply_flow_properties(xml: String, settings: &LayoutSettings) -> String {
+    let properties = docx_flow_properties(settings);
+    if properties.is_empty() || xml.is_empty() {
+        return xml;
+    }
+    if let Some(index) = xml.find("<w:pPr>") {
+        let insert_at = index + "<w:pPr>".len();
+        let mut output = String::with_capacity(xml.len() + properties.len());
+        output.push_str(&xml[..insert_at]);
+        output.push_str(&properties);
+        output.push_str(&xml[insert_at..]);
+        return output;
+    }
+    if let Some(index) = xml.find("<w:p>") {
+        let insert_at = index + "<w:p>".len();
+        let mut output = String::with_capacity(xml.len() + properties.len() + 15);
+        output.push_str(&xml[..insert_at]);
+        output.push_str("<w:pPr>");
+        output.push_str(&properties);
+        output.push_str("</w:pPr>");
+        output.push_str(&xml[insert_at..]);
+        return output;
+    }
+    xml
+}
+
+fn docx_flow_properties(settings: &LayoutSettings) -> String {
+    let mut properties = Vec::new();
+    if matches_layout_break(settings.break_before.as_deref()) {
+        properties.push("<w:pageBreakBefore/>");
+    }
+    if settings.keep_with_next {
+        properties.push("<w:keepNext/>");
+    }
+    if settings.keep_together {
+        properties.push("<w:keepLines/>");
+    }
+    properties.join("")
 }
 
 fn docx_paragraph_from_inlines(
@@ -2850,17 +2907,32 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<PdfPage> 
                 paginator.finish_page();
             }
             DocumentBlock::Layout {
-                directive, options, ..
+                directive,
+                options,
+                settings,
+                ..
             } if directive == "section-break" => {
                 paginator.finish_page();
-                paginator.apply_section_options(options);
-                paginator.extend_text(layout_export_lines(directive, options));
+                paginator.apply_section_options(settings);
+                paginator.extend_text(layout_export_lines(directive, options, settings));
+                if matches_layout_break(settings.break_after.as_deref()) {
+                    paginator.finish_page();
+                }
             }
             DocumentBlock::Layout {
-                directive, options, ..
+                directive,
+                options,
+                settings,
+                ..
             } if directive == "layout" => {
-                paginator.apply_section_options(options);
-                paginator.extend_text(layout_export_lines(directive, options));
+                if matches_layout_break(settings.break_before.as_deref()) {
+                    paginator.finish_page();
+                }
+                paginator.apply_section_options(settings);
+                paginator.extend_text(layout_export_lines(directive, options, settings));
+                if matches_layout_break(settings.break_after.as_deref()) {
+                    paginator.finish_page();
+                }
             }
             _ => paginator.extend_items(block_pdf_items(block)),
         }
@@ -2964,12 +3036,12 @@ impl PdfPaginator {
         }
     }
 
-    fn apply_section_options(&mut self, options: &str) {
-        if let Some(header) = layout_option_text(options, "header") {
-            self.current_header = Some(header);
+    fn apply_section_options(&mut self, settings: &LayoutSettings) {
+        if let Some(header) = &settings.header {
+            self.current_header = Some(header.clone());
         }
-        if let Some(footer) = layout_option_text(options, "footer") {
-            self.current_footer = Some(footer);
+        if let Some(footer) = &settings.footer {
+            self.current_footer = Some(footer.clone());
         }
     }
 
@@ -3302,42 +3374,75 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                 current = Some(PptxSlide::new("Continued"));
             }
             DocumentBlock::Layout {
-                directive, options, ..
+                directive,
+                options,
+                settings,
+                ..
             } if directive == "section-break" => {
                 if let Some(slide) = current.take() {
                     if !slide.lines.is_empty() || slide.title != "Continued" {
                         slides.push(slide);
                     }
                 }
-                let mut slide =
-                    PptxSlide::with_lines("Section", layout_export_lines(directive, options));
+                let mut slide = PptxSlide::with_lines(
+                    "Section",
+                    layout_export_lines(directive, options, settings),
+                );
                 slide.layout = PptxLayout::Section;
-                apply_pptx_section_options(&mut slide, options);
+                apply_pptx_section_options(&mut slide, settings);
                 current = Some(slide);
+                if matches_layout_break(settings.break_after.as_deref()) {
+                    if let Some(slide) = current.take() {
+                        slides.push(slide);
+                    }
+                    current = Some(PptxSlide::new("Continued"));
+                }
             }
             DocumentBlock::Layout {
-                directive, options, ..
+                directive,
+                options,
+                settings,
+                ..
             } if directive == "slide" => {
                 if let Some(slide) = current.take() {
                     if !slide.lines.is_empty() || slide.title != "Continued" {
                         slides.push(slide);
                     }
                 }
-                let mut slide = PptxSlide::new(slide_title_from_options(options));
-                slide.layout = pptx_layout_from_options(options);
-                slide.notes = slide_notes_from_options(options);
-                apply_pptx_section_options(&mut slide, options);
+                let mut slide = PptxSlide::new(slide_title_from_options(options, settings));
+                slide.layout = pptx_layout_from_options(settings);
+                slide.notes = slide_notes_from_options(settings);
+                apply_pptx_section_options(&mut slide, settings);
                 current = Some(slide);
             }
             DocumentBlock::Layout {
-                directive, options, ..
+                directive,
+                options,
+                settings,
+                ..
             } if directive == "layout" => {
+                if matches_layout_break(settings.break_before.as_deref()) {
+                    if let Some(slide) = current.take() {
+                        if !slide.lines.is_empty() || slide.title != "Continued" {
+                            slides.push(slide);
+                        }
+                    }
+                    current = Some(PptxSlide::new("Continued"));
+                }
                 if current.is_none() {
                     current = Some(PptxSlide::new("Document"));
                 }
                 if let Some(slide) = current.as_mut() {
-                    apply_pptx_section_options(slide, options);
-                    slide.lines.extend(layout_export_lines(directive, options));
+                    apply_pptx_section_options(slide, settings);
+                    slide
+                        .lines
+                        .extend(layout_export_lines(directive, options, settings));
+                }
+                if matches_layout_break(settings.break_after.as_deref()) {
+                    if let Some(slide) = current.take() {
+                        slides.push(slide);
+                    }
+                    current = Some(PptxSlide::new("Continued"));
                 }
             }
             _ => {
@@ -3402,15 +3507,15 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
         .collect()
 }
 
-fn apply_pptx_section_options(slide: &mut PptxSlide, options: &str) {
-    slide.header_override = layout_option_text(options, "header");
-    slide.footer_override = layout_option_text(options, "footer");
+fn apply_pptx_section_options(slide: &mut PptxSlide, settings: &LayoutSettings) {
+    slide.header_override = settings.header.clone();
+    slide.footer_override = settings.footer.clone();
 }
 
-fn pptx_layout_from_options(options: &str) -> PptxLayout {
-    ["layout", "type", "kind"]
-        .iter()
-        .find_map(|key| layout_option_text(options, key))
+fn pptx_layout_from_options(settings: &LayoutSettings) -> PptxLayout {
+    settings
+        .layout
+        .as_deref()
         .map(|value| match value.trim().to_ascii_lowercase().as_str() {
             "title" | "title-slide" | "cover" => PptxLayout::Title,
             "section" | "section-divider" | "divider" => PptxLayout::Section,
@@ -3692,8 +3797,11 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             id, caption, text, ..
         } => vec![equation_export_line(id, text, caption)],
         DocumentBlock::Layout {
-            directive, options, ..
-        } => layout_export_lines(directive, options),
+            directive,
+            options,
+            settings,
+            ..
+        } => layout_export_lines(directive, options, settings),
         DocumentBlock::Callout {
             callout_type,
             title,
@@ -3797,8 +3905,8 @@ fn decode_export_html_entities(text: &str) -> String {
         .replace("&amp;", "&")
 }
 
-fn layout_export_lines(directive: &str, options: &str) -> Vec<String> {
-    let summary = layout_summary(options);
+fn layout_export_lines(directive: &str, options: &str, settings: &LayoutSettings) -> Vec<String> {
+    let summary = layout_summary(options, settings);
     let label = match directive {
         "section-break" => "Section break",
         "slide" => "Slide",
@@ -3809,10 +3917,22 @@ fn layout_export_lines(directive: &str, options: &str) -> Vec<String> {
     vec![format!("{label}{summary}")]
 }
 
-fn layout_summary(options: &str) -> String {
+fn layout_summary(options: &str, settings: &LayoutSettings) -> String {
     let mut parts = Vec::new();
-    if let Some(columns) = layout_columns(options) {
+    if let Some(columns) = settings.columns {
         parts.push(format!("columns={columns}"));
+    }
+    if let Some(break_before) = &settings.break_before {
+        parts.push(format!("breakBefore={break_before}"));
+    }
+    if let Some(break_after) = &settings.break_after {
+        parts.push(format!("breakAfter={break_after}"));
+    }
+    if settings.keep_with_next {
+        parts.push("keepWithNext=true".to_string());
+    }
+    if settings.keep_together {
+        parts.push("keepTogether=true".to_string());
     }
     if parts.is_empty() {
         let trimmed = options.trim();
@@ -3826,8 +3946,8 @@ fn layout_summary(options: &str) -> String {
     }
 }
 
-fn slide_title_from_options(options: &str) -> String {
-    layout_option_text(options, "title").unwrap_or_else(|| {
+fn slide_title_from_options(options: &str, settings: &LayoutSettings) -> String {
+    settings.title.clone().unwrap_or_else(|| {
         let trimmed = options.trim();
         if trimmed.is_empty() {
             "Slide".to_string()
@@ -3837,10 +3957,10 @@ fn slide_title_from_options(options: &str) -> String {
     })
 }
 
-fn slide_notes_from_options(options: &str) -> Vec<String> {
-    ["notes", "speakerNotes", "speaker_notes"]
-        .iter()
-        .find_map(|key| layout_option_text(options, key))
+fn slide_notes_from_options(settings: &LayoutSettings) -> Vec<String> {
+    settings
+        .notes
+        .as_ref()
         .map(|value| {
             value
                 .replace("\\n", "\n")
@@ -3851,50 +3971,6 @@ fn slide_notes_from_options(options: &str) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
-}
-
-fn layout_option_text(text: &str, key: &str) -> Option<String> {
-    for line in text.lines() {
-        if let Some((candidate, value)) = line.split_once(':') {
-            if candidate.trim() == key {
-                return Some(value.trim().trim_matches('"').to_string());
-            }
-        }
-    }
-    let prefix = format!("{key}=");
-    let start = text.find(&prefix)? + prefix.len();
-    let value = &text[start..];
-    if let Some(quoted) = value.strip_prefix('"') {
-        return quoted.split_once('"').map(|(title, _)| title.to_string());
-    }
-    value
-        .split_whitespace()
-        .next()
-        .filter(|value| !value.is_empty())
-        .map(|value| value.trim_matches('"').to_string())
-}
-
-fn layout_columns(options: &str) -> Option<usize> {
-    for line in options.lines() {
-        if let Some((key, value)) = line.split_once(':') {
-            if key.trim() == "columns" {
-                return parse_layout_columns(value);
-            }
-        }
-    }
-    for part in options.split_whitespace() {
-        if let Some((key, value)) = part.split_once('=') {
-            if key.trim() == "columns" {
-                return parse_layout_columns(value);
-            }
-        }
-    }
-    None
-}
-
-fn parse_layout_columns(value: &str) -> Option<usize> {
-    let columns = value.trim().trim_matches('"').parse::<usize>().ok()?;
-    (columns > 0).then_some(columns)
 }
 
 fn callout_export_line(callout_type: &str, title: &str, text: &str) -> String {

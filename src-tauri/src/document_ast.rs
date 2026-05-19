@@ -1,4 +1,5 @@
 use crate::{
+    layout::LayoutSettings,
     markdown_tables::{
         is_markdown_table_row, is_markdown_table_separator, split_markdown_table_row,
     },
@@ -182,6 +183,7 @@ pub(crate) enum DocumentBlock {
         end_line: usize,
         directive: String,
         options: String,
+        settings: LayoutSettings,
         source: Option<AstSourceRange>,
     },
     Callout {
@@ -1383,13 +1385,15 @@ fn parse_ast_html_block(line: &str, line_number: usize, end_line: usize) -> Docu
     }
 
     if line.contains("data-layout=\"") {
+        let options = extract_quoted_attribute(line, "data-options")
+            .map(|value| decode_html_entities(&value))
+            .unwrap_or_default();
         return DocumentBlock::Layout {
             line: line_number,
             end_line,
             directive: extract_quoted_attribute(line, "data-layout").unwrap_or_default(),
-            options: extract_quoted_attribute(line, "data-options")
-                .map(|value| decode_html_entities(&value))
-                .unwrap_or_default(),
+            settings: LayoutSettings::from_options(&options),
+            options,
             source: None,
         };
     }

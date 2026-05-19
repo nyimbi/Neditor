@@ -27,6 +27,7 @@ mod generated_sections;
 mod git;
 mod html_preview;
 mod indexing;
+mod layout;
 mod link_validation;
 mod manifest;
 mod markdown_tables;
@@ -3091,6 +3092,75 @@ ARR: Annual recurring revenue.
         assert!(response.html.contains("columns=1"));
         assert!(response.html.contains("data-layout=\"layout\""));
         assert!(response.html.contains("column-count:2"));
+    }
+
+    #[test]
+    fn layout_pagination_controls_flow_through_exports() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Flow Layout\nstatus: approved\napprovedBy: QA\n---\n# Flow Layout\n\n```layout\nbreakBefore: page\nkeepWithNext: true\nkeepTogether: true\n```\n## Kept Heading\nKept paragraph.\n\n{{section-break columns=2 breakAfter=page header=\"Flow Header\" footer=\"Flow {{page}}/{{pages}}\"}}\nAfter section.\n".to_string(),
+            file_path: None,
+        });
+        let options = json!({});
+
+        assert!(response.html.contains("break-before:page"));
+        assert!(response.html.contains("page-break-before:always"));
+        assert!(response.html.contains("break-after:avoid"));
+        assert!(response.html.contains("break-inside:avoid"));
+        assert!(response.document_ast.blocks.iter().any(|block| matches!(
+            block,
+            DocumentBlock::Layout {
+                directive,
+                settings,
+                ..
+            } if directive == "layout"
+                && settings.break_before.as_deref() == Some("page")
+                && settings.keep_with_next
+                && settings.keep_together
+        )));
+        assert!(response.document_ast.blocks.iter().any(|block| matches!(
+            block,
+            DocumentBlock::Layout {
+                directive,
+                settings,
+                ..
+            } if directive == "section-break"
+                && settings.columns == Some(2)
+                && settings.break_after.as_deref() == Some("page")
+        )));
+
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        let docx_header = zip_entry_text(&docx, "word/header2.xml");
+        let docx_footer = zip_entry_text(&docx, "word/footer2.xml");
+        assert!(docx_document.contains("<w:pageBreakBefore/>"));
+        assert!(docx_document.contains("<w:keepNext/>"));
+        assert!(docx_document.contains("<w:keepLines/>"));
+        assert!(docx_document.contains(r#"<w:cols w:num="2""#));
+        assert!(docx_header.contains("Flow Header"));
+        assert!(docx_footer.contains(r#"<w:fldSimple w:instr="PAGE">"#));
+        assert!(docx_footer.contains(r#"<w:fldSimple w:instr="NUMPAGES">"#));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let pptx_app = zip_entry_text(&pptx, "docProps/app.xml");
+        let slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/slide");
+        assert!(pptx_app.contains("<Slides>"));
+        assert!(slides.iter().any(|slide| slide.contains("Flow Header")));
+        assert!(slides
+            .iter()
+            .any(|slide| slide.contains("Section break: columns=2, breakAfter=page")));
+
+        let pdf = render_pdf_bytes(&response, &options);
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains("Layout: breakBefore=page, keepWithNext=true, keepTogether=true"));
+        assert!(pdf_text.contains("Section break: columns=2, breakAfter=page"));
+        assert!(pdf_text.contains("Flow Header"));
+
+        let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+            .expect("layout bundle");
+        let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
+        assert!(bundled_ast.contains(r#""break_before": "page""#));
+        assert!(bundled_ast.contains(r#""keep_with_next": true"#));
+        assert!(bundled_ast.contains(r#""keep_together": true"#));
     }
 
     #[test]
