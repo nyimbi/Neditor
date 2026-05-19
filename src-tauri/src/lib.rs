@@ -2921,6 +2921,69 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn edited_table_fixture_exports_to_all_packages() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Edited Table Export\nstatus: approved\napprovedBy: QA\n---\n# Edited Table Export\nTable: Edited revenue {#tbl:edited}\n| Region | Revenue | Margin |\n| --- | ---: | ---: |\n| East | $125,000 | 42% |\n| West | $98,000 | 38% |\n| Total | =SUM(B1:B2) | =AVG(C1:C2) |\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == "error"));
+        assert!(response
+            .compiled_markdown
+            .contains("| Total | 223000 | 40 |"));
+        assert_eq!(response.semantic.tables, 1);
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Table {
+                    id,
+                    caption,
+                    headers,
+                    rows,
+                    ..
+                } if id.as_deref() == Some("tbl:edited")
+                    && caption.as_deref() == Some("Edited revenue")
+                    && headers == &vec!["Region".to_string(), "Revenue".to_string(), "Margin".to_string()]
+                    && rows.iter().any(|row| row == &vec![
+                        "Total".to_string(),
+                        "223000".to_string(),
+                        "40".to_string()
+                    ])
+            )
+        }));
+
+        let options = json!({});
+        let docx = render_docx_bytes(&response, &options).expect("docx edited table");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains("Edited revenue"));
+        assert!(docx_document.contains("223000"));
+        assert!(docx_document.contains(r#"<w:jc w:val="right"/>"#));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx edited table");
+        let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        assert!(pptx_slide.contains("Edited revenue"));
+        assert!(pptx_slide.contains("<a:tbl>"));
+        assert!(pptx_slide.contains("<a:t>223000</a:t>"));
+        assert!(pptx_slide.contains(r#"<a:pPr algn="r"/>"#));
+
+        let pdf = render_pdf_bytes(&response, &options);
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains("Edited revenue"));
+        assert!(pdf_text.contains("(223000) Tj"));
+        assert!(pdf_text.contains("(40) Tj"));
+
+        let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+            .expect("edited table bundle");
+        let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
+        assert!(bundled_ast.contains("\"kind\": \"table\""));
+        assert!(bundled_ast.contains("Edited revenue"));
+        assert!(bundled_ast.contains("223000"));
+    }
+
+    #[test]
     fn compiler_renders_layout_break_directives() {
         let response = compile(CompileRequest {
             text: "---\ntitle: Layout\nstatus: approved\napprovedBy: QA\n---\n# Layout\n{{page-break}}\n{{section-break columns=1}}\n\n```layout\ncolumns: 2\n```\n".to_string(),
