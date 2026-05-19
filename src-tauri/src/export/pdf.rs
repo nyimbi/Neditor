@@ -31,6 +31,7 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
         let mut y = page_height.saturating_sub(margin_top) as i32;
         let column_width = page.layout.column_width();
         let column_gap = page.layout.column_gap;
+        let mut active_float: Option<PdfRenderFloat> = None;
         if !header.trim().is_empty() {
             stream.push_str(&pdf_text_line(
                 9,
@@ -41,6 +42,7 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
         }
         for item in page.items.iter().take(160) {
             if matches!(item, PdfPageItem::ColumnBreak) {
+                active_float = None;
                 column_index = (column_index + 1).min(page.layout.columns.saturating_sub(1));
                 y = page_height.saturating_sub(margin_top) as i32;
                 continue;
@@ -49,20 +51,49 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
                 margin_left + column_index as u32 * (column_width.saturating_add(column_gap));
             match item {
                 PdfPageItem::Text(line) | PdfPageItem::WrappedText(line) => {
-                    stream.push_str(&pdf_text_line(10, item_x, y, line));
+                    let text_x = active_float
+                        .as_ref()
+                        .filter(|float| y > float.clear_y)
+                        .map(|float| match float.side.as_str() {
+                            "left" => item_x.saturating_add(float.reserve_width),
+                            _ => item_x,
+                        })
+                        .unwrap_or(item_x);
+                    stream.push_str(&pdf_text_line(10, text_x, y, line));
                     y -= 12;
+                    if active_float
+                        .as_ref()
+                        .is_some_and(|float| y <= float.clear_y)
+                    {
+                        active_float = None;
+                    }
                 }
                 PdfPageItem::Table(table) => {
+                    if let Some(float) = active_float.take() {
+                        y = y.min(float.clear_y);
+                    }
                     let (table_stream, consumed_height) =
                         pdf_table_stream(table, item_x, y, column_width);
                     stream.push_str(&table_stream);
                     y -= consumed_height;
                 }
                 PdfPageItem::Figure(figure) => {
+                    if let Some(float) = active_float.take() {
+                        y = y.min(float.clear_y);
+                    }
                     let (figure_stream, consumed_height) =
                         pdf_figure_stream(figure, item_x, y, column_width);
                     stream.push_str(&figure_stream);
-                    y -= consumed_height;
+                    if figure.is_text_float() {
+                        let reserve_width = pdf_figure_reserve_width(figure, column_width);
+                        active_float = Some(PdfRenderFloat {
+                            side: figure.float.clone().unwrap_or_default(),
+                            reserve_width,
+                            clear_y: y - consumed_height,
+                        });
+                    } else {
+                        y -= consumed_height;
+                    }
                 }
                 PdfPageItem::ColumnBreak => unreachable!("column breaks are handled before render"),
             }
@@ -387,6 +418,19 @@ struct PdfFigure {
     dimensions: Option<ExportImageDimensions>,
 }
 
+impl PdfFigure {
+    fn is_text_float(&self) -> bool {
+        matches!(self.float.as_deref(), Some("left" | "right"))
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PdfRenderFloat {
+    side: String,
+    reserve_width: u32,
+    clear_y: i32,
+}
+
 #[derive(Clone, Debug)]
 struct PdfPageLayout {
     page_size: String,
@@ -569,8 +613,16 @@ struct PdfPaginator {
     current_footer: Option<String>,
     used_height: i32,
     current_column: usize,
+    active_float: Option<PdfActiveFloat>,
     base_layout: PdfPageLayout,
     current_layout: PdfPageLayout,
+}
+
+#[derive(Clone, Debug)]
+struct PdfActiveFloat {
+    height: i32,
+    reserve_width: u32,
+    start_used_height: i32,
 }
 
 impl PdfPaginator {
@@ -582,6 +634,7 @@ impl PdfPaginator {
             current_footer: None,
             used_height: 0,
             current_column: 0,
+            active_float: None,
             current_layout: base_layout.clone(),
             base_layout,
         }
@@ -635,11 +688,12 @@ impl PdfPaginator {
             self.advance_flow();
         }
         self.used_height += height;
+        self.consume_active_float(height);
         self.current.push(PdfPageItem::Text(line));
     }
 
     fn push_wrapped_text(&mut self, line: String) {
-        let lines = pdf_wrapped_text_lines(&line, self.current_layout.column_width(), 10);
+        let lines = pdf_wrapped_text_lines(&line, self.current_text_width(), 10);
         let height = lines.len() as i32 * pdf_text_item_height();
         let keep_wrapped_paragraph_together = height <= self.available_height()
             && self.used_height + height > self.available_height();
@@ -657,6 +711,7 @@ impl PdfPaginator {
     }
 
     fn push_table(&mut self, table: PdfTable) {
+        self.clear_active_float();
         let mut remaining_rows = table.rows.as_slice();
         let mut continued = false;
         while !remaining_rows.is_empty() {
@@ -697,7 +752,19 @@ impl PdfPaginator {
         if self.used_height + height > self.available_height() && !self.current.is_empty() {
             self.advance_flow();
         }
-        self.used_height += height.min(self.available_height());
+        self.clear_active_float();
+        if figure.is_text_float() {
+            self.active_float = Some(PdfActiveFloat {
+                height,
+                reserve_width: pdf_figure_reserve_width(
+                    &figure,
+                    self.current_layout.column_width(),
+                ),
+                start_used_height: self.used_height,
+            });
+        } else {
+            self.used_height += height.min(self.available_height());
+        }
         self.current.push(PdfPageItem::Figure(figure));
     }
 
@@ -719,6 +786,7 @@ impl PdfPaginator {
         if self.current.is_empty() {
             return;
         }
+        self.clear_active_float();
         self.pages.push(PdfPage {
             items: std::mem::take(&mut self.current),
             header: self.current_header.clone(),
@@ -730,6 +798,7 @@ impl PdfPaginator {
     }
 
     fn advance_flow(&mut self) {
+        self.clear_active_float();
         if self.current_layout.columns > 1
             && self.current_column + 1 < self.current_layout.columns
             && !self.current.is_empty()
@@ -787,6 +856,36 @@ impl PdfPaginator {
             })
             .sum()
     }
+
+    fn current_text_width(&self) -> u32 {
+        self.active_float
+            .as_ref()
+            .map(|float| {
+                self.current_layout
+                    .column_width()
+                    .saturating_sub(float.reserve_width)
+                    .max(96)
+            })
+            .unwrap_or_else(|| self.current_layout.column_width())
+    }
+
+    fn consume_active_float(&mut self, height: i32) {
+        let Some(float) = &self.active_float else {
+            return;
+        };
+        if self.used_height.saturating_sub(float.start_used_height) >= float.height.max(height) {
+            self.active_float = None;
+        }
+    }
+
+    fn clear_active_float(&mut self) {
+        let Some(float) = self.active_float.take() else {
+            return;
+        };
+        self.used_height = self
+            .used_height
+            .max(float.start_used_height + float.height.min(self.available_height()));
+    }
 }
 
 fn pdf_table_chunk(table: &PdfTable, rows: Vec<Vec<String>>, continued: bool) -> PdfTable {
@@ -842,6 +941,12 @@ fn pdf_figure_height(
 ) -> i32 {
     let (_, height) = pdf_figure_box_size(dimensions, max_width, 180, fit);
     height + pdf_figure_caption_height()
+}
+
+fn pdf_figure_reserve_width(figure: &PdfFigure, column_width: u32) -> u32 {
+    let (width, _) =
+        pdf_figure_box_size(figure.dimensions, column_width, 180, figure.fit.as_deref());
+    (width.max(0) as u32).saturating_add(12).min(column_width)
 }
 
 fn pdf_page_layout(response: &CompileResponse, options: &Value) -> PdfPageLayout {

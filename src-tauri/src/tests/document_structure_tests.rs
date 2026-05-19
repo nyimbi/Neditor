@@ -305,6 +305,30 @@ fn pdf_layout_keep_with_next_moves_following_block_as_group() {
 }
 
 #[test]
+fn pdf_left_floats_allow_text_to_wrap_alongside_figures() {
+    let left_response = compile(CompileRequest {
+            text: "---\ntitle: Float PDF\nstatus: approved\napprovedBy: QA\n---\n# Float PDF\n![Float](data:image/svg+xml;base64,PHN2Zy8+){#fig:left caption=\"Left float\" float=\"left\"}\nParagraph after the floated figure should begin beside the reserved figure area and continue wrapping in the remaining column width.\n".to_string(),
+            file_path: None,
+        });
+
+    let pdf = render_pdf_bytes(&left_response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+
+    assert!(pdf_text.contains("68 627 240 135 re S"));
+    assert!(pdf_text.contains("BT /F1 10 Tf 320 762 Td (Paragraph after the floated figure"));
+    assert!(!pdf_text.contains("BT /F1 10 Tf 68 601 Td (Paragraph after the floated figure"));
+
+    let right_response = compile(CompileRequest {
+            text: "---\ntitle: Float PDF\nstatus: approved\napprovedBy: QA\n---\n# Float PDF\n![Float](data:image/svg+xml;base64,PHN2Zy8+){#fig:right caption=\"Right float\" float=\"right\"}\nParagraph after the right floated figure should stay in the left text column while the figure occupies the right side.\n".to_string(),
+            file_path: None,
+        });
+    let pdf = render_pdf_bytes(&right_response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("287 627 240 135 re S"));
+    assert!(pdf_text.contains("BT /F1 10 Tf 68 762 Td (Paragraph after the right floated figure"));
+}
+
+#[test]
 fn pdf_wraps_long_paragraphs_and_avoids_single_line_widows() {
     let filler = (1..=57)
         .map(|index| format!("Filler paragraph {index}."))
