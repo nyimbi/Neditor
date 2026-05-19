@@ -885,14 +885,21 @@
           <div class="conflict-toolbar">
             <button type="button" @click="seedConflictMerge('local')">Use local as merge base</button>
             <button type="button" @click="seedConflictMerge('external')">Use external as merge base</button>
+            <button type="button" @click="clearConflictMerge">Clear merge</button>
             <button type="button" :disabled="!mergedConflictText.trim()" @click="applyConflictMerge">Apply merged text</button>
           </div>
           <section class="conflict-diff" aria-label="Conflict line diff">
             <div class="conflict-diff-head">Local</div>
             <div class="conflict-diff-head">External</div>
             <template v-for="row in conflictDiffRows" :key="row.key">
-              <pre :class="['conflict-diff-cell', `is-${row.kind}`]"><span>{{ row.localLine || "" }}</span>{{ row.local }}</pre>
-              <pre :class="['conflict-diff-cell', `is-${row.kind}`]"><span>{{ row.externalLine || "" }}</span>{{ row.external }}</pre>
+              <div :class="['conflict-diff-cell', `is-${row.kind}`]">
+                <button type="button" :disabled="row.localLine === null" @click="appendConflictMergeLine(row, 'local')">Use</button>
+                <pre><span>{{ row.localLine || "" }}</span>{{ row.local }}</pre>
+              </div>
+              <div :class="['conflict-diff-cell', `is-${row.kind}`]">
+                <button type="button" :disabled="row.externalLine === null" @click="appendConflictMergeLine(row, 'external')">Use</button>
+                <pre><span>{{ row.externalLine || "" }}</span>{{ row.external }}</pre>
+              </div>
             </template>
           </section>
           <label class="merge-editor">
@@ -2126,6 +2133,17 @@ async function saveConflictCopy() {
 
 function seedConflictMerge(source: "local" | "external") {
   mergedConflictText.value = source === "external" ? store.externalConflict?.externalText || "" : conflictDocument.value.text;
+}
+
+function clearConflictMerge() {
+  mergedConflictText.value = "";
+}
+
+function appendConflictMergeLine(row: ConflictDiffRow, source: "local" | "external") {
+  const hasLine = source === "local" ? row.localLine !== null : row.externalLine !== null;
+  if (!hasLine) return;
+  const text = source === "local" ? row.local : row.external;
+  mergedConflictText.value = mergedConflictText.value ? `${mergedConflictText.value}\n${text}` : text;
 }
 
 async function applyConflictMerge() {
@@ -4139,12 +4157,27 @@ select:hover {
 }
 
 .conflict-diff-cell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
   min-height: 26px;
   margin: 0;
   padding: 6px 10px;
   border-bottom: 1px solid #e2e8f0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.conflict-diff-cell button {
+  min-width: 48px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.conflict-diff-cell pre {
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .conflict-diff-cell span {

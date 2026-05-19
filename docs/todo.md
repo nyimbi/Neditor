@@ -19,8 +19,8 @@ What remains to achieve the full vision:
   5. Watcher/conflict hardening
      Native watcher support exists behind native-watch, with fallback now. Watch events are now scoped to the document that installed the watcher, tab activation
      recompiles/resyncs watched paths, conflict actions target the conflicted document instead of whichever tab is currently visible, and backend watch setup discovers nested
-     include directives for stronger include graph refresh coverage. The native-watch build has been verified after the optional watcher crates were available. Still needed:
-     richer merge workflow.
+     include directives for stronger include graph refresh coverage. The native-watch build has been verified after the optional watcher crates were available. The conflict
+     modal now supports line-by-line merge composition from the local/external diff. Still needed: browser-level workflow coverage for conflict resolution.
   6. E2E and export conformance tests
      Need Playwright/Tauri workflow tests, DOCX/PPTX/PDF package inspections, fixture comparisons, and confirmed macOS/Windows/Linux CI runs.
   7. Backend modularization
