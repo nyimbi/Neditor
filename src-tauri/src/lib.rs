@@ -5056,6 +5056,7 @@ beta</pre>
         let bundled_manifest = zip_entry_text(&bundle, "manifest.json");
         let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
         let bundled_source_map = zip_entry_text(&bundle, "source-map.json");
+        let bundled_diagnostics = zip_entry_text(&bundle, "diagnostics.json");
         let bundled_media_map = zip_entry_text(&bundle, "media-map.json");
         let bundled_svg = zip_entry_text(&bundle, "media/image1.svg");
         assert!(bundled_markdown.contains("Competitive Advantage"));
@@ -5067,6 +5068,7 @@ beta</pre>
         assert!(bundled_ast.contains("\"source_file\""));
         assert!(bundled_source_map.contains("\"generated_line\""));
         assert!(bundled_source_map.contains("\"source_line\""));
+        assert!(bundled_diagnostics.starts_with('['));
         assert!(bundled_media_map.contains("\"bundle_path\": \"media/image1.svg\""));
         assert!(bundled_media_map.contains("\"hash\": \"sha256:"));
         assert_eq!(bundled_svg, "<svg/>");

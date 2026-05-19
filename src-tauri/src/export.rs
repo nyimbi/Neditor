@@ -563,6 +563,14 @@ pub(crate) fn render_markdown_bundle_bytes(
             .as_bytes(),
     )
     .map_err(|err| err.to_string())?;
+    zip.start_file("diagnostics.json", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        serde_json::to_string_pretty(&response.diagnostics)
+            .map_err(|err| err.to_string())?
+            .as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
     let media = collect_docx_media(response);
     if !media.is_empty() {
         zip.start_file("media-map.json", options)
