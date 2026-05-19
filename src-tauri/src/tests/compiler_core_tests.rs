@@ -481,7 +481,7 @@ fn compiler_reports_broken_local_markdown_links() {
     fs::write(root.join("docs").join("existing.md"), "# Existing").expect("write linked doc");
 
     let response = compile(CompileRequest {
-            text: "---\ntitle: Links\nstatus: approved\napprovedBy: QA\nbrand:\n  logo: docs/missing-logo.svg\n---\n# Links\nRead [existing](docs/existing.md), [missing](docs/missing.md), [section](#links), and [web](https://example.com).\n![Missing image](docs/missing.png)\n".to_string(),
+            text: "---\ntitle: Links\nstatus: approved\napprovedBy: QA\nbrand:\n  logo: docs/missing-logo.svg\n---\n# Links\nRead [existing](docs/existing.md), [missing](docs/missing.md), [section](#links), and [web](https://example.com).\n![Missing image](docs/missing.png)\n\n```md\n[example link](docs/code-missing.md)\n![Example image](docs/code-missing.png)\n```\n".to_string(),
             file_path: Some(path_to_string(&root.join("root.md"))),
         });
     let root_doc = path_to_string(&root.join("root.md"));
@@ -507,6 +507,10 @@ fn compiler_reports_broken_local_markdown_links() {
             .count(),
         1
     );
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("code-missing")));
     let broken_image = response
         .diagnostics
         .iter()

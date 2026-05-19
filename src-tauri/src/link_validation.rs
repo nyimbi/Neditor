@@ -17,7 +17,18 @@ pub(crate) fn validate_image_paths(
         .and_then(Path::parent)
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
+    let mut fence_marker = None;
     for (line_index, line) in markdown.lines().enumerate() {
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
+            continue;
+        }
         let trimmed = line.trim_start();
         if !trimmed.starts_with("![") {
             continue;
@@ -98,7 +109,18 @@ pub(crate) fn validate_link_paths(
         .and_then(Path::parent)
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
+    let mut fence_marker = None;
     for (line_index, line) in markdown.lines().enumerate() {
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
+            continue;
+        }
         let mut search_from = 0usize;
         while let Some(relative_close) = line[search_from..].find("](") {
             let close_index = search_from + relative_close;
@@ -147,6 +169,17 @@ pub(crate) fn validate_link_paths(
             }
             search_from = target_end + 1;
         }
+    }
+}
+
+fn fenced_code_marker(line: &str) -> Option<&'static str> {
+    let trimmed = line.trim_start();
+    if trimmed.starts_with("```") {
+        Some("```")
+    } else if trimmed.starts_with("~~~") {
+        Some("~~~")
+    } else {
+        None
     }
 }
 
