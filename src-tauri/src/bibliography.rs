@@ -1,6 +1,8 @@
 use crate::diagnostics::DocumentDiagnostic;
 use crate::{
-    compiler_support::collect_fence_bodies, diagnostics::diag, escape_html, path_to_string,
+    compiler_support::{collect_fence_bodies, fenced_code_marker},
+    diagnostics::diag,
+    escape_html, path_to_string,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -237,7 +239,18 @@ fn csl_issued_year(entry: &Value) -> Option<String> {
 
 pub(crate) fn collect_citation_references(text: &str) -> Vec<CitationReference> {
     let mut citations = Vec::new();
+    let mut fence_marker = None;
     for (index, line) in text.lines().enumerate() {
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
+            continue;
+        }
         let mut search_from = 0usize;
         while let Some(relative_start) = line[search_from..].find('[') {
             let start = search_from + relative_start;
@@ -317,8 +330,37 @@ pub(crate) fn render_citations(
         .iter()
         .map(|entry| (entry.key.as_str(), entry))
         .collect::<HashMap<_, _>>();
-    let mut output = String::with_capacity(markdown.len());
-    let mut rest = markdown;
+    let mut lines = Vec::new();
+    let mut fence_marker = None;
+    for line in markdown.lines() {
+        if let Some(marker) = fence_marker {
+            lines.push(line.to_string());
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            lines.push(line.to_string());
+            fence_marker = Some(marker);
+            continue;
+        }
+        lines.push(render_citation_line(line, &entries, style));
+    }
+    let mut output = lines.join("\n");
+    if markdown.ends_with('\n') {
+        output.push('\n');
+    }
+    output
+}
+
+fn render_citation_line(
+    line: &str,
+    entries: &HashMap<&str, &BibliographyEntry>,
+    style: &str,
+) -> String {
+    let mut output = String::with_capacity(line.len());
+    let mut rest = line;
     while let Some(start) = rest.find('[') {
         output.push_str(&rest[..start]);
         let after_start = &rest[start + 1..];
@@ -329,7 +371,7 @@ pub(crate) fn render_citations(
         let inside = &after_start[..end];
         if inside.contains('@') {
             let references = citation_references_from_bracket(inside, 0, 1);
-            output.push_str(&render_citation_span(&references, &entries, style));
+            output.push_str(&render_citation_span(&references, entries, style));
         } else {
             output.push('[');
             output.push_str(inside);

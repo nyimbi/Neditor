@@ -20,7 +20,7 @@ What remains to achieve the full vision:
      through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler now emits a source-mapped semantic paged-document model,
      includes it in Markdown bundles, stores compact layout-section summaries in export manifests, and returns it from prepare-for-export so readiness checks and the export UI
      can inspect section layout before files are written. Semantic table/figure/equation inventory now counts AST blocks instead of scanning raw Markdown strings, heading/rich block/table
-     scanners, cross-reference handling, and local link validators now preserve fenced-code examples, and layout shortcode tokens now pass through interpolation without false
+     scanners, citation and cross-reference handling, and local link validators now preserve fenced-code examples, and layout shortcode tokens now pass through interpolation without false
      missing-variable warnings, so semantic layout directives do not make readiness reports noisy.
      The compiler still has string-heavy paths. Export, references, transforms, and validation need to depend more fully on durable semantic models.
   3. Full visual table editor

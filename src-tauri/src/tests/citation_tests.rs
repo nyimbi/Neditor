@@ -76,6 +76,29 @@ fn compiler_loads_external_bibliography_and_validates_cross_refs() {
 }
 
 #[test]
+fn citation_references_ignore_fenced_examples() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Fenced Citations\nstatus: approved\napprovedBy: QA\n---\n# Fenced Citations\nClaim [@real2026].\n\n```md\nExample [@not-real] should stay literal.\n```\n\n```bibtex\n@article{real2026,\n title={Real Evidence},\n author={Doe},\n year={2026}\n}\n```\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert_eq!(response.semantic.citations, vec!["real2026"]);
+    assert!(response
+        .semantic
+        .citation_references
+        .iter()
+        .all(|reference| reference.key != "not-real"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("not-real")));
+    assert!(response
+        .compiled_markdown
+        .contains("Example [@not-real] should stay literal."));
+}
+
+#[test]
 fn compile_options_supply_default_citation_style() {
     let response = compile_with_options(
             CompileRequest {
