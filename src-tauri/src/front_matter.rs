@@ -1,0 +1,264 @@
+use crate::{diagnostics::diag, path_to_string, DocumentDiagnostic, IncludeEdge};
+use serde_json::{json, Value};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
+pub(crate) fn parse_front_matter(
+    text: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+    source_file: Option<String>,
+) -> (Value, String, usize) {
+    if !text.starts_with("---\n") {
+        return (json!({}), text.to_string(), 1);
+    }
+    let mut lines = text.lines();
+    lines.next();
+    let mut consumed_lines = 1usize;
+    let mut yaml = String::new();
+    for line in &mut lines {
+        consumed_lines += 1;
+        if line.trim() == "---" {
+            let body = lines.collect::<Vec<_>>().join("\n");
+            let metadata = serde_yaml::from_str::<Value>(&yaml).unwrap_or_else(|err| {
+                diagnostics.push(diag(
+                    "error",
+                    format!("Invalid YAML front matter: {err}"),
+                    source_file.clone(),
+                    None,
+                    Some("Fix the YAML syntax between the opening and closing --- markers."),
+                ));
+                json!({})
+            });
+            return (metadata, body, consumed_lines + 1);
+        }
+        yaml.push_str(line);
+        yaml.push('\n');
+    }
+    diagnostics.push(diag(
+        "error",
+        "Front matter was opened but not closed.",
+        source_file,
+        Some(1),
+        Some("Add a closing --- marker."),
+    ));
+    (json!({}), text.to_string(), 1)
+}
+
+pub(crate) fn merge_project_variables(
+    metadata: &mut Value,
+    root_path: Option<&Path>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(path) = project_variables_path(root_path) else {
+        return;
+    };
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(err) => {
+            diagnostics.push(diag(
+                "warning",
+                format!("Unable to read project variables {}: {err}", path.display()),
+                Some(path_to_string(&path)),
+                None,
+                Some("Check permissions or remove the project variables file."),
+            ));
+            return;
+        }
+    };
+    let mut variables = match serde_yaml::from_str::<Value>(&text) {
+        Ok(value) => value,
+        Err(err) => {
+            diagnostics.push(diag(
+                "error",
+                format!("Invalid project variables YAML {}: {err}", path.display()),
+                Some(path_to_string(&path)),
+                None,
+                Some("Fix .neditor/variables.yaml or variables.yml."),
+            ));
+            return;
+        }
+    };
+    if let Some(inner) = variables.get("variables").cloned() {
+        variables = inner;
+    }
+    let (Some(target), Some(source)) = (metadata.as_object_mut(), variables.as_object()) else {
+        diagnostics.push(diag(
+            "warning",
+            format!(
+                "Project variables {} must be a YAML mapping.",
+                path.display()
+            ),
+            Some(path_to_string(&path)),
+            None,
+            Some("Use key-value YAML such as client: Acme."),
+        ));
+        return;
+    };
+    for (key, value) in source {
+        target.entry(key.clone()).or_insert_with(|| value.clone());
+    }
+}
+
+fn project_variables_path(root_path: Option<&Path>) -> Option<PathBuf> {
+    let mut dir = root_path
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .or_else(|| std::env::current_dir().ok())?;
+    loop {
+        for name in ["variables.yaml", "variables.yml"] {
+            let candidate = dir.join(".neditor").join(name);
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
+pub(crate) fn render_front_matter_data_sources(
+    metadata: &Value,
+    root_path: Option<&Path>,
+    root_file: &str,
+    include_graph: &mut Vec<IncludeEdge>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let mut specs = Vec::new();
+    collect_data_source_specs(metadata.get("dataSources"), None, &mut specs);
+    collect_data_source_specs(metadata.get("data_sources"), None, &mut specs);
+    collect_data_source_specs(metadata.get("csvFiles"), Some("csv"), &mut specs);
+    collect_data_source_specs(metadata.get("csv_files"), Some("csv"), &mut specs);
+    collect_data_source_specs(metadata.get("tsvFiles"), Some("tsv"), &mut specs);
+    collect_data_source_specs(metadata.get("tsv_files"), Some("tsv"), &mut specs);
+    if specs.is_empty() {
+        return String::new();
+    }
+
+    let base = root_path
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let mut rendered = Vec::new();
+    for spec in specs {
+        let kind = spec
+            .kind
+            .as_deref()
+            .or_else(|| data_source_kind_from_path(&spec.path))
+            .unwrap_or("csv");
+        if !matches!(kind, "csv" | "tsv") {
+            diagnostics.push(diag(
+                "warning",
+                format!("Unsupported data source type '{kind}' for {}", spec.path),
+                Some(spec.path.clone()),
+                None,
+                Some("Use csv or tsv for first-release local data sources."),
+            ));
+            continue;
+        }
+        let path = base.join(&spec.path);
+        let contents = match fs::read_to_string(&path) {
+            Ok(contents) => contents,
+            Err(err) => {
+                diagnostics.push(diag(
+                    "error",
+                    format!("Unable to read data source {}: {err}", path.display()),
+                    Some(path_to_string(&path)),
+                    None,
+                    Some("Create the data file or update front matter dataSources/csvFiles."),
+                ));
+                continue;
+            }
+        };
+        include_graph.push(IncludeEdge {
+            parent: root_file.to_string(),
+            child: path_to_string(&path),
+            depth: 0,
+        });
+        let title = spec.name.unwrap_or_else(|| {
+            path.file_stem()
+                .and_then(|name| name.to_str())
+                .unwrap_or("Data source")
+                .to_string()
+        });
+        rendered.push(format!(
+            "## Data Source: {title}\n\n```{kind}\n{}\n```",
+            contents.trim_end()
+        ));
+    }
+    rendered.join("\n\n")
+}
+
+struct DataSourceSpec {
+    name: Option<String>,
+    path: String,
+    kind: Option<String>,
+}
+
+fn collect_data_source_specs(
+    value: Option<&Value>,
+    default_kind: Option<&str>,
+    specs: &mut Vec<DataSourceSpec>,
+) {
+    match value {
+        Some(Value::String(path)) => specs.push(DataSourceSpec {
+            name: None,
+            path: path.clone(),
+            kind: default_kind.map(ToString::to_string),
+        }),
+        Some(Value::Array(items)) => {
+            for item in items {
+                collect_data_source_specs(Some(item), default_kind, specs);
+            }
+        }
+        Some(Value::Object(object)) => {
+            if let Some(path) = object
+                .get("path")
+                .or_else(|| object.get("file"))
+                .and_then(Value::as_str)
+            {
+                specs.push(DataSourceSpec {
+                    name: object
+                        .get("name")
+                        .or_else(|| object.get("title"))
+                        .and_then(Value::as_str)
+                        .map(ToString::to_string),
+                    path: path.to_string(),
+                    kind: object
+                        .get("type")
+                        .or_else(|| object.get("kind"))
+                        .and_then(Value::as_str)
+                        .map(ToString::to_string)
+                        .or_else(|| default_kind.map(ToString::to_string)),
+                });
+            }
+        }
+        _ => {}
+    }
+}
+
+fn data_source_kind_from_path(path: &str) -> Option<&'static str> {
+    if path.to_ascii_lowercase().ends_with(".tsv") {
+        Some("tsv")
+    } else if path.to_ascii_lowercase().ends_with(".csv") {
+        Some("csv")
+    } else {
+        None
+    }
+}
+
+pub(crate) fn strip_front_matter(text: &str) -> String {
+    if !text.starts_with("---\n") {
+        return text.to_string();
+    }
+    let mut lines = text.lines();
+    lines.next();
+    for line in &mut lines {
+        if line.trim() == "---" {
+            return lines.collect::<Vec<_>>().join("\n");
+        }
+    }
+    text.to_string()
+}
