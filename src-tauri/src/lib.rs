@@ -3928,6 +3928,14 @@ paths:
             .get("installationLabel")
             .and_then(Value::as_str)
             .is_some_and(|label| label.contains("not bundled")));
+        assert!(pikchr
+            .get("setupHint")
+            .and_then(Value::as_str)
+            .is_some_and(|hint| hint.contains("Pikchr executable")));
+        assert!(pikchr
+            .get("securitySummary")
+            .and_then(Value::as_str)
+            .is_some_and(|summary| summary.contains("no shell interpolation")));
         assert_eq!(
             pikchr.get("preferenceKey").and_then(Value::as_str),
             Some("transforms.pikchr.path")

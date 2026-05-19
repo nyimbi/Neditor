@@ -125,6 +125,13 @@ interface DocumentWatchEvent {
   modified?: string | null;
 }
 
+interface TransformProbeResult {
+  ok: boolean;
+  message: string;
+  diagnostics: string[];
+  cacheKey?: string;
+}
+
 const staleSaveConflictMessage = "File changed on disk since it was opened; resolve the external conflict before saving.";
 
 function quoteMarkdown(text: string) {
@@ -506,6 +513,7 @@ export const useDocumentsStore = defineStore("documents", {
     trustedTransformEngines: {} as Record<string, boolean>,
     transformInputModes: {} as Record<string, "stdin" | "file">,
     transformTimeoutMs: 5000,
+    transformProbeResults: {} as Record<string, TransformProbeResult>,
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
     exportBusy: false,
@@ -1247,7 +1255,22 @@ export const useDocumentsStore = defineStore("documents", {
       }
     },
     async setTransformEnginePath(name: string, path: string) {
+      const previousPath = this.transformEnginePaths[name] || "";
       this.transformEnginePaths = { ...this.transformEnginePaths, [name]: path };
+      this.transformProbeResults = {
+        ...this.transformProbeResults,
+        [name]: {
+          ok: false,
+          message: "Probe required after engine path change.",
+          diagnostics:
+            previousPath !== path
+              ? ["Trust was cleared because the executable path changed."]
+              : ["Run a probe to verify the configured engine path."],
+        },
+      };
+      if (previousPath !== path) {
+        this.trustedTransformEngines = { ...this.trustedTransformEngines, [name]: false };
+      }
       await this.persistWorkspace();
     },
     async setTransformTrust(name: string, trusted: boolean) {
@@ -1281,10 +1304,29 @@ export const useDocumentsStore = defineStore("documents", {
             max_output_bytes: engine?.limits.maxOutputBytes,
           },
         });
-        const detail = response.diagnostics[0]?.message || response.cache_key;
+        const diagnostics = response.diagnostics.map((diagnostic) => diagnostic.message).filter(Boolean);
+        const detail = diagnostics[0] || response.cache_key;
+        this.transformProbeResults = {
+          ...this.transformProbeResults,
+          [name]: {
+            ok: true,
+            message: detail,
+            diagnostics,
+            cacheKey: response.cache_key,
+          },
+        };
         this.statusMessage = `${name} transform probe succeeded: ${detail}`;
       } catch (error) {
-        this.lastError = error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
+        this.lastError = message;
+        this.transformProbeResults = {
+          ...this.transformProbeResults,
+          [name]: {
+            ok: false,
+            message,
+            diagnostics: [message],
+          },
+        };
         this.statusMessage = `${name} transform probe failed`;
       }
     },

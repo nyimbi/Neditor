@@ -681,6 +681,8 @@
             <h4>{{ engine.name }}</h4>
             <small>{{ engine.execution }}</small>
             <small>{{ engine.installationLabel }}</small>
+            <small>{{ engine.setupHint }}</small>
+            <small>{{ engine.securitySummary }}</small>
             <label>
               Engine path
               <span class="path-picker">
@@ -688,7 +690,7 @@
                 <button type="button" @click="chooseTransformEngine(engine.name)">Choose</button>
               </span>
             </label>
-            <label><input :checked="Boolean(store.trustedTransformEngines[engine.name])" type="checkbox" @change="store.setTransformTrust(engine.name, eventChecked($event))" /> Trusted</label>
+            <label><input :checked="Boolean(store.trustedTransformEngines[engine.name])" type="checkbox" @change="toggleTransformTrust(engine.name, $event)" /> Trusted</label>
             <label>
               Input
               <select :value="store.transformInputModes[engine.name] || 'stdin'" @change="store.setTransformInputMode(engine.name, eventValue($event) === 'file' ? 'file' : 'stdin')">
@@ -696,9 +698,20 @@
               </select>
             </label>
             <button type="button" @click="store.testExternalTransform(engine.name)">Probe</button>
+            <article
+              v-if="store.transformProbeResults[engine.name]"
+              :class="['engine-probe', store.transformProbeResults[engine.name].ok ? 'ok' : 'failed']"
+            >
+              <strong>{{ store.transformProbeResults[engine.name].ok ? "Probe passed" : "Probe failed" }}</strong>
+              <p>{{ store.transformProbeResults[engine.name].message }}</p>
+              <small v-if="store.transformProbeResults[engine.name].cacheKey">Cache: {{ store.transformProbeResults[engine.name].cacheKey }}</small>
+              <ul v-if="store.transformProbeResults[engine.name].diagnostics.length">
+                <li v-for="diagnostic in store.transformProbeResults[engine.name].diagnostics" :key="diagnostic">{{ diagnostic }}</li>
+              </ul>
+            </article>
           </article>
           <p v-for="engine in store.transformEngines.filter((candidate) => !candidate.requiresExecution)" :key="engine.name" class="engine-summary">
-            {{ engine.name }}: {{ engine.execution }} | {{ engine.installationLabel }}
+            {{ engine.name }}: {{ engine.execution }} | {{ engine.installationLabel }} | {{ engine.securitySummary }}
           </p>
         </template>
       </aside>
@@ -862,7 +875,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorState, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, keymap, lineNumbers, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
@@ -1955,6 +1968,30 @@ async function chooseTransformEngine(name: string) {
     multiple: false,
   });
   if (typeof selected === "string") await store.setTransformEnginePath(name, selected);
+}
+
+async function toggleTransformTrust(name: string, event: Event) {
+  const trusted = eventChecked(event);
+  if (!trusted) {
+    await store.setTransformTrust(name, false);
+    return;
+  }
+  const enginePath = store.transformEnginePaths[name]?.trim();
+  if (!enginePath) {
+    if (event.target instanceof HTMLInputElement) event.target.checked = false;
+    store.statusMessage = `Choose a ${name} engine path before trusting it`;
+    return;
+  }
+  const allowed = await confirm(
+    `Trust ${name} external transform engine?\n\nNEditor will be allowed to run ${enginePath} for this transform with timeout, size, and no-shell execution limits.`,
+    { title: "Trust external transform engine", kind: "warning" },
+  );
+  if (allowed) {
+    await store.setTransformTrust(name, true);
+  } else {
+    if (event.target instanceof HTMLInputElement) event.target.checked = false;
+    await store.setTransformTrust(name, false);
+  }
 }
 
 async function saveDocument() {
@@ -3370,6 +3407,25 @@ select:hover {
 .engine-row h4 {
   margin: 0;
   font-size: 13px;
+}
+
+.engine-probe {
+  border-left: 3px solid #64748b;
+  padding: 6px 8px;
+  background: #f8fafc;
+}
+
+.engine-probe.ok {
+  border-left-color: #2f855a;
+}
+
+.engine-probe.failed {
+  border-left-color: #c2410c;
+}
+
+.engine-probe p,
+.engine-probe ul {
+  margin: 4px 0 0;
 }
 
 .path-picker {

@@ -259,6 +259,8 @@ export interface TransformEngineMetadata {
   available: boolean;
   bundled: boolean;
   installationLabel: string;
+  setupHint: string;
+  securitySummary: string;
   requiresExecution: boolean;
   preferenceKey: string;
   inputModes: Array<"stdin" | "file" | string>;

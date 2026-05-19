@@ -577,6 +577,8 @@ fn transform_engine(
         "safeByDefault": safe_by_default,
         "bundled": !requires_execution,
         "installationLabel": installation_label,
+        "setupHint": transform_setup_hint(name, requires_execution),
+        "securitySummary": transform_security_summary(requires_execution),
         "requiresNetwork": false,
         "requiresExecution": requires_execution,
         "trustRequired": requires_execution,
@@ -592,4 +594,30 @@ fn transform_engine(
         "cacheScope": "name+enginePath+inputMode+sourceHash",
         "exportTargets": ["html", "pdf", "docx", "pptx"]
     })
+}
+
+fn transform_setup_hint(name: &str, requires_execution: bool) -> &'static str {
+    if !requires_execution {
+        return "No setup required; this renderer is built into NEditor.";
+    }
+    match name {
+        "pikchr" => "Choose a local Pikchr executable. NEditor does not bundle Pikchr by default.",
+        "dot" | "graphviz" => {
+            "Choose a local Graphviz executable such as dot. NEditor invokes it directly, not through a shell."
+        }
+        "plantuml" => {
+            "Choose a local PlantUML launcher or wrapper script. Java and PlantUML remain user-installed."
+        }
+        "d2" => "Choose a local D2 executable. Bundling is intentionally deferred to license/package review.",
+        "stl" => "Choose a local STL renderer only if static SVG fallback is insufficient.",
+        _ => "Choose an absolute path to a local executable for this optional transform engine.",
+    }
+}
+
+fn transform_security_summary(requires_execution: bool) -> &'static str {
+    if requires_execution {
+        "Disabled until trusted. Runs with an absolute path, no shell interpolation, timeout limits, input size limits, output size limits, and cache-keyed diagnostics."
+    } else {
+        "Rust-native transform. Does not execute external programs or perform network access."
+    }
 }
