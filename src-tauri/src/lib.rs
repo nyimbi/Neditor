@@ -2778,6 +2778,15 @@ ARR: Annual recurring revenue.
             .find(|diagnostic| diagnostic.message.contains("unresolved review comments"))
             .expect("unresolved comment diagnostic");
         assert_eq!(unresolved_comment_diagnostic.severity, "error");
+        assert_eq!(unresolved_comment_diagnostic.line, Some(7));
+        assert_eq!(
+            unresolved_comment_diagnostic.source_file.as_deref(),
+            Some("untitled.md")
+        );
+        assert!(unresolved_comment_diagnostic
+            .related
+            .iter()
+            .any(|related| related.contains("Clarify the risk note")));
     }
 
     #[test]
@@ -4982,6 +4991,11 @@ paths:
             })
             .expect("AI review diagnostic");
         assert_eq!(ai_review_diagnostic.severity, "error");
+        assert_eq!(ai_review_diagnostic.line, Some(6));
+        assert_eq!(
+            ai_review_diagnostic.source_file.as_deref(),
+            Some("untitled.md")
+        );
 
         let report = prepare_for_export(PrepareExportRequest {
             text: source.to_string(),

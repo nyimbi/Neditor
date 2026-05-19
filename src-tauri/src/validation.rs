@@ -170,36 +170,52 @@ pub(crate) fn validate_document(
             diagnostics.push(diagnostic);
         }
     }
-    if input
+    if let Some(comment) = input
         .comments
         .iter()
-        .any(|comment| comment.state != "resolved")
+        .find(|comment| comment.state != "resolved")
     {
-        diagnostics.push(diag(
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, comment.line);
+        let mut diagnostic = diag(
             if release_status { "error" } else { "warning" },
             "Document has unresolved review comments.",
-            None,
-            None,
+            source_file,
+            line,
             Some("Resolve comments before publishing."),
+        );
+        diagnostic.related.push(format!(
+            "First unresolved comment by {}: {}",
+            comment.author, comment.text
         ));
+        diagnostics.push(diagnostic);
     }
-    if input
-        .ai_sources
-        .iter()
-        .any(|source| source.status != "human-reviewed")
-        || input
-            .ai_assisted_sections
-            .iter()
-            .any(|section| section.status != "human-reviewed")
-    {
+    if let Some(line_number) = first_pending_ai_review_line(&input) {
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, line_number);
         diagnostics.push(diag(
             if release_status { "error" } else { "warning" },
             "Document has AI-assisted sections that are not human-reviewed.",
-            None,
-            None,
+            source_file,
+            line,
             Some("Mark AI source blocks and AI-assisted section markers as human-reviewed after review."),
         ));
     }
+}
+
+fn first_pending_ai_review_line(input: &DocumentValidationInput<'_>) -> Option<usize> {
+    input
+        .ai_sources
+        .iter()
+        .find(|source| source.status != "human-reviewed")
+        .map(|source| source.line)
+        .or_else(|| {
+            input
+                .ai_assisted_sections
+                .iter()
+                .find(|section| section.status != "human-reviewed")
+                .map(|section| section.line)
+        })
 }
 
 fn validate_layout_metadata(metadata: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {
