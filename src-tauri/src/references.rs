@@ -1,5 +1,7 @@
 use crate::{
-    diagnostic_location_for_generated_line, diagnostics::diag, DocumentDiagnostic, SourceMapEntry,
+    diagnostic_location_for_generated_line,
+    diagnostics::{diag, with_range},
+    DocumentDiagnostic, SourceMapEntry,
 };
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -10,6 +12,8 @@ pub(crate) struct CrossReference {
     pub(crate) target_kind: String,
     pub(crate) resolved: bool,
     pub(crate) line: usize,
+    pub(crate) column: usize,
+    pub(crate) end_column: usize,
     pub(crate) source_file: Option<String>,
 }
 
@@ -39,24 +43,38 @@ pub(crate) fn collect_cross_references(
     let mut references = Vec::new();
     for (line_index, line) in text.lines().enumerate() {
         let generated_line = line_index + 1;
-        for segment in line.split("{@").skip(1) {
-            let Some((key, _)) = segment.split_once('}') else {
-                continue;
+        let mut search_from = 0usize;
+        while let Some(relative_start) = line[search_from..].find("{@") {
+            let start = search_from + relative_start;
+            let key_start = start + 2;
+            let Some(relative_end) = line[key_start..].find('}') else {
+                break;
             };
-            let key = key.trim().to_string();
+            let key_end = key_start + relative_end;
+            let key = line[key_start..key_end].trim().to_string();
             if key.is_empty() {
+                search_from = key_end + 1;
                 continue;
             }
+            let column = start + 1;
+            let end_column = key_end + 2;
             let resolved = known.contains(key.as_str());
             let (source_file, source_line) =
                 diagnostic_location_for_generated_line(source_map, generated_line);
             if !resolved {
-                let mut diagnostic = diag(
-                    "error",
-                    format!("Broken cross reference: {key}"),
-                    source_file.clone(),
+                let mut diagnostic = with_range(
+                    diag(
+                        "error",
+                        format!("Broken cross reference: {key}"),
+                        source_file.clone(),
+                        source_line,
+                        Some(
+                            "Add a matching label such as {#fig:name}, {#tbl:name}, or {#eq:name}.",
+                        ),
+                    ),
+                    column,
                     source_line,
-                    Some("Add a matching label such as {#fig:name}, {#tbl:name}, or {#eq:name}."),
+                    end_column,
                 );
                 diagnostic
                     .related
@@ -71,8 +89,11 @@ pub(crate) fn collect_cross_references(
                 key,
                 resolved,
                 line: source_line.unwrap_or(generated_line),
+                column,
+                end_column,
                 source_file,
             });
+            search_from = key_end + 1;
         }
     }
     references

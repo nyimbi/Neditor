@@ -1,7 +1,7 @@
 use crate::{
     bibliography::{BibliographyEntry, CitationReference},
     diagnostic_location_for_generated_line,
-    diagnostics::{diag, DocumentDiagnostic},
+    diagnostics::{diag, with_range, DocumentDiagnostic},
     metadata_string,
     provenance::{AiAssistedSection, AiSource},
     review::ReviewComment,
@@ -127,12 +127,17 @@ pub(crate) fn validate_document(
         let first = &input.citation_references[0];
         let (source_file, line) =
             diagnostic_location_for_generated_line(input.source_map, first.line);
-        let mut diagnostic = diag(
-            "warning",
-            "Document contains citations but no bibliography source.",
-            source_file,
+        let mut diagnostic = with_range(
+            diag(
+                "warning",
+                "Document contains citations but no bibliography source.",
+                source_file,
+                line,
+                Some("Add bibliography front matter, a bibtex fence, or a bibliography marker."),
+            ),
+            first.column,
             line,
-            Some("Add bibliography front matter, a bibtex fence, or a bibliography marker."),
+            first.end_column,
         );
         diagnostic
             .related
@@ -147,12 +152,17 @@ pub(crate) fn validate_document(
         {
             let (source_file, line) =
                 diagnostic_location_for_generated_line(input.source_map, reference.line);
-            let mut diagnostic = diag(
-                "error",
-                format!("Broken citation: {}", reference.key),
-                source_file,
+            let mut diagnostic = with_range(
+                diag(
+                    "error",
+                    format!("Broken citation: {}", reference.key),
+                    source_file,
+                    line,
+                    Some("Add the key to a BibTeX or CSL bibliography source."),
+                ),
+                reference.column,
                 line,
-                Some("Add the key to a BibTeX or CSL bibliography source."),
+                reference.end_column,
             );
             diagnostic
                 .related

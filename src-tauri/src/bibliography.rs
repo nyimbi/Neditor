@@ -23,6 +23,8 @@ pub(crate) struct CitationReference {
     pub(crate) locator: Option<String>,
     pub(crate) raw: String,
     pub(crate) line: usize,
+    pub(crate) column: usize,
+    pub(crate) end_column: usize,
 }
 
 pub(crate) fn collect_bibliography(
@@ -234,13 +236,22 @@ fn csl_issued_year(entry: &Value) -> Option<String> {
 pub(crate) fn collect_citation_references(text: &str) -> Vec<CitationReference> {
     let mut citations = Vec::new();
     for (index, line) in text.lines().enumerate() {
-        for segment in line.split('[').skip(1) {
-            if let Some((inside, _)) = segment.split_once(']') {
-                if !inside.contains('@') {
-                    continue;
-                }
-                citations.extend(citation_references_from_bracket(inside, index + 1));
+        let mut search_from = 0usize;
+        while let Some(relative_start) = line[search_from..].find('[') {
+            let start = search_from + relative_start;
+            let inside_start = start + 1;
+            let Some(relative_end) = line[inside_start..].find(']') else {
+                break;
+            };
+            let inside = &line[inside_start..inside_start + relative_end];
+            if inside.contains('@') {
+                citations.extend(citation_references_from_bracket(
+                    inside,
+                    index + 1,
+                    inside_start + 1,
+                ));
             }
+            search_from = inside_start + relative_end + 1;
         }
     }
     citations
@@ -254,9 +265,14 @@ pub(crate) fn citation_keys_from_references(references: &[CitationReference]) ->
     citations.into_iter().collect()
 }
 
-fn citation_references_from_bracket(text: &str, line: usize) -> Vec<CitationReference> {
+fn citation_references_from_bracket(
+    text: &str,
+    line: usize,
+    bracket_content_column: usize,
+) -> Vec<CitationReference> {
     let mut references = Vec::new();
     let mut rest = text;
+    let mut consumed = 0usize;
     while let Some(index) = rest.find('@') {
         let after_at = &rest[index + 1..];
         let key = after_at
@@ -265,6 +281,7 @@ fn citation_references_from_bracket(text: &str, line: usize) -> Vec<CitationRefe
             .collect::<String>();
         let key_len = key.len();
         if !key.is_empty() {
+            let column = bracket_content_column + consumed + index;
             let after_key = &after_at[key_len..];
             let locator_end = after_key.find('@').unwrap_or(after_key.len());
             let locator = after_key[..locator_end]
@@ -278,9 +295,13 @@ fn citation_references_from_bracket(text: &str, line: usize) -> Vec<CitationRefe
                 locator: (!locator.is_empty()).then(|| locator.to_string()),
                 raw: text.to_string(),
                 line,
+                column,
+                end_column: column + key_len + 1,
             });
         }
-        rest = &after_at[key_len..];
+        let advance = index + 1 + key_len;
+        consumed += advance;
+        rest = &rest[advance..];
     }
     references
 }
@@ -305,7 +326,7 @@ pub(crate) fn render_citations(
         };
         let inside = &after_start[..end];
         if inside.contains('@') {
-            let references = citation_references_from_bracket(inside, 0);
+            let references = citation_references_from_bracket(inside, 0, 1);
             output.push_str(&render_citation_span(&references, &entries, style));
         } else {
             output.push('[');

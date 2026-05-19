@@ -2754,7 +2754,10 @@ ARR: Annual recurring revenue.
             .citation_references
             .iter()
             .any(|citation| {
-                citation.key == "porter1985" && citation.locator.as_deref() == Some("p. 42")
+                citation.key == "porter1985"
+                    && citation.locator.as_deref() == Some("p. 42")
+                    && citation.column == 8
+                    && citation.end_column > citation.column
             }));
         assert!(response.html.contains("Porter 1985, p. 42; Doe 2026"));
         assert!(response
@@ -2786,6 +2789,8 @@ ARR: Annual recurring revenue.
             })
             .expect("broken cross-reference diagnostic");
         assert_eq!(broken_cross_reference.line, Some(12));
+        assert!(broken_cross_reference.column.is_some());
+        assert!(broken_cross_reference.end_column > broken_cross_reference.column);
         assert!(broken_cross_reference
             .related
             .iter()
@@ -3137,6 +3142,8 @@ ARR: Annual recurring revenue.
             .find(|diagnostic| diagnostic.message.contains("Broken citation: missing2026"))
             .expect("broken citation diagnostic");
         assert_eq!(broken_citation.line, Some(11));
+        assert_eq!(broken_citation.column, Some(10));
+        assert!(broken_citation.end_column > broken_citation.column);
         assert!(broken_citation
             .related
             .iter()

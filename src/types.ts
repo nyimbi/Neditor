@@ -34,7 +34,14 @@ export interface SemanticDocument {
   figures: number;
   equations: number;
   citations: string[];
-  citation_references: Array<{ key: string; locator?: string | null; raw: string; line: number }>;
+  citation_references: Array<{
+    key: string;
+    locator?: string | null;
+    raw: string;
+    line: number;
+    column: number;
+    end_column: number;
+  }>;
   duplicate_bibliography_keys: string[];
   glossary: Record<string, string>;
   layout_directives: string[];
@@ -60,7 +67,15 @@ export interface SemanticDocument {
     prompt_summary: string;
   }>;
   labels: string[];
-  cross_references: Array<{ key: string; target_kind: string; resolved: boolean; line: number; source_file?: string | null }>;
+  cross_references: Array<{
+    key: string;
+    target_kind: string;
+    resolved: boolean;
+    line: number;
+    column: number;
+    end_column: number;
+    source_file?: string | null;
+  }>;
 }
 
 export interface DocumentSourceRange {
