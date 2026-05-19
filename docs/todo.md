@@ -22,7 +22,7 @@ What remains to achieve the full vision:
   3. Full visual table editor
      Core editor controls now cover table parsing/paste/captions, add/remove/duplicate/move rows and columns, alignment, sorting, column formats, totals, formula rows,
      validation, Markdown preview before apply, target/range formula authoring, and cell/header accessibility labels. Export fixtures now cover broader edited-table
-     permutations, and no-new-dependency frontend unit coverage now locks table parsing/paste/validation/serialization behavior. Still needed: browser-level interaction tests.
+     permutations, and no-new-dependency frontend unit coverage now locks table parsing/paste/validation/serialization behavior in CI. Still needed: browser-level interaction tests.
   4. External transform UX and adapters
      Safety primitives exist: trust, active document trust prompts, timeouts, size limits, stdin/file modes, caching, diagnostics, setup/security guidance, and adapter
      profiles for Graphviz, D2, PlantUML, and Pikchr. Platform setup guidance, per-engine diagnostic profiles and failure hints, an installed-engine conformance harness,
@@ -31,7 +31,7 @@ What remains to achieve the full vision:
      Native watcher support exists behind native-watch, with fallback now. Watch events are now scoped to the document that installed the watcher, tab activation
      recompiles/resyncs watched paths, conflict actions target the conflicted document instead of whichever tab is currently visible, and backend watch setup discovers nested
      include directives for stronger include graph refresh coverage. The native-watch build has been verified after the optional watcher crates were available. The conflict
-     modal now supports line-by-line merge composition from the local/external diff, with frontend unit coverage for local/external diff alignment. Still needed: browser-level
+     modal now supports line-by-line merge composition from the local/external diff, with frontend unit coverage for local/external diff alignment in CI. Still needed: browser-level
      workflow coverage for conflict resolution.
   6. E2E and export conformance tests
      Need Playwright/Tauri workflow tests, broader fixture comparisons, and confirmed macOS/Windows/Linux CI runs. DOCX sidecar manifests and PPTX slide/media
