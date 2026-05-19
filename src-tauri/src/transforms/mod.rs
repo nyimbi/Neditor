@@ -8,6 +8,7 @@ pub(crate) mod external;
 pub(crate) mod options;
 pub(crate) mod pipeline;
 pub(crate) mod qr;
+pub(crate) mod structured;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct TransformArtifact {
