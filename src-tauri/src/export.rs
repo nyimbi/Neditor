@@ -1894,7 +1894,7 @@ fn docx_generated_toc() -> String {
 fn docx_heading(level: usize, text: &str) -> String {
     let style = format!("Heading{}", level.clamp(1, 6));
     format!(
-        r#"<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr><w:r><w:t>{}</w:t></w:r></w:p>"#,
+        r#"<w:p><w:pPr><w:pStyle w:val="{style}"/><w:widowControl/></w:pPr><w:r><w:t>{}</w:t></w:r></w:p>"#,
         escape_xml(text)
     )
 }
@@ -1905,7 +1905,10 @@ fn docx_toc_field() -> String {
 }
 
 fn docx_paragraph(text: &str) -> String {
-    format!(r#"<w:p><w:r><w:t>{}</w:t></w:r></w:p>"#, escape_xml(text))
+    format!(
+        r#"<w:p><w:pPr><w:widowControl/></w:pPr><w:r><w:t>{}</w:t></w:r></w:p>"#,
+        escape_xml(text)
+    )
 }
 
 fn docx_paragraph_from_inlines(
@@ -1937,7 +1940,7 @@ fn docx_paragraph_from_inlines(
             }
         })
         .collect::<String>();
-    format!("<w:p>{runs}</w:p>")
+    format!("<w:p><w:pPr><w:widowControl/></w:pPr>{runs}</w:p>")
 }
 
 fn inline_export_text(text: &str) -> String {
@@ -3509,7 +3512,7 @@ fn export_css(
         ""
     };
     format!(
-        "body{{font-family:{};margin:{body_margin};color:#1f2937;line-height:{body_line_height}}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:{cover_min_height};display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:{heading_size};margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}figure[data-float='right'],.figure-float-right{{float:right;max-width:45%;margin:0 0 16px 24px}}figure[data-float='left'],.figure-float-left{{float:left;max-width:45%;margin:0 24px 16px 0}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.equation{{margin:18px 0}}.math-rendered{{font-family:Georgia,'Times New Roman',serif;font-size:1.08em}}.math-display{{padding:12px;border:1px solid #d8e0e8;background:#f8fafc;text-align:center}}.math-frac{{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center}}.math-frac span:first-child{{border-bottom:1px solid currentColor}}.math-sqrt::before{{content:'√'}}.math-source-inline{{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}{syntax_rules}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{size:{page_size};margin:{page_margin};@top-center{{content:element(header)}}{page_counter_rule}}}",
+        "body{{font-family:{};margin:{body_margin};color:#1f2937;line-height:{body_line_height}}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:{cover_min_height};display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:{heading_size};margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}p,li,blockquote{{orphans:2;widows:2}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}figure[data-float='right'],.figure-float-right{{float:right;max-width:45%;margin:0 0 16px 24px}}figure[data-float='left'],.figure-float-left{{float:left;max-width:45%;margin:0 24px 16px 0}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.equation{{margin:18px 0}}.math-rendered{{font-family:Georgia,'Times New Roman',serif;font-size:1.08em}}.math-display{{padding:12px;border:1px solid #d8e0e8;background:#f8fafc;text-align:center}}.math-frac{{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center}}.math-frac span:first-child{{border-bottom:1px solid currentColor}}.math-sqrt::before{{content:'√'}}.math-source-inline{{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}{syntax_rules}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{size:{page_size};margin:{page_margin};@top-center{{content:element(header)}}{page_counter_rule}}}",
         escape_css(brand_font),
         escape_css(watermark)
     )

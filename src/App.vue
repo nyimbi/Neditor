@@ -3483,6 +3483,13 @@ select:hover {
   line-height: 1.2;
 }
 
+.preview-document p,
+.preview-document li,
+.preview-document blockquote {
+  orphans: 2;
+  widows: 2;
+}
+
 .preview-document table,
 .transform-table {
   width: 100%;

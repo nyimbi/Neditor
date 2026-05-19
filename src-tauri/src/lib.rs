@@ -3209,7 +3209,12 @@ ARR: Annual recurring revenue.
         let html = render_full_html(&response, &options);
         assert!(html.contains("margin:32px"));
         assert!(html.contains("line-height:1.42"));
+        assert!(html.contains("p,li,blockquote{orphans:2;widows:2}"));
         assert!(html.contains("@page{size:A4;margin:18mm"));
+
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let document = zip_entry_text(&docx, "word/document.xml");
+        assert!(document.contains("<w:widowControl/>"));
 
         let exported_text = export::export_text(&response, &options);
         assert!(exported_text.contains("Layout preset: compact"));
