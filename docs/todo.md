@@ -4,8 +4,8 @@ What remains to achieve the full vision:
      DOCX/PPTX/PDF now map more business semantics, including native DOCX comments/change notes, footnotes with inline references, and DOCX bookmarks/internal
      hyperlinks for cross references, DOCX citation fields with bookmarked bibliography fallbacks, DOCX/PDF/PPTX section header/footer overrides from layout directives, and
      PPTX title, section-divider, two-column, and table-oriented slide layouts. SVG/PNG/JPEG dimensions now drive DOCX/PPTX image boxes and proportionate PDF
-     figure boxes, figure float semantics affect DOCX/PPTX/PDF positioning, and fit="cover" plus crop position maps to preview/export metadata and
-     DOCX/PPTX crop rectangles. Still needed: deeper page-aware behavior and UI affordances for crop focus.
+     figure boxes, figure float semantics affect DOCX/PPTX/PDF positioning, fit="cover" plus crop position maps to preview/export metadata and DOCX/PPTX
+     crop rectangles, and the toolbar/command palette can insert cover figures with crop focus. Still needed: deeper page-aware behavior and a visual crop editor.
   2. Canonical document AST
      There is an AST foundation, but the compiler still has string-heavy paths. Export, diagnostics, source maps, references, transforms, and validation need to depend on
      a durable semantic model.

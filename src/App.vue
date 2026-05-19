@@ -73,6 +73,7 @@
       <button type="button" title="Heading" @click="insertAtLineStart('## ')">H2</button>
       <button type="button" title="Link" @click="wrapSelection('[', '](https://)')">Link</button>
       <button type="button" title="Table" @click="insertBlock(tableSnippet)">Table</button>
+      <button type="button" title="Figure" @click="insertFigureSnippet()">Figure</button>
       <button type="button" title="Calculation" @click="insertBlock(calcSnippet)">Calc</button>
       <button type="button" title="Equation" @click="insertBlock(equationSnippet)">Equation</button>
       <button type="button" title="AI source" @click="insertBlock(aiSnippet)">AI</button>
@@ -995,6 +996,7 @@ type TableAlignment = "left" | "center" | "right";
 type TableFormat = "text" | "number" | "currency" | "percent" | "date";
 type TableSortDirection = "asc" | "desc";
 type TableFormulaFunction = "SUM" | "AVG" | "MIN" | "MAX" | "COUNT";
+type FigureCropPosition = "center" | "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 interface TableDraft {
   id: string;
@@ -1041,6 +1043,7 @@ interface DocumentTabGroup {
 }
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
+const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
 const equationSnippet = "$$\nE = mc^2\n$$ {#eq:energy}\n";
 const glossarySnippet = "```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n";
@@ -1213,6 +1216,14 @@ const commands = computed(() => [
   { name: "Add review comment", group: "Review", run: () => (store.sidebar = "review") },
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
+  { name: "Insert cover figure", group: "Snippet", run: () => insertFigureSnippet() },
+  ...figureCropPositions
+    .filter((position) => position !== "center")
+    .map((position) => ({
+      name: `Insert ${position} crop figure`,
+      group: "Snippet",
+      run: () => insertFigureSnippet(position),
+    })),
   { name: "Insert calculation", group: "Snippet", run: () => insertBlock(calcSnippet) },
   { name: "Insert equation", group: "Snippet", run: () => insertBlock(equationSnippet) },
   { name: "Insert glossary", group: "Snippet", run: () => insertBlock(glossarySnippet) },
@@ -2390,6 +2401,14 @@ function insertBlock(block: string) {
   const position = editorView.state.selection.main.to;
   editorView.dispatch({ changes: { from: position, insert: `\n${block}\n` } });
   editorView.focus();
+}
+
+function insertFigureSnippet(position: FigureCropPosition = "center") {
+  insertBlock(formatFigureSnippet(position));
+}
+
+function formatFigureSnippet(position: FigureCropPosition) {
+  return `![Figure alt](assets/figure.png){#fig:figure caption="Figure caption" fit="cover" position="${position}"}`;
 }
 
 function openTableEditor() {
