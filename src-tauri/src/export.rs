@@ -1,12 +1,12 @@
 use crate::{
     document_ast::{export_body_text_from_ast, AstSourceRange, DocumentBlock, InlineNode},
     escape_css, escape_html, escape_pdf, escape_xml, metadata_string, render_export_template,
-    sha256_hex,
+    sha256_hex, sha256_uri,
     tables::delimited_rows_for_export,
     CompileResponse, ExportManifest,
 };
 use chrono::Utc;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::{
     fs,
     io::{Cursor, Write},
@@ -540,6 +540,13 @@ pub(crate) fn render_markdown_bundle_bytes(
             .as_bytes(),
     )
     .map_err(|err| err.to_string())?;
+    let media = collect_docx_media(response);
+    if !media.is_empty() {
+        zip.start_file("media-map.json", options)
+            .map_err(|err| err.to_string())?;
+        zip.write_all(render_bundle_media_map(&media)?.as_bytes())
+            .map_err(|err| err.to_string())?;
+    }
     for included in &manifest.included_files {
         if let Ok(bytes) = fs::read(&included.path) {
             let bundle_path = format!("includes/{}", safe_bundle_path(&included.path));
@@ -548,13 +555,29 @@ pub(crate) fn render_markdown_bundle_bytes(
             zip.write_all(&bytes).map_err(|err| err.to_string())?;
         }
     }
-    for item in collect_docx_media(response) {
+    for item in media {
         zip.start_file(item.path, options)
             .map_err(|err| err.to_string())?;
         zip.write_all(&item.bytes).map_err(|err| err.to_string())?;
     }
     zip.finish().map_err(|err| err.to_string())?;
     Ok(cursor.into_inner())
+}
+
+fn render_bundle_media_map(media: &[ExportMedia]) -> Result<String, String> {
+    let entries = media
+        .iter()
+        .map(|item| {
+            json!({
+                "source": item.source,
+                "source_file": item.source_file,
+                "bundle_path": item.path,
+                "content_type": item.content_type,
+                "hash": sha256_uri(&item.bytes),
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::to_string_pretty(&entries).map_err(|err| err.to_string())
 }
 
 fn safe_bundle_path(path: &str) -> String {

@@ -5054,12 +5054,15 @@ beta</pre>
         let bundled_markdown = zip_entry_text(&bundle, "document.md");
         let bundled_text = zip_entry_text(&bundle, "document.txt");
         let bundled_manifest = zip_entry_text(&bundle, "manifest.json");
+        let bundled_media_map = zip_entry_text(&bundle, "media-map.json");
         let bundled_svg = zip_entry_text(&bundle, "media/image1.svg");
         assert!(bundled_markdown.contains("Competitive Advantage"));
         assert!(bundled_text.contains("Figure: fig:architecture: Reference architecture"));
         assert!(bundled_text.contains("Verify board-pack export fidelity."));
         assert!(bundled_text.contains("OpenAI / gpt-5.4"));
         assert!(bundled_manifest.contains("\"document_title\": \"Export Conformance Report\""));
+        assert!(bundled_media_map.contains("\"bundle_path\": \"media/image1.svg\""));
+        assert!(bundled_media_map.contains("\"hash\": \"sha256:"));
         assert_eq!(bundled_svg, "<svg/>");
     }
 
