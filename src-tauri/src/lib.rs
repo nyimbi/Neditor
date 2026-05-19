@@ -69,7 +69,7 @@ use export::{
 use export_commands::{export_document, prepare_for_export};
 #[cfg(test)]
 use export_commands::{ExportRequest, PrepareExportRequest};
-#[cfg(feature = "native-watch")]
+#[cfg(all(test, feature = "native-watch"))]
 use filesystem::notify_event_should_emit;
 use filesystem::{
     duplicate_file, file_metadata, list_workspace_files, open_file, read_file, rename_file,
