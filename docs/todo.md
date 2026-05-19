@@ -41,5 +41,5 @@ What remains to achieve the full vision:
      and the export package writers are split into HTML, DOCX, PDF, PPTX, and Markdown bundle modules, with shared export text/table/layout helpers isolated in
      export/shared.rs. Filesystem watch/include-graph logic and workspace tree scanning now live outside the low-level file command module, snapshot metadata/storage
      helpers are isolated from snapshot commands, Git IPC types/process helpers now live outside Git command routing, and diagnostic payload types are split from diagnostic
-     builder helpers. The transform/external-transform and semantic export renderer test clusters now live in dedicated nested test modules instead of the root backend
-     fixture file. Still needed: split the remaining large test fixture clusters further as the feature set grows.
+     builder helpers. The transform/external-transform, semantic export renderer, and export command/readiness test clusters now live in dedicated nested test modules instead
+     of the root backend fixture file. Still needed: split the remaining large compiler, table, media, Git, and cleanup fixture clusters further as the feature set grows.
