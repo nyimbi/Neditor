@@ -10,7 +10,6 @@
     "fs:allow-watch",
     "fs:allow-unwatch",
     "opener:default",
-    "shell:allow-execute",
     "store:default",
     "window-state:default"
   ]
