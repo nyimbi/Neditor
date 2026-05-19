@@ -50,7 +50,7 @@ use calculations::{
     FormulaValue,
 };
 use compile_options::apply_compile_options;
-use diagnostics::{diag, DocumentDiagnostic};
+use diagnostics::{diag, with_range, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
 use document_ast::{attach_source_ranges, build_document_ast, DocumentAst};
@@ -487,13 +487,18 @@ fn interpolate_variables(
     let mut output = String::new();
     let mut rest = text;
     let mut generated_line = 1usize;
+    let mut generated_column = 1usize;
     while let Some(start) = rest.find("{{") {
         let (before, after_start) = rest.split_at(start);
         output.push_str(before);
-        generated_line += before.chars().filter(|ch| *ch == '\n').count();
+        advance_source_position(&mut generated_line, &mut generated_column, before);
         if let Some(end) = after_start.find("}}") {
             let token = after_start[2..end].trim();
             let token_line = generated_line;
+            let token_column = generated_column;
+            let token_source = &after_start[..end + 2];
+            let (token_end_line, token_end_column) =
+                source_position_after(token_line, token_column, token_source);
             let mut formula_token = false;
             let replacement = if let Some(expr) = token.strip_prefix('=') {
                 formula_token = true;
@@ -502,12 +507,18 @@ fn interpolate_variables(
                     Err(error) => {
                         let (source_file, line) =
                             diagnostic_location_for_generated_line(source_map, token_line);
-                        diagnostics.push(diag(
-                            "error",
-                            format!("Inline formula error for {{{{{token}}}}}: {error}"),
-                            source_file,
-                            line,
-                            Some("Use numeric expressions, supported functions, and names defined in calc blocks."),
+                        let end_line = diagnostic_end_line(line, token_line, token_end_line);
+                        diagnostics.push(with_range(
+                            diag(
+                                "error",
+                                format!("Inline formula error for {{{{{token}}}}}: {error}"),
+                                source_file,
+                                line,
+                                Some("Use numeric expressions, supported functions, and names defined in calc blocks."),
+                            ),
+                            token_column,
+                            end_line,
+                            token_end_column,
                         ));
                         None
                     }
@@ -525,19 +536,22 @@ fn interpolate_variables(
             } else {
                 let (source_file, line) =
                     diagnostic_location_for_generated_line(source_map, token_line);
-                diagnostics.push(diag(
-                    "warning",
-                    format!("Missing document variable: {token}"),
-                    source_file,
-                    line,
-                    Some("Define the variable in front matter or a calc block."),
+                let end_line = diagnostic_end_line(line, token_line, token_end_line);
+                diagnostics.push(with_range(
+                    diag(
+                        "warning",
+                        format!("Missing document variable: {token}"),
+                        source_file,
+                        line,
+                        Some("Define the variable in front matter or a calc block."),
+                    ),
+                    token_column,
+                    end_line,
+                    token_end_column,
                 ));
                 output.push_str(&format!("{{{{{token}}}}}"));
             }
-            generated_line += after_start[..end + 2]
-                .chars()
-                .filter(|ch| *ch == '\n')
-                .count();
+            advance_source_position(&mut generated_line, &mut generated_column, token_source);
             rest = &after_start[end + 2..];
         } else {
             output.push_str(after_start);
@@ -546,6 +560,32 @@ fn interpolate_variables(
     }
     output.push_str(rest);
     output
+}
+
+fn advance_source_position(line: &mut usize, column: &mut usize, text: &str) {
+    for ch in text.chars() {
+        if ch == '\n' {
+            *line += 1;
+            *column = 1;
+        } else {
+            *column += 1;
+        }
+    }
+}
+
+fn source_position_after(line: usize, column: usize, text: &str) -> (usize, usize) {
+    let mut end_line = line;
+    let mut end_column = column;
+    advance_source_position(&mut end_line, &mut end_column, text);
+    (end_line, end_column)
+}
+
+fn diagnostic_end_line(
+    source_line: Option<usize>,
+    generated_start_line: usize,
+    generated_end_line: usize,
+) -> Option<usize> {
+    source_line.map(|line| line + generated_end_line.saturating_sub(generated_start_line))
 }
 
 pub(crate) fn diagnostic_location_for_generated_line(
@@ -2439,6 +2479,9 @@ ARR: Annual recurring revenue.
             })
             .expect("missing owner diagnostic");
         assert_eq!(missing_owner.line, Some(9));
+        assert_eq!(missing_owner.column, Some(15));
+        assert_eq!(missing_owner.end_line, Some(9));
+        assert_eq!(missing_owner.end_column, Some(24));
         assert_eq!(missing_owner.source_file.as_deref(), Some("untitled.md"));
         assert!(!response
             .diagnostics
