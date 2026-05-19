@@ -24,6 +24,7 @@ mod indexing;
 mod link_validation;
 mod markdown_tables;
 mod provenance;
+mod references;
 mod review;
 mod rich_blocks;
 mod snapshot;
@@ -78,6 +79,7 @@ use html_preview::markdown_to_html;
 use indexing::{collect_index_entries, strip_index_markers};
 use link_validation::{validate_image_paths, validate_link_paths, validate_logo_path};
 use provenance::{collect_ai_assisted_sections, collect_ai_sources, AiAssistedSection, AiSource};
+use references::{collect_cross_references, collect_labels, CrossReference};
 use review::{collect_change_notes, collect_comments, ChangeNote, ReviewComment};
 use rich_blocks::{
     render_callouts, render_equations, render_figures, render_layout_block_html,
@@ -195,15 +197,6 @@ struct ManifestFile {
     hash: String,
 }
 
-#[derive(Debug, Serialize)]
-struct CrossReference {
-    key: String,
-    target_kind: String,
-    resolved: bool,
-    line: usize,
-    source_file: Option<String>,
-}
-
 #[tauri::command]
 fn compile_document(request: CompileRequest) -> Result<CompileResponse, String> {
     Ok(compile(request))
@@ -303,7 +296,11 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     let glossary = collect_glossary(&interpolated);
     let citation_references = collect_citation_references(&interpolated);
     let citations = citation_keys_from_references(&citation_references);
-    let labels = collect_labels(&interpolated, &headings);
+    let semantic_heading_anchors = headings
+        .iter()
+        .map(|heading| heading.anchor.as_str())
+        .collect::<Vec<_>>();
+    let labels = collect_labels(&interpolated, &semantic_heading_anchors);
     let cross_references =
         collect_cross_references(&interpolated, &labels, &source_map, &mut diagnostics);
     let index_entries = collect_index_entries(&interpolated, &metadata, &headings, &glossary);
@@ -1327,72 +1324,6 @@ fn citation_style(metadata: &Value) -> &str {
         .or_else(|| metadata.get("citation_style"))
         .and_then(Value::as_str)
         .unwrap_or("title")
-}
-
-fn collect_labels(text: &str, headings: &[Heading]) -> Vec<String> {
-    let mut labels = BTreeSet::new();
-    for heading in headings {
-        labels.insert(heading.anchor.clone());
-    }
-    for segment in text.split("{#").skip(1) {
-        if let Some((label, _)) = segment.split_once('}') {
-            let label = label.split_whitespace().next().unwrap_or("").trim();
-            if !label.is_empty() {
-                labels.insert(label.to_string());
-            }
-        }
-    }
-    labels.into_iter().collect()
-}
-
-fn collect_cross_references(
-    text: &str,
-    labels: &[String],
-    source_map: &[SourceMapEntry],
-    diagnostics: &mut Vec<DocumentDiagnostic>,
-) -> Vec<CrossReference> {
-    let known = labels.iter().map(String::as_str).collect::<HashSet<_>>();
-    let mut references = Vec::new();
-    for (line_index, line) in text.lines().enumerate() {
-        let generated_line = line_index + 1;
-        for segment in line.split("{@").skip(1) {
-            if let Some((key, _)) = segment.split_once('}') {
-                let key = key.trim().to_string();
-                if key.is_empty() {
-                    continue;
-                }
-                let resolved = known.contains(key.as_str());
-                let (source_file, source_line) =
-                    diagnostic_location_for_generated_line(source_map, generated_line);
-                if !resolved {
-                    let mut diagnostic = diag(
-                        "error",
-                        format!("Broken cross reference: {key}"),
-                        source_file.clone(),
-                        source_line,
-                        Some(
-                            "Add a matching label such as {#fig:name}, {#tbl:name}, or {#eq:name}.",
-                        ),
-                    );
-                    diagnostic
-                        .related
-                        .push(format!("Reference syntax: {{@{key}}}"));
-                    diagnostics.push(diagnostic);
-                }
-                references.push(CrossReference {
-                    target_kind: key
-                        .split_once(':')
-                        .map(|(kind, _)| kind.to_string())
-                        .unwrap_or_else(|| "section".to_string()),
-                    key,
-                    resolved,
-                    line: source_line.unwrap_or(generated_line),
-                    source_file,
-                });
-            }
-        }
-    }
-    references
 }
 
 fn collect_fence_bodies(text: &str, target: &str) -> Vec<String> {

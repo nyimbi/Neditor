@@ -1,0 +1,79 @@
+use crate::{
+    diagnostic_location_for_generated_line, diagnostics::diag, DocumentDiagnostic, SourceMapEntry,
+};
+use serde::Serialize;
+use std::collections::{BTreeSet, HashSet};
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CrossReference {
+    pub(crate) key: String,
+    pub(crate) target_kind: String,
+    pub(crate) resolved: bool,
+    pub(crate) line: usize,
+    pub(crate) source_file: Option<String>,
+}
+
+pub(crate) fn collect_labels(text: &str, heading_anchors: &[&str]) -> Vec<String> {
+    let mut labels = BTreeSet::new();
+    for anchor in heading_anchors {
+        labels.insert((*anchor).to_string());
+    }
+    for segment in text.split("{#").skip(1) {
+        if let Some((label, _)) = segment.split_once('}') {
+            let label = label.split_whitespace().next().unwrap_or("").trim();
+            if !label.is_empty() {
+                labels.insert(label.to_string());
+            }
+        }
+    }
+    labels.into_iter().collect()
+}
+
+pub(crate) fn collect_cross_references(
+    text: &str,
+    labels: &[String],
+    source_map: &[SourceMapEntry],
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> Vec<CrossReference> {
+    let known = labels.iter().map(String::as_str).collect::<HashSet<_>>();
+    let mut references = Vec::new();
+    for (line_index, line) in text.lines().enumerate() {
+        let generated_line = line_index + 1;
+        for segment in line.split("{@").skip(1) {
+            let Some((key, _)) = segment.split_once('}') else {
+                continue;
+            };
+            let key = key.trim().to_string();
+            if key.is_empty() {
+                continue;
+            }
+            let resolved = known.contains(key.as_str());
+            let (source_file, source_line) =
+                diagnostic_location_for_generated_line(source_map, generated_line);
+            if !resolved {
+                let mut diagnostic = diag(
+                    "error",
+                    format!("Broken cross reference: {key}"),
+                    source_file.clone(),
+                    source_line,
+                    Some("Add a matching label such as {#fig:name}, {#tbl:name}, or {#eq:name}."),
+                );
+                diagnostic
+                    .related
+                    .push(format!("Reference syntax: {{@{key}}}"));
+                diagnostics.push(diagnostic);
+            }
+            references.push(CrossReference {
+                target_kind: key
+                    .split_once(':')
+                    .map(|(kind, _)| kind.to_string())
+                    .unwrap_or_else(|| "section".to_string()),
+                key,
+                resolved,
+                line: source_line.unwrap_or(generated_line),
+                source_file,
+            });
+        }
+    }
+    references
+}
