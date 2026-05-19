@@ -2674,6 +2674,8 @@ ARR: Annual recurring revenue.
             .find(|diagnostic| diagnostic.message.contains("Broken link path"))
             .expect("broken link diagnostic");
         assert_eq!(broken_link.line, Some(9));
+        assert!(broken_link.column.is_some());
+        assert!(broken_link.end_column > broken_link.column);
         assert_eq!(broken_link.source_file.as_deref(), Some(root_doc.as_str()));
         assert!(broken_link
             .related
@@ -2693,6 +2695,8 @@ ARR: Annual recurring revenue.
             .find(|diagnostic| diagnostic.message.contains("Broken image path"))
             .expect("broken image diagnostic");
         assert_eq!(broken_image.line, Some(10));
+        assert!(broken_image.column.is_some());
+        assert!(broken_image.end_column > broken_image.column);
         assert_eq!(broken_image.source_file.as_deref(), Some(root_doc.as_str()));
         assert!(broken_image
             .related

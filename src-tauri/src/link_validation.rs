@@ -1,6 +1,6 @@
 use crate::{
     diagnostic_location_for_generated_line,
-    diagnostics::{diag, DocumentDiagnostic},
+    diagnostics::{diag, with_range, DocumentDiagnostic},
     metadata_string, path_to_string, SourceMapEntry,
 };
 use serde_json::Value;
@@ -17,16 +17,19 @@ pub(crate) fn validate_image_paths(
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
     for (line_index, line) in markdown.lines().enumerate() {
-        let Some((_, after_alt)) = line
-            .trim()
-            .strip_prefix("![")
-            .and_then(|rest| rest.split_once("]("))
-        else {
+        let trimmed = line.trim_start();
+        if !trimmed.starts_with("![") {
+            continue;
+        }
+        let Some(close_index) = line.find("](") else {
             continue;
         };
-        let Some((src, _)) = after_alt.split_once(')') else {
+        let target_start = close_index + 2;
+        let Some(relative_end) = line[target_start..].find(')') else {
             continue;
         };
+        let target_end = target_start + relative_end;
+        let src = &line[target_start..target_end];
         if src.starts_with("http://") || src.starts_with("https://") || src.starts_with("data:") {
             continue;
         }
@@ -34,12 +37,17 @@ pub(crate) fn validate_image_paths(
         if !path.exists() {
             let (source_file, line) =
                 diagnostic_location_for_generated_line(source_map, line_index + 1);
-            let mut diagnostic = diag(
-                "warning",
-                format!("Broken image path: {}", path.display()),
-                source_file,
+            let mut diagnostic = with_range(
+                diag(
+                    "warning",
+                    format!("Broken image path: {}", path.display()),
+                    source_file,
+                    line,
+                    Some("Create the image file or update the image path."),
+                ),
+                target_start + 1,
                 line,
-                Some("Create the image file or update the image path."),
+                target_end + 1,
             );
             diagnostic
                 .related
@@ -116,12 +124,17 @@ pub(crate) fn validate_link_paths(
                         if !path.exists() {
                             let (source_file, line) =
                                 diagnostic_location_for_generated_line(source_map, line_index + 1);
-                            let mut diagnostic = diag(
-                                "warning",
-                                format!("Broken link path: {}", path.display()),
-                                source_file,
+                            let mut diagnostic = with_range(
+                                diag(
+                                    "warning",
+                                    format!("Broken link path: {}", path.display()),
+                                    source_file,
+                                    line,
+                                    Some("Create the linked file or update the Markdown link."),
+                                ),
+                                target_start + 1,
                                 line,
-                                Some("Create the linked file or update the Markdown link."),
+                                target_end + 1,
                             );
                             diagnostic
                                 .related

@@ -5,6 +5,9 @@ export interface DocumentDiagnostic {
   message: string;
   source_file?: string | null;
   line?: number | null;
+  column?: number | null;
+  end_line?: number | null;
+  end_column?: number | null;
   suggestion?: string | null;
   related: string[];
 }

@@ -1537,17 +1537,35 @@ function editorDiagnostics(view: EditorView): CodeMirrorDiagnostic[] {
 
 function codeMirrorDiagnostic(view: EditorView, diagnostic: DocumentDiagnostic): CodeMirrorDiagnostic[] {
   if (!diagnostic.line || diagnosticAppliesToIncludedFile(diagnostic)) return [];
-  const line = view.state.doc.line(Math.max(1, Math.min(diagnostic.line, view.state.doc.lines)));
+  const range = diagnosticEditorRange(view, diagnostic);
   const message = [diagnostic.message, diagnostic.suggestion, ...diagnostic.related].filter(Boolean).join("\n");
   return [
     {
-      from: line.from,
-      to: Math.max(line.from, line.to),
+      from: range.from,
+      to: range.to,
       severity: diagnostic.severity,
       message,
       source: diagnostic.source_file || "compiler",
     },
   ];
+}
+
+function diagnosticEditorRange(view: EditorView, diagnostic: DocumentDiagnostic) {
+  const startLine = view.state.doc.line(Math.max(1, Math.min(diagnostic.line || 1, view.state.doc.lines)));
+  if (!diagnostic.column) {
+    return { from: startLine.from, to: Math.max(startLine.from + 1, startLine.to) };
+  }
+  const endLine = view.state.doc.line(
+    Math.max(1, Math.min(diagnostic.end_line || diagnostic.line || 1, view.state.doc.lines)),
+  );
+  const from = startLine.from + clampColumnOffset(diagnostic.column, startLine.length);
+  const to = endLine.from + clampColumnOffset(diagnostic.end_column, endLine.length);
+  return { from, to: Math.max(from + 1, to) };
+}
+
+function clampColumnOffset(column: number | null | undefined, lineLength: number) {
+  if (!column || column < 1) return 0;
+  return Math.max(0, Math.min(column - 1, lineLength));
 }
 
 function diagnosticAppliesToIncludedFile(diagnostic: DocumentDiagnostic) {
