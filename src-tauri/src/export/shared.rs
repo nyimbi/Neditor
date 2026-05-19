@@ -1,4 +1,7 @@
 use super::*;
+use crate::table_cells::{
+    html_table_cell, normalize_table_cell_rows, plain_table_cells, table_cell_texts,
+};
 
 #[derive(Debug)]
 pub(super) struct ExportMedia {
@@ -237,14 +240,14 @@ pub(super) fn export_table_from_transform_html(html: &str) -> Option<ExportTable
     }
     let header_section = html_between(html, "<thead", "</thead>")?;
     let header_cells =
-        normalize_export_table_cell_rows(&[html_table_semantic_cells(header_section, "th")])
+        normalize_table_cell_rows(&[html_table_semantic_cells(header_section, "th")])
             .into_iter()
             .next()
             .unwrap_or_default();
     if header_cells.is_empty() {
         return None;
     }
-    let headers = export_table_cell_texts(&header_cells);
+    let headers = table_cell_texts(&header_cells);
     let body_section = html_between(html, "<tbody", "</tbody>").unwrap_or("");
     let mut raw_row_cells = Vec::new();
     let mut rest = body_section;
@@ -255,7 +258,7 @@ pub(super) fn export_table_from_transform_html(html: &str) -> Option<ExportTable
         }
         rest = next;
     }
-    let row_cells = normalize_export_table_cell_rows(&raw_row_cells);
+    let row_cells = normalize_table_cell_rows(&raw_row_cells);
     let rows: Vec<Vec<String>> = row_cells
         .iter()
         .map(|row| {
@@ -278,84 +281,8 @@ pub(super) fn export_table_from_transform_html(html: &str) -> Option<ExportTable
     })
 }
 
-fn normalize_export_table_cell_rows(raw_rows: &[Vec<TableCell>]) -> Vec<Vec<TableCell>> {
-    let mut rows = Vec::new();
-    let mut active_rowspans: Vec<usize> = Vec::new();
-    for raw_row in raw_rows {
-        let mut row = Vec::new();
-        let mut column_index = 0usize;
-        for raw_cell in raw_row.iter().cloned() {
-            while active_rowspans
-                .get(column_index)
-                .is_some_and(|remaining| *remaining > 0)
-            {
-                row.push(covered_export_table_cell(true));
-                active_rowspans[column_index] = active_rowspans[column_index].saturating_sub(1);
-                column_index += 1;
-            }
-            let colspan = raw_cell.colspan.max(1);
-            let rowspan = raw_cell.rowspan.max(1);
-            if active_rowspans.len() < column_index + colspan {
-                active_rowspans.resize(column_index + colspan, 0);
-            }
-            if rowspan > 1 {
-                for offset in 0..colspan {
-                    active_rowspans[column_index + offset] = rowspan - 1;
-                }
-            }
-            row.push(raw_cell);
-            for _ in 1..colspan {
-                row.push(covered_export_table_cell(false));
-            }
-            column_index += colspan;
-        }
-        while active_rowspans
-            .get(column_index)
-            .is_some_and(|remaining| *remaining > 0)
-        {
-            row.push(covered_export_table_cell(true));
-            active_rowspans[column_index] = active_rowspans[column_index].saturating_sub(1);
-            column_index += 1;
-        }
-        rows.push(row);
-    }
-    rows
-}
-
-fn covered_export_table_cell(continues_rowspan: bool) -> TableCell {
-    TableCell {
-        text: String::new(),
-        colspan: 1,
-        rowspan: 1,
-        covered: true,
-        continues_rowspan,
-    }
-}
-
-fn export_table_cell_texts(cells: &[TableCell]) -> Vec<String> {
-    cells
-        .iter()
-        .map(|cell| {
-            if cell.covered {
-                String::new()
-            } else {
-                cell.text.clone()
-            }
-        })
-        .collect()
-}
-
 pub(super) fn plain_export_table_cells(cells: &[String]) -> Vec<TableCell> {
-    cells
-        .iter()
-        .map(|cell| TableCell {
-            text: cell.clone(),
-            colspan: 1,
-            rowspan: 1,
-            covered: false,
-            continues_rowspan: false,
-        })
-        .collect()
+    plain_table_cells(cells)
 }
 
 pub(super) fn populated_table_cells(cells: &[TableCell], fallback: &[String]) -> Vec<TableCell> {
@@ -420,42 +347,10 @@ fn html_table_semantic_cells(row_html: &str, tag: &str) -> Vec<TableCell> {
         let text = decode_export_html_entities(&strip_export_html_tags(cell_html))
             .trim()
             .to_string();
-        cells.push(TableCell {
-            text,
-            colspan: html_span_attribute(open_tag, "colspan").unwrap_or(1),
-            rowspan: html_span_attribute(open_tag, "rowspan").unwrap_or(1),
-            covered: false,
-            continues_rowspan: false,
-        });
+        cells.push(html_table_cell(text, open_tag, "colspan", "rowspan"));
         rest = next;
     }
     cells
-}
-
-fn html_span_attribute(open_tag: &str, name: &str) -> Option<usize> {
-    html_quoted_attribute(open_tag, name)
-        .or_else(|| {
-            let marker = format!("{name}=");
-            let value = open_tag.split(&marker).nth(1)?;
-            Some(
-                value
-                    .split(|ch: char| ch == '>' || ch.is_whitespace())
-                    .next()
-                    .unwrap_or("")
-                    .trim_matches('"')
-                    .trim_matches('\'')
-                    .to_string(),
-            )
-        })
-        .and_then(|value| value.parse::<usize>().ok())
-        .filter(|value| *value > 1)
-}
-
-fn html_quoted_attribute(text: &str, key: &str) -> Option<String> {
-    let marker = format!("{key}=\"");
-    let after_marker = text.split(&marker).nth(1)?;
-    let (value, _) = after_marker.split_once('"')?;
-    Some(value.to_string())
 }
 
 pub(super) fn export_header_footer(

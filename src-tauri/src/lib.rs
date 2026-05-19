@@ -39,6 +39,7 @@ mod snapshot;
 mod snapshot_metadata;
 mod snapshot_storage;
 mod source_mapping;
+mod table_cells;
 mod tables;
 mod transforms;
 mod utils;

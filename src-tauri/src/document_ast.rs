@@ -4,6 +4,10 @@ use crate::{
         is_markdown_table_row, is_markdown_table_separator, split_markdown_table_row,
     },
     review::{parse_change_note, parse_review_comment},
+    table_cells::{
+        html_table_cell, normalize_table_cell_rows, table_cell_from_markdown, table_cell_texts,
+        TableCell,
+    },
     transforms::TransformArtifact,
 };
 use serde::Serialize;
@@ -41,15 +45,6 @@ pub(crate) struct FootnoteEntry {
 pub(crate) struct TaskListItem {
     pub(crate) checked: bool,
     pub(crate) text: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub(crate) struct TableCell {
-    pub(crate) text: String,
-    pub(crate) colspan: usize,
-    pub(crate) rowspan: usize,
-    pub(crate) covered: bool,
-    pub(crate) continues_rowspan: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -1051,118 +1046,11 @@ fn semantic_table_rows_from_raw(raw_rows: &[Vec<String>]) -> Vec<Vec<TableCell>>
         .iter()
         .map(|row| {
             row.iter()
-                .map(|cell| semantic_table_cell(cell))
+                .map(|cell| table_cell_from_markdown(cell, clean_inline_text))
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
-    semantic_table_rows_from_cells(&raw_cells)
-}
-
-fn semantic_table_rows_from_cells(raw_rows: &[Vec<TableCell>]) -> Vec<Vec<TableCell>> {
-    let mut rows = Vec::new();
-    let mut active_rowspans: Vec<usize> = Vec::new();
-    for raw_row in raw_rows {
-        let mut row = Vec::new();
-        let mut column_index = 0usize;
-        for raw_cell in raw_row.iter().cloned() {
-            while active_rowspans
-                .get(column_index)
-                .is_some_and(|remaining| *remaining > 0)
-            {
-                row.push(covered_table_cell(true));
-                active_rowspans[column_index] = active_rowspans[column_index].saturating_sub(1);
-                column_index += 1;
-            }
-            let colspan = raw_cell.colspan.max(1);
-            let rowspan = raw_cell.rowspan.max(1);
-            if active_rowspans.len() < column_index + colspan {
-                active_rowspans.resize(column_index + colspan, 0);
-            }
-            if rowspan > 1 {
-                for offset in 0..colspan {
-                    active_rowspans[column_index + offset] = rowspan - 1;
-                }
-            }
-            row.push(raw_cell);
-            for _ in 1..colspan {
-                row.push(covered_table_cell(false));
-            }
-            column_index += colspan;
-        }
-        while active_rowspans
-            .get(column_index)
-            .is_some_and(|remaining| *remaining > 0)
-        {
-            row.push(covered_table_cell(true));
-            active_rowspans[column_index] = active_rowspans[column_index].saturating_sub(1);
-            column_index += 1;
-        }
-        rows.push(row);
-    }
-    rows
-}
-
-fn semantic_table_cell(raw: &str) -> TableCell {
-    let (text, colspan, rowspan) = split_table_cell_span_attributes(raw);
-    TableCell {
-        text: clean_inline_text(&text),
-        colspan,
-        rowspan,
-        covered: false,
-        continues_rowspan: false,
-    }
-}
-
-fn covered_table_cell(continues_rowspan: bool) -> TableCell {
-    TableCell {
-        text: String::new(),
-        colspan: 1,
-        rowspan: 1,
-        covered: true,
-        continues_rowspan,
-    }
-}
-
-fn table_cell_texts(cells: &[TableCell]) -> Vec<String> {
-    cells
-        .iter()
-        .map(|cell| {
-            if cell.covered {
-                String::new()
-            } else {
-                cell.text.clone()
-            }
-        })
-        .collect()
-}
-
-fn split_table_cell_span_attributes(raw: &str) -> (String, usize, usize) {
-    let trimmed = raw.trim();
-    let Some(open_index) = trimmed.rfind('{') else {
-        return (trimmed.to_string(), 1, 1);
-    };
-    if !trimmed.ends_with('}') {
-        return (trimmed.to_string(), 1, 1);
-    }
-    let attrs = &trimmed[open_index + 1..trimmed.len() - 1];
-    if !attrs.contains("colspan")
-        && !attrs.contains("rowspan")
-        && !attrs.contains("colspan=")
-        && !attrs.contains("rowspan=")
-    {
-        return (trimmed.to_string(), 1, 1);
-    }
-    let colspan = table_span_attribute(attrs, "colspan").unwrap_or(1);
-    let rowspan = table_span_attribute(attrs, "rowspan").unwrap_or(1);
-    (trimmed[..open_index].trim().to_string(), colspan, rowspan)
-}
-
-fn table_span_attribute(attrs: &str, name: &str) -> Option<usize> {
-    attrs
-        .split_whitespace()
-        .find_map(|part| part.strip_prefix(&format!("{name}=")))
-        .and_then(|value| value.trim_matches('"').parse::<usize>().ok())
-        .filter(|value| *value > 1)
+    normalize_table_cell_rows(&raw_cells)
 }
 
 fn parse_ast_list(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize)> {
@@ -1606,7 +1494,7 @@ fn parse_ast_transform_table(
     if header_raw_cells.is_empty() {
         return None;
     }
-    let header_cells = semantic_table_rows_from_cells(&[header_raw_cells])
+    let header_cells = normalize_table_cell_rows(&[header_raw_cells])
         .into_iter()
         .next()
         .unwrap_or_default();
@@ -1621,7 +1509,7 @@ fn parse_ast_transform_table(
         }
         rest = next;
     }
-    let row_cells = semantic_table_rows_from_cells(&raw_rows);
+    let row_cells = normalize_table_cell_rows(&raw_rows);
     let rows = row_cells
         .iter()
         .map(|row| {
@@ -1682,35 +1570,10 @@ fn html_table_semantic_cells(row_html: &str, tag: &str) -> Vec<TableCell> {
     let mut rest = row_html;
     while let Some((open_tag, cell_html, next)) = next_html_tag_block_with_open(rest, tag) {
         let text = clean_inline_text(cell_html).trim().to_string();
-        cells.push(TableCell {
-            text,
-            colspan: html_span_attribute(open_tag, "colspan").unwrap_or(1),
-            rowspan: html_span_attribute(open_tag, "rowspan").unwrap_or(1),
-            covered: false,
-            continues_rowspan: false,
-        });
+        cells.push(html_table_cell(text, open_tag, "colspan", "rowspan"));
         rest = next;
     }
     cells
-}
-
-fn html_span_attribute(open_tag: &str, name: &str) -> Option<usize> {
-    extract_quoted_attribute(open_tag, name)
-        .or_else(|| {
-            let marker = format!("{name}=");
-            let value = open_tag.split(&marker).nth(1)?;
-            Some(
-                value
-                    .split(|ch: char| ch == '>' || ch.is_whitespace())
-                    .next()
-                    .unwrap_or("")
-                    .trim_matches('"')
-                    .trim_matches('\'')
-                    .to_string(),
-            )
-        })
-        .and_then(|value| value.parse::<usize>().ok())
-        .filter(|value| *value > 1)
 }
 
 fn parse_ast_ai_source(content: &str) -> AstAiSource {

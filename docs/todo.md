@@ -49,5 +49,5 @@ What remains to achieve the full vision:
      helpers are isolated from snapshot commands, Git IPC types/process helpers now live outside Git command routing, and diagnostic payload types are split from diagnostic
      builder helpers. The transform renderer, external transform, semantic export renderer, export command/readiness, AI cleanup, table/formula export, review/provenance,
      media package, file/Git command, compiler core, bibliography/citation, export/layout option, document structure/include, export conformance, and validation test clusters
-     now live in dedicated nested test modules instead of the root backend fixture file. Still needed: continue splitting oversized backend modules and the largest nested test
-     modules as the feature set grows.
+     now live in dedicated nested test modules instead of the root backend fixture file, and shared table-cell span normalization now lives outside document AST/export internals.
+     Still needed: continue splitting oversized backend modules and the largest nested test modules as the feature set grows.

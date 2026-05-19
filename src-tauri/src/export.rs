@@ -1,7 +1,5 @@
 use crate::{
-    document_ast::{
-        export_body_text_from_ast, DocumentBlock, FootnoteEntry, InlineNode, TableCell,
-    },
+    document_ast::{export_body_text_from_ast, DocumentBlock, FootnoteEntry, InlineNode},
     escape_css, escape_html, escape_pdf, escape_xml,
     export_media::{
         drawingml_source_crop, export_dimensions_emu_size, normalized_fit, normalized_position,
@@ -10,6 +8,7 @@ use crate::{
     generated_sections::toc_depth,
     layout::{matches_layout_break, LayoutSettings},
     metadata_string, render_export_template, sha256_uri,
+    table_cells::TableCell,
     tables::delimited_rows_for_export,
     CompileResponse, ExportManifest,
 };
