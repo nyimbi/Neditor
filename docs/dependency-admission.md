@@ -29,6 +29,7 @@ This record satisfies the dependency admission gate in `docs/specification.md`.
 | Package | Version | License expectation | Purpose | Packaging | Simpler in-house alternative | Export/security impact |
 | --- | --- | --- | --- | --- | --- | --- |
 | `@tauri-apps/cli` | `^2` | MIT/Apache-2.0 | Tauri development/build CLI | Dev-only | Required by Tauri | Build-time only |
+| `@playwright/test` | `^1.60.0` | Apache-2.0 | Browser workflow testing for the Vite-rendered workbench | Dev-only | Manual browser QA or DOM-only tests would miss interaction regressions | Test-only; CI installs Chromium for the browser workflow job |
 | `@vitejs/plugin-vue` | `^5.2.1` | MIT | Vue SFC compilation | Dev-only | Required for Vue/Vite | Build-time only |
 | `typescript` | `~5.6.2` | Apache-2.0 | Type checking | Dev-only | Not appropriate | Build-time only |
 | `vite` | `^6.0.3` | MIT | Frontend build server/bundler | Dev-only | Required by scaffold | Build-time only |

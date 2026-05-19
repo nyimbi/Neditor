@@ -22,7 +22,7 @@ is not "Complete".
 | 1 Purpose | Local-first business Markdown workbench | Partial | `README.md`; Tauri/Vue/Rust project layout; compiler/export modules | Full buildout still needs requirement-by-requirement verification and workflow tests. |
 | 2 Source Prompt Extension | Tauri 2, Vue 3, Pinia, Vite, vanilla CSS | Complete | `package.json`; `src/main.ts`; `src/App.vue`; `src-tauri/Cargo.toml` | Keep dependency admission docs current as test dependencies are added. |
 | 2 Source Prompt Extension | Side-by-side Markdown editor and live preview | Partial | `src/App.vue` editor/preview panes; CodeMirror setup | Browser workflow proof for live typing, scroll sync, and preview navigation. |
-| 2 Source Prompt Extension | Split, preview-only, focus/source modes | Partial | `src/App.vue` mode controls and pane visibility | Browser workflow tests for all modes. |
+| 2 Source Prompt Extension | Split, preview-only, focus/source modes | Partial | `src/App.vue` mode controls; `e2e/app-workflows.spec.ts` covers split/source/preview modes | Focus/export/review/presentation modes and non-sandboxed browser execution still need proof. |
 | 2 Source Prompt Extension | Local new/open/save/save-as flows | Partial | `src/stores/documents.ts`; `src-tauri/src/filesystem.rs`; file command tests | Browser/desktop workflow tests for dialogs and state transitions. |
 | 2 Source Prompt Extension | Window title reflects file and dirty state | Partial | `windowTitle` getter and `setWindowTitle` in `src/App.vue` | Desktop/browser assertion for title updates. |
 | 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler | Test coverage for command execution and keybindings. |
@@ -85,10 +85,10 @@ is not "Complete".
 | 9.1 Git-free snapshots | Local snapshots for non-Git users | Partial | `snapshot.rs`; snapshot UI/tests | Restore workflow through UI and storage-mode docs. |
 | 9.2 Export snapshots | Manifest with hashes/options/app/version/status/timestamp | Partial | `manifest.rs`; `export_commands.rs`; export command tests | Confirm all export targets write/consume manifests consistently. |
 | 9.3 Release workflow | Status values, badge, draft export warning, approval metadata, release tagging | Partial | Review UI; validation; Git tag command | Visual badge proof and workflow tests. |
-| 9.4 AI paste cleanup | Normalize chat output, code fences, bullets, tables, links, citations, insert modes | Partial | `ai_cleanup.rs`; AI modal; AI cleanup tests | Browser tests for all insert modes and clipboard behavior. |
+| 9.4 AI paste cleanup | Normalize chat output, code fences, bullets, tables, links, citations, insert modes | Partial | `ai_cleanup.rs`; AI modal; AI cleanup tests; shared insertion helper tests; initial Playwright modal test | Browser tests for all insert modes, clipboard behavior, provenance, and non-sandboxed execution. |
 | 9.5 AI provenance | `ai-source`, AI-assisted sections, export appendix | Partial | `provenance.rs`; review/provenance tests; UI toggles | Workflow and export readiness proof for unreviewed content. |
 | 9.6 Includes | Include graph, diagnostics, re-render, export single doc | Partial | Document structure tests; compiler support | UI include graph/navigation and watcher workflow proof. |
-| 9.7 Business table editor | Visual editor, rows/cols, alignment, paste, sort, formats, readable Markdown, export | Partial | `src/lib/tables.ts`; table UI; frontend/backend tests | Browser interaction tests and more export fixtures. |
+| 9.7 Business table editor | Visual editor, rows/cols, alignment, paste, sort, formats, readable Markdown, export | Partial | `src/lib/tables.ts`; table UI; frontend/backend tests; initial Playwright table-editor test | Broader browser interaction tests, non-sandboxed execution, and more export fixtures. |
 | 9.8 Calculations | Calc blocks, inline formulas, table formulas, named values/tables, dependency graph | Partial | `calculations.rs`; table tests; compiler tests | Named table/range coverage, circular dependency behavior, UI proof. |
 | 9.9 Equations | Inline/display math, numbering, references, export support | Partial | `rich_blocks.rs`; export tests | Cross-target artifact proof and editor UX tests. |
 | 9.10 TOC | Automatic TOC with marker/front matter | Partial | `generated_sections.rs`; document/export tests | Page-numbered target proof and UI controls. |
@@ -101,7 +101,7 @@ is not "Complete".
 | 9.17 Review comments/change notes | Comments, unresolved validation, exports | Partial | `review.rs`; review UI; export conformance tests | UI workflow tests and native target fidelity. |
 | 9.18 Document variables | Front matter/project/data variables | Partial | `variables.rs`; project variable tests | Filter coverage and docs. |
 | 9.19 Pikchr diagrams | Native fallback/external setup and diagnostics | Partial | `transforms/diagram.rs`; `external.rs`; transform tests | Cross-platform optional engine proof. |
-| 9.20 Validation | One-click prepare report across metadata/includes/citations/formulas/figures/transforms/settings/links/comments | Partial | `validation.rs`; `export_commands.rs`; readiness UI | Completeness audit and UI workflow tests. |
+| 9.20 Validation | One-click prepare report across metadata/includes/citations/formulas/figures/transforms/settings/links/comments | Partial | `validation.rs`; `export_commands.rs`; readiness UI; initial Playwright readiness test | Completeness audit, target-specific readiness cases, and non-sandboxed browser execution. |
 
 ## Fenced-Code Transform System
 
@@ -147,7 +147,7 @@ is not "Complete".
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
 | 19 Workspace/tab groups | Tabs, groups, pinning, recents, restore | Partial | `src/App.vue`; store persistence | Document-set grouping and workflow tests. |
-| 20 Command palette | Search commands/headings/citations/glossary/index | Partial | `commands` computed in `src/App.vue` | Browser tests for command execution and navigation. |
+| 20 Command palette | Search commands/headings/citations/glossary/index | Partial | `commands` computed in `src/App.vue`; initial Playwright table insertion command test | Browser tests for heading/citation/glossary/index navigation, keyboard shortcuts, and non-sandboxed execution. |
 | 21 Preferences | Theme, typography, export, Git, AI, transforms, recents | Partial | Settings UI; persisted workspace | Migration/schema tests and UI workflow. |
 | 22 Security/privacy | Local-first, trust-gated executable transforms, no shell | Partial | External transform runner/tests; local file design | Security review, platform proof, threat-model docs. |
 | 23 Accessibility | Keyboard, ARIA, contrast, reduced motion | Partial | Some labels/roles/settings in UI | Accessibility audit and automated/manual checks. |
@@ -193,9 +193,10 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- No browser-level workflow test harness.
+- Initial browser-level workflow test harness exists, but local sandbox
+  execution is blocked at Chromium launch before app assertions.
 - No desktop WebDriver/Tauri-driver workflow test harness.
-- No current committed fresh baseline results after this matrix was created.
+- No current committed fresh baseline results after the latest harness changes.
 - Export tests rely heavily on package/text assertions; visual/rendered quality
   remains under-proven.
 - Optional external transform engines are proven most strongly on Linux; macOS

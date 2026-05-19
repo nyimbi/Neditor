@@ -16,7 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected commit: `3214d1f Refresh the completion backlog from current evidence`
+- Latest inspected committed baseline before this update: `dee18fc Lock shared
+  workflow insertion helpers`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -33,6 +34,8 @@ Recent pushed checkpoints visible in current git history:
 - `3214d1f` refreshed `docs/todo.md` from current evidence.
 - `a93a974` recorded the spec completion matrix and durable progress log.
 - `237f68c` logged the fresh verification baseline.
+- `dee18fc` extracted shared workflow insertion helpers and added frontend unit
+  coverage for AI paste insertion modes and conflict merge-line composition.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -71,17 +74,24 @@ Implemented or substantially present, pending the conservative caveats in
 - Backend test coverage across many compiler, export, transform, table,
   validation, media, file, Git, snapshot, review, and provenance paths.
 - Frontend unit coverage for table logic and conflict diff alignment.
+- Initial Playwright browser workflow harness for Vite with mocked Tauri IPC,
+  covering view mode switching, command palette table insertion, table editor
+  insertion, AI paste cleanup insertion, and export readiness.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
+- CI browser workflow job on Ubuntu with Playwright Chromium installation and
+  `pnpm run test:e2e`.
 
 ## Active Known Gaps
 
 P0 gaps:
 
-- Browser-level workflow tests are missing.
+- Browser-level workflow tests now exist, but still need a passing run in CI or
+  a non-sandboxed local shell. Local sandbox execution currently fails before
+  app assertions because Chromium cannot register its Mach bootstrap port.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
-- Current progress/matrix docs need to be kept updated as evidence changes.
+- Current progress/matrix/docs need to be kept updated as evidence changes.
 
 P1 gaps:
 
@@ -127,6 +137,15 @@ Additional focused verification after workflow helper extraction:
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed, including AI paste insertion modes and conflict merge-line composition. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
 
+Additional browser workflow harness verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm exec playwright --version` | Pass | Playwright reported `Version 1.60.0`. |
+| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright install chromium` | Pass | Chromium, FFmpeg, and Chromium headless shell downloaded into Playwright's workspace-local browser cache. |
+| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test --list` | Pass | Listed 4 Chromium tests in `e2e/app-workflows.spec.ts`. |
+| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm run test:e2e` | Blocked by sandbox | Chromium launch failed before app assertions with `bootstrap_check_in ... Permission denied (1100)`. |
+
 Baseline command set:
 
 ```sh
@@ -142,8 +161,9 @@ cd src-tauri && cargo test --locked
 
 Baseline gaps:
 
-- The baseline does not include browser-level or desktop WebDriver workflow
-  tests because no such harness exists yet.
+- The baseline includes an initial browser workflow harness, but it does not yet
+  include a passing browser execution result from this sandbox.
+- The baseline does not include desktop WebDriver/Tauri-driver workflow tests.
 - The baseline does not include rendered visual QA for PDF/DOCX/PPTX outputs.
 - The baseline does not include full macOS/Windows/Linux package bundle
   creation.
@@ -166,11 +186,13 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Commit and push the fresh verification baseline results in this log.
-2. Add a browser-level workflow test harness.
-3. Cover the highest-risk workflows first: table editor, conflict modal, AI
-   paste, command palette, preview navigation, and export readiness.
-4. Use failures from those tests to drive implementation fixes.
+1. Get the Playwright suite passing in CI or a non-sandboxed local shell.
+2. Expand browser coverage for file operations, workspace restore, conflicts,
+   preview navigation, scroll sync, transform settings, export progress, and
+   the remaining AI/table modes.
+3. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
+   stable.
+4. Use failures from workflow tests to drive implementation fixes.
 5. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
 6. Add macOS/Windows optional transform engine evidence.
 7. Only after behavior is locked, modularize oversized frontend/store/backend

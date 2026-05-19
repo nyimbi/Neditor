@@ -119,3 +119,31 @@ jobs:
 
       - name: Build Tauri desktop shell
         run: pnpm tauri build --no-bundle
+
+  browser-workflows:
+    name: Browser workflow tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.1.2 --activate
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test browser workflows
+        run: pnpm run test:e2e

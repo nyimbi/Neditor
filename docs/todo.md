@@ -47,6 +47,9 @@ NEditor is well past basic scaffolding. The current codebase contains:
 - CI for macOS, Ubuntu, and Windows that runs Rust formatting/checks/tests,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle desktop compilation.
+- A first Playwright browser workflow harness for the Vite-rendered workbench,
+  with mocked Tauri IPC and coverage for view modes, command palette insertion,
+  table editor insertion, AI paste cleanup insertion, and export readiness.
 
 The remaining work is therefore mostly about proving real workflows,
 hardening incomplete edges, shrinking risk in oversized modules, and closing
@@ -56,8 +59,11 @@ spec details that are currently only partially satisfied.
 
 ### 1. Full Requirement-by-Requirement Completion Matrix
 
-Build a maintained completion matrix from `docs/specification.md` section by
-section.
+Status: initial artifact exists and must be maintained.
+
+`docs/spec-completion-matrix.md` now tracks the specification section by
+section with conservative statuses. It should be treated as a living audit,
+not as a completion claim.
 
 For each requirement, record:
 
@@ -73,9 +79,9 @@ Why this is P0:
 - The user asked for full buildout, not a narrowed first-release subset.
 - A completion claim needs auditable evidence for every explicit requirement.
 
-Suggested artifact:
+Current artifact:
 
-- Add `docs/spec-completion-matrix.md`.
+- `docs/spec-completion-matrix.md`.
 - Keep `docs/todo.md` as the execution backlog and link matrix rows from it.
 
 ### 2. Browser/Desktop Workflow Tests
@@ -85,26 +91,55 @@ Add real interaction coverage for the most important frontend workflows.
 Current evidence:
 
 - Frontend logic unit tests exist for table parsing/serialization and conflict
-  diff alignment.
-- No Playwright/WebDriver/Tauri-driver e2e harness is currently present in
-  `package.json`, CI, or the test tree.
+  diff alignment, AI paste insertion helpers, and conflict merge-line
+  composition.
+- `@playwright/test` is now admitted as a dev dependency.
+- `playwright.config.ts` runs browser workflow tests against Vite on
+  `127.0.0.1:5173`.
+- `e2e/app-workflows.spec.ts` installs a browser-side Tauri IPC mock and lists
+  four Chromium tests:
+  - Workbench boot and split/preview/source view mode switching.
+  - Command palette table snippet insertion plus table editor insertion.
+  - AI paste cleanup preview and insertion through the modal.
+  - Export readiness from the export sidebar.
+- `.github/workflows/ci.yml` now has a Linux `browser-workflows` job that
+  installs Playwright Chromium and runs `pnpm run test:e2e`.
+
+Current verification caveat:
+
+- `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test --list` lists all four
+  tests.
+- Local execution in this sandbox reaches Chromium launch, then fails before
+  any app assertion because macOS denies Chromium's Mach bootstrap registration:
+  `bootstrap_check_in ... Permission denied (1100)`.
+- The normal user-cache browser install also fails in the sandbox because it
+  cannot create `~/Library/Caches/ms-playwright/__dirlock`; the local
+  workspace browser install succeeds with `PLAYWRIGHT_BROWSERS_PATH=0`.
 
 Required workflow coverage:
 
-- Open/edit/save/save-as/revert document flows.
+- Open/edit/save/save-as/revert document flows. Missing browser/desktop proof.
 - Workspace folder browsing, tab activation, pinning, recently closed reopen,
-  and workspace restore.
-- Split/source/preview/focus/export/review/presentation mode switching.
-- Preview heading click-to-source and synchronized scrolling.
-- Command palette search and command execution.
+  and workspace restore. Missing browser/desktop proof.
+- Split/source/preview/focus/export/review/presentation mode switching. Split,
+  source, and preview now have an initial browser test; focus/export/review/
+  presentation still need coverage.
+- Preview heading click-to-source and synchronized scrolling. Missing browser
+  proof.
+- Command palette search and command execution. Initial table insertion command
+  is covered; heading/citation/glossary/index navigation and keybindings remain.
 - Table editor interactions: create table, paste CSV/Markdown, add/remove rows
   and columns, sort, format columns, add totals, author merged cells, apply.
+  Initial create/add totals/insert coverage exists; the rest remains.
 - Conflict modal interactions: compare, compose line merge, keep local, accept
-  external, save local copy.
+  external, save local copy. Missing browser/desktop proof.
 - AI paste cleanup modal: preview, options, insert modes, provenance output.
-- Export readiness and export flow progress.
+  Initial preview/insert coverage exists; quote/appendix/replace/merge,
+  provenance, clipboard, and review-state flows remain.
+- Export readiness and export flow progress. Initial readiness coverage exists;
+  export progress and target-specific readiness remain.
 - Transform engine settings: path change clears trust, trust prompt, probe
-  success/failure UI.
+  success/failure UI. Missing browser proof.
 
 Implementation notes:
 
@@ -112,13 +147,18 @@ Implementation notes:
   without adding brittle desktop automation.
 - Add Tauri-driver/WebDriver desktop smoke tests only after the browser-level
   harness is stable.
-- Keep no-new-dependency discipline in mind, but this is one place where a test
-  dependency may be justified because the spec requires workflow confidence.
+- Keep the Playwright dependency dev-only and covered by
+  `docs/dependency-admission.md`.
+- Run the Playwright suite in CI or a non-sandboxed local shell to distinguish
+  real selector/app failures from this environment's Chromium launch denial.
 
 ### 3. Current Progress Log
 
-Create or update a committed progress log that is separate from stale todo
-history.
+Status: initial artifact exists and must be maintained.
+
+`docs/progress.md` records the active full-buildout goal, recent commits,
+current capability snapshot, active known gaps, verification baseline, and
+completion gate. Update it whenever a slice changes the evidence.
 
 Required log content:
 
@@ -131,7 +171,7 @@ Required log content:
 - Commit hashes for completed slices.
 - Known environment-specific limitations, such as macOS DMG creation failure.
 
-Suggested artifact:
+Current artifact:
 
 - `docs/progress.md`
 
@@ -143,7 +183,13 @@ Why this is P0:
 
 ### 4. Fresh Verification Baseline
 
-Run and record a fresh verification baseline after the current audit.
+Status: latest full baseline is recorded; rerun after behavior changes.
+
+The current baseline in `docs/progress.md` was recorded on 2026-05-20 after
+commit `237f68c`. Focused frontend verification was rerun after commit
+`dee18fc`. The baseline is no longer sufficient by itself because the new
+browser harness adds a separate verification lane that still needs a
+non-sandboxed passing run.
 
 Minimum commands:
 
@@ -534,11 +580,16 @@ or manual QA.
 
 ## Recommended Execution Order
 
-1. Add `docs/spec-completion-matrix.md`.
-2. Add `docs/progress.md` and record the fresh baseline.
-3. Run the full verification baseline and update `docs/progress.md`.
-4. Add browser-level frontend workflow tests.
-5. Close gaps exposed by those workflow tests.
+1. Keep `docs/spec-completion-matrix.md`, `docs/progress.md`, and this backlog
+   synchronized after every verified slice.
+2. Get the new Playwright browser workflow suite passing in CI or a
+   non-sandboxed local shell.
+3. Expand browser workflow coverage for file operations, workspace restore,
+   conflicts, preview navigation/scroll sync, transform settings, export
+   progress, and remaining AI/table modes.
+4. Add Tauri-driver/WebDriver desktop smoke tests once browser tests are
+   stable.
+5. Close implementation gaps exposed by those workflow tests.
 6. Audit export artifacts against the completion matrix and add missing
    conformance tests.
 7. Harden cross-platform external transform evidence.
