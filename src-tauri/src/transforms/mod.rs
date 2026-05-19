@@ -1,5 +1,6 @@
 use crate::diagnostics::DocumentDiagnostic;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 pub(crate) mod external;
 pub(crate) mod qr;
@@ -10,6 +11,10 @@ pub(crate) struct TransformArtifact {
     pub(crate) name: String,
     pub(crate) output_kind: String,
     pub(crate) source_hash: String,
+    #[serde(default)]
+    pub(crate) source: String,
+    #[serde(default = "empty_transform_options")]
+    pub(crate) options: Value,
     pub(crate) output_hash: String,
     pub(crate) cache_key: String,
     pub(crate) execution_kind: String,
@@ -19,6 +24,10 @@ pub(crate) struct TransformArtifact {
     pub(crate) duration_ms: Option<u64>,
     pub(crate) html: String,
     pub(crate) diagnostics: Vec<DocumentDiagnostic>,
+}
+
+fn empty_transform_options() -> Value {
+    json!({})
 }
 
 pub(crate) fn transform_cache_key(

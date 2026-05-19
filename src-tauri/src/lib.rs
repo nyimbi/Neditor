@@ -237,6 +237,7 @@ fn run_transform(name: String, body: String) -> Result<TransformArtifact, String
     Ok(render_transform(
         &name,
         &body,
+        &json!({}),
         &TransformExecutionOptions::default(),
         &mut diagnostics,
     ))
@@ -424,6 +425,8 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
                     "name": artifact.name,
                     "outputKind": artifact.output_kind,
                     "sourceHash": artifact.source_hash,
+                    "source": artifact.source.clone(),
+                    "options": artifact.options.clone(),
                     "outputHash": artifact.output_hash,
                     "cacheKey": artifact.cache_key,
                     "executionKind": artifact.execution_kind,
@@ -717,6 +720,7 @@ fn apply_transforms(
         if let Some(info) = line.trim().strip_prefix("```") {
             let name = info.split_whitespace().next().unwrap_or("");
             if supported_transform(name) {
+                let fence_options = transform_fence_options(info);
                 let mut body = String::new();
                 for body_line in lines.by_ref() {
                     if body_line.trim() == "```" {
@@ -725,7 +729,7 @@ fn apply_transforms(
                     body.push_str(body_line);
                     body.push('\n');
                 }
-                let artifact = render_transform(name, &body, options, diagnostics);
+                let artifact = render_transform(name, &body, &fence_options, options, diagnostics);
                 output.push_str(&artifact.html);
                 output.push('\n');
                 artifacts.push(artifact);
@@ -738,14 +742,57 @@ fn apply_transforms(
     (output, artifacts)
 }
 
+fn transform_fence_options(info: &str) -> Value {
+    let mut fields = serde_json::Map::new();
+    for token in transform_info_tokens(info).into_iter().skip(1) {
+        if let Some((key, value)) = token.split_once('=') {
+            let value = value.trim_matches(|ch| ch == '"' || ch == '\'');
+            fields.insert(key.to_string(), Value::String(value.to_string()));
+        } else if !token.is_empty() {
+            fields.insert(token.to_string(), Value::Bool(true));
+        }
+    }
+    Value::Object(fields)
+}
+
+fn transform_info_tokens(info: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut token = String::new();
+    let mut quote = None::<char>;
+    for ch in info.chars() {
+        if let Some(quote_ch) = quote {
+            if ch == quote_ch {
+                quote = None;
+            } else {
+                token.push(ch);
+            }
+        } else if ch == '"' || ch == '\'' {
+            quote = Some(ch);
+        } else if ch.is_whitespace() {
+            if !token.is_empty() {
+                tokens.push(std::mem::take(&mut token));
+            }
+        } else {
+            token.push(ch);
+        }
+    }
+    if !token.is_empty() {
+        tokens.push(token);
+    }
+    tokens
+}
+
 fn render_transform(
     name: &str,
     body: &str,
+    fence_options: &Value,
     options: &TransformExecutionOptions,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> TransformArtifact {
     if external_transform_supported(name) {
-        if let Some(artifact) = render_external_transform(name, body, options, diagnostics) {
+        if let Some(artifact) =
+            render_external_transform(name, body, fence_options, options, diagnostics)
+        {
             return artifact;
         }
     }
@@ -808,6 +855,8 @@ fn render_transform(
         input_mode: "embedded".to_string(),
         duration_ms: None,
         source_hash,
+        source: body.to_string(),
+        options: fence_options.clone(),
         html,
         diagnostics: artifact_diags,
     }
@@ -816,6 +865,7 @@ fn render_transform(
 fn render_external_transform(
     name: &str,
     body: &str,
+    fence_options: &Value,
     options: &TransformExecutionOptions,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> Option<TransformArtifact> {
@@ -831,7 +881,9 @@ fn render_external_transform(
         max_output_bytes: None,
     };
     match run_external_transform(request) {
-        Ok(artifact) => {
+        Ok(mut artifact) => {
+            artifact.source = body.to_string();
+            artifact.options = fence_options.clone();
             diagnostics.extend(artifact.diagnostics.iter().cloned());
             Some(artifact)
         }
@@ -2343,7 +2395,7 @@ After tax: {{=profit * 0.70 | currency}}
 Healthy score: {{=IF(revenue > cost, profit, 0) | round}}
 Discount: {{=discount | percent}}
 
-```csv
+```csv caption="Regional revenue" audited
 Region,Revenue
 East,100
 West,80
@@ -2384,6 +2436,15 @@ ARR: Annual recurring revenue.
             .find(|artifact| artifact.name == "csv")
             .expect("csv transform artifact");
         assert!(!csv_artifact.output_hash.is_empty());
+        assert!(csv_artifact.source.contains("Region,Revenue"));
+        assert_eq!(
+            csv_artifact.options.get("caption").and_then(Value::as_str),
+            Some("Regional revenue")
+        );
+        assert_eq!(
+            csv_artifact.options.get("audited").and_then(Value::as_bool),
+            Some(true)
+        );
         let manifest_csv_artifact = response
             .export_manifest
             .transform_artifacts
@@ -2395,6 +2456,17 @@ ARR: Annual recurring revenue.
                 .get("sourceHash")
                 .and_then(Value::as_str),
             Some(csv_artifact.source_hash.as_str())
+        );
+        assert_eq!(
+            manifest_csv_artifact.get("source").and_then(Value::as_str),
+            Some(csv_artifact.source.as_str())
+        );
+        assert_eq!(
+            manifest_csv_artifact
+                .get("options")
+                .and_then(|options| options.get("caption"))
+                .and_then(Value::as_str),
+            Some("Regional revenue")
         );
         assert_eq!(
             manifest_csv_artifact

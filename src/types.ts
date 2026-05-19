@@ -193,6 +193,8 @@ export interface CompileResponse {
     name: string;
     output_kind: string;
     source_hash: string;
+    source: string;
+    options: Record<string, unknown>;
     output_hash: string;
     cache_key: string;
     execution_kind: string;

@@ -479,6 +479,8 @@ fn execute_external_transform(
         input_mode: input_mode.to_string(),
         duration_ms: Some(duration_ms),
         source_hash,
+        source: request.body.to_string(),
+        options: json!({}),
         html,
         diagnostics,
     })
