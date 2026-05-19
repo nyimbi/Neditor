@@ -759,6 +759,8 @@
             <small>{{ engine.installationLabel }}</small>
             <small>{{ engine.setupHint }}</small>
             <small>{{ engine.adapterProfile }} Default command: {{ engine.defaultCommand }}</small>
+            <small v-if="engine.diagnosticProfile.versionProbe">Version probe: {{ engine.diagnosticProfile.versionProbe }}</small>
+            <small v-if="engine.diagnosticProfile.failureHint">Failure hint: {{ engine.diagnosticProfile.failureHint }}</small>
             <small>{{ engine.securitySummary }}</small>
             <label>
               Engine path

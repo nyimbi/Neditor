@@ -1872,6 +1872,14 @@ fn transform_registry_covers_required_first_release_transforms() {
         .pointer("/diagnosticProfile/successRelated")
         .and_then(Value::as_array)
         .is_some_and(|fields| fields.iter().any(|field| field == "output_channel")));
+    assert!(pikchr
+        .pointer("/diagnosticProfile/failureHint")
+        .and_then(Value::as_str)
+        .is_some_and(|hint| hint.contains("Pikchr syntax")));
+    assert!(pikchr
+        .pointer("/diagnosticProfile/stderrHint")
+        .and_then(Value::as_str)
+        .is_some_and(|hint| hint.contains("Pikchr stderr")));
 
     for name in [
         "calc",
@@ -2726,6 +2734,10 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
             .and_then(Value::as_str),
         Some("dot -V")
     );
+    assert!(graphviz
+        .pointer("/diagnosticProfile/failureHint")
+        .and_then(Value::as_str)
+        .is_some_and(|hint| hint.contains("Graphviz dot")));
 
     let _ = fs::remove_file(d2);
     let _ = fs::remove_file(plantuml);
@@ -3036,6 +3048,8 @@ fn external_transform_exit_errors_include_stderr() {
     let _ = fs::remove_file(script);
     assert!(error.contains("status 7"));
     assert!(error.contains("engine exploded"));
+    assert!(error.contains("Check DOT syntax"));
+    assert!(error.contains("-Tsvg"));
 }
 
 #[test]

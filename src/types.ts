@@ -280,6 +280,14 @@ export interface TransformEngineMetadata {
   setupHint: string;
   securitySummary: string;
   adapterProfile: string;
+  diagnosticProfile: {
+    versionProbe: string | null;
+    failureHint?: string;
+    stderrHint?: string;
+    successRelated: string[];
+    failureRelated: string[];
+    cacheKeyIncludes: string[];
+  };
   defaultCommand: string;
   requiresExecution: boolean;
   preferenceKey: string;

@@ -616,7 +616,7 @@ fn execute_external_transform(
             format!("{name} stderr: {stderr}"),
             None,
             None,
-            Some("Review external engine diagnostics."),
+            Some(transform_failure_suggestion(name)),
         ));
     }
 
@@ -630,8 +630,9 @@ fn execute_external_transform(
         } else {
             format!(": {stderr}")
         };
+        let hint = transform_failure_suggestion(name);
         return Err(format!(
-            "{name} external transform exited with status {status_label}{stderr_detail}."
+            "{name} external transform exited with status {status_label}{stderr_detail}. Hint: {hint}"
         ));
     }
 
@@ -784,6 +785,8 @@ fn transform_diagnostic_profile(name: &str, requires_execution: bool) -> Value {
     }
     json!({
         "versionProbe": transform_version_probe(name),
+        "failureHint": transform_failure_suggestion(name),
+        "stderrHint": transform_stderr_suggestion(name),
         "successRelated": [
             "engine_path",
             "engine_version",
@@ -857,6 +860,34 @@ fn transform_adapter_profile(name: &str) -> &'static str {
         "plantuml" => "PlantUML adapter: uses -tsvg -pipe for stdin, or reads PlantUML's SVG sidecar for file mode.",
         "pikchr" => "Pikchr adapter: passes stdin directly or a temporary Pikchr source file.",
         _ => "No external adapter; rendered by the embedded Rust engine.",
+    }
+}
+
+fn transform_failure_suggestion(name: &str) -> &'static str {
+    match name {
+        "dot" | "graphviz" => {
+            "Check DOT syntax and verify the selected executable is Graphviz dot; NEditor invokes -Tsvg without a shell."
+        }
+        "d2" => {
+            "Check D2 syntax and verify the selected executable supports '-' input with '-' output."
+        }
+        "plantuml" => {
+            "Check PlantUML syntax, Java availability, and -tsvg/-pipe support for the selected launcher."
+        }
+        "pikchr" => {
+            "Check Pikchr syntax; NEditor passes stdin or a temporary .pikchr file directly."
+        }
+        _ => "Review the transform source and renderer diagnostics.",
+    }
+}
+
+fn transform_stderr_suggestion(name: &str) -> &'static str {
+    match name {
+        "dot" | "graphviz" => "Graphviz stderr is captured verbatim; DOT parse errors usually include the source line.",
+        "d2" => "D2 stderr is captured verbatim; syntax and layout errors usually identify the failed shape or edge.",
+        "plantuml" => "PlantUML stderr is captured verbatim; launcher, Java, and syntax errors are reported by the selected wrapper.",
+        "pikchr" => "Pikchr stderr is captured verbatim; parser errors usually reference the malformed statement.",
+        _ => "Renderer stderr is captured verbatim when available.",
     }
 }
 
