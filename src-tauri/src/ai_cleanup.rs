@@ -22,6 +22,7 @@ pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
     let mut cleaned = request.text.replace("\r\n", "\n");
     cleaned = remove_chat_labels(&cleaned, &mut issues);
     cleaned = normalize_rich_html_clipboard(&cleaned, &mut issues);
+    cleaned = remove_duplicate_markdown_headings(&cleaned, &mut issues);
     cleaned = normalize_markdown_lists(&cleaned, &mut issues);
     cleaned = normalize_markdown_tables(&cleaned, &mut issues);
     if request.insert_citation_todos {
@@ -49,6 +50,67 @@ pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
         issues,
         provenance_block,
     }
+}
+
+fn remove_duplicate_markdown_headings(text: &str, issues: &mut Vec<String>) -> String {
+    let mut in_code_fence = false;
+    let mut last_heading = None::<String>;
+    let mut only_blank_since_heading = false;
+    let mut removed = 0usize;
+    let mut output = Vec::new();
+
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") {
+            in_code_fence = !in_code_fence;
+            last_heading = None;
+            only_blank_since_heading = false;
+            output.push(line.to_string());
+            continue;
+        }
+        if in_code_fence {
+            output.push(line.to_string());
+            continue;
+        }
+        if let Some(heading) = normalized_markdown_heading(trimmed) {
+            if only_blank_since_heading && last_heading.as_deref() == Some(heading.as_str()) {
+                removed += 1;
+                continue;
+            }
+            last_heading = Some(heading);
+            only_blank_since_heading = true;
+            output.push(line.to_string());
+        } else if trimmed.trim().is_empty() {
+            output.push(line.to_string());
+        } else {
+            last_heading = None;
+            only_blank_since_heading = false;
+            output.push(line.to_string());
+        }
+    }
+
+    if removed > 0 {
+        issues.push(format!("Removed {removed} duplicated heading marker(s)."));
+    }
+    output.join("\n")
+}
+
+fn normalized_markdown_heading(line: &str) -> Option<String> {
+    let marker_len = line.chars().take_while(|ch| *ch == '#').count();
+    if !(1..=6).contains(&marker_len) || !line[marker_len..].starts_with(' ') {
+        return None;
+    }
+    let heading = line[marker_len..].trim().trim_end_matches('#').trim();
+    if heading.is_empty() {
+        return None;
+    }
+    Some(
+        heading
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_ascii_lowercase(),
+    )
 }
 
 fn remove_chat_labels(text: &str, issues: &mut Vec<String>) -> String {

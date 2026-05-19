@@ -5540,6 +5540,32 @@ paths:
     }
 
     #[test]
+    fn ai_cleanup_removes_duplicate_markdown_headings() {
+        let response = cleanup_ai_paste(AiCleanupRequest {
+            text: "## Market Update\n\n## Market Update\nRevenue grew 24%.\n\n```markdown\n## Market Update\n## Market Update\n```"
+                .to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+            insert_citation_todos: false,
+        });
+
+        assert_eq!(
+            response
+                .cleaned_markdown
+                .matches("## Market Update")
+                .count(),
+            3
+        );
+        assert!(response
+            .cleaned_markdown
+            .contains("```markdown\n## Market Update\n## Market Update\n```"));
+        assert!(response
+            .issues
+            .iter()
+            .any(|issue| issue.contains("duplicated heading")));
+    }
+
+    #[test]
     fn ai_cleanup_normalizes_rich_html_clipboard_content() {
         let response = cleanup_ai_paste(AiCleanupRequest {
             text: "<h2>Board Update</h2><p>Revenue grew 24%. <a href=\"https://example.com/report?x=1&amp;y=2\">Source report</a></p><ul><li>Approve budget</li></ul><table><tr><th>Region</th><th>Revenue</th></tr><tr><td>EMEA</td><td>24</td></tr></table>"
