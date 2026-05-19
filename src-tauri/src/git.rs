@@ -1,50 +1,12 @@
-use crate::{path_to_string, read_file, FileResponse};
-use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    process::Command,
+use crate::{
+    git_support::{git_cwd_for_path, git_pathspec, run_git},
+    git_types::{
+        GitCommitRequest, GitHistoryEntry, GitPathRequest, GitRestoreRequest, GitStatus,
+        GitTagRequest,
+    },
+    path_to_string, read_file, FileResponse,
 };
-
-#[derive(Debug, Serialize)]
-pub(crate) struct GitStatus {
-    pub(crate) inside_repo: bool,
-    pub(crate) branch: Option<String>,
-    pub(crate) dirty: bool,
-    pub(crate) summary: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct GitPathRequest {
-    pub(crate) path: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct GitCommitRequest {
-    pub(crate) path: String,
-    pub(crate) message: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct GitTagRequest {
-    pub(crate) path: String,
-    pub(crate) tag: String,
-    pub(crate) message: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct GitRestoreRequest {
-    pub(crate) path: String,
-    pub(crate) revision: String,
-}
-
-#[derive(Debug, Serialize)]
-pub(crate) struct GitHistoryEntry {
-    pub(crate) revision: String,
-    pub(crate) author: String,
-    pub(crate) date: String,
-    pub(crate) subject: String,
-}
+use std::{fs, path::PathBuf};
 
 #[tauri::command]
 pub(crate) fn get_git_status(path: Option<String>) -> Result<GitStatus, String> {
@@ -52,13 +14,7 @@ pub(crate) fn get_git_status(path: Option<String>) -> Result<GitStatus, String> 
         .as_deref()
         .map(PathBuf::from)
         .filter(|path| path.exists())
-        .and_then(|path| {
-            if path.is_file() {
-                path.parent().map(Path::to_path_buf)
-            } else {
-                Some(path)
-            }
-        })
+        .map(|path| git_cwd_for_path(&path))
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     let inside = run_git(&cwd, &["rev-parse", "--is-inside-work-tree"])?;
@@ -88,10 +44,8 @@ pub(crate) fn get_git_status(path: Option<String>) -> Result<GitStatus, String> 
 #[tauri::command]
 pub(crate) fn git_history(request: GitPathRequest) -> Result<Vec<GitHistoryEntry>, String> {
     let path = PathBuf::from(&request.path);
-    let cwd = path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
+    let cwd = git_cwd_for_path(&path);
+    let pathspec = git_pathspec(&path, request.path.as_str());
     let output = run_git(
         &cwd,
         &[
@@ -99,9 +53,7 @@ pub(crate) fn git_history(request: GitPathRequest) -> Result<Vec<GitHistoryEntry
             "--date=iso-strict",
             "--format=%H%x1f%an%x1f%ad%x1f%s",
             "--",
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or(request.path.as_str()),
+            pathspec,
         ],
     )?;
     Ok(output
@@ -124,33 +76,18 @@ pub(crate) fn git_history(request: GitPathRequest) -> Result<Vec<GitHistoryEntry
 #[tauri::command]
 pub(crate) fn git_diff(request: GitPathRequest) -> Result<String, String> {
     let path = PathBuf::from(&request.path);
-    let cwd = path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
+    let cwd = git_cwd_for_path(&path);
     run_git(
         &cwd,
-        &[
-            "diff",
-            "--",
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or(request.path.as_str()),
-        ],
+        &["diff", "--", git_pathspec(&path, request.path.as_str())],
     )
 }
 
 #[tauri::command]
 pub(crate) fn commit_document_changes(request: GitCommitRequest) -> Result<GitStatus, String> {
     let path = PathBuf::from(&request.path);
-    let cwd = path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(request.path.as_str());
+    let cwd = git_cwd_for_path(&path);
+    let file_name = git_pathspec(&path, request.path.as_str());
     run_git(&cwd, &["add", "--", file_name])?;
     run_git(&cwd, &["commit", "-m", &request.message, "--", file_name])?;
     get_git_status(Some(request.path))
@@ -159,10 +96,7 @@ pub(crate) fn commit_document_changes(request: GitCommitRequest) -> Result<GitSt
 #[tauri::command]
 pub(crate) fn tag_release(request: GitTagRequest) -> Result<String, String> {
     let path = PathBuf::from(&request.path);
-    let cwd = path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
+    let cwd = git_cwd_for_path(&path);
     run_git(&cwd, &["tag", "-a", &request.tag, "-m", &request.message])?;
     Ok(request.tag)
 }
@@ -170,31 +104,12 @@ pub(crate) fn tag_release(request: GitTagRequest) -> Result<String, String> {
 #[tauri::command]
 pub(crate) fn restore_git_revision(request: GitRestoreRequest) -> Result<FileResponse, String> {
     let path = PathBuf::from(&request.path);
-    let cwd = path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(request.path.as_str());
+    let cwd = git_cwd_for_path(&path);
+    let file_name = git_pathspec(&path, request.path.as_str());
     let content = run_git(
         &cwd,
         &["show", &format!("{}:{file_name}", request.revision)],
     )?;
     fs::write(&path, content.as_bytes()).map_err(|err| err.to_string())?;
     read_file(path_to_string(&path))
-}
-
-pub(crate) fn run_git(cwd: &Path, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .map_err(|err| err.to_string())?;
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
-    }
 }

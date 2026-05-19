@@ -21,6 +21,8 @@ mod footnotes;
 mod front_matter;
 mod generated_sections;
 mod git;
+mod git_support;
+mod git_types;
 mod html_preview;
 mod indexing;
 mod layout;
@@ -79,7 +81,9 @@ use git::{
     tag_release,
 };
 #[cfg(test)]
-use git::{run_git, GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRequest};
+use git_support::run_git;
+#[cfg(test)]
+use git_types::{GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRequest};
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
 #[cfg(test)]
 use transforms::external::ExternalTransformRequest;
