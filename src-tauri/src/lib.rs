@@ -5495,7 +5495,7 @@ paths:
     #[test]
     fn ai_cleanup_normalizes_rich_html_clipboard_content() {
         let response = cleanup_ai_paste(AiCleanupRequest {
-            text: "<h2>Board Update</h2><p>Revenue grew 24%.</p><ul><li>Approve budget</li></ul><table><tr><th>Region</th><th>Revenue</th></tr><tr><td>EMEA</td><td>24</td></tr></table>"
+            text: "<h2>Board Update</h2><p>Revenue grew 24%. <a href=\"https://example.com/report?x=1&amp;y=2\">Source report</a></p><ul><li>Approve budget</li></ul><table><tr><th>Region</th><th>Revenue</th></tr><tr><td>EMEA</td><td>24</td></tr></table>"
                 .to_string(),
             add_provenance: false,
             mark_as_draft: false,
@@ -5503,9 +5503,10 @@ paths:
         });
 
         assert!(response.cleaned_markdown.contains("## Board Update"));
+        assert!(response.cleaned_markdown.contains("Revenue grew 24%."));
         assert!(response
             .cleaned_markdown
-            .contains("Revenue grew 24%. <!-- TODO: citation needed -->"));
+            .contains("[Source report](https://example.com/report?x=1&y=2)"));
         assert!(response.cleaned_markdown.contains("- Approve budget"));
         assert!(response.cleaned_markdown.contains("| Region | Revenue |"));
         assert!(response.cleaned_markdown.contains("| --- | --- |"));

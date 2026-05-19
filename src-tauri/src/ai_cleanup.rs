@@ -73,6 +73,7 @@ fn normalize_rich_html_clipboard(text: &str, issues: &mut Vec<String>) -> String
     let mut input = text.replace("\r\n", "\n").replace('\r', "\n");
     input = strip_html_comments(&input);
     let mut index = 0usize;
+    let mut link_stack = Vec::new();
 
     while index < input.len() {
         let remainder = &input[index..];
@@ -88,7 +89,7 @@ fn normalize_rich_html_clipboard(text: &str, issues: &mut Vec<String>) -> String
             break;
         };
         let raw_tag = &tag_remainder[1..tag_end];
-        push_markdown_for_html_tag(raw_tag, &mut output);
+        push_markdown_for_html_tag(raw_tag, &mut output, &mut link_stack);
         index = tag_absolute_start + tag_end + 1;
     }
 
@@ -100,7 +101,7 @@ fn looks_like_rich_html_clipboard(text: &str) -> bool {
     let lower = text.to_ascii_lowercase();
     [
         "<p", "</p", "<div", "</div", "<br", "<h1", "<h2", "<h3", "<ul", "<ol", "<li", "<table",
-        "<tr", "<td", "<th",
+        "<tr", "<td", "<th", "<a ",
     ]
     .iter()
     .any(|tag| lower.contains(tag))
@@ -121,7 +122,7 @@ fn strip_html_comments(text: &str) -> String {
     output
 }
 
-fn push_markdown_for_html_tag(raw_tag: &str, output: &mut String) {
+fn push_markdown_for_html_tag(raw_tag: &str, output: &mut String, link_stack: &mut Vec<String>) {
     let tag = raw_tag.trim().trim_end_matches('/').trim();
     if tag.is_empty() || tag.starts_with('!') {
         return;
@@ -136,6 +137,20 @@ fn push_markdown_for_html_tag(raw_tag: &str, output: &mut String) {
 
     match (closing, name.as_str()) {
         (false, "br") => output.push('\n'),
+        (false, "a") => {
+            if let Some(href) = html_attribute(tag, "href").filter(|value| !value.trim().is_empty())
+            {
+                output.push('[');
+                link_stack.push(href);
+            }
+        }
+        (true, "a") => {
+            if let Some(href) = link_stack.pop() {
+                output.push_str("](");
+                output.push_str(&href);
+                output.push(')');
+            }
+        }
         (false, "h1") => start_block_with(output, "# "),
         (false, "h2") => start_block_with(output, "## "),
         (false, "h3") => start_block_with(output, "### "),
@@ -152,6 +167,28 @@ fn push_markdown_for_html_tag(raw_tag: &str, output: &mut String) {
         (true, "table" | "thead" | "tbody") => output.push('\n'),
         _ => {}
     }
+}
+
+fn html_attribute(tag: &str, key: &str) -> Option<String> {
+    let lower = tag.to_ascii_lowercase();
+    let marker = format!("{key}=");
+    let marker_start = lower.find(&marker)?;
+    let after_marker = &tag[marker_start + marker.len()..];
+    let mut chars = after_marker.chars();
+    let first = chars.next()?;
+    if first == '"' || first == '\'' {
+        let value_start = first.len_utf8();
+        let value_end = after_marker[value_start..].find(first)? + value_start;
+        return Some(after_marker[value_start..value_end].to_string());
+    }
+    Some(
+        after_marker
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .trim_end_matches('/')
+            .to_string(),
+    )
 }
 
 fn start_block_with(output: &mut String, prefix: &str) {
