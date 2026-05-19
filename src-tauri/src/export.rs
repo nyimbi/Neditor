@@ -540,6 +540,22 @@ pub(crate) fn render_markdown_bundle_bytes(
             .as_bytes(),
     )
     .map_err(|err| err.to_string())?;
+    zip.start_file("document-ast.json", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        serde_json::to_string_pretty(&response.document_ast)
+            .map_err(|err| err.to_string())?
+            .as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
+    zip.start_file("source-map.json", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        serde_json::to_string_pretty(&response.source_map)
+            .map_err(|err| err.to_string())?
+            .as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
     let media = collect_docx_media(response);
     if !media.is_empty() {
         zip.start_file("media-map.json", options)
