@@ -232,13 +232,33 @@ fn prepare_cached_external_transform(
     } else {
         "memory cache"
     };
-    artifact.diagnostics.push(diag(
+    let mut diagnostic = diag(
         "info",
         format!("{name} external transform served from cache ({cache_scope})."),
         None,
         None,
         Some("Cache key includes transform name, engine path, input mode, and source hash."),
-    ));
+    );
+    diagnostic
+        .related
+        .push(format!("cache_key: {}", artifact.cache_key));
+    diagnostic
+        .related
+        .push(format!("output_hash: {}", artifact.output_hash));
+    diagnostic
+        .related
+        .push(format!("input_mode: {}", artifact.input_mode));
+    if let Some(engine_path) = &artifact.engine_path {
+        diagnostic
+            .related
+            .push(format!("engine_path: {engine_path}"));
+    }
+    if let Some(engine_version) = &artifact.engine_version {
+        diagnostic
+            .related
+            .push(format!("engine_version: {engine_version}"));
+    }
+    artifact.diagnostics.push(diagnostic);
     Some(())
 }
 
@@ -487,21 +507,35 @@ fn execute_external_transform(
         escape_html(name)
     );
     let duration_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
-    diagnostics.push(diag(
+    let output_hash = sha256_hex(html.as_bytes());
+    let cache_key = transform_cache_key(name, input_mode, request.engine_identity, &source_hash);
+    let mut diagnostic = diag(
         "info",
         format!("{name} external transform completed in {duration_ms}ms."),
         None,
         None,
         Some("Output was captured without invoking a shell."),
+    );
+    diagnostic.related.push(format!(
+        "engine_path: {}",
+        path_to_string(request.engine_path)
     ));
+    diagnostic
+        .related
+        .push(format!("engine_version: {}", request.engine_version));
+    diagnostic.related.push(format!("input_mode: {input_mode}"));
+    diagnostic.related.push(format!("cache_key: {cache_key}"));
+    diagnostic
+        .related
+        .push(format!("output_hash: {output_hash}"));
+    diagnostics.push(diagnostic);
 
-    let output_hash = sha256_hex(html.as_bytes());
     Ok(TransformArtifact {
         id: format!("{name}-{source_hash}"),
         name: name.to_string(),
         output_kind: if html.contains("<svg") { "svg" } else { "html" }.to_string(),
         output_hash,
-        cache_key: transform_cache_key(name, input_mode, request.engine_identity, &source_hash),
+        cache_key,
         execution_kind: "external".to_string(),
         engine_version: Some(request.engine_version.to_string()),
         engine_path: Some(path_to_string(request.engine_path)),

@@ -4469,6 +4469,19 @@ beta</pre>
         assert_eq!(stdin_artifact.input_mode, "stdin");
         assert!(stdin_artifact.html.contains(&unique_body));
         assert!(!stdin_artifact.cache_key.is_empty());
+        let success_diagnostic = stdin_artifact
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message.contains("completed"))
+            .expect("success diagnostic");
+        assert!(success_diagnostic
+            .related
+            .iter()
+            .any(|related| related == &format!("cache_key: {}", stdin_artifact.cache_key)));
+        assert!(success_diagnostic
+            .related
+            .iter()
+            .any(|related| related == "input_mode: stdin"));
         assert!(stdin_artifact
             .engine_version
             .as_deref()
@@ -4495,6 +4508,12 @@ beta</pre>
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("served from cache")));
+        assert!(cached_artifact.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .related
+                .iter()
+                .any(|related| related == &format!("cache_key: {}", cached_artifact.cache_key))
+        }));
         transforms::external::clear_external_transform_memory_cache_for_tests();
         let persistent_cached_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
