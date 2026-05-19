@@ -361,6 +361,18 @@
             <p>{{ table.rows }} rows | {{ table.columns.join(", ") }}</p>
             <small v-for="(total, column) in table.numeric_columns" :key="column">{{ column }} total: {{ total }} </small>
           </article>
+          <h3>Figures</h3>
+          <article v-for="figure in figureBlocks" :key="`${figure.id || figure.src}-${figure.line}`" class="snapshot-row">
+            <p>{{ figure.caption || figure.alt || figure.id || figure.src || "Figure" }}</p>
+            <small>{{ figure.fit || "default" }} | {{ figure.position || "center" }}</small>
+            <button type="button" @click="goToSourceTarget(figure)">Go to source</button>
+            <label>
+              Crop focus
+              <select :value="figure.position || 'center'" :disabled="!canEditFigureSource(figure)" @change="onFigureCropPositionChange(figure, $event)">
+                <option v-for="position in figureCropPositions" :key="position" :value="position">{{ position }}</option>
+              </select>
+            </label>
+          </article>
           <h3>Formula graph</h3>
           <article v-for="formula in active.compile?.formula_graph || []" :key="formula.name" class="snapshot-row">
             <p>{{ formula.name }} = {{ formula.expression }}</p>
@@ -940,7 +952,7 @@ import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searc
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { useDocumentsStore } from "./stores/documents";
-import type { AiCleanupResponse, DocumentDiagnostic, OpenDocument } from "./types";
+import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument } from "./types";
 
 const store = useDocumentsStore();
 const appWindow = getCurrentWindow();
@@ -1042,6 +1054,18 @@ interface DocumentTabGroup {
   documents: OpenDocument[];
 }
 
+interface FigureListItem {
+  id?: string | null;
+  src?: string | null;
+  alt?: string | null;
+  caption?: string | null;
+  fit?: string | null;
+  position?: string | null;
+  line: number;
+  end_line: number;
+  source_file?: string | null;
+}
+
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
@@ -1114,6 +1138,24 @@ const outlineHeadings = computed(() =>
         text: block.text,
         anchor: block.anchor,
         level: block.level,
+        line: block.source?.source_line || block.line,
+        end_line: block.source?.end_source_line || block.end_line,
+        source_file: block.source?.source_file || null,
+      },
+    ];
+  }),
+);
+const figureBlocks = computed<FigureListItem[]>(() =>
+  (active.value.compile?.document_ast.blocks || []).flatMap((block: DocumentBlock) => {
+    if (block.kind !== "figure") return [];
+    return [
+      {
+        id: block.id || null,
+        src: block.src || null,
+        alt: block.alt || null,
+        caption: block.caption || null,
+        fit: block.fit || null,
+        position: block.position || null,
         line: block.source?.source_line || block.line,
         end_line: block.source?.end_source_line || block.end_line,
         source_file: block.source?.source_file || null,
@@ -2409,6 +2451,44 @@ function insertFigureSnippet(position: FigureCropPosition = "center") {
 
 function formatFigureSnippet(position: FigureCropPosition) {
   return `![Figure alt](assets/figure.png){#fig:figure caption="Figure caption" fit="cover" position="${position}"}`;
+}
+
+function onFigureCropPositionChange(figure: FigureListItem, event: Event) {
+  const value = (event.target as HTMLSelectElement | null)?.value;
+  if (!isFigureCropPosition(value)) return;
+  setFigureCropPosition(figure, value);
+}
+
+function setFigureCropPosition(figure: FigureListItem, position: FigureCropPosition) {
+  if (!editorView || !canEditFigureSource(figure)) return;
+  const line = editorView.state.doc.line(Math.max(1, Math.min(figure.line, editorView.state.doc.lines)));
+  const withFit = upsertMarkdownAttribute(line.text, "fit", "cover");
+  const updated = upsertMarkdownAttribute(withFit, "position", position);
+  editorView.dispatch({
+    changes: { from: line.from, to: line.to, insert: updated },
+    selection: { anchor: line.from, head: line.from + updated.length },
+  });
+  editorView.focus();
+}
+
+function canEditFigureSource(figure: FigureListItem) {
+  return !figure.source_file || !active.value.path || figure.source_file === active.value.path;
+}
+
+function upsertMarkdownAttribute(line: string, key: string, value: string) {
+  const attribute = `${key}="${value}"`;
+  const match = line.match(/\{([^{}]*)\}\s*$/);
+  if (!match || match.index === undefined) return `${line}{${attribute}}`;
+  const attrs = match[1];
+  const pattern = new RegExp(`(^|\\s)${key}="[^"]*"`);
+  const updatedAttrs = pattern.test(attrs)
+    ? attrs.replace(pattern, (_token, prefix: string) => `${prefix}${attribute}`)
+    : `${attrs.trim()} ${attribute}`.trim();
+  return `${line.slice(0, match.index)}{${updatedAttrs}}`;
+}
+
+function isFigureCropPosition(value: string | undefined): value is FigureCropPosition {
+  return Boolean(value && figureCropPositions.includes(value as FigureCropPosition));
 }
 
 function openTableEditor() {
