@@ -20,7 +20,10 @@ use crate::{
     html_preview::markdown_to_html,
     indexing::{collect_index_entries, strip_index_markers},
     link_validation::{validate_image_paths, validate_link_paths, validate_logo_path},
-    manifest::{count_equations, count_figures, manifest_file, manifest_media_files},
+    manifest::{
+        count_equations, count_figures, manifest_file, manifest_layout_sections,
+        manifest_media_files,
+    },
     metadata_string,
     paged_document::build_paged_document,
     path_to_string,
@@ -259,6 +262,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         .filter_map(|edge| manifest_file(&edge.child))
         .collect::<Vec<_>>();
     let media_files = manifest_media_files(&document_ast);
+    let layout_sections = manifest_layout_sections(&paged_document);
     let manifest = ExportManifest {
         document_title: title.clone(),
         document_version: metadata
@@ -273,6 +277,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         output_hash: None,
         included_files,
         media_files,
+        layout_sections,
         export_target: "preview".to_string(),
         export_options: json!({}),
         transform_artifacts: transform_artifacts

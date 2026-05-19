@@ -1645,6 +1645,19 @@ fn layout_pagination_controls_flow_through_exports() {
         .blocks
         .iter()
         .any(|block| block.kind == "layout" && block.source.is_some()));
+    let manifest_flow_section = response
+        .export_manifest
+        .layout_sections
+        .iter()
+        .find(|section| section.id == flow_section.id)
+        .expect("manifest layout section");
+    assert_eq!(manifest_flow_section.columns, Some(2));
+    assert_eq!(manifest_flow_section.page_size.as_deref(), Some("letter"));
+    assert_eq!(
+        manifest_flow_section.orientation.as_deref(),
+        Some("landscape")
+    );
+    assert_eq!(manifest_flow_section.margins.as_deref(), Some("narrow"));
 
     let docx = render_docx_bytes(&response, &options).expect("docx bytes");
     let docx_document = zip_entry_text(&docx, "word/document.xml");

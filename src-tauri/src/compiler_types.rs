@@ -100,6 +100,7 @@ pub(crate) struct ExportManifest {
     pub(crate) output_hash: Option<String>,
     pub(crate) included_files: Vec<ManifestFile>,
     pub(crate) media_files: Vec<ManifestFile>,
+    pub(crate) layout_sections: Vec<ManifestLayoutSection>,
     pub(crate) export_target: String,
     pub(crate) export_options: Value,
     pub(crate) transform_artifacts: Vec<Value>,
@@ -112,4 +113,18 @@ pub(crate) struct ExportManifest {
 pub(crate) struct ManifestFile {
     pub(crate) path: String,
     pub(crate) hash: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct ManifestLayoutSection {
+    pub(crate) id: String,
+    pub(crate) title: Option<String>,
+    pub(crate) start_line: usize,
+    pub(crate) end_line: usize,
+    pub(crate) columns: Option<usize>,
+    pub(crate) page_size: Option<String>,
+    pub(crate) orientation: Option<String>,
+    pub(crate) margins: Option<String>,
+    pub(crate) header: Option<String>,
+    pub(crate) footer: Option<String>,
 }

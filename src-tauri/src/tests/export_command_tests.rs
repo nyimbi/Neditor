@@ -100,8 +100,10 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(manifest_text.contains("\"output_hash\": \"sha256:"));
     assert!(manifest_text.contains("\"diagnostics\": []"));
     assert!(manifest_text.contains("\"source_map\": ["));
+    assert!(manifest_text.contains("\"layout_sections\": ["));
     assert_eq!(response.manifest.document_title, "Manifest Ready");
     assert_eq!(response.manifest.export_target, "html");
+    assert_eq!(response.manifest.layout_sections.len(), 1);
     let output_string = path_to_string(&output);
     assert_eq!(
         response.manifest.output_path.as_deref(),

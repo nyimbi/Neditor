@@ -1,6 +1,7 @@
 use crate::{
-    compiler_types::ManifestFile,
+    compiler_types::{ManifestFile, ManifestLayoutSection},
     document_ast::{AstSourceRange, DocumentAst, DocumentBlock},
+    paged_document::PagedDocument,
     path_to_string, sha256_uri,
 };
 use std::{collections::BTreeSet, fs, path::PathBuf};
@@ -43,6 +44,27 @@ pub(crate) fn manifest_media_files(document_ast: &DocumentAst) -> Vec<ManifestFi
         }
     }
     files
+}
+
+pub(crate) fn manifest_layout_sections(
+    paged_document: &PagedDocument,
+) -> Vec<ManifestLayoutSection> {
+    paged_document
+        .sections
+        .iter()
+        .map(|section| ManifestLayoutSection {
+            id: section.id.clone(),
+            title: section.title.clone(),
+            start_line: section.start_line,
+            end_line: section.end_line,
+            columns: section.layout.columns,
+            page_size: section.layout.page_size.clone(),
+            orientation: section.layout.orientation.clone(),
+            margins: section.layout.margins.clone(),
+            header: section.layout.header.clone(),
+            footer: section.layout.footer.clone(),
+        })
+        .collect()
 }
 
 fn manifest_media_path(src: &str, source: Option<&AstSourceRange>) -> Option<String> {

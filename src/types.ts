@@ -277,6 +277,19 @@ export interface ManifestFile {
   hash: string;
 }
 
+export interface ManifestLayoutSection {
+  id: string;
+  title?: string | null;
+  start_line: number;
+  end_line: number;
+  columns?: number | null;
+  page_size?: string | null;
+  orientation?: string | null;
+  margins?: string | null;
+  header?: string | null;
+  footer?: string | null;
+}
+
 export interface ExportManifest {
   document_title: string;
   document_version: string;
@@ -287,6 +300,7 @@ export interface ExportManifest {
   output_hash?: string | null;
   included_files: ManifestFile[];
   media_files: ManifestFile[];
+  layout_sections: ManifestLayoutSection[];
   export_target: string;
   export_options: Record<string, unknown>;
   transform_artifacts: Array<Record<string, unknown>>;
