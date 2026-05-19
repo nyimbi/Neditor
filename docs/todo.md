@@ -8,8 +8,9 @@ What remains to achieve the full vision:
      crop rectangles, the toolbar/command palette can insert cover figures with crop focus, and the References sidebar can update figure crop focus in-place with
      a pointer/keyboard crop focus pad.
      Layout directives now carry page break, keep-with-next, keep-together, section column, section page-size/orientation/margin, and header/footer semantics through HTML,
-     AST, DOCX, PDF, PPTX, and bundle conformance fixtures, DOCX native TOC fields now honor front matter TOC depth, and layout orientation metadata maps to
-     HTML/PDF/DOCX page geometry. Still needed: richer paged-layout reflow beyond static section controls.
+     AST, DOCX, PDF, PPTX, and bundle conformance fixtures, DOCX native TOC fields now honor front matter TOC depth, layout orientation metadata maps to
+     HTML/PDF/DOCX page geometry, and section-level PDF page controls now produce per-page MediaBox geometry. Still needed: richer paged-layout reflow beyond static
+     section controls.
   2. Canonical document AST
      There is an AST foundation, with normalized layout settings now attached to layout blocks, and transform artifacts now preserve source-file/range provenance
      through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler still has string-heavy paths. Export, source maps,

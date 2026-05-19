@@ -2,7 +2,6 @@ use super::*;
 
 pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> Vec<u8> {
     let pages = build_pdf_pages(response, options);
-    let (page_width, page_height, margin_top, margin_left) = pdf_page_layout(response, options);
     let total_pages = pages.len().max(1);
     let mut objects = vec![
         String::new(),
@@ -15,6 +14,10 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
         let page_id = objects.len() + 1;
         let content_id = page_id + 1;
         page_ids.push(page_id);
+        let page_width = page.layout.width;
+        let page_height = page.layout.height;
+        let margin_top = page.layout.margin_top;
+        let margin_left = page.layout.margin_left;
         let (mut header, mut footer) =
             export_header_footer_for_page(response, options, page_index + 1, total_pages);
         if let Some(section_header) = &page.header {
@@ -302,6 +305,7 @@ struct PdfPage {
     items: Vec<PdfPageItem>,
     header: Option<String>,
     footer: Option<String>,
+    layout: PdfPageLayout,
 }
 
 #[derive(Clone, Debug)]
@@ -322,12 +326,19 @@ struct PdfFigure {
     dimensions: Option<ExportImageDimensions>,
 }
 
+#[derive(Clone, Debug)]
+struct PdfPageLayout {
+    page_size: String,
+    orientation: String,
+    width: u32,
+    height: u32,
+    margin_top: u32,
+    margin_left: u32,
+}
+
 fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<PdfPage> {
-    let (_, page_height, margin_top, _) = pdf_page_layout(response, options);
-    let footer_reserved = (margin_top / 2).max(12) + 24;
-    let available_height =
-        (page_height as i32 - margin_top as i32 - footer_reserved as i32).max(120);
-    let mut paginator = PdfPaginator::new(available_height);
+    let base_layout = pdf_page_layout(response, options);
+    let mut paginator = PdfPaginator::new(base_layout);
     paginator.extend_text(export_metadata_lines(response, options));
     paginator.finish_page();
 
@@ -451,27 +462,35 @@ struct PdfPaginator {
     current_header: Option<String>,
     current_footer: Option<String>,
     used_height: i32,
-    available_height: i32,
+    base_layout: PdfPageLayout,
+    current_layout: PdfPageLayout,
 }
 
 impl PdfPaginator {
-    fn new(available_height: i32) -> Self {
+    fn new(base_layout: PdfPageLayout) -> Self {
         Self {
             pages: Vec::new(),
             current: Vec::new(),
             current_header: None,
             current_footer: None,
             used_height: 0,
-            available_height,
+            current_layout: base_layout.clone(),
+            base_layout,
         }
     }
 
     fn apply_section_options(&mut self, settings: &LayoutSettings) {
+        if settings.has_page_model_controls() && !self.current.is_empty() {
+            self.finish_page();
+        }
         if let Some(header) = &settings.header {
             self.current_header = Some(header.clone());
         }
         if let Some(footer) = &settings.footer {
             self.current_footer = Some(footer.clone());
+        }
+        if settings.has_page_model_controls() {
+            self.current_layout = pdf_section_layout(&self.base_layout, settings);
         }
     }
 
@@ -491,7 +510,7 @@ impl PdfPaginator {
 
     fn push_text(&mut self, line: String) {
         let height = pdf_text_item_height();
-        if self.used_height + height > self.available_height {
+        if self.used_height + height > self.available_height() {
             self.finish_page();
         }
         self.used_height += height;
@@ -510,7 +529,7 @@ impl PdfPaginator {
             let take_count = remaining_rows.len().min(available_rows);
             let chunk = pdf_table_chunk(&table, remaining_rows[..take_count].to_vec(), continued);
             let height = pdf_table_height(&chunk);
-            if self.used_height + height > self.available_height && !self.current.is_empty() {
+            if self.used_height + height > self.available_height() && !self.current.is_empty() {
                 self.finish_page();
                 continue;
             }
@@ -522,7 +541,7 @@ impl PdfPaginator {
 
         if table.rows.is_empty() {
             let height = pdf_table_height(&table);
-            if self.used_height + height > self.available_height {
+            if self.used_height + height > self.available_height() {
                 self.finish_page();
             }
             self.used_height += height;
@@ -531,16 +550,20 @@ impl PdfPaginator {
     }
 
     fn push_figure(&mut self, figure: PdfFigure) {
-        let height = pdf_figure_height(figure.dimensions, figure.fit.as_deref());
-        if self.used_height + height > self.available_height && !self.current.is_empty() {
+        let height = pdf_figure_height(
+            figure.dimensions,
+            figure.fit.as_deref(),
+            self.content_width(),
+        );
+        if self.used_height + height > self.available_height() && !self.current.is_empty() {
             self.finish_page();
         }
-        self.used_height += height.min(self.available_height);
+        self.used_height += height.min(self.available_height());
         self.current.push(PdfPageItem::Figure(figure));
     }
 
     fn available_table_rows(&self, continued: bool) -> usize {
-        let remaining = self.available_height - self.used_height;
+        let remaining = self.available_height() - self.used_height;
         let caption_height = if continued {
             pdf_table_continued_caption_height()
         } else {
@@ -561,6 +584,7 @@ impl PdfPaginator {
             items: std::mem::take(&mut self.current),
             header: self.current_header.clone(),
             footer: self.current_footer.clone(),
+            layout: self.current_layout.clone(),
         });
         self.used_height = 0;
     }
@@ -572,9 +596,25 @@ impl PdfPaginator {
                 items: Vec::new(),
                 header: self.current_header.clone(),
                 footer: self.current_footer.clone(),
+                layout: self.current_layout.clone(),
             });
         }
         self.pages
+    }
+
+    fn available_height(&self) -> i32 {
+        let footer_reserved = (self.current_layout.margin_top / 2).max(12) + 24;
+        (self.current_layout.height as i32
+            - self.current_layout.margin_top as i32
+            - footer_reserved as i32)
+            .max(120)
+    }
+
+    fn content_width(&self) -> u32 {
+        self.current_layout
+            .width
+            .saturating_sub(self.current_layout.margin_left * 2)
+            .max(120)
     }
 }
 
@@ -624,29 +664,77 @@ fn pdf_table_height(table: &PdfTable) -> i32 {
         + 10
 }
 
-fn pdf_figure_height(dimensions: Option<ExportImageDimensions>, fit: Option<&str>) -> i32 {
-    let (_, height) = pdf_figure_box_size(dimensions, 468, 180, fit);
+fn pdf_figure_height(
+    dimensions: Option<ExportImageDimensions>,
+    fit: Option<&str>,
+    max_width: u32,
+) -> i32 {
+    let (_, height) = pdf_figure_box_size(dimensions, max_width, 180, fit);
     height + pdf_figure_caption_height()
 }
 
-fn pdf_page_layout(response: &CompileResponse, options: &Value) -> (u32, u32, u32, u32) {
-    let (mut width, mut height) = match layout_page_size(&response.metadata).as_str() {
+fn pdf_page_layout(response: &CompileResponse, options: &Value) -> PdfPageLayout {
+    let page_size = layout_page_size(&response.metadata);
+    let orientation = layout_orientation(&response.metadata);
+    let (width, height) = pdf_page_dimensions(&page_size, orientation);
+    let margin = explicit_layout_margins(&response.metadata)
+        .as_deref()
+        .map(pdf_margin_for_preset)
+        .unwrap_or_else(|| match layout_preset(options) {
+            "compact" => 51,
+            "presentation" => 57,
+            _ => 68,
+        });
+    PdfPageLayout {
+        page_size,
+        orientation: orientation.to_string(),
+        width,
+        height,
+        margin_top: margin,
+        margin_left: margin,
+    }
+}
+
+fn pdf_section_layout(base: &PdfPageLayout, settings: &LayoutSettings) -> PdfPageLayout {
+    let page_size = settings.page_size.as_deref().unwrap_or(&base.page_size);
+    let orientation = settings.orientation.as_deref().unwrap_or(&base.orientation);
+    let (width, height) = if settings.page_size.is_some() || settings.orientation.is_some() {
+        pdf_page_dimensions(page_size, orientation)
+    } else {
+        (base.width, base.height)
+    };
+    let margin = settings
+        .margins
+        .as_deref()
+        .map(pdf_margin_for_preset)
+        .unwrap_or(base.margin_top);
+    PdfPageLayout {
+        page_size: page_size.to_string(),
+        orientation: orientation.to_string(),
+        width,
+        height,
+        margin_top: margin,
+        margin_left: margin,
+    }
+}
+
+fn pdf_page_dimensions(page_size: &str, orientation: &str) -> (u32, u32) {
+    let (mut width, mut height) = match page_size {
         "letter" => (612, 792),
         "legal" => (612, 1008),
         _ => (595, 842),
     };
-    if layout_orientation(&response.metadata) == "landscape" {
+    if orientation == "landscape" {
         std::mem::swap(&mut width, &mut height);
     }
-    let margin = match explicit_layout_margins(&response.metadata).as_deref() {
-        Some("narrow") | Some("compact") => 34,
-        Some("wide") => 91,
-        Some("normal") => 68,
-        _ => match layout_preset(options) {
-            "compact" => 51,
-            "presentation" => 57,
-            _ => 68,
-        },
-    };
-    (width, height, margin, margin)
+    (width, height)
+}
+
+fn pdf_margin_for_preset(margins: &str) -> u32 {
+    match margins {
+        "narrow" | "compact" => 34,
+        "wide" => 91,
+        "normal" => 68,
+        _ => 68,
+    }
 }

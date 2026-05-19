@@ -1653,6 +1653,8 @@ fn layout_pagination_controls_flow_through_exports() {
         "Section break: columns=2, pageSize=letter, orientation=landscape, margins=narrow, breakAfter=page"
     ));
     assert!(pdf_text.contains("Flow Header"));
+    assert!(pdf_text.contains("/MediaBox [0 0 595 842]"));
+    assert!(pdf_text.contains("/MediaBox [0 0 792 612]"));
 
     let bundle =
         render_markdown_bundle_bytes(&response, &response.export_manifest).expect("layout bundle");
