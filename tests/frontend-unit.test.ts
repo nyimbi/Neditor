@@ -5,9 +5,11 @@ import test from "node:test";
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import {
   formatTableTotal,
+  parseTableCellSpan,
   parseMarkdownTables,
   parseTablePaste,
   serializeMarkdownTable,
+  setTableCellSpan,
   tableColumnRange,
   validateTableDraft,
   type TableDraft,
@@ -60,6 +62,31 @@ test("table validation and formatting cover editor formulas and totals", () => {
     "| Region | Revenue |",
     "| --- | ---: |",
   ]);
+});
+
+test("table span helpers preserve merged-cell attributes through serialization", () => {
+  const draft: TableDraft = {
+    id: "tbl:merged",
+    caption: "Merged plan",
+    headers: ["Phase", "Scope", "Owner"],
+    alignments: ["left", "left", "left"],
+    formats: ["text", "text", "text"],
+    rows: [
+      [setTableCellSpan("Discovery", 2, 1), "", "PM"],
+      [setTableCellSpan("Delivery", 1, 2), "Build", "Lead"],
+      ["", "Launch", "Ops"],
+    ],
+  };
+
+  deepEqual(parseTableCellSpan(draft.rows[0][0]), {
+    text: "Discovery",
+    colspan: 2,
+    rowspan: 1,
+  });
+  equal(setTableCellSpan(draft.rows[0][0], 1, 1), "Discovery");
+  ok(!validateTableDraft(draft).some((issue) => issue.severity === "error"));
+  ok(serializeMarkdownTable(draft).join("\n").includes("Discovery {colspan=2}"));
+  ok(serializeMarkdownTable(draft).join("\n").includes("Delivery {rowspan=2}"));
 });
 
 test("conflict diff keeps local and external edits aligned for merge UI", () => {

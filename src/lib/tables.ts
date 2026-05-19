@@ -35,6 +35,12 @@ export interface ParsedTablePaste {
   caption?: string;
 }
 
+export interface TableCellSpan {
+  text: string;
+  colspan: number;
+  rowspan: number;
+}
+
 export function parseMarkdownTables(text: string): MarkdownTable[] {
   const lines = text.split("\n");
   const tables: MarkdownTable[] = [];
@@ -183,6 +189,19 @@ export function validateTableDraft(draft: TableDraft): TableDraftIssue[] {
   for (const [rowIndex, row] of normalized.rows.entries()) {
     for (const [columnIndex, cell] of row.entries()) {
       const address = `${spreadsheetColumnName(columnIndex + 1)}${rowIndex + 1}`;
+      const span = parseTableCellSpan(cell);
+      if (span.colspan > normalized.headers.length - columnIndex) {
+        issues.push({
+          severity: "error",
+          message: `${address} colspan exceeds the available table columns.`,
+        });
+      }
+      if (span.rowspan > normalized.rows.length - rowIndex) {
+        issues.push({
+          severity: "error",
+          message: `${address} rowspan exceeds the available table rows.`,
+        });
+      }
       issues.push(...validateTableCell(cell, normalized.formats[columnIndex], address, normalized.headers.length, dataRowCount));
     }
   }
@@ -196,7 +215,7 @@ function validateTableCell(
   columnCount: number,
   dataRowCount: number,
 ): TableDraftIssue[] {
-  const trimmed = value.trim();
+  const trimmed = parseTableCellSpan(value).text.trim();
   if (!trimmed) return [];
   if (isFormulaCell(trimmed)) return validateTableFormula(trimmed, address, columnCount, dataRowCount);
   if (format === "date" && Number.isNaN(Date.parse(trimmed))) {
@@ -274,6 +293,33 @@ function separatorForAlignment(alignment: TableAlignment) {
 
 function escapeTableCell(cell: string) {
   return cell.replace(/\r?\n/g, " ").replace(/\|/g, "\\|").trim();
+}
+
+export function parseTableCellSpan(value: string): TableCellSpan {
+  const trimmed = value.trim();
+  const match = trimmed.match(/\s*\{(?=[^{}]*(?:colspan|rowspan)=)([^{}]*)\}\s*$/);
+  if (!match || match.index === undefined) {
+    return { text: trimmed, colspan: 1, rowspan: 1 };
+  }
+  return {
+    text: trimmed.slice(0, match.index).trim(),
+    colspan: spanAttribute(match[1], "colspan"),
+    rowspan: spanAttribute(match[1], "rowspan"),
+  };
+}
+
+export function setTableCellSpan(value: string, colspan: number, rowspan: number) {
+  const current = parseTableCellSpan(value);
+  const attrs = [
+    colspan > 1 ? `colspan=${Math.trunc(colspan)}` : "",
+    rowspan > 1 ? `rowspan=${Math.trunc(rowspan)}` : "",
+  ].filter(Boolean);
+  return attrs.length ? `${current.text} {${attrs.join(" ")}}`.trim() : current.text;
+}
+
+function spanAttribute(attrs: string, name: "colspan" | "rowspan") {
+  const match = attrs.match(new RegExp(`(?:^|\\s)${name}=(?:"(\\d+)"|(\\d+))`));
+  return Math.max(1, Number(match?.[1] || match?.[2] || 1));
 }
 
 export function parseTablePaste(text: string): ParsedTablePaste {
@@ -399,21 +445,25 @@ export function compareTableCells(left: string, right: string, format: TableForm
 }
 
 function formatTableCell(value: string, format: TableFormat) {
-  const trimmed = value.trim();
-  if (!trimmed || format === "text") return trimmed;
-  if (isFormulaCell(trimmed)) return trimmed;
+  const span = parseTableCellSpan(value);
+  const trimmed = span.text.trim();
+  if (!trimmed || format === "text") return setTableCellSpan(trimmed, span.colspan, span.rowspan);
+  if (isFormulaCell(trimmed)) return setTableCellSpan(trimmed, span.colspan, span.rowspan);
+  let formatted = trimmed;
   if (format === "date") {
     const time = Date.parse(trimmed);
-    return Number.isNaN(time) ? trimmed : new Date(time).toISOString().slice(0, 10);
+    formatted = Number.isNaN(time) ? trimmed : new Date(time).toISOString().slice(0, 10);
+    return setTableCellSpan(formatted, span.colspan, span.rowspan);
   }
   const number = parseCellNumber(trimmed);
-  if (Number.isNaN(number)) return trimmed;
-  if (format === "currency") return `$${trimFixed(number, 2)}`;
+  if (Number.isNaN(number)) return setTableCellSpan(trimmed, span.colspan, span.rowspan);
+  if (format === "currency") formatted = `$${trimFixed(number, 2)}`;
   if (format === "percent") {
     const percent = trimmed.includes("%") || Math.abs(number) > 1 ? number : number * 100;
-    return `${trimFixed(percent, 2)}%`;
+    formatted = `${trimFixed(percent, 2)}%`;
   }
-  return trimFixed(number, 2);
+  if (format === "number") formatted = trimFixed(number, 2);
+  return setTableCellSpan(formatted, span.colspan, span.rowspan);
 }
 
 export function formatTableTotal(draft: TableDraft, columnIndex: number) {

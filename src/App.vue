@@ -228,6 +228,27 @@
               <output>{{ tableFormulaPreview || "-" }}</output>
               <button type="button" :disabled="!tableFormulaPreview" @click="appendCustomTableFormulaRow">Add formula row</button>
             </section>
+            <section class="table-span-builder" aria-label="Merged table cells">
+              <label>
+                Cell
+                <select v-model="selectedTableSpanCell">
+                  <option v-for="option in tableSpanCellOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                Columns
+                <input v-model.number="tableSpanColspan" type="number" min="1" :max="tableSpanMaxColspan" />
+              </label>
+              <label>
+                Rows
+                <input v-model.number="tableSpanRowspan" type="number" min="1" :max="tableSpanMaxRowspan" />
+              </label>
+              <output>{{ tableSpanPreview || "-" }}</output>
+              <button type="button" :disabled="!tableSpanPreview" @click="applyTableCellSpan">Merge cell</button>
+              <button type="button" @click="clearTableCellSpan">Clear merge</button>
+            </section>
             <div class="table-metadata">
               <label>
                 Table id
@@ -998,7 +1019,9 @@ import {
   padTableRow,
   parseMarkdownTables,
   parseTablePaste,
+  parseTableCellSpan,
   serializeMarkdownTable,
+  setTableCellSpan,
   spreadsheetColumnName,
   tableColumnRange,
   validateTableDraft,
@@ -1046,6 +1069,10 @@ const tableFormulaTargetColumn = ref(1);
 const tableFormulaStartRow = ref(1);
 const tableFormulaEndRow = ref(2);
 const tableFormulaLabel = ref("Total");
+const tableSpanRow = ref(0);
+const tableSpanColumn = ref(0);
+const tableSpanColspan = ref(1);
+const tableSpanRowspan = ref(1);
 const draggedTabId = ref("");
 
 type FigureCropPosition = "center" | "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -1282,6 +1309,45 @@ const tableFormulaPreview = computed(() => {
   const row = buildCustomTableFormulaRow();
   if (!row) return "";
   return row.find(isFormulaCell) || "";
+});
+const selectedTableSpanCell = computed({
+  get: () => `${tableSpanRow.value}:${tableSpanColumn.value}`,
+  set: (value: string) => {
+    const [row, column] = value.split(":").map((part) => Number(part));
+    tableSpanRow.value = Number.isInteger(row) ? row : 0;
+    tableSpanColumn.value = Number.isInteger(column) ? column : 0;
+    syncTableSpanControlsFromCell();
+  },
+});
+const tableSpanCellOptions = computed(() => {
+  const draft = tableDraft.value;
+  if (!draft) return [];
+  return draft.rows.flatMap((row, rowIndex) =>
+    draft.headers.map((header, columnIndex) => ({
+      value: `${rowIndex}:${columnIndex}`,
+      label: `${spreadsheetColumnName(columnIndex + 1)}${rowIndex + 1} - ${header || `Column ${columnIndex + 1}`} - ${row[columnIndex] || "blank"}`,
+    })),
+  );
+});
+const tableSpanMaxColspan = computed(() => {
+  const draft = tableDraft.value;
+  if (!draft) return 1;
+  return Math.max(1, draft.headers.length - tableSpanColumn.value);
+});
+const tableSpanMaxRowspan = computed(() => {
+  const draft = tableDraft.value;
+  if (!draft) return 1;
+  return Math.max(1, draft.rows.length - tableSpanRow.value);
+});
+const tableSpanPreview = computed(() => {
+  const draft = tableDraft.value;
+  if (!draft) return "";
+  const row = draft.rows[tableSpanRow.value];
+  const value = row?.[tableSpanColumn.value];
+  if (value === undefined) return "";
+  const colspan = clampInteger(tableSpanColspan.value, 1, tableSpanMaxColspan.value);
+  const rowspan = clampInteger(tableSpanRowspan.value, 1, tableSpanMaxRowspan.value);
+  return setTableCellSpan(value, colspan, rowspan);
 });
 const diagnosticSignature = computed(() =>
   (active.value.compile?.diagnostics || [])
@@ -2837,6 +2903,43 @@ function appendCustomTableFormulaRow() {
   draft.rows.push(row);
 }
 
+function applyTableCellSpan() {
+  const draft = tableDraft.value;
+  if (!draft) return;
+  const rowIndex = clampInteger(tableSpanRow.value, 0, Math.max(0, draft.rows.length - 1));
+  const columnIndex = clampInteger(tableSpanColumn.value, 0, Math.max(0, draft.headers.length - 1));
+  const row = draft.rows[rowIndex];
+  if (!row) return;
+  const colspan = clampInteger(tableSpanColspan.value, 1, Math.max(1, draft.headers.length - columnIndex));
+  const rowspan = clampInteger(tableSpanRowspan.value, 1, Math.max(1, draft.rows.length - rowIndex));
+  row[columnIndex] = setTableCellSpan(row[columnIndex] || "", colspan, rowspan);
+}
+
+function clearTableCellSpan() {
+  const draft = tableDraft.value;
+  if (!draft) return;
+  const row = draft.rows[tableSpanRow.value];
+  if (!row || row[tableSpanColumn.value] === undefined) return;
+  const span = parseTableCellSpan(row[tableSpanColumn.value]);
+  row[tableSpanColumn.value] = span.text;
+  tableSpanColspan.value = 1;
+  tableSpanRowspan.value = 1;
+}
+
+function syncTableSpanControlsFromCell() {
+  const draft = tableDraft.value;
+  const row = draft?.rows[tableSpanRow.value];
+  const value = row?.[tableSpanColumn.value];
+  if (value === undefined) {
+    tableSpanColspan.value = 1;
+    tableSpanRowspan.value = 1;
+    return;
+  }
+  const span = parseTableCellSpan(value);
+  tableSpanColspan.value = span.colspan;
+  tableSpanRowspan.value = span.rowspan;
+}
+
 function buildCustomTableFormulaRow() {
   const draft = tableDraft.value;
   if (!draft || !draft.headers.length) return null;
@@ -3593,7 +3696,8 @@ select:hover {
   margin-bottom: 12px;
 }
 
-.table-formula-builder {
+.table-formula-builder,
+.table-span-builder {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   gap: 8px;
@@ -3604,7 +3708,8 @@ select:hover {
   background: #f8fafc;
 }
 
-.table-formula-builder output {
+.table-formula-builder output,
+.table-span-builder output {
   min-height: 32px;
   padding: 7px 9px;
   border: 1px solid #d8e0e8;
@@ -3615,7 +3720,10 @@ select:hover {
 
 .table-formula-builder button,
 .table-formula-builder input,
-.table-formula-builder select {
+.table-formula-builder select,
+.table-span-builder button,
+.table-span-builder input,
+.table-span-builder select {
   width: 100%;
   min-width: 0;
 }

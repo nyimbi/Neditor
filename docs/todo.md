@@ -13,8 +13,8 @@ What remains to achieve the full vision:
      through real column slots instead of only recording column metadata. PDF fixture coverage now proves keep-with-next/keep-together grouping moves controlled blocks as a
      unit, long paragraphs wrap within the available column width with two-line widow/orphan splitting, left/right figure floats reserve side width for adjacent wrapped text,
      large tables continue across section columns and onto following pages, large table continuation is covered inside mixed page-size/orientation sections, tall PDF table cells
-     split into continued row fragments instead of overflowing a single flow slot, and table cell span metadata now carries Markdown and imported HTML colspan/rowspan semantics through
-     the AST, DOCX gridSpan/vMerge, PPTX table span metadata, PDF cell geometry, and bundle conformance fixtures. Still needed: visual merged-cell editing.
+     split into continued row fragments instead of overflowing a single flow slot, table cell span metadata now carries Markdown and imported HTML colspan/rowspan semantics through
+     the AST, DOCX gridSpan/vMerge, PPTX table span metadata, PDF cell geometry, and bundle conformance fixtures, and the table editor can set and clear merged-cell spans.
   2. Canonical document AST
      There is an AST foundation, with normalized layout settings now attached to layout blocks, and transform artifacts now preserve source-file/range provenance
      through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler now emits a source-mapped semantic paged-document model,
@@ -24,7 +24,7 @@ What remains to achieve the full vision:
      missing-variable warnings, so semantic layout directives do not make readiness reports noisy.
      The compiler still has string-heavy paths. Export, references, transforms, and validation need to depend more fully on durable semantic models.
   3. Full visual table editor
-     Core editor controls now cover table parsing/paste/captions, add/remove/duplicate/move rows and columns, alignment, sorting, column formats, totals, formula rows,
+     Core editor controls now cover table parsing/paste/captions, add/remove/duplicate/move rows and columns, merged-cell span controls, alignment, sorting, column formats, totals, formula rows,
      validation, Markdown preview before apply, target/range formula authoring, and cell/header accessibility labels. Export fixtures now cover broader edited-table
      permutations, and no-new-dependency frontend unit coverage now locks table parsing/paste/validation/serialization behavior in CI. Still needed: browser-level interaction tests.
   4. External transform UX and adapters
