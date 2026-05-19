@@ -20,5 +20,5 @@ What remains to achieve the full vision:
   6. E2E and export conformance tests
      Need Playwright/Tauri workflow tests, DOCX/PPTX/PDF package inspections, fixture comparisons, and confirmed macOS/Windows/Linux CI runs.
   7. Backend modularization
-     Chart and native diagram renderers have moved into transform modules, but src-tauri/src/lib.rs is still too large. Compiler orchestration, remaining transform
-     families, export helpers, diagnostics, filesystem, git, snapshot, and test fixtures should be split further.
+     Chart/native diagram renderers and manifest/media helpers have moved out of lib.rs, but src-tauri/src/lib.rs is still too large. Compiler orchestration, remaining
+     transform families, export helpers, diagnostics, filesystem, git, snapshot, and test fixtures should be split further.

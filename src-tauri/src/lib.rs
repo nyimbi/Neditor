@@ -1,10 +1,12 @@
 use chrono::Utc;
 use serde_json::{json, Value};
 #[cfg(test)]
+use std::fs;
+#[cfg(test)]
 use std::path::Path;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    env, fs,
+    env,
     path::PathBuf,
 };
 
@@ -25,6 +27,7 @@ mod git;
 mod html_preview;
 mod indexing;
 mod link_validation;
+mod manifest;
 mod markdown_tables;
 mod provenance;
 mod references;
@@ -49,14 +52,14 @@ use calculations::{collect_calculations, formula_dependency_edges};
 use compile_options::apply_compile_options;
 use compiler_types::{
     CompileRequest, CompileResponse, CompileWithOptionsRequest, ExportManifest, Heading,
-    IncludeEdge, ManifestFile, SemanticDocument, SourceMapEntry,
+    IncludeEdge, SemanticDocument, SourceMapEntry,
 };
 use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
 use document_ast::{
     attach_source_ranges, attach_transform_artifacts, build_document_ast, extract_label, slugify,
-    AstDocumentMetadata, DocumentAst,
+    AstDocumentMetadata,
 };
 #[cfg(test)]
 use export::{
@@ -90,6 +93,7 @@ use git::{run_git, GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRe
 use html_preview::markdown_to_html;
 use indexing::{collect_index_entries, strip_index_markers};
 use link_validation::{validate_image_paths, validate_link_paths, validate_logo_path};
+use manifest::{count_equations, count_figures, manifest_file, manifest_media_files};
 use provenance::{collect_ai_assisted_sections, collect_ai_sources};
 use references::{collect_cross_references, collect_labels, render_cross_references};
 use review::{collect_change_notes, collect_comments};
@@ -1500,64 +1504,6 @@ fn parse_json_or_yaml(body: &str) -> Result<Value, String> {
     serde_json::from_str::<Value>(body)
         .or_else(|_| serde_yaml::from_str::<Value>(body))
         .map_err(|err| err.to_string())
-}
-
-fn count_figures(text: &str) -> usize {
-    text.matches("![").count()
-}
-
-fn count_equations(text: &str) -> usize {
-    text.matches("$$").count() / 2
-}
-
-fn manifest_file(path: &str) -> Option<ManifestFile> {
-    let bytes = fs::read(path).ok()?;
-    Some(ManifestFile {
-        path: path.to_string(),
-        hash: sha256_uri(&bytes),
-    })
-}
-
-fn manifest_media_files(document_ast: &DocumentAst) -> Vec<ManifestFile> {
-    let mut seen = BTreeSet::new();
-    let mut files = Vec::new();
-    for block in &document_ast.blocks {
-        let document_ast::DocumentBlock::Figure {
-            src: Some(src),
-            source,
-            ..
-        } = block
-        else {
-            continue;
-        };
-        let Some(path) = manifest_media_path(src, source.as_ref()) else {
-            continue;
-        };
-        if seen.insert(path.clone()) {
-            if let Some(file) = manifest_file(&path) {
-                files.push(file);
-            }
-        }
-    }
-    files
-}
-
-fn manifest_media_path(src: &str, source: Option<&document_ast::AstSourceRange>) -> Option<String> {
-    if src.starts_with("data:") || src.contains("://") || src.starts_with('#') {
-        return None;
-    }
-    let path = PathBuf::from(src);
-    let resolved = if path.is_absolute() {
-        path
-    } else if let Some(source) = source {
-        PathBuf::from(&source.source_file)
-            .parent()
-            .map(|parent| parent.join(src))
-            .unwrap_or(path)
-    } else {
-        path
-    };
-    Some(path_to_string(&resolved))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
