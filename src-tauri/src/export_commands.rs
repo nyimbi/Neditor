@@ -6,6 +6,7 @@ use crate::{
         render_pptx_bytes,
     },
     git::get_git_status,
+    paged_document::PagedDocument,
     path_to_string, sha256_uri, CompileRequest, ExportManifest, SourceMapEntry,
 };
 use serde::{Deserialize, Serialize};
@@ -47,6 +48,7 @@ pub(crate) struct ExportReadinessReport {
     pub(crate) warning_count: usize,
     pub(crate) info_count: usize,
     pub(crate) source_map: Vec<SourceMapEntry>,
+    pub(crate) paged_document: PagedDocument,
     pub(crate) diagnostics: Vec<DocumentDiagnostic>,
     pub(crate) manifest: ExportManifest,
 }
@@ -188,6 +190,7 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
         warning_count,
         info_count,
         source_map: response.source_map,
+        paged_document: response.paged_document,
         diagnostics: response.diagnostics,
         manifest: response.export_manifest,
     }

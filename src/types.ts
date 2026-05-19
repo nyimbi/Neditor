@@ -405,6 +405,7 @@ export interface ExportReadinessReport {
   warning_count: number;
   info_count: number;
   source_map: Array<{ generated_line: number; source_file: string; source_line: number }>;
+  paged_document: PagedDocument;
   diagnostics: DocumentDiagnostic[];
   manifest: ExportManifest;
 }

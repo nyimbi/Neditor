@@ -65,7 +65,7 @@ pub(crate) fn interpolate_variables(
             };
             if let Some(value) = replacement {
                 output.push_str(&value);
-            } else if formula_token || matches!(token, "page" | "pages") {
+            } else if formula_token || is_passthrough_token(token) {
                 output.push_str(&format!("{{{{{token}}}}}"));
             } else {
                 let (source_file, line) =
@@ -94,6 +94,12 @@ pub(crate) fn interpolate_variables(
     }
     output.push_str(rest);
     output
+}
+
+fn is_passthrough_token(token: &str) -> bool {
+    matches!(token, "page" | "pages" | "page-break")
+        || token.starts_with("section-break")
+        || token.starts_with("slide")
 }
 
 fn evaluate_inline_formula(

@@ -473,6 +473,7 @@
           <article v-if="store.exportReadiness" class="readiness" :class="{ ready: store.exportReadiness.ready }">
             <strong>{{ store.exportReadiness.ready ? "Ready" : "Needs attention" }}</strong>
             <p>{{ store.exportReadiness.error_count }} errors, {{ store.exportReadiness.warning_count }} warnings, {{ store.exportReadiness.info_count }} info</p>
+            <p>{{ readinessLayoutSummary }}</p>
           </article>
           <section v-if="store.exportReadiness?.diagnostics.length" class="export-diagnostic-report" aria-label="Export readiness diagnostics">
             <article
@@ -1159,6 +1160,11 @@ const externalTransformTrustPrompts = computed<TransformTrustPrompt[]>(() => {
     }));
 });
 const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
+const readinessLayoutSummary = computed(() => {
+  const sections = store.exportReadiness?.paged_document.sections || [];
+  const columnedSections = sections.filter((section) => (section.layout.columns || 1) > 1).length;
+  return `${sections.length} layout sections, ${columnedSections} columned`;
+});
 const bibliographyByKey = computed(() => new Map((active.value.compile?.bibliography || []).map((entry) => [entry.key, entry.title])));
 const missingCitationKeys = computed(() => {
   const byKey = bibliographyByKey.value;

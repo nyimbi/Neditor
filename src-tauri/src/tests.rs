@@ -1580,6 +1580,9 @@ fn compiler_renders_layout_break_directives() {
     assert!(response.html.contains("columns=1"));
     assert!(response.html.contains("data-layout=\"layout\""));
     assert!(response.html.contains("column-count:2"));
+    assert!(!response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("Missing document variable: section-break")));
 }
 
 #[test]
@@ -3101,6 +3104,21 @@ fn export_document_writes_optional_sidecar_manifest() {
 
 #[test]
 fn prepare_for_export_validates_target_and_options() {
+    let ready_report = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: Ready Layout\nversion: 1.0.0\nstatus: archived\n---\n# Ready Layout\n\n{{section-break columns=2}}\nColumned content.".to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "warnOnDirtyGit": false }),
+    });
+
+    assert!(ready_report.ready);
+    assert_eq!(ready_report.paged_document.sections.len(), 2);
+    assert!(ready_report
+        .paged_document
+        .sections
+        .iter()
+        .any(|section| section.layout.columns == Some(2)));
+
     let report = prepare_for_export(PrepareExportRequest {
         text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),
         file_path: None,

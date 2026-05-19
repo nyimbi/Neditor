@@ -14,9 +14,10 @@ What remains to achieve the full vision:
      splitting across columns/pages.
   2. Canonical document AST
      There is an AST foundation, with normalized layout settings now attached to layout blocks, and transform artifacts now preserve source-file/range provenance
-     through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler now emits a source-mapped semantic paged-document model
-     and includes it in Markdown bundles. The compiler still has string-heavy paths. Export, references, transforms, and validation need to depend more fully on
-     durable semantic models.
+     through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler now emits a source-mapped semantic paged-document model,
+     includes it in Markdown bundles, and returns it from prepare-for-export so readiness checks and the export UI can inspect section layout before files are written.
+     Layout shortcode tokens now pass through interpolation without false missing-variable warnings, so semantic layout directives do not make readiness reports noisy.
+     The compiler still has string-heavy paths. Export, references, transforms, and validation need to depend more fully on durable semantic models.
   3. Full visual table editor
      Core editor controls now cover table parsing/paste/captions, add/remove/duplicate/move rows and columns, alignment, sorting, column formats, totals, formula rows,
      validation, Markdown preview before apply, target/range formula authoring, and cell/header accessibility labels. Export fixtures now cover broader edited-table
