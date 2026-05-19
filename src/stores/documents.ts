@@ -302,6 +302,15 @@ function folderFromPath(path: string | null) {
   return separator > 0 ? path.slice(0, separator) : null;
 }
 
+function normalizeWatchPath(path?: string | null) {
+  const normalized = (path || "").replace(/\\/g, "/").replace(/\/+$/, "");
+  return /^[a-z]:/i.test(normalized) ? normalized.toLowerCase() : normalized;
+}
+
+function sameWatchPath(left?: string | null, right?: string | null) {
+  return normalizeWatchPath(left) === normalizeWatchPath(right);
+}
+
 function watchEventIsAccessOnly(event: WatchEvent) {
   return typeof event.type === "object" && "access" in event.type;
 }
@@ -871,7 +880,9 @@ export const useDocumentsStore = defineStore("documents", {
       const watchPaths = watchedFiles.map((file) => file.path);
       const pathRoles = watchedFiles.reduce(
         (roles, file) => {
-          roles[file.path] = file.role === "root" ? "root" : "include";
+          const role = file.role === "root" ? "root" : "include";
+          roles[file.path] = role;
+          roles[normalizeWatchPath(file.path)] = role;
           return roles;
         },
         {} as Record<string, "root" | "include">,
@@ -957,9 +968,15 @@ export const useDocumentsStore = defineStore("documents", {
       }
     },
     watchReasonForPath(path: string, rootPath: string, includedPaths: string[]) {
+      const normalizedPath = normalizeWatchPath(path);
       return (
         this.watchedPathRoles[path] ||
-        (path === rootPath ? "root" : includedPaths.includes(path) ? "include" : null)
+        this.watchedPathRoles[normalizedPath] ||
+        (sameWatchPath(path, rootPath)
+          ? "root"
+          : includedPaths.some((includedPath) => sameWatchPath(path, includedPath))
+            ? "include"
+            : null)
       );
     },
     async handleWatchedFileChange(event: DocumentWatchEvent) {
@@ -968,7 +985,7 @@ export const useDocumentsStore = defineStore("documents", {
       const watched = this.watchedPaths.length
         ? this.watchedPaths
         : [doc.path, ...(doc.compile?.export_manifest.included_files || []).map((file) => file.path)];
-      if (!watched.includes(event.path)) return;
+      if (!watched.some((path) => sameWatchPath(path, event.path))) return;
       await this.refreshExternalState(event);
     },
     async refreshExternalState(event?: DocumentWatchEvent) {
