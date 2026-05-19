@@ -1,5 +1,6 @@
 use crate::{
     calculations::eval_expression,
+    compiler_support::fenced_code_marker,
     diagnostics::{diag, DocumentDiagnostic},
     document_ast::{DocumentAst, DocumentBlock},
     escape_html, format_value,
@@ -191,17 +192,6 @@ pub(crate) fn evaluate_markdown_table_formulas(
         register_named_table(&mut named_tables, table_id.as_deref(), &rows);
     }
     output.join("\n")
-}
-
-fn fenced_code_marker(line: &str) -> Option<&'static str> {
-    let trimmed = line.trim_start();
-    if trimmed.starts_with("```") {
-        Some("```")
-    } else if trimmed.starts_with("~~~") {
-        Some("~~~")
-    } else {
-        None
-    }
 }
 
 pub(crate) fn collect_table_summaries(document_ast: &DocumentAst) -> Vec<TableSummary> {

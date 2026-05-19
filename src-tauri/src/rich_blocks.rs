@@ -1,4 +1,5 @@
 use crate::{
+    compiler_support::fenced_code_marker,
     document_ast::{extract_label, extract_quoted_attribute},
     escape_html,
     layout::layout_css_style,
@@ -475,17 +476,6 @@ pub(crate) fn render_layout_tokens(markdown: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-fn fenced_code_marker(line: &str) -> Option<&'static str> {
-    let trimmed = line.trim_start();
-    if trimmed.starts_with("```") {
-        Some("```")
-    } else if trimmed.starts_with("~~~") {
-        Some("~~~")
-    } else {
-        None
-    }
 }
 
 pub(crate) fn render_layout_block_html(body: &str) -> String {

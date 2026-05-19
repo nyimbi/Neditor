@@ -1,4 +1,5 @@
 use crate::{
+    compiler_support::fenced_code_marker,
     diagnostics::{diag, with_range, DocumentDiagnostic},
     metadata_string, path_to_string,
     source_mapping::diagnostic_location_for_generated_line,
@@ -169,17 +170,6 @@ pub(crate) fn validate_link_paths(
             }
             search_from = target_end + 1;
         }
-    }
-}
-
-fn fenced_code_marker(line: &str) -> Option<&'static str> {
-    let trimmed = line.trim_start();
-    if trimmed.starts_with("```") {
-        Some("```")
-    } else if trimmed.starts_with("~~~") {
-        Some("~~~")
-    } else {
-        None
     }
 }
 

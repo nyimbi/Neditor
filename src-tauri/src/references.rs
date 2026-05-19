@@ -1,4 +1,5 @@
 use crate::{
+    compiler_support::fenced_code_marker,
     diagnostics::{diag, with_range},
     source_mapping::diagnostic_location_for_generated_line,
     DocumentDiagnostic, SourceMapEntry,
@@ -185,17 +186,6 @@ fn render_cross_reference_line(
     }
     output.push_str(rest);
     output
-}
-
-fn fenced_code_marker(line: &str) -> Option<&'static str> {
-    let trimmed = line.trim_start();
-    if trimmed.starts_with("```") {
-        Some("```")
-    } else if trimmed.starts_with("~~~") {
-        Some("~~~")
-    } else {
-        None
-    }
 }
 
 fn reference_display_text(reference: &CrossReference) -> String {

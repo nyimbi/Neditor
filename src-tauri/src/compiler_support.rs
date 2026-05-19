@@ -71,7 +71,7 @@ fn strip_heading_attributes(text: &str) -> &str {
     text.split("{#").next().unwrap_or(text).trim()
 }
 
-fn fenced_code_marker(line: &str) -> Option<&'static str> {
+pub(crate) fn fenced_code_marker(line: &str) -> Option<&'static str> {
     let trimmed = line.trim_start();
     if trimmed.starts_with("```") {
         Some("```")
