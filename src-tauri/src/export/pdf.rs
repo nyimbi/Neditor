@@ -369,7 +369,9 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<PdfPage> 
     paginator.extend_text(export_metadata_lines(response, options));
     paginator.finish_page();
 
-    for block in &response.document_ast.blocks {
+    let mut index = 0usize;
+    while index < response.document_ast.blocks.len() {
+        let block = &response.document_ast.blocks[index];
         match block {
             DocumentBlock::Layout { directive, .. } if directive == "page-break" => {
                 paginator.finish_page();
@@ -392,7 +394,7 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<PdfPage> 
                 options,
                 settings,
                 ..
-            } if directive == "layout" => {
+            } if directive == "layout" && !settings.has_pagination_controls() => {
                 if matches_layout_break(settings.break_before.as_deref()) {
                     paginator.finish_page();
                 }
@@ -402,8 +404,31 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<PdfPage> 
                     paginator.finish_page();
                 }
             }
+            DocumentBlock::Layout {
+                directive,
+                options,
+                settings,
+                ..
+            } if directive == "layout" && settings.has_pagination_controls() => {
+                if matches_layout_break(settings.break_before.as_deref()) {
+                    paginator.finish_page();
+                }
+                paginator.apply_section_options(settings);
+                let mut items = pdf_text_items(layout_export_lines(directive, options, settings));
+                if settings.keep_with_next {
+                    if let Some(next_block) = response.document_ast.blocks.get(index + 1) {
+                        items.extend(block_pdf_items(next_block));
+                        index += 1;
+                    }
+                }
+                paginator.extend_items_with_flow(items, settings);
+                if matches_layout_break(settings.break_after.as_deref()) {
+                    paginator.finish_page();
+                }
+            }
             _ => paginator.extend_items(block_pdf_items(block)),
         }
+        index += 1;
     }
     paginator.finish_page();
     for appendix in appendix_pages(response, options) {
@@ -538,6 +563,17 @@ impl PdfPaginator {
         }
     }
 
+    fn extend_items_with_flow(&mut self, items: Vec<PdfPageItem>, settings: &LayoutSettings) {
+        if (settings.keep_together || settings.keep_with_next)
+            && !self.current.is_empty()
+            && self.items_fit_empty_flow(&items)
+            && self.used_height + self.items_height(&items) > self.available_height()
+        {
+            self.advance_flow();
+        }
+        self.extend_items(items);
+    }
+
     fn push_text(&mut self, line: String) {
         let height = pdf_text_item_height();
         if self.used_height + height > self.available_height() {
@@ -652,6 +688,26 @@ impl PdfPaginator {
             - self.current_layout.margin_top as i32
             - footer_reserved as i32)
             .max(120)
+    }
+
+    fn items_fit_empty_flow(&self, items: &[PdfPageItem]) -> bool {
+        self.items_height(items) <= self.available_height()
+    }
+
+    fn items_height(&self, items: &[PdfPageItem]) -> i32 {
+        items
+            .iter()
+            .map(|item| match item {
+                PdfPageItem::Text(_) => pdf_text_item_height(),
+                PdfPageItem::Table(table) => pdf_table_height(table),
+                PdfPageItem::Figure(figure) => pdf_figure_height(
+                    figure.dimensions,
+                    figure.fit.as_deref(),
+                    self.current_layout.column_width(),
+                ),
+                PdfPageItem::ColumnBreak => 0,
+            })
+            .sum()
     }
 }
 

@@ -270,6 +270,28 @@ fn layout_pagination_controls_flow_through_exports() {
 }
 
 #[test]
+fn pdf_layout_keep_with_next_moves_following_block_as_group() {
+    let filler = (1..=57)
+        .map(|index| format!("Filler paragraph {index}."))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let response = compile(CompileRequest {
+        text: format!(
+            "---\ntitle: PDF Keep\nstatus: approved\napprovedBy: QA\n---\n# PDF Keep\n\n{filler}\n\n```layout\nkeepWithNext: true\nkeepTogether: true\n```\n## Kept Heading\nKept paragraph.\n"
+        ),
+        file_path: None,
+    });
+
+    let pdf = render_pdf_bytes(&response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text
+        .contains("BT /F1 10 Tf 68 774 Td (Layout: keepWithNext=true, keepTogether=true) Tj"));
+    assert!(pdf_text.contains("BT /F1 10 Tf 68 762 Td (## Kept Heading) Tj"));
+    assert!(!pdf_text
+        .contains("BT /F1 10 Tf 68 78 Td (Layout: keepWithNext=true, keepTogether=true) Tj"));
+}
+
+#[test]
 fn pdf_section_columns_split_large_tables_across_columns() {
     let table_rows = (1..=34)
         .map(|index| format!("| R{index} | {index} |"))
