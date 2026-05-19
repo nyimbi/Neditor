@@ -372,6 +372,23 @@
                 <option v-for="position in figureCropPositions" :key="position" :value="position">{{ position }}</option>
               </select>
             </label>
+            <div
+              class="crop-focus-pad"
+              :class="{ disabled: !canEditFigureSource(figure) }"
+              :style="figureCropPreviewStyle(figure)"
+              :data-position="figure.position || 'center'"
+              role="slider"
+              tabindex="0"
+              aria-label="Crop focus"
+              :aria-valuetext="figure.position || 'center'"
+              :aria-disabled="!canEditFigureSource(figure)"
+              @pointerdown.prevent="onFigureCropPointerDown(figure, $event)"
+              @pointermove.prevent="onFigureCropPointerMove(figure, $event)"
+              @keydown="onFigureCropKeydown(figure, $event)"
+            >
+              <span v-for="position in figureCropPositions" :key="position" class="crop-focus-point" :style="figureCropPointStyle(position)"></span>
+              <span class="crop-focus-reticle" :style="figureCropReticleStyle(normalizeFigureCropPosition(figure.position))"></span>
+            </div>
           </article>
           <h3>Formula graph</h3>
           <article v-for="formula in active.compile?.formula_graph || []" :key="formula.name" class="snapshot-row">
@@ -941,7 +958,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorState, RangeSetBuilder } from "@codemirror/state";
@@ -1068,6 +1085,28 @@ interface FigureListItem {
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
+const figureCropPositionGrid: Record<FigureCropPosition, { x: -1 | 0 | 1; y: -1 | 0 | 1 }> = {
+  center: { x: 0, y: 0 },
+  top: { x: 0, y: -1 },
+  bottom: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+  "top-left": { x: -1, y: -1 },
+  "top-right": { x: 1, y: -1 },
+  "bottom-left": { x: -1, y: 1 },
+  "bottom-right": { x: 1, y: 1 },
+};
+const figureCropPositionPoints: Record<FigureCropPosition, { x: number; y: number }> = {
+  center: { x: 50, y: 50 },
+  top: { x: 50, y: 12 },
+  bottom: { x: 50, y: 88 },
+  left: { x: 12, y: 50 },
+  right: { x: 88, y: 50 },
+  "top-left": { x: 12, y: 12 },
+  "top-right": { x: 88, y: 12 },
+  "bottom-left": { x: 12, y: 88 },
+  "bottom-right": { x: 88, y: 88 },
+};
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
 const equationSnippet = "$$\nE = mc^2\n$$ {#eq:energy}\n";
 const glossarySnippet = "```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n";
@@ -2471,6 +2510,93 @@ function setFigureCropPosition(figure: FigureListItem, position: FigureCropPosit
   editorView.focus();
 }
 
+function onFigureCropPointerDown(figure: FigureListItem, event: PointerEvent) {
+  const element = event.currentTarget as HTMLElement | null;
+  if (!element || !canEditFigureSource(figure)) return;
+  element.setPointerCapture?.(event.pointerId);
+  setFigureCropPosition(figure, figureCropPositionFromPointer(element, event));
+}
+
+function onFigureCropPointerMove(figure: FigureListItem, event: PointerEvent) {
+  if (event.buttons !== 1) return;
+  const element = event.currentTarget as HTMLElement | null;
+  if (!element || !canEditFigureSource(figure)) return;
+  setFigureCropPosition(figure, figureCropPositionFromPointer(element, event));
+}
+
+function onFigureCropKeydown(figure: FigureListItem, event: KeyboardEvent) {
+  if (!canEditFigureSource(figure)) return;
+  const current = normalizeFigureCropPosition(figure.position);
+  const grid = figureCropPositionGrid[current];
+  let next = grid;
+  if (event.key === "ArrowUp") next = { ...grid, y: clampGridValue(grid.y - 1) };
+  else if (event.key === "ArrowDown") next = { ...grid, y: clampGridValue(grid.y + 1) };
+  else if (event.key === "ArrowLeft") next = { ...grid, x: clampGridValue(grid.x - 1) };
+  else if (event.key === "ArrowRight") next = { ...grid, x: clampGridValue(grid.x + 1) };
+  else if (event.key === "Home") next = { x: 0, y: 0 };
+  else return;
+  event.preventDefault();
+  setFigureCropPosition(figure, figureCropPositionFromGrid(next.x, next.y));
+}
+
+function figureCropPositionFromPointer(element: HTMLElement, event: PointerEvent): FigureCropPosition {
+  const rect = element.getBoundingClientRect();
+  const x = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
+  const y = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+  return figureCropPositionFromGrid(pointerGridValue(x), pointerGridValue(y));
+}
+
+function pointerGridValue(value: number): -1 | 0 | 1 {
+  if (value < 1 / 3) return -1;
+  if (value > 2 / 3) return 1;
+  return 0;
+}
+
+function clampGridValue(value: number): -1 | 0 | 1 {
+  if (value < 0) return -1;
+  if (value > 0) return 1;
+  return 0;
+}
+
+function figureCropPositionFromGrid(x: -1 | 0 | 1, y: -1 | 0 | 1): FigureCropPosition {
+  const match = figureCropPositions.find((position) => {
+    const point = figureCropPositionGrid[position];
+    return point.x === x && point.y === y;
+  });
+  return match || "center";
+}
+
+function figureCropPreviewStyle(figure: FigureListItem): CSSProperties {
+  const position = normalizeFigureCropPosition(figure.position);
+  const point = figureCropPositionPoints[position];
+  const style: CSSProperties = {
+    backgroundPosition: `${point.x}% ${point.y}%`,
+  };
+  if (figure.src) {
+    style.backgroundImage = `linear-gradient(rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.18)), url("${escapeCssUrl(figure.src)}")`;
+  }
+  return style;
+}
+
+function figureCropPointStyle(position: FigureCropPosition): CSSProperties {
+  const point = figureCropPositionPoints[position];
+  return { left: `${point.x}%`, top: `${point.y}%` };
+}
+
+function figureCropReticleStyle(position: FigureCropPosition): CSSProperties {
+  const point = figureCropPositionPoints[position];
+  return { left: `${point.x}%`, top: `${point.y}%` };
+}
+
+function normalizeFigureCropPosition(value: string | null | undefined): FigureCropPosition {
+  if (isFigureCropPosition(value || undefined)) return value as FigureCropPosition;
+  return "center";
+}
+
+function escapeCssUrl(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 function canEditFigureSource(figure: FigureListItem) {
   return !figure.source_file || !active.value.path || figure.source_file === active.value.path;
 }
@@ -3769,6 +3895,64 @@ select:hover {
 
 .snapshot-row p {
   margin: 0 0 4px;
+}
+
+.crop-focus-pad {
+  position: relative;
+  width: 100%;
+  min-height: 128px;
+  overflow: hidden;
+  border: 1px solid #9fb0c2;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.72)),
+    repeating-linear-gradient(45deg, #e6ecf3 0 8px, #f7f9fb 8px 16px);
+  background-repeat: no-repeat;
+  background-size: cover;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.crop-focus-pad::before {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, transparent 33%, rgba(15, 23, 42, 0.32) 33% 34%, transparent 34% 66%, rgba(15, 23, 42, 0.32) 66% 67%, transparent 67%),
+    linear-gradient(to bottom, transparent 33%, rgba(15, 23, 42, 0.32) 33% 34%, transparent 34% 66%, rgba(15, 23, 42, 0.32) 66% 67%, transparent 67%);
+  content: "";
+}
+
+.crop-focus-pad:focus-visible {
+  outline: 2px solid #2f6f9f;
+  outline-offset: 2px;
+}
+
+.crop-focus-pad.disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.crop-focus-point,
+.crop-focus-reticle {
+  position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.crop-focus-point {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.crop-focus-reticle {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #2f6f9f;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.72);
 }
 
 .engine-row {
