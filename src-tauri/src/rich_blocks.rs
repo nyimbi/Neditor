@@ -1,4 +1,7 @@
-use crate::{escape_html, extract_label, extract_quoted_attribute};
+use crate::{
+    document_ast::{extract_label, extract_quoted_attribute},
+    escape_html,
+};
 
 pub(crate) fn render_figures(markdown: &str) -> String {
     markdown

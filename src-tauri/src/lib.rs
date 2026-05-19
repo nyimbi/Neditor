@@ -55,7 +55,8 @@ use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
 use document_ast::{
-    attach_source_ranges, attach_transform_artifacts, build_document_ast, DocumentAst,
+    attach_source_ranges, attach_transform_artifacts, build_document_ast, extract_label, slugify,
+    DocumentAst,
 };
 #[cfg(test)]
 use export::{
@@ -698,21 +699,6 @@ fn supported_transform(name: &str) -> bool {
 
 fn external_transform_supported(name: &str) -> bool {
     matches!(name, "pikchr" | "dot" | "graphviz" | "plantuml" | "d2")
-}
-
-pub(crate) fn extract_label(text: &str) -> Option<String> {
-    text.split("{#")
-        .nth(1)
-        .and_then(|rest| rest.split_once('}'))
-        .map(|(label, _)| label.split_whitespace().next().unwrap_or("").to_string())
-        .filter(|label| !label.is_empty())
-}
-
-pub(crate) fn extract_quoted_attribute(text: &str, key: &str) -> Option<String> {
-    let marker = format!("{key}=\"");
-    let after_marker = text.split(&marker).nth(1)?;
-    let (value, _) = after_marker.split_once('"')?;
-    Some(value.to_string())
 }
 
 fn extract_headings(text: &str) -> Vec<Heading> {
@@ -2100,17 +2086,6 @@ fn manifest_media_path(src: &str, source: Option<&document_ast::AstSourceRange>)
         path
     };
     Some(path_to_string(&resolved))
-}
-
-fn slugify(text: &str) -> String {
-    text.to_ascii_lowercase()
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -1528,7 +1528,7 @@ fn table_alignment(cell: &str) -> String {
     }
 }
 
-fn extract_label(text: &str) -> Option<String> {
+pub(crate) fn extract_label(text: &str) -> Option<String> {
     text.split("{#")
         .nth(1)
         .and_then(|rest| rest.split_once('}'))
@@ -1536,7 +1536,7 @@ fn extract_label(text: &str) -> Option<String> {
         .filter(|label| !label.is_empty())
 }
 
-fn extract_quoted_attribute(text: &str, key: &str) -> Option<String> {
+pub(crate) fn extract_quoted_attribute(text: &str, key: &str) -> Option<String> {
     let marker = format!("{key}=\"");
     let after_marker = text.split(&marker).nth(1)?;
     let (value, _) = after_marker.split_once('"')?;
@@ -1597,7 +1597,7 @@ fn extract_between(text: &str, start: &str, end: &str) -> Option<String> {
     Some(value.to_string())
 }
 
-fn slugify(text: &str) -> String {
+pub(crate) fn slugify(text: &str) -> String {
     text.to_ascii_lowercase()
         .chars()
         .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
