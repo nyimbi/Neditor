@@ -2522,6 +2522,26 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn inline_formula_diagnostics_include_source_ranges() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Formula Diagnostics\nstatus: approved\napprovedBy: QA\n---\n# Formula Diagnostics\nBad: {{=missing + 1}}\n"
+                .to_string(),
+            file_path: None,
+        });
+
+        let diagnostic = response
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message.contains("Inline formula error"))
+            .expect("inline formula diagnostic");
+        assert_eq!(diagnostic.line, Some(7));
+        assert_eq!(diagnostic.column, Some(6));
+        assert_eq!(diagnostic.end_line, Some(7));
+        assert_eq!(diagnostic.end_column, Some(22));
+        assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
+    }
+
+    #[test]
     fn compiler_loads_project_level_variables_without_overriding_front_matter() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
