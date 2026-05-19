@@ -12,6 +12,7 @@ node_modules
 .omx/
 dist
 dist-ssr
+.tmp-tests
 *.local
 
 # Editor directories and files
