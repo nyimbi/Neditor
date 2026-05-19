@@ -1687,7 +1687,8 @@ fn render_docx_document(
 }
 
 fn docx_has_native_comments(response: &CompileResponse, options: &Value) -> bool {
-    include_comments(options) && !response.semantic.comments.is_empty()
+    include_comments(options)
+        && (!response.semantic.comments.is_empty() || !response.semantic.change_notes.is_empty())
 }
 
 fn docx_has_native_footnotes(response: &CompileResponse) -> bool {
@@ -1708,7 +1709,7 @@ fn docx_footnote_entries(response: &CompileResponse) -> Vec<&FootnoteEntry> {
 }
 
 fn render_docx_comments(response: &CompileResponse) -> String {
-    let comments = response
+    let mut comments = response
         .semantic
         .comments
         .iter()
@@ -1728,6 +1729,30 @@ fn render_docx_comments(response: &CompileResponse) -> String {
             )
         })
         .collect::<String>();
+    let change_note_offset = response.semantic.comments.len();
+    comments.push_str(
+        &response
+            .semantic
+            .change_notes
+            .iter()
+            .enumerate()
+            .map(|(index, note)| {
+                let comment_id = change_note_offset + index;
+                let author = empty_as(note.author.as_str(), "local");
+                let created_at = if note.created_at.is_empty() {
+                    Utc::now().to_rfc3339()
+                } else {
+                    note.created_at.clone()
+                };
+                format!(
+                    r#"<w:comment w:id="{comment_id}" w:author="{}" w:date="{}"><w:p><w:r><w:t>Change note: {}</w:t></w:r></w:p></w:comment>"#,
+                    escape_xml(author),
+                    escape_xml(&created_at),
+                    escape_xml(&note.text)
+                )
+            })
+            .collect::<String>(),
+    );
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{comments}</w:comments>"#
     )
@@ -1751,7 +1776,7 @@ fn render_docx_footnotes(response: &CompileResponse) -> String {
 }
 
 fn render_docx_comment_references(response: &CompileResponse) -> String {
-    response
+    let mut references = response
         .semantic
         .comments
         .iter()
@@ -1763,7 +1788,25 @@ fn render_docx_comment_references(response: &CompileResponse) -> String {
                 escape_xml(&label)
             )
         })
-        .collect::<String>()
+        .collect::<String>();
+    let change_note_offset = response.semantic.comments.len();
+    references.push_str(
+        &response
+            .semantic
+            .change_notes
+            .iter()
+            .enumerate()
+            .map(|(index, note)| {
+                let comment_id = change_note_offset + index;
+                let label = format!("Change note on source line {}", note.line);
+                format!(
+                    r#"<w:p><w:commentRangeStart w:id="{comment_id}"/><w:r><w:t>{}</w:t></w:r><w:commentRangeEnd w:id="{comment_id}"/><w:r><w:commentReference w:id="{comment_id}"/></w:r></w:p>"#,
+                    escape_xml(&label)
+                )
+            })
+            .collect::<String>(),
+    );
+    references
 }
 
 fn render_docx_header(response: &CompileResponse, options: &Value) -> String {

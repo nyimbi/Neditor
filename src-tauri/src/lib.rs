@@ -4618,8 +4618,12 @@ beta</pre>
         assert!(docx_document.contains("w:footerReference"));
         assert!(docx_document.contains(r#"<w:commentRangeStart w:id="0""#));
         assert!(docx_document.contains(r#"<w:commentReference w:id="0""#));
+        assert!(docx_document.contains(r#"<w:commentRangeStart w:id="1""#));
+        assert!(docx_document.contains(r#"<w:commentReference w:id="1""#));
         assert!(docx_comments.contains(r#"<w:comment w:id="0" w:author="QA""#));
         assert!(docx_comments.contains("Verify board-pack export fidelity."));
+        assert!(docx_comments.contains(r#"<w:comment w:id="1" w:author="QA""#));
+        assert!(docx_comments.contains("Change note: Added export conformance evidence."));
         assert!(docx_app.contains("<Application>NEditor</Application>"));
         assert!(docx_app.contains("<Company>Acme Strategy</Company>"));
         let docx_without_comments = render_docx_bytes(
