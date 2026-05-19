@@ -94,6 +94,7 @@ pub(crate) struct ExportManifest {
     pub(crate) status: String,
     pub(crate) exported_at: String,
     pub(crate) source_hash: String,
+    pub(crate) output_path: Option<String>,
     pub(crate) output_hash: Option<String>,
     pub(crate) included_files: Vec<ManifestFile>,
     pub(crate) media_files: Vec<ManifestFile>,

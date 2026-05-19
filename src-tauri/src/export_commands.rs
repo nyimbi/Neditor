@@ -124,6 +124,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
         }
     }
     let output_bytes = fs::read(&output_path).map_err(|err| err.to_string())?;
+    manifest.output_path = Some(path_to_string(&output_path));
     manifest.output_hash = Some(sha256_uri(&output_bytes));
 
     let manifest_path = if request
