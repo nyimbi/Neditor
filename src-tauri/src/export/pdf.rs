@@ -27,7 +27,10 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
             footer = render_section_template(response, section_footer, page_index + 1, total_pages);
         }
         let mut stream = String::new();
+        let mut column_index = 0usize;
         let mut y = page_height.saturating_sub(margin_top) as i32;
+        let column_width = page.layout.column_width();
+        let column_gap = page.layout.column_gap;
         if !header.trim().is_empty() {
             stream.push_str(&pdf_text_line(
                 9,
@@ -36,24 +39,32 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
                 &header,
             ));
         }
-        for item in page.items.iter().take(60) {
+        for item in page.items.iter().take(160) {
+            if matches!(item, PdfPageItem::ColumnBreak) {
+                column_index = (column_index + 1).min(page.layout.columns.saturating_sub(1));
+                y = page_height.saturating_sub(margin_top) as i32;
+                continue;
+            }
+            let item_x =
+                margin_left + column_index as u32 * (column_width.saturating_add(column_gap));
             match item {
                 PdfPageItem::Text(line) => {
-                    stream.push_str(&pdf_text_line(10, margin_left, y, line));
+                    stream.push_str(&pdf_text_line(10, item_x, y, line));
                     y -= 12;
                 }
                 PdfPageItem::Table(table) => {
                     let (table_stream, consumed_height) =
-                        pdf_table_stream(table, margin_left, y, page_width - margin_left * 2);
+                        pdf_table_stream(table, item_x, y, column_width);
                     stream.push_str(&table_stream);
                     y -= consumed_height;
                 }
                 PdfPageItem::Figure(figure) => {
                     let (figure_stream, consumed_height) =
-                        pdf_figure_stream(figure, margin_left, y, page_width - margin_left * 2);
+                        pdf_figure_stream(figure, item_x, y, column_width);
                     stream.push_str(&figure_stream);
                     y -= consumed_height;
                 }
+                PdfPageItem::ColumnBreak => unreachable!("column breaks are handled before render"),
             }
         }
         if !footer.trim().is_empty() {
@@ -298,6 +309,7 @@ enum PdfPageItem {
     Text(String),
     Table(PdfTable),
     Figure(PdfFigure),
+    ColumnBreak,
 }
 
 #[derive(Clone, Debug)]
@@ -334,6 +346,21 @@ struct PdfPageLayout {
     height: u32,
     margin_top: u32,
     margin_left: u32,
+    columns: usize,
+    column_gap: u32,
+}
+
+impl PdfPageLayout {
+    fn column_width(&self) -> u32 {
+        let columns = self.columns.max(1) as u32;
+        let total_gap = self.column_gap.saturating_mul(columns.saturating_sub(1));
+        self.width
+            .saturating_sub(self.margin_left * 2)
+            .saturating_sub(total_gap)
+            .checked_div(columns)
+            .unwrap_or(0)
+            .max(120)
+    }
 }
 
 fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<PdfPage> {
@@ -462,6 +489,7 @@ struct PdfPaginator {
     current_header: Option<String>,
     current_footer: Option<String>,
     used_height: i32,
+    current_column: usize,
     base_layout: PdfPageLayout,
     current_layout: PdfPageLayout,
 }
@@ -474,13 +502,14 @@ impl PdfPaginator {
             current_header: None,
             current_footer: None,
             used_height: 0,
+            current_column: 0,
             current_layout: base_layout.clone(),
             base_layout,
         }
     }
 
     fn apply_section_options(&mut self, settings: &LayoutSettings) {
-        if settings.has_page_model_controls() && !self.current.is_empty() {
+        if has_pdf_flow_controls(settings) && !self.current.is_empty() {
             self.finish_page();
         }
         if let Some(header) = &settings.header {
@@ -489,7 +518,7 @@ impl PdfPaginator {
         if let Some(footer) = &settings.footer {
             self.current_footer = Some(footer.clone());
         }
-        if settings.has_page_model_controls() {
+        if has_pdf_flow_controls(settings) {
             self.current_layout = pdf_section_layout(&self.base_layout, settings);
         }
     }
@@ -504,6 +533,7 @@ impl PdfPaginator {
                 PdfPageItem::Text(line) => self.push_text(line),
                 PdfPageItem::Table(table) => self.push_table(table),
                 PdfPageItem::Figure(figure) => self.push_figure(figure),
+                PdfPageItem::ColumnBreak => self.advance_flow(),
             }
         }
     }
@@ -511,7 +541,7 @@ impl PdfPaginator {
     fn push_text(&mut self, line: String) {
         let height = pdf_text_item_height();
         if self.used_height + height > self.available_height() {
-            self.finish_page();
+            self.advance_flow();
         }
         self.used_height += height;
         self.current.push(PdfPageItem::Text(line));
@@ -523,14 +553,14 @@ impl PdfPaginator {
         while !remaining_rows.is_empty() {
             let available_rows = self.available_table_rows(continued);
             if available_rows == 0 {
-                self.finish_page();
+                self.advance_flow();
                 continue;
             }
             let take_count = remaining_rows.len().min(available_rows);
             let chunk = pdf_table_chunk(&table, remaining_rows[..take_count].to_vec(), continued);
             let height = pdf_table_height(&chunk);
             if self.used_height + height > self.available_height() && !self.current.is_empty() {
-                self.finish_page();
+                self.advance_flow();
                 continue;
             }
             self.used_height += height;
@@ -542,7 +572,7 @@ impl PdfPaginator {
         if table.rows.is_empty() {
             let height = pdf_table_height(&table);
             if self.used_height + height > self.available_height() {
-                self.finish_page();
+                self.advance_flow();
             }
             self.used_height += height;
             self.current.push(PdfPageItem::Table(table));
@@ -553,10 +583,10 @@ impl PdfPaginator {
         let height = pdf_figure_height(
             figure.dimensions,
             figure.fit.as_deref(),
-            self.content_width(),
+            self.current_layout.column_width(),
         );
         if self.used_height + height > self.available_height() && !self.current.is_empty() {
-            self.finish_page();
+            self.advance_flow();
         }
         self.used_height += height.min(self.available_height());
         self.current.push(PdfPageItem::Figure(figure));
@@ -587,6 +617,20 @@ impl PdfPaginator {
             layout: self.current_layout.clone(),
         });
         self.used_height = 0;
+        self.current_column = 0;
+    }
+
+    fn advance_flow(&mut self) {
+        if self.current_layout.columns > 1
+            && self.current_column + 1 < self.current_layout.columns
+            && !self.current.is_empty()
+        {
+            self.current.push(PdfPageItem::ColumnBreak);
+            self.current_column += 1;
+            self.used_height = 0;
+            return;
+        }
+        self.finish_page();
     }
 
     fn into_pages(mut self) -> Vec<PdfPage> {
@@ -607,13 +651,6 @@ impl PdfPaginator {
         (self.current_layout.height as i32
             - self.current_layout.margin_top as i32
             - footer_reserved as i32)
-            .max(120)
-    }
-
-    fn content_width(&self) -> u32 {
-        self.current_layout
-            .width
-            .saturating_sub(self.current_layout.margin_left * 2)
             .max(120)
     }
 }
@@ -692,6 +729,8 @@ fn pdf_page_layout(response: &CompileResponse, options: &Value) -> PdfPageLayout
         height,
         margin_top: margin,
         margin_left: margin,
+        columns: 1,
+        column_gap: 24,
     }
 }
 
@@ -715,7 +754,13 @@ fn pdf_section_layout(base: &PdfPageLayout, settings: &LayoutSettings) -> PdfPag
         height,
         margin_top: margin,
         margin_left: margin,
+        columns: settings.columns.unwrap_or(base.columns).clamp(1, 4),
+        column_gap: base.column_gap,
     }
+}
+
+fn has_pdf_flow_controls(settings: &LayoutSettings) -> bool {
+    settings.has_page_model_controls() || settings.columns.is_some()
 }
 
 fn pdf_page_dimensions(page_size: &str, orientation: &str) -> (u32, u32) {

@@ -1584,8 +1584,12 @@ fn compiler_renders_layout_break_directives() {
 
 #[test]
 fn layout_pagination_controls_flow_through_exports() {
+    let column_lines = (1..=46)
+        .map(|index| format!("Column flow line {index}."))
+        .collect::<Vec<_>>()
+        .join("\n\n");
     let response = compile(CompileRequest {
-            text: "---\ntitle: Flow Layout\nstatus: approved\napprovedBy: QA\n---\n# Flow Layout\n\n```layout\nbreakBefore: page\nkeepWithNext: true\nkeepTogether: true\n```\n## Kept Heading\nKept paragraph.\n\n{{section-break columns=2 pageSize=letter orientation=landscape margins=narrow breakAfter=page header=\"Flow Header\" footer=\"Flow {{page}}/{{pages}}\"}}\nAfter section.\n".to_string(),
+            text: format!("---\ntitle: Flow Layout\nstatus: approved\napprovedBy: QA\n---\n# Flow Layout\n\n```layout\nbreakBefore: page\nkeepWithNext: true\nkeepTogether: true\n```\n## Kept Heading\nKept paragraph.\n\n{{{{section-break columns=2 pageSize=letter orientation=landscape margins=narrow breakAfter=page header=\"Flow Header\" footer=\"Flow {{{{page}}}}/{{{{pages}}}}\"}}}}\nAfter section.\n\n{column_lines}\n\nSecond column marker.\n"),
             file_path: None,
         });
     let options = json!({});
@@ -1672,6 +1676,8 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(pdf_text.contains("Flow Header"));
     assert!(pdf_text.contains("/MediaBox [0 0 595 842]"));
     assert!(pdf_text.contains("/MediaBox [0 0 792 612]"));
+    assert!(pdf_text.contains("BT /F1 10 Tf 408 "));
+    assert!(pdf_text.contains("(Second column marker.) Tj"));
 
     let bundle =
         render_markdown_bundle_bytes(&response, &response.export_manifest).expect("layout bundle");
