@@ -253,4 +253,18 @@ fn validate_layout_metadata(metadata: &Value, diagnostics: &mut Vec<DocumentDiag
             ));
         }
     }
+    if let Some(orientation) = metadata_string(metadata, "layout.orientation")
+        .or_else(|| metadata_string(metadata, "orientation"))
+    {
+        let normalized = orientation.to_ascii_lowercase().replace([' ', '-'], "");
+        if !matches!(normalized.as_str(), "portrait" | "landscape") {
+            diagnostics.push(diag(
+                "warning",
+                format!("Unsupported layout orientation: {orientation}"),
+                None,
+                None,
+                Some("Use portrait or landscape."),
+            ));
+        }
+    }
 }

@@ -1092,7 +1092,7 @@ fn docx_page_break() -> String {
 
 fn docx_section_break(
     section: &DocxSectionProperties,
-    page_layout: (u32, u32, u32, u32, u32, u32),
+    page_layout: (u32, u32, u32, u32, u32, u32, &'static str),
 ) -> String {
     format!(
         r#"<w:p><w:pPr>{}</w:pPr></w:p>"#,
@@ -1102,27 +1102,46 @@ fn docx_section_break(
 
 fn docx_section_properties(
     section: &DocxSectionProperties,
-    page_layout: (u32, u32, u32, u32, u32, u32),
+    page_layout: (u32, u32, u32, u32, u32, u32, &'static str),
 ) -> String {
-    let (page_width, page_height, margin_top, margin_right, margin_bottom, margin_left) =
-        page_layout;
+    let (
+        page_width,
+        page_height,
+        margin_top,
+        margin_right,
+        margin_bottom,
+        margin_left,
+        orientation,
+    ) = page_layout;
+    let orientation_attr = if orientation == "landscape" {
+        r#" w:orient="landscape""#
+    } else {
+        ""
+    };
     let columns = section
         .columns
         .map(|columns| format!(r#"<w:cols w:num="{columns}" w:space="720"/>"#))
         .unwrap_or_default();
     format!(
-        r#"<w:sectPr><w:headerReference w:type="default" r:id="{}"/><w:footerReference w:type="default" r:id="{}"/><w:pgSz w:w="{page_width}" w:h="{page_height}"/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/>{columns}</w:sectPr>"#,
+        r#"<w:sectPr><w:headerReference w:type="default" r:id="{}"/><w:footerReference w:type="default" r:id="{}"/><w:pgSz w:w="{page_width}" w:h="{page_height}"{orientation_attr}/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/>{columns}</w:sectPr>"#,
         escape_xml(&section.header_relationship_id),
         escape_xml(&section.footer_relationship_id)
     )
 }
 
-fn docx_page_layout(response: &CompileResponse, options: &Value) -> (u32, u32, u32, u32, u32, u32) {
-    let (width, height) = match layout_page_size(&response.metadata).as_str() {
+fn docx_page_layout(
+    response: &CompileResponse,
+    options: &Value,
+) -> (u32, u32, u32, u32, u32, u32, &'static str) {
+    let (mut width, mut height) = match layout_page_size(&response.metadata).as_str() {
         "letter" => (12240, 15840),
         "legal" => (12240, 20160),
         _ => (11906, 16838),
     };
+    let orientation = layout_orientation(&response.metadata);
+    if orientation == "landscape" {
+        std::mem::swap(&mut width, &mut height);
+    }
     let margin = match explicit_layout_margins(&response.metadata).as_deref() {
         Some("narrow") | Some("compact") => 720,
         Some("wide") => 1800,
@@ -1133,7 +1152,7 @@ fn docx_page_layout(response: &CompileResponse, options: &Value) -> (u32, u32, u
             _ => 1440,
         },
     };
-    (width, height, margin, margin, margin, margin)
+    (width, height, margin, margin, margin, margin, orientation)
 }
 
 fn docx_table(headers: &[String], alignments: &[String], rows: &[Vec<String>]) -> String {

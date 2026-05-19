@@ -630,11 +630,14 @@ fn pdf_figure_height(dimensions: Option<ExportImageDimensions>, fit: Option<&str
 }
 
 fn pdf_page_layout(response: &CompileResponse, options: &Value) -> (u32, u32, u32, u32) {
-    let (width, height) = match layout_page_size(&response.metadata).as_str() {
+    let (mut width, mut height) = match layout_page_size(&response.metadata).as_str() {
         "letter" => (612, 792),
         "legal" => (612, 1008),
         _ => (595, 842),
     };
+    if layout_orientation(&response.metadata) == "landscape" {
+        std::mem::swap(&mut width, &mut height);
+    }
     let margin = match explicit_layout_margins(&response.metadata).as_deref() {
         Some("narrow") | Some("compact") => 34,
         Some("wide") => 91,

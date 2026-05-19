@@ -413,6 +413,18 @@ fn layout_page_size(metadata: &Value) -> String {
         .unwrap_or_else(|| "a4".to_string())
 }
 
+fn layout_orientation(metadata: &Value) -> &'static str {
+    metadata_string(metadata, "layout.orientation")
+        .or_else(|| metadata_string(metadata, "orientation"))
+        .map(|value| value.to_ascii_lowercase().replace([' ', '-'], ""))
+        .and_then(|value| match value.as_str() {
+            "landscape" => Some("landscape"),
+            "portrait" => Some("portrait"),
+            _ => None,
+        })
+        .unwrap_or("portrait")
+}
+
 fn explicit_layout_margins(metadata: &Value) -> Option<String> {
     metadata_string(metadata, "layout.margins")
         .or_else(|| metadata_string(metadata, "margins"))

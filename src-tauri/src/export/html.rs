@@ -433,10 +433,15 @@ fn export_css(
             "presentation" => ("64px", "1.7", "78vh", "54px", "20mm"),
             _ => ("48px", "1.55", "85vh", "44px", "24mm"),
         };
-    let page_size = match layout_page_size(metadata).as_str() {
+    let page_size_name = match layout_page_size(metadata).as_str() {
         "letter" => "Letter",
         "legal" => "Legal",
         _ => "A4",
+    };
+    let page_size = if layout_orientation(metadata) == "landscape" {
+        format!("{page_size_name} landscape")
+    } else {
+        page_size_name.to_string()
     };
     let page_margin = match explicit_layout_margins(metadata).as_deref() {
         Some("narrow") | Some("compact") => "12mm",

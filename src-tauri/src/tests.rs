@@ -919,30 +919,30 @@ fn export_layout_preset_controls_html_css_and_metadata() {
 #[test]
 fn export_layout_metadata_controls_page_size_and_margins() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: Page Layout\nstatus: approved\napprovedBy: QA\nlayout:\n  pageSize: Letter\n  margins: wide\n---\n# Page Layout\n\nBody.".to_string(),
+            text: "---\ntitle: Page Layout\nstatus: approved\napprovedBy: QA\nlayout:\n  pageSize: Letter\n  margins: wide\n  orientation: landscape\n---\n# Page Layout\n\nBody.".to_string(),
             file_path: None,
         });
     let options = json!({});
 
     let html = render_full_html(&response, &options);
-    assert!(html.contains("@page{size:Letter;margin:32mm"));
+    assert!(html.contains("@page{size:Letter landscape;margin:32mm"));
 
     let docx = render_docx_bytes(&response, &options).expect("docx bytes");
     let document = zip_entry_text(&docx, "word/document.xml");
-    assert!(document.contains(r#"<w:pgSz w:w="12240" w:h="15840"/>"#));
+    assert!(document.contains(r#"<w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>"#));
     assert!(document
         .contains(r#"<w:pgMar w:top="1800" w:right="1800" w:bottom="1800" w:left="1800"/>"#));
 
     let pdf = render_pdf_bytes(&response, &options);
     let pdf_text = String::from_utf8_lossy(&pdf);
-    assert!(pdf_text.contains("/MediaBox [0 0 612 792]"));
-    assert!(pdf_text.contains("BT /F1 10 Tf 91 701 Td"));
+    assert!(pdf_text.contains("/MediaBox [0 0 792 612]"));
+    assert!(pdf_text.contains("BT /F1 10 Tf 91 521 Td"));
 }
 
 #[test]
 fn compiler_validates_layout_page_metadata() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: Bad Layout\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\nlayout:\n  pageSize: Tabloid\n  margins: huge\n---\n# Bad Layout\n".to_string(),
+            text: "---\ntitle: Bad Layout\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\nlayout:\n  pageSize: Tabloid\n  margins: huge\n  orientation: diagonal\n---\n# Bad Layout\n".to_string(),
             file_path: None,
         });
 
@@ -952,6 +952,9 @@ fn compiler_validates_layout_page_metadata() {
     assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
         .message
         .contains("Unsupported layout margins: huge")));
+    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("Unsupported layout orientation: diagonal")));
 }
 
 #[test]
