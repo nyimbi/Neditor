@@ -2596,12 +2596,7 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
     for appendix in appendix_pages(response, options) {
         let title = appendix
             .iter()
-            .find(|line| {
-                matches!(
-                    line.as_str(),
-                    "Glossary" | "Review Comments" | "AI Provenance"
-                )
-            })
+            .find(|line| is_appendix_heading(line))
             .cloned()
             .unwrap_or_else(|| "Appendix".to_string());
         slides.push(PptxSlide::with_lines(
@@ -2609,12 +2604,7 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
             appendix
                 .into_iter()
                 .filter(|line| !line.is_empty())
-                .filter(|line| {
-                    !matches!(
-                        line.as_str(),
-                        "Glossary" | "Review Comments" | "AI Provenance"
-                    )
-                })
+                .filter(|line| !is_appendix_heading(line))
                 .collect(),
         ));
     }
@@ -2635,6 +2625,13 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
             slide
         })
         .collect()
+}
+
+fn is_appendix_heading(line: &str) -> bool {
+    matches!(
+        line,
+        "Glossary" | "Review Comments" | "AI Provenance" | "Legal Disclaimer"
+    )
 }
 
 fn expand_pptx_table_slides(slides: Vec<PptxSlide>) -> Vec<PptxSlide> {

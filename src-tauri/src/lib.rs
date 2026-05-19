@@ -2967,6 +2967,14 @@ ARR: Annual recurring revenue.
         assert!(exported_text.contains("Footer: Confidential | Page 1"));
         assert!(exported_text.contains("Watermark: BOARD"));
         assert!(exported_text.contains("Legal Disclaimer"));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let legal_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
+            .into_iter()
+            .find(|slide| slide.contains("Legal Disclaimer"))
+            .expect("legal disclaimer slide");
+        assert!(legal_slide.contains("<a:t>Legal Disclaimer</a:t>"));
+        assert!(legal_slide.contains("Internal use only."));
     }
 
     #[test]
