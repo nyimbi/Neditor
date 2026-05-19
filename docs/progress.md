@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `dee18fc Lock shared
-  workflow insertion helpers`
+- Latest inspected committed baseline before this update: `d94dc6c Prove
+  browser workflows outside the stale backlog`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -36,6 +36,9 @@ Recent pushed checkpoints visible in current git history:
 - `237f68c` logged the fresh verification baseline.
 - `dee18fc` extracted shared workflow insertion helpers and added frontend unit
   coverage for AI paste insertion modes and conflict merge-line composition.
+- `d94dc6c` added the first Playwright browser workflow harness, admitted the
+  test dependency, wired the browser workflow CI lane, and refreshed this
+  backlog/progress evidence.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -146,6 +149,21 @@ Additional browser workflow harness verification:
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test --list` | Pass | Listed 4 Chromium tests in `e2e/app-workflows.spec.ts`. |
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm run test:e2e` | Blocked by sandbox | Chromium launch failed before app assertions with `bootstrap_check_in ... Permission denied (1100)`. |
 
+Current CI follow-up:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `gh run view 26131218116 --json jobs,conclusion,status,headSha,url` | Failure diagnosed | All jobs for `d94dc6c` failed at `Set up Node.js` before project commands ran. |
+| `XDG_CACHE_HOME=.cache gh run view 26131218116 --log-failed` | Failure diagnosed | `actions/setup-node` could not locate `pnpm` while `cache: pnpm` was enabled before pnpm setup. |
+
+Fix staged after that CI run:
+
+- `.github/workflows/ci.yml` now installs pnpm with `pnpm/action-setup@v4`
+  before `actions/setup-node@v4` in both the desktop matrix and browser
+  workflow job.
+- `tests/frontend-unit.test.ts` now asserts that the CI workflow keeps the pnpm
+  setup step and both frontend test commands.
+
 Baseline command set:
 
 ```sh
@@ -186,16 +204,17 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Get the Playwright suite passing in CI or a non-sandboxed local shell.
-2. Expand browser coverage for file operations, workspace restore, conflicts,
+1. Confirm the CI pnpm setup fix on the next pushed run.
+2. Get the Playwright suite passing in CI or a non-sandboxed local shell.
+3. Expand browser coverage for file operations, workspace restore, conflicts,
    preview navigation, scroll sync, transform settings, export progress, and
    the remaining AI/table modes.
-3. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
+4. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
-4. Use failures from workflow tests to drive implementation fixes.
-5. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
-6. Add macOS/Windows optional transform engine evidence.
-7. Only after behavior is locked, modularize oversized frontend/store/backend
+5. Use failures from workflow tests to drive implementation fixes.
+6. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
+7. Add macOS/Windows optional transform engine evidence.
+8. Only after behavior is locked, modularize oversized frontend/store/backend
    modules.
 
 ## Completion Gate

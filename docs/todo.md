@@ -104,6 +104,10 @@ Current evidence:
   - Export readiness from the export sidebar.
 - `.github/workflows/ci.yml` now has a Linux `browser-workflows` job that
   installs Playwright Chromium and runs `pnpm run test:e2e`.
+- After the first pushed browser-harness commit, CI failed before project
+  commands because `actions/setup-node` tried to use `cache: pnpm` before pnpm
+  was installed. The workflow has been adjusted so `pnpm/action-setup@v4` runs
+  before `actions/setup-node@v4` in both CI jobs.
 
 Current verification caveat:
 
@@ -582,20 +586,21 @@ or manual QA.
 
 1. Keep `docs/spec-completion-matrix.md`, `docs/progress.md`, and this backlog
    synchronized after every verified slice.
-2. Get the new Playwright browser workflow suite passing in CI or a
+2. Confirm the CI pnpm setup fix on the next pushed run.
+3. Get the new Playwright browser workflow suite passing in CI or a
    non-sandboxed local shell.
-3. Expand browser workflow coverage for file operations, workspace restore,
+4. Expand browser workflow coverage for file operations, workspace restore,
    conflicts, preview navigation/scroll sync, transform settings, export
    progress, and remaining AI/table modes.
-4. Add Tauri-driver/WebDriver desktop smoke tests once browser tests are
+5. Add Tauri-driver/WebDriver desktop smoke tests once browser tests are
    stable.
-5. Close implementation gaps exposed by those workflow tests.
-6. Audit export artifacts against the completion matrix and add missing
+6. Close implementation gaps exposed by those workflow tests.
+7. Audit export artifacts against the completion matrix and add missing
    conformance tests.
-7. Harden cross-platform external transform evidence.
-8. Modularize frontend and backend only after behavior is locked by tests.
-9. Complete cross-platform packaging evidence.
-10. Final pass: requirement-by-requirement audit, fresh verification, commit,
+8. Harden cross-platform external transform evidence.
+9. Modularize frontend and backend only after behavior is locked by tests.
+10. Complete cross-platform packaging evidence.
+11. Final pass: requirement-by-requirement audit, fresh verification, commit,
     push, and only then mark the goal complete.
 
 ## Completion Gate

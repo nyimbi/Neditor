@@ -130,6 +130,7 @@ test("CI keeps frontend logic tests in the desktop platform matrix", () => {
   ok(workflow.includes("- macos-latest"));
   ok(workflow.includes("- ubuntu-22.04"));
   ok(workflow.includes("- windows-latest"));
+  ok(workflow.includes("uses: pnpm/action-setup@v4"));
   ok(workflow.includes("run: pnpm run test:unit"));
   ok(workflow.includes("run: pnpm run test:e2e"));
 });
