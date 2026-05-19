@@ -63,6 +63,7 @@ interface GitIntegrationPreferences {
 interface PersistedWorkspace {
   theme?: "system" | "light" | "dark";
   previewTheme?: PreviewTheme;
+  editorPaneRatio?: number;
   wordWrap?: boolean;
   lineNumbers?: boolean;
   highContrast?: boolean;
@@ -319,6 +320,10 @@ function clampSnapshotInterval(value: number) {
   return Math.min(Math.max(Number(value) || 300000, 30000), 3600000);
 }
 
+function clampPaneRatio(value: number) {
+  return Math.min(Math.max(Number(value) || 0.5, 0.25), 0.75);
+}
+
 function normalizeExportDefaults(
   defaults: Partial<ExportDefaults> & {
     includeCoverPage?: boolean;
@@ -418,6 +423,7 @@ export const useDocumentsStore = defineStore("documents", {
       | "settings",
     theme: "system" as "system" | "light" | "dark",
     previewTheme: "match" as PreviewTheme,
+    editorPaneRatio: 0.5,
     wordWrap: true,
     lineNumbers: true,
     highContrast: false,
@@ -507,6 +513,7 @@ export const useDocumentsStore = defineStore("documents", {
         const persisted = (await preferencesStore.get<PersistedWorkspace>("workspace")) || {};
         if (persisted.theme) this.theme = persisted.theme;
         if (persisted.previewTheme === "match" || persisted.previewTheme === "light" || persisted.previewTheme === "dark") this.previewTheme = persisted.previewTheme;
+        if (typeof persisted.editorPaneRatio === "number") this.editorPaneRatio = clampPaneRatio(persisted.editorPaneRatio);
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
         if (typeof persisted.highContrast === "boolean") this.highContrast = persisted.highContrast;
@@ -548,6 +555,7 @@ export const useDocumentsStore = defineStore("documents", {
       const workspace: PersistedWorkspace = {
         theme: this.theme,
         previewTheme: this.previewTheme,
+        editorPaneRatio: this.editorPaneRatio,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,
         highContrast: this.highContrast,
@@ -1132,6 +1140,10 @@ export const useDocumentsStore = defineStore("documents", {
     async setTransformTimeout(timeoutMs: number) {
       this.transformTimeoutMs = Math.min(Math.max(Number(timeoutMs) || 1, 1), 30000);
       await this.persistWorkspace();
+    },
+    setEditorPaneRatio(value: number, persist = true) {
+      this.editorPaneRatio = clampPaneRatio(value);
+      if (persist) void this.persistWorkspace();
     },
     async testExternalTransform(name: string) {
       const engine = this.transformEngines.find((candidate) => candidate.name === name);

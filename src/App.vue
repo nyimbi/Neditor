@@ -677,7 +677,7 @@
         role="separator"
         aria-label="Resize editor and preview panes"
         aria-orientation="vertical"
-        :aria-valuenow="Math.round(editorPaneRatio * 100)"
+        :aria-valuenow="Math.round(store.editorPaneRatio * 100)"
         aria-valuemin="25"
         aria-valuemax="75"
         @pointerdown="startPaneResize"
@@ -862,7 +862,6 @@ const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const isNewTableDraft = ref(false);
 const draggedTabId = ref("");
-const editorPaneRatio = ref(0.5);
 
 interface MarkdownTable {
   startLine: number;
@@ -918,7 +917,7 @@ const previewDocumentStyle = computed(() => ({
   fontFamily: store.previewFont,
   lineHeight: String(clampUiLineHeight(store.previewLineHeight)),
 }));
-const workspaceStyle = computed(() => ({ "--editor-ratio": String(editorPaneRatio.value) }));
+const workspaceStyle = computed(() => ({ "--editor-ratio": String(store.editorPaneRatio) }));
 const paneSplitterVisible = computed(() => !["source", "focus", "preview", "export"].includes(store.mode));
 const wordStats = computed(() => {
   const text = active.value?.text || "";
@@ -1586,6 +1585,7 @@ function startPaneResize(event: PointerEvent) {
 
 function stopPaneResize() {
   window.removeEventListener("pointermove", resizeEditorPane);
+  void store.persistWorkspace();
 }
 
 function resizeEditorPane(event: PointerEvent) {
@@ -1597,28 +1597,24 @@ function resizeEditorPane(event: PointerEvent) {
   const availableWidth = rect.width - sidebarWidth - splitterWidth;
   if (availableWidth <= 0) return;
   const x = event.clientX - rect.left - sidebarWidth;
-  editorPaneRatio.value = clampPaneRatio(x / availableWidth);
+  store.setEditorPaneRatio(x / availableWidth, false);
 }
 
 function handlePaneSplitterKeydown(event: KeyboardEvent) {
   const keyStep = event.shiftKey ? 0.1 : 0.025;
   if (event.key === "ArrowLeft") {
     event.preventDefault();
-    editorPaneRatio.value = clampPaneRatio(editorPaneRatio.value - keyStep);
+    store.setEditorPaneRatio(store.editorPaneRatio - keyStep);
   } else if (event.key === "ArrowRight") {
     event.preventDefault();
-    editorPaneRatio.value = clampPaneRatio(editorPaneRatio.value + keyStep);
+    store.setEditorPaneRatio(store.editorPaneRatio + keyStep);
   } else if (event.key === "Home") {
     event.preventDefault();
-    editorPaneRatio.value = 0.25;
+    store.setEditorPaneRatio(0.25);
   } else if (event.key === "End") {
     event.preventDefault();
-    editorPaneRatio.value = 0.75;
+    store.setEditorPaneRatio(0.75);
   }
-}
-
-function clampPaneRatio(value: number) {
-  return Math.min(0.75, Math.max(0.25, value));
 }
 
 function runEditorCommand(command: (view: EditorView) => boolean) {
