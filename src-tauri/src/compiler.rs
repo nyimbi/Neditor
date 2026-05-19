@@ -38,7 +38,7 @@ use crate::{
         renderer::{render_transform, supported_transform},
         TransformArtifact,
     },
-    validation::{validate_document, DocumentValidationInput},
+    validation::{validate_document, validate_layout_directives, DocumentValidationInput},
     variables::interpolate_variables,
 };
 use chrono::Utc;
@@ -213,6 +213,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         ast_source_range_for_generated_lines(&source_map, line, end_line)
     });
     attach_transform_artifacts(&mut document_ast, &transform_artifacts);
+    validate_layout_directives(&document_ast.blocks, &mut diagnostics);
     let preview_headings = extract_headings(&layout_markdown);
     let heading_anchors = preview_headings
         .iter()

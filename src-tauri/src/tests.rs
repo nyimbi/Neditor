@@ -955,6 +955,29 @@ fn compiler_validates_layout_page_metadata() {
     assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
         .message
         .contains("Unsupported layout orientation: diagonal")));
+
+    let directive_response = compile(CompileRequest {
+            text: "---\ntitle: Bad Directive Layout\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\n---\n# Bad Directive Layout\n\n{{section-break pageSize=Tabloid orientation=sideways margins=huge}}\n".to_string(),
+            file_path: None,
+        });
+    assert!(directive_response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic
+            .message
+            .contains("Unsupported layout directive pageSize: Tabloid")));
+    assert!(directive_response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic
+            .message
+            .contains("Unsupported layout directive orientation: sideways")));
+    assert!(directive_response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic
+            .message
+            .contains("Unsupported layout directive margins: huge")));
 }
 
 #[test]

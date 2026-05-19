@@ -1,6 +1,11 @@
 use crate::{
     bibliography::{BibliographyEntry, CitationReference},
     diagnostics::{diag, with_range, DocumentDiagnostic},
+    document_ast::DocumentBlock,
+    layout::{
+        layout_margins_option, layout_option_text_any, layout_orientation_option,
+        layout_page_size_option,
+    },
     metadata_string,
     provenance::{AiAssistedSection, AiSource},
     review::ReviewComment,
@@ -200,6 +205,57 @@ pub(crate) fn validate_document(
             line,
             Some("Mark AI source blocks and AI-assisted section markers as human-reviewed after review."),
         ));
+    }
+}
+
+pub(crate) fn validate_layout_directives(
+    blocks: &[DocumentBlock],
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    for block in blocks {
+        let DocumentBlock::Layout {
+            options, source, ..
+        } = block
+        else {
+            continue;
+        };
+        let source_file = source.as_ref().map(|range| range.source_file.clone());
+        let line = source.as_ref().map(|range| range.source_line);
+        let cases = [
+            (
+                &["pageSize", "page-size", "page_size", "paper", "size"] as &[&str],
+                layout_page_size_option(options),
+                "pageSize",
+                "Use A4, Letter, or Legal.",
+            ),
+            (
+                &["orientation", "pageOrientation", "page_orientation"] as &[&str],
+                layout_orientation_option(options),
+                "orientation",
+                "Use portrait or landscape.",
+            ),
+            (
+                &["margins", "margin", "pageMargins", "page_margins"] as &[&str],
+                layout_margins_option(options),
+                "margins",
+                "Use narrow, normal, wide, or compact.",
+            ),
+        ];
+        for (keys, normalized, label, suggestion) in cases {
+            if normalized.is_some() {
+                continue;
+            }
+            let Some(raw) = layout_option_text_any(options, keys) else {
+                continue;
+            };
+            diagnostics.push(diag(
+                "warning",
+                format!("Unsupported layout directive {label}: {raw}"),
+                source_file.clone(),
+                line,
+                Some(suggestion),
+            ));
+        }
     }
 }
 
