@@ -10,8 +10,8 @@ What remains to achieve the full vision:
      a durable semantic model.
   3. Full visual table editor
      Core editor controls now cover table parsing/paste/captions, add/remove/duplicate/move rows and columns, alignment, sorting, column formats, totals, formula rows,
-     validation, and Markdown preview before apply. Still needed: browser-level interaction tests, richer formula authoring, accessibility polish, and export fixture
-     coverage for edited tables.
+     validation, Markdown preview before apply, target/range formula authoring, and cell/header accessibility labels. Still needed: browser-level interaction tests and export
+     fixture coverage for edited tables.
   4. External transform UX and adapters
      Safety primitives exist: trust, timeouts, size limits, stdin/file modes, caching, diagnostics, setup/security guidance, and adapter profiles for Graphviz, D2,
      PlantUML, and Pikchr. Platform setup guidance and per-engine diagnostic profiles now exist. Still needed: conformance against real installed binaries.

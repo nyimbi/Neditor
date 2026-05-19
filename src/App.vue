@@ -178,6 +178,40 @@
               <button type="button" @click="addTableFormulaRow('MAX')">MAX row</button>
               <button type="button" @click="addTableFormulaRow('COUNT')">COUNT row</button>
             </div>
+            <section class="table-formula-builder" aria-label="Table formula builder">
+              <label>
+                Function
+                <select v-model="tableFormulaFunction">
+                  <option value="SUM">SUM</option>
+                  <option value="AVG">AVG</option>
+                  <option value="MIN">MIN</option>
+                  <option value="MAX">MAX</option>
+                  <option value="COUNT">COUNT</option>
+                </select>
+              </label>
+              <label>
+                Target
+                <select v-model.number="tableFormulaTargetColumn">
+                  <option v-for="option in tableFormulaTargetColumns" :key="option.index" :value="option.index">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                From row
+                <input v-model.number="tableFormulaStartRow" type="number" min="1" :max="tableDataRowCount" />
+              </label>
+              <label>
+                To row
+                <input v-model.number="tableFormulaEndRow" type="number" min="1" :max="tableDataRowCount" />
+              </label>
+              <label>
+                Label
+                <input v-model="tableFormulaLabel" />
+              </label>
+              <output>{{ tableFormulaPreview || "-" }}</output>
+              <button type="button" :disabled="!tableFormulaPreview" @click="appendCustomTableFormulaRow">Add formula row</button>
+            </section>
             <div class="table-metadata">
               <label>
                 Table id
@@ -202,7 +236,7 @@
                 v-for="(_, columnIndex) in tableDraft.headers"
                 :key="`header-${columnIndex}`"
                 v-model="tableDraft.headers[columnIndex]"
-                aria-label="Column header"
+                :aria-label="tableHeaderLabel(columnIndex)"
               />
               <span></span>
               <span>Align</span>
@@ -239,7 +273,7 @@
                   :key="`cell-${rowIndex}-${columnIndex}`"
                   v-model="row[columnIndex]"
                   :class="{ 'formula-cell': isFormulaCell(row[columnIndex]) }"
-                  aria-label="Table cell"
+                  :aria-label="tableCellLabel(rowIndex, columnIndex)"
                 />
                 <span></span>
               </template>
@@ -932,6 +966,11 @@ const selectedTableIndex = ref(0);
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const isNewTableDraft = ref(false);
+const tableFormulaFunction = ref<TableFormulaFunction>("SUM");
+const tableFormulaTargetColumn = ref(1);
+const tableFormulaStartRow = ref(1);
+const tableFormulaEndRow = ref(2);
+const tableFormulaLabel = ref("Total");
 const draggedTabId = ref("");
 
 interface MarkdownTable {
@@ -1105,6 +1144,25 @@ const tableDraftMarkdownPreview = computed(() => {
   const draft = tableDraft.value;
   if (!draft) return "";
   return serializeMarkdownTable(normalizeTableDraft(draft)).join("\n");
+});
+const tableDataRowCount = computed(() => {
+  const draft = tableDraft.value;
+  if (!draft) return 1;
+  return Math.max(1, draft.rows.filter((row) => !isTableSummaryRow(row)).length);
+});
+const tableFormulaTargetColumns = computed(() => {
+  const draft = tableDraft.value;
+  if (!draft) return [];
+  const options = draft.headers.map((header, index) => ({
+    index,
+    label: `${spreadsheetColumnName(index + 1)} - ${header || `Column ${index + 1}`}`,
+  }));
+  return options.length > 1 ? options.slice(1) : options;
+});
+const tableFormulaPreview = computed(() => {
+  const row = buildCustomTableFormulaRow();
+  if (!row) return "";
+  return row.find(isFormulaCell) || "";
 });
 const diagnosticSignature = computed(() =>
   (active.value.compile?.diagnostics || [])
@@ -2477,6 +2535,45 @@ function addTableFormulaRow(formula: TableFormulaFunction, label: string = formu
   draft.rows.push(totals);
 }
 
+function appendCustomTableFormulaRow() {
+  const draft = tableDraft.value;
+  const row = buildCustomTableFormulaRow();
+  if (!draft || !row) return;
+  draft.rows.push(row);
+}
+
+function buildCustomTableFormulaRow() {
+  const draft = tableDraft.value;
+  if (!draft || !draft.headers.length) return null;
+  const targetColumn = resolvedFormulaTargetColumn(draft);
+  const [startRow, endRow] = resolvedFormulaRows();
+  const column = spreadsheetColumnName(targetColumn + 1);
+  const row = draft.headers.map(() => "");
+  const label = tableFormulaLabel.value.trim() || tableFormulaFunction.value;
+  if (targetColumn > 0) row[0] = label;
+  row[targetColumn] = `=${tableFormulaFunction.value}(${column}${startRow}:${column}${endRow})`;
+  return row;
+}
+
+function resolvedFormulaTargetColumn(draft: TableDraft) {
+  const preferred = Number(tableFormulaTargetColumn.value);
+  const firstFormulaColumn = draft.headers.length > 1 ? 1 : 0;
+  if (!Number.isInteger(preferred)) return firstFormulaColumn;
+  return Math.min(Math.max(preferred, firstFormulaColumn), draft.headers.length - 1);
+}
+
+function resolvedFormulaRows() {
+  const maxRow = tableDataRowCount.value;
+  const start = clampInteger(tableFormulaStartRow.value, 1, maxRow);
+  const end = clampInteger(tableFormulaEndRow.value, 1, maxRow);
+  return start <= end ? [start, end] : [end, start];
+}
+
+function clampInteger(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(Math.trunc(value), min), max);
+}
+
 function replaceTableFromPaste() {
   const parsed = parseTablePaste(tablePasteText.value);
   const rows = parsed.rows;
@@ -2999,6 +3096,17 @@ function isTableSummaryRow(row: string[]) {
 
 function isFormulaCell(value = "") {
   return value.trim().startsWith("=");
+}
+
+function tableHeaderLabel(columnIndex: number) {
+  return `Column ${spreadsheetColumnName(columnIndex + 1)} header`;
+}
+
+function tableCellLabel(rowIndex: number, columnIndex: number) {
+  const draft = tableDraft.value;
+  const header = draft?.headers[columnIndex]?.trim();
+  const column = spreadsheetColumnName(columnIndex + 1);
+  return header ? `${header}, row ${rowIndex + 1}, column ${column}` : `Row ${rowIndex + 1}, column ${column}`;
 }
 
 function tableColumnRange(columnIndex: number, rowCount: number) {
@@ -3606,6 +3714,33 @@ select:hover {
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.table-formula-builder {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+}
+
+.table-formula-builder output {
+  min-height: 32px;
+  padding: 7px 9px;
+  border: 1px solid #d8e0e8;
+  background: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #7c2d12;
+}
+
+.table-formula-builder button,
+.table-formula-builder input,
+.table-formula-builder select {
+  width: 100%;
+  min-width: 0;
 }
 
 .table-metadata {
