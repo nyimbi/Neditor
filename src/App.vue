@@ -1648,7 +1648,7 @@ function diagnosticAppliesToIncludedFile(diagnostic: DocumentDiagnostic) {
 }
 
 function canNavigateDiagnostic(diagnostic: DocumentDiagnostic) {
-  return Boolean(diagnostic.line && !diagnosticAppliesToIncludedFile(diagnostic));
+  return Boolean(diagnostic.line);
 }
 
 function diagnosticLocation(diagnostic: DocumentDiagnostic) {
