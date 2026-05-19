@@ -29,7 +29,7 @@ What remains to achieve the full vision:
   4. External transform UX and adapters
      Safety primitives exist: trust, active document trust prompts, timeouts, size limits, stdin/file modes, caching, diagnostics, setup/security guidance, and adapter
      profiles for Graphviz, D2, PlantUML, and Pikchr. Platform setup guidance, per-engine diagnostic profiles and failure hints, an installed-engine conformance harness,
-     and Linux CI coverage for Graphviz/PlantUML real binaries now exist. Still needed: broader Windows/macOS optional-engine evidence and D2/Pikchr CI coverage.
+     and Linux CI coverage for Graphviz, D2, PlantUML, and Pikchr real binaries now exist. Still needed: broader Windows/macOS optional-engine evidence.
   5. Watcher/conflict hardening
      Native watcher support exists behind native-watch, with fallback now. Watch events are now scoped to the document that installed the watcher, tab activation
      recompiles/resyncs watched paths, conflict actions target the conflicted document instead of whichever tab is currently visible, and backend watch setup discovers nested

@@ -61,6 +61,33 @@ jobs:
             plantuml \
             wget
 
+      - name: Install Linux optional transform engines
+        if: runner.os == 'Linux'
+        run: |
+          set -eux
+          curl -fsSL https://d2lang.com/install.sh | sh -s -- --prefix "$HOME/.local"
+          cargo install pikchr-cli --version 0.1.2 --locked
+
+          if [ ! -x "$HOME/.local/bin/d2" ]; then
+            ls -la "$HOME/.local/bin"
+            exit 1
+          fi
+          if [ -x "$HOME/.cargo/bin/pikchr-cli" ]; then
+            pikchr_bin="$HOME/.cargo/bin/pikchr-cli"
+          elif [ -x "$HOME/.cargo/bin/pikchr" ]; then
+            pikchr_bin="$HOME/.cargo/bin/pikchr"
+          else
+            ls -la "$HOME/.cargo/bin"
+            exit 1
+          fi
+
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          echo "NEDITOR_TEST_DOT=$(command -v dot)" >> "$GITHUB_ENV"
+          echo "NEDITOR_TEST_D2=$HOME/.local/bin/d2" >> "$GITHUB_ENV"
+          echo "NEDITOR_TEST_PLANTUML=$(command -v plantuml)" >> "$GITHUB_ENV"
+          echo "NEDITOR_TEST_PIKCHR=$pikchr_bin" >> "$GITHUB_ENV"
+
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
