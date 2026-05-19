@@ -1,6 +1,7 @@
 <template>
   <div
     class="app-shell"
+    :class="{ 'has-trust-prompt': externalTransformTrustPrompts.length }"
     :data-theme="store.theme"
     :data-high-contrast="store.highContrast ? 'true' : 'false'"
     :data-reduced-motion="store.reducedMotion ? 'true' : 'false'"
@@ -101,6 +102,20 @@
         <option value="settings">Settings</option>
       </select>
     </nav>
+
+    <section v-if="externalTransformTrustPrompts.length" class="trust-prompt" aria-label="External transform trust prompts">
+      <article v-for="prompt in externalTransformTrustPrompts" :key="prompt.name" class="trust-prompt-item">
+        <div>
+          <strong>{{ prompt.name }} transform</strong>
+          <span>{{ prompt.path }}</span>
+          <small>{{ prompt.inputMode }} | {{ prompt.securitySummary }}</small>
+        </div>
+        <div class="trust-prompt-actions">
+          <button type="button" @click="trustTransformEngine(prompt.name)">Trust</button>
+          <button type="button" @click="reviewTransformEngineSettings(prompt.name)">Settings</button>
+        </div>
+      </article>
+    </section>
 
     <main ref="workspacePane" class="workspace" :class="`mode-${store.mode}`" :style="workspaceStyle">
       <aside class="sidebar" aria-label="Document workspace">
@@ -1067,6 +1082,13 @@ interface FigureListItem {
   source_file?: string | null;
 }
 
+interface TransformTrustPrompt {
+  name: string;
+  path: string;
+  inputMode: string;
+  securitySummary: string;
+}
+
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
 const figureCropPositionGrid: Record<FigureCropPosition, { x: -1 | 0 | 1; y: -1 | 0 | 1 }> = {
@@ -1119,6 +1141,22 @@ const watchStatus = computed(() => {
   const label = store.watchDriver === "native" ? "Native watch" : "Plugin watch";
   const suffix = store.watchedPaths.length === 1 ? "path" : "paths";
   return `${label}: ${store.watchedPaths.length} ${suffix}`;
+});
+const externalTransformTrustPrompts = computed<TransformTrustPrompt[]>(() => {
+  const text = active.value?.text || "";
+  return store.externalTransformEngines
+    .filter((engine) => documentUsesTransformFence(text, engine.name))
+    .map((engine) => ({
+      engine,
+      path: store.transformEnginePaths[engine.name]?.trim() || "",
+    }))
+    .filter(({ engine, path }) => Boolean(path) && !store.trustedTransformEngines[engine.name])
+    .map(({ engine, path }) => ({
+      name: engine.name,
+      path,
+      inputMode: store.transformInputModes[engine.name] || "stdin",
+      securitySummary: engine.securitySummary,
+    }));
 });
 const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
 const bibliographyByKey = computed(() => new Map((active.value.compile?.bibliography || []).map((entry) => [entry.key, entry.title])));
@@ -2140,28 +2178,52 @@ async function chooseTransformEngine(name: string) {
   if (typeof selected === "string") await store.setTransformEnginePath(name, selected);
 }
 
+function documentUsesTransformFence(text: string, name: string) {
+  const fencePrefix = new RegExp(`^\\s*\`\`\`${escapeRegExp(name)}(?:\\s|$)`, "i");
+  return text.split("\n").some((line) => fencePrefix.test(line));
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function confirmTransformEngineTrust(name: string) {
+  const enginePath = store.transformEnginePaths[name]?.trim();
+  if (!enginePath) {
+    store.statusMessage = `Choose a ${name} engine path before trusting it`;
+    return false;
+  }
+  return confirm(
+    `Trust ${name} external transform engine?\n\nNEditor will be allowed to run ${enginePath} for this transform with timeout, size, and no-shell execution limits.`,
+    { title: "Trust external transform engine", kind: "warning" },
+  );
+}
+
+async function trustTransformEngine(name: string) {
+  if (!(await confirmTransformEngineTrust(name))) return;
+  await store.setTransformTrust(name, true);
+  await store.compileActive();
+  store.statusMessage = `${name} external transform trusted`;
+}
+
+function reviewTransformEngineSettings(name: string) {
+  store.sidebar = "settings";
+  store.statusMessage = `Review ${name} external transform settings`;
+}
+
 async function toggleTransformTrust(name: string, event: Event) {
   const trusted = eventChecked(event);
   if (!trusted) {
     await store.setTransformTrust(name, false);
     return;
   }
-  const enginePath = store.transformEnginePaths[name]?.trim();
-  if (!enginePath) {
-    if (event.target instanceof HTMLInputElement) event.target.checked = false;
-    store.statusMessage = `Choose a ${name} engine path before trusting it`;
-    return;
-  }
-  const allowed = await confirm(
-    `Trust ${name} external transform engine?\n\nNEditor will be allowed to run ${enginePath} for this transform with timeout, size, and no-shell execution limits.`,
-    { title: "Trust external transform engine", kind: "warning" },
-  );
-  if (allowed) {
-    await store.setTransformTrust(name, true);
-  } else {
+  const allowed = await confirmTransformEngineTrust(name);
+  if (!allowed) {
     if (event.target instanceof HTMLInputElement) event.target.checked = false;
     await store.setTransformTrust(name, false);
+    return;
   }
+  await store.setTransformTrust(name, true);
 }
 
 async function saveDocument() {
@@ -3007,6 +3069,10 @@ select:hover {
   background: #edf1f5;
 }
 
+.app-shell.has-trust-prompt {
+  grid-template-rows: 38px 42px auto minmax(0, 1fr) 28px;
+}
+
 .app-shell[data-theme="dark"] {
   color: #e6edf5;
   background: #111821;
@@ -3026,6 +3092,7 @@ select:hover {
 
 .app-shell[data-high-contrast="true"] .titlebar,
 .app-shell[data-high-contrast="true"] .command-bar,
+.app-shell[data-high-contrast="true"] .trust-prompt,
 .app-shell[data-high-contrast="true"] .status-bar,
 .app-shell[data-high-contrast="true"] .sidebar,
 .app-shell[data-high-contrast="true"] button,
@@ -3181,6 +3248,50 @@ select:hover {
 
 .command-bar {
   overflow-x: auto;
+}
+
+.trust-prompt {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 10px;
+  border-bottom: 1px solid #d8b66d;
+  background: #fff8e8;
+}
+
+.trust-prompt-item {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  min-width: min(100%, 560px);
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid #d8b66d;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.trust-prompt-item strong,
+.trust-prompt-item span,
+.trust-prompt-item small {
+  display: block;
+}
+
+.trust-prompt-item span {
+  overflow-wrap: anywhere;
+  color: #374151;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.trust-prompt-item small {
+  color: #526171;
+}
+
+.trust-prompt-actions {
+  display: inline-flex;
+  gap: 6px;
 }
 
 .divider {
