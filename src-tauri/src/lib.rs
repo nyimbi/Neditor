@@ -1574,6 +1574,33 @@ mod tests {
         path
     }
 
+    fn installed_command_path(env_var: &str, command: &str) -> Option<PathBuf> {
+        if let Some(path) = std::env::var_os(env_var)
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute() && path.is_file())
+        {
+            return Some(path);
+        }
+
+        let path_value = std::env::var_os("PATH")?;
+        for directory in std::env::split_paths(&path_value) {
+            let direct = directory.join(command);
+            if direct.is_file() {
+                return Some(direct);
+            }
+            #[cfg(windows)]
+            {
+                for extension in ["exe", "bat", "cmd"] {
+                    let candidate = directory.join(format!("{command}.{extension}"));
+                    if candidate.is_file() {
+                        return Some(candidate);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     fn sample_document() -> String {
         r#"---
 title: Test Report
@@ -3956,6 +3983,116 @@ beta</pre>
 
         let _ = fs::remove_file(d2);
         let _ = fs::remove_file(plantuml);
+    }
+
+    #[test]
+    fn external_transform_conformance_runs_installed_engines() {
+        struct EngineCase {
+            name: &'static str,
+            command: &'static str,
+            env_var: &'static str,
+            input_mode: &'static str,
+            body: String,
+        }
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let cases = [
+            EngineCase {
+                name: "dot",
+                command: "dot",
+                env_var: "NEDITOR_TEST_DOT",
+                input_mode: "stdin",
+                body: format!("digraph G {{ start -> done [label=\"{unique}\"]; }}"),
+            },
+            EngineCase {
+                name: "d2",
+                command: "d2",
+                env_var: "NEDITOR_TEST_D2",
+                input_mode: "stdin",
+                body: format!("source -> target: {unique}"),
+            },
+            EngineCase {
+                name: "plantuml",
+                command: "plantuml",
+                env_var: "NEDITOR_TEST_PLANTUML",
+                input_mode: "file",
+                body: format!("@startuml\nAlice -> Bob: {unique}\n@enduml\n"),
+            },
+            EngineCase {
+                name: "pikchr",
+                command: "pikchr",
+                env_var: "NEDITOR_TEST_PIKCHR",
+                input_mode: "stdin",
+                body: format!("box \"{unique}\"; arrow; box \"Done\""),
+            },
+        ];
+
+        let mut verified = Vec::new();
+        let mut skipped = Vec::new();
+        for case in cases {
+            let Some(path) = installed_command_path(case.env_var, case.command) else {
+                skipped.push(case.name);
+                continue;
+            };
+            let artifact = run_external_transform(ExternalTransformRequest {
+                name: case.name.to_string(),
+                body: case.body,
+                engine_path: Some(path_to_string(&path)),
+                trusted: true,
+                input_mode: Some(case.input_mode.to_string()),
+                timeout_ms: Some(15_000),
+                max_input_bytes: Some(16_384),
+                max_output_bytes: Some(1_048_576),
+            })
+            .unwrap_or_else(|error| {
+                panic!(
+                    "{} conformance failed with {}: {error}",
+                    case.name,
+                    path.display()
+                )
+            });
+
+            assert_eq!(artifact.execution_kind, "external");
+            assert_eq!(artifact.input_mode, case.input_mode);
+            assert_eq!(artifact.output_kind, "svg");
+            assert!(artifact.html.contains("<svg"));
+            let engine_path = path_to_string(&path);
+            assert_eq!(artifact.engine_path.as_deref(), Some(engine_path.as_str()));
+            assert!(artifact.diagnostics.iter().any(|diagnostic| {
+                diagnostic.related.iter().any(|related| {
+                    related == &format!("adapter: {}", external_conformance_adapter(case.name))
+                })
+            }));
+            assert!(artifact.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .related
+                    .iter()
+                    .any(|related| related.starts_with("engine_version: file-size:"))
+            }));
+            verified.push(case.name);
+        }
+
+        eprintln!(
+            "external transform conformance verified: {}; skipped: {}",
+            verified.join(", "),
+            skipped.join(", ")
+        );
+        if verified.is_empty() {
+            eprintln!("No optional external transform engines were installed; set NEDITOR_TEST_DOT, NEDITOR_TEST_D2, NEDITOR_TEST_PLANTUML, or NEDITOR_TEST_PIKCHR to force a conformance run.");
+        }
+    }
+
+    fn external_conformance_adapter(name: &str) -> &'static str {
+        match name {
+            "dot" => "graphviz",
+            "d2" => "d2",
+            "plantuml" => "plantuml",
+            "pikchr" => "pikchr",
+            _ => "unknown",
+        }
     }
 
     #[cfg(unix)]
