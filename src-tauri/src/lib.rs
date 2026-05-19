@@ -5014,6 +5014,71 @@ beta</pre>
     }
 
     #[test]
+    fn export_packages_raster_media_intrinsic_dimensions() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-raster-media-export-{unique}"));
+        let assets = root.join("assets");
+        fs::create_dir_all(&assets).expect("create media fixture dir");
+        let png = assets.join("chart.png");
+        fs::write(
+            &png,
+            [
+                0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, b'I', b'H',
+                b'D', b'R', 0x00, 0x00, 0x00, 0xc8, 0x00, 0x00, 0x00, 0x64, 0x08, 0x02, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ],
+        )
+        .expect("write png");
+        let jpg = assets.join("photo.jpg");
+        fs::write(
+            &jpg,
+            [
+                0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01,
+                0x00, 0x60, 0x00, 0x60, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x78, 0x00,
+                0xf0, 0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00, 0xff, 0xd9,
+            ],
+        )
+        .expect("write jpg");
+        let doc = root.join("report.md");
+        fs::write(
+            &doc,
+            "---\ntitle: Raster Media\nstatus: approved\napprovedBy: QA\n---\n# Raster Media\n![Chart](assets/chart.png){#fig:chart caption=\"PNG chart\"}\n\n![Photo](assets/photo.jpg){#fig:photo caption=\"JPEG photo\"}\n",
+        )
+        .expect("write document");
+
+        let response = compile(CompileRequest {
+            text: fs::read_to_string(&doc).expect("read document"),
+            file_path: Some(path_to_string(&doc)),
+        });
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == "error"));
+
+        let options = json!({});
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        let docx_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
+        assert!(docx_relationships.contains(r#"Target="media/image1.png""#));
+        assert!(docx_relationships.contains(r#"Target="media/image2.jpg""#));
+        assert!(docx_document.contains(r#"<wp:extent cx="1905000" cy="952500""#));
+        assert!(docx_document.contains(r#"<wp:extent cx="2286000" cy="1143000""#));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        let pptx_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide2.xml.rels");
+        assert!(pptx_relationships.contains(r#"Target="../media/image1.png""#));
+        assert!(pptx_relationships.contains(r#"Target="../media/image2.jpg""#));
+        assert!(pptx_slide.contains(r#"<a:ext cx="1905000" cy="952500""#));
+        assert!(pptx_slide.contains(r#"<a:ext cx="2286000" cy="1143000""#));
+
+        fs::remove_dir_all(root).expect("clean media export fixture");
+    }
+
+    #[test]
     fn export_keeps_duplicate_relative_media_from_includes_distinct() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)

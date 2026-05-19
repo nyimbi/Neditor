@@ -2813,6 +2813,8 @@ fn image_content_type_for_extension(extension: &str) -> Option<&'static str> {
 fn export_image_dimensions(content_type: &str, bytes: &[u8]) -> Option<ExportImageDimensions> {
     match content_type {
         "image/svg+xml" => svg_image_dimensions(bytes),
+        "image/png" => png_image_dimensions(bytes),
+        "image/jpeg" => jpeg_image_dimensions(bytes),
         _ => None,
     }
 }
@@ -2907,6 +2909,77 @@ fn parse_svg_view_box(value: &str) -> Option<(f64, f64, f64, f64)> {
         return None;
     }
     Some((values[0], values[1], values[2], values[3]))
+}
+
+fn png_image_dimensions(bytes: &[u8]) -> Option<ExportImageDimensions> {
+    const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
+    if bytes.len() < 24 || &bytes[..8] != PNG_SIGNATURE || &bytes[12..16] != b"IHDR" {
+        return None;
+    }
+    let width = u32::from_be_bytes(bytes[16..20].try_into().ok()?);
+    let height = u32::from_be_bytes(bytes[20..24].try_into().ok()?);
+    image_dimensions_from_u32(width, height)
+}
+
+fn jpeg_image_dimensions(bytes: &[u8]) -> Option<ExportImageDimensions> {
+    if bytes.len() < 4 || bytes[0] != 0xff || bytes[1] != 0xd8 {
+        return None;
+    }
+    let mut index = 2;
+    while index + 3 < bytes.len() {
+        if bytes[index] != 0xff {
+            index += 1;
+            continue;
+        }
+        while index < bytes.len() && bytes[index] == 0xff {
+            index += 1;
+        }
+        if index >= bytes.len() {
+            return None;
+        }
+        let marker = bytes[index];
+        index += 1;
+        if marker == 0xda || marker == 0xd9 {
+            return None;
+        }
+        if marker == 0x01 || (0xd0..=0xd7).contains(&marker) {
+            continue;
+        }
+        if index + 1 >= bytes.len() {
+            return None;
+        }
+        let segment_length = u16::from_be_bytes([bytes[index], bytes[index + 1]]) as usize;
+        if segment_length < 2 || index + segment_length > bytes.len() {
+            return None;
+        }
+        if is_jpeg_start_of_frame(marker) {
+            if segment_length < 7 {
+                return None;
+            }
+            let height = u16::from_be_bytes([bytes[index + 3], bytes[index + 4]]) as u32;
+            let width = u16::from_be_bytes([bytes[index + 5], bytes[index + 6]]) as u32;
+            return image_dimensions_from_u32(width, height);
+        }
+        index += segment_length;
+    }
+    None
+}
+
+fn is_jpeg_start_of_frame(marker: u8) -> bool {
+    matches!(
+        marker,
+        0xc0 | 0xc1 | 0xc2 | 0xc3 | 0xc5 | 0xc6 | 0xc7 | 0xc9 | 0xca | 0xcb | 0xcd | 0xce | 0xcf
+    )
+}
+
+fn image_dimensions_from_u32(width: u32, height: u32) -> Option<ExportImageDimensions> {
+    if width == 0 || height == 0 {
+        return None;
+    }
+    Some(ExportImageDimensions {
+        width_px: width as f64,
+        height_px: height as f64,
+    })
 }
 
 fn decode_base64(input: &str) -> Option<Vec<u8>> {
