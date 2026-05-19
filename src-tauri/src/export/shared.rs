@@ -186,7 +186,9 @@ pub(super) fn export_logo(metadata: &Value) -> Option<String> {
 pub(super) struct ExportTable {
     pub(super) headers: Vec<String>,
     pub(super) alignments: Vec<String>,
+    pub(super) header_cells: Vec<TableCell>,
     pub(super) rows: Vec<Vec<String>>,
+    pub(super) row_cells: Vec<Vec<TableCell>>,
 }
 
 pub(super) fn export_table_from_delimited_code(
@@ -207,18 +209,25 @@ pub(super) fn export_table_from_delimited_code(
         return None;
     }
     let alignments = headers.iter().map(|_| "left".to_string()).collect();
-    let rows = rows
+    let rows: Vec<Vec<String>> = rows
         .into_iter()
         .map(|row| {
             (0..headers.len())
                 .map(|index| row.get(index).cloned().unwrap_or_default())
-                .collect()
+                .collect::<Vec<_>>()
         })
+        .collect();
+    let header_cells = plain_export_table_cells(&headers);
+    let row_cells = rows
+        .iter()
+        .map(|row| plain_export_table_cells(row))
         .collect();
     Some(ExportTable {
         headers,
         alignments,
+        header_cells,
         rows,
+        row_cells,
     })
 }
 
@@ -232,7 +241,7 @@ pub(super) fn export_table_from_transform_html(html: &str) -> Option<ExportTable
         return None;
     }
     let body_section = html_between(html, "<tbody", "</tbody>").unwrap_or("");
-    let mut rows = Vec::new();
+    let mut rows: Vec<Vec<String>> = Vec::new();
     let mut rest = body_section;
     while let Some((row_html, next)) = next_html_tag_block(rest, "tr") {
         let row = html_table_cells(row_html, "td");
@@ -240,17 +249,59 @@ pub(super) fn export_table_from_transform_html(html: &str) -> Option<ExportTable
             rows.push(
                 (0..headers.len())
                     .map(|index| row.get(index).cloned().unwrap_or_default())
-                    .collect(),
+                    .collect::<Vec<_>>(),
             );
         }
         rest = next;
     }
     let alignments = headers.iter().map(|_| "left".to_string()).collect();
+    let header_cells = plain_export_table_cells(&headers);
+    let row_cells = rows
+        .iter()
+        .map(|row| plain_export_table_cells(row))
+        .collect();
     Some(ExportTable {
         headers,
         alignments,
+        header_cells,
         rows,
+        row_cells,
     })
+}
+
+pub(super) fn plain_export_table_cells(cells: &[String]) -> Vec<TableCell> {
+    cells
+        .iter()
+        .map(|cell| TableCell {
+            text: cell.clone(),
+            colspan: 1,
+            rowspan: 1,
+            covered: false,
+            continues_rowspan: false,
+        })
+        .collect()
+}
+
+pub(super) fn populated_table_cells(cells: &[TableCell], fallback: &[String]) -> Vec<TableCell> {
+    if cells.is_empty() {
+        plain_export_table_cells(fallback)
+    } else {
+        cells.to_vec()
+    }
+}
+
+pub(super) fn populated_table_row_cells(
+    cells: &[Vec<TableCell>],
+    fallback: &[Vec<String>],
+) -> Vec<Vec<TableCell>> {
+    if cells.is_empty() {
+        fallback
+            .iter()
+            .map(|row| plain_export_table_cells(row))
+            .collect()
+    } else {
+        cells.to_vec()
+    }
 }
 
 pub(super) fn html_between<'a>(

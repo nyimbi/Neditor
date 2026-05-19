@@ -43,6 +43,15 @@ pub(crate) struct TaskListItem {
     pub(crate) text: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct TableCell {
+    pub(crate) text: String,
+    pub(crate) colspan: usize,
+    pub(crate) rowspan: usize,
+    pub(crate) covered: bool,
+    pub(crate) continues_rowspan: bool,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct AstReviewComment {
     pub(crate) author: String,
@@ -155,7 +164,9 @@ pub(crate) enum DocumentBlock {
         caption: Option<String>,
         headers: Vec<String>,
         alignments: Vec<String>,
+        header_cells: Vec<TableCell>,
         rows: Vec<Vec<String>>,
+        row_cells: Vec<Vec<TableCell>>,
         source: Option<AstSourceRange>,
     },
     Figure {
@@ -1000,24 +1011,23 @@ fn parse_ast_table(
         return None;
     }
 
-    let headers = split_markdown_table_row(header)
-        .iter()
-        .map(|cell| clean_inline_text(cell))
-        .collect::<Vec<_>>();
+    let header_raw = split_markdown_table_row(header);
+    let header_grid = semantic_table_rows_from_raw(&[header_raw]);
+    let header_cells = header_grid.into_iter().next().unwrap_or_default();
+    let headers = table_cell_texts(&header_cells);
     let alignments = split_markdown_table_row(separator)
         .iter()
         .map(|cell| table_alignment(cell))
         .collect::<Vec<_>>();
+    let mut raw_rows = Vec::new();
     let mut rows = Vec::new();
     let mut next_index = index + 2;
     while next_index < lines.len() && is_markdown_table_row(lines[next_index].trim()) {
-        let row = split_markdown_table_row(lines[next_index].trim())
-            .iter()
-            .map(|cell| clean_inline_text(cell))
-            .collect::<Vec<_>>();
-        rows.push(row);
+        raw_rows.push(split_markdown_table_row(lines[next_index].trim()));
         next_index += 1;
     }
+    let row_cells = semantic_table_rows_from_raw(&raw_rows);
+    rows.extend(row_cells.iter().map(|row| table_cell_texts(row)));
 
     Some((
         DocumentBlock::Table {
@@ -1027,11 +1037,121 @@ fn parse_ast_table(
             caption: caption.and_then(|caption| caption.caption),
             headers,
             alignments,
+            header_cells,
             rows,
+            row_cells,
             source: None,
         },
         next_index,
     ))
+}
+
+fn semantic_table_rows_from_raw(raw_rows: &[Vec<String>]) -> Vec<Vec<TableCell>> {
+    let mut rows = Vec::new();
+    let mut active_rowspans: Vec<usize> = Vec::new();
+    for raw_row in raw_rows {
+        let mut row = Vec::new();
+        let mut column_index = 0usize;
+        for raw_cell in raw_row {
+            while active_rowspans
+                .get(column_index)
+                .is_some_and(|remaining| *remaining > 0)
+            {
+                row.push(covered_table_cell(true));
+                active_rowspans[column_index] = active_rowspans[column_index].saturating_sub(1);
+                column_index += 1;
+            }
+            let cell = semantic_table_cell(raw_cell);
+            let colspan = cell.colspan.max(1);
+            let rowspan = cell.rowspan.max(1);
+            if active_rowspans.len() < column_index + colspan {
+                active_rowspans.resize(column_index + colspan, 0);
+            }
+            if rowspan > 1 {
+                for offset in 0..colspan {
+                    active_rowspans[column_index + offset] = rowspan - 1;
+                }
+            }
+            row.push(cell);
+            for _ in 1..colspan {
+                row.push(covered_table_cell(false));
+            }
+            column_index += colspan;
+        }
+        while active_rowspans
+            .get(column_index)
+            .is_some_and(|remaining| *remaining > 0)
+        {
+            row.push(covered_table_cell(true));
+            active_rowspans[column_index] = active_rowspans[column_index].saturating_sub(1);
+            column_index += 1;
+        }
+        rows.push(row);
+    }
+    rows
+}
+
+fn semantic_table_cell(raw: &str) -> TableCell {
+    let (text, colspan, rowspan) = split_table_cell_span_attributes(raw);
+    TableCell {
+        text: clean_inline_text(&text),
+        colspan,
+        rowspan,
+        covered: false,
+        continues_rowspan: false,
+    }
+}
+
+fn covered_table_cell(continues_rowspan: bool) -> TableCell {
+    TableCell {
+        text: String::new(),
+        colspan: 1,
+        rowspan: 1,
+        covered: true,
+        continues_rowspan,
+    }
+}
+
+fn table_cell_texts(cells: &[TableCell]) -> Vec<String> {
+    cells
+        .iter()
+        .map(|cell| {
+            if cell.covered {
+                String::new()
+            } else {
+                cell.text.clone()
+            }
+        })
+        .collect()
+}
+
+fn split_table_cell_span_attributes(raw: &str) -> (String, usize, usize) {
+    let trimmed = raw.trim();
+    let Some(open_index) = trimmed.rfind('{') else {
+        return (trimmed.to_string(), 1, 1);
+    };
+    if !trimmed.ends_with('}') {
+        return (trimmed.to_string(), 1, 1);
+    }
+    let attrs = &trimmed[open_index + 1..trimmed.len() - 1];
+    if !attrs.contains("colspan")
+        && !attrs.contains("rowspan")
+        && !attrs.contains("colspan=")
+        && !attrs.contains("rowspan=")
+    {
+        return (trimmed.to_string(), 1, 1);
+    }
+    let colspan = table_span_attribute(attrs, "colspan").unwrap_or(1);
+    let rowspan = table_span_attribute(attrs, "rowspan").unwrap_or(1);
+    (trimmed[..open_index].trim().to_string(), colspan, rowspan)
+}
+
+fn table_span_attribute(attrs: &str, name: &str) -> Option<usize> {
+    attrs
+        .split_whitespace()
+        .find_map(|part| part.strip_prefix(&format!("{name}=")))
+        .and_then(|value| value.trim_matches('"').parse::<usize>().ok())
+        .filter(|value| *value > 1)
 }
 
 fn parse_ast_list(lines: &[&str], index: usize) -> Option<(DocumentBlock, usize)> {
@@ -1475,20 +1595,33 @@ fn parse_ast_transform_table(
     if headers.is_empty() {
         return None;
     }
+    let header_cells = semantic_table_rows_from_raw(std::slice::from_ref(&headers))
+        .into_iter()
+        .next()
+        .unwrap_or_default();
     let body_section = html_between(html, "<tbody", "</tbody>").unwrap_or("");
-    let mut rows = Vec::new();
+    let mut raw_rows = Vec::new();
     let mut rest = body_section;
     while let Some((row_html, next)) = next_html_tag_block(rest, "tr") {
         let row = html_table_cells(row_html, "td");
         if !row.is_empty() {
-            rows.push(
-                (0..headers.len())
-                    .map(|index| row.get(index).cloned().unwrap_or_default())
-                    .collect(),
-            );
+            raw_rows.push(row);
         }
         rest = next;
     }
+    let row_cells = semantic_table_rows_from_raw(&raw_rows);
+    let rows = row_cells
+        .iter()
+        .map(|row| {
+            (0..headers.len())
+                .map(|index| {
+                    row.get(index)
+                        .map(|cell| cell.text.clone())
+                        .unwrap_or_default()
+                })
+                .collect()
+        })
+        .collect();
     Some(DocumentBlock::Table {
         line: line_number,
         end_line,
@@ -1496,7 +1629,9 @@ fn parse_ast_transform_table(
         caption: None,
         headers: headers.clone(),
         alignments: headers.iter().map(|_| "left".to_string()).collect(),
+        header_cells,
         rows,
+        row_cells,
         source: None,
     })
 }

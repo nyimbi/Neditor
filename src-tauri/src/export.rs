@@ -1,5 +1,7 @@
 use crate::{
-    document_ast::{export_body_text_from_ast, DocumentBlock, FootnoteEntry, InlineNode},
+    document_ast::{
+        export_body_text_from_ast, DocumentBlock, FootnoteEntry, InlineNode, TableCell,
+    },
     escape_css, escape_html, escape_pdf, escape_xml,
     export_media::{
         drawingml_source_crop, export_dimensions_emu_size, normalized_fit, normalized_position,

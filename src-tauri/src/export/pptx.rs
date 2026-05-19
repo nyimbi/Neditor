@@ -161,7 +161,9 @@ struct PptxTable {
     caption: Option<String>,
     headers: Vec<String>,
     alignments: Vec<String>,
+    header_cells: Vec<TableCell>,
     rows: Vec<Vec<String>>,
+    row_cells: Vec<Vec<TableCell>>,
 }
 
 #[derive(Clone, Debug)]
@@ -505,12 +507,28 @@ fn pptx_table_chunk(table: &PptxTable, rows: Vec<Vec<String>>, continued: bool) 
     } else {
         table.caption.clone()
     };
+    let start = table
+        .rows
+        .windows(rows.len().max(1))
+        .position(|window| window == rows.as_slice())
+        .unwrap_or(0);
+    let row_cells = table
+        .row_cells
+        .get(start..start + rows.len())
+        .map(|slice| slice.to_vec())
+        .unwrap_or_else(|| {
+            rows.iter()
+                .map(|row| plain_export_table_cells(row))
+                .collect()
+        });
     PptxTable {
         id: table.id.clone(),
         caption,
         headers: table.headers.clone(),
         alignments: table.alignments.clone(),
+        header_cells: table.header_cells.clone(),
         rows,
+        row_cells,
     }
 }
 
@@ -535,7 +553,9 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
                 caption: None,
                 headers: table.headers,
                 alignments: table.alignments,
+                header_cells: table.header_cells,
                 rows: table.rows,
+                row_cells: table.row_cells,
             });
         }
     }
@@ -549,7 +569,9 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
                 caption: None,
                 headers: table.headers,
                 alignments: table.alignments,
+                header_cells: table.header_cells,
                 rows: table.rows,
+                row_cells: table.row_cells,
             });
         }
     }
@@ -558,7 +580,9 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
         caption,
         headers,
         alignments,
+        header_cells,
         rows,
+        row_cells,
         ..
     } = block
     {
@@ -570,7 +594,9 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
             caption: caption.clone(),
             headers: headers.clone(),
             alignments: alignments.clone(),
+            header_cells: populated_table_cells(header_cells, headers),
             rows: rows.clone(),
+            row_cells: populated_table_row_cells(row_cells, rows),
         });
     }
     if let DocumentBlock::Figure {
@@ -902,9 +928,10 @@ fn render_pptx_table(table: &PptxTable, index: usize, body_line_count: usize) ->
     let grid = (0..column_count)
         .map(|_| format!(r#"<a:gridCol w="{column_width}"/>"#))
         .collect::<String>();
-    let header = render_pptx_table_row(&table.headers, &table.alignments, true);
-    let rows = table
-        .rows
+    let header_cells = populated_table_cells(&table.header_cells, &table.headers);
+    let header = render_pptx_table_row(&header_cells, &table.alignments, true);
+    let row_cells = populated_table_row_cells(&table.row_cells, &table.rows);
+    let rows = row_cells
         .iter()
         .map(|row| render_pptx_table_row(row, &table.alignments, false))
         .collect::<String>();
@@ -915,29 +942,51 @@ fn render_pptx_table(table: &PptxTable, index: usize, body_line_count: usize) ->
     )
 }
 
-fn render_pptx_table_row(cells: &[String], alignments: &[String], header: bool) -> String {
+fn render_pptx_table_row(cells: &[TableCell], alignments: &[String], header: bool) -> String {
     let height = if header { 320_000 } else { 280_000 };
     let cells = cells
         .iter()
         .enumerate()
-        .map(|(index, cell)| {
+        .filter_map(|(index, cell)| {
             render_pptx_table_cell(cell, alignments.get(index).map(String::as_str), header)
         })
         .collect::<String>();
     format!(r#"<a:tr h="{height}">{cells}</a:tr>"#)
 }
 
-fn render_pptx_table_cell(text: &str, alignment: Option<&str>, header: bool) -> String {
+fn render_pptx_table_cell(
+    cell: &TableCell,
+    alignment: Option<&str>,
+    header: bool,
+) -> Option<String> {
+    if cell.covered && !cell.continues_rowspan {
+        return None;
+    }
     let alignment = match alignment {
         Some("center") => "ctr",
         Some("right") => "r",
         _ => "l",
     };
     let bold_start = if header { "<a:rPr b=\"1\"/>" } else { "" };
-    format!(
-        r#"<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="{alignment}"/><a:r>{bold_start}<a:t>{}</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc>"#,
-        escape_xml(text)
-    )
+    let grid_span = if cell.colspan > 1 {
+        format!(r#" gridSpan="{}""#, cell.colspan)
+    } else {
+        String::new()
+    };
+    let row_span = if cell.rowspan > 1 {
+        format!(r#" rowSpan="{}""#, cell.rowspan)
+    } else {
+        String::new()
+    };
+    let merge = if cell.covered && cell.continues_rowspan {
+        r#" vMerge="1""#
+    } else {
+        ""
+    };
+    Some(format!(
+        r#"<a:tc{grid_span}{row_span}{merge}><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="{alignment}"/><a:r>{bold_start}<a:t>{}</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc>"#,
+        escape_xml(&cell.text)
+    ))
 }
 
 fn render_pptx_notes_slide(slide: &PptxSlide) -> String {

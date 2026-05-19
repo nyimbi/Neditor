@@ -307,3 +307,67 @@ fn edited_table_permutation_exports_alignment_escapes_and_formula_rows() {
     assert!(bundled_ast.contains("Base | Case"));
     assert!(bundled_ast.contains("1200"));
 }
+
+#[test]
+fn merged_table_cells_flow_through_semantic_exports() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Merged Tables\nstatus: approved\napprovedBy: QA\n---\n# Merged Tables\nTable: Merged plan {#tbl:merged}\n| Phase {colspan=2} | Owner |\n| --- | --- | --- |\n| Discovery {rowspan=2} | Scope | PM |\n| Detail | Analyst |\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    let table = response
+        .document_ast
+        .blocks
+        .iter()
+        .find_map(|block| {
+            if let DocumentBlock::Table {
+                id,
+                header_cells,
+                row_cells,
+                ..
+            } = block
+            {
+                (id.as_deref() == Some("tbl:merged")).then_some((header_cells, row_cells))
+            } else {
+                None
+            }
+        })
+        .expect("semantic merged table");
+    assert_eq!(table.0[0].text, "Phase");
+    assert_eq!(table.0[0].colspan, 2);
+    assert!(table.0[1].covered);
+    assert_eq!(table.1[0][0].text, "Discovery");
+    assert_eq!(table.1[0][0].rowspan, 2);
+    assert!(table.1[1][0].covered);
+    assert!(table.1[1][0].continues_rowspan);
+
+    let options = json!({});
+    let docx = render_docx_bytes(&response, &options).expect("docx merged table");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains(r#"<w:gridSpan w:val="2"/>"#));
+    assert!(docx_document.contains(r#"<w:vMerge w:val="restart"/>"#));
+    assert!(docx_document.contains("<w:vMerge/>"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx merged table");
+    let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+    assert!(pptx_slide.contains(r#"<a:tc gridSpan="2""#));
+    assert!(pptx_slide.contains(r#"rowSpan="2""#));
+    assert!(pptx_slide.contains(r#"vMerge="1""#));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("(Phase) Tj"));
+    assert!(pdf_text.contains("(Discovery) Tj"));
+
+    let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+        .expect("merged table bundle");
+    let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
+    assert!(bundled_ast.contains(r#""colspan": 2"#));
+    assert!(bundled_ast.contains(r#""rowspan": 2"#));
+    assert!(bundled_ast.contains(r#""continues_rowspan": true"#));
+}

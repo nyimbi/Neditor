@@ -739,7 +739,11 @@ fn render_docx_block(
         DocumentBlock::CodeBlock { language, code, .. } => {
             if let Some(table) = export_table_from_delimited_code(language.as_deref(), code) {
                 let mut output = docx_paragraph(&table_export_line(&None, &None, &table.headers));
-                output.push_str(&docx_table(&table.headers, &table.alignments, &table.rows));
+                output.push_str(&docx_table(
+                    &table.header_cells,
+                    &table.alignments,
+                    &table.row_cells,
+                ));
                 return output;
             }
             let label = language
@@ -754,7 +758,9 @@ fn render_docx_block(
             caption,
             headers,
             alignments,
+            header_cells,
             rows,
+            row_cells,
             ..
         } => {
             let mut output = String::new();
@@ -764,7 +770,9 @@ fn render_docx_block(
                     id.as_deref(),
                 ));
             }
-            output.push_str(&docx_table(headers, alignments, rows));
+            let header_cells = populated_table_cells(header_cells, headers);
+            let row_cells = populated_table_row_cells(row_cells, rows);
+            output.push_str(&docx_table(&header_cells, alignments, &row_cells));
             output
         }
         DocumentBlock::Figure { .. } => docx_figure(block, media),
@@ -806,7 +814,11 @@ fn render_docx_block(
         DocumentBlock::RawHtml { html, .. } => {
             if let Some(table) = export_table_from_transform_html(html) {
                 let mut output = docx_paragraph(&table_export_line(&None, &None, &table.headers));
-                output.push_str(&docx_table(&table.headers, &table.alignments, &table.rows));
+                output.push_str(&docx_table(
+                    &table.header_cells,
+                    &table.alignments,
+                    &table.row_cells,
+                ));
                 return output;
             }
             raw_html_export_lines(html)
@@ -1226,7 +1238,7 @@ fn docx_margin_for_preset(margins: &str) -> u32 {
     }
 }
 
-fn docx_table(headers: &[String], alignments: &[String], rows: &[Vec<String>]) -> String {
+fn docx_table(headers: &[TableCell], alignments: &[String], rows: &[Vec<TableCell>]) -> String {
     let mut table = String::from(
         r#"<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>"#,
     );
@@ -1238,25 +1250,40 @@ fn docx_table(headers: &[String], alignments: &[String], rows: &[Vec<String>]) -
     table
 }
 
-fn docx_table_row(cells: &[String], alignments: &[String]) -> String {
+fn docx_table_row(cells: &[TableCell], alignments: &[String]) -> String {
     let cells = cells
         .iter()
         .enumerate()
-        .map(|(index, cell)| docx_cell(cell, alignments.get(index).map(String::as_str)))
+        .filter_map(|(index, cell)| docx_cell(cell, alignments.get(index).map(String::as_str)))
         .collect::<String>();
     format!("<w:tr>{cells}</w:tr>")
 }
 
-fn docx_cell(text: &str, alignment: Option<&str>) -> String {
+fn docx_cell(cell: &TableCell, alignment: Option<&str>) -> Option<String> {
+    if cell.covered && !cell.continues_rowspan {
+        return None;
+    }
     let alignment = match alignment {
         Some("center") => r#"<w:pPr><w:jc w:val="center"/></w:pPr>"#,
         Some("right") => r#"<w:pPr><w:jc w:val="right"/></w:pPr>"#,
         _ => "",
     };
-    format!(
-        r#"<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr><w:p>{alignment}<w:r><w:t>{}</w:t></w:r></w:p></w:tc>"#,
-        escape_xml(text)
-    )
+    let grid_span = if cell.colspan > 1 {
+        format!(r#"<w:gridSpan w:val="{}"/>"#, cell.colspan)
+    } else {
+        String::new()
+    };
+    let vmerge = if cell.covered && cell.continues_rowspan {
+        r#"<w:vMerge/>"#.to_string()
+    } else if cell.rowspan > 1 {
+        r#"<w:vMerge w:val="restart"/>"#.to_string()
+    } else {
+        String::new()
+    };
+    Some(format!(
+        r#"<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/>{grid_span}{vmerge}</w:tcPr><w:p>{alignment}<w:r><w:t>{}</w:t></w:r></w:p></w:tc>"#,
+        escape_xml(&cell.text)
+    ))
 }
 
 fn docx_figure(block: &DocumentBlock, media: &[ExportMedia]) -> String {

@@ -12,8 +12,10 @@ What remains to achieve the full vision:
      HTML/PDF/DOCX page geometry, section-level PDF page controls now produce per-page MediaBox geometry, and PDF section columns now reflow text/table/figure items
      through real column slots instead of only recording column metadata. PDF fixture coverage now proves keep-with-next/keep-together grouping moves controlled blocks as a
      unit, long paragraphs wrap within the available column width with two-line widow/orphan splitting, left/right figure floats reserve side width for adjacent wrapped text,
-     large tables continue across section columns and onto following pages, large table continuation is covered inside mixed page-size/orientation sections, and tall PDF table cells
-     split into continued row fragments instead of overflowing a single flow slot. Still needed: richer semantic handling for complex merged table structures.
+     large tables continue across section columns and onto following pages, large table continuation is covered inside mixed page-size/orientation sections, tall PDF table cells
+     split into continued row fragments instead of overflowing a single flow slot, and table cell span metadata now carries Markdown colspan/rowspan semantics through the AST,
+     DOCX gridSpan/vMerge, PPTX table span metadata, PDF cell geometry, and bundle conformance fixtures. Still needed: visual merged-cell editing and broader imported-table span
+     conformance.
   2. Canonical document AST
      There is an AST foundation, with normalized layout settings now attached to layout blocks, and transform artifacts now preserve source-file/range provenance
      through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler now emits a source-mapped semantic paged-document model,

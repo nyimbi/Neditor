@@ -169,8 +169,9 @@ fn pdf_table_stream(table: &PdfTable, x: u32, top_y: i32, width: u32) -> (String
     let column_width = (width / column_count as u32).max(48);
     let row_height = 18i32;
 
-    stream.push_str(&pdf_table_row_stream(
-        &table.headers,
+    let header_cells = populated_table_cells(&table.header_cells, &table.headers);
+    stream.push_str(&pdf_table_cell_row_stream(
+        &header_cells,
         &table.alignments,
         x,
         current_y,
@@ -178,8 +179,9 @@ fn pdf_table_stream(table: &PdfTable, x: u32, top_y: i32, width: u32) -> (String
         row_height,
     ));
     current_y -= row_height;
-    for row in &table.rows {
-        stream.push_str(&pdf_table_row_stream(
+    let row_cells = populated_table_row_cells(&table.row_cells, &table.rows);
+    for row in &row_cells {
+        stream.push_str(&pdf_table_cell_row_stream(
             row,
             &table.alignments,
             x,
@@ -260,8 +262,8 @@ fn pdf_figure_box_size(
     }
 }
 
-fn pdf_table_row_stream(
-    cells: &[String],
+fn pdf_table_cell_row_stream(
+    cells: &[TableCell],
     alignments: &[String],
     x: u32,
     y: i32,
@@ -269,18 +271,26 @@ fn pdf_table_row_stream(
     row_height: i32,
 ) -> String {
     let mut stream = String::new();
-    let column_count = cells.len().max(1);
-    for index in 0..column_count {
-        let cell_x = x + (index as u32 * column_width);
-        let cell = cells.get(index).map(String::as_str).unwrap_or("");
-        stream.push_str(&format!("{cell_x} {y} {column_width} {row_height} re S\n"));
+    let mut column_index = 0usize;
+    for cell in cells {
+        if cell.covered {
+            column_index += 1;
+            continue;
+        }
+        let colspan = cell.colspan.max(1);
+        let rowspan = cell.rowspan.max(1);
+        let cell_x = x + (column_index as u32 * column_width);
+        let cell_width = column_width.saturating_mul(colspan as u32);
+        let cell_height = row_height.saturating_mul(rowspan as i32);
+        stream.push_str(&format!("{cell_x} {y} {cell_width} {cell_height} re S\n"));
         let text_x = pdf_table_cell_text_x(
             cell_x,
-            column_width,
-            cell,
-            alignments.get(index).map(String::as_str),
+            cell_width,
+            &cell.text,
+            alignments.get(column_index).map(String::as_str),
         );
-        stream.push_str(&pdf_text_line(8, text_x, y + 6, cell));
+        stream.push_str(&pdf_text_line(8, text_x, y + 6, &cell.text));
+        column_index += colspan;
     }
     stream
 }
@@ -406,7 +416,9 @@ struct PdfTable {
     caption: Option<String>,
     headers: Vec<String>,
     alignments: Vec<String>,
+    header_cells: Vec<TableCell>,
     rows: Vec<Vec<String>>,
+    row_cells: Vec<Vec<TableCell>>,
 }
 
 #[derive(Clone, Debug)]
@@ -544,7 +556,9 @@ fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
                 caption: None,
                 headers: table.headers,
                 alignments: table.alignments,
+                header_cells: table.header_cells,
                 rows: table.rows,
+                row_cells: table.row_cells,
             })];
         }
     }
@@ -555,7 +569,9 @@ fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
                 caption: None,
                 headers: table.headers,
                 alignments: table.alignments,
+                header_cells: table.header_cells,
                 rows: table.rows,
+                row_cells: table.row_cells,
             })];
         }
     }
@@ -564,7 +580,9 @@ fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
         caption,
         headers,
         alignments,
+        header_cells,
         rows,
+        row_cells,
         ..
     } = block
     {
@@ -573,7 +591,9 @@ fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
             caption: caption.clone(),
             headers: headers.clone(),
             alignments: alignments.clone(),
+            header_cells: populated_table_cells(header_cells, headers),
             rows: rows.clone(),
+            row_cells: populated_table_row_cells(row_cells, rows),
         })];
     }
     if let DocumentBlock::Figure {
@@ -737,16 +757,22 @@ impl PdfPaginator {
     fn push_table(&mut self, table: PdfTable) {
         self.clear_active_float();
         let table = pdf_table_with_wrapped_rows(&table, self.current_layout.column_width());
-        let mut remaining_rows = table.rows.as_slice();
+        let mut row_start = 0usize;
         let mut continued = false;
-        while !remaining_rows.is_empty() {
+        while row_start < table.rows.len() {
             let available_rows = self.available_table_rows(continued);
             if available_rows == 0 {
                 self.advance_flow();
                 continue;
             }
-            let take_count = remaining_rows.len().min(available_rows);
-            let chunk = pdf_table_chunk(&table, remaining_rows[..take_count].to_vec(), continued);
+            let take_count = (table.rows.len() - row_start).min(available_rows);
+            let row_end = row_start + take_count;
+            let chunk = pdf_table_chunk(
+                &table,
+                table.rows[row_start..row_end].to_vec(),
+                table.row_cells[row_start..row_end].to_vec(),
+                continued,
+            );
             let height = pdf_table_height(&chunk);
             if self.used_height + height > self.available_height() && !self.current.is_empty() {
                 self.advance_flow();
@@ -754,7 +780,7 @@ impl PdfPaginator {
             }
             self.used_height += height;
             self.current.push(PdfPageItem::Table(chunk));
-            remaining_rows = &remaining_rows[take_count..];
+            row_start = row_end;
             continued = true;
         }
 
@@ -917,7 +943,12 @@ impl PdfPaginator {
     }
 }
 
-fn pdf_table_chunk(table: &PdfTable, rows: Vec<Vec<String>>, continued: bool) -> PdfTable {
+fn pdf_table_chunk(
+    table: &PdfTable,
+    rows: Vec<Vec<String>>,
+    row_cells: Vec<Vec<TableCell>>,
+    continued: bool,
+) -> PdfTable {
     let caption = if continued {
         Some(table.caption.clone().unwrap_or_else(|| "Table".to_string()) + " (continued)")
     } else {
@@ -928,11 +959,16 @@ fn pdf_table_chunk(table: &PdfTable, rows: Vec<Vec<String>>, continued: bool) ->
         caption,
         headers: table.headers.clone(),
         alignments: table.alignments.clone(),
+        header_cells: table.header_cells.clone(),
         rows,
+        row_cells,
     }
 }
 
 fn pdf_table_with_wrapped_rows(table: &PdfTable, available_width: u32) -> PdfTable {
+    if table_has_spans(&table.header_cells, &table.row_cells) {
+        return table.clone();
+    }
     let column_count = table.headers.len().max(1);
     let column_width = (available_width / column_count as u32).max(48);
     let text_width = column_width.saturating_sub(8).max(24);
@@ -946,8 +982,20 @@ fn pdf_table_with_wrapped_rows(table: &PdfTable, available_width: u32) -> PdfTab
         caption: table.caption.clone(),
         headers: table.headers.clone(),
         alignments: table.alignments.clone(),
+        header_cells: table.header_cells.clone(),
+        row_cells: rows
+            .iter()
+            .map(|row| plain_export_table_cells(row))
+            .collect(),
         rows,
     }
+}
+
+fn table_has_spans(header_cells: &[TableCell], row_cells: &[Vec<TableCell>]) -> bool {
+    header_cells
+        .iter()
+        .chain(row_cells.iter().flatten())
+        .any(|cell| cell.colspan > 1 || cell.rowspan > 1 || cell.covered)
 }
 
 fn pdf_wrapped_table_row(row: &[String], column_count: usize, text_width: u32) -> Vec<Vec<String>> {
