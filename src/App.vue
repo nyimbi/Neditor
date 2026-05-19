@@ -189,7 +189,7 @@
               <textarea v-model="tablePasteText" rows="4"></textarea>
             </label>
             <button type="button" @click="replaceTableFromPaste">Replace from paste</button>
-            <div class="table-editor-grid" :style="{ gridTemplateColumns: `168px repeat(${tableDraft.headers.length}, minmax(132px, 1fr)) 44px` }">
+            <div class="table-editor-grid" :style="{ gridTemplateColumns: `220px repeat(${tableDraft.headers.length}, minmax(132px, 1fr)) 44px` }">
               <span></span>
               <input
                 v-for="(_, columnIndex) in tableDraft.headers"
@@ -221,6 +221,7 @@
                 <span class="row-actions">
                   <button type="button" :disabled="rowIndex === 0" @click="moveTableRow(rowIndex, -1)">Up</button>
                   <button type="button" :disabled="rowIndex === tableDraft.rows.length - 1" @click="moveTableRow(rowIndex, 1)">Down</button>
+                  <button type="button" @click="duplicateTableRow(rowIndex)">Copy</button>
                   <button type="button" @click="removeTableRow(rowIndex)">Remove</button>
                 </span>
                 <input
@@ -241,6 +242,11 @@
                 <button type="button" :disabled="columnIndex === 0" @click="moveTableColumn(columnIndex, -1)">Left</button>
                 <button type="button" :disabled="columnIndex === tableDraft.headers.length - 1" @click="moveTableColumn(columnIndex, 1)">Right</button>
               </span>
+              <span></span>
+              <span>Duplicate column</span>
+              <button v-for="(_, columnIndex) in tableDraft.headers" :key="`duplicate-col-${columnIndex}`" type="button" @click="duplicateTableColumn(columnIndex)">
+                Copy
+              </button>
               <span></span>
               <span>Remove column</span>
               <button v-for="(_, columnIndex) in tableDraft.headers" :key="`remove-col-${columnIndex}`" type="button" @click="removeTableColumn(columnIndex)">
@@ -2322,6 +2328,13 @@ function removeTableRow(rowIndex: number) {
   tableDraft.value.rows.splice(rowIndex, 1);
 }
 
+function duplicateTableRow(rowIndex: number) {
+  const draft = tableDraft.value;
+  if (!draft) return;
+  const source = draft.rows[rowIndex] || draft.headers.map(() => "");
+  draft.rows.splice(rowIndex + 1, 0, padTableRow([...source], draft.headers.length));
+}
+
 function moveTableRow(rowIndex: number, direction: -1 | 1) {
   const draft = tableDraft.value;
   if (!draft) return;
@@ -2343,6 +2356,18 @@ function removeTableColumn(columnIndex: number) {
   tableDraft.value.alignments.splice(columnIndex, 1);
   tableDraft.value.formats.splice(columnIndex, 1);
   for (const row of tableDraft.value.rows) row.splice(columnIndex, 1);
+}
+
+function duplicateTableColumn(columnIndex: number) {
+  const draft = tableDraft.value;
+  if (!draft) return;
+  const header = draft.headers[columnIndex] || `Column ${columnIndex + 1}`;
+  draft.headers.splice(columnIndex + 1, 0, `${header} copy`);
+  draft.alignments.splice(columnIndex + 1, 0, draft.alignments[columnIndex] || "left");
+  draft.formats.splice(columnIndex + 1, 0, draft.formats[columnIndex] || "text");
+  for (const row of draft.rows) {
+    row.splice(columnIndex + 1, 0, row[columnIndex] || "");
+  }
 }
 
 function moveTableColumn(columnIndex: number, direction: -1 | 1) {
@@ -3380,7 +3405,7 @@ select:hover {
 }
 
 .table-editor-grid .row-actions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .table-editor-grid .column-actions {
