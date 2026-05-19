@@ -1,10 +1,12 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+#[cfg(test)]
+use std::path::Path;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     env, fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 mod ai_cleanup;
@@ -29,6 +31,7 @@ mod references;
 mod review;
 mod rich_blocks;
 mod snapshot;
+mod source_mapping;
 mod tables;
 mod transforms;
 mod utils;
@@ -47,7 +50,7 @@ use compile_options::apply_compile_options;
 use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
-use document_ast::{attach_source_ranges, build_document_ast, AstSourceRange, DocumentAst};
+use document_ast::{attach_source_ranges, build_document_ast, DocumentAst};
 #[cfg(test)]
 use export::{
     render_docx_bytes, render_full_html, render_markdown_bundle_bytes, render_pdf_bytes,
@@ -69,10 +72,7 @@ use filesystem::{
     WorkspaceFileRequest,
 };
 use footnotes::render_footnotes;
-use front_matter::{
-    merge_project_variables, parse_front_matter, render_front_matter_data_sources,
-    strip_front_matter,
-};
+use front_matter::{merge_project_variables, parse_front_matter, render_front_matter_data_sources};
 use generated_sections::inject_generated_sections;
 use git::{
     commit_document_changes, get_git_status, git_diff, git_history, restore_git_revision,
@@ -91,6 +91,9 @@ use rich_blocks::{
     render_layout_tokens,
 };
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
+use source_mapping::{
+    ast_source_range_for_generated_lines, expand_includes, normalize_source_map_after_front_matter,
+};
 use tables::{
     collect_table_summaries, evaluate_markdown_table_formulas, render_delimited_table, TableSummary,
 };
@@ -106,7 +109,6 @@ pub(crate) use utils::{
 };
 use validation::{validate_document, DocumentValidationInput};
 
-const MAX_INCLUDE_DEPTH: usize = 16;
 #[derive(Debug, Deserialize)]
 struct CompileRequest {
     text: String,
@@ -177,9 +179,9 @@ pub(crate) struct IncludeEdge {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct SourceMapEntry {
-    generated_line: usize,
-    source_file: String,
-    source_line: usize,
+    pub(crate) generated_line: usize,
+    pub(crate) source_file: String,
+    pub(crate) source_line: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -464,181 +466,6 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         transform_artifacts,
         export_manifest: manifest,
     }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn expand_includes(
-    text: &str,
-    current_path: Option<&Path>,
-    source_file: &str,
-    depth: usize,
-    visited: &mut HashSet<PathBuf>,
-    include_graph: &mut Vec<IncludeEdge>,
-    source_map: &mut Vec<SourceMapEntry>,
-    generated_line_count: &mut usize,
-    diagnostics: &mut Vec<DocumentDiagnostic>,
-) -> String {
-    if depth > MAX_INCLUDE_DEPTH {
-        diagnostics.push(diag(
-            "error",
-            "Maximum include depth exceeded.",
-            Some(source_file.to_string()),
-            None,
-            Some("Reduce nested include directives."),
-        ));
-        return String::new();
-    }
-
-    let base_dir = current_path
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
-    let mut output = String::new();
-    for (line_index, line) in text.lines().enumerate() {
-        if let Some(include_target) = parse_include_directive(line) {
-            let child = base_dir.join(include_target);
-            let canonical = child.canonicalize().unwrap_or(child.clone());
-            if visited.contains(&canonical) {
-                let mut diagnostic = diag(
-                    "error",
-                    "Circular include detected.",
-                    Some(source_file.to_string()),
-                    Some(line_index + 1),
-                    Some("Remove the cycle or include a different file."),
-                );
-                diagnostic
-                    .related
-                    .push(format!("Include target: {}", child.display()));
-                diagnostic
-                    .related
-                    .push(format!("Canonical path: {}", canonical.display()));
-                diagnostics.push(diagnostic);
-                continue;
-            }
-            if !child.exists() {
-                let mut diagnostic = diag(
-                    "error",
-                    format!("Missing include file: {}", child.display()),
-                    Some(source_file.to_string()),
-                    Some(line_index + 1),
-                    Some("Create the file or update the include path."),
-                );
-                diagnostic
-                    .related
-                    .push(format!("Include target: {include_target}"));
-                diagnostic
-                    .related
-                    .push(format!("Resolved path: {}", child.display()));
-                diagnostics.push(diagnostic);
-                continue;
-            }
-            match fs::read_to_string(&child) {
-                Ok(child_text) => {
-                    include_graph.push(IncludeEdge {
-                        parent: source_file.to_string(),
-                        child: path_to_string(&child),
-                        depth: depth + 1,
-                    });
-                    visited.insert(canonical.clone());
-                    let child_without_front_matter = strip_front_matter(&child_text);
-                    push_unmapped_expanded_text(
-                        &mut output,
-                        generated_line_count,
-                        &format!("\n\n<!-- begin include: {} -->\n", child.display()),
-                    );
-                    output.push_str(&expand_includes(
-                        &child_without_front_matter,
-                        Some(&child),
-                        &path_to_string(&child),
-                        depth + 1,
-                        visited,
-                        include_graph,
-                        source_map,
-                        generated_line_count,
-                        diagnostics,
-                    ));
-                    push_unmapped_expanded_text(
-                        &mut output,
-                        generated_line_count,
-                        &format!("\n<!-- end include: {} -->\n\n", child.display()),
-                    );
-                    visited.remove(&canonical);
-                }
-                Err(err) => diagnostics.push(diag(
-                    "error",
-                    format!("Unable to read include file: {err}"),
-                    Some(source_file.to_string()),
-                    Some(line_index + 1),
-                    Some("Check file permissions."),
-                )),
-            }
-        } else {
-            let generated_line = *generated_line_count + 1;
-            source_map.push(SourceMapEntry {
-                generated_line,
-                source_file: source_file.to_string(),
-                source_line: line_index + 1,
-            });
-            output.push_str(line);
-            output.push('\n');
-            *generated_line_count += 1;
-        }
-    }
-    output
-}
-
-fn push_unmapped_expanded_text(output: &mut String, generated_line_count: &mut usize, text: &str) {
-    output.push_str(text);
-    *generated_line_count += text.chars().filter(|ch| *ch == '\n').count();
-}
-
-fn parse_include_directive(line: &str) -> Option<&str> {
-    let trimmed = line.trim();
-    if let Some(rest) = trimmed.strip_prefix("!include ") {
-        return Some(rest.trim());
-    }
-    if let Some(rest) = trimmed.strip_prefix("{{include ") {
-        return rest.strip_suffix("}}").map(str::trim);
-    }
-    if let Some(rest) = trimmed.strip_prefix("<!-- include:") {
-        return rest.strip_suffix("-->").map(str::trim);
-    }
-    None
-}
-
-fn normalize_source_map_after_front_matter(
-    source_map: &mut Vec<SourceMapEntry>,
-    body_start_line: usize,
-) {
-    let offset = body_start_line.saturating_sub(1);
-    source_map.retain(|entry| entry.generated_line >= body_start_line);
-    for entry in source_map {
-        entry.generated_line = entry.generated_line.saturating_sub(offset);
-    }
-}
-
-fn ast_source_range_for_generated_lines(
-    source_map: &[SourceMapEntry],
-    line: usize,
-    end_line: usize,
-) -> Option<AstSourceRange> {
-    let start = source_map
-        .iter()
-        .find(|entry| entry.generated_line == line)?;
-    let end = source_map
-        .iter()
-        .rev()
-        .find(|entry| {
-            entry.generated_line >= line
-                && entry.generated_line <= end_line
-                && entry.source_file == start.source_file
-        })
-        .unwrap_or(start);
-    Some(AstSourceRange {
-        source_file: start.source_file.clone(),
-        source_line: start.source_line,
-        end_source_line: end.source_line,
-    })
 }
 
 fn interpolate_variables(
