@@ -2147,6 +2147,22 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
     use zip::ZipArchive;
 
+    #[cfg(unix)]
+    fn write_executable_script(prefix: &str, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("neditor-{prefix}-{unique}.sh"));
+        fs::write(&path, body).expect("write executable test script");
+        let mut permissions = fs::metadata(&path).expect("script metadata").permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&path, permissions).expect("make script executable");
+        path
+    }
+
     fn sample_document() -> String {
         r#"---
 title: Test Report
@@ -4210,12 +4226,18 @@ beta</pre>
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn external_transforms_are_trust_gated_and_limited() {
+        let graphviz = write_executable_script(
+            "graphviz-adapter",
+            "#!/bin/sh\nprintf '<svg data-args=\"%s\">' \"$*\"\nfor arg in \"$@\"; do if [ -f \"$arg\" ]; then cat \"$arg\"; fi; done\ncat\nprintf '</svg>'\n",
+        );
+        let graphviz_path = path_to_string(&graphviz);
         let trust_error = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
             body: "digraph {}".to_string(),
-            engine_path: Some("/bin/cat".to_string()),
+            engine_path: Some(graphviz_path.clone()),
             trusted: false,
             input_mode: Some("stdin".to_string()),
             timeout_ms: Some(1000),
@@ -4225,11 +4247,6 @@ beta</pre>
         .unwrap_err();
         assert!(trust_error.contains("explicit trust"));
 
-        let cat = Path::new("/bin/cat");
-        if !cat.exists() {
-            return;
-        }
-        let cat_path = path_to_string(cat);
         let unique_body = format!(
             "<svg>{}</svg>",
             SystemTime::now()
@@ -4240,7 +4257,7 @@ beta</pre>
         let limit_error = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
             body: "1234".to_string(),
-            engine_path: Some(cat_path.clone()),
+            engine_path: Some(graphviz_path.clone()),
             trusted: true,
             input_mode: Some("stdin".to_string()),
             timeout_ms: Some(1000),
@@ -4253,7 +4270,7 @@ beta</pre>
         let output_limit_error = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
             body: "1234".to_string(),
-            engine_path: Some(cat_path.clone()),
+            engine_path: Some(graphviz_path.clone()),
             trusted: true,
             input_mode: Some("stdin".to_string()),
             timeout_ms: Some(1000),
@@ -4261,12 +4278,13 @@ beta</pre>
             max_output_bytes: Some(3),
         })
         .unwrap_err();
-        assert!(output_limit_error.contains("output is 4 bytes"));
+        assert!(output_limit_error.contains("output is"));
+        assert!(output_limit_error.contains("above the 3 byte limit"));
 
         let stdin_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
             body: unique_body.clone(),
-            engine_path: Some(cat_path.clone()),
+            engine_path: Some(graphviz_path.clone()),
             trusted: true,
             input_mode: Some("stdin".to_string()),
             timeout_ms: Some(1000),
@@ -4291,6 +4309,14 @@ beta</pre>
             .related
             .iter()
             .any(|related| related == "input_mode: stdin"));
+        assert!(success_diagnostic
+            .related
+            .iter()
+            .any(|related| related == "adapter: graphviz"));
+        assert!(success_diagnostic
+            .related
+            .iter()
+            .any(|related| related == "adapter_args: -Tsvg"));
         assert!(stdin_artifact
             .engine_version
             .as_deref()
@@ -4298,7 +4324,7 @@ beta</pre>
         let cached_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
             body: unique_body.clone(),
-            engine_path: Some(cat_path.clone()),
+            engine_path: Some(graphviz_path.clone()),
             trusted: true,
             input_mode: Some("stdin".to_string()),
             timeout_ms: Some(1000),
@@ -4327,7 +4353,7 @@ beta</pre>
         let persistent_cached_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
             body: unique_body,
-            engine_path: Some(cat_path.clone()),
+            engine_path: Some(graphviz_path.clone()),
             trusted: true,
             input_mode: Some("stdin".to_string()),
             timeout_ms: Some(1000),
@@ -4348,7 +4374,7 @@ beta</pre>
         let file_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
             body: "digraph {}".to_string(),
-            engine_path: Some(cat_path),
+            engine_path: Some(graphviz_path),
             trusted: true,
             input_mode: Some("file".to_string()),
             timeout_ms: Some(1000),
@@ -4358,14 +4384,86 @@ beta</pre>
         .expect("file external transform");
         assert_eq!(file_artifact.input_mode, "file");
         assert!(file_artifact.html.contains("digraph"));
+        assert!(file_artifact.html.contains("-Tsvg"));
+        let _ = fs::remove_file(graphviz);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn external_transform_adapters_shape_engine_specific_invocations() {
+        let d2 = write_executable_script(
+            "d2-adapter",
+            "#!/bin/sh\nprintf '<svg data-args=\"%s\">d2</svg>' \"$*\"\n",
+        );
+        let d2_artifact = run_external_transform(ExternalTransformRequest {
+            name: "d2".to_string(),
+            body: "source -> target".to_string(),
+            engine_path: Some(path_to_string(&d2)),
+            trusted: true,
+            input_mode: Some("stdin".to_string()),
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(2048),
+        })
+        .expect("d2 adapter transform");
+        assert!(d2_artifact.html.contains("data-args=\"- -\""));
+        assert!(d2_artifact.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .related
+                .iter()
+                .any(|related| related == "adapter: d2")
+        }));
+
+        let plantuml = write_executable_script(
+            "plantuml-adapter",
+            "#!/bin/sh\nlast=\"\"\nfor arg in \"$@\"; do last=\"$arg\"; done\nout=\"${last%.*}.svg\"\nprintf '<svg data-args=\"%s\">plantuml sidecar</svg>' \"$*\" > \"$out\"\n",
+        );
+        let plantuml_artifact = run_external_transform(ExternalTransformRequest {
+            name: "plantuml".to_string(),
+            body: "@startuml\nAlice -> Bob: hi\n@enduml".to_string(),
+            engine_path: Some(path_to_string(&plantuml)),
+            trusted: true,
+            input_mode: Some("file".to_string()),
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(2048),
+        })
+        .expect("plantuml file adapter transform");
+        assert!(plantuml_artifact.html.contains("plantuml sidecar"));
+        assert!(plantuml_artifact.html.contains("-tsvg"));
+        assert_eq!(plantuml_artifact.input_mode, "file");
+        assert!(plantuml_artifact.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .related
+                .iter()
+                .any(|related| related == "adapter: plantuml")
+        }));
+
+        let engines = list_transform_engines();
+        let graphviz = engines
+            .iter()
+            .find(|engine| engine.get("name").and_then(Value::as_str) == Some("graphviz"))
+            .expect("graphviz metadata");
+        assert_eq!(
+            graphviz.get("defaultCommand").and_then(Value::as_str),
+            Some("dot")
+        );
+        assert!(graphviz
+            .get("adapterProfile")
+            .and_then(Value::as_str)
+            .is_some_and(|profile| profile.contains("Graphviz DOT adapter")));
+
+        let _ = fs::remove_file(d2);
+        let _ = fs::remove_file(plantuml);
+    }
+
+    #[cfg(unix)]
     #[test]
     fn compiler_uses_trusted_external_transform_preferences() {
-        let cat = Path::new("/bin/cat");
-        if !cat.exists() {
-            return;
-        }
+        let graphviz = write_executable_script(
+            "compiler-graphviz-adapter",
+            "#!/bin/sh\nprintf '<svg data-args=\"%s\">' \"$*\"\ncat\nprintf '</svg>'\n",
+        );
         let response = compile_with_options(
             CompileRequest {
                 text: "---\ntitle: External Dot\n---\n# External Dot\n```dot\ndigraph { a -> b }\n```\n"
@@ -4373,7 +4471,7 @@ beta</pre>
                 file_path: None,
             },
             &json!({
-                "transformEnginePaths": { "dot": path_to_string(cat) },
+                "transformEnginePaths": { "dot": path_to_string(&graphviz) },
                 "trustedTransformEngines": { "dot": true },
                 "transformInputModes": { "dot": "stdin" },
                 "transformTimeoutMs": 1000
@@ -4390,8 +4488,9 @@ beta</pre>
         assert!(artifact
             .engine_path
             .as_deref()
-            .is_some_and(|path| path == "/bin/cat"));
-        assert!(artifact.html.contains("digraph { a -&gt; b }"));
+            .is_some_and(|path| path == path_to_string(&graphviz)));
+        assert!(artifact.html.contains("digraph { a -> b }"));
+        assert!(artifact.html.contains("-Tsvg"));
         assert!(response.html.contains("transform-external"));
         assert!(response.html.contains("transform-dot"));
         let ast_transform = response
@@ -4411,6 +4510,7 @@ beta</pre>
         assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("dot external transform completed")));
+        let _ = fs::remove_file(graphviz);
     }
 
     #[test]

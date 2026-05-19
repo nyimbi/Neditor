@@ -687,6 +687,7 @@
             <small>{{ engine.execution }}</small>
             <small>{{ engine.installationLabel }}</small>
             <small>{{ engine.setupHint }}</small>
+            <small>{{ engine.adapterProfile }} Default command: {{ engine.defaultCommand }}</small>
             <small>{{ engine.securitySummary }}</small>
             <label>
               Engine path

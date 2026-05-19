@@ -261,6 +261,8 @@ export interface TransformEngineMetadata {
   installationLabel: string;
   setupHint: string;
   securitySummary: string;
+  adapterProfile: string;
+  defaultCommand: string;
   requiresExecution: boolean;
   preferenceKey: string;
   inputModes: Array<"stdin" | "file" | string>;

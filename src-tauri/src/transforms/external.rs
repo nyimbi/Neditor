@@ -18,7 +18,7 @@ const MAX_TRANSFORM_INPUT_BYTES: usize = 1_048_576;
 const MAX_TRANSFORM_OUTPUT_BYTES: usize = 2_097_152;
 const MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES: usize = 64;
 const MAX_EXTERNAL_TRANSFORM_CACHE_FILE_BYTES: u64 = 4_194_304;
-const EXTERNAL_TRANSFORM_RENDERER_VERSION: &str = "external-render-v3";
+const EXTERNAL_TRANSFORM_RENDERER_VERSION: &str = "external-render-v4";
 
 static EXTERNAL_TRANSFORM_CACHE: OnceLock<Mutex<HashMap<String, TransformArtifact>>> =
     OnceLock::new();
@@ -131,7 +131,10 @@ pub(crate) fn run_external_transform(
     }
     let source_hash = sha256_hex(request.body.as_bytes());
     let (engine_identity, engine_version) = external_engine_identity(&engine_path)?;
-    let renderer_identity = format!("{engine_identity};{EXTERNAL_TRANSFORM_RENDERER_VERSION}");
+    let adapter = external_engine_adapter(&request.name, input_mode, None)?;
+    let renderer_identity = adapter.cache_identity(&format!(
+        "{engine_identity};{EXTERNAL_TRANSFORM_RENDERER_VERSION}"
+    ));
     let cache_key =
         transform_cache_key(&request.name, input_mode, &renderer_identity, &source_hash);
     if let Some(artifact) = cached_external_transform(&cache_key, &request.name, output_limit) {
@@ -145,7 +148,7 @@ pub(crate) fn run_external_transform(
         input_mode,
         timeout_ms,
         max_output_bytes: output_limit,
-        engine_identity: &renderer_identity,
+        renderer_identity: &renderer_identity,
         engine_version: &engine_version,
     })?;
     store_external_transform(artifact.clone());
@@ -154,6 +157,108 @@ pub(crate) fn run_external_transform(
 
 fn external_transform_supported(name: &str) -> bool {
     matches!(name, "pikchr" | "dot" | "graphviz" | "plantuml" | "d2")
+}
+
+#[derive(Debug)]
+struct ExternalEngineAdapter {
+    engine: &'static str,
+    input_mode: &'static str,
+    args: Vec<String>,
+    stdin: bool,
+    sidecar_output_suffix: Option<&'static str>,
+}
+
+impl ExternalEngineAdapter {
+    fn stdout(engine: &'static str, input_mode: &'static str, args: Vec<String>) -> Self {
+        Self {
+            engine,
+            input_mode,
+            args,
+            stdin: input_mode == "stdin",
+            sidecar_output_suffix: None,
+        }
+    }
+
+    fn sidecar(
+        engine: &'static str,
+        input_mode: &'static str,
+        args: Vec<String>,
+        output_suffix: &'static str,
+    ) -> Self {
+        Self {
+            engine,
+            input_mode,
+            args,
+            stdin: false,
+            sidecar_output_suffix: Some(output_suffix),
+        }
+    }
+
+    fn cache_identity(&self, engine_identity: &str) -> String {
+        format!(
+            "{engine_identity};adapter={};mode={};args={}",
+            self.engine,
+            self.input_mode,
+            self.args.join("\u{1f}")
+        )
+    }
+}
+
+fn external_engine_adapter(
+    name: &str,
+    input_mode: &str,
+    temp_path: Option<&Path>,
+) -> Result<ExternalEngineAdapter, String> {
+    let temp = temp_path
+        .map(path_to_string)
+        .unwrap_or_else(|| "-".to_string());
+    match (name, input_mode) {
+        ("dot" | "graphviz", "stdin") => Ok(ExternalEngineAdapter::stdout(
+            "graphviz",
+            "stdin",
+            vec!["-Tsvg".to_string()],
+        )),
+        ("dot" | "graphviz", "file") => Ok(ExternalEngineAdapter::stdout(
+            "graphviz",
+            "file",
+            vec!["-Tsvg".to_string(), temp],
+        )),
+        ("d2", "stdin") => Ok(ExternalEngineAdapter::stdout(
+            "d2",
+            "stdin",
+            vec!["-".to_string(), "-".to_string()],
+        )),
+        ("d2", "file") => Ok(ExternalEngineAdapter::stdout(
+            "d2",
+            "file",
+            vec![temp, "-".to_string()],
+        )),
+        ("plantuml", "stdin") => Ok(ExternalEngineAdapter::stdout(
+            "plantuml",
+            "stdin",
+            vec!["-tsvg".to_string(), "-pipe".to_string()],
+        )),
+        ("plantuml", "file") => Ok(ExternalEngineAdapter::sidecar(
+            "plantuml",
+            "file",
+            vec!["-tsvg".to_string(), temp],
+            "svg",
+        )),
+        ("pikchr", "stdin") => Ok(ExternalEngineAdapter::stdout("pikchr", "stdin", Vec::new())),
+        ("pikchr", "file") => Ok(ExternalEngineAdapter::stdout("pikchr", "file", vec![temp])),
+        (_, "stdin" | "file") => Err(format!("No external adapter is registered for {name}.")),
+        _ => Err("External transform input_mode must be 'stdin' or 'file'.".to_string()),
+    }
+}
+
+fn external_engine_temp_suffix(name: &str) -> &'static str {
+    match name {
+        "dot" | "graphviz" => "dot",
+        "d2" => "d2",
+        "plantuml" => "puml",
+        "pikchr" => "pikchr",
+        _ => "input",
+    }
 }
 
 #[cfg(unix)]
@@ -361,7 +466,7 @@ struct ExternalTransformExecution<'a> {
     input_mode: &'a str,
     timeout_ms: u64,
     max_output_bytes: usize,
-    engine_identity: &'a str,
+    renderer_identity: &'a str,
     engine_version: &'a str,
 }
 
@@ -375,22 +480,33 @@ fn execute_external_transform(
     let started = Instant::now();
     let mut diagnostics = Vec::new();
     let mut temp_input = None;
-    let mut command = Command::new(request.engine_path);
-    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut temp_output = None;
 
     if input_mode == "file" {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
             .unwrap_or_default();
+        let suffix = external_engine_temp_suffix(name);
         let path = std::env::temp_dir().join(format!(
-            "neditor-{name}-{source_hash}-{}-{unique}.input",
+            "neditor-{name}-{source_hash}-{}-{unique}.{suffix}",
             std::process::id()
         ));
         fs::write(&path, request.body.as_bytes()).map_err(|err| err.to_string())?;
-        command.arg(&path);
         temp_input = Some(path);
-    } else {
+    }
+
+    let adapter = external_engine_adapter(name, input_mode, temp_input.as_deref())?;
+    if let (Some(input_path), Some(output_suffix)) =
+        (temp_input.as_deref(), adapter.sidecar_output_suffix)
+    {
+        temp_output = Some(input_path.with_extension(output_suffix));
+    }
+
+    let mut command = Command::new(request.engine_path);
+    command.args(&adapter.args);
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    if adapter.stdin {
         command.stdin(Stdio::piped());
     }
 
@@ -403,7 +519,7 @@ fn execute_external_transform(
             return Err(error.to_string());
         }
     };
-    let stdin_writer = if input_mode == "stdin" {
+    let stdin_writer = if adapter.stdin {
         child.stdin.take().map(|mut stdin| {
             let input = request.body.as_bytes().to_vec();
             std::thread::spawn(move || stdin.write_all(&input).map_err(|err| err.to_string()))
@@ -420,6 +536,9 @@ fn execute_external_transform(
             let _ = child.kill();
             let _ = child.wait();
             if let Some(path) = temp_input {
+                let _ = fs::remove_file(path);
+            }
+            if let Some(path) = temp_output {
                 let _ = fs::remove_file(path);
             }
             return Err(format!(
@@ -447,13 +566,27 @@ fn execute_external_transform(
     }
 
     let output = child.wait_with_output().map_err(|err| err.to_string())?;
+    let sidecar_output = if let Some(path) = temp_output.as_deref() {
+        Some(fs::read(path).map_err(|err| {
+            format!(
+                "{name} external transform did not produce expected sidecar output {}: {err}",
+                path.display()
+            )
+        })?)
+    } else {
+        None
+    };
     if let Some(path) = temp_input {
         let _ = fs::remove_file(path);
     }
-    if output.stdout.len() > max_output_bytes {
+    if let Some(path) = temp_output {
+        let _ = fs::remove_file(path);
+    }
+    let stdout = sidecar_output.as_deref().unwrap_or(&output.stdout);
+    if stdout.len() > max_output_bytes {
         return Err(format!(
             "{name} external transform output is {} bytes, above the {} byte limit.",
-            output.stdout.len(),
+            stdout.len(),
             max_output_bytes
         ));
     }
@@ -491,7 +624,7 @@ fn execute_external_transform(
         ));
     }
 
-    let output_text = String::from_utf8_lossy(&output.stdout).to_string();
+    let output_text = String::from_utf8_lossy(stdout).to_string();
     let rendered_output = if output_text.trim_start().starts_with('<') {
         output_text
             .lines()
@@ -508,7 +641,7 @@ fn execute_external_transform(
     );
     let duration_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
     let output_hash = sha256_hex(html.as_bytes());
-    let cache_key = transform_cache_key(name, input_mode, request.engine_identity, &source_hash);
+    let cache_key = transform_cache_key(name, input_mode, request.renderer_identity, &source_hash);
     let mut diagnostic = diag(
         "info",
         format!("{name} external transform completed in {duration_ms}ms."),
@@ -520,6 +653,12 @@ fn execute_external_transform(
         "engine_path: {}",
         path_to_string(request.engine_path)
     ));
+    diagnostic
+        .related
+        .push(format!("adapter: {}", adapter.engine));
+    diagnostic
+        .related
+        .push(format!("adapter_args: {}", adapter.args.join(" ")));
     diagnostic
         .related
         .push(format!("engine_version: {}", request.engine_version));
@@ -583,7 +722,8 @@ fn transform_engine(
         "requiresExecution": requires_execution,
         "trustRequired": requires_execution,
         "preferenceKey": format!("transforms.{name}.path"),
-        "defaultCommand": name,
+        "defaultCommand": transform_default_command(name),
+        "adapterProfile": transform_adapter_profile(name),
         "inputModes": input_modes,
         "limits": {
             "timeoutMs": DEFAULT_TRANSFORM_TIMEOUT_MS,
@@ -611,6 +751,26 @@ fn transform_setup_hint(name: &str, requires_execution: bool) -> &'static str {
         "d2" => "Choose a local D2 executable. Bundling is intentionally deferred to license/package review.",
         "stl" => "Choose a local STL renderer only if static SVG fallback is insufficient.",
         _ => "Choose an absolute path to a local executable for this optional transform engine.",
+    }
+}
+
+fn transform_default_command(name: &str) -> String {
+    match name {
+        "dot" | "graphviz" => "dot".to_string(),
+        "plantuml" => "plantuml".to_string(),
+        "d2" => "d2".to_string(),
+        "pikchr" => "pikchr".to_string(),
+        _ => name.to_string(),
+    }
+}
+
+fn transform_adapter_profile(name: &str) -> &'static str {
+    match name {
+        "dot" | "graphviz" => "Graphviz DOT adapter: invokes -Tsvg and captures SVG from stdout.",
+        "d2" => "D2 adapter: invokes input-to-stdout mode with '-' as the output target.",
+        "plantuml" => "PlantUML adapter: uses -tsvg -pipe for stdin, or reads PlantUML's SVG sidecar for file mode.",
+        "pikchr" => "Pikchr adapter: passes stdin directly or a temporary Pikchr source file.",
+        _ => "No external adapter; rendered by the embedded Rust engine.",
     }
 }
 
