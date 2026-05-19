@@ -1891,7 +1891,12 @@ fn render_docx_block(
     hyperlinks: &[ExportHyperlink],
 ) -> String {
     match block {
-        DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
+        DocumentBlock::Heading {
+            level,
+            text,
+            anchor,
+            ..
+        } => docx_heading_with_bookmark(*level, text, Some(anchor)),
         DocumentBlock::Paragraph { text, inlines, .. } => {
             docx_paragraph_from_inlines(text, inlines, hyperlinks)
         }
@@ -1921,7 +1926,10 @@ fn render_docx_block(
         } => {
             let mut output = String::new();
             if id.is_some() || caption.is_some() {
-                output.push_str(&docx_paragraph(&table_export_line(id, caption, headers)));
+                output.push_str(&docx_bookmarked_paragraph(
+                    &table_export_line(id, caption, headers),
+                    id.as_deref(),
+                ));
             }
             output.push_str(&docx_table(headers, alignments, rows));
             output
@@ -1937,7 +1945,7 @@ fn render_docx_block(
         } => docx_figure(id, src, alt, caption, float, source.as_ref(), media),
         DocumentBlock::Equation {
             id, caption, text, ..
-        } => docx_paragraph(&equation_export_line(id, text, caption)),
+        } => docx_bookmarked_paragraph(&equation_export_line(id, text, caption), id.as_deref()),
         DocumentBlock::Layout { directive, .. } if directive == "page-break" => docx_page_break(),
         DocumentBlock::Layout {
             directive, options, ..
@@ -1993,9 +2001,15 @@ fn docx_generated_toc() -> String {
 }
 
 fn docx_heading(level: usize, text: &str) -> String {
+    docx_heading_with_bookmark(level, text, None)
+}
+
+fn docx_heading_with_bookmark(level: usize, text: &str, bookmark: Option<&str>) -> String {
     let style = format!("Heading{}", level.clamp(1, 6));
+    let bookmark_start = bookmark.map(docx_bookmark_start).unwrap_or_default();
+    let bookmark_end = bookmark.map(docx_bookmark_end).unwrap_or_default();
     format!(
-        r#"<w:p><w:pPr><w:pStyle w:val="{style}"/><w:widowControl/></w:pPr><w:r><w:t>{}</w:t></w:r></w:p>"#,
+        r#"<w:p><w:pPr><w:pStyle w:val="{style}"/><w:widowControl/></w:pPr>{bookmark_start}<w:r><w:t>{}</w:t></w:r>{bookmark_end}</w:p>"#,
         escape_xml(text)
     )
 }
@@ -2008,6 +2022,15 @@ fn docx_toc_field() -> String {
 fn docx_paragraph(text: &str) -> String {
     format!(
         r#"<w:p><w:pPr><w:widowControl/></w:pPr><w:r><w:t>{}</w:t></w:r></w:p>"#,
+        escape_xml(text)
+    )
+}
+
+fn docx_bookmarked_paragraph(text: &str, bookmark: Option<&str>) -> String {
+    let bookmark_start = bookmark.map(docx_bookmark_start).unwrap_or_default();
+    let bookmark_end = bookmark.map(docx_bookmark_end).unwrap_or_default();
+    format!(
+        r#"<w:p><w:pPr><w:widowControl/></w:pPr>{bookmark_start}<w:r><w:t>{}</w:t></w:r>{bookmark_end}</w:p>"#,
         escape_xml(text)
     )
 }
@@ -2034,7 +2057,9 @@ fn docx_paragraph_from_inlines(
                 docx_text_run_with_properties(text, r#"<w:rStyle w:val="Code"/>"#)
             }
             InlineNode::Link { text, url } => {
-                if let Some(link) = hyperlinks.iter().find(|item| item.url == *url) {
+                if let Some(anchor) = url.strip_prefix('#') {
+                    docx_internal_hyperlink_run(text, anchor)
+                } else if let Some(link) = hyperlinks.iter().find(|item| item.url == *url) {
                     docx_hyperlink_run(text, &link.relationship_id)
                 } else {
                     docx_text_run(text)
@@ -2067,10 +2092,59 @@ fn docx_hyperlink_run(text: &str, relationship_id: &str) -> String {
     )
 }
 
+fn docx_internal_hyperlink_run(text: &str, anchor: &str) -> String {
+    format!(
+        r#"<w:hyperlink w:anchor="{}" w:history="1"><w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">{}</w:t></w:r></w:hyperlink>"#,
+        escape_xml(&docx_bookmark_name(anchor)),
+        escape_xml(text)
+    )
+}
+
 fn docx_footnote_reference_run(number: usize) -> String {
     format!(
         r#"<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="{number}"/></w:r>"#
     )
+}
+
+fn docx_bookmark_start(anchor: &str) -> String {
+    let id = docx_bookmark_id(anchor);
+    format!(
+        r#"<w:bookmarkStart w:id="{id}" w:name="{}"/>"#,
+        escape_xml(&docx_bookmark_name(anchor))
+    )
+}
+
+fn docx_bookmark_end(anchor: &str) -> String {
+    format!(r#"<w:bookmarkEnd w:id="{}"/>"#, docx_bookmark_id(anchor))
+}
+
+fn docx_bookmark_name(anchor: &str) -> String {
+    let mut name = anchor
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    if name.is_empty()
+        || !name
+            .chars()
+            .next()
+            .is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_')
+    {
+        name.insert_str(0, "neditor_");
+    }
+    name
+}
+
+fn docx_bookmark_id(anchor: &str) -> usize {
+    anchor.bytes().fold(17usize, |hash, byte| {
+        hash.wrapping_mul(31).wrapping_add(byte as usize)
+    }) % 2_000_000
+        + 10
 }
 
 fn docx_list(ordered: bool, items: &[String]) -> String {
@@ -2195,7 +2269,10 @@ fn docx_figure(
         escape_xml(name),
         escape_xml(&item.relationship_id)
     );
-    format!("{drawing}{}", docx_paragraph(&caption_text))
+    format!(
+        "{drawing}{}",
+        docx_bookmarked_paragraph(&caption_text, id.as_deref())
+    )
 }
 
 fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {

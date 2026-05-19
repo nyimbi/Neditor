@@ -4596,6 +4596,10 @@ beta</pre>
         assert!(docx_document.contains("Reference architecture"));
         assert!(docx_document.contains("Figure architecture"));
         assert!(docx_document.contains("Equation roi"));
+        assert!(docx_document.contains(r#"w:name="fig_architecture""#));
+        assert!(docx_document.contains(r#"w:name="eq_roi""#));
+        assert!(docx_document.contains(r#"<w:hyperlink w:anchor="fig_architecture""#));
+        assert!(docx_document.contains(r#"<w:hyperlink w:anchor="eq_roi""#));
         assert!(docx_document.contains("Competitive Advantage"));
         assert!(docx_document.contains("Annual recurring revenue"));
         assert!(docx_document.contains("Review Comments"));
