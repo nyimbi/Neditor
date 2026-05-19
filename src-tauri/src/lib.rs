@@ -2717,7 +2717,7 @@ ARR: Annual recurring revenue.
     #[test]
     fn compiler_generates_linked_index_with_exclusions_and_proper_terms() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Index\nstatus: approved\napprovedBy: QA\nindexExclude:\n  - Internal Draft\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Internal Draft should stay out. Working capital{#index:Liquidity} marker.\n\n[INDEX]\n".to_string(),
+            text: "---\ntitle: Index\nstatus: approved\napprovedBy: QA\nindexExclude:\n  - internal draft\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Internal Draft should stay out. Working capital{#index:Liquidity} marker.\n\n[INDEX]\n".to_string(),
             file_path: None,
         });
 

@@ -42,7 +42,7 @@ pub(crate) fn collect_index_entries(
             insert_index_entry(&mut entries, &excluded, term, current_anchor.clone());
         }
         for term in proper_noun_candidates(line) {
-            if excluded.contains(&term) {
+            if excluded.contains(&index_exclude_key(&term)) {
                 continue;
             }
             let entry = proper_nouns
@@ -125,7 +125,10 @@ fn insert_index_entry(
     anchor: Option<String>,
 ) {
     let normalized = term.trim().trim_matches('"').trim_matches('\'').to_string();
-    if normalized.is_empty() || normalized.len() > 100 || excluded.contains(&normalized) {
+    if normalized.is_empty()
+        || normalized.len() > 100
+        || excluded.contains(&index_exclude_key(&normalized))
+    {
         return;
     }
     entries
@@ -143,7 +146,7 @@ fn index_exclude_terms(metadata: &Value) -> BTreeSet<String> {
     if let Some(values) = metadata.get("indexExclude").and_then(Value::as_array) {
         for value in values {
             if let Some(term) = value.as_str() {
-                terms.insert(term.to_string());
+                terms.insert(index_exclude_key(term));
             }
         }
     }
@@ -154,11 +157,15 @@ fn index_exclude_terms(metadata: &Value) -> BTreeSet<String> {
     {
         for value in values {
             if let Some(term) = value.as_str() {
-                terms.insert(term.to_string());
+                terms.insert(index_exclude_key(term));
             }
         }
     }
     terms
+}
+
+fn index_exclude_key(term: &str) -> String {
+    term.trim().to_ascii_lowercase()
 }
 
 fn explicit_index_terms(line: &str) -> Vec<String> {
