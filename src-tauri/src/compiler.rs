@@ -21,7 +21,9 @@ use crate::{
     indexing::{collect_index_entries, strip_index_markers},
     link_validation::{validate_image_paths, validate_link_paths, validate_logo_path},
     manifest::{count_equations, count_figures, manifest_file, manifest_media_files},
-    metadata_string, path_to_string,
+    metadata_string,
+    paged_document::build_paged_document,
+    path_to_string,
     provenance::{collect_ai_assisted_sections, collect_ai_sources},
     references::{collect_cross_references, collect_labels, render_cross_references},
     review::{collect_change_notes, collect_comments},
@@ -237,6 +239,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         version: metadata_string(&metadata, "version").unwrap_or_default(),
         source_hash: sha256_uri(layout_markdown.as_bytes()),
     };
+    let paged_document = build_paged_document(&document_ast);
     validate_document(
         DocumentValidationInput {
             metadata: &metadata,
@@ -327,6 +330,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         html,
         semantic,
         document_ast,
+        paged_document,
         diagnostics,
         include_graph,
         source_map,

@@ -54,6 +54,14 @@ pub(crate) fn render_markdown_bundle_bytes(
             .as_bytes(),
     )
     .map_err(|err| err.to_string())?;
+    zip.start_file("paged-document.json", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        serde_json::to_string_pretty(&response.paged_document)
+            .map_err(|err| err.to_string())?
+            .as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
     zip.start_file("source-map.json", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(

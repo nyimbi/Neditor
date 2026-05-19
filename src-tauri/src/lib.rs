@@ -30,6 +30,7 @@ mod layout;
 mod link_validation;
 mod manifest;
 mod markdown_tables;
+mod paged_document;
 mod provenance;
 mod references;
 mod review;

@@ -120,6 +120,9 @@ export interface AstAiSource {
 
 export interface LayoutSettings {
   columns?: number | null;
+  page_size?: string | null;
+  orientation?: string | null;
+  margins?: string | null;
   break_before?: string | null;
   break_after?: string | null;
   keep_with_next: boolean;
@@ -205,11 +208,32 @@ export interface DocumentAst {
   blocks: DocumentBlock[];
 }
 
+export interface PagedBlockRef {
+  kind: string;
+  line: number;
+  end_line: number;
+  source?: DocumentSourceRange | null;
+}
+
+export interface PagedSection {
+  id: string;
+  title?: string | null;
+  start_line: number;
+  end_line: number;
+  layout: LayoutSettings;
+  blocks: PagedBlockRef[];
+}
+
+export interface PagedDocument {
+  sections: PagedSection[];
+}
+
 export interface CompileResponse {
   compiled_markdown: string;
   html: string;
   semantic: SemanticDocument;
   document_ast: DocumentAst;
+  paged_document: PagedDocument;
   diagnostics: DocumentDiagnostic[];
   include_graph: Array<{ parent: string; child: string; depth: number }>;
   source_map: Array<{ generated_line: number; source_file: string; source_line: number }>;

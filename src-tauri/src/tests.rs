@@ -1621,6 +1621,23 @@ fn layout_pagination_controls_flow_through_exports() {
             && settings.margins.as_deref() == Some("narrow")
             && settings.break_after.as_deref() == Some("page")
     )));
+    assert_eq!(response.paged_document.sections.len(), 2);
+    let flow_section = response
+        .paged_document
+        .sections
+        .iter()
+        .find(|section| section.layout.columns == Some(2))
+        .expect("section-level paged layout");
+    assert_eq!(flow_section.layout.page_size.as_deref(), Some("letter"));
+    assert_eq!(
+        flow_section.layout.orientation.as_deref(),
+        Some("landscape")
+    );
+    assert_eq!(flow_section.layout.margins.as_deref(), Some("narrow"));
+    assert!(flow_section
+        .blocks
+        .iter()
+        .any(|block| block.kind == "layout" && block.source.is_some()));
 
     let docx = render_docx_bytes(&response, &options).expect("docx bytes");
     let docx_document = zip_entry_text(&docx, "word/document.xml");
@@ -1665,6 +1682,10 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(bundled_ast.contains(r#""page_size": "letter""#));
     assert!(bundled_ast.contains(r#""orientation": "landscape""#));
     assert!(bundled_ast.contains(r#""margins": "narrow""#));
+    let bundled_paged_document = zip_entry_text(&bundle, "paged-document.json");
+    assert!(bundled_paged_document.contains(r#""id": "section-2""#));
+    assert!(bundled_paged_document.contains(r#""columns": 2"#));
+    assert!(bundled_paged_document.contains(r#""page_size": "letter""#));
 }
 
 #[test]

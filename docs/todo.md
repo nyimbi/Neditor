@@ -13,8 +13,9 @@ What remains to achieve the full vision:
      section controls.
   2. Canonical document AST
      There is an AST foundation, with normalized layout settings now attached to layout blocks, and transform artifacts now preserve source-file/range provenance
-     through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler still has string-heavy paths. Export, source maps,
-     references, transforms, and validation need to depend more fully on a durable semantic model.
+     through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler now emits a source-mapped semantic paged-document model
+     and includes it in Markdown bundles. The compiler still has string-heavy paths. Export, references, transforms, and validation need to depend more fully on
+     durable semantic models.
   3. Full visual table editor
      Core editor controls now cover table parsing/paste/captions, add/remove/duplicate/move rows and columns, alignment, sorting, column formats, totals, formula rows,
      validation, Markdown preview before apply, target/range formula authoring, and cell/header accessibility labels. Export fixtures now cover broader edited-table
