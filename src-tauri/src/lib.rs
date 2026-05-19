@@ -439,18 +439,16 @@ fn apply_transforms(
                     body.push('\n');
                     end_source_line = body_line_index + 1;
                 }
+                let diagnostic_start = diagnostics.len();
                 let mut artifact =
                     render_transform(name, &body, &fence_options, options, diagnostics);
-                if let Some(source) =
-                    ast_source_range_for_generated_lines(source_map, source_line, end_source_line)
-                {
-                    artifact.source_file = Some(source.source_file);
-                    artifact.source_line = Some(source.source_line);
-                    artifact.end_source_line = Some(source.end_source_line);
-                } else {
-                    artifact.source_line = Some(source_line);
-                    artifact.end_source_line = Some(end_source_line);
-                }
+                attach_transform_source(
+                    &mut artifact,
+                    source_map,
+                    source_line,
+                    end_source_line,
+                    &mut diagnostics[diagnostic_start..],
+                );
                 output.push_str(&artifact.html);
                 output.push('\n');
                 artifacts.push(artifact);
@@ -461,6 +459,62 @@ fn apply_transforms(
         output.push('\n');
     }
     (output, artifacts)
+}
+
+fn attach_transform_source(
+    artifact: &mut TransformArtifact,
+    source_map: &[SourceMapEntry],
+    generated_start_line: usize,
+    generated_end_line: usize,
+    diagnostics: &mut [DocumentDiagnostic],
+) {
+    if let Some(source) =
+        ast_source_range_for_generated_lines(source_map, generated_start_line, generated_end_line)
+    {
+        artifact.source_file = Some(source.source_file);
+        artifact.source_line = Some(source.source_line);
+        artifact.end_source_line = Some(source.end_source_line);
+    } else {
+        artifact.source_line = Some(generated_start_line);
+        artifact.end_source_line = Some(generated_end_line);
+    }
+
+    let source_file = artifact.source_file.clone();
+    let source_line = artifact.source_line;
+    let end_source_line = artifact.end_source_line;
+    for diagnostic in &mut artifact.diagnostics {
+        attach_transform_diagnostic_source(
+            diagnostic,
+            source_file.as_deref(),
+            source_line,
+            end_source_line,
+        );
+    }
+    for diagnostic in diagnostics {
+        attach_transform_diagnostic_source(
+            diagnostic,
+            source_file.as_deref(),
+            source_line,
+            end_source_line,
+        );
+    }
+}
+
+fn attach_transform_diagnostic_source(
+    diagnostic: &mut DocumentDiagnostic,
+    source_file: Option<&str>,
+    source_line: Option<usize>,
+    end_source_line: Option<usize>,
+) {
+    if diagnostic.source_file.is_none() {
+        diagnostic.source_file = source_file.map(ToString::to_string);
+    }
+    if diagnostic.line.is_none() {
+        diagnostic.line = source_line;
+    }
+    if diagnostic.end_line.is_none() {
+        diagnostic.end_line = end_source_line;
+    }
 }
 
 fn transform_fence_options(info: &str) -> Value {
@@ -3653,6 +3707,45 @@ flowchart LR
         let exported = export::export_text(&response, &json!({}));
         assert!(exported.contains("Transform: roadmap"));
         assert!(exported.contains("Transform: mermaid"));
+    }
+
+    #[test]
+    fn transform_diagnostics_resolve_to_source_fence_ranges() {
+        let response = compile(CompileRequest {
+            text: r#"---
+title: Bad Transform
+---
+# Bad Transform
+
+```json
+{bad
+```
+"#
+            .to_string(),
+            file_path: None,
+        });
+
+        let diagnostic = response
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message.contains("Invalid JSON transform input"))
+            .expect("json transform diagnostic");
+        assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
+        assert_eq!(diagnostic.line, Some(6));
+        assert_eq!(diagnostic.end_line, Some(8));
+
+        let artifact_diagnostic = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == "json")
+            .and_then(|artifact| artifact.diagnostics.first())
+            .expect("json artifact diagnostic");
+        assert_eq!(
+            artifact_diagnostic.source_file.as_deref(),
+            Some("untitled.md")
+        );
+        assert_eq!(artifact_diagnostic.line, Some(6));
+        assert_eq!(artifact_diagnostic.end_line, Some(8));
     }
 
     #[test]

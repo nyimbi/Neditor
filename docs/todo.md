@@ -11,8 +11,8 @@ What remains to achieve the full vision:
      and bundle conformance fixtures, and DOCX native TOC fields now honor front matter TOC depth. Still needed: deeper page model controls beyond directive-level pagination.
   2. Canonical document AST
      There is an AST foundation, with normalized layout settings now attached to layout blocks, and transform artifacts now preserve source-file/range provenance
-     through the compiler, manifests, bundle exports, and frontend types. The compiler still has string-heavy paths. Export, diagnostics, source maps, references,
-     transforms, and validation need to depend more fully on a durable semantic model.
+     through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler still has string-heavy paths. Export, source maps,
+     references, transforms, and validation need to depend more fully on a durable semantic model.
   3. Full visual table editor
      Core editor controls now cover table parsing/paste/captions, add/remove/duplicate/move rows and columns, alignment, sorting, column formats, totals, formula rows,
      validation, Markdown preview before apply, target/range formula authoring, and cell/header accessibility labels. Export fixtures now cover broader edited-table
