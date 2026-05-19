@@ -2631,10 +2631,26 @@ function handlePreviewClick(event: MouseEvent) {
   const heading = target.closest("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
   const anchor = heading?.id || link?.getAttribute("href")?.slice(1) || "";
   if (!anchor) return;
-  const headingEntry = active.value.compile?.semantic.outline.find((item) => item.anchor === anchor);
-  if (!headingEntry) return;
+  const line = sourceLineForAnchor(anchor);
+  if (!line) return;
   event.preventDefault();
-  goToLine(headingEntry.line);
+  goToLine(line);
+}
+
+function sourceLineForAnchor(anchor: string) {
+  const compile = active.value.compile;
+  if (!compile) return 0;
+  const headingEntry = compile.semantic.outline.find((item) => item.anchor === anchor);
+  if (headingEntry) return headingEntry.line;
+  for (const block of compile.document_ast.blocks) {
+    if (
+      (block.kind === "table" || block.kind === "figure" || block.kind === "equation") &&
+      block.id === anchor
+    ) {
+      return block.source?.source_line || block.line;
+    }
+  }
+  return 0;
 }
 
 function handleShortcut(event: KeyboardEvent) {
