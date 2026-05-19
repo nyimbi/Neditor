@@ -2812,26 +2812,38 @@ function handlePreviewClick(event: MouseEvent) {
   const heading = target.closest("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
   const anchor = heading?.id || link?.getAttribute("href")?.slice(1) || "";
   if (!anchor) return;
-  const line = sourceLineForAnchor(anchor);
-  if (!line) return;
+  const sourceTarget = sourceTargetForAnchor(anchor);
+  if (!sourceTarget?.line) return;
   event.preventDefault();
-  goToLine(line);
+  goToSourceTarget(sourceTarget);
 }
 
-function sourceLineForAnchor(anchor: string) {
+function sourceTargetForAnchor(anchor: string) {
   const compile = active.value.compile;
-  if (!compile) return 0;
-  const headingEntry = compile.semantic.outline.find((item) => item.anchor === anchor);
-  if (headingEntry) return headingEntry.line;
+  if (!compile) return null;
+  const headingBlock = compile.document_ast.blocks.find((block) => block.kind === "heading" && block.anchor === anchor);
+  if (headingBlock?.kind === "heading") {
+    return {
+      line: headingBlock.source?.source_line || headingBlock.line,
+      end_line: headingBlock.source?.end_source_line || headingBlock.end_line,
+      source_file: headingBlock.source?.source_file || null,
+    };
+  }
   for (const block of compile.document_ast.blocks) {
     if (
       (block.kind === "table" || block.kind === "figure" || block.kind === "equation") &&
       block.id === anchor
     ) {
-      return block.source?.source_line || block.line;
+      return {
+        line: block.source?.source_line || block.line,
+        end_line: block.source?.end_source_line || block.end_line,
+        source_file: block.source?.source_file || null,
+      };
     }
   }
-  return 0;
+  const headingEntry = compile.semantic.outline.find((item) => item.anchor === anchor);
+  if (headingEntry) return { line: headingEntry.line };
+  return null;
 }
 
 function handleShortcut(event: KeyboardEvent) {
