@@ -100,9 +100,18 @@ export interface AstAiSource {
   status: string;
 }
 
+export type InlineNode =
+  | { kind: "text"; text: string }
+  | { kind: "strong"; text: string }
+  | { kind: "emphasis"; text: string }
+  | { kind: "code"; text: string }
+  | { kind: "link"; text: string; url: string }
+  | { kind: "citation"; key: string; raw: string }
+  | { kind: "cross_reference"; key: string; raw: string };
+
 export type DocumentBlock =
   | { kind: "heading"; level: number; text: string; anchor: string; line: number; end_line: number; source?: DocumentSourceRange | null }
-  | { kind: "paragraph"; text: string; line: number; end_line: number; source?: DocumentSourceRange | null }
+  | { kind: "paragraph"; text: string; inlines: InlineNode[]; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "list"; ordered: boolean; items: string[]; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "task_list"; items: TaskListItem[]; line: number; end_line: number; source?: DocumentSourceRange | null }
   | { kind: "block_quote"; text: string; line: number; end_line: number; source?: DocumentSourceRange | null }

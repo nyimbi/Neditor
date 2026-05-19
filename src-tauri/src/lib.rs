@@ -3460,7 +3460,7 @@ ARR: Annual recurring revenue.
     #[test]
     fn compiler_builds_document_ast_blocks_for_exports() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: AST\nstatus: approved\napprovedBy: QA\n---\n# AST\nBusiness paragraph.\n\n> Quoted evidence\n> with continuation\n\n```js\nconst total = 42;\n```\n\n- First decision\n- Second decision\n\n- [x] Reviewed by finance\n- [ ] Attach signed approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n".to_string(),
+            text: "---\ntitle: AST\nstatus: approved\napprovedBy: QA\n---\n# AST\nBusiness paragraph with **margin** and [source](https://example.com) [@doe2024] {@missing-ref}.\n\n> Quoted evidence\n> with continuation\n\n```js\nconst total = 42;\n```\n\n- First decision\n- Second decision\n\n- [x] Reviewed by finance\n- [ ] Attach signed approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n".to_string(),
             file_path: None,
         });
 
@@ -3473,7 +3473,14 @@ ARR: Annual recurring revenue.
             .document_ast
             .blocks
             .iter()
-            .any(|block| matches!(block, DocumentBlock::Paragraph { text, line, end_line, .. } if text == "Business paragraph." && line == end_line)));
+            .any(|block| matches!(block, DocumentBlock::Paragraph { text, inlines, line, end_line, .. }
+                if text.contains("Business paragraph with margin")
+                    && line == end_line
+                    && inlines.iter().any(|node| matches!(node, document_ast::InlineNode::Strong { text } if text == "margin"))
+                    && inlines.iter().any(|node| matches!(node, document_ast::InlineNode::Link { text, url } if text == "source" && url == "https://example.com"))
+                    && inlines.iter().any(|node| matches!(node, document_ast::InlineNode::Citation { key, .. } if key == "doe2024"))
+                    && inlines.iter().any(|node| matches!(node, document_ast::InlineNode::CrossReference { key, .. } if key == "missing-ref"))
+            )));
         assert!(response.document_ast.blocks.iter().any(|block| {
             matches!(
                 block,

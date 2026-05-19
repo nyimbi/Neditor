@@ -59,6 +59,18 @@ pub(crate) struct AstAiSource {
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum InlineNode {
+    Text { text: String },
+    Strong { text: String },
+    Emphasis { text: String },
+    Code { text: String },
+    Link { text: String, url: String },
+    Citation { key: String, raw: String },
+    CrossReference { key: String, raw: String },
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum DocumentBlock {
     Heading {
         level: usize,
@@ -70,6 +82,7 @@ pub(crate) enum DocumentBlock {
     },
     Paragraph {
         text: String,
+        inlines: Vec<InlineNode>,
         line: usize,
         end_line: usize,
         source: Option<AstSourceRange>,
@@ -510,8 +523,10 @@ fn flush_ast_paragraph(
     }
     let text = clean_inline_text(&paragraph_lines.join(" "));
     if !text.is_empty() {
+        let inlines = parse_inline_nodes(&paragraph_lines.join(" "));
         blocks.push(DocumentBlock::Paragraph {
             text,
+            inlines,
             line: paragraph_start.unwrap_or(1),
             end_line: paragraph_start.unwrap_or(1) + paragraph_lines.len().saturating_sub(1),
             source: None,
@@ -519,6 +534,211 @@ fn flush_ast_paragraph(
     }
     paragraph_lines.clear();
     *paragraph_start = None;
+}
+
+fn parse_inline_nodes(text: &str) -> Vec<InlineNode> {
+    let mut nodes = Vec::new();
+    let mut index = 0usize;
+    while index < text.len() {
+        let rest = &text[index..];
+        let Some((start, end, node)) = earliest_inline_node(rest) else {
+            push_inline_text(&mut nodes, rest);
+            break;
+        };
+        push_inline_text(&mut nodes, &rest[..start]);
+        push_inline_node(&mut nodes, node);
+        index += end;
+    }
+    nodes
+}
+
+fn earliest_inline_node(text: &str) -> Option<(usize, usize, InlineNode)> {
+    let mut candidates = Vec::new();
+    if let Some(strong) = parse_wrapped_inline(text, "**", "**") {
+        candidates.push((
+            strong.start,
+            strong.end,
+            InlineNode::Strong { text: strong.text },
+        ));
+    }
+    if let Some(code) = parse_wrapped_inline(text, "`", "`") {
+        candidates.push((code.start, code.end, InlineNode::Code { text: code.text }));
+    }
+    if let Some(link) = parse_markdown_link_inline(text) {
+        candidates.push((
+            link.start,
+            link.end,
+            InlineNode::Link {
+                text: link.text,
+                url: link.url,
+            },
+        ));
+    }
+    if let Some(citation) = parse_html_citation_inline(text) {
+        candidates.push((
+            citation.start,
+            citation.end,
+            InlineNode::Citation {
+                key: citation.key,
+                raw: citation.raw,
+            },
+        ));
+    }
+    if let Some(citation) = parse_citation_inline(text) {
+        candidates.push((
+            citation.start,
+            citation.end,
+            InlineNode::Citation {
+                key: citation.key,
+                raw: citation.raw,
+            },
+        ));
+    }
+    if let Some(reference) = parse_cross_reference_inline(text) {
+        candidates.push((
+            reference.start,
+            reference.end,
+            InlineNode::CrossReference {
+                key: reference.key,
+                raw: reference.raw,
+            },
+        ));
+    }
+    if let Some(emphasis) = parse_wrapped_inline(text, "*", "*") {
+        candidates.push((
+            emphasis.start,
+            emphasis.end,
+            InlineNode::Emphasis {
+                text: emphasis.text,
+            },
+        ));
+    }
+    candidates.into_iter().min_by_key(|(start, _, _)| *start)
+}
+
+struct WrappedInline {
+    start: usize,
+    end: usize,
+    text: String,
+}
+
+struct CitationInline {
+    start: usize,
+    end: usize,
+    key: String,
+    raw: String,
+}
+
+struct LinkInline {
+    start: usize,
+    end: usize,
+    text: String,
+    url: String,
+}
+
+fn parse_wrapped_inline(text: &str, open: &str, close: &str) -> Option<WrappedInline> {
+    let start = text.find(open)?;
+    if open == "*" && text[start..].starts_with("**") {
+        return None;
+    }
+    let content_start = start + open.len();
+    let content_end = text[content_start..].find(close)? + content_start;
+    if content_end == content_start {
+        return None;
+    }
+    Some(WrappedInline {
+        start,
+        end: content_end + close.len(),
+        text: clean_inline_text(&text[content_start..content_end]),
+    })
+}
+
+fn parse_citation_inline(text: &str) -> Option<CitationInline> {
+    let start = text.find("[@")?;
+    let end = text[start..].find(']')? + start + 1;
+    let raw = text[start..end].to_string();
+    let key = raw
+        .trim_start_matches("[@")
+        .trim_end_matches(']')
+        .trim_start_matches(['-', '+'])
+        .trim()
+        .to_string();
+    (!key.is_empty()).then_some(CitationInline {
+        start,
+        end,
+        key,
+        raw,
+    })
+}
+
+fn parse_html_citation_inline(text: &str) -> Option<CitationInline> {
+    let marker = "data-citation-keys=\"";
+    let marker_start = text.find(marker)?;
+    let start = text[..marker_start].rfind("<span").unwrap_or(marker_start);
+    let key_start = marker_start + marker.len();
+    let key_end = text[key_start..].find('"')? + key_start;
+    let key = text[key_start..key_end]
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .to_string();
+    let close_start = text[key_end..].find("</span>")? + key_end;
+    let end = close_start + "</span>".len();
+    (!key.is_empty()).then_some(CitationInline {
+        start,
+        end,
+        key,
+        raw: text[start..end].to_string(),
+    })
+}
+
+fn parse_cross_reference_inline(text: &str) -> Option<CitationInline> {
+    let start = text.find("{@")?;
+    let end = text[start..].find('}')? + start + 1;
+    let raw = text[start..end].to_string();
+    let key = raw
+        .trim_start_matches("{@")
+        .trim_end_matches('}')
+        .trim()
+        .to_string();
+    (!key.is_empty()).then_some(CitationInline {
+        start,
+        end,
+        key,
+        raw,
+    })
+}
+
+fn parse_markdown_link_inline(text: &str) -> Option<LinkInline> {
+    let start = text.find('[')?;
+    if text[start..].starts_with("[@") {
+        return None;
+    }
+    let label_end = text[start..].find(']')? + start;
+    let url_start = label_end + 1;
+    if !text[url_start..].starts_with('(') {
+        return None;
+    }
+    let url_end = text[url_start + 1..].find(')')? + url_start + 1;
+    let label = clean_inline_text(&text[start + 1..label_end]);
+    let url = decode_html_entities(&text[url_start + 1..url_end]);
+    (!label.is_empty() && !url.trim().is_empty()).then_some(LinkInline {
+        start,
+        end: url_end + 1,
+        text: label,
+        url,
+    })
+}
+
+fn push_inline_text(nodes: &mut Vec<InlineNode>, text: &str) {
+    let text = clean_inline_text(text);
+    if !text.is_empty() {
+        push_inline_node(nodes, InlineNode::Text { text });
+    }
+}
+
+fn push_inline_node(nodes: &mut Vec<InlineNode>, node: InlineNode) {
+    nodes.push(node);
 }
 
 fn parse_ast_heading(line: &str, line_number: usize) -> Option<DocumentBlock> {
