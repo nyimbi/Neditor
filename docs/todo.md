@@ -11,8 +11,8 @@ What remains to achieve the full vision:
      AST, DOCX, PDF, PPTX, and bundle conformance fixtures, DOCX native TOC fields now honor front matter TOC depth, layout orientation metadata maps to
      HTML/PDF/DOCX page geometry, section-level PDF page controls now produce per-page MediaBox geometry, and PDF section columns now reflow text/table/figure items
      through real column slots instead of only recording column metadata. PDF fixture coverage now proves keep-with-next/keep-together grouping moves controlled blocks as a
-     unit and that large tables continue into the next section column. Still needed: richer paged-layout behavior for floats, widows/orphans, and more complex table splitting
-     across mixed columns/pages.
+     unit, long paragraphs wrap within the available column width with basic single-line widow avoidance, and large tables continue into the next section column. Still needed:
+     richer paged-layout behavior for floats, full widows/orphans control, and more complex table splitting across mixed columns/pages.
   2. Canonical document AST
      There is an AST foundation, with normalized layout settings now attached to layout blocks, and transform artifacts now preserve source-file/range provenance
      through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler now emits a source-mapped semantic paged-document model,

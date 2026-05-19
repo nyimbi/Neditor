@@ -180,7 +180,9 @@ fn export_conformance_fixture_maps_business_features() {
     assert!(pdf_text.contains("Export Conformance Report | restricted"));
     assert!(pdf_text.contains("Page 6 of 6"));
     assert!(pdf_text.contains("Export Conformance Report"));
-    assert!(pdf_text.contains("Competitive Advantage, p. 42"));
+    assert!(pdf_text.contains("Competitive Advantage"));
+    assert!(pdf_text.contains("Competitive Advantage, p."));
+    assert!(pdf_text.contains("42\\)"));
     assert!(pdf_text.contains(" re S"));
     assert!(pdf_text.contains("(Region) Tj"));
     assert!(pdf_text.contains("Reference architecture"));

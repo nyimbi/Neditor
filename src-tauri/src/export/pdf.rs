@@ -48,7 +48,7 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
             let item_x =
                 margin_left + column_index as u32 * (column_width.saturating_add(column_gap));
             match item {
-                PdfPageItem::Text(line) => {
+                PdfPageItem::Text(line) | PdfPageItem::WrappedText(line) => {
                     stream.push_str(&pdf_text_line(10, item_x, y, line));
                     y -= 12;
                 }
@@ -280,6 +280,54 @@ fn approximate_pdf_text_width(text: &str, font_size: u32) -> u32 {
         .max(4)
 }
 
+fn pdf_wrapped_text_lines(text: &str, width: u32, font_size: u32) -> Vec<String> {
+    if approximate_pdf_text_width(text, font_size) <= width {
+        return vec![text.to_string()];
+    }
+    let approximate_char_width = (font_size / 2).max(1);
+    let max_chars = (width / approximate_char_width).max(24) as usize;
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for word in text.split_whitespace() {
+        if current.is_empty() {
+            if word.chars().count() > max_chars {
+                lines.extend(pdf_split_long_word(word, max_chars));
+            } else {
+                current.push_str(word);
+            }
+            continue;
+        }
+        let candidate_len = current.chars().count() + 1 + word.chars().count();
+        if candidate_len <= max_chars {
+            current.push(' ');
+            current.push_str(word);
+            continue;
+        }
+        lines.push(std::mem::take(&mut current));
+        if word.chars().count() > max_chars {
+            lines.extend(pdf_split_long_word(word, max_chars));
+        } else {
+            current.push_str(word);
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    if lines.is_empty() {
+        vec![text.to_string()]
+    } else {
+        lines
+    }
+}
+
+fn pdf_split_long_word(word: &str, max_chars: usize) -> Vec<String> {
+    word.chars()
+        .collect::<Vec<_>>()
+        .chunks(max_chars.max(1))
+        .map(|chunk| chunk.iter().collect::<String>())
+        .collect()
+}
+
 fn render_pdf_info_object(object_id: usize, response: &CompileResponse) -> String {
     let author = metadata_string(&response.metadata, "author")
         .or_else(|| metadata_string(&response.metadata, "approvedBy"))
@@ -307,6 +355,7 @@ fn render_pdf_info_object(object_id: usize, response: &CompileResponse) -> Strin
 #[derive(Clone, Debug)]
 enum PdfPageItem {
     Text(String),
+    WrappedText(String),
     Table(PdfTable),
     Figure(PdfFigure),
     ColumnBreak,
@@ -439,6 +488,11 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<PdfPage> 
 }
 
 fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
+    if let DocumentBlock::Paragraph { text, inlines, .. } = block {
+        return vec![PdfPageItem::WrappedText(paragraph_export_line(
+            text, inlines,
+        ))];
+    }
     if let DocumentBlock::RawHtml { html, .. } = block {
         if let Some(table) = export_table_from_transform_html(html) {
             return vec![PdfPageItem::Table(PdfTable {
@@ -556,6 +610,7 @@ impl PdfPaginator {
         for item in items {
             match item {
                 PdfPageItem::Text(line) => self.push_text(line),
+                PdfPageItem::WrappedText(line) => self.push_wrapped_text(line),
                 PdfPageItem::Table(table) => self.push_table(table),
                 PdfPageItem::Figure(figure) => self.push_figure(figure),
                 PdfPageItem::ColumnBreak => self.advance_flow(),
@@ -581,6 +636,24 @@ impl PdfPaginator {
         }
         self.used_height += height;
         self.current.push(PdfPageItem::Text(line));
+    }
+
+    fn push_wrapped_text(&mut self, line: String) {
+        let lines = pdf_wrapped_text_lines(&line, self.current_layout.column_width(), 10);
+        let height = lines.len() as i32 * pdf_text_item_height();
+        let keep_wrapped_paragraph_together = height <= self.available_height()
+            && self.used_height + height > self.available_height();
+        let avoids_single_line_widow =
+            self.available_height() - self.used_height < pdf_text_item_height() * 2;
+        if lines.len() >= 3
+            && !self.current.is_empty()
+            && (keep_wrapped_paragraph_together || avoids_single_line_widow)
+        {
+            self.advance_flow();
+        }
+        for line in lines {
+            self.push_text(line);
+        }
     }
 
     fn push_table(&mut self, table: PdfTable) {
@@ -699,6 +772,11 @@ impl PdfPaginator {
             .iter()
             .map(|item| match item {
                 PdfPageItem::Text(_) => pdf_text_item_height(),
+                PdfPageItem::WrappedText(line) => {
+                    pdf_wrapped_text_lines(line, self.current_layout.column_width(), 10).len()
+                        as i32
+                        * pdf_text_item_height()
+                }
                 PdfPageItem::Table(table) => pdf_table_height(table),
                 PdfPageItem::Figure(figure) => pdf_figure_height(
                     figure.dimensions,

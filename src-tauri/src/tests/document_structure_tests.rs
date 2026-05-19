@@ -292,6 +292,40 @@ fn pdf_layout_keep_with_next_moves_following_block_as_group() {
 }
 
 #[test]
+fn pdf_wraps_long_paragraphs_and_avoids_single_line_widows() {
+    let filler = (1..=57)
+        .map(|index| format!("Filler paragraph {index}."))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let long_paragraph = (1..=25)
+        .map(|index| format!("alpha{index:02}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let first_wrapped_line = (1..=11)
+        .map(|index| format!("alpha{index:02}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let second_wrapped_line = (12..=22)
+        .map(|index| format!("alpha{index:02}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let response = compile(CompileRequest {
+        text: format!(
+            "---\ntitle: PDF Widows\nstatus: approved\napprovedBy: QA\n---\n# PDF Widows\n\n{filler}\n\n{long_paragraph}\n"
+        ),
+        file_path: None,
+    });
+
+    let pdf = render_pdf_bytes(&response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains(&format!("BT /F1 10 Tf 68 774 Td ({first_wrapped_line}) Tj")));
+    assert!(pdf_text.contains(&format!(
+        "BT /F1 10 Tf 68 762 Td ({second_wrapped_line}) Tj"
+    )));
+    assert!(!pdf_text.contains(&format!("BT /F1 10 Tf 68 78 Td ({first_wrapped_line}) Tj")));
+}
+
+#[test]
 fn pdf_section_columns_split_large_tables_across_columns() {
     let table_rows = (1..=34)
         .map(|index| format!("| R{index} | {index} |"))
