@@ -69,9 +69,9 @@ can still be verified, but backend compilation remains unverified.
 ## Current Packaging Note
 
 `./node_modules/.bin/tauri build --debug --bundles app` succeeds on macOS and
-produces `src-tauri/target/debug/bundle/macos/NEditor.app`. Release app bundles
-use the same command without `--debug` and produce
-`src-tauri/target/release/bundle/macos/NEditor.app`.
+produces `src-tauri/target/debug/bundle/macos/NEditor.app`.
+`./node_modules/.bin/tauri build --bundles app` also succeeds on macOS and
+produces `src-tauri/target/release/bundle/macos/NEditor.app`.
 
 `./node_modules/.bin/tauri build --debug --bundles dmg --verbose` currently
 reaches the `.app` bundle step and then fails in Tauri's generated
