@@ -20,20 +20,7 @@ pub(crate) struct AiCleanupResponse {
 pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
     let mut issues = Vec::new();
     let mut cleaned = request.text.replace("\r\n", "\n");
-    let chat_labels = [
-        "ChatGPT said:",
-        "Claude said:",
-        "Gemini said:",
-        "Copilot said:",
-        "Assistant:",
-        "User:",
-    ];
-    for label in chat_labels {
-        if cleaned.contains(label) {
-            cleaned = cleaned.replace(label, "");
-            issues.push(format!("Removed chat label '{label}'"));
-        }
-    }
+    cleaned = remove_chat_labels(&cleaned, &mut issues);
     cleaned = normalize_rich_html_clipboard(&cleaned, &mut issues);
     cleaned = normalize_markdown_lists(&cleaned, &mut issues);
     cleaned = normalize_markdown_tables(&cleaned, &mut issues);
@@ -62,6 +49,67 @@ pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
         issues,
         provenance_block,
     }
+}
+
+fn remove_chat_labels(text: &str, issues: &mut Vec<String>) -> String {
+    let mut removed = Vec::new();
+    let mut in_code_fence = false;
+    let output = text
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("```") {
+                in_code_fence = !in_code_fence;
+                return Some(line.to_string());
+            }
+            if in_code_fence {
+                return Some(line.to_string());
+            }
+            if let Some((label, rest)) = strip_chat_label(trimmed) {
+                removed.push(label.to_string());
+                if rest.trim().is_empty() {
+                    None
+                } else {
+                    let indent = &line[..line.len() - trimmed.len()];
+                    Some(format!("{indent}{}", rest.trim_start()))
+                }
+            } else {
+                Some(line.to_string())
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !removed.is_empty() {
+        removed.sort();
+        removed.dedup();
+        issues.push(format!("Removed chat labels: {}.", removed.join(", ")));
+    }
+    output
+}
+
+fn strip_chat_label(line: &str) -> Option<(&'static str, &str)> {
+    const LABELS: &[&str] = &[
+        "ChatGPT said:",
+        "Claude said:",
+        "DeepSeek said:",
+        "Gemini said:",
+        "Google Gemini said:",
+        "Copilot said:",
+        "Microsoft Copilot said:",
+        "Perplexity said:",
+        "Assistant:",
+        "AI:",
+        "User:",
+        "You:",
+        "Human:",
+    ];
+    let lower = line.to_ascii_lowercase();
+    LABELS.iter().find_map(|label| {
+        let normalized_label = label.to_ascii_lowercase();
+        lower
+            .starts_with(&normalized_label)
+            .then(|| (*label, &line[label.len()..]))
+    })
 }
 
 fn normalize_rich_html_clipboard(text: &str, issues: &mut Vec<String>) -> String {

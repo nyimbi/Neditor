@@ -5518,6 +5518,28 @@ paths:
     }
 
     #[test]
+    fn ai_cleanup_removes_chat_labels_without_touching_code_fences() {
+        let response = cleanup_ai_paste(AiCleanupRequest {
+            text: "DeepSeek said:\nAssistant: Revenue grew 24%.\n```text\nAssistant: literal\nChatGPT said: literal\n```\nYou: ignore this prompt"
+                .to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+            insert_citation_todos: false,
+        });
+
+        assert!(!response.cleaned_markdown.contains("DeepSeek said:"));
+        assert!(response.cleaned_markdown.contains("Revenue grew 24%."));
+        assert!(response
+            .cleaned_markdown
+            .contains("```text\nAssistant: literal\nChatGPT said: literal\n```"));
+        assert!(response.cleaned_markdown.contains("ignore this prompt"));
+        assert!(response
+            .issues
+            .iter()
+            .any(|issue| issue.contains("Removed chat labels")));
+    }
+
+    #[test]
     fn ai_cleanup_normalizes_rich_html_clipboard_content() {
         let response = cleanup_ai_paste(AiCleanupRequest {
             text: "<h2>Board Update</h2><p>Revenue grew 24%. <a href=\"https://example.com/report?x=1&amp;y=2\">Source report</a></p><ul><li>Approve budget</li></ul><table><tr><th>Region</th><th>Revenue</th></tr><tr><td>EMEA</td><td>24</td></tr></table>"
