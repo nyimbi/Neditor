@@ -5003,6 +5003,11 @@ beta</pre>
         assert!(pptx_relationships.contains(r#"Target="../media/image1.svg""#));
         assert!(pptx_svg.contains("<rect"));
 
+        let pdf = render_pdf_bytes(&response, &options);
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains(" 240 135 re S"));
+        assert!(pdf_text.contains("Local diagram"));
+
         let mut bundle_manifest = response.export_manifest.clone();
         bundle_manifest.export_options = options;
         let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
@@ -5074,6 +5079,11 @@ beta</pre>
         assert!(pptx_relationships.contains(r#"Target="../media/image2.jpg""#));
         assert!(pptx_slide.contains(r#"<a:ext cx="1905000" cy="952500""#));
         assert!(pptx_slide.contains(r#"<a:ext cx="2286000" cy="1143000""#));
+
+        let pdf = render_pdf_bytes(&response, &options);
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains(" 150 75 re S"));
+        assert!(pdf_text.contains(" 180 90 re S"));
 
         fs::remove_dir_all(root).expect("clean media export fixture");
     }
