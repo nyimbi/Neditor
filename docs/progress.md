@@ -107,12 +107,20 @@ P2/P3 gaps:
 
 ## Verification Status
 
-Current turn:
+Fresh baseline recorded on 2026-05-20:
 
-- `git status --short --branch`: clean at start, aligned with `origin/main`.
-- Documentation diff checks will be run before committing this slice.
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 6 frontend unit tests passed. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 53 modules transformed. |
+| `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff. |
+| `cargo check --locked` in `src-tauri` | Pass | Finished dev profile successfully. |
+| `cargo check --locked --features native-watch` in `src-tauri` | Pass | Finished dev profile successfully. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
+| `cargo test --locked` in `src-tauri` | Pass | 126 Rust tests passed; 0 failed. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
 
-Fresh baseline still required:
+Baseline command set:
 
 ```sh
 pnpm run test:unit
@@ -124,6 +132,16 @@ cd src-tauri && cargo clippy --locked --all-targets -- -D warnings
 cd src-tauri && cargo test --locked
 ./node_modules/.bin/tauri build --no-bundle
 ```
+
+Baseline gaps:
+
+- The baseline does not include browser-level or desktop WebDriver workflow
+  tests because no such harness exists yet.
+- The baseline does not include rendered visual QA for PDF/DOCX/PPTX outputs.
+- The baseline does not include full macOS/Windows/Linux package bundle
+  creation.
+- The baseline does not include macOS/Windows optional external transform
+  engines.
 
 Optional packaging checks:
 
@@ -141,15 +159,14 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Commit and push `docs/spec-completion-matrix.md` and `docs/progress.md`.
-2. Run the fresh verification baseline and append exact results here.
-3. Add a browser-level workflow test harness.
-4. Cover the highest-risk workflows first: table editor, conflict modal, AI
+1. Commit and push the fresh verification baseline results in this log.
+2. Add a browser-level workflow test harness.
+3. Cover the highest-risk workflows first: table editor, conflict modal, AI
    paste, command palette, preview navigation, and export readiness.
-5. Use failures from those tests to drive implementation fixes.
-6. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
-7. Add macOS/Windows optional transform engine evidence.
-8. Only after behavior is locked, modularize oversized frontend/store/backend
+4. Use failures from those tests to drive implementation fixes.
+5. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
+6. Add macOS/Windows optional transform engine evidence.
+7. Only after behavior is locked, modularize oversized frontend/store/backend
    modules.
 
 ## Completion Gate
