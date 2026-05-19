@@ -110,6 +110,7 @@ interface FileMetadataResponse {
 }
 
 interface ExternalConflict {
+  documentId: string;
   path: string;
   reason: "root" | "include";
   message: string;
@@ -123,6 +124,13 @@ interface DocumentWatchEvent {
   kind: string;
   hash?: string | null;
   modified?: string | null;
+}
+
+interface WatchContext {
+  documentId: string;
+  rootPath: string;
+  includedPaths: string[];
+  signature: string;
 }
 
 interface TransformProbeResult {
@@ -506,6 +514,7 @@ export const useDocumentsStore = defineStore("documents", {
     ignoredConflictHashes: {} as Record<string, string>,
     watchSignature: "",
     watchDriver: "off" as "off" | "native" | "plugin",
+    watchContext: null as WatchContext | null,
     watchedPaths: [] as string[],
     watchedPathRoles: {} as Record<string, "root" | "include">,
     transformEngines: [] as TransformEngineMetadata[],
@@ -555,6 +564,19 @@ export const useDocumentsStore = defineStore("documents", {
       } catch {
         this.transformEngines = [];
       }
+    },
+    setActiveDocument(id: string) {
+      if (this.documents.some((document) => document.id === id)) {
+        this.activeId = id;
+      }
+    },
+    async activateDocument(id: string) {
+      if (!this.documents.some((document) => document.id === id)) return;
+      if (this.activeId === id) return;
+      this.setActiveDocument(id);
+      await this.compileActive();
+      await this.refreshGitStatus();
+      await this.persistWorkspace();
     },
     async loadPreferences() {
       try {
@@ -743,7 +765,7 @@ export const useDocumentsStore = defineStore("documents", {
       if (isExistingDocumentSave) {
         const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: target });
         if (metadata.exists && metadata.hash && metadata.hash !== doc.savedHash) {
-          await this.openExternalConflict(target, "root", "The root file changed outside NEditor before save.", metadata.hash);
+          await this.openExternalConflict(doc, target, "root", "The root file changed outside NEditor before save.", metadata.hash);
           this.statusMessage = "Save blocked; resolve external changes first";
           return;
         }
@@ -757,6 +779,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (isExistingDocumentSave && isStaleSaveConflict(error)) {
           const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: target });
           await this.openExternalConflict(
+            doc,
             target,
             "root",
             "The root file changed outside NEditor during save.",
@@ -876,6 +899,7 @@ export const useDocumentsStore = defineStore("documents", {
         }
         this.watchSignature = "";
         this.watchDriver = "off";
+        this.watchContext = null;
         this.watchedPaths = [];
         this.watchedPathRoles = {};
         return;
@@ -896,23 +920,31 @@ export const useDocumentsStore = defineStore("documents", {
         {} as Record<string, "root" | "include">,
       );
       const driver = watchSnapshot.native_watcher ? "native" : "plugin";
-      const signature = `${driver}\n${watchedFiles.map((file) => `${file.role || "include"}:${file.path}`).join("\n")}`;
+      const signature = `${doc.id}\n${driver}\n${watchedFiles.map((file) => `${file.role || "include"}:${file.path}`).join("\n")}`;
       if (signature === this.watchSignature) return;
+      const context: WatchContext = {
+        documentId: doc.id,
+        rootPath: doc.path,
+        includedPaths,
+        signature,
+      };
       this.detachFileWatchListeners();
       if (!watchPaths.length) {
         this.watchSignature = "";
         this.watchDriver = "off";
+        this.watchContext = null;
         this.watchedPaths = [];
         this.watchedPathRoles = {};
         return;
       }
+      this.watchContext = context;
       if (watchSnapshot.native_watcher) {
-        await this.attachBackendFileWatchListeners(doc.path, includedPaths);
+        await this.attachBackendFileWatchListeners(context);
       } else {
         unwatchFileChanges = await watchFs(
           watchPaths,
           (event) => {
-            void this.handleFsWatchEvent(event, doc.path as string, includedPaths);
+            void this.handleFsWatchEvent(event, context);
           },
           { delayMs: 250 },
         );
@@ -936,19 +968,22 @@ export const useDocumentsStore = defineStore("documents", {
       await invoke("stop_file_watcher").catch(() => undefined);
       this.watchSignature = "";
       this.watchDriver = "off";
+      this.watchContext = null;
       this.watchedPaths = [];
       this.watchedPathRoles = {};
     },
-    async attachBackendFileWatchListeners(rootPath: string, includedPaths: string[]) {
+    async attachBackendFileWatchListeners(context: WatchContext) {
       unwatchFileChanges = await listen<BackendWatchEvent>("neditor-file-watch-event", (event) => {
-        void this.handleBackendWatchEvent(event.payload, rootPath, includedPaths);
+        void this.handleBackendWatchEvent(event.payload, context);
       });
       unwatchFileErrors = await listen<string>("neditor-file-watch-error", (event) => {
         this.lastError = event.payload;
         this.statusMessage = "File watcher failed";
       });
     },
-    async handleFsWatchEvent(event: WatchEvent, rootPath: string, includedPaths: string[]) {
+    async handleFsWatchEvent(event: WatchEvent, context: WatchContext) {
+      if (!this.watchContextIsCurrent(context)) return;
+      const { rootPath, includedPaths } = context;
       const paths = event.paths.length ? event.paths : [rootPath];
       for (const path of paths) {
         const reason = this.watchReasonForPath(path, rootPath, includedPaths);
@@ -960,10 +995,12 @@ export const useDocumentsStore = defineStore("documents", {
           kind: stringifyWatchEventKind(event.type),
           hash: metadata.hash,
           modified: metadata.modified,
-        });
+        }, context);
       }
     },
-    async handleBackendWatchEvent(event: BackendWatchEvent, rootPath: string, includedPaths: string[]) {
+    async handleBackendWatchEvent(event: BackendWatchEvent, context: WatchContext) {
+      if (!this.watchContextIsCurrent(context)) return;
+      const { rootPath, includedPaths } = context;
       const paths = event.paths.length ? event.paths : [rootPath];
       for (const path of paths) {
         const reason = this.watchReasonForPath(path, rootPath, includedPaths);
@@ -975,7 +1012,7 @@ export const useDocumentsStore = defineStore("documents", {
           kind: event.kind,
           hash: metadata.hash,
           modified: metadata.modified,
-        });
+        }, context);
       }
     },
     watchReasonForPath(path: string, rootPath: string, includedPaths: string[]) {
@@ -990,31 +1027,44 @@ export const useDocumentsStore = defineStore("documents", {
             : null)
       );
     },
-    async handleWatchedFileChange(event: DocumentWatchEvent) {
+    watchContextIsCurrent(context: WatchContext) {
+      const current = this.watchContext;
+      if (!current || current.signature !== context.signature) return false;
       const doc = this.activeDocument;
-      if (!doc?.path) return;
+      return doc?.id === context.documentId && Boolean(doc.path) && sameWatchPath(doc.path as string, context.rootPath);
+    },
+    documentForWatchContext(context: WatchContext) {
+      const doc = this.documents.find((document) => document.id === context.documentId);
+      if (!doc?.path || !sameWatchPath(doc.path, context.rootPath)) return null;
+      return doc;
+    },
+    async handleWatchedFileChange(event: DocumentWatchEvent, context: WatchContext) {
+      if (!this.watchContextIsCurrent(context)) return;
+      const doc = this.documentForWatchContext(context);
+      if (!doc) return;
       const watched = this.watchedPaths.length
         ? this.watchedPaths
-        : [doc.path, ...(doc.compile?.export_manifest.included_files || []).map((file) => file.path)];
+        : [context.rootPath, ...context.includedPaths];
       if (!watched.some((path) => sameWatchPath(path, event.path))) return;
-      await this.refreshExternalState(event);
+      await this.refreshExternalState(doc, event, context);
     },
-    async refreshExternalState(event?: DocumentWatchEvent) {
-      const doc = this.activeDocument;
-      if (!doc.path) return;
-      const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: doc.path });
+    async refreshExternalState(doc?: OpenDocument, event?: DocumentWatchEvent, context?: WatchContext) {
+      if (context && !this.watchContextIsCurrent(context)) return;
+      const targetDoc = doc || this.activeDocument;
+      if (!targetDoc.path) return;
+      const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: targetDoc.path });
       this.externalHash = metadata.hash || "";
-      const rootEventIsRealChange = event?.reason === "root" && (!event.hash || event.hash !== doc.savedHash);
+      const rootEventIsRealChange = event?.reason === "root" && (!event.hash || event.hash !== targetDoc.savedHash);
       const mainChanged =
-        rootEventIsRealChange || Boolean(metadata.exists && metadata.hash && metadata.hash !== doc.savedHash);
+        rootEventIsRealChange || Boolean(metadata.exists && metadata.hash && metadata.hash !== targetDoc.savedHash);
       const changedInclude =
         event?.reason === "include"
           ? { path: event.path, hash: event.hash || "include-change" }
-          : await this.changedIncludedFile(doc);
+          : await this.changedIncludedFile(targetDoc);
       const includeChanged = Boolean(changedInclude);
-      if (doc.dirty) {
+      if (targetDoc.dirty) {
         const ignoredRoot = Boolean(
-          mainChanged && metadata.hash && this.ignoredConflictHashes[doc.path] === metadata.hash,
+          mainChanged && metadata.hash && this.ignoredConflictHashes[targetDoc.path] === metadata.hash,
         );
         const ignoredInclude = Boolean(
           changedInclude?.path &&
@@ -1023,9 +1073,10 @@ export const useDocumentsStore = defineStore("documents", {
         );
         if (ignoredRoot || ignoredInclude) return;
       }
-      if ((mainChanged || includeChanged) && doc.dirty) {
+      if ((mainChanged || includeChanged) && targetDoc.dirty) {
         await this.openExternalConflict(
-          mainChanged ? doc.path : changedInclude?.path || event?.path || doc.path,
+          targetDoc,
+          mainChanged ? targetDoc.path : changedInclude?.path || event?.path || targetDoc.path,
           mainChanged ? "root" : "include",
           mainChanged
             ? "The root file changed outside NEditor while local edits are unsaved."
@@ -1038,11 +1089,11 @@ export const useDocumentsStore = defineStore("documents", {
         return;
       }
       if (mainChanged && metadata.hash) {
-        const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path: doc.path });
-        doc.text = response.text;
-        doc.savedHash = response.hash;
-        doc.modified = response.modified;
-        doc.dirty = false;
+        const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path: targetDoc.path });
+        targetDoc.text = response.text;
+        targetDoc.savedHash = response.hash;
+        targetDoc.modified = response.modified;
+        targetDoc.dirty = false;
         this.externalConflict = null;
         this.statusMessage = "Reloaded external changes";
         await this.compileActive();
@@ -1057,12 +1108,13 @@ export const useDocumentsStore = defineStore("documents", {
     async acceptExternalChanges() {
       const conflict = this.externalConflict;
       if (!conflict) return;
+      const doc = this.documents.find((document) => document.id === conflict.documentId) || this.activeDocument;
+      this.setActiveDocument(doc.id);
       if (conflict.reason === "root") {
         await this.snapshotBeforeDestructiveAction("pre-accept-external");
         const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", {
           path: conflict.path,
         });
-        const doc = this.activeDocument;
         doc.text = response.text;
         doc.savedHash = response.hash;
         doc.modified = response.modified;
@@ -1074,6 +1126,7 @@ export const useDocumentsStore = defineStore("documents", {
       }
       this.externalConflict = null;
       this.clearIgnoredConflicts();
+      await this.compileActive();
       await this.refreshGitStatus();
     },
     keepLocalChanges() {
@@ -1084,6 +1137,10 @@ export const useDocumentsStore = defineStore("documents", {
       this.statusMessage = "Keeping local edits";
     },
     async saveLocalConflictCopy(path: string) {
+      const conflict = this.externalConflict;
+      if (conflict?.documentId && conflict.documentId !== this.activeId) {
+        this.setActiveDocument(conflict.documentId);
+      }
       await this.saveActive(path);
       this.externalConflict = null;
       this.clearIgnoredConflicts();
@@ -1092,8 +1149,9 @@ export const useDocumentsStore = defineStore("documents", {
     async applyConflictMerge(text: string) {
       const conflict = this.externalConflict;
       if (!conflict || conflict.reason !== "root") return;
+      const doc = this.documents.find((document) => document.id === conflict.documentId) || this.activeDocument;
+      this.setActiveDocument(doc.id);
       await this.snapshotBeforeDestructiveAction("pre-conflict-merge");
-      const doc = this.activeDocument;
       doc.text = text;
       doc.savedHash = conflict.externalHash;
       doc.dirty = text !== (conflict.externalText || "");
@@ -1125,7 +1183,7 @@ export const useDocumentsStore = defineStore("documents", {
       }
       return null;
     },
-    async openExternalConflict(path: string, reason: "root" | "include", message: string, externalHash: string) {
+    async openExternalConflict(doc: OpenDocument, path: string, reason: "root" | "include", message: string, externalHash: string) {
       let externalText = "";
       try {
         externalText = (await invoke<{ text: string }>("read_file", { path })).text;
@@ -1133,6 +1191,7 @@ export const useDocumentsStore = defineStore("documents", {
         externalText = reason === "include" ? "The changed included file could not be read. It may have been deleted or moved." : "";
       }
       this.externalConflict = {
+        documentId: doc.id,
         path,
         reason,
         message,
@@ -1472,11 +1531,15 @@ export const useDocumentsStore = defineStore("documents", {
       const index = this.documents.findIndex((document) => document.id === id);
       if (index >= 0) {
         const [closed] = this.documents.slice(index, index + 1);
+        const closingActiveDocument = closed?.id === this.activeId;
         if (closed?.path) {
           this.recentlyClosed = [closed.path, ...this.recentlyClosed.filter((recent) => recent !== closed.path)].slice(0, 20);
         }
         this.documents.splice(index, 1);
-        this.activeId = this.documents[Math.max(0, index - 1)].id;
+        if (closingActiveDocument) {
+          this.activeId = this.documents[Math.max(0, index - 1)].id;
+          void this.compileActive();
+        }
         void this.persistWorkspace();
       }
     },

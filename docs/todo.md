@@ -14,8 +14,9 @@ What remains to achieve the full vision:
      Safety primitives exist: trust, timeouts, size limits, stdin/file modes, caching, diagnostics, setup/security guidance, and adapter profiles for Graphviz, D2,
      PlantUML, and Pikchr. Still needed: conformance against real installed binaries, richer per-engine diagnostics, and packaged setup docs for each platform.
   5. Watcher/conflict hardening
-     Native watcher support exists behind native-watch, with fallback now. Still needed: verified native-watch builds after fsevent-sys downloads, richer merge workflow,
-     multi-document watcher behavior, and stronger include graph refresh coverage.
+     Native watcher support exists behind native-watch, with fallback now. Watch events are now scoped to the document that installed the watcher, tab activation
+     recompiles/resyncs watched paths, and conflict actions target the conflicted document instead of whichever tab is currently visible. Still needed: verified native-watch
+     builds after fsevent-sys downloads, richer merge workflow, background multi-document include watching, and stronger include graph refresh coverage.
   6. E2E and export conformance tests
      Need Playwright/Tauri workflow tests, DOCX/PPTX/PDF package inspections, fixture comparisons, and confirmed macOS/Windows/Linux CI runs.
   7. Backend modularization

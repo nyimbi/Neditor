@@ -869,7 +869,7 @@
         <section v-else class="compare-grid">
           <article>
             <h3>Local document</h3>
-            <pre>{{ active.text }}</pre>
+            <pre>{{ conflictDocument.text }}</pre>
           </article>
           <article>
             <h3>Changed file</h3>
@@ -1088,7 +1088,12 @@ const groupedDocuments = computed<DocumentTabGroup[]>(() => {
 const rootConflictCanMerge = computed(
   () => store.externalConflict?.reason === "root" && typeof store.externalConflict.externalText === "string",
 );
-const conflictDiffRows = computed(() => buildConflictDiff(active.value.text, store.externalConflict?.externalText || ""));
+const conflictDocument = computed(() => {
+  const conflict = store.externalConflict;
+  if (!conflict) return active.value;
+  return store.documents.find((document) => document.id === conflict.documentId) || active.value;
+});
+const conflictDiffRows = computed(() => buildConflictDiff(conflictDocument.value.text, store.externalConflict?.externalText || ""));
 const tableColumnTotals = computed(() => {
   const draft = tableDraft.value;
   if (!draft) return [];
@@ -1157,9 +1162,7 @@ const commands = computed(() => [
   ...store.documents.map((document) => ({
     name: document.title,
     group: "Open document",
-    run: () => {
-      store.activeId = document.id;
-    },
+    run: () => activate(document.id),
   })),
   ...store.workspaceFiles
     .filter((entry) => entry.kind !== "directory")
@@ -1278,7 +1281,7 @@ watch(
   () => [active.value.id, store.externalConflict?.externalHash, store.externalConflict?.externalText],
   () => {
     if (store.externalConflict?.reason === "root") {
-      mergedConflictText.value = active.value.text;
+      mergedConflictText.value = conflictDocument.value.text;
     } else {
       mergedConflictText.value = "";
     }
@@ -1791,7 +1794,7 @@ function runEditorCommand(command: (view: EditorView) => boolean) {
 }
 
 function activate(id: string) {
-  store.activeId = id;
+  void store.activateDocument(id);
 }
 
 function closeTabGroup(group: DocumentTabGroup) {
@@ -1805,7 +1808,7 @@ function dropTabOnGroup(group: DocumentTabGroup) {
   const document = store.documents.find((candidate) => candidate.id === draggedTabId.value);
   if (group.key.startsWith("set:") && document) {
     store.setPinned(document.id, false);
-    store.activeId = document.id;
+    store.setActiveDocument(document.id);
     store.updateText(upsertFrontMatterField(document.text, "documentSet", group.label));
   } else {
     store.setPinned(draggedTabId.value, group.key === "pinned");
@@ -2055,7 +2058,7 @@ async function duplicateDocument() {
 async function saveConflictCopy() {
   const path = await save({
     filters: [{ name: "Markdown", extensions: ["md"] }],
-    defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")} local copy.md`,
+    defaultPath: `${conflictDocument.value.title.replace(/\.[^.]+$/, "")} local copy.md`,
   });
   if (path) {
     await store.saveLocalConflictCopy(path);
@@ -2064,7 +2067,7 @@ async function saveConflictCopy() {
 }
 
 function seedConflictMerge(source: "local" | "external") {
-  mergedConflictText.value = source === "external" ? store.externalConflict?.externalText || "" : active.value.text;
+  mergedConflictText.value = source === "external" ? store.externalConflict?.externalText || "" : conflictDocument.value.text;
 }
 
 async function applyConflictMerge() {
