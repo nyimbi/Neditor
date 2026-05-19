@@ -24,6 +24,7 @@ fn render_figure_line(line: &str) -> Option<String> {
     let caption = extract_quoted_attribute(attrs, "caption").unwrap_or_else(|| alt.to_string());
     let float = figure_float(attrs);
     let fit = figure_fit(attrs);
+    let position = figure_position(attrs);
     let float_class = float
         .as_deref()
         .map(|value| format!(" figure-float-{value}"))
@@ -31,6 +32,10 @@ fn render_figure_line(line: &str) -> Option<String> {
     let fit_class = fit
         .as_deref()
         .map(|value| format!(" figure-fit-{value}"))
+        .unwrap_or_default();
+    let position_class = position
+        .as_deref()
+        .map(|value| format!(" figure-position-{value}"))
         .unwrap_or_default();
     let float_attr = float
         .as_deref()
@@ -40,13 +45,19 @@ fn render_figure_line(line: &str) -> Option<String> {
         .as_deref()
         .map(|value| format!(" data-fit=\"{}\"", escape_html(value)))
         .unwrap_or_default();
+    let position_attr = position
+        .as_deref()
+        .map(|value| format!(" data-position=\"{}\"", escape_html(value)))
+        .unwrap_or_default();
     Some(format!(
-        "<figure id=\"{}\" class=\"figure{}{}\"{}{}><img src=\"{}\" alt=\"{}\"/><figcaption>{}</figcaption></figure>",
+        "<figure id=\"{}\" class=\"figure{}{}{}\"{}{}{}><img src=\"{}\" alt=\"{}\"/><figcaption>{}</figcaption></figure>",
         escape_html(&id),
         float_class,
         fit_class,
+        position_class,
         float_attr,
         fit_attr,
+        position_attr,
         escape_html(src),
         escape_html(alt),
         escape_html(&caption)
@@ -64,6 +75,26 @@ fn figure_fit(attrs: &str) -> Option<String> {
     extract_quoted_attribute(attrs, "fit")
         .map(|value| value.trim().to_ascii_lowercase())
         .filter(|value| matches!(value.as_str(), "cover" | "contain"))
+}
+
+fn figure_position(attrs: &str) -> Option<String> {
+    extract_quoted_attribute(attrs, "position")
+        .or_else(|| extract_quoted_attribute(attrs, "focus"))
+        .map(|value| value.trim().to_ascii_lowercase().replace('_', "-"))
+        .filter(|value| {
+            matches!(
+                value.as_str(),
+                "center"
+                    | "top"
+                    | "bottom"
+                    | "left"
+                    | "right"
+                    | "top-left"
+                    | "top-right"
+                    | "bottom-left"
+                    | "bottom-right"
+            )
+        })
 }
 
 pub(crate) fn render_equations(markdown: &str) -> String {

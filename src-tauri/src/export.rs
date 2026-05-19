@@ -22,6 +22,7 @@ struct ExportMedia {
     source_file: Option<String>,
     float: Option<String>,
     fit: Option<String>,
+    position: Option<String>,
     relationship_id: String,
     path: String,
     extension: String,
@@ -824,6 +825,7 @@ fn render_bundle_media_map(media: &[ExportMedia]) -> Result<String, String> {
                 "source_file": item.source_file,
                 "float": item.float,
                 "fit": item.fit,
+                "position": item.position,
                 "bundle_path": item.path,
                 "content_type": item.content_type,
                 "hash": sha256_uri(&item.bytes),
@@ -869,6 +871,7 @@ fn drawingml_source_crop(
     box_width: i64,
     box_height: i64,
     fit: Option<&str>,
+    position: Option<&str>,
 ) -> String {
     if normalized_fit(fit) != Some("cover") {
         return String::new();
@@ -890,17 +893,29 @@ fn drawingml_source_crop(
     }
     if source_ratio > box_ratio {
         let visible_width = dimensions.height_px * box_ratio;
-        let crop = drawingml_crop_value((1.0 - (visible_width / dimensions.width_px)) / 2.0);
-        format!(r#"<a:srcRect l="{crop}" r="{crop}"/>"#)
+        let total_crop = 1.0 - (visible_width / dimensions.width_px);
+        let (left, right) = drawingml_crop_pair(total_crop, crop_position_axes(position).0);
+        format!(r#"<a:srcRect l="{left}" r="{right}"/>"#)
     } else {
         let visible_height = dimensions.width_px / box_ratio;
-        let crop = drawingml_crop_value((1.0 - (visible_height / dimensions.height_px)) / 2.0);
-        format!(r#"<a:srcRect t="{crop}" b="{crop}"/>"#)
+        let total_crop = 1.0 - (visible_height / dimensions.height_px);
+        let (top, bottom) = drawingml_crop_pair(total_crop, crop_position_axes(position).1);
+        format!(r#"<a:srcRect t="{top}" b="{bottom}"/>"#)
     }
 }
 
 fn drawingml_crop_value(fraction: f64) -> i64 {
     (fraction.clamp(0.0, 0.49) * 100_000.0).round() as i64
+}
+
+fn drawingml_crop_pair(total_fraction: f64, align: CropAlign) -> (i64, i64) {
+    let total_fraction = total_fraction.clamp(0.0, 0.98);
+    let (start, end) = match align {
+        CropAlign::Start => (0.0, total_fraction),
+        CropAlign::Center => (total_fraction / 2.0, total_fraction / 2.0),
+        CropAlign::End => (total_fraction, 0.0),
+    };
+    (drawingml_crop_value(start), drawingml_crop_value(end))
 }
 
 fn safe_bundle_path(path: &str) -> String {
@@ -2743,13 +2758,14 @@ fn docx_figure(block: &DocumentBlock, media: &[ExportMedia]) -> String {
         caption,
         float,
         fit,
+        position,
         source,
         ..
     } = block
     else {
         return String::new();
     };
-    let caption_text = figure_export_line(id, src, alt, caption, float, fit);
+    let caption_text = figure_export_line(id, src, alt, caption, float, fit, position);
     let Some(src) = src else {
         return docx_paragraph(&caption_text);
     };
@@ -2768,8 +2784,13 @@ fn docx_figure(block: &DocumentBlock, media: &[ExportMedia]) -> String {
         .unwrap_or("Figure");
     let (image_width, image_height) =
         export_media_emu_size(item, 4_320_000, 3_240_000, (4_320_000, 2_430_000));
-    let src_rect =
-        drawingml_source_crop(item.dimensions, image_width, image_height, fit.as_deref());
+    let src_rect = drawingml_source_crop(
+        item.dimensions,
+        image_width,
+        image_height,
+        fit.as_deref(),
+        position.as_deref(),
+    );
     let paragraph_props = docx_figure_paragraph_props(float.as_deref());
     let drawing = format!(
         r#"<w:p>{paragraph_props}<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{image_width}" cy="{image_height}"/><wp:docPr id="{doc_pr_id}" name="{}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="{doc_pr_id}" name="{}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="{}"/>{src_rect}<a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{image_width}" cy="{image_height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"#,
@@ -2800,6 +2821,7 @@ fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
             source,
             float,
             fit,
+            position,
             ..
         } = block
         else {
@@ -2822,6 +2844,7 @@ fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
             source_file,
             float: normalized_float(float.as_deref()).map(str::to_string),
             fit: normalized_fit(fit.as_deref()).map(str::to_string),
+            position: normalized_position(position.as_deref()).map(str::to_string),
             relationship_id: format!("rIdImage{index}"),
             path,
             extension: parsed.extension,
@@ -3261,6 +3284,7 @@ fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
         caption,
         float,
         fit,
+        position,
         source,
         ..
     } = block
@@ -3269,7 +3293,7 @@ fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
             parse_export_image(src, source.as_ref()).and_then(|image| image.dimensions)
         });
         return vec![PdfPageItem::Figure(PdfFigure {
-            caption_line: figure_export_line(id, src, alt, caption, float, fit),
+            caption_line: figure_export_line(id, src, alt, caption, float, fit, position),
             alt: alt.clone(),
             float: normalized_float(float.as_deref()).map(str::to_string),
             fit: normalized_fit(fit.as_deref()).map(str::to_string),
@@ -4007,8 +4031,11 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             caption,
             float,
             fit,
+            position,
             ..
-        } => vec![figure_export_line(id, src, alt, caption, float, fit)],
+        } => vec![figure_export_line(
+            id, src, alt, caption, float, fit, position,
+        )],
         DocumentBlock::Equation {
             id, caption, text, ..
         } => vec![equation_export_line(id, text, caption)],
@@ -4245,6 +4272,7 @@ fn figure_export_line(
     caption: &Option<String>,
     float: &Option<String>,
     fit: &Option<String>,
+    position: &Option<String>,
 ) -> String {
     let mut parts = vec!["Figure".to_string()];
     if let Some(id) = id {
@@ -4261,6 +4289,9 @@ fn figure_export_line(
     }
     if let Some(fit) = fit {
         parts.push(format!("fit={fit}"));
+    }
+    if let Some(position) = position {
+        parts.push(format!("position={position}"));
     }
     if let Some(src) = src {
         parts.push(format!("({src})"));
@@ -4282,6 +4313,47 @@ fn normalized_fit(fit: Option<&str>) -> Option<&'static str> {
         "cover" | "crop" => Some("cover"),
         "contain" => Some("contain"),
         _ => None,
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CropAlign {
+    Start,
+    Center,
+    End,
+}
+
+fn normalized_position(position: Option<&str>) -> Option<&'static str> {
+    match position?
+        .trim()
+        .to_ascii_lowercase()
+        .replace('_', "-")
+        .as_str()
+    {
+        "center" | "middle" => Some("center"),
+        "top" => Some("top"),
+        "bottom" => Some("bottom"),
+        "left" => Some("left"),
+        "right" => Some("right"),
+        "top-left" | "left-top" => Some("top-left"),
+        "top-right" | "right-top" => Some("top-right"),
+        "bottom-left" | "left-bottom" => Some("bottom-left"),
+        "bottom-right" | "right-bottom" => Some("bottom-right"),
+        _ => None,
+    }
+}
+
+fn crop_position_axes(position: Option<&str>) -> (CropAlign, CropAlign) {
+    match normalized_position(position) {
+        Some("top") => (CropAlign::Center, CropAlign::Start),
+        Some("bottom") => (CropAlign::Center, CropAlign::End),
+        Some("left") => (CropAlign::Start, CropAlign::Center),
+        Some("right") => (CropAlign::End, CropAlign::Center),
+        Some("top-left") => (CropAlign::Start, CropAlign::Start),
+        Some("top-right") => (CropAlign::End, CropAlign::Start),
+        Some("bottom-left") => (CropAlign::Start, CropAlign::End),
+        Some("bottom-right") => (CropAlign::End, CropAlign::End),
+        _ => (CropAlign::Center, CropAlign::Center),
     }
 }
 
@@ -4665,6 +4737,7 @@ fn render_pptx_picture(item: &ExportMedia, index: usize) -> String {
         image_width,
         image_height,
         item.fit.as_deref(),
+        item.position.as_deref(),
     );
     format!(
         r#"<p:pic><p:nvPicPr><p:cNvPr id="{shape_id}" name="{}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{}"/>{src_rect}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{image_width}" cy="{image_height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#,
@@ -4730,8 +4803,9 @@ fn export_css(
     } else {
         ""
     };
+    let figure_position_rules = "figure[data-position='top'] img,.figure-position-top img{object-position:center top}figure[data-position='bottom'] img,.figure-position-bottom img{object-position:center bottom}figure[data-position='left'] img,.figure-position-left img{object-position:left center}figure[data-position='right'] img,.figure-position-right img{object-position:right center}figure[data-position='top-left'] img,.figure-position-top-left img{object-position:left top}figure[data-position='top-right'] img,.figure-position-top-right img{object-position:right top}figure[data-position='bottom-left'] img,.figure-position-bottom-left img{object-position:left bottom}figure[data-position='bottom-right'] img,.figure-position-bottom-right img{object-position:right bottom}";
     format!(
-        "body{{font-family:{};margin:{body_margin};color:#1f2937;line-height:{body_line_height}}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:{cover_min_height};display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:{heading_size};margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}p,li,blockquote{{orphans:2;widows:2}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}figure[data-float='right'],.figure-float-right{{float:right;max-width:45%;margin:0 0 16px 24px}}figure[data-float='left'],.figure-float-left{{float:left;max-width:45%;margin:0 24px 16px 0}}figure[data-fit='cover'] img,.figure-fit-cover img{{width:100%;aspect-ratio:16/9;object-fit:cover}}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.equation{{margin:18px 0}}.math-rendered{{font-family:Georgia,'Times New Roman',serif;font-size:1.08em}}.math-display{{padding:12px;border:1px solid #d8e0e8;background:#f8fafc;text-align:center}}.math-frac{{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center}}.math-frac span:first-child{{border-bottom:1px solid currentColor}}.math-sqrt::before{{content:'√'}}.math-source-inline{{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}{syntax_rules}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{size:{page_size};margin:{page_margin};@top-center{{content:element(header)}}{page_counter_rule}}}",
+        "body{{font-family:{};margin:{body_margin};color:#1f2937;line-height:{body_line_height}}}.running-header{{position:running(header);border-bottom:3px solid {brand_color};padding-bottom:8px;color:#475569}}.cover{{min-height:{cover_min_height};display:flex;flex-direction:column;justify-content:center;border-left:10px solid {brand_color};padding-left:32px;page-break-after:always}}.cover-logo{{max-width:160px;max-height:80px;object-fit:contain;margin-bottom:24px}}.cover h1{{font-size:{heading_size};margin:0 0 12px}}.subtitle{{font-size:22px;color:#475569}}.status{{display:inline-block;color:{brand_color};font-weight:700;text-transform:uppercase}}footer{{display:flex;justify-content:space-between;gap:16px;margin-top:40px;border-top:1px solid #cbd5e1;padding-top:12px;color:#475569}}h1,h2,h3{{color:#111827}}p,li,blockquote{{orphans:2;widows:2}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #cbd5e1;padding:6px 8px}}figure[data-float='right'],.figure-float-right{{float:right;max-width:45%;margin:0 0 16px 24px}}figure[data-float='left'],.figure-float-left{{float:left;max-width:45%;margin:0 24px 16px 0}}figure[data-fit='cover'] img,.figure-fit-cover img{{width:100%;aspect-ratio:16/9;object-fit:cover}}{figure_position_rules}.citation{{color:{brand_color};font-weight:700}}.glossary-term{{border-bottom:1px dotted {brand_color};color:{brand_color};cursor:help}}.callout{{border-left:4px solid {brand_color};background:#eefaf4;padding:10px 12px;margin:14px 0}}.callout strong{{display:block;color:#0f5132;margin-bottom:4px}}.equation{{margin:18px 0}}.math-rendered{{font-family:Georgia,'Times New Roman',serif;font-size:1.08em}}.math-display{{padding:12px;border:1px solid #d8e0e8;background:#f8fafc;text-align:center}}.math-frac{{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center}}.math-frac span:first-child{{border-bottom:1px solid currentColor}}.math-sqrt::before{{content:'√'}}.math-source-inline{{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}.export-glossary,.export-comments,.export-provenance,.export-legal{{page-break-before:always;border-top:3px solid {brand_color};margin-top:40px;padding-top:16px}}.export-glossary dt{{font-weight:700;color:#111827}}.export-glossary dd{{margin:0 0 10px 0}}.export-comments li,.export-provenance li{{margin-bottom:12px}}.export-comments p,.export-provenance p{{margin:4px 0 0}}{syntax_rules}main::before{{content:'{}';position:fixed;inset:35% auto auto 20%;font-size:64px;color:rgba(0,0,0,.06);transform:rotate(-25deg);z-index:-1}}.page-break{{page-break-after:always}}@page{{size:{page_size};margin:{page_margin};@top-center{{content:element(header)}}{page_counter_rule}}}",
         escape_css(brand_font),
         escape_css(watermark)
     )

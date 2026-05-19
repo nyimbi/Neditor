@@ -155,6 +155,7 @@ export type DocumentBlock =
       caption?: string | null;
       float?: string | null;
       fit?: string | null;
+      position?: string | null;
       source?: DocumentSourceRange | null;
     }
   | { kind: "equation"; line: number; end_line: number; id?: string | null; caption?: string | null; text: string; source?: DocumentSourceRange | null }

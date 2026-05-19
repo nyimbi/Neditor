@@ -3939,6 +3939,46 @@ select:hover {
   object-fit: cover;
 }
 
+.preview-document figure[data-position="top"] img,
+.preview-document .figure-position-top img {
+  object-position: center top;
+}
+
+.preview-document figure[data-position="bottom"] img,
+.preview-document .figure-position-bottom img {
+  object-position: center bottom;
+}
+
+.preview-document figure[data-position="left"] img,
+.preview-document .figure-position-left img {
+  object-position: left center;
+}
+
+.preview-document figure[data-position="right"] img,
+.preview-document .figure-position-right img {
+  object-position: right center;
+}
+
+.preview-document figure[data-position="top-left"] img,
+.preview-document .figure-position-top-left img {
+  object-position: left top;
+}
+
+.preview-document figure[data-position="top-right"] img,
+.preview-document .figure-position-top-right img {
+  object-position: right top;
+}
+
+.preview-document figure[data-position="bottom-left"] img,
+.preview-document .figure-position-bottom-left img {
+  object-position: left bottom;
+}
+
+.preview-document figure[data-position="bottom-right"] img,
+.preview-document .figure-position-bottom-right img {
+  object-position: right bottom;
+}
+
 .preview-document .glossary-term {
   border-bottom: 1px dotted #275da8;
   color: #174a8c;

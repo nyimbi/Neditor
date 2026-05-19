@@ -166,6 +166,7 @@ pub(crate) enum DocumentBlock {
         caption: Option<String>,
         float: Option<String>,
         fit: Option<String>,
+        position: Option<String>,
         source: Option<AstSourceRange>,
     },
     Equation {
@@ -440,6 +441,7 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 caption,
                 float,
                 fit,
+                position,
                 ..
             } => {
                 let mut parts = vec!["Figure".to_string()];
@@ -454,6 +456,9 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 }
                 if let Some(fit) = fit {
                     parts.push(format!("fit={fit}"));
+                }
+                if let Some(position) = position {
+                    parts.push(format!("position={position}"));
                 }
                 if let Some(src) = src {
                     parts.push(format!("({src})"));
@@ -1358,6 +1363,7 @@ fn parse_ast_html_block(line: &str, line_number: usize, end_line: usize) -> Docu
                 .map(|value| clean_inline_text(&value)),
             float: extract_quoted_attribute(line, "data-float"),
             fit: extract_quoted_attribute(line, "data-fit"),
+            position: extract_quoted_attribute(line, "data-position"),
             source: None,
         };
     }

@@ -5291,6 +5291,67 @@ beta</pre>
     }
 
     #[test]
+    fn export_packages_preserve_figure_cover_crop_position() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-cover-position-export-{unique}"));
+        let assets = root.join("assets");
+        fs::create_dir_all(&assets).expect("create cover position fixture dir");
+        let image = assets.join("square.svg");
+        fs::write(
+            &image,
+            "<svg width=\"320\" height=\"320\" viewBox=\"0 0 320 320\"><rect width=\"320\" height=\"320\"/></svg>",
+        )
+        .expect("write square svg");
+        let doc = root.join("report.md");
+        fs::write(
+            &doc,
+            "---\ntitle: Cover Position\nstatus: approved\napprovedBy: QA\n---\n# Cover Position\n![Square](assets/square.svg){#fig:square-top caption=\"Top crop\" fit=\"cover\" position=\"top\"}\n",
+        )
+        .expect("write document");
+
+        let response = compile(CompileRequest {
+            text: fs::read_to_string(&doc).expect("read document"),
+            file_path: Some(path_to_string(&doc)),
+        });
+        assert!(response.html.contains("figure-position-top"));
+        assert!(response.html.contains("data-position=\"top\""));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Figure { id, fit, position, .. }
+                    if id.as_deref() == Some("fig:square-top")
+                        && fit.as_deref() == Some("cover")
+                        && position.as_deref() == Some("top")
+            )
+        }));
+        let export_text = export::export_text(&response, &json!({}));
+        assert!(export_text.contains("fit=cover"));
+        assert!(export_text.contains("position=top"));
+
+        let options = json!({});
+        let full_html = render_full_html(&response, &options);
+        assert!(full_html.contains("figure[data-position='top'] img"));
+
+        let docx = render_docx_bytes(&response, &options).expect("docx cover position");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains(r#"<a:srcRect t="0" b="25000"/>"#));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx cover position");
+        let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        assert!(pptx_slide.contains(r#"<a:srcRect t="0" b="43750"/>"#));
+
+        let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+            .expect("cover position bundle");
+        let media_map = zip_entry_text(&bundle, "media-map.json");
+        assert!(media_map.contains(r#""position": "top""#));
+
+        fs::remove_dir_all(root).expect("clean cover position fixture");
+    }
+
+    #[test]
     fn export_packages_raster_media_intrinsic_dimensions() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
