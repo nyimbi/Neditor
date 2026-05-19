@@ -274,9 +274,14 @@ fn normalize_markdown_lists(text: &str, issues: &mut Vec<String>) -> String {
                 return line.to_string();
             }
             if !in_code_fence {
-                if let Some(rest) = trimmed.strip_prefix("• ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                if let Some(rest) = strip_ai_bullet_prefix(trimmed) {
                     changed = true;
-                    return format!("{}- {}", &line[..line.len() - trimmed.len()], rest);
+                    return format!("{indent}- {rest}");
+                }
+                if let Some((number, rest)) = strip_ai_number_prefix(trimmed) {
+                    changed = true;
+                    return format!("{indent}{number}. {rest}");
                 }
             }
             line.to_string()
@@ -287,6 +292,24 @@ fn normalize_markdown_lists(text: &str, issues: &mut Vec<String>) -> String {
         issues.push("Normalized bullet characters to Markdown list markers.".to_string());
     }
     output
+}
+
+fn strip_ai_bullet_prefix(line: &str) -> Option<&str> {
+    ["• ", "◦ ", "‣ ", "▪ ", "▫ ", "– ", "— "]
+        .iter()
+        .find_map(|prefix| line.strip_prefix(prefix))
+}
+
+fn strip_ai_number_prefix(line: &str) -> Option<(&str, &str)> {
+    let marker_end = line
+        .char_indices()
+        .take_while(|(_, ch)| ch.is_ascii_digit())
+        .last()
+        .map(|(index, ch)| index + ch.len_utf8())?;
+    if marker_end == 0 || !line[marker_end..].starts_with(") ") {
+        return None;
+    }
+    Some((&line[..marker_end], line[marker_end + 2..].trim_start()))
 }
 
 fn normalize_markdown_tables(text: &str, issues: &mut Vec<String>) -> String {

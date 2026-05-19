@@ -5493,6 +5493,24 @@ paths:
     }
 
     #[test]
+    fn ai_cleanup_normalizes_chat_list_numbering() {
+        let response = cleanup_ai_paste(AiCleanupRequest {
+            text: "1) First action\n  ◦ Nested action\n2) Second action\n```text\n1) literal\n◦ literal\n```"
+                .to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+            insert_citation_todos: false,
+        });
+
+        assert!(response.cleaned_markdown.contains("1. First action"));
+        assert!(response.cleaned_markdown.contains("  - Nested action"));
+        assert!(response.cleaned_markdown.contains("2. Second action"));
+        assert!(response
+            .cleaned_markdown
+            .contains("```text\n1) literal\n◦ literal\n```"));
+    }
+
+    #[test]
     fn ai_cleanup_normalizes_rich_html_clipboard_content() {
         let response = cleanup_ai_paste(AiCleanupRequest {
             text: "<h2>Board Update</h2><p>Revenue grew 24%. <a href=\"https://example.com/report?x=1&amp;y=2\">Source report</a></p><ul><li>Approve budget</li></ul><table><tr><th>Region</th><th>Revenue</th></tr><tr><td>EMEA</td><td>24</td></tr></table>"
