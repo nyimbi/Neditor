@@ -141,7 +141,7 @@
           <h2>Diagnostics</h2>
           <article
             v-for="diagnostic in active.compile?.diagnostics || []"
-            :key="`${diagnostic.severity}-${diagnostic.message}-${diagnostic.line}`"
+            :key="`${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.column || ''}-${diagnostic.message}`"
             class="diagnostic"
             :class="diagnostic.severity"
           >
