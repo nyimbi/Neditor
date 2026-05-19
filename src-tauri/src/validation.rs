@@ -1,10 +1,10 @@
 use crate::{
     bibliography::{BibliographyEntry, CitationReference},
-    diagnostic_location_for_generated_line,
     diagnostics::{diag, with_range, DocumentDiagnostic},
     metadata_string,
     provenance::{AiAssistedSection, AiSource},
     review::ReviewComment,
+    source_mapping::diagnostic_location_for_generated_line,
     SourceMapEntry,
 };
 use serde_json::Value;

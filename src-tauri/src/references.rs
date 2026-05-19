@@ -1,6 +1,6 @@
 use crate::{
-    diagnostic_location_for_generated_line,
     diagnostics::{diag, with_range},
+    source_mapping::diagnostic_location_for_generated_line,
     DocumentDiagnostic, SourceMapEntry,
 };
 use serde::Serialize;

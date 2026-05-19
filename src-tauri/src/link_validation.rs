@@ -1,7 +1,8 @@
 use crate::{
-    diagnostic_location_for_generated_line,
     diagnostics::{diag, with_range, DocumentDiagnostic},
-    metadata_string, path_to_string, SourceMapEntry,
+    metadata_string, path_to_string,
+    source_mapping::diagnostic_location_for_generated_line,
+    SourceMapEntry,
 };
 use serde_json::Value;
 use std::path::{Path, PathBuf};

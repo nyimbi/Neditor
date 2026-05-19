@@ -184,3 +184,40 @@ pub(crate) fn ast_source_range_for_generated_lines(
         end_source_line: end.source_line,
     })
 }
+
+pub(crate) fn advance_source_position(line: &mut usize, column: &mut usize, text: &str) {
+    for ch in text.chars() {
+        if ch == '\n' {
+            *line += 1;
+            *column = 1;
+        } else {
+            *column += 1;
+        }
+    }
+}
+
+pub(crate) fn source_position_after(line: usize, column: usize, text: &str) -> (usize, usize) {
+    let mut end_line = line;
+    let mut end_column = column;
+    advance_source_position(&mut end_line, &mut end_column, text);
+    (end_line, end_column)
+}
+
+pub(crate) fn diagnostic_end_line(
+    source_line: Option<usize>,
+    generated_start_line: usize,
+    generated_end_line: usize,
+) -> Option<usize> {
+    source_line.map(|line| line + generated_end_line.saturating_sub(generated_start_line))
+}
+
+pub(crate) fn diagnostic_location_for_generated_line(
+    source_map: &[SourceMapEntry],
+    generated_line: usize,
+) -> (Option<String>, Option<usize>) {
+    source_map
+        .iter()
+        .find(|entry| entry.generated_line == generated_line)
+        .map(|entry| (Some(entry.source_file.clone()), Some(entry.source_line)))
+        .unwrap_or((None, Some(generated_line)))
+}

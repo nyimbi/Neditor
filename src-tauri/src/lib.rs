@@ -99,7 +99,9 @@ use rich_blocks::{
 };
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
 use source_mapping::{
-    ast_source_range_for_generated_lines, expand_includes, normalize_source_map_after_front_matter,
+    advance_source_position, ast_source_range_for_generated_lines, diagnostic_end_line,
+    diagnostic_location_for_generated_line, expand_includes,
+    normalize_source_map_after_front_matter, source_position_after,
 };
 use tables::{
     collect_table_summaries, evaluate_markdown_table_formulas, render_delimited_table, TableSummary,
@@ -566,43 +568,6 @@ fn interpolate_variables(
     }
     output.push_str(rest);
     output
-}
-
-fn advance_source_position(line: &mut usize, column: &mut usize, text: &str) {
-    for ch in text.chars() {
-        if ch == '\n' {
-            *line += 1;
-            *column = 1;
-        } else {
-            *column += 1;
-        }
-    }
-}
-
-fn source_position_after(line: usize, column: usize, text: &str) -> (usize, usize) {
-    let mut end_line = line;
-    let mut end_column = column;
-    advance_source_position(&mut end_line, &mut end_column, text);
-    (end_line, end_column)
-}
-
-fn diagnostic_end_line(
-    source_line: Option<usize>,
-    generated_start_line: usize,
-    generated_end_line: usize,
-) -> Option<usize> {
-    source_line.map(|line| line + generated_end_line.saturating_sub(generated_start_line))
-}
-
-pub(crate) fn diagnostic_location_for_generated_line(
-    source_map: &[SourceMapEntry],
-    generated_line: usize,
-) -> (Option<String>, Option<usize>) {
-    source_map
-        .iter()
-        .find(|entry| entry.generated_line == generated_line)
-        .map(|entry| (Some(entry.source_file.clone()), Some(entry.source_line)))
-        .unwrap_or((None, Some(generated_line)))
 }
 
 fn evaluate_inline_formula(
