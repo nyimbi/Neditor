@@ -56,7 +56,7 @@ use diagnostics::{diag, DocumentDiagnostic};
 use document_ast::DocumentBlock;
 use document_ast::{
     attach_source_ranges, attach_transform_artifacts, build_document_ast, extract_label,
-    extract_quoted_attribute, slugify, DocumentAst,
+    extract_quoted_attribute, slugify, AstDocumentMetadata, DocumentAst,
 };
 #[cfg(test)]
 use export::{
@@ -292,6 +292,12 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         .and_then(Value::as_str)
         .unwrap_or("draft")
         .to_string();
+    document_ast.metadata = AstDocumentMetadata {
+        title: title.clone(),
+        status: status.clone(),
+        version: metadata_string(&metadata, "version").unwrap_or_default(),
+        source_hash: sha256_uri(layout_markdown.as_bytes()),
+    };
     validate_document(
         DocumentValidationInput {
             metadata: &metadata,
@@ -3661,6 +3667,13 @@ ARR: Annual recurring revenue.
             file_path: None,
         });
 
+        assert_eq!(response.document_ast.metadata.title, "AST");
+        assert_eq!(response.document_ast.metadata.status, "approved");
+        assert!(response
+            .document_ast
+            .metadata
+            .source_hash
+            .starts_with("sha256:"));
         assert!(response
             .document_ast
             .blocks

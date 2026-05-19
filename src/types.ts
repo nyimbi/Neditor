@@ -180,6 +180,12 @@ export type DocumentBlock =
   | { kind: "raw_html"; line: number; end_line: number; html: string; source?: DocumentSourceRange | null };
 
 export interface DocumentAst {
+  metadata: {
+    title: string;
+    status: string;
+    version: string;
+    source_hash: string;
+  };
   blocks: DocumentBlock[];
 }
 

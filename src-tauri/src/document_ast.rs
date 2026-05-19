@@ -10,7 +10,16 @@ use serde_json::Value;
 
 #[derive(Debug, Serialize)]
 pub(crate) struct DocumentAst {
+    pub(crate) metadata: AstDocumentMetadata,
     pub(crate) blocks: Vec<DocumentBlock>,
+}
+
+#[derive(Debug, Default, Serialize)]
+pub(crate) struct AstDocumentMetadata {
+    pub(crate) title: String,
+    pub(crate) status: String,
+    pub(crate) version: String,
+    pub(crate) source_hash: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -301,7 +310,10 @@ pub(crate) fn build_document_ast(markdown: &str) -> DocumentAst {
     }
 
     flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
-    DocumentAst { blocks }
+    DocumentAst {
+        metadata: AstDocumentMetadata::default(),
+        blocks,
+    }
 }
 
 fn collect_ast_html_block(lines: &[&str], start_index: usize) -> (String, usize) {
