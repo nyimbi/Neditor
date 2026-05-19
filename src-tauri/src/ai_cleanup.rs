@@ -426,7 +426,8 @@ fn normalize_markdown_tables(text: &str, issues: &mut Vec<String>) -> String {
     let lines = text.lines().collect::<Vec<_>>();
     let mut output = Vec::new();
     let mut index = 0;
-    let mut changed = false;
+    let mut tab_blocks = 0usize;
+    let mut csv_blocks = 0usize;
     let mut in_code_fence = false;
     while index < lines.len() {
         let line = lines[index];
@@ -434,41 +435,173 @@ fn normalize_markdown_tables(text: &str, issues: &mut Vec<String>) -> String {
         if trimmed.starts_with("```") {
             in_code_fence = !in_code_fence;
             output.push(line.to_string());
-        } else if !in_code_fence && line.contains('\t') {
-            let cells = trimmed_tab_cells(line);
-            if cells.is_empty() {
-                index += 1;
+            index += 1;
+            continue;
+        }
+        if !in_code_fence {
+            if let Some((rows, consumed)) = delimited_table_block(&lines[index..], '\t') {
+                output.extend(markdown_table_rows(&rows));
+                tab_blocks += 1;
+                index += consumed;
                 continue;
             }
-            output.push(format!("| {} |", cells.join(" | ")));
-            if index + 1 < lines.len() && lines[index + 1].contains('\t') {
-                output.push(format!(
-                    "| {} |",
-                    cells.iter().map(|_| "---").collect::<Vec<_>>().join(" | ")
-                ));
+            if let Some((rows, consumed)) = delimited_table_block(&lines[index..], ',') {
+                output.extend(markdown_table_rows(&rows));
+                csv_blocks += 1;
+                index += consumed;
+                continue;
             }
-            changed = true;
-        } else {
-            output.push(line.to_string());
         }
+        output.push(line.to_string());
         index += 1;
     }
-    if changed {
-        issues.push("Converted tab-separated rows to Markdown table rows.".to_string());
+    if tab_blocks > 0 {
+        issues.push(format!(
+            "Converted {tab_blocks} tab-separated table block(s) to Markdown."
+        ));
+    }
+    if csv_blocks > 0 {
+        issues.push(format!(
+            "Converted {csv_blocks} comma-separated table block(s) to Markdown."
+        ));
     }
     output.join("\n")
 }
 
-fn trimmed_tab_cells(line: &str) -> Vec<&str> {
-    let cells = line.split('\t').map(str::trim).collect::<Vec<_>>();
-    let Some(start) = cells.iter().position(|cell| !cell.is_empty()) else {
-        return Vec::new();
+fn delimited_table_block(lines: &[&str], delimiter: char) -> Option<(Vec<Vec<String>>, usize)> {
+    let first = lines.first()?;
+    let first_cells = trimmed_delimited_cells(first, delimiter)?;
+    let width = first_cells.len();
+    if width < 2 {
+        return None;
+    }
+    let mut rows = vec![first_cells];
+    let mut consumed = 1usize;
+    for line in lines.iter().skip(1) {
+        if line.trim().is_empty() || line.trim_start().starts_with("```") {
+            break;
+        }
+        let Some(cells) = trimmed_delimited_cells(line, delimiter) else {
+            break;
+        };
+        if cells.len() != width {
+            break;
+        }
+        rows.push(cells);
+        consumed += 1;
+    }
+    if delimiter == ',' && !looks_like_csv_table_block(&rows) {
+        return None;
+    }
+    Some((rows, consumed))
+}
+
+fn trimmed_delimited_cells(line: &str, delimiter: char) -> Option<Vec<String>> {
+    if !line.contains(delimiter) {
+        return None;
+    }
+    let cells: Vec<String> = if delimiter == '\t' {
+        line.split('\t')
+            .map(str::trim)
+            .map(str::to_string)
+            .collect()
+    } else {
+        parse_csv_line(line)?
+            .into_iter()
+            .map(|cell| cell.trim().to_string())
+            .collect()
     };
+    let start = cells.iter().position(|cell| !cell.is_empty())?;
     let end = cells
         .iter()
         .rposition(|cell| !cell.is_empty())
         .unwrap_or(start);
-    cells[start..=end].to_vec()
+    Some(cells[start..=end].to_vec())
+}
+
+fn parse_csv_line(line: &str) -> Option<Vec<String>> {
+    let mut cells = Vec::new();
+    let mut cell = String::new();
+    let mut quoted = false;
+    let mut chars = line.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '"' if quoted && chars.peek() == Some(&'"') => {
+                cell.push('"');
+                chars.next();
+            }
+            '"' => quoted = !quoted,
+            ',' if !quoted => {
+                cells.push(cell.trim().to_string());
+                cell.clear();
+            }
+            _ => cell.push(ch),
+        }
+    }
+    if quoted {
+        return None;
+    }
+    cells.push(cell.trim().to_string());
+    Some(cells)
+}
+
+fn looks_like_csv_table_block(rows: &[Vec<String>]) -> bool {
+    if rows.len() < 2 {
+        return false;
+    }
+    let header_like = rows[0]
+        .iter()
+        .all(|cell| !cell.is_empty() && cell.len() <= 48 && !cell.ends_with('.'));
+    let data_like = rows.iter().skip(1).any(|row| {
+        row.iter()
+            .any(|cell| parse_tableish_number(cell).is_some() || looks_like_short_date(cell))
+    });
+    header_like && data_like
+}
+
+fn parse_tableish_number(value: &str) -> Option<f64> {
+    value
+        .trim()
+        .trim_end_matches('%')
+        .replace(['$', ','], "")
+        .parse::<f64>()
+        .ok()
+}
+
+fn looks_like_short_date(value: &str) -> bool {
+    let normalized = value.trim();
+    normalized.len() >= 8
+        && normalized.len() <= 12
+        && normalized.chars().any(|ch| ch.is_ascii_digit())
+        && (normalized.contains('-') || normalized.contains('/'))
+}
+
+fn markdown_table_rows(rows: &[Vec<String>]) -> Vec<String> {
+    let mut output = Vec::new();
+    output.push(markdown_table_row(&rows[0]));
+    if rows.len() > 1 {
+        output.push(format!(
+            "| {} |",
+            rows[0]
+                .iter()
+                .map(|_| "---")
+                .collect::<Vec<_>>()
+                .join(" | ")
+        ));
+        output.extend(rows.iter().skip(1).map(|row| markdown_table_row(row)));
+    }
+    output
+}
+
+fn markdown_table_row(cells: &[String]) -> String {
+    format!(
+        "| {} |",
+        cells
+            .iter()
+            .map(|cell| cell.replace('|', "\\|"))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    )
 }
 
 fn insert_citation_todos(text: &str, issues: &mut Vec<String>) -> String {

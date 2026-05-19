@@ -5566,6 +5566,31 @@ paths:
     }
 
     #[test]
+    fn ai_cleanup_converts_csv_table_blocks_conservatively() {
+        let response = cleanup_ai_paste(AiCleanupRequest {
+            text: "Region,Revenue,Growth\nEMEA,1200,24%\nAMER,950,12%\n\nThis sentence, with a comma, should stay prose.\n```csv\nRegion,Revenue\nEMEA,1200\n```"
+                .to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+            insert_citation_todos: false,
+        });
+
+        assert!(response
+            .cleaned_markdown
+            .contains("| Region | Revenue | Growth |\n| --- | --- | --- |\n| EMEA | 1200 | 24% |"));
+        assert!(response
+            .cleaned_markdown
+            .contains("This sentence, with a comma, should stay prose."));
+        assert!(response
+            .cleaned_markdown
+            .contains("```csv\nRegion,Revenue\nEMEA,1200\n```"));
+        assert!(response
+            .issues
+            .iter()
+            .any(|issue| issue.contains("comma-separated table")));
+    }
+
+    #[test]
     fn ai_cleanup_normalizes_rich_html_clipboard_content() {
         let response = cleanup_ai_paste(AiCleanupRequest {
             text: "<h2>Board Update</h2><p>Revenue grew 24%. <a href=\"https://example.com/report?x=1&amp;y=2\">Source report</a></p><ul><li>Approve budget</li></ul><table><tr><th>Region</th><th>Revenue</th></tr><tr><td>EMEA</td><td>24</td></tr></table>"
