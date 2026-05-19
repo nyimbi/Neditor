@@ -144,10 +144,10 @@ fn parse_ai_assisted_section(
             let value = value.trim().to_string();
             match key {
                 "status" => status = value,
-                "reviewedBy" | "reviewer" => reviewed_by = value,
-                "reviewedAt" | "reviewDate" => reviewed_at = value,
+                "reviewedBy" | "reviewed_by" | "reviewer" => reviewed_by = value,
+                "reviewedAt" | "reviewed_at" | "reviewDate" => reviewed_at = value,
                 "source" => source = value,
-                "promptSummary" | "prompt" => prompt_summary = value,
+                "promptSummary" | "prompt_summary" | "prompt" => prompt_summary = value,
                 _ => {}
             }
         }

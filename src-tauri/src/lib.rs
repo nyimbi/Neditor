@@ -5042,6 +5042,27 @@ paths:
     }
 
     #[test]
+    fn compiler_accepts_ai_assisted_section_metadata_aliases() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: AI Section Aliases\nstatus: approved\napprovedBy: QA\n---\n<!-- ai-assisted: status=human-reviewed | reviewed_by=Jane Doe | reviewed_at=2026-05-19 | source=OpenAI | prompt_summary=Alias section prompt -->\n# AI Section Aliases\nReviewed body.\n"
+                .to_string(),
+            file_path: None,
+        });
+
+        let section = response
+            .semantic
+            .ai_assisted_sections
+            .first()
+            .expect("ai-assisted section");
+        assert_eq!(section.reviewed_by, "Jane Doe");
+        assert_eq!(section.reviewed_at, "2026-05-19");
+        assert_eq!(section.prompt_summary, "Alias section prompt");
+        assert!(!response.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("AI-assisted sections that are not human-reviewed")));
+    }
+
+    #[test]
     fn compiler_accepts_ai_source_metadata_aliases() {
         let response = compile(CompileRequest {
             text: "---\ntitle: AI Source Aliases\nstatus: approved\napprovedBy: QA\n---\n# AI Source Aliases\n```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nprompt_summary: Alias prompt\nreviewer: Jane Doe\nreviewed_at: 2026-05-19T09:00:00Z\nstatus: human-reviewed\n```\n"
