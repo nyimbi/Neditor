@@ -381,6 +381,10 @@ pub(crate) fn render_docx_bytes(
         .map_err(|err| err.to_string())?;
     zip.write_all(render_docx_app_properties(response).as_bytes())
         .map_err(|err| err.to_string())?;
+    zip.start_file("docProps/custom.xml", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(render_custom_properties(response).as_bytes())
+        .map_err(|err| err.to_string())?;
     zip.add_directory("word/", options)
         .map_err(|err| err.to_string())?;
     zip.add_directory("word/_rels/", options)
@@ -454,6 +458,10 @@ pub(crate) fn render_pptx_bytes(
         .filter(|slide| !slide.notes.is_empty())
         .count();
     zip.write_all(render_pptx_app_properties(response, slides.len(), notes_count).as_bytes())
+        .map_err(|err| err.to_string())?;
+    zip.start_file("docProps/custom.xml", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(render_custom_properties(response).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.add_directory("ppt/_rels/", options)
         .map_err(|err| err.to_string())?;
@@ -739,13 +747,13 @@ fn render_docx_content_types(media: &[ExportMedia], include_comments: bool) -> S
         ""
     };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>{comments_override}</Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>{comments_override}</Types>"#
     )
 }
 
 fn render_root_relationships(office_document_target: &str) -> String {
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{}"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>"#,
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{}"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties" Target="docProps/custom.xml"/></Relationships>"#,
         escape_xml(office_document_target)
     )
 }
@@ -849,6 +857,52 @@ fn render_pptx_app_properties(
         escape_xml(&company),
         escape_xml(env!("CARGO_PKG_VERSION"))
     )
+}
+
+fn render_custom_properties(response: &CompileResponse) -> String {
+    let mut properties = Vec::new();
+    push_custom_property(&mut properties, "NEditorStatus", &response.semantic.status);
+    push_custom_property(
+        &mut properties,
+        "NEditorVersion",
+        &metadata_string(&response.metadata, "version").unwrap_or_default(),
+    );
+    push_custom_property(
+        &mut properties,
+        "NEditorClassification",
+        &metadata_string(&response.metadata, "classification").unwrap_or_default(),
+    );
+    push_custom_property(
+        &mut properties,
+        "NEditorClient",
+        &metadata_string(&response.metadata, "client").unwrap_or_default(),
+    );
+    push_custom_property(
+        &mut properties,
+        "NEditorSourceHash",
+        &response.export_manifest.source_hash,
+    );
+    push_custom_property(
+        &mut properties,
+        "NEditorAppVersion",
+        env!("CARGO_PKG_VERSION"),
+    );
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">{}</Properties>"#,
+        properties.join("")
+    )
+}
+
+fn push_custom_property(properties: &mut Vec<String>, name: &str, value: &str) {
+    if value.trim().is_empty() {
+        return;
+    }
+    let pid = properties.len() + 2;
+    properties.push(format!(
+        r#"<property fmtid="{{D5CDD505-2E9C-101B-9397-08002B2CF9AE}}" pid="{pid}" name="{}"><vt:lpwstr>{}</vt:lpwstr></property>"#,
+        escape_xml(name),
+        escape_xml(value)
+    ));
 }
 
 pub(crate) fn export_text(response: &CompileResponse, options: &Value) -> String {
@@ -3213,7 +3267,7 @@ fn render_pptx_content_types(slides: &[PptxSlide], media: &[ExportMedia]) -> Str
         })
         .collect::<String>();
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}{notes_overrides}</Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}{notes_overrides}</Types>"#
     )
 }
 

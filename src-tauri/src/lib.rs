@@ -4520,16 +4520,25 @@ beta</pre>
         assert!(docx_document.contains("Cover: Test Report"));
         assert!(docx_document.contains("Logo: data:image/svg+xml"));
         assert!(docx_document.contains("Watermark: DRAFT"));
+        let docx_content_types = zip_entry_text(&docx, "[Content_Types].xml");
         let docx_core = zip_entry_text(&docx, "docProps/core.xml");
         let docx_app = zip_entry_text(&docx, "docProps/app.xml");
+        let docx_custom = zip_entry_text(&docx, "docProps/custom.xml");
+        assert!(docx_content_types.contains("custom-properties"));
         assert!(docx_core.contains("<dc:title>Test Report</dc:title>"));
         assert!(docx_core.contains("<cp:category>approved</cp:category>"));
         assert!(docx_app.contains("<Application>NEditor</Application>"));
         assert!(docx_app.contains("<Words>"));
         assert!(docx_app.contains("<AppVersion>"));
+        assert!(docx_custom.contains(r#"name="NEditorStatus""#));
+        assert!(docx_custom.contains("<vt:lpwstr>approved</vt:lpwstr>"));
+        assert!(docx_custom.contains(r#"name="NEditorVersion""#));
+        assert!(docx_custom.contains("<vt:lpwstr>1.2.0</vt:lpwstr>"));
+        assert!(docx_custom.contains(r#"name="NEditorSourceHash""#));
         let docx_relationships = zip_entry_text(&docx, "_rels/.rels");
         assert!(docx_relationships.contains("metadata/core-properties"));
         assert!(docx_relationships.contains("extended-properties"));
+        assert!(docx_relationships.contains("custom-properties"));
         let docx_document_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
         assert!(docx_document_relationships.contains("relationships/header"));
         assert!(docx_document_relationships.contains("relationships/footer"));
@@ -4543,13 +4552,19 @@ beta</pre>
         assert!(pptx_slide.contains("Test Report"));
         assert!(pptx_slide.contains(r#"name="Header""#));
         assert!(pptx_slide.contains("Page 1 of 1"));
+        let pptx_content_types = zip_entry_text(&pptx, "[Content_Types].xml");
         let pptx_core = zip_entry_text(&pptx, "docProps/core.xml");
         let pptx_app = zip_entry_text(&pptx, "docProps/app.xml");
+        let pptx_custom = zip_entry_text(&pptx, "docProps/custom.xml");
+        assert!(pptx_content_types.contains("custom-properties"));
         assert!(pptx_core.contains("<dc:title>Test Report</dc:title>"));
         assert!(pptx_core.contains("<cp:category>approved</cp:category>"));
         assert!(pptx_app.contains("<Application>NEditor</Application>"));
         assert!(pptx_app.contains("<Slides>"));
         assert!(pptx_app.contains("<Notes>0</Notes>"));
+        assert!(pptx_custom.contains(r#"name="NEditorClient""#));
+        assert!(pptx_custom.contains("<vt:lpwstr>Acme</vt:lpwstr>"));
+        assert!(pptx_custom.contains(r#"name="NEditorSourceHash""#));
         assert!(
             render_markdown_bundle_bytes(&response, &response.export_manifest)
                 .expect("bundle bytes")
