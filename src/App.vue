@@ -1464,7 +1464,7 @@ function buildSemanticEditorDecorations(view: EditorView) {
       continue;
     }
     const inlineDecorations: Array<{ start: number; end: number; className: string }> = [];
-    collectRegexDecorations(inlineDecorations, text, /\[@[A-Za-z0-9_:-]+(?:[^\]]*)\]/g, "cm-neditor-citation");
+    collectRegexDecorations(inlineDecorations, text, /\[[^\]\n]*@[A-Za-z0-9_:-]+[^\]\n]*\]/g, "cm-neditor-citation");
     collectRegexDecorations(inlineDecorations, text, /\{\{=[^}\n]+\}\}/g, "cm-neditor-formula");
     collectReferenceDecorations(inlineDecorations, text, knownReferences);
     collectRegexDecorations(inlineDecorations, text, /\{\{[^}\n]+\}\}/g, "cm-neditor-variable");
