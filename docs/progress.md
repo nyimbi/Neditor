@@ -90,9 +90,9 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Browser-level workflow tests now exist, but still need a passing run in CI or
-  a non-sandboxed local shell. Local sandbox execution currently fails before
-  app assertions because Chromium cannot register its Mach bootstrap port.
+- Initial browser-level workflow tests now pass in Linux CI, but coverage is
+  still narrow and local sandbox execution still fails before app assertions
+  because Chromium cannot register its Mach bootstrap port.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -157,6 +157,7 @@ Current CI follow-up:
 | `XDG_CACHE_HOME=.cache gh run view 26131218116 --log-failed` | Failure diagnosed | `actions/setup-node` could not locate `pnpm` while `cache: pnpm` was enabled before pnpm setup. |
 | `gh run view 26131619095 --json jobs,conclusion,status,headSha,url` | Partial improvement | For `6489162`, pnpm and Node setup succeeded in every job; the browser job reached Playwright execution. |
 | `XDG_CACHE_HOME=.cache gh api repos/nyimbi/Neditor/actions/jobs/76857769468/logs` | Browser failure diagnosed | Playwright ran 4 tests in CI; 3 passed and the readiness test failed because `getByText("Ready")` matched both `Ready` and `Document is ready for export`. |
+| `gh run view 26131805873 --json jobs,conclusion,status,headSha,url` | Browser workflow pass | For `420af08`, the `Browser workflow tests` job passed through Playwright Chromium installation and `pnpm run test:e2e`. |
 
 Fix staged after that CI run:
 
@@ -209,17 +210,17 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Confirm the CI pnpm setup fix on the next pushed run.
-2. Get the Playwright suite passing in CI or a non-sandboxed local shell.
-3. Expand browser coverage for file operations, workspace restore, conflicts,
+1. Keep watching the latest desktop CI matrix and fix the next blocker if it
+   fails.
+2. Expand browser coverage for file operations, workspace restore, conflicts,
    preview navigation, scroll sync, transform settings, export progress, and
    the remaining AI/table modes.
-4. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
+3. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
-5. Use failures from workflow tests to drive implementation fixes.
-6. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
-7. Add macOS/Windows optional transform engine evidence.
-8. Only after behavior is locked, modularize oversized frontend/store/backend
+4. Use failures from workflow tests to drive implementation fixes.
+5. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
+6. Add macOS/Windows optional transform engine evidence.
+7. Only after behavior is locked, modularize oversized frontend/store/backend
    modules.
 
 ## Completion Gate

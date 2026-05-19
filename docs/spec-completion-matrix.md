@@ -22,7 +22,7 @@ is not "Complete".
 | 1 Purpose | Local-first business Markdown workbench | Partial | `README.md`; Tauri/Vue/Rust project layout; compiler/export modules | Full buildout still needs requirement-by-requirement verification and workflow tests. |
 | 2 Source Prompt Extension | Tauri 2, Vue 3, Pinia, Vite, vanilla CSS | Complete | `package.json`; `src/main.ts`; `src/App.vue`; `src-tauri/Cargo.toml` | Keep dependency admission docs current as test dependencies are added. |
 | 2 Source Prompt Extension | Side-by-side Markdown editor and live preview | Partial | `src/App.vue` editor/preview panes; CodeMirror setup | Browser workflow proof for live typing, scroll sync, and preview navigation. |
-| 2 Source Prompt Extension | Split, preview-only, focus/source modes | Partial | `src/App.vue` mode controls; `e2e/app-workflows.spec.ts` covers split/source/preview modes | Focus/export/review/presentation modes and non-sandboxed browser execution still need proof. |
+| 2 Source Prompt Extension | Split, preview-only, focus/source modes | Partial | `src/App.vue` mode controls; `e2e/app-workflows.spec.ts` covers split/source/preview modes; GitHub Actions browser job passed on commit `420af08` | Focus/export/review/presentation modes and desktop execution still need proof. |
 | 2 Source Prompt Extension | Local new/open/save/save-as flows | Partial | `src/stores/documents.ts`; `src-tauri/src/filesystem.rs`; file command tests | Browser/desktop workflow tests for dialogs and state transitions. |
 | 2 Source Prompt Extension | Window title reflects file and dirty state | Partial | `windowTitle` getter and `setWindowTitle` in `src/App.vue` | Desktop/browser assertion for title updates. |
 | 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler | Test coverage for command execution and keybindings. |
@@ -193,8 +193,8 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Initial browser-level workflow test harness exists, but local sandbox
-  execution is blocked at Chromium launch before app assertions.
+- Initial browser-level workflow test harness passes in Linux CI, but local
+  sandbox execution is blocked at Chromium launch before app assertions.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - No current committed fresh baseline results after the latest harness changes.
 - Export tests rely heavily on package/text assertions; visual/rendered quality
