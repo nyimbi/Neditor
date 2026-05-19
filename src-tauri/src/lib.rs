@@ -1208,7 +1208,7 @@ fn render_timeline_svg(body: &str) -> String {
         .filter(|line| !line.trim().is_empty())
         .collect::<Vec<_>>();
     let height = 80 + items.len() * 54;
-    let mut svg = format!("<svg class=\"timeline\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 {height}\" role=\"img\"><line x1=\"120\" y1=\"40\" x2=\"120\" y2=\"{}\" stroke=\"#275DA8\" stroke-width=\"3\"/>", height - 30);
+    let mut svg = format!("<svg class=\"transform transform-timeline timeline\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 {height}\" role=\"img\"><line x1=\"120\" y1=\"40\" x2=\"120\" y2=\"{}\" stroke=\"#275DA8\" stroke-width=\"3\"/>", height - 30);
     for (index, item) in items.iter().enumerate() {
         let y = 50 + index * 54;
         svg.push_str(&format!("<circle cx=\"120\" cy=\"{y}\" r=\"8\" fill=\"#275DA8\"/><text x=\"150\" y=\"{}\" font-size=\"18\" fill=\"#1f2937\">{}</text>", y + 6, escape_html(item)));
@@ -1296,7 +1296,7 @@ fn render_chart_svg(body: &str) -> String {
     let height = 300;
     let width = 760;
     let mut svg = format!(
-        "<svg class=\"chart\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><title>{}</title><text x=\"80\" y=\"32\" font-size=\"18\" font-weight=\"700\" fill=\"#1f2937\">{}</text>",
+        "<svg class=\"transform transform-chart chart\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><title>{}</title><text x=\"80\" y=\"32\" font-size=\"18\" font-weight=\"700\" fill=\"#1f2937\">{}</text>",
         escape_html(&title),
         escape_html(&title)
     );
@@ -3887,6 +3887,10 @@ Q1: Launch beta
 Q2: Expand exports
 ```
 
+```timeline
+2026-05-19: Semantic AST
+```
+
 ```mermaid
 flowchart LR
   A[Start] --> B[Done]
@@ -3914,6 +3918,23 @@ flowchart LR
         assert_eq!(roadmap.0, "html");
         assert!(roadmap.1.contains("Launch beta"));
         assert!(roadmap.2.contains("transform-roadmap"));
+
+        let timeline = response
+            .document_ast
+            .blocks
+            .iter()
+            .find_map(|block| match block {
+                DocumentBlock::Transform {
+                    name,
+                    output_kind,
+                    text,
+                    ..
+                } if name == "timeline" => Some((output_kind, text)),
+                _ => None,
+            })
+            .expect("timeline transform block");
+        assert_eq!(timeline.0, "svg");
+        assert!(timeline.1.contains("Semantic AST"));
 
         let mermaid = response
             .document_ast
@@ -4034,7 +4055,7 @@ flowchart LR
         .expect("chart transform");
 
         assert_eq!(artifact.output_kind, "svg");
-        assert!(artifact.html.contains("class=\"chart\""));
+        assert!(artifact.html.contains("transform-chart"));
         assert!(artifact.html.contains("Revenue by Region"));
         assert!(artifact.html.contains(">East<"));
         assert!(artifact.html.contains(">120<"));
@@ -4050,7 +4071,7 @@ flowchart LR
         .expect("timeline transform");
 
         assert_eq!(artifact.output_kind, "svg");
-        assert!(artifact.html.contains("class=\"timeline\""));
+        assert!(artifact.html.contains("transform-timeline"));
         assert!(artifact.html.contains("Kickoff"));
         assert!(artifact.html.contains("Release"));
         assert!(artifact.diagnostics.is_empty());
