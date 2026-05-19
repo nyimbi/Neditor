@@ -4259,7 +4259,7 @@ beta</pre>
     #[test]
     fn semantic_exporters_map_ast_blocks() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph with [source](https://example.com/report).\n\n- [x] Confirm controls\n- [ ] Final approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n{{slide title=\"Board Review\" notes=\"Open with risk summary\\nClose with decision ask\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
+            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph with [source](https://example.com/report).\n\n- [x] Confirm controls\n- [ ] Final approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2 header=\"Section Header\" footer=\"Section {{page}}/{{pages}}\"}}\n\n{{slide title=\"Board Review\" header=\"Slide Header\" footer=\"Slide {{page}}/{{pages}}\" notes=\"Open with risk summary\\nClose with decision ask\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
             file_path: None,
         });
         let options = json!({ "watermark": "DRAFT" });
@@ -4323,9 +4323,13 @@ beta</pre>
         let slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
         assert!(slide_three.contains("Section"));
         assert!(slide_three.contains("Section break: columns=2"));
+        assert!(slide_three.contains("Section Header"));
+        assert!(slide_three.contains("Section 3/5"));
         let slide_four = zip_entry_text(&pptx, "ppt/slides/slide4.xml");
         assert!(slide_four.contains("Board Review"));
         assert!(slide_four.contains("Slide-specific body."));
+        assert!(slide_four.contains("Slide Header"));
+        assert!(slide_four.contains("Slide 4/5"));
         assert!(slide_four_relationships.contains(r#"Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide""#));
         assert!(slide_four_relationships.contains(r#"Target="../notesSlides/notesSlide4.xml""#));
         assert!(slide_four_notes.contains("Open with risk summary"));
@@ -4338,13 +4342,14 @@ beta</pre>
         assert!(pdf_text.contains("/Count 3"));
         assert!(pdf_text.contains("Page 1 of 3"));
         assert!(pdf_text.contains("Page 2 of 3"));
-        assert!(pdf_text.contains("Page 3 of 3"));
         assert!(pdf_text.contains(" re S"));
         assert!(pdf_text.contains("(Metric) Tj"));
         assert!(pdf_text.contains("(Total) Tj"));
         assert!(pdf_text.contains("- [x] Confirm controls"));
         assert!(pdf_text.contains("- [ ] Final approval"));
         assert!(pdf_text.contains("Section break: columns=2"));
+        assert!(pdf_text.contains("Section Header"));
+        assert!(pdf_text.contains("Section 3/3"));
         assert!(pdf_text.contains("System diagram"));
         assert!(pdf_text.contains("After the break."));
     }

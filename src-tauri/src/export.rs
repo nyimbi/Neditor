@@ -152,12 +152,18 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
     ];
     let mut page_ids = Vec::new();
 
-    for (page_index, page_items) in pages.iter().enumerate() {
+    for (page_index, page) in pages.iter().enumerate() {
         let page_id = objects.len() + 1;
         let content_id = page_id + 1;
         page_ids.push(page_id);
-        let (header, footer) =
+        let (mut header, mut footer) =
             export_header_footer_for_page(response, options, page_index + 1, total_pages);
+        if let Some(section_header) = &page.header {
+            header = render_section_template(response, section_header, page_index + 1, total_pages);
+        }
+        if let Some(section_footer) = &page.footer {
+            footer = render_section_template(response, section_footer, page_index + 1, total_pages);
+        }
         let mut stream = String::new();
         let mut y = page_height.saturating_sub(margin_top) as i32;
         if !header.trim().is_empty() {
@@ -168,7 +174,7 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
                 &header,
             ));
         }
-        for item in page_items.iter().take(60) {
+        for item in page.items.iter().take(60) {
             match item {
                 PdfPageItem::Text(line) => {
                     stream.push_str(&pdf_text_line(10, margin_left, y, line));
@@ -1120,6 +1126,16 @@ fn export_header_footer_for_page(
             }
         });
     (header, footer)
+}
+
+fn render_section_template(
+    response: &CompileResponse,
+    template: &str,
+    page: usize,
+    pages: usize,
+) -> String {
+    let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
+    render_export_template_for_page(template, response, &classification, page, pages)
 }
 
 fn render_export_template_for_page(
@@ -2510,6 +2526,13 @@ enum PdfPageItem {
 }
 
 #[derive(Clone, Debug)]
+struct PdfPage {
+    items: Vec<PdfPageItem>,
+    header: Option<String>,
+    footer: Option<String>,
+}
+
+#[derive(Clone, Debug)]
 struct PdfTable {
     id: Option<String>,
     caption: Option<String>,
@@ -2518,7 +2541,7 @@ struct PdfTable {
     rows: Vec<Vec<String>>,
 }
 
-fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<PdfPageItem>> {
+fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<PdfPage> {
     let (_, page_height, margin_top, _) = pdf_page_layout(response, options);
     let footer_reserved = (margin_top / 2).max(12) + 24;
     let available_height =
@@ -2536,6 +2559,13 @@ fn build_pdf_pages(response: &CompileResponse, options: &Value) -> Vec<Vec<PdfPa
                 directive, options, ..
             } if directive == "section-break" => {
                 paginator.finish_page();
+                paginator.apply_section_options(options);
+                paginator.extend_text(layout_export_lines(directive, options));
+            }
+            DocumentBlock::Layout {
+                directive, options, ..
+            } if directive == "layout" => {
+                paginator.apply_section_options(options);
                 paginator.extend_text(layout_export_lines(directive, options));
             }
             _ => paginator.extend_items(block_pdf_items(block)),
@@ -2597,8 +2627,10 @@ fn pdf_text_items(lines: Vec<String>) -> Vec<PdfPageItem> {
 }
 
 struct PdfPaginator {
-    pages: Vec<Vec<PdfPageItem>>,
+    pages: Vec<PdfPage>,
     current: Vec<PdfPageItem>,
+    current_header: Option<String>,
+    current_footer: Option<String>,
     used_height: i32,
     available_height: i32,
 }
@@ -2608,8 +2640,19 @@ impl PdfPaginator {
         Self {
             pages: Vec::new(),
             current: Vec::new(),
+            current_header: None,
+            current_footer: None,
             used_height: 0,
             available_height,
+        }
+    }
+
+    fn apply_section_options(&mut self, options: &str) {
+        if let Some(header) = layout_option_text(options, "header") {
+            self.current_header = Some(header);
+        }
+        if let Some(footer) = layout_option_text(options, "footer") {
+            self.current_footer = Some(footer);
         }
     }
 
@@ -2685,14 +2728,22 @@ impl PdfPaginator {
         if self.current.is_empty() {
             return;
         }
-        self.pages.push(std::mem::take(&mut self.current));
+        self.pages.push(PdfPage {
+            items: std::mem::take(&mut self.current),
+            header: self.current_header.clone(),
+            footer: self.current_footer.clone(),
+        });
         self.used_height = 0;
     }
 
-    fn into_pages(mut self) -> Vec<Vec<PdfPageItem>> {
+    fn into_pages(mut self) -> Vec<PdfPage> {
         self.finish_page();
         if self.pages.is_empty() {
-            self.pages.push(Vec::new());
+            self.pages.push(PdfPage {
+                items: Vec::new(),
+                header: self.current_header.clone(),
+                footer: self.current_footer.clone(),
+            });
         }
         self.pages
     }
@@ -2779,6 +2830,8 @@ struct PptxSlide {
     lines: Vec<String>,
     header: String,
     footer: String,
+    header_override: Option<String>,
+    footer_override: Option<String>,
     tables: Vec<PptxTable>,
     media_refs: Vec<MediaRef>,
     hyperlinks: Vec<ExportHyperlink>,
@@ -2807,6 +2860,8 @@ impl PptxSlide {
             lines: Vec::new(),
             header: String::new(),
             footer: String::new(),
+            header_override: None,
+            footer_override: None,
             tables: Vec::new(),
             media_refs: Vec::new(),
             hyperlinks: Vec::new(),
@@ -2820,6 +2875,8 @@ impl PptxSlide {
             lines,
             header: String::new(),
             footer: String::new(),
+            header_override: None,
+            footer_override: None,
             tables: Vec::new(),
             media_refs: Vec::new(),
             hyperlinks: Vec::new(),
@@ -2892,10 +2949,10 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                         slides.push(slide);
                     }
                 }
-                current = Some(PptxSlide::with_lines(
-                    "Section",
-                    layout_export_lines(directive, options),
-                ));
+                let mut slide =
+                    PptxSlide::with_lines("Section", layout_export_lines(directive, options));
+                apply_pptx_section_options(&mut slide, options);
+                current = Some(slide);
             }
             DocumentBlock::Layout {
                 directive, options, ..
@@ -2907,7 +2964,19 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                 }
                 let mut slide = PptxSlide::new(slide_title_from_options(options));
                 slide.notes = slide_notes_from_options(options);
+                apply_pptx_section_options(&mut slide, options);
                 current = Some(slide);
+            }
+            DocumentBlock::Layout {
+                directive, options, ..
+            } if directive == "layout" => {
+                if current.is_none() {
+                    current = Some(PptxSlide::new("Document"));
+                }
+                if let Some(slide) = current.as_mut() {
+                    apply_pptx_section_options(slide, options);
+                    slide.lines.extend(layout_export_lines(directive, options));
+                }
             }
             _ => {
                 if current.is_none() {
@@ -2951,12 +3020,29 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
             }
             let (header, footer) =
                 export_header_footer_for_page(response, options, index + 1, total_slides);
-            slide.header = header;
-            slide.footer = footer;
+            slide.header = slide
+                .header_override
+                .as_deref()
+                .map(|template| {
+                    render_section_template(response, template, index + 1, total_slides)
+                })
+                .unwrap_or(header);
+            slide.footer = slide
+                .footer_override
+                .as_deref()
+                .map(|template| {
+                    render_section_template(response, template, index + 1, total_slides)
+                })
+                .unwrap_or(footer);
             slide.lines.truncate(14);
             slide
         })
         .collect()
+}
+
+fn apply_pptx_section_options(slide: &mut PptxSlide, options: &str) {
+    slide.header_override = layout_option_text(options, "header");
+    slide.footer_override = layout_option_text(options, "footer");
 }
 
 fn is_appendix_heading(line: &str) -> bool {
@@ -2992,14 +3078,17 @@ fn expand_pptx_table_slides(slides: Vec<PptxSlide>) -> Vec<PptxSlide> {
                     )];
                     slide
                 } else {
-                    PptxSlide::with_lines(
+                    let mut continued = PptxSlide::with_lines(
                         format!("{} (continued)", slide.title),
                         vec![table_export_line(
                             &table_chunk.id,
                             &table_chunk.caption,
                             &table_chunk.headers,
                         )],
-                    )
+                    );
+                    continued.header_override = slide.header_override.clone();
+                    continued.footer_override = slide.footer_override.clone();
+                    continued
                 };
                 if chunk_index > 0 && next_slide.lines.is_empty() {
                     next_slide.lines.push(table_export_line(
