@@ -732,6 +732,7 @@
       </span>
       <span>{{ wordStats }}</span>
       <span v-if="watchStatus">{{ watchStatus }}</span>
+      <span v-if="store.exportProgress">{{ store.exportProgress }}</span>
       <span v-if="store.lastError" class="error">{{ store.lastError }}</span>
     </footer>
 

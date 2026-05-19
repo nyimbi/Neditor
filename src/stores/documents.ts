@@ -482,6 +482,7 @@ export const useDocumentsStore = defineStore("documents", {
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
     exportBusy: false,
+    exportProgress: "",
     aiCleanupIssues: [] as string[],
     aiCleanupPreview: null as AiCleanupResponse | null,
     recentFiles: [] as string[],
@@ -1079,7 +1080,9 @@ export const useDocumentsStore = defineStore("documents", {
       const doc = this.activeDocument;
       this.exportBusy = true;
       try {
+        this.exportProgress = "Creating pre-export snapshot";
         await this.createSnapshot("pre-export");
+        this.exportProgress = `Writing ${this.exportTarget.toUpperCase()} export`;
         const response = await invoke<{ output_path: string; manifest_path?: string }>("export_document", {
           request: {
             text: doc.text,
@@ -1090,8 +1093,10 @@ export const useDocumentsStore = defineStore("documents", {
           },
         });
         this.statusMessage = `Exported ${response.output_path}${response.manifest_path ? " with manifest" : ""}`;
+        this.exportProgress = "Refreshing export snapshots";
         await this.listSnapshots();
       } finally {
+        this.exportProgress = "";
         this.exportBusy = false;
       }
     },
@@ -1166,6 +1171,7 @@ export const useDocumentsStore = defineStore("documents", {
       const doc = this.activeDocument;
       this.exportBusy = true;
       try {
+        this.exportProgress = "Checking export readiness";
         this.exportReadiness = await invoke<ExportReadinessReport>("prepare_for_export", {
           request: {
             text: doc.text,
@@ -1178,6 +1184,7 @@ export const useDocumentsStore = defineStore("documents", {
           ? "Document is ready for export"
           : `${this.exportReadiness.error_count} errors, ${this.exportReadiness.warning_count} warnings before export`;
       } finally {
+        this.exportProgress = "";
         this.exportBusy = false;
       }
     },
