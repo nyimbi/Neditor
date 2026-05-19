@@ -1698,6 +1698,33 @@ fn layout_pagination_controls_flow_through_exports() {
 }
 
 #[test]
+fn pdf_section_columns_split_large_tables_across_columns() {
+    let table_rows = (1..=34)
+        .map(|index| format!("| R{index} | {index} |"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let response = compile(CompileRequest {
+        text: format!(
+            "---\ntitle: Column Table\nstatus: archived\nversion: 1.0.0\n---\n# Column Table\n\n{{{{section-break columns=2 pageSize=letter orientation=landscape margins=narrow}}}}\n\nTable: Column flow\n\n| Item | Value |\n| --- | ---: |\n{table_rows}\n"
+        ),
+        file_path: None,
+    });
+
+    assert!(response.diagnostics.is_empty());
+    assert!(response
+        .paged_document
+        .sections
+        .iter()
+        .any(|section| section.layout.columns == Some(2)));
+
+    let pdf = render_pdf_bytes(&response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Table \\(continued\\)"));
+    assert!(pdf_text.contains("BT /F1 8 Tf 412 "));
+    assert!(pdf_text.contains("(R30) Tj"));
+}
+
+#[test]
 fn compiler_renders_callouts_as_semantic_blocks() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Callouts\nstatus: approved\napprovedBy: QA\n---\n# Callouts\n> [!NOTE] Board review\n> Confirm the launch criteria.\n".to_string(),
