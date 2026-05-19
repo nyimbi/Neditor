@@ -4768,10 +4768,14 @@ beta</pre>
         assert!(slide_two.contains(r#"<a:pPr algn="r"/>"#));
         assert!(slide_two.contains("<a:t>Total</a:t>"));
         assert!(slide_two.contains("System diagram"));
+        assert!(slide_two.contains("Business paragraph with source (https://example.com/report)."));
+        assert!(slide_two.contains(r#"<a:hlinkClick r:id="rIdHyperlink1""#));
         assert!(slide_two.contains(r#"name="Footer""#));
         assert!(slide_two.contains("Page 2 of 5"));
         assert!(slide_two.contains(r#"r:embed="rIdImage1""#));
         assert!(slide_two_relationships.contains(r#"Target="../media/image1.svg""#));
+        assert!(slide_two_relationships.contains(r#"Target="https://example.com/report""#));
+        assert!(slide_two_relationships.contains(r#"TargetMode="External""#));
         assert_eq!(pptx_svg, "<svg/>");
         let slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
         assert!(slide_three.contains("Section"));

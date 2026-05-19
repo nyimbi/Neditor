@@ -24,7 +24,7 @@ struct ExportMedia {
     bytes: Vec<u8>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ExportHyperlink {
     url: String,
     relationship_id: String,
@@ -455,8 +455,10 @@ pub(crate) fn render_pptx_bytes(
         .map_err(|err| err.to_string())?;
     zip.add_directory("ppt/slides/", options)
         .map_err(|err| err.to_string())?;
-    let has_slide_relationships =
-        !media.is_empty() || slides.iter().any(|slide| !slide.notes.is_empty());
+    let has_slide_relationships = !media.is_empty()
+        || slides
+            .iter()
+            .any(|slide| !slide.notes.is_empty() || !slide.hyperlinks.is_empty());
     if has_slide_relationships {
         zip.add_directory("ppt/slides/_rels/", options)
             .map_err(|err| err.to_string())?;
@@ -480,7 +482,7 @@ pub(crate) fn render_pptx_bytes(
         .map_err(|err| err.to_string())?;
     for (index, slide) in slides.iter().enumerate() {
         let slide_media = pptx_slide_media(slide, &media);
-        if !slide_media.is_empty() || !slide.notes.is_empty() {
+        if !slide_media.is_empty() || !slide.notes.is_empty() || !slide.hyperlinks.is_empty() {
             zip.start_file(
                 format!("ppt/slides/_rels/slide{}.xml.rels", index + 1),
                 options,
@@ -489,6 +491,7 @@ pub(crate) fn render_pptx_bytes(
             zip.write_all(
                 render_pptx_slide_relationships(
                     &slide_media,
+                    &slide.hyperlinks,
                     (!slide.notes.is_empty()).then_some(index + 1),
                 )
                 .as_bytes(),
@@ -2306,6 +2309,7 @@ struct PptxSlide {
     footer: String,
     tables: Vec<PptxTable>,
     media_refs: Vec<MediaRef>,
+    hyperlinks: Vec<ExportHyperlink>,
     notes: Vec<String>,
 }
 
@@ -2333,6 +2337,7 @@ impl PptxSlide {
             footer: String::new(),
             tables: Vec::new(),
             media_refs: Vec::new(),
+            hyperlinks: Vec::new(),
             notes: Vec::new(),
         }
     }
@@ -2345,6 +2350,7 @@ impl PptxSlide {
             footer: String::new(),
             tables: Vec::new(),
             media_refs: Vec::new(),
+            hyperlinks: Vec::new(),
             notes: Vec::new(),
         }
     }
@@ -2579,6 +2585,7 @@ fn include_pptx_agenda(response: &CompileResponse, options: &Value) -> bool {
 
 fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
     slide.lines.extend(block_export_lines(block));
+    collect_pptx_block_hyperlinks(slide, block);
     if let DocumentBlock::RawHtml { html, .. } = block {
         if let Some(table) = export_table_from_transform_html(html) {
             slide.tables.push(PptxTable {
@@ -2631,6 +2638,25 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
     }
 }
 
+fn collect_pptx_block_hyperlinks(slide: &mut PptxSlide, block: &DocumentBlock) {
+    let DocumentBlock::Paragraph { inlines, .. } = block else {
+        return;
+    };
+    for inline in inlines {
+        let InlineNode::Link { url, .. } = inline else {
+            continue;
+        };
+        if !is_external_hyperlink(url) || slide.hyperlinks.iter().any(|item| item.url == *url) {
+            continue;
+        }
+        let index = slide.hyperlinks.len() + 1;
+        slide.hyperlinks.push(ExportHyperlink {
+            url: url.clone(),
+            relationship_id: format!("rIdHyperlink{index}"),
+        });
+    }
+}
+
 fn is_generated_toc_heading(block: &DocumentBlock) -> bool {
     matches!(
         block,
@@ -2652,7 +2678,9 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
         DocumentBlock::Heading { level, text, .. } => {
             vec![format!("{} {text}", "#".repeat(*level))]
         }
-        DocumentBlock::Paragraph { text, .. } => vec![text.clone()],
+        DocumentBlock::Paragraph { text, inlines, .. } => {
+            vec![paragraph_export_line(text, inlines)]
+        }
         DocumentBlock::BlockQuote { text, .. } => {
             text.lines().map(|line| format!("> {line}")).collect()
         }
@@ -2745,6 +2773,28 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             raw_html_export_lines(html)
         }
     }
+}
+
+fn paragraph_export_line(text: &str, inlines: &[InlineNode]) -> String {
+    let mut rendered = text.to_string();
+    for inline in inlines {
+        let InlineNode::Link { text: label, url } = inline else {
+            continue;
+        };
+        if !is_external_hyperlink(url) {
+            continue;
+        }
+        let replacement = format!("{label} ({url})");
+        let markdown_link = format!("[{label}]({url})");
+        if let Some(start) = rendered.find(&markdown_link) {
+            rendered.replace_range(start..start + markdown_link.len(), &replacement);
+        } else if let Some(start) = rendered.find(label) {
+            rendered.replace_range(start..start + label.len(), &replacement);
+        } else if !rendered.contains(url) {
+            rendered.push_str(&format!(" ({url})"));
+        }
+    }
+    rendered
 }
 
 fn raw_html_export_lines(html: &str) -> Vec<String> {
@@ -3012,6 +3062,7 @@ fn render_pptx_relationships(slide_count: usize) -> String {
 
 fn render_pptx_slide_relationships(
     media: &[&ExportMedia],
+    hyperlinks: &[ExportHyperlink],
     notes_slide_index: Option<usize>,
 ) -> String {
     let mut relationships = media
@@ -3024,6 +3075,13 @@ fn render_pptx_slide_relationships(
             )
         })
         .collect::<Vec<_>>();
+    relationships.extend(hyperlinks.iter().map(|item| {
+        format!(
+            r#"<Relationship Id="{}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="{}" TargetMode="External"/>"#,
+            escape_xml(&item.relationship_id),
+            escape_xml(&item.url)
+        )
+    }));
     if let Some(index) = notes_slide_index {
         relationships.push(format!(
             r#"<Relationship Id="rIdNotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide{index}.xml"/>"#
@@ -3053,7 +3111,7 @@ fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
         .lines
         .iter()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| format!(r#"<a:p><a:r><a:t>{}</a:t></a:r></a:p>"#, escape_xml(line)))
+        .map(|line| render_pptx_body_line(line, &slide.hyperlinks))
         .collect::<String>();
     let pictures = media
         .iter()
@@ -3085,6 +3143,18 @@ fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{header}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{tables}{pictures}{footer}</p:spTree></p:cSld></p:sld>"#
     )
+}
+
+fn render_pptx_body_line(line: &str, hyperlinks: &[ExportHyperlink]) -> String {
+    let hyperlink = hyperlinks.iter().find(|item| line.contains(&item.url));
+    match hyperlink {
+        Some(item) => format!(
+            r#"<a:p><a:r><a:rPr><a:hlinkClick r:id="{}"/></a:rPr><a:t>{}</a:t></a:r></a:p>"#,
+            escape_xml(&item.relationship_id),
+            escape_xml(line)
+        ),
+        None => format!(r#"<a:p><a:r><a:t>{}</a:t></a:r></a:p>"#, escape_xml(line)),
+    }
 }
 
 fn render_pptx_table(table: &PptxTable, index: usize, body_line_count: usize) -> String {
