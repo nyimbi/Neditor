@@ -248,6 +248,43 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
             .any(|related| related == "output_channel: sidecar svg")
     }));
 
+    use std::os::unix::fs::PermissionsExt;
+
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let pikchr_cli = std::env::temp_dir().join(format!("pikchr-cli-{unique}.sh"));
+    fs::write(
+        &pikchr_cli,
+        "#!/bin/sh\nif [ \"$#\" -ne 1 ]; then echo 'missing source argument' >&2; exit 2; fi\nprintf '<svg data-args=\"%s\">%s</svg>' \"$#\" \"$1\"\n",
+    )
+    .expect("write fake pikchr-cli");
+    let mut permissions = fs::metadata(&pikchr_cli)
+        .expect("fake pikchr-cli metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&pikchr_cli, permissions).expect("make fake pikchr-cli executable");
+    let pikchr_body = "box \"CI\"; arrow; box \"Done\"".to_string();
+    let pikchr_artifact = run_external_transform(ExternalTransformRequest {
+        name: "pikchr".to_string(),
+        body: pikchr_body.clone(),
+        engine_path: Some(path_to_string(&pikchr_cli)),
+        trusted: true,
+        input_mode: Some("stdin".to_string()),
+        timeout_ms: Some(1000),
+        max_input_bytes: Some(1024),
+        max_output_bytes: Some(2048),
+    })
+    .expect("pikchr-cli positional source adapter transform");
+    assert!(pikchr_artifact.html.contains(&pikchr_body));
+    assert!(pikchr_artifact.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .related
+            .iter()
+            .any(|related| related == "adapter_args: <source>")
+    }));
+
     let engines = list_transform_engines();
     let graphviz = engines
         .iter()
@@ -274,6 +311,7 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
 
     let _ = fs::remove_file(d2);
     let _ = fs::remove_file(plantuml);
+    let _ = fs::remove_file(pikchr_cli);
 }
 
 #[test]

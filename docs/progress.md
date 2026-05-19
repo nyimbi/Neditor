@@ -45,6 +45,7 @@ Recent pushed checkpoints visible in current git history:
   exact `Ready` match to the readiness panel.
 - `9a6d52e` recorded the first passing Linux browser workflow CI lane in the
   durable docs.
+- `5ce5b99` rewrote the active backlog around the latest survey and CI evidence.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -96,10 +97,12 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest CI for commit `9a6d52e` is not green: Windows fails clippy on a
+- Latest pushed CI for commit `9a6d52e` is not green: Windows fails clippy on a
   dead-code test helper in `src/transforms/external.rs`, and Ubuntu fails the
   installed Pikchr conformance test because the installed `pikchr-cli` requires
-  a positional `<PIKCHR>` argument.
+  a positional `<PIKCHR>` argument. A local fix is in progress to Unix-gate the
+  test helper and support `pikchr-cli` source-argument invocation; CI has not
+  yet verified that fix.
 - Initial browser-level workflow tests pass in Linux CI, but coverage is still
   narrow and local sandbox execution still fails before app assertions because
   Chromium cannot register its Mach bootstrap port.
@@ -171,6 +174,11 @@ Current CI follow-up:
 | `gh run view 26131929125 --json jobs,conclusion,status,headSha,url` | Mixed CI result | For `9a6d52e`, browser workflows and macOS desktop passed; Windows desktop failed clippy, Ubuntu desktop failed Rust tests. |
 | `XDG_CACHE_HOME=.cache gh api repos/nyimbi/Neditor/actions/jobs/76858711971/logs` | Windows failure diagnosed | Clippy failed because `clear_external_transform_memory_cache_for_tests` in `src/transforms/external.rs:444` was dead code in the Windows lib-test target. |
 | `XDG_CACHE_HOME=.cache gh api repos/nyimbi/Neditor/actions/jobs/76858711986/logs` | Ubuntu failure diagnosed | `external_transform_conformance_runs_installed_engines` failed because the installed `pikchr-cli` requires a positional `<PIKCHR>` argument and exited with status 2. |
+| `cargo fmt --check` in `src-tauri` | Pass | Re-run after the external transform adapter fix. |
+| `cargo test --locked external_transform_adapters_shape_engine_specific_invocations --lib` in `src-tauri` | Pass | Covers the new `pikchr-cli` positional source adapter path. |
+| `cargo test --locked external_transform_tests --lib` in `src-tauri` | Pass | 8 external transform tests passed, including installed-engine conformance path and trust/timeout/error behavior. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Re-run after Unix-gating the test cache helper and adding the Pikchr adapter path. |
+| `cargo test --locked` in `src-tauri` | Pass | 126 Rust tests passed plus main/doc test targets with 0 tests. |
 
 Relevant CI fixes already landed:
 
@@ -223,21 +231,17 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Fix the current Windows clippy failure around the dead-code external
-   transform test helper.
-2. Fix the current Ubuntu Pikchr installed-engine conformance failure without
-   weakening the real optional-engine proof.
-3. Push and verify a green CI run across browser workflows and the desktop
-   matrix.
-4. Expand browser coverage for file operations, workspace restore, conflicts,
+1. Push the local external-transform CI fix and verify a green CI run across
+   browser workflows and the desktop matrix.
+2. Expand browser coverage for file operations, workspace restore, conflicts,
    preview navigation, scroll sync, transform settings, export progress, and
    the remaining AI/table modes.
-5. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
+3. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
-6. Use failures from workflow tests to drive implementation fixes.
-7. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
-8. Add macOS/Windows optional transform engine evidence.
-9. Only after behavior is locked, modularize oversized frontend/store/backend
+4. Use failures from workflow tests to drive implementation fixes.
+5. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
+6. Add macOS/Windows optional transform engine evidence.
+7. Only after behavior is locked, modularize oversized frontend/store/backend
    modules.
 
 ## Completion Gate

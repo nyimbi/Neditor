@@ -131,7 +131,7 @@ pub(crate) fn run_external_transform(
     }
     let source_hash = sha256_hex(request.body.as_bytes());
     let (engine_identity, engine_version) = external_engine_identity(&engine_path)?;
-    let adapter = external_engine_adapter(&request.name, input_mode, None)?;
+    let adapter = external_engine_adapter(&request.name, input_mode, None, &engine_path)?;
     let renderer_identity = adapter.cache_identity(&format!(
         "{engine_identity};{EXTERNAL_TRANSFORM_RENDERER_VERSION}"
     ));
@@ -165,6 +165,7 @@ struct ExternalEngineAdapter {
     input_mode: &'static str,
     args: Vec<String>,
     stdin: bool,
+    source_arg: bool,
     sidecar_output_suffix: Option<&'static str>,
 }
 
@@ -175,6 +176,18 @@ impl ExternalEngineAdapter {
             input_mode,
             args,
             stdin: input_mode == "stdin",
+            source_arg: false,
+            sidecar_output_suffix: None,
+        }
+    }
+
+    fn source_arg(engine: &'static str, input_mode: &'static str) -> Self {
+        Self {
+            engine,
+            input_mode,
+            args: Vec::new(),
+            stdin: false,
+            source_arg: true,
             sidecar_output_suffix: None,
         }
     }
@@ -190,16 +203,18 @@ impl ExternalEngineAdapter {
             input_mode,
             args,
             stdin: false,
+            source_arg: false,
             sidecar_output_suffix: Some(output_suffix),
         }
     }
 
     fn cache_identity(&self, engine_identity: &str) -> String {
         format!(
-            "{engine_identity};adapter={};mode={};args={}",
+            "{engine_identity};adapter={};mode={};args={};source_arg={}",
             self.engine,
             self.input_mode,
-            self.args.join("\u{1f}")
+            self.args.join("\u{1f}"),
+            self.source_arg
         )
     }
 }
@@ -208,6 +223,7 @@ fn external_engine_adapter(
     name: &str,
     input_mode: &str,
     temp_path: Option<&Path>,
+    engine_path: &Path,
 ) -> Result<ExternalEngineAdapter, String> {
     let temp = temp_path
         .map(path_to_string)
@@ -244,11 +260,35 @@ fn external_engine_adapter(
             vec!["-tsvg".to_string(), temp],
             "svg",
         )),
+        ("pikchr", "stdin") if pikchr_uses_source_argument(engine_path) => {
+            Ok(ExternalEngineAdapter::source_arg("pikchr", "stdin"))
+        }
+        ("pikchr", "file") if pikchr_uses_source_argument(engine_path) => {
+            Ok(ExternalEngineAdapter::source_arg("pikchr", "file"))
+        }
         ("pikchr", "stdin") => Ok(ExternalEngineAdapter::stdout("pikchr", "stdin", Vec::new())),
         ("pikchr", "file") => Ok(ExternalEngineAdapter::stdout("pikchr", "file", vec![temp])),
         (_, "stdin" | "file") => Err(format!("No external adapter is registered for {name}.")),
         _ => Err("External transform input_mode must be 'stdin' or 'file'.".to_string()),
     }
+}
+
+fn pikchr_uses_source_argument(engine_path: &Path) -> bool {
+    engine_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| {
+            let name = name.to_ascii_lowercase();
+            name == "pikchr-cli" || name.starts_with("pikchr-cli-")
+        })
+}
+
+fn adapter_args_label(adapter: &ExternalEngineAdapter) -> String {
+    let mut args = adapter.args.clone();
+    if adapter.source_arg {
+        args.push("<source>".to_string());
+    }
+    args.join(" ")
 }
 
 fn external_engine_temp_suffix(name: &str) -> &'static str {
@@ -440,7 +480,7 @@ fn prune_external_transform_disk_cache(root: &Path) {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(crate) fn clear_external_transform_memory_cache_for_tests() {
     if let Ok(mut cache) = external_transform_cache().lock() {
         cache.clear();
@@ -499,7 +539,8 @@ fn execute_external_transform(
         temp_input = Some(path);
     }
 
-    let adapter = external_engine_adapter(name, input_mode, temp_input.as_deref())?;
+    let adapter =
+        external_engine_adapter(name, input_mode, temp_input.as_deref(), request.engine_path)?;
     if let (Some(input_path), Some(output_suffix)) =
         (temp_input.as_deref(), adapter.sidecar_output_suffix)
     {
@@ -508,6 +549,9 @@ fn execute_external_transform(
 
     let mut command = Command::new(request.engine_path);
     command.args(&adapter.args);
+    if adapter.source_arg {
+        command.arg(request.body);
+    }
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     if adapter.stdin {
         command.stdin(Stdio::piped());
@@ -670,7 +714,7 @@ fn execute_external_transform(
         .push(format!("adapter: {}", adapter.engine));
     diagnostic
         .related
-        .push(format!("adapter_args: {}", adapter.args.join(" ")));
+        .push(format!("adapter_args: {}", adapter_args_label(&adapter)));
     diagnostic
         .related
         .push(format!("engine_version: {}", request.engine_version));
@@ -858,7 +902,7 @@ fn transform_adapter_profile(name: &str) -> &'static str {
         "dot" | "graphviz" => "Graphviz DOT adapter: invokes -Tsvg and captures SVG from stdout.",
         "d2" => "D2 adapter: invokes input-to-stdout mode with '-' as the output target.",
         "plantuml" => "PlantUML adapter: uses -tsvg -pipe for stdin, or reads PlantUML's SVG sidecar for file mode.",
-        "pikchr" => "Pikchr adapter: passes stdin directly or a temporary Pikchr source file.",
+        "pikchr" => "Pikchr adapter: passes stdin directly, a temporary Pikchr source file, or a direct source argument for pikchr-cli.",
         _ => "No external adapter; rendered by the embedded Rust engine.",
     }
 }
@@ -875,7 +919,7 @@ fn transform_failure_suggestion(name: &str) -> &'static str {
             "Check PlantUML syntax, Java availability, and -tsvg/-pipe support for the selected launcher."
         }
         "pikchr" => {
-            "Check Pikchr syntax; NEditor passes stdin or a temporary .pikchr file directly."
+            "Check Pikchr syntax; NEditor passes stdin, a temporary .pikchr file, or a direct source argument for pikchr-cli."
         }
         _ => "Review the transform source and renderer diagnostics.",
     }

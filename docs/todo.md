@@ -72,7 +72,7 @@ modules after behavior is locked.
 
 ## Current Verification Snapshot
 
-Latest pushed commit inspected:
+Latest pushed commit inspected before this fix:
 
 - `9a6d52e Record the passing browser workflow lane`
 
@@ -103,6 +103,10 @@ CI evidence from run `26131929125`:
   `external_transform_conformance_runs_installed_engines` because the installed
   `pikchr-cli` executable requires a positional `<PIKCHR>` argument and exited
   with status 2 when NEditor invoked it using the current adapter mode.
+- Local changes now Unix-gate the cache-clearing test helper and add a
+  `pikchr-cli` source-argument adapter path. These changes pass focused local
+  verification, but the follow-up GitHub Actions run is still required before
+  the desktop CI blocker can be closed.
 
 Recent local verification evidence from this buildout:
 
@@ -125,11 +129,12 @@ Known local environment caveat:
 
 ## P0 - Immediate Blockers
 
-### 1. Restore Green Desktop CI
+### 1. Verify The Desktop CI Fix
 
-Status: required now.
+Status: local fix implemented; remote CI verification pending.
 
-Fix the two current desktop CI failures before widening the feature surface.
+The two latest desktop CI failures have local fixes. Push and verify the next
+GitHub Actions run before widening the feature surface.
 
 Windows failure:
 
@@ -139,7 +144,12 @@ Windows failure:
 - Failure: `clear_external_transform_memory_cache_for_tests` is dead code in
   `src/transforms/external.rs:444` for the Windows lib-test target.
 
-Likely completion criteria:
+Local fix:
+
+- `clear_external_transform_memory_cache_for_tests` is now compiled only for
+  Unix tests, matching its Unix-only call site.
+
+Completion criteria:
 
 - The helper is compiled only where it is used, used by tests on every target,
   or annotated with a narrowly justified lint expectation.
@@ -156,7 +166,15 @@ Ubuntu failure:
 - Failure: `pikchr-cli` exits with status 2 and reports that required argument
   `<PIKCHR>` was not provided.
 
-Likely completion criteria:
+Local fix:
+
+- The external Pikchr adapter now detects `pikchr-cli` executables and passes
+  the Pikchr source as a direct positional argument while preserving stdin/file
+  behavior for other Pikchr executables.
+- The adapter cache identity and diagnostics now include whether the source was
+  passed as an argument.
+
+Completion criteria:
 
 - The Pikchr external adapter detects the installed CLI contract correctly, or
   the CI-installed executable is replaced with a compatible engine invocation.
@@ -641,22 +659,20 @@ Completion criteria:
 
 ## Recommended Execution Order
 
-1. Fix the current Windows clippy failure.
-2. Fix the current Ubuntu Pikchr installed-engine conformance failure.
-3. Push and verify a green CI run for browser workflow, macOS desktop, Ubuntu
+1. Push and verify a green CI run for browser workflow, macOS desktop, Ubuntu
    desktop, and Windows desktop.
-4. Update `docs/progress.md` and `docs/spec-completion-matrix.md` with the new
+2. Update `docs/progress.md` and `docs/spec-completion-matrix.md` with the new
    CI evidence.
-5. Expand browser workflow coverage for file operations, workspace restore,
+3. Expand browser workflow coverage for file operations, workspace restore,
    conflicts, preview navigation/scroll sync, transform settings, export
    progress, and remaining AI/table modes.
-6. Add desktop WebDriver/Tauri smoke tests.
-7. Use workflow failures to close real implementation gaps.
-8. Audit export artifacts and add conformance fixtures.
-9. Harden cross-platform external transform evidence.
-10. Modularize frontend/store/backend code after behavior is locked.
-11. Complete packaging evidence, user docs, and example projects.
-12. Run a final requirement-by-requirement audit and fresh verification baseline.
+4. Add desktop WebDriver/Tauri smoke tests.
+5. Use workflow failures to close real implementation gaps.
+6. Audit export artifacts and add conformance fixtures.
+7. Harden cross-platform external transform evidence.
+8. Modularize frontend/store/backend code after behavior is locked.
+9. Complete packaging evidence, user docs, and example projects.
+10. Run a final requirement-by-requirement audit and fresh verification baseline.
 
 ## Completion Gate
 

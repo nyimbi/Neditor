@@ -52,6 +52,7 @@ D2 and Pikchr may need vendor packages or release binaries:
 
 ```sh
 curl -fsSL https://d2lang.com/install.sh | sh -s --
+cargo install pikchr-cli --locked
 ```
 
 After installing release binaries, place them under a user-owned bin directory such as:
@@ -59,6 +60,7 @@ After installing release binaries, place them under a user-owned bin directory s
 ```text
 ~/.local/bin/d2
 ~/.local/bin/pikchr
+~/.cargo/bin/pikchr-cli
 ```
 
 Then configure those exact paths in NEditor.
@@ -90,7 +92,7 @@ If an engine is installed through a package manager shim, verify that the shim w
 | --- | --- | --- | --- |
 | Graphviz / DOT | stdin | SVG stdout | Uses `dot -Tsvg` semantics. |
 | D2 | stdin | SVG stdout | Uses SVG export profile. |
-| Pikchr | stdin | SVG stdout | Native fallback covers simple diagrams. |
+| Pikchr | stdin | SVG stdout | Native fallback covers simple diagrams. `pikchr-cli` executables receive the source as a direct positional argument. |
 | PlantUML | file | SVG sidecar | File mode avoids version-specific stdin behavior. |
 
 ## Troubleshooting
