@@ -2589,9 +2589,32 @@ function escapeTableCell(cell: string) {
 
 function parseDelimitedRows(text: string) {
   const source = text.trim();
+  const markdownRows = parseMarkdownTablePaste(source);
+  if (markdownRows.length) return markdownRows;
   const rows = parseDelimitedText(source, detectDelimitedPasteDelimiter(source));
   const width = Math.max(0, ...rows.map((row) => row.length));
   return rows.map((row) => padTableRow(row, width));
+}
+
+function parseMarkdownTablePaste(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (let index = 0; index + 1 < lines.length; index += 1) {
+    const header = lines[index];
+    const separator = lines[index + 1];
+    if (!isMarkdownTableRow(header) || !isMarkdownTableSeparator(separator)) continue;
+    const rows = [splitMarkdownTableRow(header)];
+    let nextIndex = index + 2;
+    while (nextIndex < lines.length && isMarkdownTableRow(lines[nextIndex])) {
+      rows.push(splitMarkdownTableRow(lines[nextIndex]));
+      nextIndex += 1;
+    }
+    const width = Math.max(0, ...rows.map((row) => row.length));
+    return rows.map((row) => padTableRow(row, width));
+  }
+  return [];
 }
 
 function parseDelimitedText(text: string, delimiter: "," | "\t") {
