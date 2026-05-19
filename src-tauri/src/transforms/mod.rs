@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 pub(crate) mod external;
+pub(crate) mod options;
 pub(crate) mod qr;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

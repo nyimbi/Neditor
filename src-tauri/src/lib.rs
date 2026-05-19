@@ -103,6 +103,7 @@ use source_mapping::{
 };
 use tables::{collect_table_summaries, evaluate_markdown_table_formulas, render_delimited_table};
 use transforms::external::ExternalTransformRequest;
+use transforms::options::TransformExecutionOptions;
 use transforms::{
     external::{list_transform_engines, run_external_transform},
     transform_cache_key, TransformArtifact,
@@ -396,80 +397,6 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         transform_artifacts,
         export_manifest: manifest,
     }
-}
-
-#[derive(Debug, Default)]
-struct TransformExecutionOptions {
-    engine_paths: HashMap<String, String>,
-    trusted_engines: HashMap<String, bool>,
-    input_modes: HashMap<String, String>,
-    timeout_ms: Option<u64>,
-}
-
-impl TransformExecutionOptions {
-    fn from_compile_options(options: Option<&Value>) -> Self {
-        let Some(options) = options else {
-            return Self::default();
-        };
-        Self {
-            engine_paths: string_map_option(options, "transformEnginePaths"),
-            trusted_engines: bool_map_option(options, "trustedTransformEngines"),
-            input_modes: string_map_option(options, "transformInputModes"),
-            timeout_ms: options.get("transformTimeoutMs").and_then(Value::as_u64),
-        }
-    }
-
-    fn engine_path(&self, name: &str) -> Option<String> {
-        self.engine_paths
-            .get(name)
-            .or_else(|| {
-                if name == "graphviz" {
-                    self.engine_paths.get("dot")
-                } else {
-                    None
-                }
-            })
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty())
-    }
-
-    fn trusted(&self, name: &str) -> bool {
-        self.trusted_engines.get(name).copied().unwrap_or(false)
-    }
-
-    fn input_mode(&self, name: &str) -> Option<String> {
-        self.input_modes.get(name).cloned()
-    }
-}
-
-fn string_map_option(options: &Value, key: &str) -> HashMap<String, String> {
-    options
-        .get(key)
-        .and_then(Value::as_object)
-        .map(|fields| {
-            fields
-                .iter()
-                .filter_map(|(name, value)| {
-                    value
-                        .as_str()
-                        .map(|field| (name.clone(), field.to_string()))
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn bool_map_option(options: &Value, key: &str) -> HashMap<String, bool> {
-    options
-        .get(key)
-        .and_then(Value::as_object)
-        .map(|fields| {
-            fields
-                .iter()
-                .filter_map(|(name, value)| value.as_bool().map(|field| (name.clone(), field)))
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 fn apply_transforms(
