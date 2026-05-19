@@ -3987,6 +3987,49 @@ flowchart LR
     }
 
     #[test]
+    fn document_ast_parses_multiline_semantic_html_blocks() {
+        let response = compile(CompileRequest {
+            text: r#"---
+title: Multiline HTML AST
+---
+# Multiline HTML AST
+
+<figure class="figure" id="fig:multi">
+<img src="diagram.svg" alt="Diagram">
+<figcaption>Multiline caption</figcaption>
+</figure>
+
+<section class="transform transform-custom">
+<pre>alpha
+beta</pre>
+</section>
+"#
+            .to_string(),
+            file_path: None,
+        });
+
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Figure { id, caption, line, end_line, .. }
+                    if id.as_deref() == Some("fig:multi")
+                        && caption.as_deref() == Some("Multiline caption")
+                        && *end_line > *line
+            )
+        }));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Transform { name, text, line, end_line, .. }
+                    if name == "custom"
+                        && text.contains("alpha")
+                        && text.contains("beta")
+                        && *end_line > *line
+            )
+        }));
+    }
+
+    #[test]
     fn qr_transform_renders_static_svg_preview() {
         let artifact = run_transform("qr".to_string(), "https://example.com".to_string())
             .expect("qr transform");

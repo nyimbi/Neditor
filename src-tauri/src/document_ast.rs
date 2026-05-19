@@ -285,10 +285,11 @@ pub(crate) fn build_document_ast(markdown: &str) -> DocumentAst {
             continue;
         }
 
-        if trimmed.starts_with('<') && trimmed.ends_with('>') {
+        if trimmed.starts_with('<') {
             flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
-            blocks.push(parse_ast_html_block(trimmed, line_number));
-            index += 1;
+            let (html, next_index) = collect_ast_html_block(&lines, index);
+            blocks.push(parse_ast_html_block(&html, line_number, next_index));
+            index = next_index;
             continue;
         }
 
@@ -301,6 +302,60 @@ pub(crate) fn build_document_ast(markdown: &str) -> DocumentAst {
 
     flush_ast_paragraph(&mut blocks, &mut paragraph_lines, &mut paragraph_start);
     DocumentAst { blocks }
+}
+
+fn collect_ast_html_block(lines: &[&str], start_index: usize) -> (String, usize) {
+    let first = lines[start_index].trim();
+    let Some(close_marker) = html_block_close_marker(first) else {
+        return (first.to_string(), start_index + 1);
+    };
+    let mut html = first.to_string();
+    let mut index = start_index + 1;
+    while !html.contains(&close_marker) && index < lines.len() {
+        let next = lines[index].trim();
+        if next.is_empty() {
+            break;
+        }
+        html.push('\n');
+        html.push_str(next);
+        index += 1;
+    }
+    (html, index)
+}
+
+fn html_block_close_marker(line: &str) -> Option<String> {
+    if line.starts_with("<!--") {
+        return Some("-->".to_string());
+    }
+    if line.ends_with("/>") {
+        return None;
+    }
+    let tag = line
+        .trim_start_matches('<')
+        .trim_start_matches('/')
+        .split(|ch: char| ch == '>' || ch.is_whitespace())
+        .next()
+        .unwrap_or("");
+    if matches!(
+        tag.to_ascii_lowercase().as_str(),
+        "area"
+            | "base"
+            | "br"
+            | "col"
+            | "embed"
+            | "hr"
+            | "img"
+            | "input"
+            | "link"
+            | "meta"
+            | "param"
+            | "source"
+            | "track"
+            | "wbr"
+    ) {
+        return None;
+    }
+    (!tag.is_empty()).then(|| format!("</{tag}>"))
 }
 
 pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
@@ -1175,12 +1230,12 @@ fn transform_export_text(name: &str, text: &str) -> String {
     }
 }
 
-fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
-    if let Some(table) = parse_ast_transform_table(line, line_number) {
+fn parse_ast_html_block(line: &str, line_number: usize, end_line: usize) -> DocumentBlock {
+    if let Some(table) = parse_ast_transform_table(line, line_number, end_line) {
         return table;
     }
 
-    if let Some(transform) = parse_ast_transform_block(line, line_number) {
+    if let Some(transform) = parse_ast_transform_block(line, line_number, end_line) {
         return transform;
     }
 
@@ -1191,7 +1246,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     {
         return DocumentBlock::ReviewComment {
             line: line_number,
-            end_line: line_number,
+            end_line,
             comment: {
                 let parsed = parse_review_comment(line_number, content);
                 AstReviewComment {
@@ -1212,7 +1267,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     {
         return DocumentBlock::ChangeNote {
             line: line_number,
-            end_line: line_number,
+            end_line,
             note: {
                 let parsed = parse_change_note(line_number, content);
                 AstChangeNote {
@@ -1228,7 +1283,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     if line.contains("class=\"figure\"") {
         return DocumentBlock::Figure {
             line: line_number,
-            end_line: line_number,
+            end_line,
             id: extract_quoted_attribute(line, "id"),
             src: extract_quoted_attribute(line, "src"),
             alt: extract_quoted_attribute(line, "alt").map(|value| decode_html_entities(&value)),
@@ -1241,7 +1296,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     if line.contains("class=\"equation\"") {
         return DocumentBlock::Equation {
             line: line_number,
-            end_line: line_number,
+            end_line,
             id: extract_quoted_attribute(line, "id"),
             caption: extract_between(line, "<figcaption>", "</figcaption>")
                 .map(|value| clean_inline_text(&value)),
@@ -1255,7 +1310,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     if line.contains("data-layout=\"") {
         return DocumentBlock::Layout {
             line: line_number,
-            end_line: line_number,
+            end_line,
             directive: extract_quoted_attribute(line, "data-layout").unwrap_or_default(),
             options: extract_quoted_attribute(line, "data-options")
                 .map(|value| decode_html_entities(&value))
@@ -1267,7 +1322,7 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     if line.contains("class=\"callout") {
         return DocumentBlock::Callout {
             line: line_number,
-            end_line: line_number,
+            end_line,
             callout_type: extract_quoted_attribute(line, "data-callout").unwrap_or_default(),
             title: extract_between(line, "<strong>", "</strong>")
                 .map(|value| clean_inline_text(&value))
@@ -1281,13 +1336,17 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
 
     DocumentBlock::RawHtml {
         line: line_number,
-        end_line: line_number,
+        end_line,
         html: line.to_string(),
         source: None,
     }
 }
 
-fn parse_ast_transform_block(html: &str, line_number: usize) -> Option<DocumentBlock> {
+fn parse_ast_transform_block(
+    html: &str,
+    line_number: usize,
+    end_line: usize,
+) -> Option<DocumentBlock> {
     let class_attr = extract_quoted_attribute(html, "class")?;
     if !class_attr
         .split_whitespace()
@@ -1304,7 +1363,7 @@ fn parse_ast_transform_block(html: &str, line_number: usize) -> Option<DocumentB
     let output_kind = if html.contains("<svg") { "svg" } else { "html" }.to_string();
     Some(DocumentBlock::Transform {
         line: line_number,
-        end_line: line_number,
+        end_line,
         name,
         output_kind,
         text: clean_inline_text(html),
@@ -1318,7 +1377,11 @@ fn parse_ast_transform_block(html: &str, line_number: usize) -> Option<DocumentB
     })
 }
 
-fn parse_ast_transform_table(html: &str, line_number: usize) -> Option<DocumentBlock> {
+fn parse_ast_transform_table(
+    html: &str,
+    line_number: usize,
+    end_line: usize,
+) -> Option<DocumentBlock> {
     if !html.contains("<table") || !html.contains("transform-table") {
         return None;
     }
@@ -1343,7 +1406,7 @@ fn parse_ast_transform_table(html: &str, line_number: usize) -> Option<DocumentB
     }
     Some(DocumentBlock::Table {
         line: line_number,
-        end_line: line_number,
+        end_line,
         id: None,
         caption: None,
         headers: headers.clone(),
