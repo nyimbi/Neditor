@@ -605,12 +605,20 @@
             <input v-model="store.editorFont" />
           </label>
           <label>
+            Editor font size
+            <input v-model.number="store.editorFontSize" type="number" min="12" max="22" step="1" />
+          </label>
+          <label>
             Editor line height
             <input v-model.number="store.editorLineHeight" type="number" min="1" max="2.4" step="0.05" />
           </label>
           <label>
             Preview font
             <input v-model="store.previewFont" />
+          </label>
+          <label>
+            Preview font size
+            <input v-model.number="store.previewFontSize" type="number" min="12" max="22" step="1" />
           </label>
           <label>
             Preview line height
@@ -915,6 +923,7 @@ const releaseStatuses = ["draft", "in-review", "approved", "published", "archive
 const active = computed(() => store.activeDocument);
 const previewDocumentStyle = computed(() => ({
   fontFamily: store.previewFont,
+  fontSize: `${clampUiFontSize(store.previewFontSize)}px`,
   lineHeight: String(clampUiLineHeight(store.previewLineHeight)),
 }));
 const workspaceStyle = computed(() => ({ "--editor-ratio": String(store.editorPaneRatio) }));
@@ -1150,8 +1159,10 @@ watch(
     store.highContrast,
     store.reducedMotion,
     store.editorFont,
+    store.editorFontSize,
     store.editorLineHeight,
     store.previewFont,
+    store.previewFontSize,
     store.previewLineHeight,
   ],
   () => {
@@ -1298,7 +1309,7 @@ function editorExtensions() {
     EditorView.theme({
       "&": {
         height: "100%",
-        fontSize: "14px",
+        fontSize: `${clampUiFontSize(store.editorFontSize)}px`,
       },
       ".cm-scroller": {
         fontFamily: store.editorFont,
@@ -1774,6 +1785,10 @@ function upsertFrontMatterField(text: string, key: string, value: string) {
 
 function clampUiLineHeight(value: number) {
   return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
+}
+
+function clampUiFontSize(value: number) {
+  return Math.min(Math.max(Number(value) || 14, 12), 22);
 }
 
 function clampAutosaveDelay(value: number) {

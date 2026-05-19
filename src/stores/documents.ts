@@ -75,6 +75,8 @@ interface PersistedWorkspace {
   snapshotStorage?: SnapshotStorage;
   editorFont?: string;
   previewFont?: string;
+  editorFontSize?: number;
+  previewFontSize?: number;
   editorLineHeight?: number;
   previewLineHeight?: number;
   exportTarget?: "html" | "pdf" | "docx" | "pptx" | "markdown-bundle";
@@ -312,6 +314,10 @@ function clampLineHeight(value: number) {
   return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
 }
 
+function clampFontSize(value: number) {
+  return Math.min(Math.max(Number(value) || 14, 12), 22);
+}
+
 function clampAutosaveDelay(value: number) {
   return Math.min(Math.max(Number(value) || 1500, 500), 30000);
 }
@@ -435,6 +441,8 @@ export const useDocumentsStore = defineStore("documents", {
     snapshotStorage: "app-data" as SnapshotStorage,
     editorFont: "Menlo, Consolas, monospace",
     previewFont: "Inter, Arial, sans-serif",
+    editorFontSize: 14,
+    previewFontSize: 14,
     editorLineHeight: 1.55,
     previewLineHeight: 1.65,
     exportTarget: "html" as "html" | "pdf" | "docx" | "pptx" | "markdown-bundle",
@@ -525,6 +533,8 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.snapshotStorage === "project-local" || persisted.snapshotStorage === "app-data") this.snapshotStorage = persisted.snapshotStorage;
         if (persisted.editorFont) this.editorFont = persisted.editorFont;
         if (persisted.previewFont) this.previewFont = persisted.previewFont;
+        if (typeof persisted.editorFontSize === "number") this.editorFontSize = clampFontSize(persisted.editorFontSize);
+        if (typeof persisted.previewFontSize === "number") this.previewFontSize = clampFontSize(persisted.previewFontSize);
         if (typeof persisted.editorLineHeight === "number") this.editorLineHeight = clampLineHeight(persisted.editorLineHeight);
         if (typeof persisted.previewLineHeight === "number") this.previewLineHeight = clampLineHeight(persisted.previewLineHeight);
         if (persisted.exportTarget) this.exportTarget = persisted.exportTarget;
@@ -567,6 +577,8 @@ export const useDocumentsStore = defineStore("documents", {
         snapshotStorage: this.snapshotStorage,
         editorFont: this.editorFont,
         previewFont: this.previewFont,
+        editorFontSize: this.editorFontSize,
+        previewFontSize: this.previewFontSize,
         editorLineHeight: this.editorLineHeight,
         previewLineHeight: this.previewLineHeight,
         exportTarget: this.exportTarget,
