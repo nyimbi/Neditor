@@ -265,6 +265,6 @@ test("opens export readiness from the export sidebar", async ({ page }) => {
   await page.getByLabel("Sidebar panel").selectOption("exports");
   await page.getByRole("button", { name: "Prepare for export" }).click();
 
-  await expect(page.getByText("Ready")).toBeVisible();
+  await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
   await expect(page.getByText("0 errors, 0 warnings, 0 info")).toBeVisible();
 });

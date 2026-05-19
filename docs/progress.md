@@ -155,6 +155,8 @@ Current CI follow-up:
 | --- | --- | --- |
 | `gh run view 26131218116 --json jobs,conclusion,status,headSha,url` | Failure diagnosed | All jobs for `d94dc6c` failed at `Set up Node.js` before project commands ran. |
 | `XDG_CACHE_HOME=.cache gh run view 26131218116 --log-failed` | Failure diagnosed | `actions/setup-node` could not locate `pnpm` while `cache: pnpm` was enabled before pnpm setup. |
+| `gh run view 26131619095 --json jobs,conclusion,status,headSha,url` | Partial improvement | For `6489162`, pnpm and Node setup succeeded in every job; the browser job reached Playwright execution. |
+| `XDG_CACHE_HOME=.cache gh api repos/nyimbi/Neditor/actions/jobs/76857769468/logs` | Browser failure diagnosed | Playwright ran 4 tests in CI; 3 passed and the readiness test failed because `getByText("Ready")` matched both `Ready` and `Document is ready for export`. |
 
 Fix staged after that CI run:
 
@@ -163,6 +165,9 @@ Fix staged after that CI run:
   workflow job.
 - `tests/frontend-unit.test.ts` now asserts that the CI workflow keeps the pnpm
   setup step and both frontend test commands.
+- `e2e/app-workflows.spec.ts` now scopes the readiness `Ready` assertion to
+  `article.readiness` with an exact text match so the browser workflow remains
+  strict without matching the status-bar message.
 
 Baseline command set:
 
