@@ -173,6 +173,10 @@
               <button type="button" @click="addTableRow">Add row</button>
               <button type="button" @click="addTableColumn">Add column</button>
               <button type="button" @click="addTableTotalsRow">Add totals row</button>
+              <button type="button" @click="addTableFormulaRow('AVG')">AVG row</button>
+              <button type="button" @click="addTableFormulaRow('MIN')">MIN row</button>
+              <button type="button" @click="addTableFormulaRow('MAX')">MAX row</button>
+              <button type="button" @click="addTableFormulaRow('COUNT')">COUNT row</button>
             </div>
             <div class="table-metadata">
               <label>
@@ -231,6 +235,7 @@
                   v-for="(_, columnIndex) in tableDraft.headers"
                   :key="`cell-${rowIndex}-${columnIndex}`"
                   v-model="row[columnIndex]"
+                  :class="{ 'formula-cell': isFormulaCell(row[columnIndex]) }"
                   aria-label="Table cell"
                 />
                 <span></span>
@@ -935,6 +940,7 @@ interface MarkdownTable {
 type TableAlignment = "left" | "center" | "right";
 type TableFormat = "text" | "number" | "currency" | "percent" | "date";
 type TableSortDirection = "asc" | "desc";
+type TableFormulaFunction = "SUM" | "AVG" | "MIN" | "MAX" | "COUNT";
 
 interface TableDraft {
   id: string;
@@ -2428,13 +2434,17 @@ function moveArrayItem<T>(items: T[], from: number, to: number) {
 }
 
 function addTableTotalsRow() {
+  addTableFormulaRow("SUM", "Total");
+}
+
+function addTableFormulaRow(formula: TableFormulaFunction, label: string = formula) {
   const draft = tableDraft.value;
   if (!draft) return;
+  const dataRowCount = draft.rows.filter((row) => !isTableSummaryRow(row)).length;
   const totals = draft.headers.map((_, columnIndex) => {
-    if (columnIndex === 0) return "Total";
-    const values = numericColumnValues(draft, columnIndex);
-    if (!values.length) return "";
-    return `=SUM(${values.map(formatFormulaNumber).join(",")})`;
+    if (columnIndex === 0) return label;
+    if (!dataRowCount) return "";
+    return `=${formula}(${tableColumnRange(columnIndex, dataRowCount)})`;
   });
   draft.rows.push(totals);
 }
@@ -2830,6 +2840,7 @@ function compareTableCells(left: string, right: string, format: TableFormat) {
 function formatTableCell(value: string, format: TableFormat) {
   const trimmed = value.trim();
   if (!trimmed || format === "text") return trimmed;
+  if (isFormulaCell(trimmed)) return trimmed;
   if (format === "date") {
     const time = Date.parse(trimmed);
     return Number.isNaN(time) ? trimmed : new Date(time).toISOString().slice(0, 10);
@@ -2869,8 +2880,24 @@ function isTableSummaryRow(row: string[]) {
   return row.slice(1).some((cell) => cell.trim().startsWith("="));
 }
 
-function formatFormulaNumber(value: number) {
-  return Number.isInteger(value) ? String(value) : trimFixed(value, 6);
+function isFormulaCell(value = "") {
+  return value.trim().startsWith("=");
+}
+
+function tableColumnRange(columnIndex: number, rowCount: number) {
+  const column = spreadsheetColumnName(columnIndex + 1);
+  return `${column}1:${column}${rowCount}`;
+}
+
+function spreadsheetColumnName(index: number) {
+  let value = index;
+  let name = "";
+  while (value > 0) {
+    value -= 1;
+    name = String.fromCharCode(65 + (value % 26)) + name;
+    value = Math.floor(value / 26);
+  }
+  return name || "A";
 }
 
 function parseCellNumber(value: string) {
@@ -3436,6 +3463,12 @@ select:hover {
 
 .path-picker input {
   min-width: 0;
+}
+
+.formula-cell {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #7c2d12;
+  background: #fff7ed;
 }
 
 .engine-summary {
