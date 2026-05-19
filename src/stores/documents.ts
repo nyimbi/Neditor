@@ -1077,6 +1077,7 @@ export const useDocumentsStore = defineStore("documents", {
       };
     },
     async exportActive(path: string) {
+      if (this.exportBusy) return;
       const doc = this.activeDocument;
       this.exportBusy = true;
       try {
@@ -1168,6 +1169,7 @@ export const useDocumentsStore = defineStore("documents", {
       await this.compileActive();
     },
     async prepareForExport() {
+      if (this.exportBusy) return;
       const doc = this.activeDocument;
       this.exportBusy = true;
       try {
