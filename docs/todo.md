@@ -34,5 +34,5 @@ What remains to achieve the full vision:
      Chart/native diagram renderers, structured data/API transforms, visual data transforms, business transforms, transform renderer dispatch, compiler support helpers, layout parsing,
      transform fence/source-provenance plumbing, and manifest/media helpers have moved out of lib.rs; export media parsing, sizing, and crop helpers have moved out of export.rs.
      The root Tauri module is now focused on command/runtime wiring, test fixtures live in src-tauri/src/tests.rs, and the export package writers are split into HTML,
-     DOCX, PDF, PPTX, and Markdown bundle modules. Still needed: split compiler orchestration, shared export text/helpers, diagnostics, filesystem, git, snapshot,
-     and remaining test fixture clusters further as the feature set grows.
+     DOCX, PDF, PPTX, and Markdown bundle modules, with shared export text/table/layout helpers isolated in export/shared.rs. Still needed: split compiler orchestration,
+     diagnostics, filesystem, git, snapshot, and remaining test fixture clusters further as the feature set grows.
