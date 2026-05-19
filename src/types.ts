@@ -124,7 +124,7 @@ export type InlineNode =
   | { kind: "emphasis"; text: string }
   | { kind: "code"; text: string }
   | { kind: "link"; text: string; url: string }
-  | { kind: "citation"; key: string; raw: string }
+  | { kind: "citation"; key: string; keys: string[]; raw: string }
   | { kind: "cross_reference"; key: string; raw: string };
 
 export type DocumentBlock =

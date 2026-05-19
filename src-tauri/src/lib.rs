@@ -3729,6 +3729,38 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn document_ast_preserves_multiple_citation_keys() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: AST Citations\nstatus: approved\napprovedBy: QA\ncitationStyle: key\n---\n# AST Citations\nClaim [@porter1985, p. 42; @doe2026].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}\n```\n"
+                .to_string(),
+            file_path: None,
+        });
+
+        let citation = response
+            .document_ast
+            .blocks
+            .iter()
+            .find_map(|block| match block {
+                DocumentBlock::Paragraph { inlines, .. } => {
+                    inlines.iter().find_map(|inline| match inline {
+                        document_ast::InlineNode::Citation { key, keys, raw } => {
+                            Some((key, keys, raw))
+                        }
+                        _ => None,
+                    })
+                }
+                _ => None,
+            })
+            .expect("AST citation inline");
+
+        assert_eq!(citation.0, "porter1985");
+        assert_eq!(citation.1.as_slice(), ["porter1985", "doe2026"]);
+        assert!(citation
+            .2
+            .contains("data-citation-keys=\"porter1985 doe2026\""));
+    }
+
+    #[test]
     fn compiler_renders_openapi_and_json_schema_tables() {
         let response = compile(CompileRequest {
             text: r#"---

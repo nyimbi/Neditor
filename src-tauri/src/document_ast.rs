@@ -60,13 +60,31 @@ pub(crate) struct AstAiSource {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum InlineNode {
-    Text { text: String },
-    Strong { text: String },
-    Emphasis { text: String },
-    Code { text: String },
-    Link { text: String, url: String },
-    Citation { key: String, raw: String },
-    CrossReference { key: String, raw: String },
+    Text {
+        text: String,
+    },
+    Strong {
+        text: String,
+    },
+    Emphasis {
+        text: String,
+    },
+    Code {
+        text: String,
+    },
+    Link {
+        text: String,
+        url: String,
+    },
+    Citation {
+        key: String,
+        keys: Vec<String>,
+        raw: String,
+    },
+    CrossReference {
+        key: String,
+        raw: String,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -580,6 +598,7 @@ fn earliest_inline_node(text: &str) -> Option<(usize, usize, InlineNode)> {
             citation.end,
             InlineNode::Citation {
                 key: citation.key,
+                keys: citation.keys,
                 raw: citation.raw,
             },
         ));
@@ -590,6 +609,7 @@ fn earliest_inline_node(text: &str) -> Option<(usize, usize, InlineNode)> {
             citation.end,
             InlineNode::Citation {
                 key: citation.key,
+                keys: citation.keys,
                 raw: citation.raw,
             },
         ));
@@ -626,6 +646,7 @@ struct CitationInline {
     start: usize,
     end: usize,
     key: String,
+    keys: Vec<String>,
     raw: String,
 }
 
@@ -657,16 +678,13 @@ fn parse_citation_inline(text: &str) -> Option<CitationInline> {
     let start = text.find("[@")?;
     let end = text[start..].find(']')? + start + 1;
     let raw = text[start..end].to_string();
-    let key = raw
-        .trim_start_matches("[@")
-        .trim_end_matches(']')
-        .trim_start_matches(['-', '+'])
-        .trim()
-        .to_string();
+    let keys = citation_keys_from_inline(raw.trim_start_matches('[').trim_end_matches(']'));
+    let key = keys.first().cloned().unwrap_or_default();
     (!key.is_empty()).then_some(CitationInline {
         start,
         end,
         key,
+        keys,
         raw,
     })
 }
@@ -677,19 +695,38 @@ fn parse_html_citation_inline(text: &str) -> Option<CitationInline> {
     let start = text[..marker_start].rfind("<span").unwrap_or(marker_start);
     let key_start = marker_start + marker.len();
     let key_end = text[key_start..].find('"')? + key_start;
-    let key = text[key_start..key_end]
+    let keys = text[key_start..key_end]
         .split_whitespace()
-        .next()
-        .unwrap_or("")
-        .to_string();
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    let key = keys.first().cloned().unwrap_or_default();
     let close_start = text[key_end..].find("</span>")? + key_end;
     let end = close_start + "</span>".len();
     (!key.is_empty()).then_some(CitationInline {
         start,
         end,
         key,
+        keys,
         raw: text[start..end].to_string(),
     })
+}
+
+fn citation_keys_from_inline(content: &str) -> Vec<String> {
+    let mut keys = Vec::new();
+    let mut rest = content;
+    while let Some(marker_start) = rest.find('@') {
+        let after_marker = &rest[marker_start + 1..];
+        let key = after_marker
+            .trim_start_matches(['-', '+'])
+            .chars()
+            .take_while(|ch| !matches!(ch, ',' | ';' | ']' | ')' | '(') && !ch.is_whitespace())
+            .collect::<String>();
+        if !key.is_empty() {
+            keys.push(key);
+        }
+        rest = after_marker;
+    }
+    keys
 }
 
 fn parse_cross_reference_inline(text: &str) -> Option<CitationInline> {
@@ -704,6 +741,7 @@ fn parse_cross_reference_inline(text: &str) -> Option<CitationInline> {
     (!key.is_empty()).then_some(CitationInline {
         start,
         end,
+        keys: vec![key.clone()],
         key,
         raw,
     })
