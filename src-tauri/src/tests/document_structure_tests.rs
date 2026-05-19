@@ -405,7 +405,7 @@ fn compiler_renders_callouts_as_semantic_blocks() {
 #[test]
 fn compiler_builds_document_ast_blocks_for_exports() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: AST\nstatus: approved\napprovedBy: QA\n---\n# AST\nBusiness paragraph with **margin** and [source](https://example.com) [@doe2024] {@missing-ref}.\n\n> Quoted evidence\n> with continuation\n\n```js\nconst total = 42;\nconst literal = \"![Not a figure](asset.png)\";\nconst math = \"$$not an equation$$\";\n| Literal | Value |\n| --- | ---: |\n| Not a table | =SUM(1,2) |\n```\n\n- First decision\n- Second decision\n\n- [x] Reviewed by finance\n- [ ] Attach signed approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n".to_string(),
+            text: "---\ntitle: AST\nstatus: approved\napprovedBy: QA\n---\n# AST\nBusiness paragraph with **margin** and [source](https://example.com) [@doe2024] {@missing-ref}.\n\n> Quoted evidence\n> with continuation\n\n```js\nconst total = 42;\nconst literal = \"![Not a figure](asset.png)\";\nconst math = \"$$not an equation$$\";\n| Literal | Value |\n| --- | ---: |\n| Not a table | =SUM(1,2) |\n![Code figure](asset.png){#fig:code caption=\"Code figure\"}\n$$\ncode equation\n$$ {#eq:code}\n> [!note] Code callout\n> Keep literal\n{{page-break}}\n```\n\n- First decision\n- Second decision\n\n- [x] Reviewed by finance\n- [ ] Attach signed approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n".to_string(),
             file_path: None,
         });
 
@@ -506,6 +506,14 @@ fn compiler_builds_document_ast_blocks_for_exports() {
     assert!(response
         .compiled_markdown
         .contains("| Not a table | =SUM(1,2) |"));
+    assert!(response
+        .compiled_markdown
+        .contains("![Code figure](asset.png){#fig:code caption=\"Code figure\"}"));
+    assert!(response.compiled_markdown.contains("$$ {#eq:code}"));
+    assert!(response
+        .compiled_markdown
+        .contains("> [!note] Code callout"));
+    assert!(response.compiled_markdown.contains("{{page-break}}"));
 
     let exported = export::export_text(&response, &json!({}));
     assert!(exported.contains("> Quoted evidence\n> with continuation"));

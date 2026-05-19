@@ -5,9 +5,22 @@ use crate::{
 };
 
 pub(crate) fn render_figures(markdown: &str) -> String {
+    let mut fence_marker = None;
     markdown
         .lines()
-        .map(|line| render_figure_line(line).unwrap_or_else(|| line.to_string()))
+        .map(|line| {
+            if let Some(marker) = fence_marker {
+                if line.trim_start().starts_with(marker) {
+                    fence_marker = None;
+                }
+                return line.to_string();
+            }
+            if let Some(marker) = fenced_code_marker(line) {
+                fence_marker = Some(marker);
+                return line.to_string();
+            }
+            render_figure_line(line).unwrap_or_else(|| line.to_string())
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -100,21 +113,44 @@ fn figure_position(attrs: &str) -> Option<String> {
 
 pub(crate) fn render_equations(markdown: &str) -> String {
     let mut output = String::new();
-    let mut lines = markdown.lines().peekable();
+    let lines = markdown.lines().collect::<Vec<_>>();
+    let mut index = 0usize;
     let mut equation_number = 1usize;
-    while let Some(line) = lines.next() {
+    let mut fence_marker = None;
+    while index < lines.len() {
+        let line = lines[index];
+        if let Some(marker) = fence_marker {
+            output.push_str(line);
+            output.push('\n');
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            index += 1;
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            output.push_str(line);
+            output.push('\n');
+            fence_marker = Some(marker);
+            index += 1;
+            continue;
+        }
         let trimmed = line.trim();
         if trimmed == "$$" || trimmed.starts_with("$$ ") {
             let mut body = String::new();
             let mut label = String::new();
-            for equation_line in lines.by_ref() {
+            index += 1;
+            while index < lines.len() {
+                let equation_line = lines[index];
                 let equation_trimmed = equation_line.trim();
                 if equation_trimmed.starts_with("$$") {
                     label = extract_label(equation_trimmed).unwrap_or_default();
+                    index += 1;
                     break;
                 }
                 body.push_str(equation_line);
                 body.push('\n');
+                index += 1;
             }
             let id = if label.is_empty() {
                 format!("eq:{equation_number}")
@@ -134,6 +170,7 @@ pub(crate) fn render_equations(markdown: &str) -> String {
         } else {
             output.push_str(&render_inline_math(line));
             output.push('\n');
+            index += 1;
         }
     }
     output
@@ -322,8 +359,23 @@ pub(crate) fn render_callouts(markdown: &str) -> String {
     let lines = markdown.lines().collect::<Vec<_>>();
     let mut output = Vec::new();
     let mut index = 0;
+    let mut fence_marker = None;
     while index < lines.len() {
         let line = lines[index];
+        if let Some(marker) = fence_marker {
+            output.push(line.to_string());
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            index += 1;
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            output.push(line.to_string());
+            fence_marker = Some(marker);
+            index += 1;
+            continue;
+        }
         let trimmed = line.trim_start();
         let Some(after_marker) = trimmed.strip_prefix("> [!") else {
             output.push(line.to_string());
@@ -386,9 +438,20 @@ fn strip_callout_quote(line: &str) -> String {
 }
 
 pub(crate) fn render_layout_tokens(markdown: &str) -> String {
+    let mut fence_marker = None;
     markdown
         .lines()
         .map(|line| {
+            if let Some(marker) = fence_marker {
+                if line.trim_start().starts_with(marker) {
+                    fence_marker = None;
+                }
+                return line.to_string();
+            }
+            if let Some(marker) = fenced_code_marker(line) {
+                fence_marker = Some(marker);
+                return line.to_string();
+            }
             let trimmed = line.trim();
             if trimmed == "{{page-break}}" {
                 "<div class=\"page-break\" data-layout=\"page-break\"></div>".to_string()
@@ -412,6 +475,17 @@ pub(crate) fn render_layout_tokens(markdown: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn fenced_code_marker(line: &str) -> Option<&'static str> {
+    let trimmed = line.trim_start();
+    if trimmed.starts_with("```") {
+        Some("```")
+    } else if trimmed.starts_with("~~~") {
+        Some("~~~")
+    } else {
+        None
+    }
 }
 
 pub(crate) fn render_layout_block_html(body: &str) -> String {
