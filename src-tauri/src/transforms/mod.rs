@@ -16,6 +16,12 @@ pub(crate) struct TransformArtifact {
     pub(crate) source_hash: String,
     #[serde(default)]
     pub(crate) source: String,
+    #[serde(default)]
+    pub(crate) source_file: Option<String>,
+    #[serde(default)]
+    pub(crate) source_line: Option<usize>,
+    #[serde(default)]
+    pub(crate) end_source_line: Option<usize>,
     #[serde(default = "empty_transform_options")]
     pub(crate) options: Value,
     pub(crate) output_hash: String,

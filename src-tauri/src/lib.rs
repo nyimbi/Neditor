@@ -251,8 +251,12 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     );
     let index_marker_markdown = strip_index_markers(&with_toc);
     let transform_options = TransformExecutionOptions::from_compile_options(options);
-    let (transformed_markdown, transform_artifacts) =
-        apply_transforms(&index_marker_markdown, &transform_options, &mut diagnostics);
+    let (transformed_markdown, transform_artifacts) = apply_transforms(
+        &index_marker_markdown,
+        &source_map,
+        &transform_options,
+        &mut diagnostics,
+    );
     let citation_markdown = render_citations(
         &transformed_markdown,
         &bibliography,
@@ -350,6 +354,9 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
                     "outputKind": artifact.output_kind,
                     "sourceHash": artifact.source_hash,
                     "source": artifact.source.clone(),
+                    "sourceFile": artifact.source_file.clone(),
+                    "sourceLine": artifact.source_line,
+                    "endSourceLine": artifact.end_source_line,
                     "options": artifact.options.clone(),
                     "outputHash": artifact.output_hash,
                     "cacheKey": artifact.cache_key,
@@ -408,26 +415,42 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
 
 fn apply_transforms(
     text: &str,
+    source_map: &[SourceMapEntry],
     options: &TransformExecutionOptions,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> (String, Vec<TransformArtifact>) {
     let mut output = String::new();
     let mut artifacts = Vec::new();
-    let mut lines = text.lines().peekable();
-    while let Some(line) = lines.next() {
+    let mut lines = text.lines().enumerate().peekable();
+    while let Some((line_index, line)) = lines.next() {
         if let Some(info) = line.trim().strip_prefix("```") {
             let name = info.split_whitespace().next().unwrap_or("");
             if supported_transform(name) {
+                let source_line = line_index + 1;
+                let mut end_source_line = source_line;
                 let fence_options = transform_fence_options(info);
                 let mut body = String::new();
-                for body_line in lines.by_ref() {
+                for (body_line_index, body_line) in lines.by_ref() {
                     if body_line.trim() == "```" {
+                        end_source_line = body_line_index + 1;
                         break;
                     }
                     body.push_str(body_line);
                     body.push('\n');
+                    end_source_line = body_line_index + 1;
                 }
-                let artifact = render_transform(name, &body, &fence_options, options, diagnostics);
+                let mut artifact =
+                    render_transform(name, &body, &fence_options, options, diagnostics);
+                if let Some(source) =
+                    ast_source_range_for_generated_lines(source_map, source_line, end_source_line)
+                {
+                    artifact.source_file = Some(source.source_file);
+                    artifact.source_line = Some(source.source_line);
+                    artifact.end_source_line = Some(source.end_source_line);
+                } else {
+                    artifact.source_line = Some(source_line);
+                    artifact.end_source_line = Some(end_source_line);
+                }
                 output.push_str(&artifact.html);
                 output.push('\n');
                 artifacts.push(artifact);
@@ -539,6 +562,9 @@ fn render_transform(
         duration_ms: None,
         source_hash,
         source: body.to_string(),
+        source_file: None,
+        source_line: None,
+        end_source_line: None,
         options: fence_options.clone(),
         html,
         diagnostics: artifact_diags,
@@ -1681,6 +1707,8 @@ ARR: Annual recurring revenue.
             .expect("csv transform artifact");
         assert!(!csv_artifact.output_hash.is_empty());
         assert!(csv_artifact.source.contains("Region,Revenue"));
+        assert!(csv_artifact.source_line.is_some_and(|line| line > 1));
+        assert!(csv_artifact.end_source_line >= csv_artifact.source_line);
         assert_eq!(
             csv_artifact.options.get("caption").and_then(Value::as_str),
             Some("Regional revenue")
@@ -1704,6 +1732,24 @@ ARR: Annual recurring revenue.
         assert_eq!(
             manifest_csv_artifact.get("source").and_then(Value::as_str),
             Some(csv_artifact.source.as_str())
+        );
+        assert_eq!(
+            manifest_csv_artifact
+                .get("sourceFile")
+                .and_then(Value::as_str),
+            csv_artifact.source_file.as_deref()
+        );
+        assert_eq!(
+            manifest_csv_artifact
+                .get("sourceLine")
+                .and_then(Value::as_u64),
+            csv_artifact.source_line.map(|line| line as u64)
+        );
+        assert_eq!(
+            manifest_csv_artifact
+                .get("endSourceLine")
+                .and_then(Value::as_u64),
+            csv_artifact.end_source_line.map(|line| line as u64)
         );
         assert_eq!(
             manifest_csv_artifact
@@ -3588,6 +3634,22 @@ flowchart LR
         assert!(mermaid.1.contains("Start"));
         assert!(mermaid.2.contains("transform-mermaid"));
 
+        let roadmap_artifact = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == "roadmap")
+            .expect("roadmap transform artifact");
+        assert_eq!(roadmap_artifact.source_file.as_deref(), Some("untitled.md"));
+        assert_eq!(roadmap_artifact.source_line, Some(8));
+        assert_eq!(roadmap_artifact.end_source_line, Some(11));
+        let mermaid_artifact = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == "mermaid")
+            .expect("mermaid transform artifact");
+        assert_eq!(mermaid_artifact.source_line, Some(17));
+        assert_eq!(mermaid_artifact.end_source_line, Some(20));
+
         let exported = export::export_text(&response, &json!({}));
         assert!(exported.contains("Transform: roadmap"));
         assert!(exported.contains("Transform: mermaid"));
@@ -5161,6 +5223,9 @@ beta</pre>
         assert!(bundled_formula_graph.contains("\"dependencies\""));
         assert!(bundled_transform_artifacts.contains("\"name\": \"glossary\""));
         assert!(bundled_transform_artifacts.contains("\"output_hash\""));
+        assert!(bundled_transform_artifacts.contains("\"source_file\""));
+        assert!(bundled_transform_artifacts.contains("\"source_line\""));
+        assert!(bundled_transform_artifacts.contains("\"end_source_line\""));
         assert!(bundled_media_map.contains("\"bundle_path\": \"media/image1.svg\""));
         assert!(bundled_media_map.contains("\"hash\": \"sha256:"));
         assert_eq!(bundled_svg, "<svg/>");

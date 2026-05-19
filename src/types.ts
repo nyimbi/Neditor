@@ -231,6 +231,9 @@ export interface CompileResponse {
     output_kind: string;
     source_hash: string;
     source: string;
+    source_file?: string | null;
+    source_line?: number | null;
+    end_source_line?: number | null;
     options: Record<string, unknown>;
     output_hash: string;
     cache_key: string;
