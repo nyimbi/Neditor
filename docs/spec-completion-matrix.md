@@ -193,10 +193,15 @@ Current direct evidence:
 
 Current major verification gaps:
 
+- Latest CI on commit `9a6d52e` is not green: Windows fails clippy on a
+  dead-code external-transform test helper, and Ubuntu fails installed Pikchr
+  conformance because the detected `pikchr-cli` contract requires a positional
+  argument.
 - Initial browser-level workflow test harness passes in Linux CI, but local
   sandbox execution is blocked at Chromium launch before app assertions.
 - No desktop WebDriver/Tauri-driver workflow test harness.
-- No current committed fresh baseline results after the latest harness changes.
+- Current committed browser workflow evidence exists, but full desktop CI is
+  blocked by the Windows and Ubuntu failures above.
 - Export tests rely heavily on package/text assertions; visual/rendered quality
   remains under-proven.
 - Optional external transform engines are proven most strongly on Linux; macOS
