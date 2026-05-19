@@ -1,5 +1,4 @@
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 #[cfg(test)]
 use std::path::Path;
@@ -13,6 +12,7 @@ mod ai_cleanup;
 mod bibliography;
 mod calculations;
 mod compile_options;
+mod compiler_types;
 mod diagnostics;
 mod document_ast;
 mod export;
@@ -43,13 +43,14 @@ use ai_cleanup::cleanup_ai_paste;
 use ai_cleanup::AiCleanupRequest;
 use bibliography::{
     citation_keys_from_references, collect_bibliography, collect_citation_references,
-    duplicate_bibliography_keys, parse_bibliography_source, render_citations, BibliographyEntry,
-    CitationReference,
+    duplicate_bibliography_keys, parse_bibliography_source, render_citations,
 };
-use calculations::{
-    collect_calculations, formula_dependency_edges, FormulaDependencyEdge, FormulaValue,
-};
+use calculations::{collect_calculations, formula_dependency_edges};
 use compile_options::apply_compile_options;
+use compiler_types::{
+    CompileRequest, CompileResponse, CompileWithOptionsRequest, ExportManifest, Heading,
+    IncludeEdge, ManifestFile, SemanticDocument, SourceMapEntry,
+};
 use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
@@ -88,11 +89,9 @@ use git::{run_git, GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRe
 use html_preview::markdown_to_html;
 use indexing::{collect_index_entries, strip_index_markers};
 use link_validation::{validate_image_paths, validate_link_paths, validate_logo_path};
-use provenance::{collect_ai_assisted_sections, collect_ai_sources, AiAssistedSection, AiSource};
-use references::{
-    collect_cross_references, collect_labels, render_cross_references, CrossReference,
-};
-use review::{collect_change_notes, collect_comments, ChangeNote, ReviewComment};
+use provenance::{collect_ai_assisted_sections, collect_ai_sources};
+use references::{collect_cross_references, collect_labels, render_cross_references};
+use review::{collect_change_notes, collect_comments};
 use rich_blocks::{
     render_callouts, render_equations, render_figures, render_layout_block_html,
     render_layout_tokens,
@@ -101,9 +100,7 @@ use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
 use source_mapping::{
     ast_source_range_for_generated_lines, expand_includes, normalize_source_map_after_front_matter,
 };
-use tables::{
-    collect_table_summaries, evaluate_markdown_table_formulas, render_delimited_table, TableSummary,
-};
+use tables::{collect_table_summaries, evaluate_markdown_table_formulas, render_delimited_table};
 use transforms::external::ExternalTransformRequest;
 use transforms::{
     external::{list_transform_engines, run_external_transform},
@@ -116,105 +113,6 @@ pub(crate) use utils::{
 };
 use validation::{validate_document, DocumentValidationInput};
 use variables::interpolate_variables;
-
-#[derive(Debug, Deserialize)]
-struct CompileRequest {
-    text: String,
-    file_path: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct CompileWithOptionsRequest {
-    text: String,
-    file_path: Option<String>,
-    options: Value,
-}
-
-#[derive(Debug, Serialize)]
-struct CompileResponse {
-    compiled_markdown: String,
-    html: String,
-    semantic: SemanticDocument,
-    document_ast: DocumentAst,
-    diagnostics: Vec<DocumentDiagnostic>,
-    include_graph: Vec<IncludeEdge>,
-    source_map: Vec<SourceMapEntry>,
-    metadata: Value,
-    bibliography: Vec<BibliographyEntry>,
-    index_terms: Vec<String>,
-    formula_graph: Vec<FormulaValue>,
-    formula_dependency_edges: Vec<FormulaDependencyEdge>,
-    transform_artifacts: Vec<TransformArtifact>,
-    export_manifest: ExportManifest,
-}
-
-#[derive(Debug, Serialize)]
-struct SemanticDocument {
-    title: String,
-    status: String,
-    headings: Vec<Heading>,
-    outline: Vec<Heading>,
-    tables: usize,
-    table_summaries: Vec<TableSummary>,
-    figures: usize,
-    equations: usize,
-    citations: Vec<String>,
-    citation_references: Vec<CitationReference>,
-    duplicate_bibliography_keys: Vec<String>,
-    glossary: BTreeMap<String, String>,
-    layout_directives: Vec<String>,
-    comments: Vec<ReviewComment>,
-    change_notes: Vec<ChangeNote>,
-    ai_sources: Vec<AiSource>,
-    ai_assisted_sections: Vec<AiAssistedSection>,
-    labels: Vec<String>,
-    cross_references: Vec<CrossReference>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-struct Heading {
-    level: usize,
-    text: String,
-    anchor: String,
-    line: usize,
-}
-
-#[derive(Debug, Serialize)]
-pub(crate) struct IncludeEdge {
-    pub(crate) parent: String,
-    pub(crate) child: String,
-    pub(crate) depth: usize,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub(crate) struct SourceMapEntry {
-    pub(crate) generated_line: usize,
-    pub(crate) source_file: String,
-    pub(crate) source_line: usize,
-}
-
-#[derive(Clone, Debug, Serialize)]
-struct ExportManifest {
-    document_title: String,
-    document_version: String,
-    status: String,
-    exported_at: String,
-    source_hash: String,
-    included_files: Vec<ManifestFile>,
-    media_files: Vec<ManifestFile>,
-    export_target: String,
-    export_options: Value,
-    transform_artifacts: Vec<Value>,
-    diagnostics: Vec<DocumentDiagnostic>,
-    source_map: Vec<SourceMapEntry>,
-    app_version: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-struct ManifestFile {
-    path: String,
-    hash: String,
-}
 
 #[tauri::command]
 fn compile_document(request: CompileRequest) -> Result<CompileResponse, String> {
