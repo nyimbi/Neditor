@@ -3,6 +3,9 @@ use serde::Serialize;
 #[derive(Clone, Debug, Default, Serialize)]
 pub(crate) struct LayoutSettings {
     pub(crate) columns: Option<usize>,
+    pub(crate) page_size: Option<String>,
+    pub(crate) orientation: Option<String>,
+    pub(crate) margins: Option<String>,
     pub(crate) break_before: Option<String>,
     pub(crate) break_after: Option<String>,
     pub(crate) keep_with_next: bool,
@@ -18,6 +21,9 @@ impl LayoutSettings {
     pub(crate) fn from_options(options: &str) -> Self {
         Self {
             columns: layout_columns(options),
+            page_size: layout_page_size_option(options),
+            orientation: layout_orientation_option(options),
+            margins: layout_margins_option(options),
             break_before: layout_break_before(options),
             break_after: layout_break_after(options),
             keep_with_next: layout_bool_option_any(
@@ -49,6 +55,10 @@ impl LayoutSettings {
             || self.keep_with_next
             || self.keep_together
     }
+
+    pub(crate) fn has_page_model_controls(&self) -> bool {
+        self.page_size.is_some() || self.orientation.is_some() || self.margins.is_some()
+    }
 }
 
 pub(crate) fn layout_css_style(options: &str) -> String {
@@ -57,6 +67,15 @@ pub(crate) fn layout_css_style(options: &str) -> String {
     if let Some(columns) = settings.columns {
         styles.push(format!("column-count:{columns}"));
         styles.push("column-gap:32px".to_string());
+    }
+    if let Some(orientation) = &settings.orientation {
+        styles.push(format!("page:neditor-{orientation}"));
+    }
+    if let Some(page_size) = &settings.page_size {
+        styles.push(format!("--neditor-page-size:{page_size}"));
+    }
+    if let Some(margins) = &settings.margins {
+        styles.push(format!("--neditor-page-margins:{margins}"));
     }
     if matches_layout_break(settings.break_before.as_deref()) {
         styles.push("break-before:page".to_string());
@@ -119,6 +138,30 @@ pub(crate) fn layout_columns(options: &str) -> Option<usize> {
     None
 }
 
+pub(crate) fn layout_page_size_option(options: &str) -> Option<String> {
+    layout_option_text_any(
+        options,
+        &["pageSize", "page-size", "page_size", "paper", "size"],
+    )
+    .and_then(|value| normalize_page_size_value(&value))
+}
+
+pub(crate) fn layout_orientation_option(options: &str) -> Option<String> {
+    layout_option_text_any(
+        options,
+        &["orientation", "pageOrientation", "page_orientation"],
+    )
+    .and_then(|value| normalize_orientation_value(&value))
+}
+
+pub(crate) fn layout_margins_option(options: &str) -> Option<String> {
+    layout_option_text_any(
+        options,
+        &["margins", "margin", "pageMargins", "page_margins"],
+    )
+    .and_then(|value| normalize_margins_value(&value))
+}
+
 pub(crate) fn layout_break_before(options: &str) -> Option<String> {
     normalize_break_value(layout_option_text_any(
         options,
@@ -169,4 +212,48 @@ fn normalize_break_value(value: Option<String>) -> Option<String> {
         "column" => Some("column".to_string()),
         _ => None,
     })
+}
+
+fn normalize_page_size_value(value: &str) -> Option<String> {
+    match value
+        .trim()
+        .trim_matches('"')
+        .to_ascii_lowercase()
+        .replace([' ', '-'], "")
+        .as_str()
+    {
+        "letter" | "usletter" => Some("letter".to_string()),
+        "legal" | "uslegal" => Some("legal".to_string()),
+        "a4" => Some("a4".to_string()),
+        _ => None,
+    }
+}
+
+fn normalize_orientation_value(value: &str) -> Option<String> {
+    match value
+        .trim()
+        .trim_matches('"')
+        .to_ascii_lowercase()
+        .replace([' ', '-'], "")
+        .as_str()
+    {
+        "landscape" => Some("landscape".to_string()),
+        "portrait" => Some("portrait".to_string()),
+        _ => None,
+    }
+}
+
+fn normalize_margins_value(value: &str) -> Option<String> {
+    match value
+        .trim()
+        .trim_matches('"')
+        .to_ascii_lowercase()
+        .replace([' ', '-'], "")
+        .as_str()
+    {
+        "narrow" | "compact" => Some("narrow".to_string()),
+        "normal" => Some("normal".to_string()),
+        "wide" => Some("wide".to_string()),
+        _ => None,
+    }
 }

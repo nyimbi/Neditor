@@ -274,10 +274,25 @@ enum DocxHeaderFooterKind {
 }
 
 #[derive(Clone, Debug)]
+struct DocxPageLayout {
+    page_size: String,
+    orientation: String,
+    width: u32,
+    height: u32,
+    margin_top: u32,
+    margin_right: u32,
+    margin_bottom: u32,
+    margin_left: u32,
+}
+
+#[derive(Clone, Debug)]
 struct DocxSectionProperties {
     header_relationship_id: String,
     footer_relationship_id: String,
     columns: Option<usize>,
+    page_size: Option<String>,
+    orientation: Option<String>,
+    margins: Option<String>,
 }
 
 impl Default for DocxSectionProperties {
@@ -286,6 +301,9 @@ impl Default for DocxSectionProperties {
             header_relationship_id: "rIdHeader1".to_string(),
             footer_relationship_id: "rIdFooter1".to_string(),
             columns: None,
+            page_size: None,
+            orientation: None,
+            margins: None,
         }
     }
 }
@@ -297,6 +315,19 @@ impl DocxSectionProperties {
         }
         if let Some(footer) = &section_override.footer {
             self.footer_relationship_id = footer.relationship_id.clone();
+        }
+    }
+
+    fn apply_layout(&mut self, settings: &LayoutSettings) {
+        self.columns = settings.columns;
+        if settings.page_size.is_some() {
+            self.page_size = settings.page_size.clone();
+        }
+        if settings.orientation.is_some() {
+            self.orientation = settings.orientation.clone();
+        }
+        if settings.margins.is_some() {
+            self.margins = settings.margins.clone();
         }
     }
 }
@@ -364,6 +395,7 @@ fn is_docx_section_layout(directive: &str, settings: &LayoutSettings) -> bool {
         || settings.columns.is_some()
         || settings.header.is_some()
         || settings.footer.is_some()
+        || settings.has_page_model_controls()
 }
 
 fn render_docx_document(
@@ -422,11 +454,11 @@ fn render_docx_document(
                 pending_flow = Some(settings.clone());
             }
             if is_docx_section_layout(directive, settings) {
-                body.push_str(&docx_section_break(&current_section, page_layout));
+                body.push_str(&docx_section_break(&current_section, &page_layout));
                 if let Some(section_override) = section_overrides.get(section_index) {
                     current_section.apply_override(section_override);
                 }
-                current_section.columns = settings.columns;
+                current_section.apply_layout(settings);
                 section_index += 1;
                 if matches_layout_break(settings.break_after.as_deref()) {
                     body.push_str(&docx_page_break());
@@ -457,7 +489,7 @@ fn render_docx_document(
             body.push_str(&docx_paragraph(&line));
         }
     }
-    let final_section = docx_section_properties(&current_section, page_layout);
+    let final_section = docx_section_properties(&current_section, &page_layout);
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>{body}{final_section}</w:body></w:document>"#
     )
@@ -1090,10 +1122,7 @@ fn docx_page_break() -> String {
     r#"<w:p><w:r><w:br w:type="page"/></w:r></w:p>"#.to_string()
 }
 
-fn docx_section_break(
-    section: &DocxSectionProperties,
-    page_layout: (u32, u32, u32, u32, u32, u32, &'static str),
-) -> String {
+fn docx_section_break(section: &DocxSectionProperties, page_layout: &DocxPageLayout) -> String {
     format!(
         r#"<w:p><w:pPr>{}</w:pPr></w:p>"#,
         docx_section_properties(section, page_layout)
@@ -1102,18 +1131,10 @@ fn docx_section_break(
 
 fn docx_section_properties(
     section: &DocxSectionProperties,
-    page_layout: (u32, u32, u32, u32, u32, u32, &'static str),
+    page_layout: &DocxPageLayout,
 ) -> String {
-    let (
-        page_width,
-        page_height,
-        margin_top,
-        margin_right,
-        margin_bottom,
-        margin_left,
-        orientation,
-    ) = page_layout;
-    let orientation_attr = if orientation == "landscape" {
+    let page_layout = section.resolve_page_layout(page_layout);
+    let orientation_attr = if page_layout.orientation == "landscape" {
         r#" w:orient="landscape""#
     } else {
         ""
@@ -1125,34 +1146,84 @@ fn docx_section_properties(
     format!(
         r#"<w:sectPr><w:headerReference w:type="default" r:id="{}"/><w:footerReference w:type="default" r:id="{}"/><w:pgSz w:w="{page_width}" w:h="{page_height}"{orientation_attr}/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/>{columns}</w:sectPr>"#,
         escape_xml(&section.header_relationship_id),
-        escape_xml(&section.footer_relationship_id)
+        escape_xml(&section.footer_relationship_id),
+        page_width = page_layout.width,
+        page_height = page_layout.height,
+        margin_top = page_layout.margin_top,
+        margin_right = page_layout.margin_right,
+        margin_bottom = page_layout.margin_bottom,
+        margin_left = page_layout.margin_left
     )
 }
 
-fn docx_page_layout(
-    response: &CompileResponse,
-    options: &Value,
-) -> (u32, u32, u32, u32, u32, u32, &'static str) {
-    let (mut width, mut height) = match layout_page_size(&response.metadata).as_str() {
-        "letter" => (12240, 15840),
-        "legal" => (12240, 20160),
-        _ => (11906, 16838),
-    };
-    let orientation = layout_orientation(&response.metadata);
-    if orientation == "landscape" {
-        std::mem::swap(&mut width, &mut height);
-    }
+fn docx_page_layout(response: &CompileResponse, options: &Value) -> DocxPageLayout {
+    let page_size = layout_page_size(&response.metadata);
+    let orientation = layout_orientation(&response.metadata).to_string();
+    let (width, height) = docx_page_dimensions(&page_size, &orientation);
     let margin = match explicit_layout_margins(&response.metadata).as_deref() {
-        Some("narrow") | Some("compact") => 720,
-        Some("wide") => 1800,
-        Some("normal") => 1440,
-        _ => match layout_preset(options) {
+        Some(margins) => docx_margin_for_preset(margins),
+        None => match layout_preset(options) {
             "compact" => 1080,
             "presentation" => 1200,
             _ => 1440,
         },
     };
-    (width, height, margin, margin, margin, margin, orientation)
+    DocxPageLayout {
+        page_size,
+        orientation,
+        width,
+        height,
+        margin_top: margin,
+        margin_right: margin,
+        margin_bottom: margin,
+        margin_left: margin,
+    }
+}
+
+impl DocxSectionProperties {
+    fn resolve_page_layout(&self, base: &DocxPageLayout) -> DocxPageLayout {
+        let page_size = self
+            .page_size
+            .clone()
+            .unwrap_or_else(|| base.page_size.clone());
+        let orientation = self
+            .orientation
+            .clone()
+            .unwrap_or_else(|| base.orientation.clone());
+        let (width, height) = docx_page_dimensions(&page_size, &orientation);
+        let margin = self.margins.as_deref().map(docx_margin_for_preset);
+        DocxPageLayout {
+            page_size,
+            orientation,
+            width,
+            height,
+            margin_top: margin.unwrap_or(base.margin_top),
+            margin_right: margin.unwrap_or(base.margin_right),
+            margin_bottom: margin.unwrap_or(base.margin_bottom),
+            margin_left: margin.unwrap_or(base.margin_left),
+        }
+    }
+}
+
+fn docx_page_dimensions(page_size: &str, orientation: &str) -> (u32, u32) {
+    let (mut width, mut height) = match page_size {
+        "letter" => (12240, 15840),
+        "legal" => (12240, 20160),
+        _ => (11906, 16838),
+    };
+    if orientation == "landscape" {
+        std::mem::swap(&mut width, &mut height);
+    }
+    (width, height)
+}
+
+fn docx_margin_for_preset(margins: &str) -> u32 {
+    match margins {
+        "narrow" | "compact" => 720,
+        "wide" => 1800,
+        "normal" => 1440,
+        _ => 1440,
+    }
 }
 
 fn docx_table(headers: &[String], alignments: &[String], rows: &[Vec<String>]) -> String {

@@ -1562,7 +1562,7 @@ fn compiler_renders_layout_break_directives() {
 #[test]
 fn layout_pagination_controls_flow_through_exports() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: Flow Layout\nstatus: approved\napprovedBy: QA\n---\n# Flow Layout\n\n```layout\nbreakBefore: page\nkeepWithNext: true\nkeepTogether: true\n```\n## Kept Heading\nKept paragraph.\n\n{{section-break columns=2 breakAfter=page header=\"Flow Header\" footer=\"Flow {{page}}/{{pages}}\"}}\nAfter section.\n".to_string(),
+            text: "---\ntitle: Flow Layout\nstatus: approved\napprovedBy: QA\n---\n# Flow Layout\n\n```layout\nbreakBefore: page\nkeepWithNext: true\nkeepTogether: true\n```\n## Kept Heading\nKept paragraph.\n\n{{section-break columns=2 pageSize=letter orientation=landscape margins=narrow breakAfter=page header=\"Flow Header\" footer=\"Flow {{page}}/{{pages}}\"}}\nAfter section.\n".to_string(),
             file_path: None,
         });
     let options = json!({});
@@ -1571,6 +1571,9 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(response.html.contains("page-break-before:always"));
     assert!(response.html.contains("break-after:avoid"));
     assert!(response.html.contains("break-inside:avoid"));
+    assert!(response.html.contains("page:neditor-landscape"));
+    assert!(response.html.contains("--neditor-page-size:letter"));
+    assert!(response.html.contains("--neditor-page-margins:narrow"));
     assert!(response.document_ast.blocks.iter().any(|block| matches!(
         block,
         DocumentBlock::Layout {
@@ -1590,6 +1593,9 @@ fn layout_pagination_controls_flow_through_exports() {
             ..
         } if directive == "section-break"
             && settings.columns == Some(2)
+            && settings.page_size.as_deref() == Some("letter")
+            && settings.orientation.as_deref() == Some("landscape")
+            && settings.margins.as_deref() == Some("narrow")
             && settings.break_after.as_deref() == Some("page")
     )));
 
@@ -1601,6 +1607,9 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(docx_document.contains("<w:keepNext/>"));
     assert!(docx_document.contains("<w:keepLines/>"));
     assert!(docx_document.contains(r#"<w:cols w:num="2""#));
+    assert!(docx_document.contains(r#"<w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>"#));
+    assert!(docx_document
+        .contains(r#"<w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/>"#));
     assert!(docx_header.contains("Flow Header"));
     assert!(docx_footer.contains(r#"<w:fldSimple w:instr="PAGE">"#));
     assert!(docx_footer.contains(r#"<w:fldSimple w:instr="NUMPAGES">"#));
@@ -1612,12 +1621,14 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(slides.iter().any(|slide| slide.contains("Flow Header")));
     assert!(slides
         .iter()
-        .any(|slide| slide.contains("Section break: columns=2, breakAfter=page")));
+        .any(|slide| slide.contains("Section break: columns=2, pageSize=letter, orientation=landscape, margins=narrow, breakAfter=page")));
 
     let pdf = render_pdf_bytes(&response, &options);
     let pdf_text = String::from_utf8_lossy(&pdf);
     assert!(pdf_text.contains("Layout: breakBefore=page, keepWithNext=true, keepTogether=true"));
-    assert!(pdf_text.contains("Section break: columns=2, breakAfter=page"));
+    assert!(pdf_text.contains(
+        "Section break: columns=2, pageSize=letter, orientation=landscape, margins=narrow, breakAfter=page"
+    ));
     assert!(pdf_text.contains("Flow Header"));
 
     let bundle =
@@ -1626,6 +1637,9 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(bundled_ast.contains(r#""break_before": "page""#));
     assert!(bundled_ast.contains(r#""keep_with_next": true"#));
     assert!(bundled_ast.contains(r#""keep_together": true"#));
+    assert!(bundled_ast.contains(r#""page_size": "letter""#));
+    assert!(bundled_ast.contains(r#""orientation": "landscape""#));
+    assert!(bundled_ast.contains(r#""margins": "narrow""#));
 }
 
 #[test]

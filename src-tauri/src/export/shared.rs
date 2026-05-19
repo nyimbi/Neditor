@@ -822,6 +822,15 @@ pub(super) fn layout_summary(options: &str, settings: &LayoutSettings) -> String
     if let Some(columns) = settings.columns {
         parts.push(format!("columns={columns}"));
     }
+    if let Some(page_size) = &settings.page_size {
+        parts.push(format!("pageSize={page_size}"));
+    }
+    if let Some(orientation) = &settings.orientation {
+        parts.push(format!("orientation={orientation}"));
+    }
+    if let Some(margins) = &settings.margins {
+        parts.push(format!("margins={margins}"));
+    }
     if let Some(break_before) = &settings.break_before {
         parts.push(format!("breakBefore={break_before}"));
     }
