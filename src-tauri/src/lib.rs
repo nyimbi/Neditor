@@ -5324,6 +5324,53 @@ paths:
     }
 
     #[test]
+    fn export_document_writes_optional_sidecar_manifest() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-export-manifest-test-{unique}"));
+        fs::create_dir_all(&root).expect("create export manifest dir");
+        let output = root.join("ready.html");
+        let source =
+            "---\ntitle: Manifest Ready\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-19\nversion: 1.0.0\n---\n# Ready\n";
+
+        let response = export_document(ExportRequest {
+            text: source.to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+            target: "html".to_string(),
+            output_path: path_to_string(&output),
+            options: json!({ "includeManifest": true }),
+        })
+        .expect("successful html export");
+
+        let manifest_path = response.manifest_path.expect("manifest path");
+        let manifest_text = fs::read_to_string(&manifest_path).expect("manifest file");
+        assert!(output.exists());
+        assert!(manifest_text.contains("\"document_title\": \"Manifest Ready\""));
+        assert!(manifest_text.contains("\"document_version\": \"1.0.0\""));
+        assert!(manifest_text.contains("\"export_target\": \"html\""));
+        assert!(manifest_text.contains("\"source_hash\": \"sha256:"));
+        assert_eq!(response.manifest.document_title, "Manifest Ready");
+        assert_eq!(response.manifest.export_target, "html");
+
+        let no_manifest_output = root.join("ready-no-manifest.html");
+        let no_manifest = export_document(ExportRequest {
+            text: source.to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+            target: "html".to_string(),
+            output_path: path_to_string(&no_manifest_output),
+            options: json!({ "includeManifest": false }),
+        })
+        .expect("successful html export without manifest");
+        assert!(no_manifest_output.exists());
+        assert!(no_manifest.manifest_path.is_none());
+        assert!(!PathBuf::from(format!("{}.manifest.json", no_manifest_output.display())).exists());
+
+        fs::remove_dir_all(root).expect("clean export manifest dir");
+    }
+
+    #[test]
     fn prepare_for_export_validates_target_and_options() {
         let report = prepare_for_export(PrepareExportRequest {
             text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),

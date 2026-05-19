@@ -34,10 +34,10 @@ pub(crate) struct PrepareExportRequest {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct ExportResponse {
-    output_path: String,
-    manifest_path: Option<String>,
-    manifest: ExportManifest,
-    diagnostics: Vec<DocumentDiagnostic>,
+    pub(crate) output_path: String,
+    pub(crate) manifest_path: Option<String>,
+    pub(crate) manifest: ExportManifest,
+    pub(crate) diagnostics: Vec<DocumentDiagnostic>,
 }
 
 #[derive(Debug, Serialize)]
