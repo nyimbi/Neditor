@@ -54,6 +54,9 @@ cd src-tauri && cargo test
 Run `pnpm run build` before desktop packaging; the Tauri build consumes the
 generated project-local `dist` path instead of launching a nested package
 manager command.
+Use the project-local `./node_modules/.bin/tauri` binary for packaging checks;
+`pnpm tauri ...` and `pnpm exec tauri ...` can attempt a package-manager fetch
+in restricted-network environments.
 
 GitHub Actions also runs formatting, Rust check/test, clippy static analysis,
 frontend build, and a `./node_modules/.bin/tauri build --no-bundle` desktop
@@ -65,9 +68,18 @@ can still be verified, but backend compilation remains unverified.
 
 ## Current Packaging Note
 
-`./node_modules/.bin/tauri build --bundles app` succeeds on macOS and produces
+`./node_modules/.bin/tauri build --debug --bundles app` succeeds on macOS and
+produces `src-tauri/target/debug/bundle/macos/NEditor.app`. Release app bundles
+use the same command without `--debug` and produce
 `src-tauri/target/release/bundle/macos/NEditor.app`.
 
-`./node_modules/.bin/tauri build --bundles dmg` currently reaches the `.app` bundle step and
-then fails inside Tauri's generated `bundle_dmg.sh` without surfacing a useful
-`hdiutil` sub-error in this environment.
+`./node_modules/.bin/tauri build --debug --bundles dmg --verbose` currently
+reaches the `.app` bundle step and then fails in Tauri's generated
+`bundle_dmg.sh` while running `hdiutil create`:
+
+```text
+hdiutil: create failed - Device not configured
+```
+
+That failure is specific to DMG image creation in the current macOS execution
+environment; it does not block the app bundle build.
