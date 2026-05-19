@@ -19,6 +19,7 @@ mod diagnostics;
 mod document_ast;
 mod export;
 mod export_commands;
+mod export_media;
 mod filesystem;
 mod footnotes;
 mod front_matter;
