@@ -327,6 +327,7 @@ export interface WatchFileResponse {
     role?: "root" | "include" | string;
   }>;
   native_watcher?: boolean;
+  watcher_error?: string | null;
 }
 
 export interface AiCleanupResponse {

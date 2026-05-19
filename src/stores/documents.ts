@@ -909,6 +909,9 @@ export const useDocumentsStore = defineStore("documents", {
           { delayMs: 250 },
         );
       }
+      if (watchSnapshot.watcher_error) {
+        this.statusMessage = "Native file watcher unavailable; using plugin watch";
+      }
       this.watchSignature = signature;
       this.watchDriver = driver;
       this.watchedPaths = watchPaths;

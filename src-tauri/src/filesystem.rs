@@ -74,6 +74,7 @@ pub(crate) struct WatchFileRequest {
 pub(crate) struct WatchFileResponse {
     pub(crate) paths: Vec<WatchedFileMetadata>,
     pub(crate) native_watcher: bool,
+    pub(crate) watcher_error: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -261,6 +262,7 @@ pub(crate) fn watch_file(request: WatchFileRequest) -> Result<WatchFileResponse,
     Ok(WatchFileResponse {
         paths,
         native_watcher: false,
+        watcher_error: None,
     })
 }
 
@@ -299,7 +301,7 @@ pub(crate) fn start_file_watcher(
     }
 
     let event_app = app.clone();
-    let mut watcher = RecommendedWatcher::new(
+    let mut watcher = match RecommendedWatcher::new(
         move |result: notify::Result<Event>| match result {
             Ok(event) => {
                 if !notify_event_should_emit(&event.kind) {
@@ -320,13 +322,22 @@ pub(crate) fn start_file_watcher(
             }
         },
         Config::default(),
-    )
-    .map_err(|err| err.to_string())?;
+    ) {
+        Ok(watcher) => watcher,
+        Err(err) => {
+            response.watcher_error = Some(format!("Native file watcher unavailable: {err}"));
+            return Ok(response);
+        }
+    };
 
     for path in &watch_paths {
-        watcher
-            .watch(Path::new(path), RecursiveMode::NonRecursive)
-            .map_err(|err| err.to_string())?;
+        if let Err(err) = watcher.watch(Path::new(path), RecursiveMode::NonRecursive) {
+            response.watcher_error = Some(format!(
+                "Native file watcher unavailable for {}: {err}",
+                path
+            ));
+            return Ok(response);
+        }
     }
 
     *active = Some(ActiveFileWatcher {
