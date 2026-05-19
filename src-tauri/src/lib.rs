@@ -2985,6 +2985,101 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn edited_table_permutation_exports_alignment_escapes_and_formula_rows() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Edited Table Permutations\nstatus: approved\napprovedBy: QA\n---\n# Edited Table Permutations\nTable: Scenario grid {#tbl:scenario}\n| Scenario | Owner | Score | Status |\n| :--- | :---: | ---: | --- |\n| Base \\| Case | Finance | $1,200.50 | Ready |\n| Stretch | Ops | 75% | Watch |\n| Floor | Risk | 20 | Hold |\n| Min | Summary | =MIN(C1:C3) | Formula |\n| Max | Summary | =MAX(C1:C3) | Formula |\n| Count | Summary | =COUNT(C1:C3) | Formula |\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == "error"));
+        assert!(response.compiled_markdown.contains("Base \\| Case"));
+        assert!(response
+            .compiled_markdown
+            .contains("| Min | Summary | 20 | Formula |"));
+        assert!(
+            response
+                .compiled_markdown
+                .contains("| Max | Summary | 1200 | Formula |"),
+            "{}",
+            response.compiled_markdown
+        );
+        assert!(response
+            .compiled_markdown
+            .contains("| Count | Summary | 3 | Formula |"));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Table {
+                    id,
+                    caption,
+                    headers,
+                    alignments,
+                    rows,
+                    ..
+                } if id.as_deref() == Some("tbl:scenario")
+                    && caption.as_deref() == Some("Scenario grid")
+                    && headers == &vec![
+                        "Scenario".to_string(),
+                        "Owner".to_string(),
+                        "Score".to_string(),
+                        "Status".to_string()
+                    ]
+                    && alignments == &vec![
+                        "left".to_string(),
+                        "center".to_string(),
+                        "right".to_string(),
+                        "left".to_string()
+                    ]
+                    && rows.iter().any(|row| row == &vec![
+                        "Base | Case".to_string(),
+                        "Finance".to_string(),
+                        "$1,200.50".to_string(),
+                        "Ready".to_string()
+                    ])
+                    && rows.iter().any(|row| row == &vec![
+                        "Max".to_string(),
+                        "Summary".to_string(),
+                        "1200".to_string(),
+                        "Formula".to_string()
+                    ])
+            )
+        }));
+
+        let options = json!({});
+        let docx = render_docx_bytes(&response, &options).expect("docx edited table permutation");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains("Scenario grid"));
+        assert!(docx_document.contains("Base | Case"));
+        assert!(docx_document.contains("1200"));
+        assert!(docx_document.contains(r#"<w:jc w:val="center"/>"#));
+        assert!(docx_document.contains(r#"<w:jc w:val="right"/>"#));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx edited table permutation");
+        let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        assert!(pptx_slide.contains("Scenario grid"));
+        assert!(pptx_slide.contains("<a:t>Base | Case</a:t>"));
+        assert!(pptx_slide.contains("<a:t>1200</a:t>"));
+        assert!(pptx_slide.contains(r#"<a:pPr algn="ctr"/>"#));
+        assert!(pptx_slide.contains(r#"<a:pPr algn="r"/>"#));
+
+        let pdf = render_pdf_bytes(&response, &options);
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains("Scenario grid"));
+        assert!(pdf_text.contains("(Base | Case) Tj"));
+        assert!(pdf_text.contains("(1200) Tj"));
+
+        let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+            .expect("edited table permutation bundle");
+        let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
+        assert!(bundled_ast.contains("\"id\": \"tbl:scenario\""));
+        assert!(bundled_ast.contains("Base | Case"));
+        assert!(bundled_ast.contains("1200"));
+    }
+
+    #[test]
     fn compiler_renders_layout_break_directives() {
         let response = compile(CompileRequest {
             text: "---\ntitle: Layout\nstatus: approved\napprovedBy: QA\n---\n# Layout\n{{page-break}}\n{{section-break columns=1}}\n\n```layout\ncolumns: 2\n```\n".to_string(),
