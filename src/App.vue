@@ -2014,9 +2014,27 @@ function applyAiPasteDefaults() {
   aiInsertCitationTodos.value = store.aiCleanupDefaults.insertCitationTodos;
 }
 
-function openAiPaste() {
+async function readClipboardPlainText() {
+  const clipboard = navigator.clipboard;
+  if (!clipboard?.readText) return "";
+  try {
+    return await clipboard.readText();
+  } catch {
+    return "";
+  }
+}
+
+async function openAiPaste() {
   applyAiPasteDefaults();
   aiPasteOpen.value = true;
+  if (aiPasteText.value.trim()) return;
+  const clipboardText = await readClipboardPlainText();
+  if (clipboardText.trim()) {
+    aiPasteText.value = clipboardText;
+    store.statusMessage = "Loaded clipboard text for AI cleanup";
+  } else {
+    store.statusMessage = "Paste AI chat text to preview cleanup";
+  }
 }
 
 function closeAiPaste() {
