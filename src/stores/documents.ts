@@ -470,8 +470,7 @@ export const useDocumentsStore = defineStore("documents", {
     lastError: "",
     externalHash: "",
     externalConflict: null as ExternalConflict | null,
-    ignoredConflictHash: "",
-    ignoredConflictPath: "",
+    ignoredConflictHashes: {} as Record<string, string>,
     watchSignature: "",
     watchedPaths: [] as string[],
     transformEngines: [] as TransformEngineMetadata[],
@@ -735,8 +734,7 @@ export const useDocumentsStore = defineStore("documents", {
       doc.savedHash = response.hash;
       doc.modified = response.modified;
       doc.dirty = false;
-      this.ignoredConflictHash = "";
-      this.ignoredConflictPath = "";
+      this.clearIgnoredConflicts();
       this.statusMessage = `Saved ${doc.title}`;
       this.rememberFile(doc.path);
       if (this.workspaceRoot) await this.refreshWorkspace();
@@ -941,15 +939,15 @@ export const useDocumentsStore = defineStore("documents", {
           ? { path: event.path, hash: event.hash || "include-change" }
           : await this.changedIncludedFile(doc);
       const includeChanged = Boolean(changedInclude);
-      if (doc.dirty && this.ignoredConflictHash) {
-        const ignoredRoot =
-          mainChanged &&
-          metadata.hash === this.ignoredConflictHash &&
-          (!this.ignoredConflictPath || this.ignoredConflictPath === doc.path);
-        const ignoredInclude =
-          Boolean(changedInclude?.hash) &&
-          changedInclude?.hash === this.ignoredConflictHash &&
-          changedInclude?.path === this.ignoredConflictPath;
+      if (doc.dirty) {
+        const ignoredRoot = Boolean(
+          mainChanged && metadata.hash && this.ignoredConflictHashes[doc.path] === metadata.hash,
+        );
+        const ignoredInclude = Boolean(
+          changedInclude?.path &&
+            changedInclude.hash &&
+            this.ignoredConflictHashes[changedInclude.path] === changedInclude.hash,
+        );
         if (ignoredRoot || ignoredInclude) return;
       }
       if ((mainChanged || includeChanged) && doc.dirty) {
@@ -1002,14 +1000,12 @@ export const useDocumentsStore = defineStore("documents", {
         this.statusMessage = "Accepted included file changes";
       }
       this.externalConflict = null;
-      this.ignoredConflictHash = "";
-      this.ignoredConflictPath = "";
+      this.clearIgnoredConflicts();
       await this.refreshGitStatus();
     },
     keepLocalChanges() {
       if (this.externalConflict?.externalHash) {
-        this.ignoredConflictHash = this.externalConflict.externalHash;
-        this.ignoredConflictPath = this.externalConflict.path;
+        this.rememberIgnoredConflict(this.externalConflict.path, this.externalConflict.externalHash);
       }
       this.externalConflict = null;
       this.statusMessage = "Keeping local edits";
@@ -1017,8 +1013,7 @@ export const useDocumentsStore = defineStore("documents", {
     async saveLocalConflictCopy(path: string) {
       await this.saveActive(path);
       this.externalConflict = null;
-      this.ignoredConflictHash = "";
-      this.ignoredConflictPath = "";
+      this.clearIgnoredConflicts();
       this.statusMessage = "Saved local edits as a copy";
     },
     async applyConflictMerge(text: string) {
@@ -1031,11 +1026,16 @@ export const useDocumentsStore = defineStore("documents", {
       doc.dirty = text !== (conflict.externalText || "");
       this.externalHash = conflict.externalHash;
       this.externalConflict = null;
-      this.ignoredConflictHash = "";
-      this.ignoredConflictPath = "";
+      this.clearIgnoredConflicts();
       this.statusMessage = "Merged external changes into the working document";
       await this.compileActive();
       await this.refreshGitStatus();
+    },
+    rememberIgnoredConflict(path: string, hash: string) {
+      this.ignoredConflictHashes = { ...this.ignoredConflictHashes, [path]: hash };
+    },
+    clearIgnoredConflicts() {
+      this.ignoredConflictHashes = {};
     },
     async changedIncludedFile(doc: OpenDocument) {
       const includedFiles = doc.compile?.export_manifest.included_files || [];
