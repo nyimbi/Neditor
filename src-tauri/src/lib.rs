@@ -21,6 +21,7 @@ mod footnotes;
 mod generated_sections;
 mod git;
 mod indexing;
+mod link_validation;
 mod markdown_tables;
 mod provenance;
 mod review;
@@ -73,6 +74,7 @@ use git::{
 #[cfg(test)]
 use git::{run_git, GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRequest};
 use indexing::{collect_index_entries, strip_index_markers};
+use link_validation::{validate_image_paths, validate_link_paths, validate_logo_path};
 use provenance::{collect_ai_assisted_sections, collect_ai_sources, AiAssistedSection, AiSource};
 use review::{collect_change_notes, collect_comments, ChangeNote, ReviewComment};
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
@@ -1413,158 +1415,6 @@ fn render_figure_line(line: &str) -> Option<String> {
         escape_html(alt),
         escape_html(&caption)
     ))
-}
-
-fn validate_image_paths(
-    markdown: &str,
-    root_path: Option<&Path>,
-    source_map: &[SourceMapEntry],
-    diagnostics: &mut Vec<DocumentDiagnostic>,
-) {
-    let base_dir = root_path
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
-    for (line_index, line) in markdown.lines().enumerate() {
-        let Some((_, after_alt)) = line
-            .trim()
-            .strip_prefix("![")
-            .and_then(|rest| rest.split_once("]("))
-        else {
-            continue;
-        };
-        let Some((src, _)) = after_alt.split_once(')') else {
-            continue;
-        };
-        if src.starts_with("http://") || src.starts_with("https://") || src.starts_with("data:") {
-            continue;
-        }
-        let path = base_dir.join(src);
-        if !path.exists() {
-            let (source_file, line) =
-                diagnostic_location_for_generated_line(source_map, line_index + 1);
-            let mut diagnostic = diag(
-                "warning",
-                format!("Broken image path: {}", path.display()),
-                source_file,
-                line,
-                Some("Create the image file or update the image path."),
-            );
-            diagnostic
-                .related
-                .push(format!("Image target: {}", path.display()));
-            diagnostics.push(diagnostic);
-        }
-    }
-}
-
-fn validate_logo_path(
-    metadata: &Value,
-    root_path: Option<&Path>,
-    diagnostics: &mut Vec<DocumentDiagnostic>,
-) {
-    let Some(logo) = metadata_string(metadata, "brand.logo")
-        .or_else(|| metadata_string(metadata, "layout.logo"))
-        .or_else(|| metadata_string(metadata, "logo"))
-    else {
-        return;
-    };
-    if logo.trim().is_empty() || !should_validate_local_link(&logo) {
-        return;
-    }
-    let base_dir = root_path
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
-    let path = base_dir.join(&logo);
-    if !path.exists() {
-        diagnostics.push(diag(
-            "warning",
-            format!("Broken logo path: {}", path.display()),
-            Some(path_to_string(&path)),
-            None,
-            Some("Create the logo file or update the logo metadata path."),
-        ));
-    }
-}
-
-fn validate_link_paths(
-    markdown: &str,
-    root_path: Option<&Path>,
-    source_map: &[SourceMapEntry],
-    diagnostics: &mut Vec<DocumentDiagnostic>,
-) {
-    let base_dir = root_path
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
-    for (line_index, line) in markdown.lines().enumerate() {
-        let mut search_from = 0usize;
-        while let Some(relative_close) = line[search_from..].find("](") {
-            let close_index = search_from + relative_close;
-            let Some(open_index) = line[..close_index].rfind('[') else {
-                search_from = close_index + 2;
-                continue;
-            };
-            if open_index > 0 && line.as_bytes().get(open_index - 1) == Some(&b'!') {
-                search_from = close_index + 2;
-                continue;
-            }
-            let target_start = close_index + 2;
-            let Some(relative_end) = line[target_start..].find(')') else {
-                break;
-            };
-            let target_end = target_start + relative_end;
-            if let Some(destination) = markdown_link_destination(&line[target_start..target_end]) {
-                if should_validate_local_link(&destination) {
-                    let path_part = destination
-                        .split_once('#')
-                        .map_or(destination.as_str(), |(path, _)| path);
-                    if !path_part.is_empty() {
-                        let path = base_dir.join(path_part);
-                        if !path.exists() {
-                            let (source_file, line) =
-                                diagnostic_location_for_generated_line(source_map, line_index + 1);
-                            let mut diagnostic = diag(
-                                "warning",
-                                format!("Broken link path: {}", path.display()),
-                                source_file,
-                                line,
-                                Some("Create the linked file or update the Markdown link."),
-                            );
-                            diagnostic
-                                .related
-                                .push(format!("Link target: {}", path.display()));
-                            diagnostics.push(diagnostic);
-                        }
-                    }
-                }
-            }
-            search_from = target_end + 1;
-        }
-    }
-}
-
-fn markdown_link_destination(raw: &str) -> Option<String> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    if let Some(stripped) = trimmed.strip_prefix('<') {
-        return stripped
-            .split_once('>')
-            .map(|(destination, _)| destination.to_string());
-    }
-    Some(trimmed.split_whitespace().next()?.to_string())
-}
-
-fn should_validate_local_link(destination: &str) -> bool {
-    !destination.starts_with('#')
-        && !destination.starts_with("mailto:")
-        && !destination.starts_with("tel:")
-        && !destination.starts_with("data:")
-        && !destination.starts_with("{{")
-        && !destination.contains("://")
 }
 
 fn render_equations(markdown: &str) -> String {
