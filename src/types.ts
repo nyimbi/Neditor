@@ -235,6 +235,7 @@ export interface ExportManifest {
   exported_at: string;
   source_hash: string;
   included_files: ManifestFile[];
+  media_files: ManifestFile[];
   export_target: string;
   export_options: Record<string, unknown>;
   transform_artifacts: Array<Record<string, unknown>>;

@@ -201,6 +201,7 @@ struct ExportManifest {
     exported_at: String,
     source_hash: String,
     included_files: Vec<ManifestFile>,
+    media_files: Vec<ManifestFile>,
     export_target: String,
     export_options: Value,
     transform_artifacts: Vec<Value>,
@@ -408,6 +409,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         .iter()
         .filter_map(|edge| manifest_file(&edge.child))
         .collect::<Vec<_>>();
+    let media_files = manifest_media_files(&document_ast);
     let manifest = ExportManifest {
         document_title: title.clone(),
         document_version: metadata
@@ -419,6 +421,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         exported_at: Utc::now().to_rfc3339(),
         source_hash: sha256_uri(source.as_bytes()),
         included_files,
+        media_files,
         export_target: "preview".to_string(),
         export_options: json!({}),
         transform_artifacts: transform_artifacts
@@ -2151,6 +2154,48 @@ fn manifest_file(path: &str) -> Option<ManifestFile> {
         path: path.to_string(),
         hash: sha256_uri(&bytes),
     })
+}
+
+fn manifest_media_files(document_ast: &DocumentAst) -> Vec<ManifestFile> {
+    let mut seen = BTreeSet::new();
+    let mut files = Vec::new();
+    for block in &document_ast.blocks {
+        let document_ast::DocumentBlock::Figure {
+            src: Some(src),
+            source,
+            ..
+        } = block
+        else {
+            continue;
+        };
+        let Some(path) = manifest_media_path(src, source.as_ref()) else {
+            continue;
+        };
+        if seen.insert(path.clone()) {
+            if let Some(file) = manifest_file(&path) {
+                files.push(file);
+            }
+        }
+    }
+    files
+}
+
+fn manifest_media_path(src: &str, source: Option<&document_ast::AstSourceRange>) -> Option<String> {
+    if src.starts_with("data:") || src.contains("://") || src.starts_with('#') {
+        return None;
+    }
+    let path = PathBuf::from(src);
+    let resolved = if path.is_absolute() {
+        path
+    } else if let Some(source) = source {
+        PathBuf::from(&source.source_file)
+            .parent()
+            .map(|parent| parent.join(src))
+            .unwrap_or(path)
+    } else {
+        path
+    };
+    Some(path_to_string(&resolved))
 }
 
 fn slugify(text: &str) -> String {
@@ -5203,6 +5248,9 @@ beta</pre>
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.severity == "error"));
+        assert!(response.export_manifest.media_files.iter().any(|file| {
+            file.path == path_to_string(&image) && file.hash.starts_with("sha256:")
+        }));
 
         let options = json!({});
         let docx = render_docx_bytes(&response, &options).expect("docx bytes");
