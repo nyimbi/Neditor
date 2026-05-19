@@ -234,6 +234,7 @@ export interface ExportManifest {
   status: string;
   exported_at: string;
   source_hash: string;
+  output_hash?: string | null;
   included_files: ManifestFile[];
   media_files: ManifestFile[];
   export_target: string;

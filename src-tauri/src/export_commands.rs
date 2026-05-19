@@ -6,7 +6,7 @@ use crate::{
         render_pptx_bytes,
     },
     git::get_git_status,
-    path_to_string, CompileRequest, ExportManifest, SourceMapEntry,
+    path_to_string, sha256_uri, CompileRequest, ExportManifest, SourceMapEntry,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -123,6 +123,8 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
             ));
         }
     }
+    let output_bytes = fs::read(&output_path).map_err(|err| err.to_string())?;
+    manifest.output_hash = Some(sha256_uri(&output_bytes));
 
     let manifest_path = if request
         .options

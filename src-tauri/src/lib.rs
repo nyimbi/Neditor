@@ -320,6 +320,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         status: status.clone(),
         exported_at: Utc::now().to_rfc3339(),
         source_hash: sha256_uri(source.as_bytes()),
+        output_hash: None,
         included_files,
         media_files,
         export_target: "preview".to_string(),
@@ -5410,10 +5411,16 @@ beta</pre>
         assert!(manifest_text.contains("\"document_version\": \"1.0.0\""));
         assert!(manifest_text.contains("\"export_target\": \"html\""));
         assert!(manifest_text.contains("\"source_hash\": \"sha256:"));
+        assert!(manifest_text.contains("\"output_hash\": \"sha256:"));
         assert!(manifest_text.contains("\"diagnostics\": []"));
         assert!(manifest_text.contains("\"source_map\": ["));
         assert_eq!(response.manifest.document_title, "Manifest Ready");
         assert_eq!(response.manifest.export_target, "html");
+        assert!(response
+            .manifest
+            .output_hash
+            .as_deref()
+            .is_some_and(|hash| hash.starts_with("sha256:")));
         assert!(response.manifest.diagnostics.is_empty());
         assert!(!response.manifest.source_map.is_empty());
 
@@ -5457,6 +5464,7 @@ beta</pre>
         assert!(!report.ready);
         assert_eq!(report.error_count, 12);
         assert_eq!(report.manifest.export_target, "rtf");
+        assert!(report.manifest.output_hash.is_none());
         assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
         assert_eq!(report.manifest.source_map.len(), report.source_map.len());
         assert!(report
