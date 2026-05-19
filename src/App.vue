@@ -169,7 +169,7 @@
           <button type="button" @click="createTableDraft">New table</button>
           <template v-if="tableDraft">
             <div class="table-actions">
-              <button type="button" @click="applyTableDraft">{{ isNewTableDraft ? "Insert table" : "Apply" }}</button>
+              <button type="button" :disabled="tableDraftHasErrors" @click="applyTableDraft">{{ isNewTableDraft ? "Insert table" : "Apply" }}</button>
               <button type="button" @click="addTableRow">Add row</button>
               <button type="button" @click="addTableColumn">Add column</button>
               <button type="button" @click="addTableTotalsRow">Add totals row</button>
@@ -193,6 +193,9 @@
               <textarea v-model="tablePasteText" rows="4"></textarea>
             </label>
             <button type="button" @click="replaceTableFromPaste">Replace from paste</button>
+            <section v-if="tableDraftIssues.length" class="table-issues" aria-label="Table validation">
+              <p v-for="issue in tableDraftIssues" :key="issue.message" :class="issue.severity">{{ issue.message }}</p>
+            </section>
             <div class="table-editor-grid" :style="{ gridTemplateColumns: `220px repeat(${tableDraft.headers.length}, minmax(132px, 1fr)) 44px` }">
               <span></span>
               <input
@@ -262,6 +265,10 @@
               </button>
               <span></span>
             </div>
+            <label class="table-preview">
+              Markdown preview
+              <textarea :value="tableDraftMarkdownPreview" rows="7" readonly></textarea>
+            </label>
           </template>
           <p v-else>No Markdown table selected.</p>
         </template>
@@ -952,6 +959,11 @@ interface TableDraft {
   rows: string[][];
 }
 
+interface TableDraftIssue {
+  severity: "warning" | "error";
+  message: string;
+}
+
 interface ConflictDiffRow {
   key: string;
   kind: "equal" | "local" | "external";
@@ -1081,6 +1093,13 @@ const tableColumnTotals = computed(() => {
   const draft = tableDraft.value;
   if (!draft) return [];
   return draft.headers.map((_, columnIndex) => formatTableTotal(draft, columnIndex));
+});
+const tableDraftIssues = computed(() => (tableDraft.value ? validateTableDraft(tableDraft.value) : []));
+const tableDraftHasErrors = computed(() => tableDraftIssues.value.some((issue) => issue.severity === "error"));
+const tableDraftMarkdownPreview = computed(() => {
+  const draft = tableDraft.value;
+  if (!draft) return "";
+  return serializeMarkdownTable(normalizeTableDraft(draft)).join("\n");
 });
 const diagnosticSignature = computed(() =>
   (active.value.compile?.diagnostics || [])
@@ -2336,6 +2355,11 @@ function applyTableDraft() {
   const table = selectedTable.value;
   const draft = tableDraft.value;
   if (!draft) return;
+  const issues = validateTableDraft(draft);
+  if (issues.some((issue) => issue.severity === "error")) {
+    store.statusMessage = "Fix table validation errors before applying";
+    return;
+  }
   const normalizedDraft = normalizeTableDraft(draft);
   const serialized = serializeMarkdownTable(normalizedDraft);
   if (table && !isNewTableDraft.value) {
@@ -2677,6 +2701,95 @@ function normalizeTableDraft(draft: TableDraft): TableDraft {
   };
 }
 
+function validateTableDraft(draft: TableDraft): TableDraftIssue[] {
+  const normalized = normalizeTableDraft(draft);
+  const issues: TableDraftIssue[] = [];
+  if (normalized.id && !/^[A-Za-z][A-Za-z0-9_.:-]*$/.test(normalized.id)) {
+    issues.push({
+      severity: "error",
+      message: "Table id must start with a letter and contain only letters, numbers, dots, colons, underscores, or hyphens.",
+    });
+  }
+
+  const headerCounts = new Map<string, number>();
+  for (const header of normalized.headers) {
+    const key = header.toLowerCase();
+    headerCounts.set(key, (headerCounts.get(key) || 0) + 1);
+  }
+  for (const [header, count] of headerCounts) {
+    if (count > 1) {
+      issues.push({
+        severity: "warning",
+        message: `Duplicate header "${header}" can make formulas and exports ambiguous.`,
+      });
+    }
+  }
+
+  const dataRowCount = normalized.rows.filter((row) => !isTableSummaryRow(row)).length;
+  for (const [rowIndex, row] of normalized.rows.entries()) {
+    for (const [columnIndex, cell] of row.entries()) {
+      const address = `${spreadsheetColumnName(columnIndex + 1)}${rowIndex + 1}`;
+      issues.push(...validateTableCell(cell, normalized.formats[columnIndex], address, normalized.headers.length, dataRowCount));
+    }
+  }
+  return issues;
+}
+
+function validateTableCell(
+  value: string,
+  format: TableFormat,
+  address: string,
+  columnCount: number,
+  dataRowCount: number,
+): TableDraftIssue[] {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (isFormulaCell(trimmed)) return validateTableFormula(trimmed, address, columnCount, dataRowCount);
+  if (format === "date" && Number.isNaN(Date.parse(trimmed))) {
+    return [{ severity: "warning", message: `${address} is marked as a date but cannot be parsed.` }];
+  }
+  if ((format === "number" || format === "currency" || format === "percent") && Number.isNaN(parseCellNumber(trimmed))) {
+    return [{ severity: "warning", message: `${address} is marked as ${format} but is not numeric.` }];
+  }
+  return [];
+}
+
+function validateTableFormula(formula: string, address: string, columnCount: number, dataRowCount: number): TableDraftIssue[] {
+  const issues: TableDraftIssue[] = [];
+  const expression = formula.trim().slice(1).trim();
+  if (!/^(SUM|AVG|MIN|MAX|COUNT)\s*\(/i.test(expression)) {
+    issues.push({
+      severity: "warning",
+      message: `${address} uses a formula outside the table editor's supported summary functions.`,
+    });
+  }
+  const references = [...expression.matchAll(/\b([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?\b/gi)];
+  if (!references.length) {
+    issues.push({
+      severity: "warning",
+      message: `${address} formula does not reference any table cells.`,
+    });
+  }
+  for (const reference of references) {
+    const fromColumn = spreadsheetColumnIndex(reference[1]);
+    const fromRow = Number(reference[2]);
+    const toColumn = reference[3] ? spreadsheetColumnIndex(reference[3]) : fromColumn;
+    const toRow = reference[4] ? Number(reference[4]) : fromRow;
+    if (fromColumn > toColumn || fromRow > toRow) {
+      issues.push({
+        severity: "error",
+        message: `${address} formula reference ${reference[0]} has an invalid range order.`,
+      });
+    } else if (fromColumn < 1 || toColumn > columnCount || fromRow < 1 || toRow > dataRowCount) {
+      issues.push({
+        severity: "error",
+        message: `${address} formula reference ${reference[0]} is outside the editable data range.`,
+      });
+    }
+  }
+  return issues;
+}
+
 function serializeMarkdownTable(draft: TableDraft) {
   const headers = draft.headers.map(escapeTableCell);
   const separator = draft.alignments.map(separatorForAlignment);
@@ -2899,6 +3012,13 @@ function spreadsheetColumnName(index: number) {
     value = Math.floor(value / 26);
   }
   return name || "A";
+}
+
+function spreadsheetColumnIndex(name: string) {
+  return name
+    .toUpperCase()
+    .split("")
+    .reduce((value, char) => value * 26 + char.charCodeAt(0) - 64, 0);
 }
 
 function parseCellNumber(value: string) {
@@ -3491,6 +3611,28 @@ select:hover {
   gap: 8px;
 }
 
+.table-issues {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+}
+
+.table-issues p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.table-issues .error {
+  color: #b91c1c;
+}
+
+.table-issues .warning {
+  color: #92400e;
+}
+
 .table-editor-grid {
   display: grid;
   gap: 4px;
@@ -3532,6 +3674,15 @@ select:hover {
 
 .table-editor-grid .column-actions {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.table-preview {
+  margin-top: 12px;
+}
+
+.table-preview textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
 }
 
 .editor-pane {
