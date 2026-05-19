@@ -186,7 +186,7 @@ pub(crate) struct IncludeEdge {
     pub(crate) depth: usize,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct SourceMapEntry {
     pub(crate) generated_line: usize,
     pub(crate) source_file: String,
@@ -206,6 +206,7 @@ struct ExportManifest {
     export_options: Value,
     transform_artifacts: Vec<Value>,
     diagnostics: Vec<DocumentDiagnostic>,
+    source_map: Vec<SourceMapEntry>,
     app_version: String,
 }
 
@@ -447,6 +448,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
             })
             .collect(),
         diagnostics: diagnostics.clone(),
+        source_map: source_map.clone(),
         app_version: env!("CARGO_PKG_VERSION").to_string(),
     };
     let table_summaries = collect_table_summaries(&table_formula_markdown);
@@ -5503,9 +5505,11 @@ beta</pre>
         assert!(manifest_text.contains("\"export_target\": \"html\""));
         assert!(manifest_text.contains("\"source_hash\": \"sha256:"));
         assert!(manifest_text.contains("\"diagnostics\": []"));
+        assert!(manifest_text.contains("\"source_map\": ["));
         assert_eq!(response.manifest.document_title, "Manifest Ready");
         assert_eq!(response.manifest.export_target, "html");
         assert!(response.manifest.diagnostics.is_empty());
+        assert!(!response.manifest.source_map.is_empty());
 
         let no_manifest_output = root.join("ready-no-manifest.html");
         let no_manifest = export_document(ExportRequest {
@@ -5548,6 +5552,7 @@ beta</pre>
         assert_eq!(report.error_count, 12);
         assert_eq!(report.manifest.export_target, "rtf");
         assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
+        assert_eq!(report.manifest.source_map.len(), report.source_map.len());
         assert!(report
             .diagnostics
             .iter()

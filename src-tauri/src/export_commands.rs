@@ -6,7 +6,7 @@ use crate::{
         render_pptx_bytes,
     },
     git::get_git_status,
-    path_to_string, CompileRequest, ExportManifest,
+    path_to_string, CompileRequest, ExportManifest, SourceMapEntry,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -46,6 +46,7 @@ pub(crate) struct ExportReadinessReport {
     pub(crate) error_count: usize,
     pub(crate) warning_count: usize,
     pub(crate) info_count: usize,
+    pub(crate) source_map: Vec<SourceMapEntry>,
     pub(crate) diagnostics: Vec<DocumentDiagnostic>,
     pub(crate) manifest: ExportManifest,
 }
@@ -183,6 +184,7 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
         error_count,
         warning_count,
         info_count,
+        source_map: response.source_map,
         diagnostics: response.diagnostics,
         manifest: response.export_manifest,
     }

@@ -240,6 +240,7 @@ export interface ExportManifest {
   export_options: Record<string, unknown>;
   transform_artifacts: Array<Record<string, unknown>>;
   diagnostics: DocumentDiagnostic[];
+  source_map: Array<{ generated_line: number; source_file: string; source_line: number }>;
   app_version: string;
 }
 
@@ -339,6 +340,7 @@ export interface ExportReadinessReport {
   error_count: number;
   warning_count: number;
   info_count: number;
+  source_map: Array<{ generated_line: number; source_file: string; source_line: number }>;
   diagnostics: DocumentDiagnostic[];
   manifest: ExportManifest;
 }
