@@ -9,6 +9,7 @@ pub(crate) mod external;
 pub(crate) mod options;
 pub(crate) mod pipeline;
 pub(crate) mod qr;
+pub(crate) mod renderer;
 pub(crate) mod structured;
 pub(crate) mod visual_data;
 
