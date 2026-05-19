@@ -1652,6 +1652,12 @@ fn render_docx_document(
     }
     body.push_str(&docx_page_break());
     let mut skip_next_toc_body = false;
+    let bibliography_keys = response
+        .bibliography
+        .iter()
+        .map(|entry| entry.key.as_str())
+        .collect::<Vec<_>>();
+    let mut next_list_is_bibliography = false;
     for block in &response.document_ast.blocks {
         if skip_next_toc_body {
             skip_next_toc_body = false;
@@ -1664,7 +1670,23 @@ fn render_docx_document(
             skip_next_toc_body = true;
             continue;
         }
-        body.push_str(&render_docx_block(block, media, hyperlinks));
+        if next_list_is_bibliography {
+            if let DocumentBlock::List { ordered, items, .. } = block {
+                body.push_str(&docx_bibliography_list(*ordered, items));
+                next_list_is_bibliography = false;
+                continue;
+            }
+            next_list_is_bibliography = false;
+        }
+        if matches!(block, DocumentBlock::Heading { text, .. } if text == "Bibliography") {
+            next_list_is_bibliography = true;
+        }
+        body.push_str(&render_docx_block(
+            block,
+            media,
+            hyperlinks,
+            &bibliography_keys,
+        ));
     }
     if docx_has_native_comments(response, options) {
         body.push_str(&render_docx_comment_references(response));
@@ -1889,6 +1911,7 @@ fn render_docx_block(
     block: &DocumentBlock,
     media: &[ExportMedia],
     hyperlinks: &[ExportHyperlink],
+    bibliography_keys: &[&str],
 ) -> String {
     match block {
         DocumentBlock::Heading {
@@ -1898,7 +1921,7 @@ fn render_docx_block(
             ..
         } => docx_heading_with_bookmark(*level, text, Some(anchor)),
         DocumentBlock::Paragraph { text, inlines, .. } => {
-            docx_paragraph_from_inlines(text, inlines, hyperlinks)
+            docx_paragraph_from_inlines(text, inlines, hyperlinks, bibliography_keys)
         }
         DocumentBlock::List { ordered, items, .. } => docx_list(*ordered, items),
         DocumentBlock::TaskList { items, .. } => docx_task_list(items),
@@ -2039,6 +2062,7 @@ fn docx_paragraph_from_inlines(
     fallback_text: &str,
     inlines: &[InlineNode],
     hyperlinks: &[ExportHyperlink],
+    bibliography_keys: &[&str],
 ) -> String {
     if inlines.is_empty() {
         return docx_paragraph(fallback_text);
@@ -2047,8 +2071,9 @@ fn docx_paragraph_from_inlines(
         .iter()
         .map(|inline| match inline {
             InlineNode::Text { text } => docx_text_run(text),
-            InlineNode::CrossReference { raw, .. } | InlineNode::Citation { raw, .. } => {
-                docx_text_run(&inline_export_text(raw))
+            InlineNode::CrossReference { raw, .. } => docx_text_run(&inline_export_text(raw)),
+            InlineNode::Citation { raw, keys, .. } => {
+                docx_citation_run(raw, keys, bibliography_keys)
             }
             InlineNode::FootnoteReference { number, .. } => docx_footnote_reference_run(*number),
             InlineNode::Strong { text } => docx_text_run_with_properties(text, "<w:b/>"),
@@ -2098,6 +2123,17 @@ fn docx_internal_hyperlink_run(text: &str, anchor: &str) -> String {
         escape_xml(&docx_bookmark_name(anchor)),
         escape_xml(text)
     )
+}
+
+fn docx_citation_run(raw: &str, keys: &[String], bibliography_keys: &[&str]) -> String {
+    let label = inline_export_text(raw);
+    let Some(key) = keys
+        .first()
+        .filter(|key| bibliography_keys.contains(&key.as_str()))
+    else {
+        return docx_text_run(&label);
+    };
+    docx_internal_hyperlink_run(&label, &format!("bib:{key}"))
 }
 
 fn docx_footnote_reference_run(number: usize) -> String {
@@ -2160,6 +2196,33 @@ fn docx_list(ordered: bool, items: &[String]) -> String {
             docx_paragraph(&format!("{marker} {item}"))
         })
         .collect::<String>()
+}
+
+fn docx_bibliography_list(ordered: bool, items: &[String]) -> String {
+    items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let marker = if ordered {
+                format!("{}.", index + 1)
+            } else {
+                "-".to_string()
+            };
+            let text = format!("{marker} {item}");
+            let bookmark = bibliography_key_from_item(item).map(|key| format!("bib:{key}"));
+            docx_bookmarked_paragraph(&text, bookmark.as_deref())
+        })
+        .collect::<String>()
+}
+
+fn bibliography_key_from_item(item: &str) -> Option<&str> {
+    let (key, _) = item.split_once('.')?;
+    let key = key.trim();
+    (!key.is_empty()
+        && key
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | ':')))
+    .then_some(key)
 }
 
 fn docx_task_list(items: &[crate::document_ast::TaskListItem]) -> String {

@@ -2538,7 +2538,7 @@ ARR: Annual recurring revenue.
     #[test]
     fn citation_export_conformance_covers_required_cases() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Citation Export\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# Citation Export\nSingle [@porter1985].\nMultiple [@porter1985; @doe2026].\nLocator [@porter1985, p. 42].\nMissing [@missing2026].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}\n```\n\n[BIBLIOGRAPHY]\n".to_string(),
+            text: "---\ntitle: Citation Export\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# Citation Export\nSingle [@porter1985].\nMultiple [@porter1985; @doe2026].\nLocator [@porter1985, p. 42].\nMissing [@missing2026].\nSecond [@doe2026].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}\n```\n\n[BIBLIOGRAPHY]\n".to_string(),
             file_path: None,
         });
         let options = json!({});
@@ -2577,6 +2577,11 @@ ARR: Annual recurring revenue.
         assert!(docx_document.contains("missing2026"));
         assert!(docx_document.contains("Competitive Advantage"));
         assert!(docx_document.contains("Evidence Based Reports"));
+        assert!(docx_document.contains(r#"w:name="bib_porter1985""#));
+        assert!(docx_document.contains(r#"w:name="bib_doe2026""#));
+        assert!(docx_document.contains(r#"<w:hyperlink w:anchor="bib_porter1985""#));
+        assert!(docx_document.contains(r#"<w:hyperlink w:anchor="bib_doe2026""#));
+        assert!(!docx_document.contains(r#"w:anchor="bib_missing2026""#));
 
         let pptx = render_pptx_bytes(&response, &options).expect("pptx citation bytes");
         let slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/");
