@@ -1263,8 +1263,8 @@ fn parse_ast_ai_source(content: &str) -> AstAiSource {
             "model" => provenance.model = value,
             "date" => provenance.date = value,
             "promptSummary" | "prompt_summary" => provenance.prompt_summary = value,
-            "reviewedBy" | "reviewed_by" => provenance.reviewed_by = value,
-            "reviewedAt" | "reviewed_at" => provenance.reviewed_at = value,
+            "reviewedBy" | "reviewed_by" | "reviewer" => provenance.reviewed_by = value,
+            "reviewedAt" | "reviewed_at" | "reviewDate" => provenance.reviewed_at = value,
             "status" => provenance.status = value,
             _ => {}
         }

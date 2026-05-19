@@ -5031,6 +5031,28 @@ paths:
     }
 
     #[test]
+    fn document_ast_accepts_ai_source_metadata_aliases() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: AI AST Aliases\nstatus: approved\napprovedBy: QA\n---\n# AI AST Aliases\n```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nprompt_summary: Alias prompt\nreviewer: Jane Doe\nreviewDate: 2026-05-19T09:00:00Z\nstatus: human-reviewed\n```\n"
+                .to_string(),
+            file_path: None,
+        });
+
+        let ast_source = response
+            .document_ast
+            .blocks
+            .iter()
+            .find_map(|block| match block {
+                DocumentBlock::AiSource { provenance, .. } => Some(provenance),
+                _ => None,
+            })
+            .expect("ai source AST block");
+        assert_eq!(ast_source.prompt_summary, "Alias prompt");
+        assert_eq!(ast_source.reviewed_by, "Jane Doe");
+        assert_eq!(ast_source.reviewed_at, "2026-05-19T09:00:00Z");
+    }
+
+    #[test]
     fn export_packages_local_figure_media_relative_to_source_file() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
