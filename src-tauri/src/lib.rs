@@ -4262,7 +4262,7 @@ beta</pre>
     #[test]
     fn semantic_exporters_map_ast_blocks() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph with [source](https://example.com/report).\n\n- [x] Confirm controls\n- [ ] Final approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2 header=\"Section Header\" footer=\"Section {{page}}/{{pages}}\"}}\n\n{{slide title=\"Board Review\" header=\"Slide Header\" footer=\"Slide {{page}}/{{pages}}\" notes=\"Open with risk summary\\nClose with decision ask\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
+            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph with [source](https://example.com/report).\n\n- [x] Confirm controls\n- [ ] Final approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2 header=\"Section Header\" footer=\"Section {{page}}/{{pages}}\"}}\n\n{{slide title=\"Board Review\" layout=\"two-column\" header=\"Slide Header\" footer=\"Slide {{page}}/{{pages}}\" notes=\"Open with risk summary\\nClose with decision ask\"}}\nSlide-specific body.\nSecond column body.\n\n## Appendix\nAfter the break.\n".to_string(),
             file_path: None,
         });
         let options = json!({ "watermark": "DRAFT" });
@@ -4345,6 +4345,9 @@ beta</pre>
         let slide_four = zip_entry_text(&pptx, "ppt/slides/slide4.xml");
         assert!(slide_four.contains("Board Review"));
         assert!(slide_four.contains("Slide-specific body."));
+        assert!(slide_four.contains("Second column body."));
+        assert!(slide_four.contains(r#"name="Left Column""#));
+        assert!(slide_four.contains(r#"name="Right Column""#));
         assert!(slide_four.contains("Slide Header"));
         assert!(slide_four.contains("Slide 4/5"));
         assert!(slide_four_relationships.contains(r#"Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide""#));

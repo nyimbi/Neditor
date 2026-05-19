@@ -3094,6 +3094,7 @@ const PPTX_TABLE_ROWS_PER_SLIDE: usize = 8;
 struct PptxSlide {
     title: String,
     lines: Vec<String>,
+    layout: PptxLayout,
     header: String,
     footer: String,
     header_override: Option<String>,
@@ -3102,6 +3103,15 @@ struct PptxSlide {
     media_refs: Vec<MediaRef>,
     hyperlinks: Vec<ExportHyperlink>,
     notes: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PptxLayout {
+    Title,
+    Section,
+    Content,
+    TwoColumn,
+    Table,
 }
 
 #[derive(Clone, Debug)]
@@ -3124,6 +3134,7 @@ impl PptxSlide {
         Self {
             title: title.into(),
             lines: Vec::new(),
+            layout: PptxLayout::Content,
             header: String::new(),
             footer: String::new(),
             header_override: None,
@@ -3139,6 +3150,7 @@ impl PptxSlide {
         Self {
             title: title.into(),
             lines,
+            layout: PptxLayout::Content,
             header: String::new(),
             footer: String::new(),
             header_override: None,
@@ -3152,13 +3164,15 @@ impl PptxSlide {
 }
 
 fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSlide> {
-    let mut slides = vec![PptxSlide::with_lines(
+    let mut title_slide = PptxSlide::with_lines(
         response.semantic.title.clone(),
         export_metadata_lines(response, options)
             .into_iter()
             .filter(|line| !line.starts_with("Cover: "))
             .collect(),
-    )];
+    );
+    title_slide.layout = PptxLayout::Title;
+    let mut slides = vec![title_slide];
     let include_agenda = include_pptx_agenda(response, options);
     if include_agenda {
         let lines = response
@@ -3217,6 +3231,7 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                 }
                 let mut slide =
                     PptxSlide::with_lines("Section", layout_export_lines(directive, options));
+                slide.layout = PptxLayout::Section;
                 apply_pptx_section_options(&mut slide, options);
                 current = Some(slide);
             }
@@ -3229,6 +3244,7 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                     }
                 }
                 let mut slide = PptxSlide::new(slide_title_from_options(options));
+                slide.layout = pptx_layout_from_options(options);
                 slide.notes = slide_notes_from_options(options);
                 apply_pptx_section_options(&mut slide, options);
                 current = Some(slide);
@@ -3311,6 +3327,20 @@ fn apply_pptx_section_options(slide: &mut PptxSlide, options: &str) {
     slide.footer_override = layout_option_text(options, "footer");
 }
 
+fn pptx_layout_from_options(options: &str) -> PptxLayout {
+    ["layout", "type", "kind"]
+        .iter()
+        .find_map(|key| layout_option_text(options, key))
+        .map(|value| match value.trim().to_ascii_lowercase().as_str() {
+            "title" | "title-slide" | "cover" => PptxLayout::Title,
+            "section" | "section-divider" | "divider" => PptxLayout::Section,
+            "two-column" | "two_columns" | "columns" => PptxLayout::TwoColumn,
+            "table" | "table-slide" => PptxLayout::Table,
+            _ => PptxLayout::Content,
+        })
+        .unwrap_or(PptxLayout::Content)
+}
+
 fn is_appendix_heading(line: &str) -> bool {
     matches!(
         line,
@@ -3352,6 +3382,7 @@ fn expand_pptx_table_slides(slides: Vec<PptxSlide>) -> Vec<PptxSlide> {
                             &table_chunk.headers,
                         )],
                     );
+                    continued.layout = slide.layout;
                     continued.header_override = slide.header_override.clone();
                     continued.footer_override = slide.footer_override.clone();
                     continued
@@ -3412,6 +3443,9 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
     collect_pptx_block_hyperlinks(slide, block);
     if let DocumentBlock::RawHtml { html, .. } = block {
         if let Some(table) = export_table_from_transform_html(html) {
+            if slide.layout == PptxLayout::Content {
+                slide.layout = PptxLayout::Table;
+            }
             slide.tables.push(PptxTable {
                 id: None,
                 caption: None,
@@ -3423,6 +3457,9 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
     }
     if let DocumentBlock::CodeBlock { language, code, .. } = block {
         if let Some(table) = export_table_from_delimited_code(language.as_deref(), code) {
+            if slide.layout == PptxLayout::Content {
+                slide.layout = PptxLayout::Table;
+            }
             slide.tables.push(PptxTable {
                 id: None,
                 caption: None,
@@ -3441,6 +3478,9 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
         ..
     } = block
     {
+        if slide.layout == PptxLayout::Content {
+            slide.layout = PptxLayout::Table;
+        }
         slide.tables.push(PptxTable {
             id: id.clone(),
             caption: caption.clone(),
@@ -3939,13 +3979,7 @@ fn render_pptx_presentation(slide_count: usize) -> String {
 }
 
 fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
-    let title = escape_xml(&slide.title);
-    let body = slide
-        .lines
-        .iter()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| render_pptx_body_line(line, &slide.hyperlinks))
-        .collect::<String>();
+    let content_shapes = render_pptx_content_shapes(slide);
     let pictures = media
         .iter()
         .enumerate()
@@ -3974,19 +4008,150 @@ fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
         )
     };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{header}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>{title}</a:t></a:r></a:p>{body}</p:txBody></p:sp>{tables}{pictures}{footer}</p:spTree></p:cSld></p:sld>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{header}{content_shapes}{tables}{pictures}{footer}</p:spTree></p:cSld></p:sld>"#
     )
 }
 
-fn render_pptx_body_line(line: &str, hyperlinks: &[ExportHyperlink]) -> String {
+fn render_pptx_content_shapes(slide: &PptxSlide) -> String {
+    match slide.layout {
+        PptxLayout::Title => {
+            let title = render_pptx_text_shape(
+                2,
+                "Title",
+                685_800,
+                1_250_000,
+                7_772_400,
+                900_000,
+                std::slice::from_ref(&slide.title),
+                2800,
+                &slide.hyperlinks,
+            );
+            let body = render_pptx_text_shape(
+                3,
+                "Subtitle",
+                914_400,
+                2_300_000,
+                7_315_200,
+                1_600_000,
+                &slide.lines,
+                1300,
+                &slide.hyperlinks,
+            );
+            format!("{title}{body}")
+        }
+        PptxLayout::Section => {
+            let mut lines = vec![slide.title.clone()];
+            lines.extend(slide.lines.clone());
+            render_pptx_text_shape(
+                2,
+                "Section Divider",
+                685_800,
+                1_600_000,
+                7_772_400,
+                1_700_000,
+                &lines,
+                2200,
+                &slide.hyperlinks,
+            )
+        }
+        PptxLayout::TwoColumn => {
+            let split = slide.lines.len().div_ceil(2);
+            let title = render_pptx_text_shape(
+                2,
+                "Title",
+                571_500,
+                600_000,
+                8_001_000,
+                520_000,
+                std::slice::from_ref(&slide.title),
+                1800,
+                &slide.hyperlinks,
+            );
+            let left = render_pptx_text_shape(
+                3,
+                "Left Column",
+                571_500,
+                1_250_000,
+                3_720_000,
+                3_250_000,
+                &slide.lines[..split],
+                1100,
+                &slide.hyperlinks,
+            );
+            let right = render_pptx_text_shape(
+                4,
+                "Right Column",
+                4_852_500,
+                1_250_000,
+                3_720_000,
+                3_250_000,
+                &slide.lines[split..],
+                1100,
+                &slide.hyperlinks,
+            );
+            format!("{title}{left}{right}")
+        }
+        PptxLayout::Content | PptxLayout::Table => {
+            let mut lines = vec![slide.title.clone()];
+            lines.extend(slide.lines.clone());
+            render_pptx_text_shape(
+                2,
+                if slide.layout == PptxLayout::Table {
+                    "Table Slide"
+                } else {
+                    "Title"
+                },
+                571_500,
+                600_000,
+                8_001_000,
+                3_950_000,
+                &lines,
+                1200,
+                &slide.hyperlinks,
+            )
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_pptx_text_shape(
+    id: usize,
+    name: &str,
+    x: i64,
+    y: i64,
+    width: i64,
+    height: i64,
+    lines: &[String],
+    font_size: usize,
+    hyperlinks: &[ExportHyperlink],
+) -> String {
+    let paragraphs = lines
+        .iter()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| render_pptx_body_line_with_size(line, hyperlinks, font_size))
+        .collect::<String>();
+    format!(
+        r#"<p:sp><p:nvSpPr><p:cNvPr id="{id}" name="{}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{width}" cy="{height}"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/>{paragraphs}</p:txBody></p:sp>"#,
+        escape_xml(name)
+    )
+}
+
+fn render_pptx_body_line_with_size(
+    line: &str,
+    hyperlinks: &[ExportHyperlink],
+    font_size: usize,
+) -> String {
     let hyperlink = hyperlinks.iter().find(|item| line.contains(&item.url));
     match hyperlink {
         Some(item) => format!(
-            r#"<a:p><a:r><a:rPr><a:hlinkClick r:id="{}"/></a:rPr><a:t>{}</a:t></a:r></a:p>"#,
+            r#"<a:p><a:r><a:rPr sz="{font_size}"><a:hlinkClick r:id="{}"/></a:rPr><a:t>{}</a:t></a:r></a:p>"#,
             escape_xml(&item.relationship_id),
             escape_xml(line)
         ),
-        None => format!(r#"<a:p><a:r><a:t>{}</a:t></a:r></a:p>"#, escape_xml(line)),
+        None => format!(
+            r#"<a:p><a:r><a:rPr sz="{font_size}"/><a:t>{}</a:t></a:r></a:p>"#,
+            escape_xml(line)
+        ),
     }
 }
 
