@@ -32,6 +32,8 @@ mod references;
 mod review;
 mod rich_blocks;
 mod snapshot;
+mod snapshot_metadata;
+mod snapshot_storage;
 mod source_mapping;
 mod tables;
 mod transforms;

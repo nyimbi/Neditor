@@ -35,5 +35,5 @@ What remains to achieve the full vision:
      transform fence/source-provenance plumbing, and manifest/media helpers have moved out of lib.rs; export media parsing, sizing, and crop helpers have moved out of export.rs.
      The root Tauri module is now focused on command/runtime wiring, compiler orchestration lives in src-tauri/src/compiler.rs, test fixtures live in src-tauri/src/tests.rs,
      and the export package writers are split into HTML, DOCX, PDF, PPTX, and Markdown bundle modules, with shared export text/table/layout helpers isolated in
-     export/shared.rs. Filesystem watch/include-graph logic and workspace tree scanning now live outside the low-level file command module. Still needed: split
-     diagnostics, git, snapshot, and remaining test fixture clusters further as the feature set grows.
+     export/shared.rs. Filesystem watch/include-graph logic and workspace tree scanning now live outside the low-level file command module, and snapshot metadata/storage
+     helpers are isolated from snapshot commands. Still needed: split diagnostics, git, and remaining test fixture clusters further as the feature set grows.
