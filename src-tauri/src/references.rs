@@ -2,7 +2,7 @@ use crate::{
     diagnostic_location_for_generated_line, diagnostics::diag, DocumentDiagnostic, SourceMapEntry,
 };
 use serde::Serialize;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 #[derive(Debug, Serialize)]
 pub(crate) struct CrossReference {
@@ -76,4 +76,75 @@ pub(crate) fn collect_cross_references(
         }
     }
     references
+}
+
+pub(crate) fn render_cross_references(markdown: &str, references: &[CrossReference]) -> String {
+    if references.is_empty() {
+        return markdown.to_string();
+    }
+    let reference_map = references
+        .iter()
+        .map(|reference| (reference.key.as_str(), reference))
+        .collect::<HashMap<_, _>>();
+    let mut output = String::with_capacity(markdown.len());
+    let mut rest = markdown;
+    while let Some(start) = rest.find("{@") {
+        output.push_str(&rest[..start]);
+        let after_start = &rest[start + 2..];
+        let Some(end) = after_start.find('}') else {
+            output.push_str(&rest[start..]);
+            return output;
+        };
+        let key = after_start[..end].trim();
+        if let Some(reference) = reference_map
+            .get(key)
+            .filter(|reference| reference.resolved)
+        {
+            output.push_str(&format!(
+                "[{}](#{})",
+                escape_markdown_link_text(&reference_display_text(reference)),
+                escape_markdown_link_target(&reference.key)
+            ));
+        } else {
+            output.push_str(&rest[start..start + 2 + end + 1]);
+        }
+        rest = &after_start[end + 1..];
+    }
+    output.push_str(rest);
+    output
+}
+
+fn reference_display_text(reference: &CrossReference) -> String {
+    let (label, suffix) = reference
+        .key
+        .split_once(':')
+        .map(|(kind, suffix)| (reference_kind_label(kind), suffix))
+        .unwrap_or(("Section", reference.key.as_str()));
+    if suffix.is_empty() {
+        label.to_string()
+    } else {
+        format!("{label} {}", suffix.replace(['-', '_'], " "))
+    }
+}
+
+fn reference_kind_label(kind: &str) -> &'static str {
+    match kind {
+        "fig" | "figure" => "Figure",
+        "tbl" | "table" => "Table",
+        "eq" | "equation" => "Equation",
+        "app" | "appendix" => "Appendix",
+        "dec" | "decision" => "Decision",
+        "sec" | "section" => "Section",
+        _ => "Reference",
+    }
+}
+
+fn escape_markdown_link_text(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
+}
+
+fn escape_markdown_link_target(target: &str) -> String {
+    target.replace(')', "%29").replace(' ', "%20")
 }

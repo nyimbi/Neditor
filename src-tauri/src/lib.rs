@@ -84,7 +84,9 @@ use html_preview::markdown_to_html;
 use indexing::{collect_index_entries, strip_index_markers};
 use link_validation::{validate_image_paths, validate_link_paths, validate_logo_path};
 use provenance::{collect_ai_assisted_sections, collect_ai_sources, AiAssistedSection, AiSource};
-use references::{collect_cross_references, collect_labels, CrossReference};
+use references::{
+    collect_cross_references, collect_labels, render_cross_references, CrossReference,
+};
 use review::{collect_change_notes, collect_comments, ChangeNote, ReviewComment};
 use rich_blocks::{
     render_callouts, render_equations, render_figures, render_layout_block_html,
@@ -310,6 +312,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     let labels = collect_labels(&interpolated, &semantic_heading_anchors);
     let cross_references =
         collect_cross_references(&interpolated, &labels, &source_map, &mut diagnostics);
+    let reference_markdown = render_cross_references(&interpolated, &cross_references);
     let index_entries = collect_index_entries(&interpolated, &metadata, &headings, &glossary);
     let index_terms = index_entries
         .iter()
@@ -321,7 +324,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     let ai_sources = collect_ai_sources(&interpolated);
     let ai_assisted_sections = collect_ai_assisted_sections(&interpolated, &headings);
     let with_toc = inject_generated_sections(
-        &interpolated,
+        &reference_markdown,
         &metadata,
         &headings,
         &index_entries,
@@ -3171,6 +3174,12 @@ ARR: Annual recurring revenue.
         assert!(response.html.contains("class=\"math-frac\""));
         assert!(response.html.contains("role=\"math\""));
         assert!(response.html.contains("<summary>LaTeX</summary>"));
+        assert!(response
+            .compiled_markdown
+            .contains("See [Equation roi](#eq:roi)."));
+        assert!(response
+            .html
+            .contains(r##"<a href="#eq:roi">Equation roi</a>"##));
         assert!(response.document_ast.blocks.iter().any(|block| {
             matches!(
                 block,
@@ -3281,6 +3290,9 @@ ARR: Annual recurring revenue.
                 .iter()
                 .any(|reference| reference.key == key && reference.resolved));
         }
+        assert!(response.compiled_markdown.contains(
+            "See [Section strategy](#sec:strategy), [Section appendix a](#appendix-a), and [Section decision record](#decision-record)."
+        ));
         assert!(!response
             .diagnostics
             .iter()
@@ -4594,6 +4606,8 @@ paths:
         assert!(html.contains("APPROVED"));
         assert!(html.contains("Competitive Advantage, p. 42"));
         assert!(html.contains("Reference architecture"));
+        assert!(html.contains(r##"<a href="#fig:architecture">Figure architecture</a>"##));
+        assert!(html.contains(r##"<a href="#eq:roi">Equation roi</a>"##));
         assert!(html.contains("Competitive Advantage"));
         assert!(html.contains("class=\"export-glossary\""));
         assert!(html.contains("<dt>ARR</dt>"));
@@ -4616,6 +4630,8 @@ paths:
         assert!(pdf_text.contains(" re S"));
         assert!(pdf_text.contains("(Region) Tj"));
         assert!(pdf_text.contains("Reference architecture"));
+        assert!(pdf_text.contains("Figure architecture"));
+        assert!(pdf_text.contains("Equation roi"));
         assert!(pdf_text.contains("Glossary"));
         assert!(pdf_text.contains("Review Comments"));
         assert!(pdf_text.contains("Change Notes"));
@@ -4675,6 +4691,8 @@ paths:
         assert!(docx_document.contains(r#"<w:br w:type="page""#));
         assert!(docx_document.contains("Competitive Advantage, p. 42"));
         assert!(docx_document.contains("Reference architecture"));
+        assert!(docx_document.contains("Figure architecture"));
+        assert!(docx_document.contains("Equation roi"));
         assert!(docx_document.contains("Competitive Advantage"));
         assert!(docx_document.contains("Annual recurring revenue"));
         assert!(docx_document.contains("Review Comments"));
@@ -4705,6 +4723,8 @@ paths:
         assert!(pptx_agenda_slide.contains("Appendix"));
         assert!(pptx_slide_three.contains("Export Conformance Report"));
         assert!(pptx_slide_three.contains("Competitive Advantage, p. 42"));
+        assert!(pptx_slide_three.contains("Figure architecture"));
+        assert!(pptx_slide_three.contains("Equation roi"));
         assert!(pptx_slide_three.contains("Table: Region | Revenue | Margin"));
         assert!(pptx_slide_three.contains("<a:tbl>"));
         assert!(pptx_slide_three.contains(r#"<a:pPr algn="r"/>"#));
