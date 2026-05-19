@@ -4370,7 +4370,7 @@ paths:
     #[test]
     fn semantic_exporters_map_ast_blocks() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph.\n\n- [x] Confirm controls\n- [ ] Final approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n{{slide title=\"Board Review\" notes=\"Open with risk summary\\nClose with decision ask\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
+            text: "---\ntitle: Semantic Export\nstatus: approved\napprovedBy: QA\n---\n# Semantic Exports\nBusiness paragraph with [source](https://example.com/report).\n\n- [x] Confirm controls\n- [ ] Final approval\n\n| Metric | Value |\n| --- | ---: |\n| Total | =SUM(1,2) |\n\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:diagram caption=\"System diagram\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n{{page-break}}\n{{section-break columns=2}}\n\n{{slide title=\"Board Review\" notes=\"Open with risk summary\\nClose with decision ask\"}}\nSlide-specific body.\n\n## Appendix\nAfter the break.\n".to_string(),
             file_path: None,
         });
         let options = json!({ "watermark": "DRAFT" });
@@ -4383,7 +4383,11 @@ paths:
         assert!(docx_content_types.contains(r#"ContentType="image/svg+xml""#));
         assert!(docx_relationships.contains(r#"Id="rIdImage1""#));
         assert!(docx_relationships.contains(r#"Target="media/image1.svg""#));
+        assert!(docx_relationships.contains(r#"Id="rIdHyperlink1""#));
+        assert!(docx_relationships.contains(r#"Target="https://example.com/report""#));
+        assert!(docx_relationships.contains(r#"TargetMode="External""#));
         assert!(docx_document.contains(r#"r:embed="rIdImage1""#));
+        assert!(docx_document.contains(r#"<w:hyperlink r:id="rIdHyperlink1""#));
         assert_eq!(docx_svg, "<svg/>");
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading1""#));
         assert!(docx_document.contains(r#"<w:pStyle w:val="Heading2""#));

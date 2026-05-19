@@ -1,5 +1,5 @@
 use crate::{
-    document_ast::{export_body_text_from_ast, AstSourceRange, DocumentBlock},
+    document_ast::{export_body_text_from_ast, AstSourceRange, DocumentBlock, InlineNode},
     escape_css, escape_html, escape_pdf, escape_xml, metadata_string, render_export_template,
     tables::delimited_rows_for_export,
     CompileResponse, ExportManifest,
@@ -22,6 +22,12 @@ struct ExportMedia {
     extension: String,
     content_type: String,
     bytes: Vec<u8>,
+}
+
+#[derive(Debug)]
+struct ExportHyperlink {
+    url: String,
+    relationship_id: String,
 }
 
 pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> String {
@@ -342,6 +348,7 @@ pub(crate) fn render_docx_bytes(
     options_value: &Value,
 ) -> Result<Vec<u8>, String> {
     let media = collect_docx_media(response);
+    let hyperlinks = collect_docx_hyperlinks(response);
     let include_native_comments = docx_has_native_comments(response, options_value);
     let mut cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(&mut cursor);
@@ -372,8 +379,10 @@ pub(crate) fn render_docx_bytes(
         .map_err(|err| err.to_string())?;
     zip.start_file("word/_rels/document.xml.rels", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_document_relationships(&media, include_native_comments).as_bytes())
-        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        render_docx_document_relationships(&media, &hyperlinks, include_native_comments).as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
     if !media.is_empty() {
         zip.add_directory("word/media/", options)
             .map_err(|err| err.to_string())?;
@@ -399,7 +408,7 @@ pub(crate) fn render_docx_bytes(
     }
     zip.start_file("word/document.xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_document(response, options_value, &media).as_bytes())
+    zip.write_all(render_docx_document(response, options_value, &media, &hyperlinks).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.finish().map_err(|err| err.to_string())?;
     Ok(cursor.into_inner())
@@ -598,7 +607,11 @@ fn render_root_relationships(office_document_target: &str) -> String {
     )
 }
 
-fn render_docx_document_relationships(media: &[ExportMedia], include_comments: bool) -> String {
+fn render_docx_document_relationships(
+    media: &[ExportMedia],
+    hyperlinks: &[ExportHyperlink],
+    include_comments: bool,
+) -> String {
     let media_relationships = media
         .iter()
         .map(|item| {
@@ -609,13 +622,23 @@ fn render_docx_document_relationships(media: &[ExportMedia], include_comments: b
             )
         })
         .collect::<String>();
+    let hyperlink_relationships = hyperlinks
+        .iter()
+        .map(|item| {
+            format!(
+                r#"<Relationship Id="{}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="{}" TargetMode="External"/>"#,
+                escape_xml(&item.relationship_id),
+                escape_xml(&item.url)
+            )
+        })
+        .collect::<String>();
     let comments_relationship = if include_comments {
         r#"<Relationship Id="rIdComments" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>"#
     } else {
         ""
     };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>{comments_relationship}{media_relationships}</Relationships>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>{comments_relationship}{media_relationships}{hyperlink_relationships}</Relationships>"#
     )
 }
 
@@ -1391,6 +1414,7 @@ fn render_docx_document(
     response: &CompileResponse,
     options: &Value,
     media: &[ExportMedia],
+    hyperlinks: &[ExportHyperlink],
 ) -> String {
     let mut body = String::new();
     for line in export_metadata_lines(response, options) {
@@ -1398,7 +1422,7 @@ fn render_docx_document(
     }
     body.push_str(&docx_page_break());
     for block in &response.document_ast.blocks {
-        body.push_str(&render_docx_block(block, media));
+        body.push_str(&render_docx_block(block, media, hyperlinks));
     }
     if docx_has_native_comments(response, options) {
         body.push_str(&render_docx_comment_references(response));
@@ -1542,10 +1566,16 @@ fn docx_text_run(text: &str) -> String {
     )
 }
 
-fn render_docx_block(block: &DocumentBlock, media: &[ExportMedia]) -> String {
+fn render_docx_block(
+    block: &DocumentBlock,
+    media: &[ExportMedia],
+    hyperlinks: &[ExportHyperlink],
+) -> String {
     match block {
         DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
-        DocumentBlock::Paragraph { text, .. } => docx_paragraph(text),
+        DocumentBlock::Paragraph { text, inlines, .. } => {
+            docx_paragraph_from_inlines(text, inlines, hyperlinks)
+        }
         DocumentBlock::List { ordered, items, .. } => docx_list(*ordered, items),
         DocumentBlock::TaskList { items, .. } => docx_task_list(items),
         DocumentBlock::BlockQuote { text, .. } => docx_paragraph(&format!("Quote: {text}")),
@@ -1650,6 +1680,60 @@ fn docx_heading(level: usize, text: &str) -> String {
 
 fn docx_paragraph(text: &str) -> String {
     format!(r#"<w:p><w:r><w:t>{}</w:t></w:r></w:p>"#, escape_xml(text))
+}
+
+fn docx_paragraph_from_inlines(
+    fallback_text: &str,
+    inlines: &[InlineNode],
+    hyperlinks: &[ExportHyperlink],
+) -> String {
+    if inlines.is_empty() {
+        return docx_paragraph(fallback_text);
+    }
+    let runs = inlines
+        .iter()
+        .map(|inline| match inline {
+            InlineNode::Text { text } => docx_text_run(text),
+            InlineNode::CrossReference { raw, .. } | InlineNode::Citation { raw, .. } => {
+                docx_text_run(&inline_export_text(raw))
+            }
+            InlineNode::Strong { text } => docx_text_run_with_properties(text, "<w:b/>"),
+            InlineNode::Emphasis { text } => docx_text_run_with_properties(text, "<w:i/>"),
+            InlineNode::Code { text } => {
+                docx_text_run_with_properties(text, r#"<w:rStyle w:val="Code"/>"#)
+            }
+            InlineNode::Link { text, url } => {
+                if let Some(link) = hyperlinks.iter().find(|item| item.url == *url) {
+                    docx_hyperlink_run(text, &link.relationship_id)
+                } else {
+                    docx_text_run(text)
+                }
+            }
+        })
+        .collect::<String>();
+    format!("<w:p>{runs}</w:p>")
+}
+
+fn inline_export_text(text: &str) -> String {
+    decode_export_html_entities(&strip_export_html_tags(text))
+}
+
+fn docx_text_run_with_properties(text: &str, properties: &str) -> String {
+    if text.is_empty() {
+        return String::new();
+    }
+    format!(
+        r#"<w:r><w:rPr>{properties}</w:rPr><w:t xml:space="preserve">{}</w:t></w:r>"#,
+        escape_xml(text)
+    )
+}
+
+fn docx_hyperlink_run(text: &str, relationship_id: &str) -> String {
+    format!(
+        r#"<w:hyperlink r:id="{}" w:history="1"><w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">{}</w:t></w:r></w:hyperlink>"#,
+        escape_xml(relationship_id),
+        escape_xml(text)
+    )
 }
 
 fn docx_list(ordered: bool, items: &[String]) -> String {
@@ -1810,6 +1894,38 @@ fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
         });
     }
     media
+}
+
+fn collect_docx_hyperlinks(response: &CompileResponse) -> Vec<ExportHyperlink> {
+    let mut hyperlinks = Vec::new();
+    for block in &response.document_ast.blocks {
+        let DocumentBlock::Paragraph { inlines, .. } = block else {
+            continue;
+        };
+        for inline in inlines {
+            let InlineNode::Link { url, .. } = inline else {
+                continue;
+            };
+            if !is_external_hyperlink(url)
+                || hyperlinks
+                    .iter()
+                    .any(|item: &ExportHyperlink| item.url == *url)
+            {
+                continue;
+            }
+            let index = hyperlinks.len() + 1;
+            hyperlinks.push(ExportHyperlink {
+                url: url.clone(),
+                relationship_id: format!("rIdHyperlink{index}"),
+            });
+        }
+    }
+    hyperlinks
+}
+
+fn is_external_hyperlink(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:")
 }
 
 fn collect_pptx_media(response: &CompileResponse) -> Vec<ExportMedia> {
