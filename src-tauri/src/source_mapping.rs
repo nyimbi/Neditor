@@ -136,7 +136,7 @@ fn push_unmapped_expanded_text(output: &mut String, generated_line_count: &mut u
     *generated_line_count += text.chars().filter(|ch| *ch == '\n').count();
 }
 
-fn parse_include_directive(line: &str) -> Option<&str> {
+pub(crate) fn parse_include_directive(line: &str) -> Option<&str> {
     let trimmed = line.trim();
     if let Some(rest) = trimmed.strip_prefix("!include ") {
         return Some(rest.trim());

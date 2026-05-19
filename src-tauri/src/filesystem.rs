@@ -1,4 +1,4 @@
-use crate::{path_to_string, sha256_hex};
+use crate::{path_to_string, sha256_hex, source_mapping::parse_include_directive};
 use chrono::Utc;
 #[cfg(feature = "native-watch")]
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -16,6 +16,7 @@ use tauri::State;
 
 const MAX_WORKSPACE_SCAN_DEPTH: usize = 12;
 const MAX_WORKSPACE_SCAN_ITEMS: usize = 2000;
+const MAX_WATCH_INCLUDE_DEPTH: usize = 12;
 
 #[derive(Default)]
 pub(crate) struct FileWatcherState {
@@ -245,9 +246,7 @@ pub(crate) fn file_metadata(path: String) -> Result<FileMetadata, String> {
 pub(crate) fn watch_file(request: WatchFileRequest) -> Result<WatchFileResponse, String> {
     let mut paths = Vec::new();
     let mut seen = HashSet::new();
-    for (path, role) in std::iter::once((request.root, "root"))
-        .chain(request.included.into_iter().map(|path| (path, "include")))
-    {
+    for (path, role) in expanded_watch_paths(request) {
         let metadata = file_metadata(path)?;
         if seen.insert(metadata.path.clone()) {
             paths.push(WatchedFileMetadata {
@@ -264,6 +263,56 @@ pub(crate) fn watch_file(request: WatchFileRequest) -> Result<WatchFileResponse,
         native_watcher: false,
         watcher_error: None,
     })
+}
+
+fn expanded_watch_paths(request: WatchFileRequest) -> Vec<(String, &'static str)> {
+    let mut output = Vec::new();
+    let mut discovered = HashSet::new();
+    let root = PathBuf::from(&request.root);
+    output.push((request.root.clone(), "root"));
+    collect_nested_watch_includes(&root, 0, &mut discovered, &mut output);
+    for included in request.included {
+        let include_path = PathBuf::from(&included);
+        output.push((included, "include"));
+        collect_nested_watch_includes(&include_path, 0, &mut discovered, &mut output);
+    }
+    output
+}
+
+fn collect_nested_watch_includes(
+    path: &Path,
+    depth: usize,
+    discovered: &mut HashSet<String>,
+    output: &mut Vec<(String, &'static str)>,
+) {
+    if depth >= MAX_WATCH_INCLUDE_DEPTH {
+        return;
+    }
+    let normalized = path_to_string(path);
+    if !discovered.insert(normalized) {
+        return;
+    }
+    let Ok(text) = fs::read_to_string(path) else {
+        return;
+    };
+    let base_dir = path.parent().unwrap_or_else(|| Path::new(""));
+    for line in text.lines() {
+        let Some(target) = parse_include_directive(line) else {
+            continue;
+        };
+        let child = resolve_watch_include_path(base_dir, target);
+        output.push((path_to_string(&child), "include"));
+        collect_nested_watch_includes(&child, depth + 1, discovered, output);
+    }
+}
+
+fn resolve_watch_include_path(base_dir: &Path, target: &str) -> PathBuf {
+    let target_path = PathBuf::from(target);
+    if target_path.is_absolute() {
+        target_path
+    } else {
+        base_dir.join(target_path)
+    }
 }
 
 #[tauri::command]

@@ -5486,14 +5486,17 @@ beta</pre>
             .as_nanos();
         let root = std::env::temp_dir().join(format!("neditor-ipc-alias-test-{unique}"));
         fs::create_dir_all(root.join("chapters")).expect("create chapters");
+        fs::create_dir_all(root.join("appendices")).expect("create appendices");
         let doc = root.join("doc.md");
         let included = root.join("chapters").join("intro.md");
+        let nested = root.join("appendices").join("risk.md");
         let copy = root.join("copy.md");
-        fs::write(&doc, "# Root").expect("write root");
-        fs::write(&included, "# Intro").expect("write include");
+        fs::write(&doc, "# Root\n!include chapters/intro.md").expect("write root");
+        fs::write(&included, "# Intro\n{{include ../appendices/risk.md}}").expect("write include");
+        fs::write(&nested, "# Risk").expect("write nested include");
 
         let opened = open_file(path_to_string(&doc)).expect("open file alias");
-        assert_eq!(opened.text, "# Root");
+        assert!(opened.text.contains("# Root"));
 
         let saved = save_file_as(SaveFileRequest {
             path: path_to_string(&copy),
@@ -5508,7 +5511,7 @@ beta</pre>
             included: vec![path_to_string(&included), path_to_string(&included)],
         })
         .expect("watch file command");
-        assert_eq!(watched.paths.len(), 2);
+        assert_eq!(watched.paths.len(), 3);
         assert!(watched.paths.iter().all(|metadata| metadata.exists));
         assert_eq!(watched.paths[0].role, "root");
         assert_eq!(watched.paths[1].role, "include");
@@ -5516,6 +5519,10 @@ beta</pre>
             .paths
             .iter()
             .any(|metadata| metadata.path.ends_with("chapters/intro.md")));
+        assert!(watched
+            .paths
+            .iter()
+            .any(|metadata| metadata.path.ends_with("appendices/risk.md")));
         fs::remove_dir_all(root).expect("clean ipc alias test dir");
     }
 
