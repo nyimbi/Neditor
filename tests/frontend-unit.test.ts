@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { buildConflictDiff } from "../src/lib/conflict.js";
+import { appendConflictMergeLine, applyAiPasteInsertion, quoteMarkdown } from "../src/lib/workflows.js";
 import {
   formatTableTotal,
   parseTableCellSpan,
@@ -100,6 +101,27 @@ test("conflict diff keeps local and external edits aligned for merge UI", () => 
   equal(rows[2].external, "external");
   equal(rows[3].localLine, 3);
   equal(rows[3].externalLine, 3);
+});
+
+test("conflict merge helpers compose selected local and external lines", () => {
+  const rows = buildConflictDiff("alpha\nlocal\nomega", "alpha\nexternal\nomega");
+  let merged = "";
+
+  merged = appendConflictMergeLine(merged, rows[0], "local");
+  merged = appendConflictMergeLine(merged, rows[1], "local");
+  merged = appendConflictMergeLine(merged, rows[2], "external");
+  merged = appendConflictMergeLine(merged, rows[3], "external");
+
+  equal(merged, "alpha\nlocal\nexternal\nomega");
+  equal(appendConflictMergeLine(merged, rows[1], "external"), merged);
+});
+
+test("AI paste insertion modes preserve workflow-specific output", () => {
+  equal(quoteMarkdown("alpha\n\nbeta"), "> alpha\n>\n> beta");
+  equal(applyAiPasteInsertion("# Report", "Cleaned", "insert"), "# Report\n\nCleaned\n");
+  equal(applyAiPasteInsertion("# Report", "Cleaned", "replace"), "Cleaned");
+  equal(applyAiPasteInsertion("# Report", "Cleaned", "quote"), "# Report\n\n> Cleaned\n");
+  equal(applyAiPasteInsertion("# Report", "Cleaned", "appendix"), "# Report\n\n## AI Draft Appendix\n\nCleaned\n");
 });
 
 test("CI keeps frontend logic tests in the desktop platform matrix", () => {

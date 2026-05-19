@@ -31,6 +31,8 @@ progress records prove the requested end state.
 Recent pushed checkpoints visible in current git history:
 
 - `3214d1f` refreshed `docs/todo.md` from current evidence.
+- `a93a974` recorded the spec completion matrix and durable progress log.
+- `237f68c` logged the fresh verification baseline.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -77,8 +79,6 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Fresh verification baseline has not yet been recorded after this matrix/log
-  update.
 - Browser-level workflow tests are missing.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix docs need to be kept updated as evidence changes.
@@ -119,6 +119,13 @@ Fresh baseline recorded on 2026-05-20:
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
 | `cargo test --locked` in `src-tauri` | Pass | 126 Rust tests passed; 0 failed. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
+
+Additional focused verification after workflow helper extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed, including AI paste insertion modes and conflict merge-line composition. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
 
 Baseline command set:
 

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/plugin-fs";
 import { Store } from "@tauri-apps/plugin-store";
+import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import type {
   AiCleanupResponse,
   AiCleanupOptions,
@@ -21,7 +22,6 @@ let preferencesStore: Store | null = null;
 let unwatchFileChanges: UnlistenFn | UnwatchFn | null = null;
 let unwatchFileErrors: UnlistenFn | null = null;
 
-type AiPasteInsertMode = "insert" | "quote" | "replace" | "appendix";
 type CitationStyle = "title" | "author-year" | "key";
 type LayoutPreset = "business" | "compact" | "presentation";
 type PreviewTheme = "match" | "light" | "dark";
@@ -141,13 +141,6 @@ interface TransformProbeResult {
 }
 
 const staleSaveConflictMessage = "File changed on disk since it was opened; resolve the external conflict before saving.";
-
-function quoteMarkdown(text: string) {
-  return text
-    .split(/\r?\n/)
-    .map((line) => (line ? `> ${line}` : ">"))
-    .join("\n");
-}
 
 function parseAiAssistedMarker(line: string) {
   const content = line.match(/<!--\s*ai-assisted:(.*?)-->/)?.[1] || "";
@@ -1406,15 +1399,7 @@ export const useDocumentsStore = defineStore("documents", {
       return response;
     },
     insertAiPaste(response: AiCleanupResponse, mode: AiPasteInsertMode) {
-      if (mode === "replace") {
-        this.updateText(response.cleaned_markdown);
-      } else if (mode === "quote") {
-        this.updateText(`${this.activeDocument.text}\n\n${quoteMarkdown(response.cleaned_markdown)}\n`);
-      } else if (mode === "appendix") {
-        this.updateText(`${this.activeDocument.text}\n\n## AI Draft Appendix\n\n${response.cleaned_markdown}\n`);
-      } else {
-        this.updateText(`${this.activeDocument.text}\n\n${response.cleaned_markdown}\n`);
-      }
+      this.updateText(applyAiPasteInsertion(this.activeDocument.text, response.cleaned_markdown, mode));
       this.statusMessage = `Cleaned AI paste with ${response.issues.length} issue notes`;
     },
     async cleanAiPaste(text: string, mode: AiPasteInsertMode, options: AiCleanupOptions) {

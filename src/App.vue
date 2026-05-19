@@ -1008,6 +1008,7 @@ import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searc
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
+import { appendConflictMergeLine as appendConflictMergeLineText } from "./lib/workflows";
 import {
   compareTableCells,
   formatTableTotal,
@@ -2350,10 +2351,7 @@ function clearConflictMerge() {
 }
 
 function appendConflictMergeLine(row: ConflictDiffRow, source: "local" | "external") {
-  const hasLine = source === "local" ? row.localLine !== null : row.externalLine !== null;
-  if (!hasLine) return;
-  const text = source === "local" ? row.local : row.external;
-  mergedConflictText.value = mergedConflictText.value ? `${mergedConflictText.value}\n${text}` : text;
+  mergedConflictText.value = appendConflictMergeLineText(mergedConflictText.value, row, source);
 }
 
 async function applyConflictMerge() {
