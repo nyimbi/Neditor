@@ -3579,7 +3579,6 @@ select:hover {
   background: #edf1f5;
 }
 
-.transform-pending,
 .transform-calc {
   padding: 10px;
   border: 1px solid #c9d2dc;
