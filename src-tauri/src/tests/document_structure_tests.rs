@@ -353,6 +353,29 @@ fn pdf_section_columns_split_large_tables_across_columns() {
 }
 
 #[test]
+fn pdf_section_columns_continue_oversized_tables_across_pages() {
+    let table_rows = (1..=72)
+        .map(|index| format!("| R{index} | {index} |"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let response = compile(CompileRequest {
+        text: format!(
+            "---\ntitle: Column Page Table\nstatus: archived\nversion: 1.0.0\n---\n# Column Page Table\n\n{{{{section-break columns=2 pageSize=letter orientation=landscape margins=narrow}}}}\n\nTable: Column page flow\n| Item | Value |\n| --- | ---: |\n{table_rows}\n"
+        ),
+        file_path: None,
+    });
+
+    let pdf = render_pdf_bytes(&response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("/Count 4"));
+    assert!(pdf_text.contains("Table: Column page flow \\(continued\\)"));
+    assert!(pdf_text.contains("BT /F1 8 Tf 412 "));
+    assert!(pdf_text.contains("(R30) Tj"));
+    assert!(pdf_text.contains("BT /F1 8 Tf 38 "));
+    assert!(pdf_text.contains("(R60) Tj"));
+}
+
+#[test]
 fn compiler_renders_callouts_as_semantic_blocks() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Callouts\nstatus: approved\napprovedBy: QA\n---\n# Callouts\n> [!NOTE] Board review\n> Confirm the launch criteria.\n".to_string(),
