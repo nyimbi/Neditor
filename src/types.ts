@@ -153,6 +153,7 @@ export type DocumentBlock =
       src?: string | null;
       alt?: string | null;
       caption?: string | null;
+      float?: string | null;
       source?: DocumentSourceRange | null;
     }
   | { kind: "equation"; line: number; end_line: number; id?: string | null; caption?: string | null; text: string; source?: DocumentSourceRange | null }

@@ -22,13 +22,31 @@ fn render_figure_line(line: &str) -> Option<String> {
     }
     let id = extract_label(attrs)?;
     let caption = extract_quoted_attribute(attrs, "caption").unwrap_or_else(|| alt.to_string());
+    let float = figure_float(attrs);
+    let float_class = float
+        .as_deref()
+        .map(|value| format!(" figure-float-{value}"))
+        .unwrap_or_default();
+    let float_attr = float
+        .as_deref()
+        .map(|value| format!(" data-float=\"{}\"", escape_html(value)))
+        .unwrap_or_default();
     Some(format!(
-        "<figure id=\"{}\" class=\"figure\"><img src=\"{}\" alt=\"{}\"/><figcaption>{}</figcaption></figure>",
+        "<figure id=\"{}\" class=\"figure{}\"{}><img src=\"{}\" alt=\"{}\"/><figcaption>{}</figcaption></figure>",
         escape_html(&id),
+        float_class,
+        float_attr,
         escape_html(src),
         escape_html(alt),
         escape_html(&caption)
     ))
+}
+
+fn figure_float(attrs: &str) -> Option<String> {
+    extract_quoted_attribute(attrs, "float")
+        .or_else(|| extract_quoted_attribute(attrs, "align"))
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| matches!(value.as_str(), "left" | "right"))
 }
 
 pub(crate) fn render_equations(markdown: &str) -> String {

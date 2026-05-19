@@ -3497,6 +3497,20 @@ select:hover {
   padding: 6px 8px;
 }
 
+.preview-document figure[data-float="right"],
+.preview-document .figure-float-right {
+  float: right;
+  max-width: 45%;
+  margin: 0 0 16px 24px;
+}
+
+.preview-document figure[data-float="left"],
+.preview-document .figure-float-left {
+  float: left;
+  max-width: 45%;
+  margin: 0 24px 16px 0;
+}
+
 .preview-document .glossary-term {
   border-bottom: 1px dotted #275da8;
   color: #174a8c;

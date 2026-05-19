@@ -159,6 +159,7 @@ pub(crate) enum DocumentBlock {
         src: Option<String>,
         alt: Option<String>,
         caption: Option<String>,
+        float: Option<String>,
         source: Option<AstSourceRange>,
     },
     Equation {
@@ -428,7 +429,11 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 Some(lines.join("\n"))
             }
             DocumentBlock::Figure {
-                id, src, caption, ..
+                id,
+                src,
+                caption,
+                float,
+                ..
             } => {
                 let mut parts = vec!["Figure".to_string()];
                 if let Some(id) = id {
@@ -436,6 +441,9 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 }
                 if let Some(caption) = caption {
                     parts.push(caption.clone());
+                }
+                if let Some(float) = float {
+                    parts.push(format!("float={float}"));
                 }
                 if let Some(src) = src {
                     parts.push(format!("({src})"));
@@ -1292,7 +1300,7 @@ fn parse_ast_html_block(line: &str, line_number: usize, end_line: usize) -> Docu
         };
     }
 
-    if line.contains("class=\"figure\"") {
+    if html_class_contains(line, "figure") {
         return DocumentBlock::Figure {
             line: line_number,
             end_line,
@@ -1301,6 +1309,7 @@ fn parse_ast_html_block(line: &str, line_number: usize, end_line: usize) -> Docu
             alt: extract_quoted_attribute(line, "alt").map(|value| decode_html_entities(&value)),
             caption: extract_between(line, "<figcaption>", "</figcaption>")
                 .map(|value| clean_inline_text(&value)),
+            float: extract_quoted_attribute(line, "data-float"),
             source: None,
         };
     }
@@ -1352,6 +1361,12 @@ fn parse_ast_html_block(line: &str, line_number: usize, end_line: usize) -> Docu
         html: line.to_string(),
         source: None,
     }
+}
+
+fn html_class_contains(html: &str, expected: &str) -> bool {
+    extract_quoted_attribute(html, "class")
+        .map(|class_attr| class_attr.split_whitespace().any(|class| class == expected))
+        .unwrap_or(false)
 }
 
 fn parse_ast_transform_block(

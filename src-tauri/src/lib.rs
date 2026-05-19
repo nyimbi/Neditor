@@ -2741,6 +2741,41 @@ ARR: Annual recurring revenue.
     }
 
     #[test]
+    fn compiler_preserves_figure_float_semantics() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Floating Figure\nstatus: approved\napprovedBy: QA\n---\n# Floating Figure\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:float caption=\"Floating diagram\" float=\"right\"}\n".to_string(),
+            file_path: None,
+        });
+
+        assert!(response.html.contains("figure-float-right"));
+        assert!(response.html.contains("data-float=\"right\""));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Figure {
+                    id,
+                    caption,
+                    float,
+                    ..
+                } if id.as_deref() == Some("fig:float")
+                    && caption.as_deref() == Some("Floating diagram")
+                    && float.as_deref() == Some("right")
+            )
+        }));
+
+        let exported = export::export_text(&response, &json!({}));
+        assert!(exported.contains("float=right"));
+
+        let full_html = render_full_html(&response, &json!({}));
+        assert!(full_html.contains("figure-float-right"));
+        assert!(full_html.contains("float:right"));
+
+        let docx = render_docx_bytes(&response, &json!({})).expect("docx bytes");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains("float=right"));
+    }
+
+    #[test]
     fn compiler_generates_linked_index_with_exclusions_and_proper_terms() {
         let response = compile(CompileRequest {
             text: "---\ntitle: Index\nstatus: approved\napprovedBy: QA\nindexExclude:\n  - internal draft\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Internal Draft should stay out. Working capital{#index:Liquidity} marker.\n\n[INDEX]\n".to_string(),
