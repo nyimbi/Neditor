@@ -2579,6 +2579,9 @@ ARR: Annual recurring revenue.
         assert!(docx_document.contains("Evidence Based Reports"));
         assert!(docx_document.contains(r#"w:name="bib_porter1985""#));
         assert!(docx_document.contains(r#"w:name="bib_doe2026""#));
+        assert!(docx_document.contains(r#"w:instr="CITATION porter1985 \l 1033""#));
+        assert!(docx_document.contains(r#"w:instr="CITATION porter1985 \m doe2026 \l 1033""#));
+        assert!(docx_document.contains(r#"w:instr="BIBLIOGRAPHY \l 1033""#));
         assert!(docx_document.contains(r#"<w:hyperlink w:anchor="bib_porter1985""#));
         assert!(docx_document.contains(r#"<w:hyperlink w:anchor="bib_doe2026""#));
         assert!(!docx_document.contains(r#"w:anchor="bib_missing2026""#));

@@ -2344,22 +2344,49 @@ fn docx_hyperlink_run(text: &str, relationship_id: &str) -> String {
 }
 
 fn docx_internal_hyperlink_run(text: &str, anchor: &str) -> String {
-    format!(
-        r#"<w:hyperlink w:anchor="{}" w:history="1"><w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">{}</w:t></w:r></w:hyperlink>"#,
-        escape_xml(&docx_bookmark_name(anchor)),
+    let run = format!(
+        r#"<w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">{}</w:t></w:r>"#,
         escape_xml(text)
+    );
+    docx_internal_hyperlink_content(&run, anchor)
+}
+
+fn docx_internal_hyperlink_content(content: &str, anchor: &str) -> String {
+    format!(
+        r#"<w:hyperlink w:anchor="{}" w:history="1">{content}</w:hyperlink>"#,
+        escape_xml(&docx_bookmark_name(anchor)),
     )
 }
 
 fn docx_citation_run(raw: &str, keys: &[String], bibliography_keys: &[&str]) -> String {
     let label = inline_export_text(raw);
-    let Some(key) = keys
-        .first()
+    let matched_keys = keys
+        .iter()
         .filter(|key| bibliography_keys.contains(&key.as_str()))
-    else {
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let Some(key) = matched_keys.first() else {
         return docx_text_run(&label);
     };
-    docx_internal_hyperlink_run(&label, &format!("bib:{key}"))
+    let citation_field = docx_citation_field(&label, &matched_keys);
+    docx_internal_hyperlink_content(&citation_field, &format!("bib:{key}"))
+}
+
+fn docx_citation_field(label: &str, keys: &[&str]) -> String {
+    let Some(first_key) = keys.first() else {
+        return docx_text_run(label);
+    };
+    let mut instruction = format!("CITATION {first_key}");
+    for key in keys.iter().skip(1) {
+        instruction.push_str(" \\m ");
+        instruction.push_str(key);
+    }
+    instruction.push_str(" \\l 1033");
+    format!(
+        r#"<w:fldSimple w:instr="{}"><w:r><w:t xml:space="preserve">{}</w:t></w:r></w:fldSimple>"#,
+        escape_xml(&instruction),
+        escape_xml(label)
+    )
 }
 
 fn docx_footnote_reference_run(number: usize) -> String {
@@ -2425,20 +2452,29 @@ fn docx_list(ordered: bool, items: &[String]) -> String {
 }
 
 fn docx_bibliography_list(ordered: bool, items: &[String]) -> String {
-    items
-        .iter()
-        .enumerate()
-        .map(|(index, item)| {
-            let marker = if ordered {
-                format!("{}.", index + 1)
-            } else {
-                "-".to_string()
-            };
-            let text = format!("{marker} {item}");
-            let bookmark = bibliography_key_from_item(item).map(|key| format!("bib:{key}"));
-            docx_bookmarked_paragraph(&text, bookmark.as_deref())
-        })
-        .collect::<String>()
+    let mut output = docx_bibliography_field();
+    output.push_str(
+        &items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                let marker = if ordered {
+                    format!("{}.", index + 1)
+                } else {
+                    "-".to_string()
+                };
+                let text = format!("{marker} {item}");
+                let bookmark = bibliography_key_from_item(item).map(|key| format!("bib:{key}"));
+                docx_bookmarked_paragraph(&text, bookmark.as_deref())
+            })
+            .collect::<String>(),
+    );
+    output
+}
+
+fn docx_bibliography_field() -> String {
+    r#"<w:p><w:fldSimple w:instr="BIBLIOGRAPHY \l 1033"><w:r><w:t>Bibliography</w:t></w:r></w:fldSimple></w:p>"#
+        .to_string()
 }
 
 fn bibliography_key_from_item(item: &str) -> Option<&str> {
