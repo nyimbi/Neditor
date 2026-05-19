@@ -547,6 +547,22 @@ pub(crate) fn render_markdown_bundle_bytes(
             .as_bytes(),
     )
     .map_err(|err| err.to_string())?;
+    zip.start_file("semantic.json", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        serde_json::to_string_pretty(&response.semantic)
+            .map_err(|err| err.to_string())?
+            .as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
+    zip.start_file("metadata.json", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        serde_json::to_string_pretty(&response.metadata)
+            .map_err(|err| err.to_string())?
+            .as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
     zip.start_file("document-ast.json", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(
