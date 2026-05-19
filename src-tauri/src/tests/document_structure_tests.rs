@@ -455,6 +455,29 @@ fn pdf_section_columns_continue_oversized_tables_across_pages() {
 }
 
 #[test]
+fn pdf_large_tables_continue_within_mixed_page_geometries() {
+    let table_rows = (1..=90)
+        .map(|index| format!("| M{index} | {} |", index * 10))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let response = compile(CompileRequest {
+        text: format!(
+            "---\ntitle: Mixed Geometry Table\nstatus: archived\nversion: 1.0.0\n---\n# Mixed Geometry Table\n\n{{{{section-break pageSize=legal orientation=landscape margins=narrow}}}}\n\nTable: Legal landscape flow\n| Item | Value |\n| --- | ---: |\n{table_rows}\n\n{{{{section-break pageSize=a4 orientation=portrait margins=normal}}}}\nPortrait reset marker.\n"
+        ),
+        file_path: None,
+    });
+
+    let pdf = render_pdf_bytes(&response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("/MediaBox [0 0 1008 612]"));
+    assert!(pdf_text.contains("/MediaBox [0 0 595 842]"));
+    assert!(pdf_text.contains("Table: Legal landscape flow \\(continued\\)"));
+    assert!(pdf_text.contains("(M1) Tj"));
+    assert!(pdf_text.contains("(M90) Tj"));
+    assert!(pdf_text.contains("Portrait reset marker."));
+}
+
+#[test]
 fn compiler_renders_callouts_as_semantic_blocks() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Callouts\nstatus: approved\napprovedBy: QA\n---\n# Callouts\n> [!NOTE] Board review\n> Confirm the launch criteria.\n".to_string(),
