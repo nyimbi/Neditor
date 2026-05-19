@@ -4959,7 +4959,11 @@ beta</pre>
         let assets = root.join("assets");
         fs::create_dir_all(&assets).expect("create media fixture dir");
         let image = assets.join("diagram.svg");
-        fs::write(&image, "<svg><rect width=\"10\" height=\"10\"/></svg>").expect("write svg");
+        fs::write(
+            &image,
+            "<svg width=\"320\" height=\"180\" viewBox=\"0 0 320 180\"><rect width=\"320\" height=\"180\"/></svg>",
+        )
+        .expect("write svg");
         let doc = root.join("report.md");
         fs::write(
             &doc,
@@ -4985,6 +4989,8 @@ beta</pre>
         let docx_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
         let docx_svg = zip_entry_text(&docx, "word/media/image1.svg");
         assert!(docx_document.contains(r#"r:embed="rIdImage1""#));
+        assert!(docx_document.contains(r#"<wp:extent cx="3048000" cy="1714500""#));
+        assert!(docx_document.contains(r#"<a:ext cx="3048000" cy="1714500""#));
         assert!(docx_relationships.contains(r#"Target="media/image1.svg""#));
         assert!(docx_svg.contains("<rect"));
 
@@ -4993,8 +4999,16 @@ beta</pre>
         let pptx_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide2.xml.rels");
         let pptx_svg = zip_entry_text(&pptx, "ppt/media/image1.svg");
         assert!(pptx_slide.contains(r#"r:embed="rIdImage1""#));
+        assert!(pptx_slide.contains(r#"<a:ext cx="3048000" cy="1714500""#));
         assert!(pptx_relationships.contains(r#"Target="../media/image1.svg""#));
         assert!(pptx_svg.contains("<rect"));
+
+        let mut bundle_manifest = response.export_manifest.clone();
+        bundle_manifest.export_options = options;
+        let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+        let media_map = zip_entry_text(&bundle, "media-map.json");
+        assert!(media_map.contains(r#""width_px": 320.0"#));
+        assert!(media_map.contains(r#""height_px": 180.0"#));
 
         fs::remove_dir_all(root).expect("clean media export fixture");
     }

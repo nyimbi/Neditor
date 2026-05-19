@@ -25,6 +25,20 @@ struct ExportMedia {
     extension: String,
     content_type: String,
     bytes: Vec<u8>,
+    dimensions: Option<ExportImageDimensions>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ExportImageDimensions {
+    width_px: f64,
+    height_px: f64,
+}
+
+struct ParsedExportImage {
+    extension: String,
+    content_type: String,
+    bytes: Vec<u8>,
+    dimensions: Option<ExportImageDimensions>,
 }
 
 #[derive(Clone, Debug)]
@@ -731,16 +745,44 @@ fn render_bundle_media_map(media: &[ExportMedia]) -> Result<String, String> {
     let entries = media
         .iter()
         .map(|item| {
-            json!({
+            let mut entry = json!({
                 "source": item.source,
                 "source_file": item.source_file,
                 "bundle_path": item.path,
                 "content_type": item.content_type,
                 "hash": sha256_uri(&item.bytes),
-            })
+            });
+            if let Some(dimensions) = item.dimensions {
+                entry["width_px"] = json!(dimensions.width_px);
+                entry["height_px"] = json!(dimensions.height_px);
+            }
+            entry
         })
         .collect::<Vec<_>>();
     serde_json::to_string_pretty(&entries).map_err(|err| err.to_string())
+}
+
+fn export_media_emu_size(
+    media: &ExportMedia,
+    max_width: i64,
+    max_height: i64,
+    fallback: (i64, i64),
+) -> (i64, i64) {
+    let Some(dimensions) = media.dimensions else {
+        return fallback;
+    };
+    let width = (dimensions.width_px * 9_525.0).round();
+    let height = (dimensions.height_px * 9_525.0).round();
+    if width <= 0.0 || height <= 0.0 {
+        return fallback;
+    }
+    let scale = (max_width as f64 / width)
+        .min(max_height as f64 / height)
+        .min(1.0);
+    (
+        (width * scale).round() as i64,
+        (height * scale).round() as i64,
+    )
 }
 
 fn safe_bundle_path(path: &str) -> String {
@@ -2608,8 +2650,10 @@ fn docx_figure(
         .or(alt.as_deref())
         .or(id.as_deref())
         .unwrap_or("Figure");
+    let (image_width, image_height) =
+        export_media_emu_size(item, 4_320_000, 3_240_000, (4_320_000, 2_430_000));
     let drawing = format!(
-        r#"<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="4320000" cy="2430000"/><wp:docPr id="{doc_pr_id}" name="{}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="{doc_pr_id}" name="{}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="4320000" cy="2430000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"#,
+        r#"<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{image_width}" cy="{image_height}"/><wp:docPr id="{doc_pr_id}" name="{}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="{doc_pr_id}" name="{}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{image_width}" cy="{image_height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"#,
         escape_xml(name),
         escape_xml(name),
         escape_xml(&item.relationship_id)
@@ -2638,19 +2682,20 @@ fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
         {
             continue;
         }
-        let Some((extension, content_type, bytes)) = parse_export_image(src, source.as_ref())
-        else {
+        let Some(parsed) = parse_export_image(src, source.as_ref()) else {
             continue;
         };
         let index = media.len() + 1;
+        let path = format!("media/image{index}.{}", parsed.extension);
         media.push(ExportMedia {
             source: src.clone(),
             source_file,
             relationship_id: format!("rIdImage{index}"),
-            path: format!("media/image{index}.{extension}"),
-            extension,
-            content_type,
-            bytes,
+            path,
+            extension: parsed.extension,
+            content_type: parsed.content_type,
+            bytes: parsed.bytes,
+            dimensions: parsed.dimensions,
         });
     }
     media
@@ -2692,14 +2737,11 @@ fn collect_pptx_media(response: &CompileResponse) -> Vec<ExportMedia> {
     collect_docx_media(response)
 }
 
-fn parse_export_image(
-    src: &str,
-    source: Option<&AstSourceRange>,
-) -> Option<(String, String, Vec<u8>)> {
+fn parse_export_image(src: &str, source: Option<&AstSourceRange>) -> Option<ParsedExportImage> {
     parse_image_data_uri(src).or_else(|| read_local_export_image(src, source))
 }
 
-fn parse_image_data_uri(src: &str) -> Option<(String, String, Vec<u8>)> {
+fn parse_image_data_uri(src: &str) -> Option<ParsedExportImage> {
     let data = src.strip_prefix("data:")?;
     let (metadata, payload) = data.split_once(',')?;
     let mut parts = metadata.split(';');
@@ -2708,13 +2750,20 @@ fn parse_image_data_uri(src: &str) -> Option<(String, String, Vec<u8>)> {
         return None;
     }
     let extension = image_extension_for_content_type(&content_type)?;
-    Some((extension.to_string(), content_type, decode_base64(payload)?))
+    let bytes = decode_base64(payload)?;
+    let dimensions = export_image_dimensions(&content_type, &bytes);
+    Some(ParsedExportImage {
+        extension: extension.to_string(),
+        content_type,
+        bytes,
+        dimensions,
+    })
 }
 
 fn read_local_export_image(
     src: &str,
     source: Option<&AstSourceRange>,
-) -> Option<(String, String, Vec<u8>)> {
+) -> Option<ParsedExportImage> {
     if src.starts_with("data:") || src.contains("://") || src.starts_with('#') {
         return None;
     }
@@ -2725,7 +2774,13 @@ fn read_local_export_image(
         .map(|extension| extension.to_ascii_lowercase())?;
     let content_type = image_content_type_for_extension(&extension)?;
     let bytes = fs::read(path).ok()?;
-    Some((extension, content_type.to_string(), bytes))
+    let dimensions = export_image_dimensions(content_type, &bytes);
+    Some(ParsedExportImage {
+        extension,
+        content_type: content_type.to_string(),
+        bytes,
+        dimensions,
+    })
 }
 
 fn local_export_image_path(src: &str, source: Option<&AstSourceRange>) -> Option<PathBuf> {
@@ -2753,6 +2808,105 @@ fn image_content_type_for_extension(extension: &str) -> Option<&'static str> {
         "jpg" | "jpeg" => Some("image/jpeg"),
         _ => None,
     }
+}
+
+fn export_image_dimensions(content_type: &str, bytes: &[u8]) -> Option<ExportImageDimensions> {
+    match content_type {
+        "image/svg+xml" => svg_image_dimensions(bytes),
+        _ => None,
+    }
+}
+
+fn svg_image_dimensions(bytes: &[u8]) -> Option<ExportImageDimensions> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let svg_start = text.find("<svg")?;
+    let svg_tag = &text[svg_start..];
+    let tag_end = svg_tag.find('>')?;
+    let tag = &svg_tag[..=tag_end];
+    let width = xml_attr_value(tag, "width").and_then(parse_svg_length_px);
+    let height = xml_attr_value(tag, "height").and_then(parse_svg_length_px);
+    let view_box = xml_attr_value(tag, "viewBox")
+        .or_else(|| xml_attr_value(tag, "viewbox"))
+        .and_then(parse_svg_view_box);
+    let (width_px, height_px) = match (width, height, view_box) {
+        (Some(width_px), Some(height_px), _) => (width_px, height_px),
+        (Some(width_px), None, Some((_, _, view_width, view_height))) if view_width > 0.0 => {
+            (width_px, width_px * view_height / view_width)
+        }
+        (None, Some(height_px), Some((_, _, view_width, view_height))) if view_height > 0.0 => {
+            (height_px * view_width / view_height, height_px)
+        }
+        (None, None, Some((_, _, view_width, view_height))) => (view_width, view_height),
+        _ => return None,
+    };
+    if width_px <= 0.0 || height_px <= 0.0 {
+        return None;
+    }
+    Some(ExportImageDimensions {
+        width_px,
+        height_px,
+    })
+}
+
+fn xml_attr_value<'a>(tag: &'a str, attr: &str) -> Option<&'a str> {
+    let mut rest = tag;
+    while let Some(offset) = rest.find(attr) {
+        let candidate_start = tag.len() - rest.len() + offset;
+        let candidate_end = candidate_start + attr.len();
+        let before = tag[..candidate_start].chars().next_back();
+        let is_name_boundary = before
+            .map(|ch| !matches!(ch, ':' | '-' | '_' | '.') && !ch.is_ascii_alphanumeric())
+            .unwrap_or(true);
+        let after = tag[candidate_end..].trim_start();
+        if is_name_boundary && after.starts_with('=') {
+            let value = after[1..].trim_start();
+            let quote = value.chars().next()?;
+            if quote == '"' || quote == '\'' {
+                let quoted_start = tag.len() - value.len() + quote.len_utf8();
+                let quoted_end = tag[quoted_start..].find(quote)? + quoted_start;
+                return Some(&tag[quoted_start..quoted_end]);
+            }
+        }
+        rest = &tag[candidate_end..];
+    }
+    None
+}
+
+fn parse_svg_length_px(value: &str) -> Option<f64> {
+    let trimmed = value.trim();
+    let numeric_end = trimmed
+        .char_indices()
+        .find_map(|(index, ch)| {
+            if ch.is_ascii_digit() || matches!(ch, '.' | '-' | '+') {
+                None
+            } else {
+                Some(index)
+            }
+        })
+        .unwrap_or(trimmed.len());
+    let number = trimmed[..numeric_end].trim().parse::<f64>().ok()?;
+    let unit = trimmed[numeric_end..].trim().to_ascii_lowercase();
+    let pixels = match unit.as_str() {
+        "" | "px" => number,
+        "pt" => number * 96.0 / 72.0,
+        "in" => number * 96.0,
+        "cm" => number * 96.0 / 2.54,
+        "mm" => number * 96.0 / 25.4,
+        _ => return None,
+    };
+    (pixels > 0.0).then_some(pixels)
+}
+
+fn parse_svg_view_box(value: &str) -> Option<(f64, f64, f64, f64)> {
+    let values = value
+        .split(|ch: char| ch == ',' || ch.is_ascii_whitespace())
+        .filter(|part| !part.is_empty())
+        .map(|part| part.parse::<f64>().ok())
+        .collect::<Option<Vec<_>>>()?;
+    if values.len() != 4 || values[2] <= 0.0 || values[3] <= 0.0 {
+        return None;
+    }
+    Some((values[0], values[1], values[2], values[3]))
 }
 
 fn decode_base64(input: &str) -> Option<Vec<u8>> {
@@ -4225,8 +4379,10 @@ fn render_pptx_notes_slide(slide: &PptxSlide) -> String {
 fn render_pptx_picture(item: &ExportMedia, index: usize) -> String {
     let shape_id = 20 + index;
     let y = 2_850_000 + (index as i64 * 1_000_000);
+    let (image_width, image_height) =
+        export_media_emu_size(item, 3_657_600, 2_057_400, (3_657_600, 1_371_600));
     format!(
-        r#"<p:pic><p:nvPicPr><p:cNvPr id="{shape_id}" name="{}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="457200" y="{y}"/><a:ext cx="3657600" cy="1371600"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#,
+        r#"<p:pic><p:nvPicPr><p:cNvPr id="{shape_id}" name="{}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="457200" y="{y}"/><a:ext cx="{image_width}" cy="{image_height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#,
         escape_xml(&item.path),
         escape_xml(&item.relationship_id)
     )

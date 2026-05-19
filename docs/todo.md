@@ -3,7 +3,8 @@ What remains to achieve the full vision:
   1. Real semantic exporters
      DOCX/PPTX/PDF now map more business semantics, including native DOCX comments/change notes, footnotes with inline references, and DOCX bookmarks/internal
      hyperlinks for cross references, DOCX citation fields with bookmarked bibliography fallbacks, DOCX/PDF/PPTX section header/footer overrides from layout directives, and
-     PPTX title, section-divider, two-column, and table-oriented slide layouts. Still needed: deeper page-aware behavior and stronger media/layout fidelity.
+     PPTX title, section-divider, two-column, and table-oriented slide layouts. SVG dimensions now drive DOCX/PPTX image boxes and bundle media metadata.
+     Still needed: deeper page-aware behavior and broader raster/media layout fidelity.
   2. Canonical document AST
      There is an AST foundation, but the compiler still has string-heavy paths. Export, diagnostics, source maps, references, transforms, and validation need to depend on
      a durable semantic model.
