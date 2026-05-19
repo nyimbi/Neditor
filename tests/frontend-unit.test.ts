@@ -1,4 +1,5 @@
 import { deepEqual, equal, ok } from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { buildConflictDiff } from "../src/lib/conflict.js";
@@ -72,4 +73,13 @@ test("conflict diff keeps local and external edits aligned for merge UI", () => 
   equal(rows[2].external, "external");
   equal(rows[3].localLine, 3);
   equal(rows[3].externalLine, 3);
+});
+
+test("CI keeps frontend logic tests in the desktop platform matrix", () => {
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+
+  ok(workflow.includes("- macos-latest"));
+  ok(workflow.includes("- ubuntu-22.04"));
+  ok(workflow.includes("- windows-latest"));
+  ok(workflow.includes("run: pnpm run test:unit"));
 });

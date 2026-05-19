@@ -34,8 +34,8 @@ What remains to achieve the full vision:
      modal now supports line-by-line merge composition from the local/external diff, with frontend unit coverage for local/external diff alignment in CI. Still needed: browser-level
      workflow coverage for conflict resolution.
   6. E2E and export conformance tests
-     Need Playwright/Tauri workflow tests, broader fixture comparisons, and confirmed macOS/Windows/Linux CI runs. DOCX sidecar manifests and PPTX slide/media
-     package inventories now have direct package-inspection coverage.
+     Need Playwright/Tauri workflow tests and broader fixture comparisons. The desktop CI matrix covers macOS/Windows/Linux, and the frontend unit harness now locks that
+     matrix plus the frontend unit-test step. DOCX sidecar manifests and PPTX slide/media package inventories now have direct package-inspection coverage.
   7. Backend modularization
      Chart/native diagram renderers, structured data/API transforms, visual data transforms, business transforms, transform renderer dispatch, compiler support helpers, layout parsing,
      transform fence/source-provenance plumbing, and manifest/media helpers have moved out of lib.rs; export media parsing, sizing, and crop helpers have moved out of export.rs.
