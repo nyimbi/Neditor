@@ -2,6 +2,7 @@ use crate::diagnostics::DocumentDiagnostic;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+pub(crate) mod business;
 pub(crate) mod chart;
 pub(crate) mod diagram;
 pub(crate) mod external;
