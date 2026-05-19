@@ -352,6 +352,9 @@ fn prepare_cached_external_transform(
         .push(format!("output_hash: {}", artifact.output_hash));
     diagnostic
         .related
+        .push(format!("cached_output_bytes: {}", artifact.html.len()));
+    diagnostic
+        .related
         .push(format!("input_mode: {}", artifact.input_mode));
     if let Some(engine_path) = &artifact.engine_path {
         diagnostic
@@ -566,6 +569,14 @@ fn execute_external_transform(
     }
 
     let output = child.wait_with_output().map_err(|err| err.to_string())?;
+    let output_channel = if adapter.sidecar_output_suffix.is_some() {
+        format!(
+            "sidecar {}",
+            adapter.sidecar_output_suffix.unwrap_or_default()
+        )
+    } else {
+        "stdout".to_string()
+    };
     let sidecar_output = if let Some(path) = temp_output.as_deref() {
         Some(fs::read(path).map_err(|err| {
             format!(
@@ -663,6 +674,28 @@ fn execute_external_transform(
         .related
         .push(format!("engine_version: {}", request.engine_version));
     diagnostic.related.push(format!("input_mode: {input_mode}"));
+    diagnostic
+        .related
+        .push(format!("input_bytes: {}", request.body.len()));
+    diagnostic
+        .related
+        .push(format!("output_bytes: {}", stdout.len()));
+    diagnostic
+        .related
+        .push(format!("stderr_bytes: {}", output.stderr.len()));
+    diagnostic
+        .related
+        .push(format!("timeout_ms: {}", request.timeout_ms));
+    diagnostic
+        .related
+        .push(format!("output_channel: {output_channel}"));
+    diagnostic.related.push(format!(
+        "status: {}",
+        status
+            .code()
+            .map(|code| code.to_string())
+            .unwrap_or_else(|| "signal".to_string())
+    ));
     diagnostic.related.push(format!("cache_key: {cache_key}"));
     diagnostic
         .related
@@ -724,6 +757,7 @@ fn transform_engine(
         "preferenceKey": format!("transforms.{name}.path"),
         "defaultCommand": transform_default_command(name),
         "adapterProfile": transform_adapter_profile(name),
+        "diagnosticProfile": transform_diagnostic_profile(name, requires_execution),
         "inputModes": input_modes,
         "limits": {
             "timeoutMs": DEFAULT_TRANSFORM_TIMEOUT_MS,
@@ -734,6 +768,55 @@ fn transform_engine(
         "cacheScope": "name+enginePath+inputMode+sourceHash",
         "exportTargets": ["html", "pdf", "docx", "pptx"]
     })
+}
+
+fn transform_diagnostic_profile(name: &str, requires_execution: bool) -> Value {
+    if !requires_execution {
+        return json!({
+            "versionProbe": null,
+            "successRelated": ["renderer", "output_hash"],
+            "failureRelated": ["diagnostic", "source_range"],
+            "cacheKeyIncludes": ["transform", "renderer", "source_hash"]
+        });
+    }
+    json!({
+        "versionProbe": transform_version_probe(name),
+        "successRelated": [
+            "engine_path",
+            "engine_version",
+            "adapter",
+            "adapter_args",
+            "input_mode",
+            "input_bytes",
+            "output_bytes",
+            "stderr_bytes",
+            "timeout_ms",
+            "output_channel",
+            "status",
+            "cache_key",
+            "output_hash"
+        ],
+        "failureRelated": [
+            "engine_path",
+            "adapter",
+            "input_mode",
+            "timeout_ms",
+            "exit_status",
+            "stderr",
+            "output_limit"
+        ],
+        "cacheKeyIncludes": ["transform", "engine_path", "engine_version", "adapter", "input_mode", "source_hash"]
+    })
+}
+
+fn transform_version_probe(name: &str) -> Option<&'static str> {
+    match name {
+        "dot" | "graphviz" => Some("dot -V"),
+        "d2" => Some("d2 --version"),
+        "plantuml" => Some("plantuml -version"),
+        "pikchr" => Some("pikchr --version"),
+        _ => None,
+    }
 }
 
 fn transform_setup_hint(name: &str, requires_execution: bool) -> &'static str {

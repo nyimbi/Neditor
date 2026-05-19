@@ -3133,6 +3133,14 @@ paths:
             pikchr.get("preferenceKey").and_then(Value::as_str),
             Some("transforms.pikchr.path")
         );
+        assert!(pikchr
+            .pointer("/diagnosticProfile/versionProbe")
+            .and_then(Value::as_str)
+            .is_some_and(|probe| probe.contains("pikchr --version")));
+        assert!(pikchr
+            .pointer("/diagnosticProfile/successRelated")
+            .and_then(Value::as_array)
+            .is_some_and(|fields| fields.iter().any(|field| field == "output_channel")));
 
         for name in [
             "calc",
@@ -3757,6 +3765,26 @@ beta</pre>
             .related
             .iter()
             .any(|related| related == "adapter_args: -Tsvg"));
+        assert!(success_diagnostic
+            .related
+            .iter()
+            .any(|related| related == &format!("input_bytes: {}", unique_body.len())));
+        assert!(success_diagnostic
+            .related
+            .iter()
+            .any(|related| related.starts_with("output_bytes: ")));
+        assert!(success_diagnostic
+            .related
+            .iter()
+            .any(|related| related == "timeout_ms: 1000"));
+        assert!(success_diagnostic
+            .related
+            .iter()
+            .any(|related| related == "output_channel: stdout"));
+        assert!(success_diagnostic
+            .related
+            .iter()
+            .any(|related| related == "status: 0"));
         assert!(stdin_artifact
             .engine_version
             .as_deref()
@@ -3810,6 +3838,15 @@ beta</pre>
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("persistent cache")));
+        assert!(persistent_cached_artifact
+            .diagnostics
+            .iter()
+            .any(|diagnostic| {
+                diagnostic
+                    .related
+                    .iter()
+                    .any(|related| related.starts_with("cached_output_bytes: "))
+            }));
 
         let file_artifact = run_external_transform(ExternalTransformRequest {
             name: "dot".to_string(),
@@ -3878,6 +3915,12 @@ beta</pre>
                 .iter()
                 .any(|related| related == "adapter: plantuml")
         }));
+        assert!(plantuml_artifact.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .related
+                .iter()
+                .any(|related| related == "output_channel: sidecar svg")
+        }));
 
         let engines = list_transform_engines();
         let graphviz = engines
@@ -3892,6 +3935,12 @@ beta</pre>
             .get("adapterProfile")
             .and_then(Value::as_str)
             .is_some_and(|profile| profile.contains("Graphviz DOT adapter")));
+        assert_eq!(
+            graphviz
+                .pointer("/diagnosticProfile/versionProbe")
+                .and_then(Value::as_str),
+            Some("dot -V")
+        );
 
         let _ = fs::remove_file(d2);
         let _ = fs::remove_file(plantuml);

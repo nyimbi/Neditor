@@ -13,8 +13,7 @@ What remains to achieve the full vision:
      coverage for edited tables.
   4. External transform UX and adapters
      Safety primitives exist: trust, timeouts, size limits, stdin/file modes, caching, diagnostics, setup/security guidance, and adapter profiles for Graphviz, D2,
-     PlantUML, and Pikchr. Platform setup guidance now exists in docs/external-transforms.md. Still needed: conformance against real installed binaries and richer
-     per-engine diagnostics.
+     PlantUML, and Pikchr. Platform setup guidance and per-engine diagnostic profiles now exist. Still needed: conformance against real installed binaries.
   5. Watcher/conflict hardening
      Native watcher support exists behind native-watch, with fallback now. Watch events are now scoped to the document that installed the watcher, tab activation
      recompiles/resyncs watched paths, and conflict actions target the conflicted document instead of whichever tab is currently visible. Still needed: verified native-watch
