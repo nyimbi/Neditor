@@ -2707,6 +2707,17 @@ ARR: Annual recurring revenue.
                         && entries[0].text.contains("Reviewed by compliance.")
             )
         }));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Paragraph { inlines, .. }
+                    if inlines.iter().any(|node| matches!(
+                        node,
+                        document_ast::InlineNode::FootnoteReference { key, number, .. }
+                            if key == "risk" && *number == 1
+                    ))
+            )
+        }));
 
         let options = json!({});
         let pdf = render_pdf_bytes(&response, &options);
@@ -2723,7 +2734,9 @@ ARR: Annual recurring revenue.
         assert!(docx_content_types.contains("wordprocessingml.footnotes+xml"));
         assert!(docx_relationships.contains(r#"Target="footnotes.xml""#));
         assert!(docx_document.contains("Footnotes"));
+        assert!(docx_document.contains("A governed claim."));
         assert!(docx_document.contains(r#"<w:footnoteReference w:id="1""#));
+        assert!(!docx_document.contains("Footnote 1"));
         assert!(docx_footnotes.contains(r#"<w:footnote w:id="1""#));
         assert!(docx_footnotes.contains("Reviewed by compliance."));
         assert!(docx_footnotes.contains("Includes second-line evidence."));

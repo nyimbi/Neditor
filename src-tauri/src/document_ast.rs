@@ -96,6 +96,11 @@ pub(crate) enum InlineNode {
         key: String,
         raw: String,
     },
+    FootnoteReference {
+        key: String,
+        number: usize,
+        raw: String,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -724,6 +729,17 @@ fn earliest_inline_node(text: &str) -> Option<(usize, usize, InlineNode)> {
             },
         ));
     }
+    if let Some(footnote) = parse_html_footnote_reference_inline(text) {
+        candidates.push((
+            footnote.start,
+            footnote.end,
+            InlineNode::FootnoteReference {
+                key: footnote.key,
+                number: footnote.number,
+                raw: footnote.raw,
+            },
+        ));
+    }
     if let Some(citation) = parse_html_citation_inline(text) {
         candidates.push((
             citation.start,
@@ -787,6 +803,14 @@ struct LinkInline {
     end: usize,
     text: String,
     url: String,
+}
+
+struct FootnoteReferenceInline {
+    start: usize,
+    end: usize,
+    key: String,
+    number: usize,
+    raw: String,
 }
 
 fn parse_wrapped_inline(text: &str, open: &str, close: &str) -> Option<WrappedInline> {
@@ -897,6 +921,24 @@ fn parse_markdown_link_inline(text: &str) -> Option<LinkInline> {
         end: url_end + 1,
         text: label,
         url,
+    })
+}
+
+fn parse_html_footnote_reference_inline(text: &str) -> Option<FootnoteReferenceInline> {
+    let marker = "<sup id=\"fnref:";
+    let start = text.find(marker)?;
+    let key_start = start + marker.len();
+    let key_end = text[key_start..].find('"')? + key_start;
+    let close_start = text[key_end..].find("</sup>")? + key_end;
+    let end = close_start + "</sup>".len();
+    let raw = text[start..end].to_string();
+    let number = clean_inline_text(&raw).parse::<usize>().ok()?;
+    Some(FootnoteReferenceInline {
+        start,
+        end,
+        key: decode_html_entities(&text[key_start..key_end]),
+        number,
+        raw,
     })
 }
 

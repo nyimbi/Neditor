@@ -1766,17 +1766,6 @@ fn render_docx_comment_references(response: &CompileResponse) -> String {
         .collect::<String>()
 }
 
-fn render_docx_footnote_references(entries: &[FootnoteEntry]) -> String {
-    let mut output = docx_heading(1, "Footnotes");
-    for entry in entries {
-        output.push_str(&format!(
-            r#"<w:p><w:r><w:t>Footnote {} </w:t></w:r><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="{}"/></w:r></w:p>"#,
-            entry.number, entry.number
-        ));
-    }
-    output
-}
-
 fn render_docx_header(response: &CompileResponse, options: &Value) -> String {
     let (header, _) = export_header_footer(response, options);
     format!(
@@ -1921,7 +1910,7 @@ fn render_docx_block(
             text,
             ..
         } => docx_paragraph(&callout_export_line(callout_type, title, text)),
-        DocumentBlock::Footnotes { entries, .. } => render_docx_footnote_references(entries),
+        DocumentBlock::Footnotes { .. } => String::new(),
         DocumentBlock::ReviewComment { comment, .. } => docx_paragraph(&format!(
             "Review comment: {} | {} | {}",
             comment.state, comment.author, comment.text
@@ -1995,6 +1984,7 @@ fn docx_paragraph_from_inlines(
             InlineNode::CrossReference { raw, .. } | InlineNode::Citation { raw, .. } => {
                 docx_text_run(&inline_export_text(raw))
             }
+            InlineNode::FootnoteReference { number, .. } => docx_footnote_reference_run(*number),
             InlineNode::Strong { text } => docx_text_run_with_properties(text, "<w:b/>"),
             InlineNode::Emphasis { text } => docx_text_run_with_properties(text, "<w:i/>"),
             InlineNode::Code { text } => {
@@ -2031,6 +2021,12 @@ fn docx_hyperlink_run(text: &str, relationship_id: &str) -> String {
         r#"<w:hyperlink r:id="{}" w:history="1"><w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">{}</w:t></w:r></w:hyperlink>"#,
         escape_xml(relationship_id),
         escape_xml(text)
+    )
+}
+
+fn docx_footnote_reference_run(number: usize) -> String {
+    format!(
+        r#"<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="{number}"/></w:r>"#
     )
 }
 
