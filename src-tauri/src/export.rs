@@ -547,6 +547,11 @@ pub(crate) fn render_markdown_bundle_bytes(
             zip.write_all(&bytes).map_err(|err| err.to_string())?;
         }
     }
+    for item in collect_docx_media(response) {
+        zip.start_file(item.path, options)
+            .map_err(|err| err.to_string())?;
+        zip.write_all(&item.bytes).map_err(|err| err.to_string())?;
+    }
     zip.finish().map_err(|err| err.to_string())?;
     Ok(cursor.into_inner())
 }
