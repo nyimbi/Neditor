@@ -215,7 +215,10 @@
               </select>
               <span></span>
               <span>Sort</span>
-              <button v-for="(_, columnIndex) in tableDraft.headers" :key="`sort-${columnIndex}`" type="button" @click="sortTableRows(columnIndex)">Sort</button>
+              <span v-for="(_, columnIndex) in tableDraft.headers" :key="`sort-${columnIndex}`" class="column-actions">
+                <button type="button" @click="sortTableRows(columnIndex, 'asc')">Asc</button>
+                <button type="button" @click="sortTableRows(columnIndex, 'desc')">Desc</button>
+              </span>
               <span></span>
               <template v-for="(row, rowIndex) in tableDraft.rows" :key="`row-${rowIndex}`">
                 <span class="row-actions">
@@ -918,6 +921,7 @@ interface MarkdownTable {
 
 type TableAlignment = "left" | "center" | "right";
 type TableFormat = "text" | "number" | "currency" | "percent" | "date";
+type TableSortDirection = "asc" | "desc";
 
 interface TableDraft {
   id: string;
@@ -2417,10 +2421,15 @@ function replaceTableFromPaste() {
   };
 }
 
-function sortTableRows(columnIndex: number) {
-  if (!tableDraft.value) return;
-  const format = tableDraft.value.formats[columnIndex];
-  tableDraft.value.rows.sort((left, right) => compareTableCells(left[columnIndex] || "", right[columnIndex] || "", format));
+function sortTableRows(columnIndex: number, direction: TableSortDirection) {
+  const draft = tableDraft.value;
+  if (!draft) return;
+  const format = draft.formats[columnIndex];
+  const sortableRows = draft.rows.filter((row) => !isTableSummaryRow(row));
+  const summaryRows = draft.rows.filter(isTableSummaryRow);
+  const multiplier = direction === "asc" ? 1 : -1;
+  sortableRows.sort((left, right) => multiplier * compareTableCells(left[columnIndex] || "", right[columnIndex] || "", format));
+  draft.rows = [...sortableRows, ...summaryRows];
 }
 
 function buildConflictDiff(localText: string, externalText: string): ConflictDiffRow[] {
@@ -2798,6 +2807,12 @@ function parseEditableTableNumber(value: string) {
   const trimmed = value.trim();
   if (!trimmed || trimmed.startsWith("=")) return Number.NaN;
   return parseCellNumber(trimmed);
+}
+
+function isTableSummaryRow(row: string[]) {
+  const firstCell = (row[0] || "").trim().toLowerCase();
+  if (["total", "subtotal", "grand total"].includes(firstCell)) return true;
+  return row.slice(1).some((cell) => cell.trim().startsWith("="));
 }
 
 function formatFormulaNumber(value: number) {
