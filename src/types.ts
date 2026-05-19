@@ -118,6 +118,19 @@ export interface AstAiSource {
   status: string;
 }
 
+export interface LayoutSettings {
+  columns?: number | null;
+  break_before?: string | null;
+  break_after?: string | null;
+  keep_with_next: boolean;
+  keep_together: boolean;
+  header?: string | null;
+  footer?: string | null;
+  title?: string | null;
+  layout?: string | null;
+  notes?: string | null;
+}
+
 export type InlineNode =
   | { kind: "text"; text: string }
   | { kind: "strong"; text: string }
@@ -159,7 +172,7 @@ export type DocumentBlock =
       source?: DocumentSourceRange | null;
     }
   | { kind: "equation"; line: number; end_line: number; id?: string | null; caption?: string | null; text: string; source?: DocumentSourceRange | null }
-  | { kind: "layout"; line: number; end_line: number; directive: string; options: string; source?: DocumentSourceRange | null }
+  | { kind: "layout"; line: number; end_line: number; directive: string; options: string; settings: LayoutSettings; source?: DocumentSourceRange | null }
   | { kind: "callout"; line: number; end_line: number; callout_type: string; title: string; text: string; source?: DocumentSourceRange | null }
   | { kind: "footnotes"; line: number; end_line: number; entries: FootnoteEntry[]; source?: DocumentSourceRange | null }
   | { kind: "review_comment"; line: number; end_line: number; comment: AstReviewComment; source?: DocumentSourceRange | null }
