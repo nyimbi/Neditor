@@ -6,12 +6,20 @@ use crate::{
 };
 use std::{collections::BTreeSet, fs, path::PathBuf};
 
-pub(crate) fn count_figures(text: &str) -> usize {
-    text.matches("![").count()
+pub(crate) fn count_ast_figures(document_ast: &DocumentAst) -> usize {
+    document_ast
+        .blocks
+        .iter()
+        .filter(|block| matches!(block, DocumentBlock::Figure { .. }))
+        .count()
 }
 
-pub(crate) fn count_equations(text: &str) -> usize {
-    text.matches("$$").count() / 2
+pub(crate) fn count_ast_equations(document_ast: &DocumentAst) -> usize {
+    document_ast
+        .blocks
+        .iter()
+        .filter(|block| matches!(block, DocumentBlock::Equation { .. }))
+        .count()
 }
 
 pub(crate) fn manifest_file(path: &str) -> Option<ManifestFile> {
