@@ -5352,6 +5352,48 @@ beta</pre>
     }
 
     #[test]
+    fn pptx_repeated_media_keeps_per_figure_crop_settings() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-pptx-repeated-media-{unique}"));
+        let assets = root.join("assets");
+        fs::create_dir_all(&assets).expect("create repeated media fixture dir");
+        let image = assets.join("square.svg");
+        fs::write(
+            &image,
+            "<svg width=\"320\" height=\"320\" viewBox=\"0 0 320 320\"><rect width=\"320\" height=\"320\"/></svg>",
+        )
+        .expect("write square svg");
+        let doc = root.join("report.md");
+        fs::write(
+            &doc,
+            "---\ntitle: Reused Media\nstatus: approved\napprovedBy: QA\n---\n# Reused Media\n![Contain](assets/square.svg){#fig:contain caption=\"Contain\" fit=\"contain\"}\n![Cover](assets/square.svg){#fig:cover caption=\"Cover\" fit=\"cover\" position=\"top\"}\n",
+        )
+        .expect("write document");
+
+        let response = compile(CompileRequest {
+            text: fs::read_to_string(&doc).expect("read document"),
+            file_path: Some(path_to_string(&doc)),
+        });
+        let pptx = render_pptx_bytes(&response, &json!({})).expect("pptx repeated media");
+        let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        assert_eq!(pptx_slide.matches("<p:pic>").count(), 2);
+        assert!(pptx_slide.contains(r#"<a:srcRect t="0" b="43750"/>"#));
+
+        let pptx_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide2.xml.rels");
+        assert_eq!(
+            pptx_relationships
+                .matches(r#"Target="../media/image1.svg""#)
+                .count(),
+            1
+        );
+
+        fs::remove_dir_all(root).expect("clean repeated media fixture");
+    }
+
+    #[test]
     fn export_packages_raster_media_intrinsic_dimensions() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)

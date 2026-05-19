@@ -632,8 +632,12 @@ pub(crate) fn render_pptx_bytes(
     zip.write_all(render_pptx_presentation(slides.len()).as_bytes())
         .map_err(|err| err.to_string())?;
     for (index, slide) in slides.iter().enumerate() {
-        let slide_media = pptx_slide_media(slide, &media);
-        if !slide_media.is_empty() || !slide.notes.is_empty() || !slide.hyperlinks.is_empty() {
+        let slide_relationship_media = pptx_slide_relationship_media(slide, &media);
+        let slide_pictures = pptx_slide_pictures(slide, &media);
+        if !slide_relationship_media.is_empty()
+            || !slide.notes.is_empty()
+            || !slide.hyperlinks.is_empty()
+        {
             zip.start_file(
                 format!("ppt/slides/_rels/slide{}.xml.rels", index + 1),
                 options,
@@ -641,7 +645,7 @@ pub(crate) fn render_pptx_bytes(
             .map_err(|err| err.to_string())?;
             zip.write_all(
                 render_pptx_slide_relationships(
-                    &slide_media,
+                    &slide_relationship_media,
                     &slide.hyperlinks,
                     (!slide.notes.is_empty()).then_some(index + 1),
                 )
@@ -651,7 +655,7 @@ pub(crate) fn render_pptx_bytes(
         }
         zip.start_file(format!("ppt/slides/slide{}.xml", index + 1), options)
             .map_err(|err| err.to_string())?;
-        zip.write_all(render_pptx_slide(slide, &slide_media).as_bytes())
+        zip.write_all(render_pptx_slide(slide, &slide_pictures).as_bytes())
             .map_err(|err| err.to_string())?;
         if !slide.notes.is_empty() {
             zip.start_file(
@@ -840,16 +844,17 @@ fn render_bundle_media_map(media: &[ExportMedia]) -> Result<String, String> {
     serde_json::to_string_pretty(&entries).map_err(|err| err.to_string())
 }
 
-fn export_media_emu_size(
-    media: &ExportMedia,
+fn export_dimensions_emu_size(
+    dimensions: Option<ExportImageDimensions>,
+    fit: Option<&str>,
     max_width: i64,
     max_height: i64,
     fallback: (i64, i64),
 ) -> (i64, i64) {
-    if normalized_fit(media.fit.as_deref()) == Some("cover") {
+    if normalized_fit(fit) == Some("cover") {
         return (max_width, max_height);
     }
-    let Some(dimensions) = media.dimensions else {
+    let Some(dimensions) = dimensions else {
         return fallback;
     };
     let width = (dimensions.width_px * 9_525.0).round();
@@ -863,6 +868,21 @@ fn export_media_emu_size(
     (
         (width * scale).round() as i64,
         (height * scale).round() as i64,
+    )
+}
+
+fn export_media_emu_size(
+    media: &ExportMedia,
+    max_width: i64,
+    max_height: i64,
+    fallback: (i64, i64),
+) -> (i64, i64) {
+    export_dimensions_emu_size(
+        media.dimensions,
+        media.fit.as_deref(),
+        max_width,
+        max_height,
+        fallback,
     )
 }
 
@@ -3561,6 +3581,16 @@ struct PptxTable {
 struct MediaRef {
     source: String,
     source_file: Option<String>,
+    float: Option<String>,
+    fit: Option<String>,
+    position: Option<String>,
+}
+
+struct PptxSlidePicture<'a> {
+    media: &'a ExportMedia,
+    float: Option<&'a str>,
+    fit: Option<&'a str>,
+    position: Option<&'a str>,
 }
 
 impl PptxSlide {
@@ -3925,6 +3955,9 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
     }
     if let DocumentBlock::Figure {
         src: Some(src),
+        float,
+        fit,
+        position,
         source,
         ..
     } = block
@@ -3932,6 +3965,9 @@ fn add_block_to_pptx_slide(slide: &mut PptxSlide, block: &DocumentBlock) {
         slide.media_refs.push(MediaRef {
             source: src.clone(),
             source_file: source.as_ref().map(|range| range.source_file.clone()),
+            float: normalized_float(float.as_deref()).map(str::to_string),
+            fit: normalized_fit(fit.as_deref()).map(str::to_string),
+            position: normalized_position(position.as_deref()).map(str::to_string),
         });
     }
 }
@@ -4482,9 +4518,9 @@ fn render_pptx_presentation(slide_count: usize) -> String {
     )
 }
 
-fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
+fn render_pptx_slide(slide: &PptxSlide, pictures: &[PptxSlidePicture]) -> String {
     let content_shapes = render_pptx_content_shapes(slide);
-    let pictures = media
+    let picture_shapes = pictures
         .iter()
         .enumerate()
         .map(|(index, item)| render_pptx_picture(item, index))
@@ -4512,7 +4548,8 @@ fn render_pptx_slide(slide: &PptxSlide, media: &[&ExportMedia]) -> String {
         )
     };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{header}{content_shapes}{tables}{pictures}{footer}</p:spTree></p:cSld></p:sld>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{header}{content_shapes}{tables}{pictures}{footer}</p:spTree></p:cSld></p:sld>"#,
+        pictures = picture_shapes
     )
 }
 
@@ -4726,18 +4763,24 @@ fn render_pptx_notes_slide(slide: &PptxSlide) -> String {
     )
 }
 
-fn render_pptx_picture(item: &ExportMedia, index: usize) -> String {
+fn render_pptx_picture(picture: &PptxSlidePicture, index: usize) -> String {
+    let item = picture.media;
     let shape_id = 20 + index;
     let y = 2_850_000 + (index as i64 * 1_000_000);
-    let (image_width, image_height) =
-        export_media_emu_size(item, 3_657_600, 2_057_400, (3_657_600, 1_371_600));
-    let x = pptx_aligned_x(image_width, item.float.as_deref());
+    let (image_width, image_height) = export_dimensions_emu_size(
+        item.dimensions,
+        picture.fit,
+        3_657_600,
+        2_057_400,
+        (3_657_600, 1_371_600),
+    );
+    let x = pptx_aligned_x(image_width, picture.float);
     let src_rect = drawingml_source_crop(
         item.dimensions,
         image_width,
         image_height,
-        item.fit.as_deref(),
-        item.position.as_deref(),
+        picture.fit,
+        picture.position,
     );
     format!(
         r#"<p:pic><p:nvPicPr><p:cNvPr id="{shape_id}" name="{}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{}"/>{src_rect}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{image_width}" cy="{image_height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#,
@@ -4756,15 +4799,51 @@ fn pptx_aligned_x(width: i64, float: Option<&str>) -> i64 {
     }
 }
 
-fn pptx_slide_media<'a>(slide: &PptxSlide, media: &'a [ExportMedia]) -> Vec<&'a ExportMedia> {
-    media
+fn pptx_slide_relationship_media<'a>(
+    slide: &PptxSlide,
+    media: &'a [ExportMedia],
+) -> Vec<&'a ExportMedia> {
+    let mut slide_media = Vec::new();
+    for media_ref in &slide.media_refs {
+        let Some(item) = export_media_for_ref(media_ref, media) else {
+            continue;
+        };
+        if !slide_media
+            .iter()
+            .any(|existing: &&ExportMedia| existing.relationship_id == item.relationship_id)
+        {
+            slide_media.push(item);
+        }
+    }
+    slide_media
+}
+
+fn pptx_slide_pictures<'a>(
+    slide: &'a PptxSlide,
+    media: &'a [ExportMedia],
+) -> Vec<PptxSlidePicture<'a>> {
+    slide
+        .media_refs
         .iter()
-        .filter(|item| {
-            slide.media_refs.iter().any(|media_ref| {
-                media_ref.source == item.source && media_ref.source_file == item.source_file
+        .filter_map(|media_ref| {
+            let item = export_media_for_ref(media_ref, media)?;
+            Some(PptxSlidePicture {
+                media: item,
+                float: media_ref.float.as_deref(),
+                fit: media_ref.fit.as_deref(),
+                position: media_ref.position.as_deref(),
             })
         })
         .collect()
+}
+
+fn export_media_for_ref<'a>(
+    media_ref: &MediaRef,
+    media: &'a [ExportMedia],
+) -> Option<&'a ExportMedia> {
+    media
+        .iter()
+        .find(|item| media_ref.source == item.source && media_ref.source_file == item.source_file)
 }
 
 fn export_css(
