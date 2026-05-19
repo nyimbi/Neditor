@@ -1102,11 +1102,22 @@ const commands = computed(() => [
       group: "Workspace file",
       run: () => void store.openPath(entry.path),
     })),
-  ...((active.value.compile?.semantic.outline || []).map((heading) => ({
-    name: heading.text,
-    group: `Heading line ${heading.line}`,
-    run: () => goToLine(heading.line),
-  }))),
+  ...((active.value.compile?.document_ast.blocks || []).flatMap((block) => {
+    if (block.kind !== "heading") return [];
+    const line = block.source?.source_line || block.line;
+    return [
+      {
+        name: block.text,
+        group: `Heading line ${line}`,
+        run: () =>
+          void goToSourceTarget({
+            line,
+            end_line: block.source?.end_source_line || block.end_line,
+            source_file: block.source?.source_file || null,
+          }),
+      },
+    ];
+  })),
   ...((active.value.compile?.semantic.citation_references || []).map((citation) => ({
     name: `[@${citation.key}]`,
     group: "Citation",
