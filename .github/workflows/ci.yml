@@ -50,12 +50,15 @@ jobs:
             build-essential \
             curl \
             file \
+            default-jre \
+            graphviz \
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libssl-dev \
             libwebkit2gtk-4.1-dev \
             libxdo-dev \
             patchelf \
+            plantuml \
             wget
 
       - name: Install frontend dependencies
