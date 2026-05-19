@@ -406,6 +406,22 @@ function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>): AiClea
   };
 }
 
+function externalTransformProbeBody(name: string) {
+  switch (name) {
+    case "dot":
+    case "graphviz":
+      return "digraph G { a -> b }\n";
+    case "plantuml":
+      return "@startuml\nAlice -> Bob: probe\n@enduml\n";
+    case "d2":
+      return "a -> b\n";
+    case "pikchr":
+      return 'box "NEditor"\n';
+    default:
+      return "neditor transform probe\n";
+  }
+}
+
 export const useDocumentsStore = defineStore("documents", {
   state: () => ({
     documents: [
@@ -1216,7 +1232,7 @@ export const useDocumentsStore = defineStore("documents", {
         const response = await invoke<{ diagnostics: Array<{ message: string }>; cache_key: string }>("run_external_transform", {
           request: {
             name,
-            body: "neditor transform probe\n",
+            body: externalTransformProbeBody(name),
             engine_path: this.transformEnginePaths[name] || "",
             trusted: Boolean(this.trustedTransformEngines[name]),
             input_mode: this.transformInputModes[name] || "stdin",
