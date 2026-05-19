@@ -471,6 +471,7 @@ export const useDocumentsStore = defineStore("documents", {
     externalHash: "",
     externalConflict: null as ExternalConflict | null,
     ignoredConflictHash: "",
+    ignoredConflictPath: "",
     watchSignature: "",
     watchedPaths: [] as string[],
     transformEngines: [] as TransformEngineMetadata[],
@@ -734,6 +735,8 @@ export const useDocumentsStore = defineStore("documents", {
       doc.savedHash = response.hash;
       doc.modified = response.modified;
       doc.dirty = false;
+      this.ignoredConflictHash = "";
+      this.ignoredConflictPath = "";
       this.statusMessage = `Saved ${doc.title}`;
       this.rememberFile(doc.path);
       if (this.workspaceRoot) await this.refreshWorkspace();
@@ -933,16 +936,30 @@ export const useDocumentsStore = defineStore("documents", {
       const rootEventIsRealChange = event?.reason === "root" && (!event.hash || event.hash !== doc.savedHash);
       const mainChanged =
         rootEventIsRealChange || Boolean(metadata.exists && metadata.hash && metadata.hash !== doc.savedHash);
-      const includeChanged = event?.reason === "include" || (await this.hasChangedIncludedFiles(doc));
-      if (metadata.hash && this.ignoredConflictHash === metadata.hash && doc.dirty) return;
+      const changedInclude =
+        event?.reason === "include"
+          ? { path: event.path, hash: event.hash || "include-change" }
+          : await this.changedIncludedFile(doc);
+      const includeChanged = Boolean(changedInclude);
+      if (doc.dirty && this.ignoredConflictHash) {
+        const ignoredRoot =
+          mainChanged &&
+          metadata.hash === this.ignoredConflictHash &&
+          (!this.ignoredConflictPath || this.ignoredConflictPath === doc.path);
+        const ignoredInclude =
+          Boolean(changedInclude?.hash) &&
+          changedInclude?.hash === this.ignoredConflictHash &&
+          changedInclude?.path === this.ignoredConflictPath;
+        if (ignoredRoot || ignoredInclude) return;
+      }
       if ((mainChanged || includeChanged) && doc.dirty) {
         await this.openExternalConflict(
-          event?.path || doc.path,
+          mainChanged ? doc.path : changedInclude?.path || event?.path || doc.path,
           mainChanged ? "root" : "include",
           mainChanged
             ? "The root file changed outside NEditor while local edits are unsaved."
             : "An included file changed while local edits are unsaved.",
-          (mainChanged ? metadata.hash : event?.hash) || "include-change",
+          (mainChanged ? metadata.hash : changedInclude?.hash) || "include-change",
         );
         this.statusMessage = mainChanged
           ? "External changes detected; compare before overwriting"
@@ -986,11 +1003,13 @@ export const useDocumentsStore = defineStore("documents", {
       }
       this.externalConflict = null;
       this.ignoredConflictHash = "";
+      this.ignoredConflictPath = "";
       await this.refreshGitStatus();
     },
     keepLocalChanges() {
       if (this.externalConflict?.externalHash) {
         this.ignoredConflictHash = this.externalConflict.externalHash;
+        this.ignoredConflictPath = this.externalConflict.path;
       }
       this.externalConflict = null;
       this.statusMessage = "Keeping local edits";
@@ -999,6 +1018,7 @@ export const useDocumentsStore = defineStore("documents", {
       await this.saveActive(path);
       this.externalConflict = null;
       this.ignoredConflictHash = "";
+      this.ignoredConflictPath = "";
       this.statusMessage = "Saved local edits as a copy";
     },
     async applyConflictMerge(text: string) {
@@ -1012,22 +1032,25 @@ export const useDocumentsStore = defineStore("documents", {
       this.externalHash = conflict.externalHash;
       this.externalConflict = null;
       this.ignoredConflictHash = "";
+      this.ignoredConflictPath = "";
       this.statusMessage = "Merged external changes into the working document";
       await this.compileActive();
       await this.refreshGitStatus();
     },
-    async hasChangedIncludedFiles(doc: OpenDocument) {
+    async changedIncludedFile(doc: OpenDocument) {
       const includedFiles = doc.compile?.export_manifest.included_files || [];
-      if (!includedFiles.length) return false;
+      if (!includedFiles.length) return null;
       for (const included of includedFiles) {
         try {
           const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: included.path });
-          if (!metadata.exists || !equivalentSha256Hash(metadata.hash, included.hash)) return true;
+          if (!metadata.exists || !equivalentSha256Hash(metadata.hash, included.hash)) {
+            return { path: included.path, hash: metadata.hash || "include-change" };
+          }
         } catch {
-          return true;
+          return { path: included.path, hash: "include-change" };
         }
       }
-      return false;
+      return null;
     },
     async openExternalConflict(path: string, reason: "root" | "include", message: string, externalHash: string) {
       let externalText = "";
