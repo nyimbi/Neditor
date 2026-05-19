@@ -7,6 +7,12 @@ pub(crate) struct AiCleanupRequest {
     pub(crate) add_provenance: bool,
     pub(crate) mark_as_draft: bool,
     pub(crate) insert_citation_todos: bool,
+    #[serde(default)]
+    pub(crate) preserve_headings: bool,
+    #[serde(default = "default_true")]
+    pub(crate) convert_numbered_lists: bool,
+    #[serde(default = "default_true")]
+    pub(crate) convert_tables: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -22,9 +28,13 @@ pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
     let mut cleaned = request.text.replace("\r\n", "\n");
     cleaned = remove_chat_labels(&cleaned, &mut issues);
     cleaned = normalize_rich_html_clipboard(&cleaned, &mut issues);
-    cleaned = remove_duplicate_markdown_headings(&cleaned, &mut issues);
-    cleaned = normalize_markdown_lists(&cleaned, &mut issues);
-    cleaned = normalize_markdown_tables(&cleaned, &mut issues);
+    if !request.preserve_headings {
+        cleaned = remove_duplicate_markdown_headings(&cleaned, &mut issues);
+    }
+    cleaned = normalize_markdown_lists(&cleaned, &mut issues, request.convert_numbered_lists);
+    if request.convert_tables {
+        cleaned = normalize_markdown_tables(&cleaned, &mut issues);
+    }
     if request.insert_citation_todos {
         cleaned = insert_citation_todos(&cleaned, &mut issues);
     }
@@ -50,6 +60,10 @@ pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
         issues,
         provenance_block,
     }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn remove_duplicate_markdown_headings(text: &str, issues: &mut Vec<String>) -> String {
@@ -372,7 +386,11 @@ fn normalize_blank_lines(text: &str) -> String {
     output.join("\n").trim().to_string()
 }
 
-fn normalize_markdown_lists(text: &str, issues: &mut Vec<String>) -> String {
+fn normalize_markdown_lists(
+    text: &str,
+    issues: &mut Vec<String>,
+    convert_numbered_lists: bool,
+) -> String {
     let mut changed = false;
     let mut in_code_fence = false;
     let output = text
@@ -389,9 +407,11 @@ fn normalize_markdown_lists(text: &str, issues: &mut Vec<String>) -> String {
                     changed = true;
                     return format!("{indent}- {rest}");
                 }
-                if let Some((number, rest)) = strip_ai_number_prefix(trimmed) {
-                    changed = true;
-                    return format!("{indent}{number}. {rest}");
+                if convert_numbered_lists {
+                    if let Some((number, rest)) = strip_ai_number_prefix(trimmed) {
+                        changed = true;
+                        return format!("{indent}{number}. {rest}");
+                    }
                 }
             }
             line.to_string()

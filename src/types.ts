@@ -309,6 +309,9 @@ export interface AiCleanupOptions {
   addProvenance: boolean;
   markAsDraft: boolean;
   insertCitationTodos: boolean;
+  preserveHeadings: boolean;
+  convertNumberedLists: boolean;
+  convertTables: boolean;
 }
 
 export interface ExportReadinessReport {

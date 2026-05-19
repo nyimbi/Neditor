@@ -613,6 +613,9 @@
           <h3>AI paste cleanup defaults</h3>
           <label><input v-model="store.aiCleanupDefaults.markAsDraft" type="checkbox" /> Mark as draft</label>
           <label><input v-model="store.aiCleanupDefaults.addProvenance" type="checkbox" /> Add provenance block</label>
+          <label><input v-model="store.aiCleanupDefaults.preserveHeadings" type="checkbox" /> Preserve original headings</label>
+          <label><input v-model="store.aiCleanupDefaults.convertNumberedLists" type="checkbox" /> Convert numbered lists</label>
+          <label><input v-model="store.aiCleanupDefaults.convertTables" type="checkbox" /> Convert tables</label>
           <label><input v-model="store.aiCleanupDefaults.insertCitationTodos" type="checkbox" /> Insert citation TODOs</label>
           <h3>Typography</h3>
           <label>
@@ -749,6 +752,9 @@
         </section>
         <label><input v-model="aiMarkAsDraft" type="checkbox" /> Mark as draft</label>
         <label><input v-model="aiAddProvenance" type="checkbox" /> Add provenance block</label>
+        <label><input v-model="aiPreserveHeadings" type="checkbox" /> Preserve original headings</label>
+        <label><input v-model="aiConvertNumberedLists" type="checkbox" /> Convert numbered lists</label>
+        <label><input v-model="aiConvertTables" type="checkbox" /> Convert tables</label>
         <label><input v-model="aiInsertCitationTodos" type="checkbox" /> Insert citation TODOs</label>
         <label>
           Insert mode
@@ -872,6 +878,9 @@ const aiInsertMode = ref<"insert" | "quote" | "replace" | "appendix" | "selectio
 const aiAddProvenance = ref(true);
 const aiMarkAsDraft = ref(true);
 const aiInsertCitationTodos = ref(true);
+const aiPreserveHeadings = ref(false);
+const aiConvertNumberedLists = ref(true);
+const aiConvertTables = ref(true);
 const aiPreviewBusy = ref(false);
 const aiPreviewSignature = ref("");
 const commandPaletteOpen = ref(false);
@@ -1284,6 +1293,9 @@ watch(
     store.aiCleanupDefaults.addProvenance,
     store.aiCleanupDefaults.markAsDraft,
     store.aiCleanupDefaults.insertCitationTodos,
+    store.aiCleanupDefaults.preserveHeadings,
+    store.aiCleanupDefaults.convertNumberedLists,
+    store.aiCleanupDefaults.convertTables,
   ],
   () => {
     void store.persistWorkspace();
@@ -2060,6 +2072,9 @@ async function previewAiPaste() {
       addProvenance: aiAddProvenance.value,
       markAsDraft: aiMarkAsDraft.value,
       insertCitationTodos: aiInsertCitationTodos.value,
+      preserveHeadings: aiPreserveHeadings.value,
+      convertNumberedLists: aiConvertNumberedLists.value,
+      convertTables: aiConvertTables.value,
     });
     aiPreviewSignature.value = aiCleanupSignature();
   } finally {
@@ -2071,6 +2086,9 @@ function applyAiPasteDefaults() {
   aiAddProvenance.value = store.aiCleanupDefaults.addProvenance;
   aiMarkAsDraft.value = store.aiCleanupDefaults.markAsDraft;
   aiInsertCitationTodos.value = store.aiCleanupDefaults.insertCitationTodos;
+  aiPreserveHeadings.value = store.aiCleanupDefaults.preserveHeadings;
+  aiConvertNumberedLists.value = store.aiCleanupDefaults.convertNumberedLists;
+  aiConvertTables.value = store.aiCleanupDefaults.convertTables;
 }
 
 async function readClipboardText(): Promise<ClipboardTextRead | null> {
@@ -2130,6 +2148,9 @@ function aiCleanupSignature() {
     addProvenance: aiAddProvenance.value,
     markAsDraft: aiMarkAsDraft.value,
     insertCitationTodos: aiInsertCitationTodos.value,
+    preserveHeadings: aiPreserveHeadings.value,
+    convertNumberedLists: aiConvertNumberedLists.value,
+    convertTables: aiConvertTables.value,
   });
 }
 

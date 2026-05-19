@@ -400,6 +400,9 @@ function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>): AiClea
     addProvenance: typeof defaults.addProvenance === "boolean" ? defaults.addProvenance : true,
     markAsDraft: typeof defaults.markAsDraft === "boolean" ? defaults.markAsDraft : true,
     insertCitationTodos: typeof defaults.insertCitationTodos === "boolean" ? defaults.insertCitationTodos : true,
+    preserveHeadings: typeof defaults.preserveHeadings === "boolean" ? defaults.preserveHeadings : false,
+    convertNumberedLists: typeof defaults.convertNumberedLists === "boolean" ? defaults.convertNumberedLists : true,
+    convertTables: typeof defaults.convertTables === "boolean" ? defaults.convertTables : true,
   };
 }
 
@@ -1186,6 +1189,9 @@ export const useDocumentsStore = defineStore("documents", {
           add_provenance: options.addProvenance,
           mark_as_draft: options.markAsDraft,
           insert_citation_todos: options.insertCitationTodos,
+          preserve_headings: options.preserveHeadings,
+          convert_numbered_lists: options.convertNumberedLists,
+          convert_tables: options.convertTables,
         },
       });
       this.aiCleanupPreview = response;

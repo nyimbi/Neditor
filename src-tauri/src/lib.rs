@@ -5467,6 +5467,9 @@ paths:
             add_provenance: true,
             mark_as_draft: true,
             insert_citation_todos: true,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
         });
 
         assert!(response.cleaned_markdown.contains("- First"));
@@ -5491,6 +5494,9 @@ paths:
             add_provenance: false,
             mark_as_draft: false,
             insert_citation_todos: false,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
         });
 
         assert!(!response.cleaned_markdown.contains("draft: AI paste"));
@@ -5507,6 +5513,9 @@ paths:
             add_provenance: false,
             mark_as_draft: false,
             insert_citation_todos: false,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
         });
 
         assert!(response.cleaned_markdown.contains("1. First action"));
@@ -5525,6 +5534,9 @@ paths:
             add_provenance: false,
             mark_as_draft: false,
             insert_citation_todos: false,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
         });
 
         assert!(!response.cleaned_markdown.contains("DeepSeek said:"));
@@ -5547,6 +5559,9 @@ paths:
             add_provenance: false,
             mark_as_draft: false,
             insert_citation_todos: false,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
         });
 
         assert_eq!(
@@ -5573,6 +5588,9 @@ paths:
             add_provenance: false,
             mark_as_draft: false,
             insert_citation_todos: false,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
         });
 
         assert!(response
@@ -5591,6 +5609,32 @@ paths:
     }
 
     #[test]
+    fn ai_cleanup_respects_structure_conversion_options() {
+        let response = cleanup_ai_paste(AiCleanupRequest {
+            text:
+                "## Market Update\n\n## Market Update\n1) Review revenue\nRegion,Revenue\nEMEA,1200"
+                    .to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+            insert_citation_todos: false,
+            preserve_headings: true,
+            convert_numbered_lists: false,
+            convert_tables: false,
+        });
+
+        assert_eq!(
+            response
+                .cleaned_markdown
+                .matches("## Market Update")
+                .count(),
+            2
+        );
+        assert!(response.cleaned_markdown.contains("1) Review revenue"));
+        assert!(response.cleaned_markdown.contains("Region,Revenue"));
+        assert!(!response.cleaned_markdown.contains("| Region | Revenue |"));
+    }
+
+    #[test]
     fn ai_cleanup_normalizes_rich_html_clipboard_content() {
         let response = cleanup_ai_paste(AiCleanupRequest {
             text: "<h2>Board Update</h2><p>Revenue grew 24%. <a href=\"https://example.com/report?x=1&amp;y=2\">Source report</a></p><ul><li>Approve budget</li></ul><table><tr><th>Region</th><th>Revenue</th></tr><tr><td>EMEA</td><td>24</td></tr></table>"
@@ -5598,6 +5642,9 @@ paths:
             add_provenance: false,
             mark_as_draft: false,
             insert_citation_todos: true,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
         });
 
         assert!(response.cleaned_markdown.contains("## Board Update"));
@@ -5622,6 +5669,9 @@ paths:
             add_provenance: false,
             mark_as_draft: false,
             insert_citation_todos: true,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
         });
 
         assert!(response
