@@ -63,7 +63,7 @@
       <button type="button" @click="duplicateDocument">Duplicate</button>
       <button type="button" @click="store.revealActive">Reveal</button>
       <button type="button" @click="store.snapshotActive()">Snapshot</button>
-      <button type="button" @click="exportDocument">Export</button>
+      <button type="button" :disabled="store.exportBusy" @click="exportDocument">Export</button>
       <button type="button" @click="openAiPaste">AI Paste</button>
       <button type="button" @click="commandPaletteOpen = true">Commands</button>
       <span class="divider"></span>
@@ -366,8 +366,8 @@
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
           <label><input v-model="store.exportDefaults.includeAgenda" type="checkbox" /> PPTX agenda</label>
-          <button type="button" @click="store.prepareForExport">Prepare for export</button>
-          <button type="button" @click="exportDocument">Export document</button>
+          <button type="button" :disabled="store.exportBusy" @click="store.prepareForExport">Prepare for export</button>
+          <button type="button" :disabled="store.exportBusy" @click="exportDocument">Export document</button>
           <article v-if="store.exportReadiness" class="readiness" :class="{ ready: store.exportReadiness.ready }">
             <strong>{{ store.exportReadiness.ready ? "Ready" : "Needs attention" }}</strong>
             <p>{{ store.exportReadiness.error_count }} errors, {{ store.exportReadiness.warning_count }} warnings, {{ store.exportReadiness.info_count }} info</p>
@@ -1971,6 +1971,7 @@ async function applyConflictMerge() {
 }
 
 async function exportDocument() {
+  if (store.exportBusy) return;
   await store.prepareForExport();
   if (store.exportReadiness && store.exportReadiness.error_count > 0) {
     store.sidebar = "exports";

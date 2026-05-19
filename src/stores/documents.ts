@@ -481,6 +481,7 @@ export const useDocumentsStore = defineStore("documents", {
     transformTimeoutMs: 5000,
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
+    exportBusy: false,
     aiCleanupIssues: [] as string[],
     aiCleanupPreview: null as AiCleanupResponse | null,
     recentFiles: [] as string[],
@@ -1076,18 +1077,23 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async exportActive(path: string) {
       const doc = this.activeDocument;
-      await this.createSnapshot("pre-export");
-      const response = await invoke<{ output_path: string; manifest_path?: string }>("export_document", {
-        request: {
-          text: doc.text,
-          file_path: doc.path,
-          target: this.exportTarget,
-          output_path: path,
-          options: this.exportOptionsForActive(),
-        },
-      });
-      this.statusMessage = `Exported ${response.output_path}${response.manifest_path ? " with manifest" : ""}`;
-      await this.listSnapshots();
+      this.exportBusy = true;
+      try {
+        await this.createSnapshot("pre-export");
+        const response = await invoke<{ output_path: string; manifest_path?: string }>("export_document", {
+          request: {
+            text: doc.text,
+            file_path: doc.path,
+            target: this.exportTarget,
+            output_path: path,
+            options: this.exportOptionsForActive(),
+          },
+        });
+        this.statusMessage = `Exported ${response.output_path}${response.manifest_path ? " with manifest" : ""}`;
+        await this.listSnapshots();
+      } finally {
+        this.exportBusy = false;
+      }
     },
     exportOptionsForActive() {
       const defaults = normalizeExportDefaults(this.exportDefaults);
@@ -1158,17 +1164,22 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async prepareForExport() {
       const doc = this.activeDocument;
-      this.exportReadiness = await invoke<ExportReadinessReport>("prepare_for_export", {
-        request: {
-          text: doc.text,
-          file_path: doc.path,
-          target: this.exportTarget,
-          options: this.exportOptionsForActive(),
-        },
-      });
-      this.statusMessage = this.exportReadiness.ready
-        ? "Document is ready for export"
-        : `${this.exportReadiness.error_count} errors, ${this.exportReadiness.warning_count} warnings before export`;
+      this.exportBusy = true;
+      try {
+        this.exportReadiness = await invoke<ExportReadinessReport>("prepare_for_export", {
+          request: {
+            text: doc.text,
+            file_path: doc.path,
+            target: this.exportTarget,
+            options: this.exportOptionsForActive(),
+          },
+        });
+        this.statusMessage = this.exportReadiness.ready
+          ? "Document is ready for export"
+          : `${this.exportReadiness.error_count} errors, ${this.exportReadiness.warning_count} warnings before export`;
+      } finally {
+        this.exportBusy = false;
+      }
     },
     async setTransformEnginePath(name: string, path: string) {
       this.transformEnginePaths = { ...this.transformEnginePaths, [name]: path };
