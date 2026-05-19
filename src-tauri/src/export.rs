@@ -365,6 +365,7 @@ pub(crate) fn render_docx_bytes(
 ) -> Result<Vec<u8>, String> {
     let media = collect_docx_media(response);
     let hyperlinks = collect_docx_hyperlinks(response);
+    let section_overrides = collect_docx_section_overrides(response);
     let include_native_comments = docx_has_native_comments(response, options_value);
     let include_native_footnotes = docx_has_native_footnotes(response);
     let mut cursor = Cursor::new(Vec::new());
@@ -373,8 +374,13 @@ pub(crate) fn render_docx_bytes(
     zip.start_file("[Content_Types].xml", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(
-        render_docx_content_types(&media, include_native_comments, include_native_footnotes)
-            .as_bytes(),
+        render_docx_content_types(
+            &media,
+            &section_overrides,
+            include_native_comments,
+            include_native_footnotes,
+        )
+        .as_bytes(),
     )
     .map_err(|err| err.to_string())?;
     zip.add_directory("_rels/", options)
@@ -407,6 +413,7 @@ pub(crate) fn render_docx_bytes(
         render_docx_document_relationships(
             &media,
             &hyperlinks,
+            &section_overrides,
             include_native_comments,
             include_native_footnotes,
         )
@@ -424,12 +431,18 @@ pub(crate) fn render_docx_bytes(
     }
     zip.start_file("word/header1.xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_header(response, options_value).as_bytes())
+    zip.write_all(render_docx_header(response).as_bytes())
         .map_err(|err| err.to_string())?;
     zip.start_file("word/footer1.xml", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(render_docx_footer(response, options_value).as_bytes())
         .map_err(|err| err.to_string())?;
+    for part in docx_section_parts(&section_overrides) {
+        zip.start_file(format!("word/{}", part.target), options)
+            .map_err(|err| err.to_string())?;
+        zip.write_all(render_docx_header_footer_part(response, part).as_bytes())
+            .map_err(|err| err.to_string())?;
+    }
     if include_native_comments {
         zip.start_file("word/comments.xml", options)
             .map_err(|err| err.to_string())?;
@@ -444,8 +457,17 @@ pub(crate) fn render_docx_bytes(
     }
     zip.start_file("word/document.xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_document(response, options_value, &media, &hyperlinks).as_bytes())
-        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        render_docx_document(
+            response,
+            options_value,
+            &media,
+            &hyperlinks,
+            &section_overrides,
+        )
+        .as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
     zip.finish().map_err(|err| err.to_string())?;
     Ok(cursor.into_inner())
 }
@@ -741,6 +763,7 @@ fn safe_bundle_path(path: &str) -> String {
 
 fn render_docx_content_types(
     media: &[ExportMedia],
+    section_overrides: &[DocxSectionOverride],
     include_comments: bool,
     include_footnotes: bool,
 ) -> String {
@@ -779,8 +802,26 @@ fn render_docx_content_types(
     } else {
         ""
     };
+    let section_part_overrides = docx_section_parts(section_overrides)
+        .into_iter()
+        .map(|part| {
+            let content_type = match part.kind {
+                DocxHeaderFooterKind::Header => {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"
+                }
+                DocxHeaderFooterKind::Footer => {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
+                }
+            };
+            format!(
+                r#"<Override PartName="/word/{}" ContentType="{}"/>"#,
+                escape_xml(&part.target),
+                content_type
+            )
+        })
+        .collect::<String>();
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>{comments_override}{footnotes_override}</Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>{section_part_overrides}{comments_override}{footnotes_override}</Types>"#
     )
 }
 
@@ -794,6 +835,7 @@ fn render_root_relationships(office_document_target: &str) -> String {
 fn render_docx_document_relationships(
     media: &[ExportMedia],
     hyperlinks: &[ExportHyperlink],
+    section_overrides: &[DocxSectionOverride],
     include_comments: bool,
     include_footnotes: bool,
 ) -> String {
@@ -817,6 +859,25 @@ fn render_docx_document_relationships(
             )
         })
         .collect::<String>();
+    let section_part_relationships = docx_section_parts(section_overrides)
+        .into_iter()
+        .map(|part| {
+            let relationship_type = match part.kind {
+                DocxHeaderFooterKind::Header => {
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header"
+                }
+                DocxHeaderFooterKind::Footer => {
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer"
+                }
+            };
+            format!(
+                r#"<Relationship Id="{}" Type="{}" Target="{}"/>"#,
+                escape_xml(&part.relationship_id),
+                relationship_type,
+                escape_xml(&part.target)
+            )
+        })
+        .collect::<String>();
     let comments_relationship = if include_comments {
         r#"<Relationship Id="rIdComments" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>"#
     } else {
@@ -828,7 +889,7 @@ fn render_docx_document_relationships(
         ""
     };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>{comments_relationship}{footnotes_relationship}{media_relationships}{hyperlink_relationships}</Relationships>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>{section_part_relationships}{comments_relationship}{footnotes_relationship}{media_relationships}{hyperlink_relationships}</Relationships>"#
     )
 }
 
@@ -881,6 +942,117 @@ fn render_docx_app_properties(response: &CompileResponse) -> String {
         escape_xml(&company),
         escape_xml(env!("CARGO_PKG_VERSION"))
     )
+}
+
+#[derive(Clone, Debug)]
+struct DocxSectionOverride {
+    header: Option<DocxHeaderFooterPart>,
+    footer: Option<DocxHeaderFooterPart>,
+}
+
+#[derive(Clone, Debug)]
+struct DocxHeaderFooterPart {
+    kind: DocxHeaderFooterKind,
+    relationship_id: String,
+    target: String,
+    template: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum DocxHeaderFooterKind {
+    Header,
+    Footer,
+}
+
+#[derive(Clone, Debug)]
+struct DocxSectionProperties {
+    header_relationship_id: String,
+    footer_relationship_id: String,
+    columns: Option<usize>,
+}
+
+impl Default for DocxSectionProperties {
+    fn default() -> Self {
+        Self {
+            header_relationship_id: "rIdHeader1".to_string(),
+            footer_relationship_id: "rIdFooter1".to_string(),
+            columns: None,
+        }
+    }
+}
+
+impl DocxSectionProperties {
+    fn apply_override(&mut self, section_override: &DocxSectionOverride) {
+        if let Some(header) = &section_override.header {
+            self.header_relationship_id = header.relationship_id.clone();
+        }
+        if let Some(footer) = &section_override.footer {
+            self.footer_relationship_id = footer.relationship_id.clone();
+        }
+    }
+}
+
+fn collect_docx_section_overrides(response: &CompileResponse) -> Vec<DocxSectionOverride> {
+    let mut header_index = 2;
+    let mut footer_index = 2;
+    response
+        .document_ast
+        .blocks
+        .iter()
+        .filter_map(|block| {
+            let DocumentBlock::Layout {
+                directive, options, ..
+            } = block
+            else {
+                return None;
+            };
+            if !is_docx_section_layout(directive, options) {
+                return None;
+            }
+            let header = layout_option_text(options, "header").map(|template| {
+                let part = DocxHeaderFooterPart {
+                    kind: DocxHeaderFooterKind::Header,
+                    relationship_id: format!("rIdHeader{header_index}"),
+                    target: format!("header{header_index}.xml"),
+                    template,
+                };
+                header_index += 1;
+                part
+            });
+            let footer = layout_option_text(options, "footer").map(|template| {
+                let part = DocxHeaderFooterPart {
+                    kind: DocxHeaderFooterKind::Footer,
+                    relationship_id: format!("rIdFooter{footer_index}"),
+                    target: format!("footer{footer_index}.xml"),
+                    template,
+                };
+                footer_index += 1;
+                part
+            });
+            Some(DocxSectionOverride { header, footer })
+        })
+        .collect()
+}
+
+fn docx_section_parts(section_overrides: &[DocxSectionOverride]) -> Vec<&DocxHeaderFooterPart> {
+    section_overrides
+        .iter()
+        .flat_map(|section_override| {
+            [
+                section_override.header.as_ref(),
+                section_override.footer.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+        })
+        .collect()
+}
+
+fn is_docx_section_layout(directive: &str, options: &str) -> bool {
+    directive == "section-break"
+        || layout_columns(options).is_some()
+        || layout_option_text(options, "header").is_some()
+        || layout_option_text(options, "footer").is_some()
 }
 
 fn render_pptx_app_properties(
@@ -1661,6 +1833,7 @@ fn render_docx_document(
     options: &Value,
     media: &[ExportMedia],
     hyperlinks: &[ExportHyperlink],
+    section_overrides: &[DocxSectionOverride],
 ) -> String {
     let mut body = String::new();
     for line in export_metadata_lines(response, options) {
@@ -1674,6 +1847,9 @@ fn render_docx_document(
         .map(|entry| entry.key.as_str())
         .collect::<Vec<_>>();
     let mut next_list_is_bibliography = false;
+    let page_layout = docx_page_layout(response, options);
+    let mut section_index = 0;
+    let mut current_section = DocxSectionProperties::default();
     for block in &response.document_ast.blocks {
         if skip_next_toc_body {
             skip_next_toc_body = false;
@@ -1697,6 +1873,20 @@ fn render_docx_document(
         if matches!(block, DocumentBlock::Heading { text, .. } if text == "Bibliography") {
             next_list_is_bibliography = true;
         }
+        if let DocumentBlock::Layout {
+            directive, options, ..
+        } = block
+        {
+            if is_docx_section_layout(directive, options) {
+                body.push_str(&docx_section_break(&current_section, page_layout));
+                if let Some(section_override) = section_overrides.get(section_index) {
+                    current_section.apply_override(section_override);
+                }
+                current_section.columns = layout_columns(options);
+                section_index += 1;
+                continue;
+            }
+        }
         body.push_str(&render_docx_block(
             block,
             media,
@@ -1717,10 +1907,9 @@ fn render_docx_document(
             body.push_str(&docx_paragraph(&line));
         }
     }
-    let (page_width, page_height, margin_top, margin_right, margin_bottom, margin_left) =
-        docx_page_layout(response, options);
+    let final_section = docx_section_properties(&current_section, page_layout);
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>{body}<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader1"/><w:footerReference w:type="default" r:id="rIdFooter1"/><w:pgSz w:w="{page_width}" w:h="{page_height}"/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/></w:sectPr></w:body></w:document>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>{body}{final_section}</w:body></w:document>"#
     )
 }
 
@@ -1847,30 +2036,53 @@ fn render_docx_comment_references(response: &CompileResponse) -> String {
     references
 }
 
-fn render_docx_header(response: &CompileResponse, options: &Value) -> String {
-    let (header, _) = export_header_footer(response, options);
+fn render_docx_header(response: &CompileResponse) -> String {
+    let header = metadata_string(&response.metadata, "layout.header")
+        .unwrap_or_else(|| response.semantic.title.clone());
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}</w:hdr>"#,
-        docx_paragraph(&header)
+        render_docx_header_footer_paragraph(response, &header)
     )
 }
 
 fn render_docx_footer(response: &CompileResponse, options: &Value) -> String {
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}</w:ftr>"#,
-        render_docx_footer_paragraph(response, options)
+        render_docx_header_footer_paragraph(response, &docx_footer_template(response, options))
     )
 }
 
-fn render_docx_footer_paragraph(response: &CompileResponse, options: &Value) -> String {
-    let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
-    let template = metadata_string(&response.metadata, "layout.footer").unwrap_or_else(|| {
+fn render_docx_header_footer_part(
+    response: &CompileResponse,
+    part: &DocxHeaderFooterPart,
+) -> String {
+    let body = render_docx_header_footer_paragraph(response, &part.template);
+    match part.kind {
+        DocxHeaderFooterKind::Header => {
+            format!(
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{body}</w:hdr>"#
+            )
+        }
+        DocxHeaderFooterKind::Footer => {
+            format!(
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{body}</w:ftr>"#
+            )
+        }
+    }
+}
+
+fn docx_footer_template(response: &CompileResponse, options: &Value) -> String {
+    metadata_string(&response.metadata, "layout.footer").unwrap_or_else(|| {
         if include_page_numbers(options) {
             "Page {{page}} of {{pages}}".to_string()
         } else {
             String::new()
         }
-    });
+    })
+}
+
+fn render_docx_header_footer_paragraph(response: &CompileResponse, template: &str) -> String {
+    let classification = metadata_string(&response.metadata, "classification").unwrap_or_default();
     if template.contains("{{page}}") || template.contains("{{pages}}") {
         let template = template
             .replace("{{title}}", &response.semantic.title)
@@ -1879,7 +2091,7 @@ fn render_docx_footer_paragraph(response: &CompileResponse, options: &Value) -> 
         return docx_paragraph_with_page_fields(&template);
     }
     docx_paragraph(&render_export_template_for_page(
-        &template,
+        template,
         response,
         &classification,
         1,
@@ -1988,9 +2200,7 @@ fn render_docx_block(
         DocumentBlock::Layout { directive, .. } if directive == "page-break" => docx_page_break(),
         DocumentBlock::Layout {
             directive, options, ..
-        } if directive == "section-break" || layout_columns(options).is_some() => {
-            docx_section_break(options)
-        }
+        } if is_docx_section_layout(directive, options) => String::new(),
         DocumentBlock::Layout {
             directive, options, ..
         } => docx_paragraph(format!("Layout: {directive} {options}").trim()),
@@ -2258,10 +2468,30 @@ fn docx_page_break() -> String {
     r#"<w:p><w:r><w:br w:type="page"/></w:r></w:p>"#.to_string()
 }
 
-fn docx_section_break(options: &str) -> String {
-    let columns = layout_columns(options).unwrap_or(1);
+fn docx_section_break(
+    section: &DocxSectionProperties,
+    page_layout: (u32, u32, u32, u32, u32, u32),
+) -> String {
     format!(
-        r#"<w:p><w:pPr><w:sectPr><w:cols w:num="{columns}" w:space="720"/></w:sectPr></w:pPr></w:p>"#
+        r#"<w:p><w:pPr>{}</w:pPr></w:p>"#,
+        docx_section_properties(section, page_layout)
+    )
+}
+
+fn docx_section_properties(
+    section: &DocxSectionProperties,
+    page_layout: (u32, u32, u32, u32, u32, u32),
+) -> String {
+    let (page_width, page_height, margin_top, margin_right, margin_bottom, margin_left) =
+        page_layout;
+    let columns = section
+        .columns
+        .map(|columns| format!(r#"<w:cols w:num="{columns}" w:space="720"/>"#))
+        .unwrap_or_default();
+    format!(
+        r#"<w:sectPr><w:headerReference w:type="default" r:id="{}"/><w:footerReference w:type="default" r:id="{}"/><w:pgSz w:w="{page_width}" w:h="{page_height}"/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/>{columns}</w:sectPr>"#,
+        escape_xml(&section.header_relationship_id),
+        escape_xml(&section.footer_relationship_id)
     )
 }
 
