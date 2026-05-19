@@ -363,6 +363,48 @@ fn pdf_wraps_long_paragraphs_and_avoids_single_line_widows() {
 }
 
 #[test]
+fn pdf_splits_wrapped_paragraphs_with_minimum_widow_lines() {
+    let filler = (1..=55)
+        .map(|index| format!("Filler paragraph {index}."))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let long_paragraph = (1..=44)
+        .map(|index| format!("beta{index:02}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let first_line = (1..=13)
+        .map(|index| format!("beta{index:02}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let second_line = (14..=26)
+        .map(|index| format!("beta{index:02}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let third_line = (27..=39)
+        .map(|index| format!("beta{index:02}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let fourth_line = (40..=44)
+        .map(|index| format!("beta{index:02}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let response = compile(CompileRequest {
+        text: format!(
+            "---\ntitle: PDF Widows\nstatus: approved\napprovedBy: QA\n---\n# PDF Widows\n\n{filler}\n\n{long_paragraph}\n"
+        ),
+        file_path: None,
+    });
+
+    let pdf = render_pdf_bytes(&response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains(&format!("BT /F1 10 Tf 68 102 Td ({first_line}) Tj")));
+    assert!(pdf_text.contains(&format!("BT /F1 10 Tf 68 90 Td ({second_line}) Tj")));
+    assert!(!pdf_text.contains(&format!("BT /F1 10 Tf 68 78 Td ({third_line}) Tj")));
+    assert!(pdf_text.contains(&format!("BT /F1 10 Tf 68 774 Td ({third_line}) Tj")));
+    assert!(pdf_text.contains(&format!("BT /F1 10 Tf 68 762 Td ({fourth_line}) Tj")));
+}
+
+#[test]
 fn pdf_section_columns_split_large_tables_across_columns() {
     let table_rows = (1..=34)
         .map(|index| format!("| R{index} | {index} |"))

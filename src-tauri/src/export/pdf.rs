@@ -693,20 +693,44 @@ impl PdfPaginator {
     }
 
     fn push_wrapped_text(&mut self, line: String) {
-        let lines = pdf_wrapped_text_lines(&line, self.current_text_width(), 10);
-        let height = lines.len() as i32 * pdf_text_item_height();
-        let keep_wrapped_paragraph_together = height <= self.available_height()
-            && self.used_height + height > self.available_height();
-        let avoids_single_line_widow =
-            self.available_height() - self.used_height < pdf_text_item_height() * 2;
-        if lines.len() >= 3
-            && !self.current.is_empty()
-            && (keep_wrapped_paragraph_together || avoids_single_line_widow)
-        {
+        let mut lines = pdf_wrapped_text_lines(&line, self.current_text_width(), 10);
+        let avoids_short_orphan = self.available_text_lines() < PDF_MIN_ORPHAN_LINES;
+        if lines.len() >= 3 && !self.current.is_empty() && avoids_short_orphan {
             self.advance_flow();
         }
-        for line in lines {
-            self.push_text(line);
+        while !lines.is_empty() {
+            let available_lines = self.available_text_lines();
+            if available_lines == 0 {
+                self.advance_flow();
+                continue;
+            }
+            if lines.len() <= available_lines {
+                for line in lines.drain(..) {
+                    self.push_text(line);
+                }
+                break;
+            }
+            let mut take_count = available_lines.min(lines.len());
+            let leaves_short_widow = lines.len().saturating_sub(take_count) < PDF_MIN_WIDOW_LINES;
+            if leaves_short_widow {
+                let adjusted = lines.len().saturating_sub(PDF_MIN_WIDOW_LINES);
+                if adjusted >= PDF_MIN_ORPHAN_LINES {
+                    take_count = adjusted;
+                } else if !self.current.is_empty() {
+                    self.advance_flow();
+                    continue;
+                }
+            }
+            if take_count < PDF_MIN_ORPHAN_LINES && !self.current.is_empty() {
+                self.advance_flow();
+                continue;
+            }
+            for line in lines.drain(..take_count) {
+                self.push_text(line);
+            }
+            if !lines.is_empty() {
+                self.advance_flow();
+            }
         }
     }
 
@@ -869,6 +893,10 @@ impl PdfPaginator {
             .unwrap_or_else(|| self.current_layout.column_width())
     }
 
+    fn available_text_lines(&self) -> usize {
+        ((self.available_height() - self.used_height).max(0) / pdf_text_item_height()) as usize
+    }
+
     fn consume_active_float(&mut self, height: i32) {
         let Some(float) = &self.active_float else {
             return;
@@ -906,6 +934,9 @@ fn pdf_table_chunk(table: &PdfTable, rows: Vec<Vec<String>>, continued: bool) ->
 fn pdf_text_item_height() -> i32 {
     12
 }
+
+const PDF_MIN_ORPHAN_LINES: usize = 2;
+const PDF_MIN_WIDOW_LINES: usize = 2;
 
 fn pdf_table_caption_height() -> i32 {
     18
