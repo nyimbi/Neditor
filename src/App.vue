@@ -261,10 +261,16 @@
             </select>
           </label>
           <h3>Citations</h3>
-          <p v-for="citation in active.compile?.semantic.citation_references || []" :key="`${citation.key}-${citation.locator || ''}`">
-            [@{{ citation.key }}<template v-if="citation.locator">, {{ citation.locator }}</template>]
+          <button
+            v-for="citation in active.compile?.semantic.citation_references || []"
+            :key="`${citation.key}-${citation.line}-${citation.column}`"
+            class="outline-row"
+            type="button"
+            @click="goToSourceTarget(citation)"
+          >
+            <span>[@{{ citation.key }}<template v-if="citation.locator">, {{ citation.locator }}</template>]</span>
             <small>{{ bibliographyByKey.get(citation.key) || "Missing bibliography entry" }}</small>
-          </p>
+          </button>
           <template v-if="resolvedCitationEntries.length">
             <h3>Resolved references</h3>
             <article v-for="entry in resolvedCitationEntries" :key="entry.key" class="snapshot-row">
@@ -380,7 +386,7 @@
               <ul v-if="diagnostic.related.length" class="diagnostic-related">
                 <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
               </ul>
-              <button v-if="canNavigateDiagnostic(diagnostic)" type="button" @click="goToLine(Number(diagnostic.line))">Go to line</button>
+              <button v-if="canNavigateDiagnostic(diagnostic)" type="button" @click="goToSourceTarget(diagnostic)">Go to source</button>
             </article>
           </section>
           <h3>Manifest</h3>
@@ -1014,7 +1020,18 @@ const tableColumnTotals = computed(() => {
 });
 const diagnosticSignature = computed(() =>
   (active.value.compile?.diagnostics || [])
-    .map((diagnostic) => [diagnostic.severity, diagnostic.source_file || "", diagnostic.line || "", diagnostic.message, diagnostic.related.join("|")].join(":"))
+    .map((diagnostic) =>
+      [
+        diagnostic.severity,
+        diagnostic.source_file || "",
+        diagnostic.line || "",
+        diagnostic.column || "",
+        diagnostic.end_line || "",
+        diagnostic.end_column || "",
+        diagnostic.message,
+        diagnostic.related.join("|"),
+      ].join(":"),
+    )
     .join("\n"),
 );
 const commands = computed(() => [
@@ -1073,11 +1090,12 @@ const commands = computed(() => [
     group: `Heading line ${heading.line}`,
     run: () => goToLine(heading.line),
   }))),
-  ...((active.value.compile?.semantic.citations || []).map((citation) => ({
-    name: `[@${citation}]`,
+  ...((active.value.compile?.semantic.citation_references || []).map((citation) => ({
+    name: `[@${citation.key}]`,
     group: "Citation",
     run: () => {
       store.sidebar = "references";
+      goToSourceTarget(citation);
     },
   }))),
   ...Object.keys(active.value.compile?.semantic.glossary || {}).map((term) => ({
@@ -1100,7 +1118,7 @@ const commands = computed(() => [
     group: `Diagnostic ${diagnostic.severity}`,
     run: () => {
       store.sidebar = "diagnostics";
-      if (diagnostic.line) goToLine(diagnostic.line);
+      if (diagnostic.line) goToSourceTarget(diagnostic);
     },
   }))),
 ]);
@@ -2683,6 +2701,29 @@ function goToLine(lineNumber: number) {
   editorView.focus();
 }
 
+function goToSourceTarget(target: {
+  line?: number | null;
+  column?: number | null;
+  end_line?: number | null;
+  end_column?: number | null;
+  source_file?: string | null;
+}) {
+  if (target.source_file && active.value.path && target.source_file !== active.value.path) {
+    void store.openPath(target.source_file);
+    return;
+  }
+  if (!editorView || !target.line) return;
+  const startLine = editorView.state.doc.line(Math.max(1, Math.min(target.line, editorView.state.doc.lines)));
+  const endLine = editorView.state.doc.line(Math.max(1, Math.min(target.end_line || target.line, editorView.state.doc.lines)));
+  const from = startLine.from + clampColumnOffset(target.column, startLine.length);
+  const to = endLine.from + clampColumnOffset(target.end_column, endLine.length);
+  editorView.dispatch({
+    selection: { anchor: from, head: Math.max(from + 1, to) },
+    effects: EditorView.scrollIntoView(from, { y: "center" }),
+  });
+  editorView.focus();
+}
+
 function goToSearchTerm(term: string) {
   if (!editorView || !term.trim()) return;
   const text = editorView.state.doc.toString();
@@ -2695,12 +2736,8 @@ function goToSearchTerm(term: string) {
   editorView.focus();
 }
 
-function goToCrossReference(reference: { line: number; source_file?: string | null }) {
-  if (reference.source_file && active.value.path && reference.source_file !== active.value.path) {
-    void store.openPath(reference.source_file);
-    return;
-  }
-  goToLine(reference.line);
+function goToCrossReference(reference: { line: number; column?: number | null; end_column?: number | null; source_file?: string | null }) {
+  goToSourceTarget(reference);
 }
 
 function handlePreviewClick(event: MouseEvent) {
@@ -3072,6 +3109,11 @@ select:hover {
   border: 0;
   background: transparent;
   text-align: left;
+}
+
+.outline-row small {
+  display: block;
+  color: #526171;
 }
 
 .file-row {
