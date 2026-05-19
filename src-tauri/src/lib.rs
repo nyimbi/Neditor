@@ -55,8 +55,8 @@ use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
 use document_ast::{
-    attach_source_ranges, attach_transform_artifacts, build_document_ast, extract_label, slugify,
-    DocumentAst,
+    attach_source_ranges, attach_transform_artifacts, build_document_ast, extract_label,
+    extract_quoted_attribute, slugify, DocumentAst,
 };
 #[cfg(test)]
 use export::{
@@ -580,25 +580,9 @@ fn render_transform(
         "vega-lite" => render_vega_lite_svg(body, &mut artifact_diags, diagnostics),
         "mermaid" => render_mermaid_svg(body, &mut artifact_diags, diagnostics),
         "pikchr" => render_pikchr_svg(body, &mut artifact_diags, diagnostics),
-        "dot" | "graphviz" | "plantuml" | "d2" => {
-            let message = format!("{name} transform captured as source artifact; configure an engine for rendered output.");
-            let diagnostic = diag(
-                "warning",
-                message.clone(),
-                None,
-                None,
-                Some("Set the transform engine path in preferences when native rendering is unavailable."),
-            );
-            diagnostics.push(diagnostic.clone());
-            artifact_diags.push(diagnostic);
-            format!(
-                "<section class=\"transform transform-{} transform-pending\"><strong>{}</strong><pre>{}</pre><p>{}</p></section>",
-                escape_html(name),
-                escape_html(name),
-                escape_preformatted_transform_text(body),
-                escape_html(&message)
-            )
-        }
+        "dot" | "graphviz" => render_dot_svg(name, body, &mut artifact_diags, diagnostics),
+        "plantuml" => render_plantuml_svg(body, &mut artifact_diags, diagnostics),
+        "d2" => render_d2_svg(body, &mut artifact_diags, diagnostics),
         _ => format!("<pre>{}</pre>", escape_html(body)),
     };
     let output_hash = sha256_hex(html.as_bytes());
@@ -657,12 +641,6 @@ fn render_external_transform(
             None
         }
     }
-}
-
-fn escape_preformatted_transform_text(text: &str) -> String {
-    escape_html(text)
-        .replace("\r\n", "&#10;")
-        .replace('\n', "&#10;")
 }
 
 fn supported_transform(name: &str) -> bool {
@@ -1497,6 +1475,131 @@ fn render_pikchr_svg(
     svg
 }
 
+fn render_dot_svg(
+    name: &str,
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let graph = parse_dot_graph(body);
+    if graph.nodes.is_empty() || graph.edges.is_empty() {
+        return unsupported_native_diagram(
+            name,
+            "DOT native preview only supports simple edge statements.",
+            "Use edges such as a -> b, or configure Graphviz as an external transform engine.",
+            artifact_diags,
+            diagnostics,
+        );
+    }
+    render_simple_graph_svg(name, &graph)
+}
+
+fn render_d2_svg(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let graph = parse_d2_graph(body);
+    if graph.nodes.is_empty() || graph.edges.is_empty() {
+        return unsupported_native_diagram(
+            "d2",
+            "D2 native preview only supports simple edge statements.",
+            "Use edges such as source -> target: label, or configure D2 as an external transform engine.",
+            artifact_diags,
+            diagnostics,
+        );
+    }
+    render_simple_graph_svg("d2", &graph)
+}
+
+fn render_plantuml_svg(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let graph = parse_plantuml_graph(body);
+    if graph.nodes.is_empty() || graph.edges.is_empty() {
+        return unsupported_native_diagram(
+            "plantuml",
+            "PlantUML native preview only supports simple sequence or component arrows.",
+            "Use arrows such as Alice -> Bob: message, or configure PlantUML as an external transform engine.",
+            artifact_diags,
+            diagnostics,
+        );
+    }
+    render_simple_graph_svg("plantuml", &graph)
+}
+
+fn unsupported_native_diagram(
+    name: &str,
+    message: &str,
+    suggestion: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let diagnostic = diag("warning", message.to_string(), None, None, Some(suggestion));
+    artifact_diags.push(diagnostic.clone());
+    diagnostics.push(diagnostic);
+    format!(
+        "<section class=\"transform transform-{} transform-error\">Unsupported {} diagram</section>",
+        escape_html(name),
+        escape_html(name)
+    )
+}
+
+fn render_simple_graph_svg(name: &str, graph: &MermaidGraph) -> String {
+    let columns = 3usize;
+    let node_width = 170usize;
+    let node_height = 54usize;
+    let x_gap = 250usize;
+    let y_gap = 120usize;
+    let rows = graph.nodes.len().div_ceil(columns);
+    let width = 120 + columns * x_gap;
+    let height = 90 + rows * y_gap;
+    let marker_id = format!("{name}-arrow");
+    let positions = graph
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| {
+            let x = 60 + (index % columns) * x_gap;
+            let y = 55 + (index / columns) * y_gap;
+            (node.id.clone(), (x, y))
+        })
+        .collect::<HashMap<_, _>>();
+    let mut svg = format!(
+        "<svg class=\"transform transform-{}\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><defs><marker id=\"{}\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\"><path d=\"M0,0 L0,6 L9,3 z\" fill=\"#275DA8\"/></marker></defs>",
+        escape_html(name),
+        escape_html(&marker_id)
+    );
+    for edge in &graph.edges {
+        if let (Some((from_x, from_y)), Some((to_x, to_y))) =
+            (positions.get(&edge.from), positions.get(&edge.to))
+        {
+            let x1 = from_x + node_width;
+            let y1 = from_y + node_height / 2;
+            let x2 = *to_x;
+            let y2 = to_y + node_height / 2;
+            svg.push_str(&format!(
+                "<line x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"#275DA8\" stroke-width=\"3\" marker-end=\"url(#{})\"/>",
+                escape_html(&marker_id)
+            ));
+        }
+    }
+    for node in &graph.nodes {
+        if let Some((x, y)) = positions.get(&node.id) {
+            svg.push_str(&format!(
+                "<rect x=\"{x}\" y=\"{y}\" width=\"{node_width}\" height=\"{node_height}\" rx=\"8\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/><text x=\"{}\" y=\"{}\" font-size=\"15\" text-anchor=\"middle\" fill=\"#1f2937\">{}</text>",
+                x + node_width / 2,
+                y + 33,
+                escape_html(&node.label)
+            ));
+        }
+    }
+    svg.push_str("</svg>");
+    svg
+}
+
 #[derive(Clone, Copy)]
 enum PikchrShape {
     Box,
@@ -1648,6 +1751,138 @@ fn add_mermaid_node(nodes: &mut Vec<MermaidNode>, seen: &mut HashSet<String>, no
             label: node.label.clone(),
         });
     }
+}
+
+fn parse_dot_graph(body: &str) -> MermaidGraph {
+    let mut nodes = Vec::new();
+    let mut seen = HashSet::new();
+    let mut edges = Vec::new();
+    for statement in body.replace(['{', '}', ';'], "\n").lines().map(str::trim) {
+        if statement.is_empty()
+            || statement.starts_with("//")
+            || statement.starts_with('#')
+            || statement.starts_with("digraph")
+            || statement.starts_with("graph")
+            || statement.starts_with("node ")
+            || statement.starts_with("edge ")
+        {
+            continue;
+        }
+        if let Some((left, right)) = split_first_operator(statement, &["->", "--"]) {
+            let from = parse_plain_graph_node(left);
+            let to = parse_plain_graph_node(strip_bracket_attributes(right));
+            add_mermaid_node(&mut nodes, &mut seen, &from);
+            add_mermaid_node(&mut nodes, &mut seen, &to);
+            edges.push(MermaidEdge {
+                from: from.id,
+                to: to.id,
+            });
+        } else if statement.contains("[label=") {
+            let node = parse_plain_graph_node(statement);
+            add_mermaid_node(&mut nodes, &mut seen, &node);
+        }
+    }
+    MermaidGraph { nodes, edges }
+}
+
+fn parse_d2_graph(body: &str) -> MermaidGraph {
+    let mut nodes = Vec::new();
+    let mut seen = HashSet::new();
+    let mut edges = Vec::new();
+    for line in body.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
+            continue;
+        }
+        if let Some((left, right)) = split_first_operator(line, &["<->", "->", "--"]) {
+            let from = parse_plain_graph_node(left);
+            let to = parse_plain_graph_node(right.split_once(':').map_or(right, |(id, _)| id));
+            add_mermaid_node(&mut nodes, &mut seen, &from);
+            add_mermaid_node(&mut nodes, &mut seen, &to);
+            edges.push(MermaidEdge {
+                from: from.id,
+                to: to.id,
+            });
+        } else if let Some((id, label)) = line.split_once(':') {
+            let node = MermaidNode {
+                id: normalize_plain_node_id(id),
+                label: label.trim().trim_matches('"').to_string(),
+            };
+            add_mermaid_node(&mut nodes, &mut seen, &node);
+        }
+    }
+    MermaidGraph { nodes, edges }
+}
+
+fn parse_plantuml_graph(body: &str) -> MermaidGraph {
+    let mut nodes = Vec::new();
+    let mut seen = HashSet::new();
+    let mut edges = Vec::new();
+    for line in body.lines().map(str::trim) {
+        if line.is_empty()
+            || line.starts_with('\'')
+            || line.starts_with("@start")
+            || line.starts_with("@end")
+        {
+            continue;
+        }
+        if let Some((keyword, rest)) = line.split_once(' ') {
+            if matches!(
+                keyword,
+                "actor" | "participant" | "component" | "database" | "queue" | "boundary"
+            ) {
+                let node = parse_plain_graph_node(rest);
+                add_mermaid_node(&mut nodes, &mut seen, &node);
+                continue;
+            }
+        }
+        if let Some((left, right)) = split_first_operator(line, &["-->", "->", "<--", "<-"]) {
+            let from = parse_plain_graph_node(left);
+            let to = parse_plain_graph_node(right.split_once(':').map_or(right, |(id, _)| id));
+            add_mermaid_node(&mut nodes, &mut seen, &from);
+            add_mermaid_node(&mut nodes, &mut seen, &to);
+            edges.push(MermaidEdge {
+                from: from.id,
+                to: to.id,
+            });
+        }
+    }
+    MermaidGraph { nodes, edges }
+}
+
+fn split_first_operator<'a>(line: &'a str, operators: &[&str]) -> Option<(&'a str, &'a str)> {
+    operators
+        .iter()
+        .filter_map(|operator| line.find(operator).map(|index| (index, *operator)))
+        .min_by_key(|(index, _)| *index)
+        .map(|(index, operator)| {
+            let after_operator = index + operator.len();
+            (line[..index].trim(), line[after_operator..].trim())
+        })
+}
+
+fn parse_plain_graph_node(text: &str) -> MermaidNode {
+    let label = extract_quoted_attribute(text, "label");
+    let id = normalize_plain_node_id(strip_bracket_attributes(text));
+    MermaidNode {
+        label: label.unwrap_or_else(|| id.clone()),
+        id,
+    }
+}
+
+fn strip_bracket_attributes(text: &str) -> &str {
+    text.split('[').next().unwrap_or(text).trim()
+}
+
+fn normalize_plain_node_id(text: &str) -> String {
+    text.trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_string()
 }
 
 fn render_geojson_svg(
@@ -3666,6 +3901,36 @@ paths:
     }
 
     #[test]
+    fn external_diagram_fallbacks_render_simple_native_svgs() {
+        for (name, body, expected) in [
+            (
+                "dot",
+                "digraph { Start -> Review; Review -> Done; }",
+                "transform-dot",
+            ),
+            (
+                "graphviz",
+                "digraph { a [label=\"Alpha\"]; a -> b; }",
+                "Alpha",
+            ),
+            ("d2", "source -> target: request", "transform-d2"),
+            (
+                "plantuml",
+                "@startuml\nAlice -> Bob: approve\n@enduml\n",
+                "transform-plantuml",
+            ),
+        ] {
+            let artifact = run_transform(name.to_string(), body.to_string())
+                .unwrap_or_else(|err| panic!("{name} transform failed: {err}"));
+            assert_eq!(artifact.output_kind, "svg", "{name} should render SVG");
+            assert_eq!(artifact.execution_kind, "embedded");
+            assert!(!artifact.html.contains("transform-pending"));
+            assert!(artifact.html.contains(expected));
+            assert!(artifact.diagnostics.is_empty());
+        }
+    }
+
+    #[test]
     fn document_ast_models_transform_artifacts_semantically() {
         let response = compile(CompileRequest {
             text: r#"---
@@ -4275,7 +4540,7 @@ beta</pre>
         }
         let response = compile_with_options(
             CompileRequest {
-                text: "---\ntitle: Untrusted Dot\n---\n# Untrusted Dot\n```dot\ndigraph {}\n```\n"
+                text: "---\ntitle: Untrusted Dot\n---\n# Untrusted Dot\n```dot\ndigraph { a -> b }\n```\n"
                     .to_string(),
                 file_path: None,
             },
@@ -4291,7 +4556,8 @@ beta</pre>
             .find(|artifact| artifact.name == "dot")
             .expect("dot artifact");
         assert_eq!(artifact.execution_kind, "embedded");
-        assert!(artifact.html.contains("transform-pending"));
+        assert_eq!(artifact.output_kind, "svg");
+        assert!(!artifact.html.contains("transform-pending"));
         assert!(artifact.html.contains("transform-dot"));
         assert!(response.document_ast.blocks.iter().any(|block| {
             matches!(
