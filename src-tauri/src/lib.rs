@@ -5231,6 +5231,66 @@ beta</pre>
     }
 
     #[test]
+    fn export_packages_preserve_figure_cover_fit_crop() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-cover-fit-export-{unique}"));
+        let assets = root.join("assets");
+        fs::create_dir_all(&assets).expect("create cover fit fixture dir");
+        let image = assets.join("square.svg");
+        fs::write(
+            &image,
+            "<svg width=\"320\" height=\"320\" viewBox=\"0 0 320 320\"><rect width=\"320\" height=\"320\"/></svg>",
+        )
+        .expect("write square svg");
+        let doc = root.join("report.md");
+        fs::write(
+            &doc,
+            "---\ntitle: Cover Fit\nstatus: approved\napprovedBy: QA\n---\n# Cover Fit\n![Square](assets/square.svg){#fig:square caption=\"Square crop\" fit=\"cover\"}\n",
+        )
+        .expect("write document");
+
+        let response = compile(CompileRequest {
+            text: fs::read_to_string(&doc).expect("read document"),
+            file_path: Some(path_to_string(&doc)),
+        });
+        assert!(response.html.contains("figure-fit-cover"));
+        assert!(response.html.contains("data-fit=\"cover\""));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Figure { id, fit, .. }
+                    if id.as_deref() == Some("fig:square")
+                        && fit.as_deref() == Some("cover")
+            )
+        }));
+        assert!(export::export_text(&response, &json!({})).contains("fit=cover"));
+
+        let options = json!({});
+        let full_html = render_full_html(&response, &options);
+        assert!(full_html.contains("figure[data-fit='cover'] img"));
+
+        let docx = render_docx_bytes(&response, &options).expect("docx cover fit");
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains(r#"<wp:extent cx="4320000" cy="3240000""#));
+        assert!(docx_document.contains(r#"<a:srcRect t="12500" b="12500"/>"#));
+
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx cover fit");
+        let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+        assert!(pptx_slide.contains(r#"<a:ext cx="3657600" cy="2057400""#));
+        assert!(pptx_slide.contains(r#"<a:srcRect t="21875" b="21875"/>"#));
+
+        let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+            .expect("cover fit bundle");
+        let media_map = zip_entry_text(&bundle, "media-map.json");
+        assert!(media_map.contains(r#""fit": "cover""#));
+
+        fs::remove_dir_all(root).expect("clean cover fit fixture");
+    }
+
+    #[test]
     fn export_packages_raster_media_intrinsic_dimensions() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)

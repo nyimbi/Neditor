@@ -3932,6 +3932,13 @@ select:hover {
   margin: 0 24px 16px 0;
 }
 
+.preview-document figure[data-fit="cover"] img,
+.preview-document .figure-fit-cover img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
 .preview-document .glossary-term {
   border-bottom: 1px dotted #275da8;
   color: #174a8c;
