@@ -53,7 +53,9 @@ use compile_options::apply_compile_options;
 use diagnostics::{diag, with_range, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
-use document_ast::{attach_source_ranges, build_document_ast, DocumentAst};
+use document_ast::{
+    attach_source_ranges, attach_transform_artifacts, build_document_ast, DocumentAst,
+};
 #[cfg(test)]
 use export::{
     render_docx_bytes, render_full_html, render_markdown_bundle_bytes, render_pdf_bytes,
@@ -369,6 +371,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     attach_source_ranges(&mut document_ast, |line, end_line| {
         ast_source_range_for_generated_lines(&source_map, line, end_line)
     });
+    attach_transform_artifacts(&mut document_ast, &transform_artifacts);
     let preview_headings = extract_headings(&layout_markdown);
     let heading_anchors = preview_headings
         .iter()
@@ -3910,14 +3913,30 @@ flowchart LR
                     output_kind,
                     text,
                     html,
+                    source_hash,
+                    output_hash,
+                    cache_key,
+                    execution_kind,
                     ..
-                } if name == "roadmap" => Some((output_kind, text, html)),
+                } if name == "roadmap" => Some((
+                    output_kind,
+                    text,
+                    html,
+                    source_hash,
+                    output_hash,
+                    cache_key,
+                    execution_kind,
+                )),
                 _ => None,
             })
             .expect("roadmap transform block");
         assert_eq!(roadmap.0, "html");
         assert!(roadmap.1.contains("Launch beta"));
         assert!(roadmap.2.contains("transform-roadmap"));
+        assert!(roadmap.3.as_deref().is_some_and(|hash| hash.len() == 64));
+        assert!(roadmap.4.as_deref().is_some_and(|hash| hash.len() == 64));
+        assert!(roadmap.5.as_deref().is_some_and(|key| key.len() == 64));
+        assert_eq!(roadmap.6.as_deref(), Some("embedded"));
 
         let timeline = response
             .document_ast

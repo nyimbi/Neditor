@@ -162,7 +162,21 @@ export type DocumentBlock =
   | { kind: "review_comment"; line: number; end_line: number; comment: AstReviewComment; source?: DocumentSourceRange | null }
   | { kind: "change_note"; line: number; end_line: number; note: AstChangeNote; source?: DocumentSourceRange | null }
   | { kind: "ai_source"; line: number; end_line: number; provenance: AstAiSource; source?: DocumentSourceRange | null }
-  | { kind: "transform"; line: number; end_line: number; name: string; output_kind: string; text: string; html: string; source?: DocumentSourceRange | null }
+  | {
+      kind: "transform";
+      line: number;
+      end_line: number;
+      name: string;
+      output_kind: string;
+      text: string;
+      html: string;
+      source_hash?: string | null;
+      output_hash?: string | null;
+      cache_key?: string | null;
+      execution_kind?: string | null;
+      options?: Record<string, unknown> | null;
+      source?: DocumentSourceRange | null;
+    }
   | { kind: "raw_html"; line: number; end_line: number; html: string; source?: DocumentSourceRange | null };
 
 export interface DocumentAst {

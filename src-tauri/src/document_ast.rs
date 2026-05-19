@@ -3,8 +3,10 @@ use crate::{
         is_markdown_table_row, is_markdown_table_separator, split_markdown_table_row,
     },
     review::{parse_change_note, parse_review_comment},
+    transforms::TransformArtifact,
 };
 use serde::Serialize;
+use serde_json::Value;
 
 #[derive(Debug, Serialize)]
 pub(crate) struct DocumentAst {
@@ -204,6 +206,11 @@ pub(crate) enum DocumentBlock {
         output_kind: String,
         text: String,
         html: String,
+        source_hash: Option<String>,
+        output_hash: Option<String>,
+        cache_key: Option<String>,
+        execution_kind: Option<String>,
+        options: Option<Value>,
         source: Option<AstSourceRange>,
     },
     RawHtml {
@@ -544,6 +551,40 @@ where
                 *source = resolve(*line, *end_line);
             }
         }
+    }
+}
+
+pub(crate) fn attach_transform_artifacts(ast: &mut DocumentAst, artifacts: &[TransformArtifact]) {
+    let mut search_start = 0usize;
+    for block in &mut ast.blocks {
+        let DocumentBlock::Transform {
+            name,
+            output_kind,
+            source_hash,
+            output_hash,
+            cache_key,
+            execution_kind,
+            options,
+            ..
+        } = block
+        else {
+            continue;
+        };
+        let Some((artifact_index, artifact)) = artifacts
+            .iter()
+            .enumerate()
+            .skip(search_start)
+            .find(|(_, artifact)| artifact.name == *name)
+        else {
+            continue;
+        };
+        *output_kind = artifact.output_kind.clone();
+        *source_hash = Some(artifact.source_hash.clone());
+        *output_hash = Some(artifact.output_hash.clone());
+        *cache_key = Some(artifact.cache_key.clone());
+        *execution_kind = Some(artifact.execution_kind.clone());
+        *options = Some(artifact.options.clone());
+        search_start = artifact_index + 1;
     }
 }
 
@@ -1268,6 +1309,11 @@ fn parse_ast_transform_block(html: &str, line_number: usize) -> Option<DocumentB
         output_kind,
         text: clean_inline_text(html),
         html: html.to_string(),
+        source_hash: None,
+        output_hash: None,
+        cache_key: None,
+        execution_kind: None,
+        options: None,
         source: None,
     })
 }
