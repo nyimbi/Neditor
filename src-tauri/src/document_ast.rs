@@ -1300,7 +1300,7 @@ fn parse_ast_ai_source(content: &str) -> AstAiSource {
             "provider" => provenance.provider = value,
             "model" => provenance.model = value,
             "date" => provenance.date = value,
-            "promptSummary" | "prompt_summary" => provenance.prompt_summary = value,
+            "promptSummary" | "prompt_summary" | "prompt" => provenance.prompt_summary = value,
             "reviewedBy" | "reviewed_by" | "reviewer" => provenance.reviewed_by = value,
             "reviewedAt" | "reviewed_at" | "reviewDate" => provenance.reviewed_at = value,
             "status" => provenance.status = value,

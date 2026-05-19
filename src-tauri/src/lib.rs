@@ -5086,7 +5086,7 @@ paths:
     #[test]
     fn document_ast_accepts_ai_source_metadata_aliases() {
         let response = compile(CompileRequest {
-            text: "---\ntitle: AI AST Aliases\nstatus: approved\napprovedBy: QA\n---\n# AI AST Aliases\n```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nprompt_summary: Alias prompt\nreviewer: Jane Doe\nreviewDate: 2026-05-19T09:00:00Z\nstatus: human-reviewed\n```\n"
+            text: "---\ntitle: AI AST Aliases\nstatus: approved\napprovedBy: QA\n---\n# AI AST Aliases\n```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nprompt: Alias prompt\nreviewer: Jane Doe\nreviewDate: 2026-05-19T09:00:00Z\nstatus: human-reviewed\n```\n"
                 .to_string(),
             file_path: None,
         });
