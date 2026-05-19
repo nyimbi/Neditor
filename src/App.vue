@@ -1112,7 +1112,7 @@ const commands = computed(() => [
     group: "Citation",
     run: () => {
       store.sidebar = "references";
-      goToSourceTarget(citation);
+      void goToSourceTarget(citation);
     },
   }))),
   ...Object.keys(active.value.compile?.semantic.glossary || {}).map((term) => ({
@@ -1135,7 +1135,7 @@ const commands = computed(() => [
     group: `Diagnostic ${diagnostic.severity}`,
     run: () => {
       store.sidebar = "diagnostics";
-      if (diagnostic.line) goToSourceTarget(diagnostic);
+      if (diagnostic.line) void goToSourceTarget(diagnostic);
     },
   }))),
 ]);
@@ -2766,7 +2766,7 @@ function goToLine(lineNumber: number) {
   editorView.focus();
 }
 
-function goToSourceTarget(target: {
+async function goToSourceTarget(target: {
   line?: number | null;
   column?: number | null;
   end_line?: number | null;
@@ -2774,8 +2774,8 @@ function goToSourceTarget(target: {
   source_file?: string | null;
 }) {
   if (target.source_file && active.value.path && target.source_file !== active.value.path) {
-    void store.openPath(target.source_file);
-    return;
+    await store.openPath(target.source_file);
+    await nextTick();
   }
   if (!editorView || !target.line) return;
   const startLine = editorView.state.doc.line(Math.max(1, Math.min(target.line, editorView.state.doc.lines)));
@@ -2802,7 +2802,7 @@ function goToSearchTerm(term: string) {
 }
 
 function goToCrossReference(reference: { line: number; column?: number | null; end_column?: number | null; source_file?: string | null }) {
-  goToSourceTarget(reference);
+  void goToSourceTarget(reference);
 }
 
 function handlePreviewClick(event: MouseEvent) {
@@ -2815,7 +2815,7 @@ function handlePreviewClick(event: MouseEvent) {
   const sourceTarget = sourceTargetForAnchor(anchor);
   if (!sourceTarget?.line) return;
   event.preventDefault();
-  goToSourceTarget(sourceTarget);
+  void goToSourceTarget(sourceTarget);
 }
 
 function sourceTargetForAnchor(anchor: string) {
