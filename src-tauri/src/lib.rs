@@ -5010,6 +5010,27 @@ paths:
     }
 
     #[test]
+    fn compiler_accepts_ai_source_metadata_aliases() {
+        let response = compile(CompileRequest {
+            text: "---\ntitle: AI Source Aliases\nstatus: approved\napprovedBy: QA\n---\n# AI Source Aliases\n```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nprompt_summary: Alias prompt\nreviewer: Jane Doe\nreviewed_at: 2026-05-19T09:00:00Z\nstatus: human-reviewed\n```\n"
+                .to_string(),
+            file_path: None,
+        });
+
+        let source = response
+            .semantic
+            .ai_sources
+            .first()
+            .expect("ai source metadata");
+        assert_eq!(source.prompt_summary, "Alias prompt");
+        assert_eq!(source.reviewed_by, "Jane Doe");
+        assert_eq!(source.reviewed_at, "2026-05-19T09:00:00Z");
+        assert!(!response.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("AI-assisted sections that are not human-reviewed")));
+    }
+
+    #[test]
     fn export_packages_local_figure_media_relative_to_source_file() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)

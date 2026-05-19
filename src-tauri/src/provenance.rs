@@ -41,11 +41,22 @@ pub(crate) fn collect_ai_sources(text: &str) -> Vec<AiSource> {
                 date: map.get("date").cloned().unwrap_or_default(),
                 prompt_summary: map
                     .get("promptSummary")
+                    .or_else(|| map.get("prompt_summary"))
                     .or_else(|| map.get("prompt"))
                     .cloned()
                     .unwrap_or_default(),
-                reviewed_by: map.get("reviewedBy").cloned().unwrap_or_default(),
-                reviewed_at: map.get("reviewedAt").cloned().unwrap_or_default(),
+                reviewed_by: map
+                    .get("reviewedBy")
+                    .or_else(|| map.get("reviewer"))
+                    .or_else(|| map.get("reviewed_by"))
+                    .cloned()
+                    .unwrap_or_default(),
+                reviewed_at: map
+                    .get("reviewedAt")
+                    .or_else(|| map.get("reviewed_at"))
+                    .or_else(|| map.get("reviewDate"))
+                    .cloned()
+                    .unwrap_or_default(),
                 status: map
                     .get("status")
                     .cloned()
