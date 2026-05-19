@@ -17,9 +17,9 @@ What remains to achieve the full vision:
      There is an AST foundation, with normalized layout settings now attached to layout blocks, and transform artifacts now preserve source-file/range provenance
      through the compiler, manifests, bundle exports, frontend types, and transform diagnostics. The compiler now emits a source-mapped semantic paged-document model,
      includes it in Markdown bundles, stores compact layout-section summaries in export manifests, and returns it from prepare-for-export so readiness checks and the export UI
-     can inspect section layout before files are written. Semantic table/figure/equation inventory now counts AST blocks instead of scanning raw Markdown strings, rich block/table
-     scanners and local link validators now preserve fenced-code examples, and layout shortcode tokens now pass through interpolation without false missing-variable warnings, so
-     semantic layout directives do not make readiness reports noisy.
+     can inspect section layout before files are written. Semantic table/figure/equation inventory now counts AST blocks instead of scanning raw Markdown strings, heading/rich block/table
+     scanners, cross-reference handling, and local link validators now preserve fenced-code examples, and layout shortcode tokens now pass through interpolation without false
+     missing-variable warnings, so semantic layout directives do not make readiness reports noisy.
      The compiler still has string-heavy paths. Export, references, transforms, and validation need to depend more fully on durable semantic models.
   3. Full visual table editor
      Core editor controls now cover table parsing/paste/captions, add/remove/duplicate/move rows and columns, alignment, sorting, column formats, totals, formula rows,

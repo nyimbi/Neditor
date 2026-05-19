@@ -22,11 +22,24 @@ pub(crate) fn collect_labels(text: &str, heading_anchors: &[&str]) -> Vec<String
     for anchor in heading_anchors {
         labels.insert((*anchor).to_string());
     }
-    for segment in text.split("{#").skip(1) {
-        if let Some((label, _)) = segment.split_once('}') {
-            let label = label.split_whitespace().next().unwrap_or("").trim();
-            if !label.is_empty() {
-                labels.insert(label.to_string());
+    let mut fence_marker = None;
+    for line in text.lines() {
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
+            continue;
+        }
+        for segment in line.split("{#").skip(1) {
+            if let Some((label, _)) = segment.split_once('}') {
+                let label = label.split_whitespace().next().unwrap_or("").trim();
+                if !label.is_empty() {
+                    labels.insert(label.to_string());
+                }
             }
         }
     }
@@ -41,7 +54,18 @@ pub(crate) fn collect_cross_references(
 ) -> Vec<CrossReference> {
     let known = labels.iter().map(String::as_str).collect::<HashSet<_>>();
     let mut references = Vec::new();
+    let mut fence_marker = None;
     for (line_index, line) in text.lines().enumerate() {
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
+            continue;
+        }
         let generated_line = line_index + 1;
         let mut search_from = 0usize;
         while let Some(relative_start) = line[search_from..].find("{@") {
@@ -107,8 +131,36 @@ pub(crate) fn render_cross_references(markdown: &str, references: &[CrossReferen
         .iter()
         .map(|reference| (reference.key.as_str(), reference))
         .collect::<HashMap<_, _>>();
-    let mut output = String::with_capacity(markdown.len());
-    let mut rest = markdown;
+    let mut fence_marker = None;
+    let mut lines = Vec::new();
+    for line in markdown.lines() {
+        if let Some(marker) = fence_marker {
+            lines.push(line.to_string());
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            lines.push(line.to_string());
+            fence_marker = Some(marker);
+            continue;
+        }
+        lines.push(render_cross_reference_line(line, &reference_map));
+    }
+    let mut output = lines.join("\n");
+    if markdown.ends_with('\n') {
+        output.push('\n');
+    }
+    output
+}
+
+fn render_cross_reference_line(
+    line: &str,
+    reference_map: &HashMap<&str, &CrossReference>,
+) -> String {
+    let mut output = String::with_capacity(line.len());
+    let mut rest = line;
     while let Some(start) = rest.find("{@") {
         output.push_str(&rest[..start]);
         let after_start = &rest[start + 2..];
@@ -133,6 +185,17 @@ pub(crate) fn render_cross_references(markdown: &str, references: &[CrossReferen
     }
     output.push_str(rest);
     output
+}
+
+fn fenced_code_marker(line: &str) -> Option<&'static str> {
+    let trimmed = line.trim_start();
+    if trimmed.starts_with("```") {
+        Some("```")
+    } else if trimmed.starts_with("~~~") {
+        Some("~~~")
+    } else {
+        None
+    }
 }
 
 fn reference_display_text(reference: &CrossReference) -> String {

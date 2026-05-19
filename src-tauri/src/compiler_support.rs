@@ -6,28 +6,37 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 pub(crate) fn extract_headings(text: &str) -> Vec<Heading> {
-    text.lines()
-        .enumerate()
-        .filter_map(|(index, line)| {
-            let trimmed = line.trim_start();
-            let level = trimmed.chars().take_while(|ch| *ch == '#').count();
-            if (1..=6).contains(&level) && trimmed.chars().nth(level) == Some(' ') {
-                let raw_text = trimmed[level..].trim();
-                let text = strip_heading_attributes(raw_text).to_string();
-                if text.is_empty() {
-                    return None;
-                }
-                Some(Heading {
-                    level,
-                    anchor: extract_label(raw_text).unwrap_or_else(|| slugify(&text)),
-                    text,
-                    line: index + 1,
-                })
-            } else {
-                None
+    let mut headings = Vec::new();
+    let mut fence_marker = None;
+    for (index, line) in text.lines().enumerate() {
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
             }
-        })
-        .collect()
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
+            continue;
+        }
+        let trimmed = line.trim_start();
+        let level = trimmed.chars().take_while(|ch| *ch == '#').count();
+        if !(1..=6).contains(&level) || trimmed.chars().nth(level) != Some(' ') {
+            continue;
+        }
+        let raw_text = trimmed[level..].trim();
+        let text = strip_heading_attributes(raw_text).to_string();
+        if text.is_empty() {
+            continue;
+        }
+        headings.push(Heading {
+            level,
+            anchor: extract_label(raw_text).unwrap_or_else(|| slugify(&text)),
+            text,
+            line: index + 1,
+        });
+    }
+    headings
 }
 
 pub(crate) fn collect_glossary(text: &str) -> BTreeMap<String, String> {
@@ -60,6 +69,17 @@ pub(crate) fn collect_fence_bodies(text: &str, target: &str) -> Vec<String> {
 
 fn strip_heading_attributes(text: &str) -> &str {
     text.split("{#").next().unwrap_or(text).trim()
+}
+
+fn fenced_code_marker(line: &str) -> Option<&'static str> {
+    let trimmed = line.trim_start();
+    if trimmed.starts_with("```") {
+        Some("```")
+    } else if trimmed.starts_with("~~~") {
+        Some("~~~")
+    } else {
+        None
+    }
 }
 
 fn collect_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(usize, String)> {

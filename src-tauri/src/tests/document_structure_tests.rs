@@ -102,7 +102,7 @@ fn compiler_renders_markdown_footnotes() {
 #[test]
 fn cross_references_resolve_heading_appendix_and_decision_anchors() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: References\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}, {@appendix-a}, and {@decision-record}.\n\n## Appendix A\nSupporting detail.\n\n## Decision Record\nUse local-first exports.\n".to_string(),
+            text: "---\ntitle: References\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}, {@appendix-a}, and {@decision-record}.\n\n```md\n# Example {#code-label}\nSee {@missing-code} and {@sec:strategy}.\n```\n\n## Appendix A\nSupporting detail.\n\n## Decision Record\nUse local-first exports.\n".to_string(),
             file_path: None,
         });
 
@@ -118,9 +118,22 @@ fn cross_references_resolve_heading_appendix_and_decision_anchors() {
             .iter()
             .any(|reference| reference.key == key && reference.resolved));
     }
+    assert!(!response
+        .semantic
+        .labels
+        .iter()
+        .any(|label| label == "code-label"));
+    assert!(!response
+        .semantic
+        .cross_references
+        .iter()
+        .any(|reference| reference.key == "missing-code"));
     assert!(response.compiled_markdown.contains(
             "See [Section strategy](#sec:strategy), [Section appendix a](#appendix-a), and [Section decision record](#decision-record)."
         ));
+    assert!(response
+        .compiled_markdown
+        .contains("See {@missing-code} and {@sec:strategy}."));
     assert!(!response
         .diagnostics
         .iter()
