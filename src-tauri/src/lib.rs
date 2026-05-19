@@ -1966,6 +1966,18 @@ ARR: Annual recurring revenue.
         let docx = render_docx_bytes(&response, &json!({})).expect("docx bytes");
         let docx_document = zip_entry_text(&docx, "word/document.xml");
         assert!(docx_document.contains("float=right"));
+        assert!(docx_document.contains(r#"<w:jc w:val="right"/>"#));
+
+        let pptx = render_pptx_bytes(&response, &json!({})).expect("pptx bytes");
+        let floating_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
+            .into_iter()
+            .find(|slide| slide.contains(r#"r:embed="rIdImage1""#))
+            .expect("floating figure slide");
+        assert!(floating_slide.contains(r#"<a:off x="5029200""#));
+
+        let pdf = render_pdf_bytes(&response, &json!({}));
+        let pdf_text = String::from_utf8_lossy(&pdf);
+        assert!(pdf_text.contains("287 627 240 135 re S"));
     }
 
     #[test]

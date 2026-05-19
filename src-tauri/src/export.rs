@@ -20,6 +20,7 @@ use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 struct ExportMedia {
     source: String,
     source_file: Option<String>,
+    float: Option<String>,
     relationship_id: String,
     path: String,
     extension: String,
@@ -306,6 +307,7 @@ fn pdf_table_stream(table: &PdfTable, x: u32, top_y: i32, width: u32) -> (String
 
 fn pdf_figure_stream(figure: &PdfFigure, x: u32, top_y: i32, max_width: u32) -> (String, i32) {
     let (width, height) = pdf_figure_box_size(figure.dimensions, max_width, 180);
+    let x = pdf_aligned_x(x, max_width, width, figure.float.as_deref());
     let bottom_y = top_y - height;
     let label = figure
         .alt
@@ -313,9 +315,29 @@ fn pdf_figure_stream(figure: &PdfFigure, x: u32, top_y: i32, max_width: u32) -> 
         .filter(|value| !value.trim().is_empty())
         .unwrap_or("Figure");
     let mut stream = format!("{x} {bottom_y} {width} {height} re S\n");
-    stream.push_str(&pdf_text_line(8, x + 8, bottom_y + (height / 2), label));
-    stream.push_str(&pdf_text_line(10, x, bottom_y - 14, &figure.caption_line));
+    stream.push_str(&pdf_text_line(
+        8,
+        (x + 8).max(0) as u32,
+        bottom_y + (height / 2),
+        label,
+    ));
+    stream.push_str(&pdf_text_line(
+        10,
+        x.max(0) as u32,
+        bottom_y - 14,
+        &figure.caption_line,
+    ));
     (stream, height + pdf_figure_caption_height())
+}
+
+fn pdf_aligned_x(base_x: u32, max_width: u32, width: i32, float: Option<&str>) -> i32 {
+    let base_x = base_x as i32;
+    let remaining = max_width as i32 - width;
+    match normalized_float(float) {
+        Some("right") => base_x + remaining.max(0),
+        Some("center") => base_x + (remaining.max(0) / 2),
+        _ => base_x,
+    }
 }
 
 fn pdf_figure_box_size(
@@ -794,6 +816,7 @@ fn render_bundle_media_map(media: &[ExportMedia]) -> Result<String, String> {
             let mut entry = json!({
                 "source": item.source,
                 "source_file": item.source_file,
+                "float": item.float,
                 "bundle_path": item.path,
                 "content_type": item.content_type,
                 "hash": sha256_uri(&item.bytes),
@@ -2698,8 +2721,9 @@ fn docx_figure(
         .unwrap_or("Figure");
     let (image_width, image_height) =
         export_media_emu_size(item, 4_320_000, 3_240_000, (4_320_000, 2_430_000));
+    let paragraph_props = docx_figure_paragraph_props(float.as_deref());
     let drawing = format!(
-        r#"<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{image_width}" cy="{image_height}"/><wp:docPr id="{doc_pr_id}" name="{}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="{doc_pr_id}" name="{}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{image_width}" cy="{image_height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"#,
+        r#"<w:p>{paragraph_props}<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{image_width}" cy="{image_height}"/><wp:docPr id="{doc_pr_id}" name="{}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="{doc_pr_id}" name="{}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{image_width}" cy="{image_height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"#,
         escape_xml(name),
         escape_xml(name),
         escape_xml(&item.relationship_id)
@@ -2710,12 +2734,22 @@ fn docx_figure(
     )
 }
 
+fn docx_figure_paragraph_props(float: Option<&str>) -> &'static str {
+    match normalized_float(float) {
+        Some("right") => r#"<w:pPr><w:jc w:val="right"/></w:pPr>"#,
+        Some("center") => r#"<w:pPr><w:jc w:val="center"/></w:pPr>"#,
+        Some("left") => r#"<w:pPr><w:jc w:val="left"/></w:pPr>"#,
+        _ => "",
+    }
+}
+
 fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
     let mut media = Vec::new();
     for block in &response.document_ast.blocks {
         let DocumentBlock::Figure {
             src: Some(src),
             source,
+            float,
             ..
         } = block
         else {
@@ -2736,6 +2770,7 @@ fn collect_docx_media(response: &CompileResponse) -> Vec<ExportMedia> {
         media.push(ExportMedia {
             source: src.clone(),
             source_file,
+            float: normalized_float(float.as_deref()).map(str::to_string),
             relationship_id: format!("rIdImage{index}"),
             path,
             extension: parsed.extension,
@@ -3085,6 +3120,7 @@ struct PdfTable {
 struct PdfFigure {
     caption_line: String,
     alt: Option<String>,
+    float: Option<String>,
     dimensions: Option<ExportImageDimensions>,
 }
 
@@ -3182,6 +3218,7 @@ fn block_pdf_items(block: &DocumentBlock) -> Vec<PdfPageItem> {
         return vec![PdfPageItem::Figure(PdfFigure {
             caption_line: figure_export_line(id, src, alt, caption, float),
             alt: alt.clone(),
+            float: normalized_float(float.as_deref()).map(str::to_string),
             dimensions,
         })];
     }
@@ -4172,6 +4209,15 @@ fn figure_export_line(
     parts.join(": ")
 }
 
+fn normalized_float(float: Option<&str>) -> Option<&'static str> {
+    match float?.trim().to_ascii_lowercase().as_str() {
+        "left" => Some("left"),
+        "right" => Some("right"),
+        "center" | "centre" => Some("center"),
+        _ => None,
+    }
+}
+
 fn table_export_line(id: &Option<String>, caption: &Option<String>, headers: &[String]) -> String {
     let mut parts = vec!["Table".to_string()];
     if let Some(id) = id {
@@ -4546,11 +4592,22 @@ fn render_pptx_picture(item: &ExportMedia, index: usize) -> String {
     let y = 2_850_000 + (index as i64 * 1_000_000);
     let (image_width, image_height) =
         export_media_emu_size(item, 3_657_600, 2_057_400, (3_657_600, 1_371_600));
+    let x = pptx_aligned_x(image_width, item.float.as_deref());
     format!(
-        r#"<p:pic><p:nvPicPr><p:cNvPr id="{shape_id}" name="{}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="457200" y="{y}"/><a:ext cx="{image_width}" cy="{image_height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#,
+        r#"<p:pic><p:nvPicPr><p:cNvPr id="{shape_id}" name="{}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{image_width}" cy="{image_height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#,
         escape_xml(&item.path),
         escape_xml(&item.relationship_id)
     )
+}
+
+fn pptx_aligned_x(width: i64, float: Option<&str>) -> i64 {
+    const SLIDE_WIDTH: i64 = 9_144_000;
+    const SLIDE_MARGIN: i64 = 457_200;
+    match normalized_float(float) {
+        Some("right") => SLIDE_WIDTH - SLIDE_MARGIN - width,
+        Some("center") => (SLIDE_WIDTH - width) / 2,
+        _ => SLIDE_MARGIN,
+    }
 }
 
 fn pptx_slide_media<'a>(slide: &PptxSlide, media: &'a [ExportMedia]) -> Vec<&'a ExportMedia> {
