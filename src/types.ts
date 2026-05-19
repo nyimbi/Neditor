@@ -314,6 +314,7 @@ export interface WatchFileResponse {
     exists: boolean;
     hash?: string | null;
     modified?: string | null;
+    role?: "root" | "include" | string;
   }>;
   native_watcher?: boolean;
 }

@@ -72,8 +72,17 @@ pub(crate) struct WatchFileRequest {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct WatchFileResponse {
-    pub(crate) paths: Vec<FileMetadata>,
+    pub(crate) paths: Vec<WatchedFileMetadata>,
     pub(crate) native_watcher: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct WatchedFileMetadata {
+    pub(crate) path: String,
+    pub(crate) exists: bool,
+    pub(crate) hash: Option<String>,
+    pub(crate) modified: Option<String>,
+    pub(crate) role: String,
 }
 
 #[cfg(feature = "native-watch")]
@@ -235,10 +244,18 @@ pub(crate) fn file_metadata(path: String) -> Result<FileMetadata, String> {
 pub(crate) fn watch_file(request: WatchFileRequest) -> Result<WatchFileResponse, String> {
     let mut paths = Vec::new();
     let mut seen = HashSet::new();
-    for path in std::iter::once(request.root).chain(request.included.into_iter()) {
+    for (path, role) in std::iter::once((request.root, "root"))
+        .chain(request.included.into_iter().map(|path| (path, "include")))
+    {
         let metadata = file_metadata(path)?;
         if seen.insert(metadata.path.clone()) {
-            paths.push(metadata);
+            paths.push(WatchedFileMetadata {
+                path: metadata.path,
+                exists: metadata.exists,
+                hash: metadata.hash,
+                modified: metadata.modified,
+                role: role.to_string(),
+            });
         }
     }
     Ok(WatchFileResponse {

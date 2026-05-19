@@ -5797,6 +5797,8 @@ beta</pre>
         .expect("watch file command");
         assert_eq!(watched.paths.len(), 2);
         assert!(watched.paths.iter().all(|metadata| metadata.exists));
+        assert_eq!(watched.paths[0].role, "root");
+        assert_eq!(watched.paths[1].role, "include");
         assert!(watched
             .paths
             .iter()

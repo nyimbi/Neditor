@@ -106,6 +106,7 @@ interface FileMetadataResponse {
   exists: boolean;
   hash?: string | null;
   modified?: string | null;
+  role?: "root" | "include" | string;
 }
 
 interface ExternalConflict {
@@ -490,6 +491,7 @@ export const useDocumentsStore = defineStore("documents", {
     watchSignature: "",
     watchDriver: "off" as "off" | "native" | "plugin",
     watchedPaths: [] as string[],
+    watchedPathRoles: {} as Record<string, "root" | "include">,
     transformEngines: [] as TransformEngineMetadata[],
     transformEnginePaths: {} as Record<string, string>,
     trustedTransformEngines: {} as Record<string, boolean>,
@@ -858,21 +860,31 @@ export const useDocumentsStore = defineStore("documents", {
         this.watchSignature = "";
         this.watchDriver = "off";
         this.watchedPaths = [];
+        this.watchedPathRoles = {};
         return;
       }
       const includedPaths = (doc.compile?.export_manifest.included_files || []).map((file) => file.path);
       const watchSnapshot = await invoke<WatchFileResponse>("start_file_watcher", {
         request: { root: doc.path, included: includedPaths },
       });
-      const watchPaths = watchSnapshot.paths.filter((file) => file.exists).map((file) => file.path);
+      const watchedFiles = watchSnapshot.paths.filter((file) => file.exists);
+      const watchPaths = watchedFiles.map((file) => file.path);
+      const pathRoles = watchedFiles.reduce(
+        (roles, file) => {
+          roles[file.path] = file.role === "root" ? "root" : "include";
+          return roles;
+        },
+        {} as Record<string, "root" | "include">,
+      );
       const driver = watchSnapshot.native_watcher ? "native" : "plugin";
-      const signature = `${driver}\n${watchPaths.join("\n")}`;
+      const signature = `${driver}\n${watchedFiles.map((file) => `${file.role || "include"}:${file.path}`).join("\n")}`;
       if (signature === this.watchSignature) return;
       this.detachFileWatchListeners();
       if (!watchPaths.length) {
         this.watchSignature = "";
         this.watchDriver = "off";
         this.watchedPaths = [];
+        this.watchedPathRoles = {};
         return;
       }
       if (watchSnapshot.native_watcher) {
@@ -889,6 +901,7 @@ export const useDocumentsStore = defineStore("documents", {
       this.watchSignature = signature;
       this.watchDriver = driver;
       this.watchedPaths = watchPaths;
+      this.watchedPathRoles = pathRoles;
     },
     detachFileWatchListeners() {
       unwatchFileChanges?.();
@@ -902,6 +915,7 @@ export const useDocumentsStore = defineStore("documents", {
       this.watchSignature = "";
       this.watchDriver = "off";
       this.watchedPaths = [];
+      this.watchedPathRoles = {};
     },
     async attachBackendFileWatchListeners(rootPath: string, includedPaths: string[]) {
       unwatchFileChanges = await listen<BackendWatchEvent>("neditor-file-watch-event", (event) => {
@@ -915,7 +929,7 @@ export const useDocumentsStore = defineStore("documents", {
     async handleFsWatchEvent(event: WatchEvent, rootPath: string, includedPaths: string[]) {
       const paths = event.paths.length ? event.paths : [rootPath];
       for (const path of paths) {
-        const reason = path === rootPath ? "root" : includedPaths.includes(path) ? "include" : null;
+        const reason = this.watchReasonForPath(path, rootPath, includedPaths);
         if (!reason || watchEventIsAccessOnly(event)) continue;
         const metadata = await invoke<FileMetadataResponse>("file_metadata", { path });
         await this.handleWatchedFileChange({
@@ -930,7 +944,7 @@ export const useDocumentsStore = defineStore("documents", {
     async handleBackendWatchEvent(event: BackendWatchEvent, rootPath: string, includedPaths: string[]) {
       const paths = event.paths.length ? event.paths : [rootPath];
       for (const path of paths) {
-        const reason = path === rootPath ? "root" : includedPaths.includes(path) ? "include" : null;
+        const reason = this.watchReasonForPath(path, rootPath, includedPaths);
         if (!reason) continue;
         const metadata = await invoke<FileMetadataResponse>("file_metadata", { path });
         await this.handleWatchedFileChange({
@@ -941,6 +955,12 @@ export const useDocumentsStore = defineStore("documents", {
           modified: metadata.modified,
         });
       }
+    },
+    watchReasonForPath(path: string, rootPath: string, includedPaths: string[]) {
+      return (
+        this.watchedPathRoles[path] ||
+        (path === rootPath ? "root" : includedPaths.includes(path) ? "include" : null)
+      );
     },
     async handleWatchedFileChange(event: DocumentWatchEvent) {
       const doc = this.activeDocument;
