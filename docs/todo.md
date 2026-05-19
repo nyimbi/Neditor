@@ -36,5 +36,5 @@ What remains to achieve the full vision:
      The root Tauri module is now focused on command/runtime wiring, compiler orchestration lives in src-tauri/src/compiler.rs, test fixtures live in src-tauri/src/tests.rs,
      and the export package writers are split into HTML, DOCX, PDF, PPTX, and Markdown bundle modules, with shared export text/table/layout helpers isolated in
      export/shared.rs. Filesystem watch/include-graph logic and workspace tree scanning now live outside the low-level file command module, snapshot metadata/storage
-     helpers are isolated from snapshot commands, and Git IPC types/process helpers now live outside Git command routing. Still needed: split diagnostics and remaining
-     test fixture clusters further as the feature set grows.
+     helpers are isolated from snapshot commands, Git IPC types/process helpers now live outside Git command routing, and diagnostic payload types are split from diagnostic
+     builder helpers. Still needed: split the remaining large test fixture clusters further as the feature set grows.

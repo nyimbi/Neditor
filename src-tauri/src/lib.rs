@@ -11,6 +11,7 @@ mod compiler;
 mod compiler_support;
 mod compiler_types;
 mod diagnostics;
+mod diagnostics_types;
 mod document_ast;
 mod export;
 mod export_commands;
