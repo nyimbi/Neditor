@@ -42,6 +42,134 @@ pub(crate) fn parse_export_image(
     parse_image_data_uri(src).or_else(|| read_local_export_image(src, source))
 }
 
+pub(crate) fn normalized_fit(fit: Option<&str>) -> Option<&'static str> {
+    match fit?.trim().to_ascii_lowercase().as_str() {
+        "cover" | "crop" => Some("cover"),
+        "contain" => Some("contain"),
+        _ => None,
+    }
+}
+
+pub(crate) fn normalized_position(position: Option<&str>) -> Option<&'static str> {
+    match position?
+        .trim()
+        .to_ascii_lowercase()
+        .replace('_', "-")
+        .as_str()
+    {
+        "center" | "middle" => Some("center"),
+        "top" => Some("top"),
+        "bottom" => Some("bottom"),
+        "left" => Some("left"),
+        "right" => Some("right"),
+        "top-left" | "left-top" => Some("top-left"),
+        "top-right" | "right-top" => Some("top-right"),
+        "bottom-left" | "left-bottom" => Some("bottom-left"),
+        "bottom-right" | "right-bottom" => Some("bottom-right"),
+        _ => None,
+    }
+}
+
+pub(crate) fn export_dimensions_emu_size(
+    dimensions: Option<ExportImageDimensions>,
+    fit: Option<&str>,
+    max_width: i64,
+    max_height: i64,
+    fallback: (i64, i64),
+) -> (i64, i64) {
+    if normalized_fit(fit) == Some("cover") {
+        return (max_width, max_height);
+    }
+    let Some(dimensions) = dimensions else {
+        return fallback;
+    };
+    let width = (dimensions.width_px * 9_525.0).round();
+    let height = (dimensions.height_px * 9_525.0).round();
+    if width <= 0.0 || height <= 0.0 {
+        return fallback;
+    }
+    let scale = (max_width as f64 / width)
+        .min(max_height as f64 / height)
+        .min(1.0);
+    (
+        (width * scale).round() as i64,
+        (height * scale).round() as i64,
+    )
+}
+
+pub(crate) fn drawingml_source_crop(
+    dimensions: Option<ExportImageDimensions>,
+    box_width: i64,
+    box_height: i64,
+    fit: Option<&str>,
+    position: Option<&str>,
+) -> String {
+    if normalized_fit(fit) != Some("cover") {
+        return String::new();
+    }
+    let Some(dimensions) = dimensions else {
+        return String::new();
+    };
+    if dimensions.width_px <= 0.0
+        || dimensions.height_px <= 0.0
+        || box_width <= 0
+        || box_height <= 0
+    {
+        return String::new();
+    }
+    let source_ratio = dimensions.width_px / dimensions.height_px;
+    let box_ratio = box_width as f64 / box_height as f64;
+    if (source_ratio - box_ratio).abs() < 0.001 {
+        return String::new();
+    }
+    if source_ratio > box_ratio {
+        let visible_width = dimensions.height_px * box_ratio;
+        let total_crop = 1.0 - (visible_width / dimensions.width_px);
+        let (left, right) = drawingml_crop_pair(total_crop, crop_position_axes(position).0);
+        format!(r#"<a:srcRect l="{left}" r="{right}"/>"#)
+    } else {
+        let visible_height = dimensions.width_px / box_ratio;
+        let total_crop = 1.0 - (visible_height / dimensions.height_px);
+        let (top, bottom) = drawingml_crop_pair(total_crop, crop_position_axes(position).1);
+        format!(r#"<a:srcRect t="{top}" b="{bottom}"/>"#)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CropAlign {
+    Start,
+    Center,
+    End,
+}
+
+fn crop_position_axes(position: Option<&str>) -> (CropAlign, CropAlign) {
+    match normalized_position(position) {
+        Some("top") => (CropAlign::Center, CropAlign::Start),
+        Some("bottom") => (CropAlign::Center, CropAlign::End),
+        Some("left") => (CropAlign::Start, CropAlign::Center),
+        Some("right") => (CropAlign::End, CropAlign::Center),
+        Some("top-left") => (CropAlign::Start, CropAlign::Start),
+        Some("top-right") => (CropAlign::End, CropAlign::Start),
+        Some("bottom-left") => (CropAlign::Start, CropAlign::End),
+        Some("bottom-right") => (CropAlign::End, CropAlign::End),
+        _ => (CropAlign::Center, CropAlign::Center),
+    }
+}
+
+fn drawingml_crop_pair(total_fraction: f64, align: CropAlign) -> (i64, i64) {
+    let total_fraction = total_fraction.clamp(0.0, 0.98);
+    let (start, end) = match align {
+        CropAlign::Start => (0.0, total_fraction),
+        CropAlign::Center => (total_fraction / 2.0, total_fraction / 2.0),
+        CropAlign::End => (total_fraction, 0.0),
+    };
+    (drawingml_crop_value(start), drawingml_crop_value(end))
+}
+
+fn drawingml_crop_value(fraction: f64) -> i64 {
+    (fraction.clamp(0.0, 0.49) * 100_000.0).round() as i64
+}
+
 fn parse_image_data_uri(src: &str) -> Option<ParsedExportImage> {
     let data = src.strip_prefix("data:")?;
     let (metadata, payload) = data.split_once(',')?;
