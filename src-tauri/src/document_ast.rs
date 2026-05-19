@@ -1047,12 +1047,24 @@ fn parse_ast_table(
 }
 
 fn semantic_table_rows_from_raw(raw_rows: &[Vec<String>]) -> Vec<Vec<TableCell>> {
+    let raw_cells = raw_rows
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|cell| semantic_table_cell(cell))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    semantic_table_rows_from_cells(&raw_cells)
+}
+
+fn semantic_table_rows_from_cells(raw_rows: &[Vec<TableCell>]) -> Vec<Vec<TableCell>> {
     let mut rows = Vec::new();
     let mut active_rowspans: Vec<usize> = Vec::new();
     for raw_row in raw_rows {
         let mut row = Vec::new();
         let mut column_index = 0usize;
-        for raw_cell in raw_row {
+        for raw_cell in raw_row.iter().cloned() {
             while active_rowspans
                 .get(column_index)
                 .is_some_and(|remaining| *remaining > 0)
@@ -1061,9 +1073,8 @@ fn semantic_table_rows_from_raw(raw_rows: &[Vec<String>]) -> Vec<Vec<TableCell>>
                 active_rowspans[column_index] = active_rowspans[column_index].saturating_sub(1);
                 column_index += 1;
             }
-            let cell = semantic_table_cell(raw_cell);
-            let colspan = cell.colspan.max(1);
-            let rowspan = cell.rowspan.max(1);
+            let colspan = raw_cell.colspan.max(1);
+            let rowspan = raw_cell.rowspan.max(1);
             if active_rowspans.len() < column_index + colspan {
                 active_rowspans.resize(column_index + colspan, 0);
             }
@@ -1072,7 +1083,7 @@ fn semantic_table_rows_from_raw(raw_rows: &[Vec<String>]) -> Vec<Vec<TableCell>>
                     active_rowspans[column_index + offset] = rowspan - 1;
                 }
             }
-            row.push(cell);
+            row.push(raw_cell);
             for _ in 1..colspan {
                 row.push(covered_table_cell(false));
             }
@@ -1591,25 +1602,26 @@ fn parse_ast_transform_table(
         return None;
     }
     let header_section = html_between(html, "<thead", "</thead>")?;
-    let headers = html_table_cells(header_section, "th");
-    if headers.is_empty() {
+    let header_raw_cells = html_table_semantic_cells(header_section, "th");
+    if header_raw_cells.is_empty() {
         return None;
     }
-    let header_cells = semantic_table_rows_from_raw(std::slice::from_ref(&headers))
+    let header_cells = semantic_table_rows_from_cells(&[header_raw_cells])
         .into_iter()
         .next()
         .unwrap_or_default();
+    let headers = table_cell_texts(&header_cells);
     let body_section = html_between(html, "<tbody", "</tbody>").unwrap_or("");
     let mut raw_rows = Vec::new();
     let mut rest = body_section;
     while let Some((row_html, next)) = next_html_tag_block(rest, "tr") {
-        let row = html_table_cells(row_html, "td");
+        let row = html_table_semantic_cells(row_html, "td");
         if !row.is_empty() {
             raw_rows.push(row);
         }
         rest = next;
     }
-    let row_cells = semantic_table_rows_from_raw(&raw_rows);
+    let row_cells = semantic_table_rows_from_cells(&raw_rows);
     let rows = row_cells
         .iter()
         .map(|row| {
@@ -1644,24 +1656,61 @@ fn html_between<'a>(html: &'a str, open_prefix: &str, close_tag: &str) -> Option
 }
 
 fn next_html_tag_block<'a>(html: &'a str, tag: &str) -> Option<(&'a str, &'a str)> {
+    let (_, body, rest) = next_html_tag_block_with_open(html, tag)?;
+    Some((body, rest))
+}
+
+fn next_html_tag_block_with_open<'a>(
+    html: &'a str,
+    tag: &str,
+) -> Option<(&'a str, &'a str, &'a str)> {
     let open = format!("<{tag}");
     let close = format!("</{tag}>");
     let open_start = html.find(&open)?;
     let open_end = html[open_start..].find('>')? + open_start + 1;
     let close_start = html[open_end..].find(&close)? + open_end;
     let close_end = close_start + close.len();
-    Some((&html[open_end..close_start], &html[close_end..]))
+    Some((
+        &html[open_start..open_end],
+        &html[open_end..close_start],
+        &html[close_end..],
+    ))
 }
 
-fn html_table_cells(row_html: &str, tag: &str) -> Vec<String> {
+fn html_table_semantic_cells(row_html: &str, tag: &str) -> Vec<TableCell> {
     let mut cells = Vec::new();
     let mut rest = row_html;
-    while let Some((cell_html, next)) = next_html_tag_block(rest, tag) {
+    while let Some((open_tag, cell_html, next)) = next_html_tag_block_with_open(rest, tag) {
         let text = clean_inline_text(cell_html).trim().to_string();
-        cells.push(text);
+        cells.push(TableCell {
+            text,
+            colspan: html_span_attribute(open_tag, "colspan").unwrap_or(1),
+            rowspan: html_span_attribute(open_tag, "rowspan").unwrap_or(1),
+            covered: false,
+            continues_rowspan: false,
+        });
         rest = next;
     }
     cells
+}
+
+fn html_span_attribute(open_tag: &str, name: &str) -> Option<usize> {
+    extract_quoted_attribute(open_tag, name)
+        .or_else(|| {
+            let marker = format!("{name}=");
+            let value = open_tag.split(&marker).nth(1)?;
+            Some(
+                value
+                    .split(|ch: char| ch == '>' || ch.is_whitespace())
+                    .next()
+                    .unwrap_or("")
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string(),
+            )
+        })
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 1)
 }
 
 fn parse_ast_ai_source(content: &str) -> AstAiSource {

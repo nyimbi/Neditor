@@ -371,3 +371,54 @@ fn merged_table_cells_flow_through_semantic_exports() {
     assert!(bundled_ast.contains(r#""rowspan": 2"#));
     assert!(bundled_ast.contains(r#""continues_rowspan": true"#));
 }
+
+#[test]
+fn imported_html_table_spans_flow_through_semantic_exports() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Imported Merged Tables\nstatus: approved\napprovedBy: QA\n---\n# Imported Merged Tables\n<table class=\"transform-table\"><thead><tr><th colspan=\"2\">Group</th><th>Owner</th></tr></thead><tbody><tr><td rowspan=\"2\">Discovery</td><td>Scope</td><td>PM</td></tr><tr><td>Detail</td><td>Analyst</td></tr></tbody></table>\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    let table = response
+        .document_ast
+        .blocks
+        .iter()
+        .find_map(|block| {
+            if let DocumentBlock::Table {
+                header_cells,
+                row_cells,
+                ..
+            } = block
+            {
+                (header_cells
+                    .first()
+                    .is_some_and(|cell| cell.text == "Group"))
+                .then_some((header_cells, row_cells))
+            } else {
+                None
+            }
+        })
+        .expect("imported html table");
+    assert_eq!(table.0[0].colspan, 2);
+    assert_eq!(table.1[0][0].rowspan, 2);
+    assert!(table.1[1][0].continues_rowspan);
+
+    let options = json!({});
+    let docx = render_docx_bytes(&response, &options).expect("docx imported merged table");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains(r#"<w:gridSpan w:val="2"/>"#));
+    assert!(docx_document.contains(r#"<w:vMerge w:val="restart"/>"#));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx imported merged table");
+    let pptx_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+    assert!(pptx_slide.contains(r#"gridSpan="2""#));
+    assert!(pptx_slide.contains(r#"rowSpan="2""#));
+
+    let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+        .expect("imported merged table bundle");
+    let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
+    assert!(bundled_ast.contains(r#""text": "Group""#));
+    assert!(bundled_ast.contains(r#""colspan": 2"#));
+    assert!(bundled_ast.contains(r#""rowspan": 2"#));
+}

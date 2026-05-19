@@ -236,30 +236,39 @@ pub(super) fn export_table_from_transform_html(html: &str) -> Option<ExportTable
         return None;
     }
     let header_section = html_between(html, "<thead", "</thead>")?;
-    let headers = html_table_cells(header_section, "th");
-    if headers.is_empty() {
+    let header_cells =
+        normalize_export_table_cell_rows(&[html_table_semantic_cells(header_section, "th")])
+            .into_iter()
+            .next()
+            .unwrap_or_default();
+    if header_cells.is_empty() {
         return None;
     }
+    let headers = export_table_cell_texts(&header_cells);
     let body_section = html_between(html, "<tbody", "</tbody>").unwrap_or("");
-    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut raw_row_cells = Vec::new();
     let mut rest = body_section;
     while let Some((row_html, next)) = next_html_tag_block(rest, "tr") {
-        let row = html_table_cells(row_html, "td");
+        let row = html_table_semantic_cells(row_html, "td");
         if !row.is_empty() {
-            rows.push(
-                (0..headers.len())
-                    .map(|index| row.get(index).cloned().unwrap_or_default())
-                    .collect::<Vec<_>>(),
-            );
+            raw_row_cells.push(row);
         }
         rest = next;
     }
-    let alignments = headers.iter().map(|_| "left".to_string()).collect();
-    let header_cells = plain_export_table_cells(&headers);
-    let row_cells = rows
+    let row_cells = normalize_export_table_cell_rows(&raw_row_cells);
+    let rows: Vec<Vec<String>> = row_cells
         .iter()
-        .map(|row| plain_export_table_cells(row))
+        .map(|row| {
+            (0..headers.len())
+                .map(|index| {
+                    row.get(index)
+                        .map(|cell| cell.text.clone())
+                        .unwrap_or_default()
+                })
+                .collect()
+        })
         .collect();
+    let alignments = headers.iter().map(|_| "left".to_string()).collect();
     Some(ExportTable {
         headers,
         alignments,
@@ -267,6 +276,73 @@ pub(super) fn export_table_from_transform_html(html: &str) -> Option<ExportTable
         rows,
         row_cells,
     })
+}
+
+fn normalize_export_table_cell_rows(raw_rows: &[Vec<TableCell>]) -> Vec<Vec<TableCell>> {
+    let mut rows = Vec::new();
+    let mut active_rowspans: Vec<usize> = Vec::new();
+    for raw_row in raw_rows {
+        let mut row = Vec::new();
+        let mut column_index = 0usize;
+        for raw_cell in raw_row.iter().cloned() {
+            while active_rowspans
+                .get(column_index)
+                .is_some_and(|remaining| *remaining > 0)
+            {
+                row.push(covered_export_table_cell(true));
+                active_rowspans[column_index] = active_rowspans[column_index].saturating_sub(1);
+                column_index += 1;
+            }
+            let colspan = raw_cell.colspan.max(1);
+            let rowspan = raw_cell.rowspan.max(1);
+            if active_rowspans.len() < column_index + colspan {
+                active_rowspans.resize(column_index + colspan, 0);
+            }
+            if rowspan > 1 {
+                for offset in 0..colspan {
+                    active_rowspans[column_index + offset] = rowspan - 1;
+                }
+            }
+            row.push(raw_cell);
+            for _ in 1..colspan {
+                row.push(covered_export_table_cell(false));
+            }
+            column_index += colspan;
+        }
+        while active_rowspans
+            .get(column_index)
+            .is_some_and(|remaining| *remaining > 0)
+        {
+            row.push(covered_export_table_cell(true));
+            active_rowspans[column_index] = active_rowspans[column_index].saturating_sub(1);
+            column_index += 1;
+        }
+        rows.push(row);
+    }
+    rows
+}
+
+fn covered_export_table_cell(continues_rowspan: bool) -> TableCell {
+    TableCell {
+        text: String::new(),
+        colspan: 1,
+        rowspan: 1,
+        covered: true,
+        continues_rowspan,
+    }
+}
+
+fn export_table_cell_texts(cells: &[TableCell]) -> Vec<String> {
+    cells
+        .iter()
+        .map(|cell| {
+            if cell.covered {
+                String::new()
+            } else {
+                cell.text.clone()
+            }
+        })
+        .collect()
 }
 
 pub(super) fn plain_export_table_cells(cells: &[String]) -> Vec<TableCell> {
@@ -316,26 +392,70 @@ pub(super) fn html_between<'a>(
 }
 
 pub(super) fn next_html_tag_block<'a>(html: &'a str, tag: &str) -> Option<(&'a str, &'a str)> {
+    let (_, body, rest) = next_html_tag_block_with_open(html, tag)?;
+    Some((body, rest))
+}
+
+fn next_html_tag_block_with_open<'a>(
+    html: &'a str,
+    tag: &str,
+) -> Option<(&'a str, &'a str, &'a str)> {
     let open = format!("<{tag}");
     let close = format!("</{tag}>");
     let open_start = html.find(&open)?;
     let open_end = html[open_start..].find('>')? + open_start + 1;
     let close_start = html[open_end..].find(&close)? + open_end;
     let close_end = close_start + close.len();
-    Some((&html[open_end..close_start], &html[close_end..]))
+    Some((
+        &html[open_start..open_end],
+        &html[open_end..close_start],
+        &html[close_end..],
+    ))
 }
 
-pub(super) fn html_table_cells(row_html: &str, tag: &str) -> Vec<String> {
+fn html_table_semantic_cells(row_html: &str, tag: &str) -> Vec<TableCell> {
     let mut cells = Vec::new();
     let mut rest = row_html;
-    while let Some((cell_html, next)) = next_html_tag_block(rest, tag) {
+    while let Some((open_tag, cell_html, next)) = next_html_tag_block_with_open(rest, tag) {
         let text = decode_export_html_entities(&strip_export_html_tags(cell_html))
             .trim()
             .to_string();
-        cells.push(text);
+        cells.push(TableCell {
+            text,
+            colspan: html_span_attribute(open_tag, "colspan").unwrap_or(1),
+            rowspan: html_span_attribute(open_tag, "rowspan").unwrap_or(1),
+            covered: false,
+            continues_rowspan: false,
+        });
         rest = next;
     }
     cells
+}
+
+fn html_span_attribute(open_tag: &str, name: &str) -> Option<usize> {
+    html_quoted_attribute(open_tag, name)
+        .or_else(|| {
+            let marker = format!("{name}=");
+            let value = open_tag.split(&marker).nth(1)?;
+            Some(
+                value
+                    .split(|ch: char| ch == '>' || ch.is_whitespace())
+                    .next()
+                    .unwrap_or("")
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string(),
+            )
+        })
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 1)
+}
+
+fn html_quoted_attribute(text: &str, key: &str) -> Option<String> {
+    let marker = format!("{key}=\"");
+    let after_marker = text.split(&marker).nth(1)?;
+    let (value, _) = after_marker.split_once('"')?;
+    Some(value.to_string())
 }
 
 pub(super) fn export_header_footer(
