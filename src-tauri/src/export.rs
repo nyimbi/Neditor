@@ -5,6 +5,7 @@ use crate::{
         drawingml_source_crop, export_dimensions_emu_size, normalized_fit, normalized_position,
         parse_export_image, safe_bundle_path, ExportImageDimensions,
     },
+    generated_sections::toc_depth,
     layout::{matches_layout_break, LayoutSettings},
     metadata_string, render_export_template, sha256_uri,
     tables::delimited_rows_for_export,
@@ -1948,7 +1949,7 @@ fn render_docx_document(
             }
         }
         if is_generated_toc_heading(block) {
-            body.push_str(&docx_generated_toc());
+            body.push_str(&docx_generated_toc(response));
             skip_next_toc_body = true;
             continue;
         }
@@ -2336,11 +2337,11 @@ fn render_docx_block(
     }
 }
 
-fn docx_generated_toc() -> String {
+fn docx_generated_toc(response: &CompileResponse) -> String {
     format!(
         "{}{}",
         docx_heading(2, "Table of Contents"),
-        docx_toc_field()
+        docx_toc_field(toc_depth(&response.metadata))
     )
 }
 
@@ -2358,9 +2359,11 @@ fn docx_heading_with_bookmark(level: usize, text: &str, bookmark: Option<&str>) 
     )
 }
 
-fn docx_toc_field() -> String {
-    r#"<w:p><w:fldSimple w:instr="TOC \o &quot;1-3&quot; \h \z \u"><w:r><w:t>Update table of contents in Word to refresh page numbers.</w:t></w:r></w:fldSimple></w:p>"#
-        .to_string()
+fn docx_toc_field(depth: usize) -> String {
+    let depth = depth.clamp(1, 6);
+    format!(
+        r#"<w:p><w:fldSimple w:instr="TOC \o &quot;1-{depth}&quot; \h \z \u"><w:r><w:t>Update table of contents in Word to refresh page numbers.</w:t></w:r></w:fldSimple></w:p>"#
+    )
 }
 
 fn docx_paragraph(text: &str) -> String {

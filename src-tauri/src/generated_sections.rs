@@ -89,7 +89,7 @@ fn toc_number_for_heading(level: usize, counters: &mut [usize; 6]) -> String {
         .join(".")
 }
 
-fn toc_depth(metadata: &Value) -> usize {
+pub(crate) fn toc_depth(metadata: &Value) -> usize {
     metadata
         .get("tocDepth")
         .or_else(|| metadata.get("toc_depth"))

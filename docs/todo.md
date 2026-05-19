@@ -8,7 +8,7 @@ What remains to achieve the full vision:
      crop rectangles, the toolbar/command palette can insert cover figures with crop focus, and the References sidebar can update figure crop focus in-place with
      a pointer/keyboard crop focus pad.
      Layout directives now carry page break, keep-with-next, keep-together, section column, and header/footer semantics through HTML, AST, DOCX, PDF, PPTX,
-     and bundle conformance fixtures. Still needed: deeper page model controls beyond directive-level pagination.
+     and bundle conformance fixtures, and DOCX native TOC fields now honor front matter TOC depth. Still needed: deeper page model controls beyond directive-level pagination.
   2. Canonical document AST
      There is an AST foundation, with normalized layout settings now attached to layout blocks, but the compiler still has string-heavy paths. Export, diagnostics,
      source maps, references, transforms, and validation need to depend more fully on a durable semantic model.
@@ -26,7 +26,8 @@ What remains to achieve the full vision:
      include directives for stronger include graph refresh coverage. The native-watch build has been verified after the optional watcher crates were available. The conflict
      modal now supports line-by-line merge composition from the local/external diff. Still needed: browser-level workflow coverage for conflict resolution.
   6. E2E and export conformance tests
-     Need Playwright/Tauri workflow tests, broader DOCX/PPTX/PDF package inspections, fixture comparisons, and confirmed macOS/Windows/Linux CI runs.
+     Need Playwright/Tauri workflow tests, broader fixture comparisons, and confirmed macOS/Windows/Linux CI runs. DOCX sidecar manifests and PPTX slide/media
+     package inventories now have direct package-inspection coverage.
   7. Backend modularization
      Chart/native diagram renderers, layout parsing, and manifest/media helpers have moved out of lib.rs; export media parsing, sizing, and crop helpers have moved out of export.rs.
      src-tauri/src/lib.rs is still too large. Compiler orchestration, remaining transform families, export package writers, diagnostics, filesystem, git, snapshot, and test fixtures should be split further.

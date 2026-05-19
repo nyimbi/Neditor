@@ -1944,7 +1944,7 @@ ARR: Annual recurring revenue.
         assert!(!response.compiled_markdown.contains("[1.1.1 Gamma](#gamma)"));
         let docx = render_docx_bytes(&response, &json!({})).expect("docx bytes");
         let docx_document = zip_entry_text(&docx, "word/document.xml");
-        assert!(docx_document.contains(r#"w:instr="TOC \o &quot;1-3&quot; \h \z \u""#));
+        assert!(docx_document.contains(r#"w:instr="TOC \o &quot;1-2&quot; \h \z \u""#));
         assert!(!docx_document.contains("#alpha"));
     }
 
@@ -5075,13 +5075,16 @@ beta</pre>
         let pptx_slide_three_relationships =
             zip_entry_text(&pptx, "ppt/slides/_rels/slide3.xml.rels");
         let pptx_svg = zip_entry_text(&pptx, "ppt/media/image1.svg");
+        let pptx_slide_part_count = zip_entry_count_with_prefix(&pptx, "ppt/slides/slide", ".xml");
+        let pptx_media_part_count = zip_entry_count_with_prefix(&pptx, "ppt/media/", "");
         assert!(pptx_content_types.contains(r#"ContentType="image/svg+xml""#));
         assert!(pptx_content_types.contains(
             r#"ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml""#
         ));
         assert!(pptx_presentation.contains(r#"r:id="rId2""#));
         assert!(pptx_app.contains("<Application>NEditor</Application>"));
-        assert!(pptx_app.contains("<Slides>"));
+        assert!(pptx_app.contains(&format!("<Slides>{pptx_slide_part_count}</Slides>")));
+        assert_eq!(pptx_media_part_count, 2);
         assert!(pptx_agenda_slide.contains("Agenda"));
         assert!(pptx_agenda_slide.contains("Export Conformance Report"));
         assert!(pptx_agenda_slide.contains("Appendix"));
@@ -5715,6 +5718,17 @@ beta</pre>
         result
     }
 
+    fn zip_entry_count_with_prefix(bytes: &[u8], prefix: &str, suffix: &str) -> usize {
+        let cursor = Cursor::new(bytes.to_vec());
+        let mut archive = ZipArchive::new(cursor).expect("zip archive");
+        (0..archive.len())
+            .filter(|index| {
+                let entry = archive.by_index(*index).expect("zip entry by index");
+                entry.name().starts_with(prefix) && entry.name().ends_with(suffix)
+            })
+            .count()
+    }
+
     fn zip_entry_texts_with_prefix(bytes: &[u8], prefix: &str) -> Vec<String> {
         let cursor = Cursor::new(bytes.to_vec());
         let mut archive = ZipArchive::new(cursor).expect("zip archive");
@@ -5846,6 +5860,36 @@ beta</pre>
             .is_some_and(|hash| hash.starts_with("sha256:")));
         assert!(response.manifest.diagnostics.is_empty());
         assert!(!response.manifest.source_map.is_empty());
+
+        let docx_output = root.join("ready.docx");
+        let docx_response = export_document(ExportRequest {
+            text: source.to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+            target: "docx".to_string(),
+            output_path: path_to_string(&docx_output),
+            options: json!({ "includeManifest": true }),
+        })
+        .expect("successful docx export with manifest");
+        let docx_manifest_path = docx_response.manifest_path.expect("docx manifest path");
+        let docx_manifest_text =
+            fs::read_to_string(&docx_manifest_path).expect("docx manifest file");
+        let docx_bytes = fs::read(&docx_output).expect("docx output bytes");
+        assert!(docx_output.exists());
+        assert!(docx_bytes.starts_with(b"PK"));
+        assert!(zip_has_entry(&docx_bytes, "word/document.xml"));
+        assert!(docx_manifest_text.contains("\"export_target\": \"docx\""));
+        assert!(docx_manifest_text.contains("\"document_title\": \"Manifest Ready\""));
+        assert!(docx_manifest_text.contains("\"output_hash\": \"sha256:"));
+        assert_eq!(docx_response.manifest.export_target, "docx");
+        assert_eq!(
+            docx_response.manifest.output_path.as_deref(),
+            Some(path_to_string(&docx_output).as_str())
+        );
+        assert!(docx_response
+            .manifest
+            .output_hash
+            .as_deref()
+            .is_some_and(|hash| hash.starts_with("sha256:")));
 
         let no_manifest_output = root.join("ready-no-manifest.html");
         let no_manifest = export_document(ExportRequest {
