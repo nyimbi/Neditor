@@ -205,6 +205,7 @@ struct ExportManifest {
     export_target: String,
     export_options: Value,
     transform_artifacts: Vec<Value>,
+    diagnostics: Vec<DocumentDiagnostic>,
     app_version: String,
 }
 
@@ -445,6 +446,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
                 })
             })
             .collect(),
+        diagnostics: diagnostics.clone(),
         app_version: env!("CARGO_PKG_VERSION").to_string(),
     };
     let table_summaries = collect_table_summaries(&table_formula_markdown);
@@ -5500,8 +5502,10 @@ beta</pre>
         assert!(manifest_text.contains("\"document_version\": \"1.0.0\""));
         assert!(manifest_text.contains("\"export_target\": \"html\""));
         assert!(manifest_text.contains("\"source_hash\": \"sha256:"));
+        assert!(manifest_text.contains("\"diagnostics\": []"));
         assert_eq!(response.manifest.document_title, "Manifest Ready");
         assert_eq!(response.manifest.export_target, "html");
+        assert!(response.manifest.diagnostics.is_empty());
 
         let no_manifest_output = root.join("ready-no-manifest.html");
         let no_manifest = export_document(ExportRequest {
@@ -5543,6 +5547,7 @@ beta</pre>
         assert!(!report.ready);
         assert_eq!(report.error_count, 12);
         assert_eq!(report.manifest.export_target, "rtf");
+        assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
         assert!(report
             .diagnostics
             .iter()

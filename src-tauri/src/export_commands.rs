@@ -83,6 +83,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
             error.message
         ));
     }
+    manifest.diagnostics = diagnostics.clone();
 
     let output_path = PathBuf::from(&request.output_path);
     if let Some(parent) = output_path.parent() {
@@ -161,6 +162,7 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
     if git_export_warnings_enabled(&request.options) {
         validate_git_export_cleanliness(request.file_path.as_deref(), &mut response.diagnostics);
     }
+    response.export_manifest.diagnostics = response.diagnostics.clone();
     let error_count = response
         .diagnostics
         .iter()

@@ -239,6 +239,7 @@ export interface ExportManifest {
   export_target: string;
   export_options: Record<string, unknown>;
   transform_artifacts: Array<Record<string, unknown>>;
+  diagnostics: DocumentDiagnostic[];
   app_version: string;
 }
 
