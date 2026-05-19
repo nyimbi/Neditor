@@ -2337,7 +2337,8 @@ function addTableTotalsRow() {
 }
 
 function replaceTableFromPaste() {
-  const rows = parseDelimitedRows(tablePasteText.value);
+  const parsed = parseTablePaste(tablePasteText.value);
+  const rows = parsed.rows;
   if (!rows.length) return;
   const current = tableDraft.value;
   const headers = rows[0].map((cell, index) => cell.trim() || `Column ${index + 1}`);
@@ -2346,7 +2347,9 @@ function replaceTableFromPaste() {
     id: current?.id || "",
     caption: current?.caption || "",
     headers,
-    alignments: headers.map(() => "left"),
+    alignments: parsed.alignments
+      ? padAlignments(parsed.alignments, headers.length)
+      : headers.map(() => "left"),
     formats: headers.map((_, columnIndex) => inferTableFormat(bodyRows.map((row) => row[columnIndex] || ""))),
     rows: bodyRows.length ? bodyRows : [headers.map(() => "")],
   };
@@ -2587,13 +2590,18 @@ function escapeTableCell(cell: string) {
   return cell.replace(/\r?\n/g, " ").replace(/\|/g, "\\|").trim();
 }
 
-function parseDelimitedRows(text: string) {
+interface ParsedTablePaste {
+  rows: string[][];
+  alignments?: TableAlignment[];
+}
+
+function parseTablePaste(text: string): ParsedTablePaste {
   const source = text.trim();
-  const markdownRows = parseMarkdownTablePaste(source);
-  if (markdownRows.length) return markdownRows;
+  const markdownTable = parseMarkdownTablePaste(source);
+  if (markdownTable) return markdownTable;
   const rows = parseDelimitedText(source, detectDelimitedPasteDelimiter(source));
   const width = Math.max(0, ...rows.map((row) => row.length));
-  return rows.map((row) => padTableRow(row, width));
+  return { rows: rows.map((row) => padTableRow(row, width)) };
 }
 
 function parseMarkdownTablePaste(text: string) {
@@ -2606,15 +2614,19 @@ function parseMarkdownTablePaste(text: string) {
     const separator = lines[index + 1];
     if (!isMarkdownTableRow(header) || !isMarkdownTableSeparator(separator)) continue;
     const rows = [splitMarkdownTableRow(header)];
+    const alignments = splitMarkdownTableRow(separator).map(alignmentFromSeparator);
     let nextIndex = index + 2;
     while (nextIndex < lines.length && isMarkdownTableRow(lines[nextIndex])) {
       rows.push(splitMarkdownTableRow(lines[nextIndex]));
       nextIndex += 1;
     }
     const width = Math.max(0, ...rows.map((row) => row.length));
-    return rows.map((row) => padTableRow(row, width));
+    return {
+      rows: rows.map((row) => padTableRow(row, width)),
+      alignments: padAlignments(alignments, width),
+    };
   }
-  return [];
+  return null;
 }
 
 function parseDelimitedText(text: string, delimiter: "," | "\t") {
