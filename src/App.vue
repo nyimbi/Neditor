@@ -126,12 +126,12 @@
         <template v-else-if="store.sidebar === 'outline'">
           <h2>Outline</h2>
           <button
-            v-for="heading in active.compile?.semantic.outline || []"
+            v-for="heading in outlineHeadings"
             :key="`${heading.line}-${heading.anchor}`"
             class="outline-row"
             :style="{ paddingLeft: `${heading.level * 10}px` }"
             type="button"
-            @click="goToLine(heading.line)"
+            @click="goToSourceTarget(heading)"
           >
             {{ heading.text }}
           </button>
@@ -1013,6 +1013,21 @@ const citationStyle = computed(() =>
 );
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
 const selectedTable = computed(() => markdownTables.value[selectedTableIndex.value] || null);
+const outlineHeadings = computed(() =>
+  (active.value.compile?.document_ast.blocks || []).flatMap((block) => {
+    if (block.kind !== "heading") return [];
+    return [
+      {
+        text: block.text,
+        anchor: block.anchor,
+        level: block.level,
+        line: block.source?.source_line || block.line,
+        end_line: block.source?.end_source_line || block.end_line,
+        source_file: block.source?.source_file || null,
+      },
+    ];
+  }),
+);
 const groupedDocuments = computed<DocumentTabGroup[]>(() => {
   const groups = new Map<string, DocumentTabGroup>();
   for (const document of store.documents) {
@@ -2768,13 +2783,6 @@ function parseCellNumber(value: string) {
 
 function trimFixed(value: number, places: number) {
   return value.toFixed(places).replace(/\.?0+$/, "");
-}
-
-function goToLine(lineNumber: number) {
-  if (!editorView) return;
-  const line = editorView.state.doc.line(Math.max(1, Math.min(lineNumber, editorView.state.doc.lines)));
-  editorView.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: "center" }) });
-  editorView.focus();
 }
 
 async function goToSourceTarget(target: {
