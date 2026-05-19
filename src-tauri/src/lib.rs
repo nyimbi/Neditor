@@ -16,6 +16,7 @@ mod export;
 mod export_commands;
 mod export_media;
 mod filesystem;
+mod filesystem_watch;
 mod footnotes;
 mod front_matter;
 mod generated_sections;
@@ -37,6 +38,7 @@ mod transforms;
 mod utils;
 mod validation;
 mod variables;
+mod workspace_files;
 
 use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
@@ -59,18 +61,17 @@ use export::{
 use export_commands::{export_document, prepare_for_export};
 #[cfg(test)]
 use export_commands::{ExportRequest, PrepareExportRequest};
-#[cfg(all(test, feature = "native-watch"))]
-use filesystem::notify_event_should_emit;
 use filesystem::{
-    duplicate_file, file_metadata, list_workspace_files, open_file, read_file, rename_file,
-    reveal_path, save_file, save_file_as, start_file_watcher, stop_file_watcher, watch_file,
-    FileResponse, FileWatcherState,
+    duplicate_file, file_metadata, open_file, read_file, rename_file, reveal_path, save_file,
+    save_file_as, FileResponse,
 };
 #[cfg(test)]
-use filesystem::{
-    DuplicateFileRequest, RenameFileRequest, SaveFileRequest, WatchFileRequest,
-    WorkspaceFileRequest,
-};
+use filesystem::{DuplicateFileRequest, RenameFileRequest, SaveFileRequest};
+#[cfg(all(test, feature = "native-watch"))]
+use filesystem_watch::notify_event_should_emit;
+#[cfg(test)]
+use filesystem_watch::WatchFileRequest;
+use filesystem_watch::{start_file_watcher, stop_file_watcher, watch_file, FileWatcherState};
 use git::{
     commit_document_changes, get_git_status, git_diff, git_history, restore_git_revision,
     tag_release,
@@ -88,6 +89,9 @@ pub(crate) use utils::{
     metadata_string, path_to_string, render_export_template, sha256_hex, sha256_uri,
     value_to_string,
 };
+use workspace_files::list_workspace_files;
+#[cfg(test)]
+use workspace_files::WorkspaceFileRequest;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
