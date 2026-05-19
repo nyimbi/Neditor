@@ -472,6 +472,7 @@ export const useDocumentsStore = defineStore("documents", {
     externalConflict: null as ExternalConflict | null,
     ignoredConflictHashes: {} as Record<string, string>,
     watchSignature: "",
+    watchDriver: "off" as "off" | "native" | "plugin",
     watchedPaths: [] as string[],
     transformEngines: [] as TransformEngineMetadata[],
     transformEnginePaths: {} as Record<string, string>,
@@ -837,6 +838,7 @@ export const useDocumentsStore = defineStore("documents", {
           await this.stopFileWatcher();
         }
         this.watchSignature = "";
+        this.watchDriver = "off";
         this.watchedPaths = [];
         return;
       }
@@ -851,6 +853,7 @@ export const useDocumentsStore = defineStore("documents", {
       this.detachFileWatchListeners();
       if (!watchPaths.length) {
         this.watchSignature = "";
+        this.watchDriver = "off";
         this.watchedPaths = [];
         return;
       }
@@ -866,6 +869,7 @@ export const useDocumentsStore = defineStore("documents", {
         );
       }
       this.watchSignature = signature;
+      this.watchDriver = driver;
       this.watchedPaths = watchPaths;
     },
     detachFileWatchListeners() {
@@ -877,6 +881,9 @@ export const useDocumentsStore = defineStore("documents", {
     async stopFileWatcher() {
       this.detachFileWatchListeners();
       await invoke("stop_file_watcher").catch(() => undefined);
+      this.watchSignature = "";
+      this.watchDriver = "off";
+      this.watchedPaths = [];
     },
     async attachBackendFileWatchListeners(rootPath: string, includedPaths: string[]) {
       unwatchFileChanges = await listen<BackendWatchEvent>("neditor-file-watch-event", (event) => {

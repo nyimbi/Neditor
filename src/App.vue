@@ -731,6 +731,7 @@
         <button type="button" @click="saveConflictCopy">Save copy</button>
       </span>
       <span>{{ wordStats }}</span>
+      <span v-if="watchStatus">{{ watchStatus }}</span>
       <span v-if="store.lastError" class="error">{{ store.lastError }}</span>
     </footer>
 
@@ -971,6 +972,12 @@ const wordStats = computed(() => {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   const minutes = words ? Math.max(1, Math.ceil(words / 220)) : 0;
   return `${words} words | ${text.length} characters | ${minutes} min read`;
+});
+const watchStatus = computed(() => {
+  if (store.watchDriver === "off" || !store.watchedPaths.length) return "";
+  const label = store.watchDriver === "native" ? "Native watch" : "Plugin watch";
+  const suffix = store.watchedPaths.length === 1 ? "path" : "paths";
+  return `${label}: ${store.watchedPaths.length} ${suffix}`;
 });
 const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
 const bibliographyByKey = computed(() => new Map((active.value.compile?.bibliography || []).map((entry) => [entry.key, entry.title])));
