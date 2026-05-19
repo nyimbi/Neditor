@@ -5019,6 +5019,45 @@ beta</pre>
     }
 
     #[test]
+    fn markdown_bundle_keeps_duplicate_include_basenames_distinct() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("neditor-bundle-includes-{unique}"));
+        let north = root.join("north");
+        let south = root.join("south");
+        fs::create_dir_all(&north).expect("create north include dir");
+        fs::create_dir_all(&south).expect("create south include dir");
+        let north_section = north.join("section.md");
+        let south_section = south.join("section.md");
+        fs::write(&north_section, "North section").expect("write north include");
+        fs::write(&south_section, "South section").expect("write south include");
+        let root_doc = root.join("root.md");
+        let response = compile(CompileRequest {
+            text: "---\ntitle: Bundle Includes\nstatus: approved\napprovedBy: QA\n---\n# Root\n!include north/section.md\n!include south/section.md\n"
+                .to_string(),
+            file_path: Some(path_to_string(&root_doc)),
+        });
+
+        let bundle =
+            render_markdown_bundle_bytes(&response, &response.export_manifest).expect("bundle");
+        let north_bundle_path = format!(
+            "includes/{}-section.md",
+            &sha256_hex(path_to_string(&north_section).as_bytes())[..12]
+        );
+        let south_bundle_path = format!(
+            "includes/{}-section.md",
+            &sha256_hex(path_to_string(&south_section).as_bytes())[..12]
+        );
+        assert_ne!(north_bundle_path, south_bundle_path);
+        assert_eq!(zip_entry_text(&bundle, &north_bundle_path), "North section");
+        assert_eq!(zip_entry_text(&bundle, &south_bundle_path), "South section");
+
+        fs::remove_dir_all(root).expect("clean bundle include fixture");
+    }
+
+    #[test]
     fn compiler_tracks_ai_assisted_section_review_status() {
         let source = "---\ntitle: AI Review\nstatus: approved\napprovedBy: QA\n---\n<!-- ai-assisted: status=needs-review | source=ChatGPT | promptSummary=Drafted risk language -->\n# Risk Review\nBody.\n\n<!-- ai-assisted: status=human-reviewed | reviewedBy=Jane Doe | reviewedAt=2026-05-18 | source=Claude | promptSummary=Edited executive summary -->\n## Executive Summary\nReviewed body.\n";
         let response = compile(CompileRequest {

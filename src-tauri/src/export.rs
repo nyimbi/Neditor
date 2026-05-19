@@ -1,6 +1,7 @@
 use crate::{
     document_ast::{export_body_text_from_ast, AstSourceRange, DocumentBlock, InlineNode},
     escape_css, escape_html, escape_pdf, escape_xml, metadata_string, render_export_template,
+    sha256_hex,
     tables::delimited_rows_for_export,
     CompileResponse, ExportManifest,
 };
@@ -557,7 +558,8 @@ pub(crate) fn render_markdown_bundle_bytes(
 }
 
 fn safe_bundle_path(path: &str) -> String {
-    PathBuf::from(path)
+    let digest = sha256_hex(path.as_bytes());
+    let filename = PathBuf::from(path)
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("include.md")
@@ -569,7 +571,8 @@ fn safe_bundle_path(path: &str) -> String {
                 '_'
             }
         })
-        .collect()
+        .collect::<String>();
+    format!("{}-{filename}", &digest[..12])
 }
 
 fn render_docx_content_types(media: &[ExportMedia], include_comments: bool) -> String {
