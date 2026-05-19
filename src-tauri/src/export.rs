@@ -2472,16 +2472,19 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
                 .collect(),
         ));
     }
-    let (header, footer) = export_header_footer(response, options);
     let slides = expand_pptx_table_slides(slides);
+    let total_slides = slides.len().max(1);
     slides
         .into_iter()
-        .map(|mut slide| {
+        .enumerate()
+        .map(|(index, mut slide)| {
             if slide.lines.is_empty() {
                 slide.lines.push("No body content".to_string());
             }
-            slide.header = header.clone();
-            slide.footer = footer.clone();
+            let (header, footer) =
+                export_header_footer_for_page(response, options, index + 1, total_slides);
+            slide.header = header;
+            slide.footer = footer;
             slide.lines.truncate(14);
             slide
         })

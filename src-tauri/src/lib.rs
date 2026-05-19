@@ -4804,7 +4804,7 @@ beta</pre>
         assert!(slide_two.contains("<a:t>Total</a:t>"));
         assert!(slide_two.contains("System diagram"));
         assert!(slide_two.contains(r#"name="Footer""#));
-        assert!(slide_two.contains("Page 1 of 1"));
+        assert!(slide_two.contains("Page 2 of 5"));
         assert!(slide_two.contains(r#"r:embed="rIdImage1""#));
         assert!(slide_two_relationships.contains(r#"Target="../media/image1.svg""#));
         assert_eq!(pptx_svg, "<svg/>");
@@ -5123,7 +5123,7 @@ beta</pre>
         assert!(pptx_slide_three.contains("Reference architecture"));
         assert!(pptx_slide_three.contains(r#"name="Header""#));
         assert!(pptx_slide_three.contains(r#"name="Footer""#));
-        assert!(pptx_slide_three.contains("Page 1 of 1"));
+        assert!(pptx_slide_three.contains("Page 3 of 9"));
         assert!(pptx_slide_three.contains(r#"r:embed="rIdImage1""#));
         assert!(pptx_slide_three_relationships.contains(r#"Target="../media/image1.svg""#));
         assert_eq!(pptx_svg, "<svg/>");
