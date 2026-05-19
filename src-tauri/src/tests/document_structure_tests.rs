@@ -478,6 +478,26 @@ fn pdf_large_tables_continue_within_mixed_page_geometries() {
 }
 
 #[test]
+fn pdf_splits_tall_table_cells_into_continued_row_fragments() {
+    let tall_cell = (1..=520)
+        .map(|index| format!("detail{index:03}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let response = compile(CompileRequest {
+        text: format!(
+            "---\ntitle: Tall Cell Table\nstatus: archived\nversion: 1.0.0\n---\n# Tall Cell Table\n\nTable: Tall cell flow\n| Item | Notes |\n| --- | --- |\n| A | {tall_cell} |\n"
+        ),
+        file_path: None,
+    });
+
+    let pdf = render_pdf_bytes(&response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Table: Tall cell flow \\(continued\\)"));
+    assert!(pdf_text.contains("detail001"));
+    assert!(pdf_text.contains("detail520"));
+}
+
+#[test]
 fn compiler_renders_callouts_as_semantic_blocks() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Callouts\nstatus: approved\napprovedBy: QA\n---\n# Callouts\n> [!NOTE] Board review\n> Confirm the launch criteria.\n".to_string(),

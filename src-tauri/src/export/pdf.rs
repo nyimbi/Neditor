@@ -736,6 +736,7 @@ impl PdfPaginator {
 
     fn push_table(&mut self, table: PdfTable) {
         self.clear_active_float();
+        let table = pdf_table_with_wrapped_rows(&table, self.current_layout.column_width());
         let mut remaining_rows = table.rows.as_slice();
         let mut continued = false;
         while !remaining_rows.is_empty() {
@@ -929,6 +930,43 @@ fn pdf_table_chunk(table: &PdfTable, rows: Vec<Vec<String>>, continued: bool) ->
         alignments: table.alignments.clone(),
         rows,
     }
+}
+
+fn pdf_table_with_wrapped_rows(table: &PdfTable, available_width: u32) -> PdfTable {
+    let column_count = table.headers.len().max(1);
+    let column_width = (available_width / column_count as u32).max(48);
+    let text_width = column_width.saturating_sub(8).max(24);
+    let rows = table
+        .rows
+        .iter()
+        .flat_map(|row| pdf_wrapped_table_row(row, table.headers.len(), text_width))
+        .collect::<Vec<_>>();
+    PdfTable {
+        id: table.id.clone(),
+        caption: table.caption.clone(),
+        headers: table.headers.clone(),
+        alignments: table.alignments.clone(),
+        rows,
+    }
+}
+
+fn pdf_wrapped_table_row(row: &[String], column_count: usize, text_width: u32) -> Vec<Vec<String>> {
+    let wrapped_cells = (0..column_count.max(row.len()).max(1))
+        .map(|index| {
+            row.get(index)
+                .map(|cell| pdf_wrapped_text_lines(cell, text_width, 8))
+                .unwrap_or_else(|| vec![String::new()])
+        })
+        .collect::<Vec<_>>();
+    let row_height = wrapped_cells.iter().map(Vec::len).max().unwrap_or(1).max(1);
+    (0..row_height)
+        .map(|line_index| {
+            wrapped_cells
+                .iter()
+                .map(|cell_lines| cell_lines.get(line_index).cloned().unwrap_or_default())
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 fn pdf_text_item_height() -> i32 {
