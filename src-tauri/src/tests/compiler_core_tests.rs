@@ -1,0 +1,528 @@
+use super::*;
+
+#[test]
+fn compiler_resolves_metadata_variables_transforms_and_manifest() {
+    let response = compile(CompileRequest {
+        text: sample_document(),
+        file_path: None,
+    });
+
+    assert_eq!(response.semantic.title, "Test Report");
+    assert_eq!(response.semantic.status, "approved");
+    assert!(response.compiled_markdown.contains("Prepared for Acme."));
+    assert!(response.compiled_markdown.contains("Margin: 60.00%"));
+    assert!(response.compiled_markdown.contains("After tax: $42.00"));
+    assert!(response.compiled_markdown.contains("Healthy score: 60"));
+    assert!(response.compiled_markdown.contains("Discount: 12.50%"));
+    assert!(response.html.contains("Table of Contents"));
+    assert!(response.html.contains("transform-table"));
+    assert!(response.html.contains("<h1 id=\"test-report\">"));
+    assert!(response.html.contains("href=\"#test-report\""));
+    assert!(response.index_terms.iter().any(|term| term == "ARR"));
+    assert_eq!(response.export_manifest.document_version, "1.2.0");
+    let csv_artifact = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "csv")
+        .expect("csv transform artifact");
+    assert!(!csv_artifact.output_hash.is_empty());
+    assert!(csv_artifact.source.contains("Region,Revenue"));
+    assert!(csv_artifact.source_line.is_some_and(|line| line > 1));
+    assert!(csv_artifact.end_source_line >= csv_artifact.source_line);
+    assert_eq!(
+        csv_artifact.options.get("caption").and_then(Value::as_str),
+        Some("Regional revenue")
+    );
+    assert_eq!(
+        csv_artifact.options.get("audited").and_then(Value::as_bool),
+        Some(true)
+    );
+    let manifest_csv_artifact = response
+        .export_manifest
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.get("name").and_then(Value::as_str) == Some("csv"))
+        .expect("csv manifest artifact");
+    assert_eq!(
+        manifest_csv_artifact
+            .get("sourceHash")
+            .and_then(Value::as_str),
+        Some(csv_artifact.source_hash.as_str())
+    );
+    assert_eq!(
+        manifest_csv_artifact.get("source").and_then(Value::as_str),
+        Some(csv_artifact.source.as_str())
+    );
+    assert_eq!(
+        manifest_csv_artifact
+            .get("sourceFile")
+            .and_then(Value::as_str),
+        csv_artifact.source_file.as_deref()
+    );
+    assert_eq!(
+        manifest_csv_artifact
+            .get("sourceLine")
+            .and_then(Value::as_u64),
+        csv_artifact.source_line.map(|line| line as u64)
+    );
+    assert_eq!(
+        manifest_csv_artifact
+            .get("endSourceLine")
+            .and_then(Value::as_u64),
+        csv_artifact.end_source_line.map(|line| line as u64)
+    );
+    assert_eq!(
+        manifest_csv_artifact
+            .get("options")
+            .and_then(|options| options.get("caption"))
+            .and_then(Value::as_str),
+        Some("Regional revenue")
+    );
+    assert_eq!(
+        manifest_csv_artifact
+            .get("outputHash")
+            .and_then(Value::as_str),
+        Some(csv_artifact.output_hash.as_str())
+    );
+    assert!(manifest_csv_artifact
+        .get("cacheKey")
+        .and_then(Value::as_str)
+        .is_some_and(|cache_key| !cache_key.is_empty()));
+    assert_eq!(
+        manifest_csv_artifact
+            .get("executionKind")
+            .and_then(Value::as_str),
+        Some("embedded")
+    );
+    assert_eq!(
+        manifest_csv_artifact
+            .get("inputMode")
+            .and_then(Value::as_str),
+        Some("embedded")
+    );
+    assert_eq!(
+        manifest_csv_artifact
+            .get("engineVersion")
+            .and_then(Value::as_str),
+        Some(env!("CARGO_PKG_VERSION"))
+    );
+    assert!(response
+        .formula_graph
+        .iter()
+        .any(|formula| formula.name == "profit" && formula.value == Some(60.0)));
+    let profit_formula = response
+        .formula_graph
+        .iter()
+        .find(|formula| formula.name == "profit")
+        .expect("profit formula");
+    assert!(matches!(
+        profit_formula.ast.as_ref(),
+        Some(calculations::FormulaAstNode::Binary { op, .. }) if op == "-"
+    ));
+    assert!(response
+        .formula_graph
+        .iter()
+        .any(|formula| formula.name == "healthy" && formula.value == Some(1.0)));
+    assert!(response
+        .formula_graph
+        .iter()
+        .any(|formula| formula.name == "target_met" && formula.value == Some(1.0)));
+    assert!(response
+        .formula_graph
+        .iter()
+        .any(|formula| formula.name == "cost_match" && formula.value == Some(1.0)));
+    assert!(response
+        .formula_graph
+        .iter()
+        .any(|formula| formula.name == "spread" && formula.value == Some(1.0)));
+    assert!(response.formula_graph.iter().any(|formula| {
+        formula.name == "discount"
+            && (formula.value.unwrap_or_default() - 0.125).abs() < f64::EPSILON
+    }));
+}
+
+#[test]
+fn compiler_supports_default_document_variables() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Defaults\nstatus: approved\napprovedBy: QA\nclient: Acme\n---\n# Defaults\nPrepared for {{client | default:Fallback}} in {{region | default:\"East Africa\"}}.\nStill missing {{owner}}.\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response
+        .compiled_markdown
+        .contains("Prepared for Acme in East Africa."));
+    let missing_owner = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic
+                .message
+                .contains("Missing document variable: owner")
+        })
+        .expect("missing owner diagnostic");
+    assert_eq!(missing_owner.line, Some(9));
+    assert_eq!(missing_owner.column, Some(15));
+    assert_eq!(missing_owner.end_line, Some(9));
+    assert_eq!(missing_owner.end_column, Some(24));
+    assert_eq!(missing_owner.source_file.as_deref(), Some("untitled.md"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("region")));
+}
+
+#[test]
+fn calc_blocks_resolve_forward_refs_and_report_cycles() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Calc Graph\nstatus: approved\napprovedBy: QA\n---\n# Calc Graph\n```calc\nprofit = revenue - cost\ncost = 40\nrevenue = 100\ncycle_a = cycle_b + 1\ncycle_b = cycle_a + 1\n```\n\nProfit: {{=profit | round}}\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.compiled_markdown.contains("Profit: 60"));
+    assert!(response
+        .formula_graph
+        .iter()
+        .any(|formula| formula.name == "profit" && formula.value == Some(60.0)));
+    assert!(response
+        .formula_dependency_edges
+        .iter()
+        .any(|edge| edge.from == "profit" && edge.to == "revenue"));
+    assert!(response
+        .formula_dependency_edges
+        .iter()
+        .any(|edge| edge.from == "profit" && edge.to == "cost"));
+    assert!(response.formula_graph.iter().any(|formula| {
+        formula.name == "cycle_a"
+            && formula
+                .error
+                .as_deref()
+                .is_some_and(|error| error.contains("#CYCLE? cycle_a -> cycle_b -> cycle_a"))
+    }));
+    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("#CYCLE? cycle_a -> cycle_b -> cycle_a")));
+}
+
+#[test]
+fn inline_formula_diagnostics_include_source_ranges() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Formula Diagnostics\nstatus: approved\napprovedBy: QA\n---\n# Formula Diagnostics\nBad: {{=missing + 1}}\n"
+                .to_string(),
+            file_path: None,
+        });
+
+    let diagnostic = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("Inline formula error"))
+        .expect("inline formula diagnostic");
+    assert_eq!(diagnostic.line, Some(7));
+    assert_eq!(diagnostic.column, Some(6));
+    assert_eq!(diagnostic.end_line, Some(7));
+    assert_eq!(diagnostic.end_column, Some(22));
+    assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
+}
+
+#[test]
+fn compiler_loads_project_level_variables_without_overriding_front_matter() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-project-vars-test-{unique}"));
+    fs::create_dir_all(root.join(".neditor")).expect("create project vars dir");
+    fs::write(
+        root.join(".neditor").join("variables.yaml"),
+        "client: Project Client\nregion: West\nowner: Strategy Office\n",
+    )
+    .expect("write project variables");
+    let doc = root.join("docs").join("report.md");
+    fs::create_dir_all(doc.parent().expect("doc parent")).expect("create docs dir");
+    fs::write(&doc, "# Report").expect("write doc");
+
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Project Vars\nstatus: approved\napprovedBy: QA\nclient: Front Matter Client\n---\n# Project Vars\nPrepared for {{client}} in {{region}} by {{owner}}.\n".to_string(),
+            file_path: Some(path_to_string(&doc)),
+        });
+
+    assert!(response
+        .compiled_markdown
+        .contains("Prepared for Front Matter Client in West by Strategy Office."));
+    assert_eq!(response.metadata["client"], "Front Matter Client");
+    assert_eq!(response.metadata["region"], "West");
+    fs::remove_dir_all(root).expect("clean project vars test dir");
+}
+
+#[test]
+fn compiler_loads_front_matter_csv_data_sources() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-data-source-test-{unique}"));
+    fs::create_dir_all(root.join("data")).expect("create data dir");
+    fs::write(
+        root.join("data").join("revenue.csv"),
+        "Region,Revenue\n\"East\nCoast\",100\nWest,\"=SUM(B1,80)\"\n",
+    )
+    .expect("write csv data source");
+
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Data Source\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Revenue\n    path: data/revenue.csv\n    type: csv\n---\n# Data Source\n".to_string(),
+            file_path: Some(path_to_string(&root.join("report.md"))),
+        });
+
+    assert!(response
+        .compiled_markdown
+        .contains("## Data Source: Revenue"));
+    assert!(response.html.contains("<td>180</td>"));
+    assert!(response.html.contains("East\nCoast"));
+    assert!(response
+        .include_graph
+        .iter()
+        .any(|edge| edge.child.ends_with("data/revenue.csv")));
+    assert!(response
+        .export_manifest
+        .included_files
+        .iter()
+        .any(|file| file.path.ends_with("data/revenue.csv")));
+    assert!(response.export_manifest.source_hash.starts_with("sha256:"));
+    assert!(response
+        .export_manifest
+        .included_files
+        .iter()
+        .all(|file| file.hash.starts_with("sha256:")));
+    fs::remove_dir_all(root).expect("clean data source test dir");
+}
+
+#[test]
+fn compiler_honors_toc_depth_and_numbering() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: TOC\nstatus: approved\napprovedBy: QA\ntoc: true\ntocDepth: 2\ntocNumbered: true\n---\n# Alpha\n## Beta\n### Gamma\n## Delta\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.compiled_markdown.contains("- [1 Alpha](#alpha)"));
+    assert!(response.compiled_markdown.contains("  - [1.1 Beta](#beta)"));
+    assert!(response
+        .compiled_markdown
+        .contains("  - [1.2 Delta](#delta)"));
+    assert!(!response.compiled_markdown.contains("[1.1.1 Gamma](#gamma)"));
+    let docx = render_docx_bytes(&response, &json!({})).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains(r#"w:instr="TOC \o &quot;1-2&quot; \h \z \u""#));
+    assert!(!docx_document.contains("#alpha"));
+}
+
+#[test]
+fn compiler_adds_glossary_hover_terms_to_preview_html() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Glossary Hover\nstatus: approved\napprovedBy: QA\n---\n# Glossary Hover\nARR informs planning.\n\n```glossary\nARR: Annual recurring revenue.\n```\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.html.contains("class=\"glossary-term\""));
+    assert!(response
+        .html
+        .contains("title=\"Annual recurring revenue.\""));
+    assert!(response.html.contains(">ARR</span> informs planning"));
+}
+
+#[test]
+fn compiler_preserves_figure_float_semantics() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Floating Figure\nstatus: approved\napprovedBy: QA\n---\n# Floating Figure\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:float caption=\"Floating diagram\" float=\"right\"}\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.html.contains("figure-float-right"));
+    assert!(response.html.contains("data-float=\"right\""));
+    assert!(response.document_ast.blocks.iter().any(|block| {
+        matches!(
+            block,
+            DocumentBlock::Figure {
+                id,
+                caption,
+                float,
+                ..
+            } if id.as_deref() == Some("fig:float")
+                && caption.as_deref() == Some("Floating diagram")
+                && float.as_deref() == Some("right")
+        )
+    }));
+
+    let exported = export::export_text(&response, &json!({}));
+    assert!(exported.contains("float=right"));
+
+    let full_html = render_full_html(&response, &json!({}));
+    assert!(full_html.contains("figure-float-right"));
+    assert!(full_html.contains("float:right"));
+
+    let docx = render_docx_bytes(&response, &json!({})).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("float=right"));
+    assert!(docx_document.contains(r#"<w:jc w:val="right"/>"#));
+
+    let pptx = render_pptx_bytes(&response, &json!({})).expect("pptx bytes");
+    let floating_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
+        .into_iter()
+        .find(|slide| slide.contains(r#"r:embed="rIdImage1""#))
+        .expect("floating figure slide");
+    assert!(floating_slide.contains(r#"<a:off x="5029200""#));
+
+    let pdf = render_pdf_bytes(&response, &json!({}));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("287 627 240 135 re S"));
+}
+
+#[test]
+fn compiler_generates_linked_index_with_exclusions_and_proper_terms() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Index\nstatus: approved\napprovedBy: QA\nindexExclude:\n  - internal draft\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Internal Draft should stay out. Working capital{#index:Liquidity} marker.\n\n[INDEX]\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response
+        .index_terms
+        .iter()
+        .any(|term| term == "Acme Strategy"));
+    assert!(response.index_terms.iter().any(|term| term == "Liquidity"));
+    assert!(response
+        .index_terms
+        .iter()
+        .any(|term| term == "Working Capital"));
+    assert!(!response
+        .index_terms
+        .iter()
+        .any(|term| term == "Internal Draft"));
+    assert!(response.html.contains("href=\"#market-analysis\""));
+    assert!(response.html.contains("Acme Strategy"));
+    assert!(response.html.contains("Liquidity"));
+    assert!(!response.html.contains("{#index:Liquidity}"));
+}
+
+#[test]
+fn compiler_parses_review_comment_metadata() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Review\nstatus: approved\napprovedBy: QA\n---\n# Review\n<!-- comment: unresolved | author: Dana | at: 2026-05-18T10:00:00Z | Clarify the risk note. -->\n<!-- change: author: Dana | at: 2026-05-18T11:00:00Z | Updated the risk note. -->\n".to_string(),
+            file_path: None,
+        });
+    let comment = response.semantic.comments.first().expect("review comment");
+    let change_note = response.semantic.change_notes.first().expect("change note");
+
+    assert_eq!(comment.state, "unresolved");
+    assert_eq!(comment.author, "Dana");
+    assert_eq!(comment.created_at, "2026-05-18T10:00:00Z");
+    assert_eq!(comment.text, "Clarify the risk note.");
+    assert_eq!(change_note.author, "Dana");
+    assert_eq!(change_note.created_at, "2026-05-18T11:00:00Z");
+    assert_eq!(change_note.text, "Updated the risk note.");
+    assert!(response.document_ast.blocks.iter().any(|block| {
+        matches!(
+            block,
+            DocumentBlock::ReviewComment { comment, .. }
+                if comment.author == "Dana"
+                    && comment.state == "unresolved"
+                    && comment.text == "Clarify the risk note."
+        )
+    }));
+    assert!(response.document_ast.blocks.iter().any(|block| {
+        matches!(
+            block,
+            DocumentBlock::ChangeNote { note, .. }
+                if note.author == "Dana" && note.text == "Updated the risk note."
+        )
+    }));
+    let unresolved_comment_diagnostic = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("unresolved review comments"))
+        .expect("unresolved comment diagnostic");
+    assert_eq!(unresolved_comment_diagnostic.severity, "error");
+    assert_eq!(unresolved_comment_diagnostic.line, Some(7));
+    assert_eq!(
+        unresolved_comment_diagnostic.source_file.as_deref(),
+        Some("untitled.md")
+    );
+    assert!(unresolved_comment_diagnostic
+        .related
+        .iter()
+        .any(|related| related.contains("Clarify the risk note")));
+}
+
+#[test]
+fn compiler_reports_missing_include_without_panicking() {
+    let response = compile(CompileRequest {
+        text: "!include missing/chapter.md\n".to_string(),
+        file_path: None,
+    });
+
+    let diagnostic = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.severity == "error" && diagnostic.message.contains("Missing include file")
+        })
+        .expect("missing include diagnostic");
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related.contains("missing/chapter.md")));
+}
+
+#[test]
+fn compiler_reports_broken_local_markdown_links() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-link-test-{unique}"));
+    fs::create_dir_all(root.join("docs")).expect("create link test dir");
+    fs::write(root.join("docs").join("existing.md"), "# Existing").expect("write linked doc");
+
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Links\nstatus: approved\napprovedBy: QA\nbrand:\n  logo: docs/missing-logo.svg\n---\n# Links\nRead [existing](docs/existing.md), [missing](docs/missing.md), [section](#links), and [web](https://example.com).\n![Missing image](docs/missing.png)\n".to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+        });
+    let root_doc = path_to_string(&root.join("root.md"));
+
+    let broken_link = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("Broken link path"))
+        .expect("broken link diagnostic");
+    assert_eq!(broken_link.line, Some(9));
+    assert!(broken_link.column.is_some());
+    assert!(broken_link.end_column > broken_link.column);
+    assert_eq!(broken_link.source_file.as_deref(), Some(root_doc.as_str()));
+    assert!(broken_link
+        .related
+        .iter()
+        .any(|related| related.contains("docs/missing.md")));
+    assert_eq!(
+        response
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.message.contains("Broken link path"))
+            .count(),
+        1
+    );
+    let broken_image = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("Broken image path"))
+        .expect("broken image diagnostic");
+    assert_eq!(broken_image.line, Some(10));
+    assert!(broken_image.column.is_some());
+    assert!(broken_image.end_column > broken_image.column);
+    assert_eq!(broken_image.source_file.as_deref(), Some(root_doc.as_str()));
+    assert!(broken_image
+        .related
+        .iter()
+        .any(|related| related.contains("docs/missing.png")));
+    assert!(response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("Broken logo path")));
+    fs::remove_dir_all(root).expect("clean link test dir");
+}

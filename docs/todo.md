@@ -42,4 +42,5 @@ What remains to achieve the full vision:
      export/shared.rs. Filesystem watch/include-graph logic and workspace tree scanning now live outside the low-level file command module, snapshot metadata/storage
      helpers are isolated from snapshot commands, Git IPC types/process helpers now live outside Git command routing, and diagnostic payload types are split from diagnostic
      builder helpers. The transform/external-transform, semantic export renderer, export command/readiness, AI cleanup, table/formula export, review/provenance, media package,
-     and file/Git command test clusters now live in dedicated nested test modules instead of the root backend fixture file. Still needed: split the remaining large compiler fixture cluster further as the feature set grows.
+     file/Git command, and compiler core test clusters now live in dedicated nested test modules instead of the root backend fixture file. Still needed: split the remaining
+     bibliography/citation, layout/export option, AST/include, and export conformance compiler fixture clusters further as the feature set grows.
