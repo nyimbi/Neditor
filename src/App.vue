@@ -147,10 +147,12 @@
           >
             <strong>{{ diagnostic.severity }}</strong>
             <p>{{ diagnostic.message }}</p>
+            <small v-if="diagnosticLocation(diagnostic)">{{ diagnosticLocation(diagnostic) }}</small>
             <small v-if="diagnostic.suggestion">{{ diagnostic.suggestion }}</small>
             <ul v-if="diagnostic.related.length" class="diagnostic-related">
               <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
             </ul>
+            <button v-if="canNavigateDiagnostic(diagnostic)" type="button" @click="goToSourceTarget(diagnostic)">Go to source</button>
           </article>
         </template>
 
