@@ -3873,6 +3873,73 @@ paths:
     }
 
     #[test]
+    fn document_ast_models_transform_artifacts_semantically() {
+        let response = compile(CompileRequest {
+            text: r#"---
+title: Transform AST
+status: approved
+approvedBy: QA
+---
+# Transform AST
+
+```roadmap
+Q1: Launch beta
+Q2: Expand exports
+```
+
+```mermaid
+flowchart LR
+  A[Start] --> B[Done]
+```
+"#
+            .to_string(),
+            file_path: None,
+        });
+
+        let roadmap = response
+            .document_ast
+            .blocks
+            .iter()
+            .find_map(|block| match block {
+                DocumentBlock::Transform {
+                    name,
+                    output_kind,
+                    text,
+                    html,
+                    ..
+                } if name == "roadmap" => Some((output_kind, text, html)),
+                _ => None,
+            })
+            .expect("roadmap transform block");
+        assert_eq!(roadmap.0, "html");
+        assert!(roadmap.1.contains("Launch beta"));
+        assert!(roadmap.2.contains("transform-roadmap"));
+
+        let mermaid = response
+            .document_ast
+            .blocks
+            .iter()
+            .find_map(|block| match block {
+                DocumentBlock::Transform {
+                    name,
+                    output_kind,
+                    text,
+                    html,
+                    ..
+                } if name == "mermaid" => Some((output_kind, text, html)),
+                _ => None,
+            })
+            .expect("mermaid transform block");
+        assert_eq!(mermaid.0, "svg");
+        assert!(mermaid.1.contains("Start"));
+        assert!(mermaid.2.contains("transform-mermaid"));
+
+        let exported = export::export_text(&response, &json!({}));
+        assert!(exported.contains("Transform: roadmap"));
+        assert!(exported.contains("Transform: mermaid"));
+    }
+
+    #[test]
     fn qr_transform_renders_static_svg_preview() {
         let artifact = run_transform("qr".to_string(), "https://example.com".to_string())
             .expect("qr transform");

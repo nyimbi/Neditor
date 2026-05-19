@@ -1656,6 +1656,9 @@ fn render_docx_block(
             empty_as(&provenance.model, "unknown"),
             empty_as(&provenance.status, "unreviewed")
         )),
+        DocumentBlock::Transform { name, text, .. } => {
+            docx_paragraph(&transform_export_line(name, text))
+        }
         DocumentBlock::RawHtml { html, .. } => {
             if let Some(table) = export_table_from_transform_html(html) {
                 let mut output = docx_paragraph(&table_export_line(&None, &None, &table.headers));
@@ -2729,6 +2732,7 @@ fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             empty_as(&provenance.model, "unknown"),
             empty_as(&provenance.status, "unreviewed")
         )],
+        DocumentBlock::Transform { name, text, .. } => vec![transform_export_line(name, text)],
         DocumentBlock::RawHtml { html, .. } => {
             if let Some(table) = export_table_from_transform_html(html) {
                 let mut lines = vec![table_export_line(&None, &None, &table.headers)];
@@ -2890,6 +2894,15 @@ fn callout_export_line(callout_type: &str, title: &str, text: &str) -> String {
         parts.push(text.to_string());
     }
     parts.join(": ")
+}
+
+fn transform_export_line(name: &str, text: &str) -> String {
+    let label = format!("Transform: {name}");
+    if text.is_empty() {
+        label
+    } else {
+        format!("{label}: {text}")
+    }
 }
 
 fn figure_export_line(

@@ -197,6 +197,15 @@ pub(crate) enum DocumentBlock {
         provenance: AstAiSource,
         source: Option<AstSourceRange>,
     },
+    Transform {
+        line: usize,
+        end_line: usize,
+        name: String,
+        output_kind: String,
+        text: String,
+        html: String,
+        source: Option<AstSourceRange>,
+    },
     RawHtml {
         line: usize,
         end_line: usize,
@@ -414,6 +423,7 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 empty_as(&provenance.model, "unknown"),
                 empty_as(&provenance.status, "unreviewed")
             )),
+            DocumentBlock::Transform { name, text, .. } => Some(transform_export_text(name, text)),
             DocumentBlock::RawHtml { html, .. } => {
                 let text = clean_inline_text(html);
                 (!text.is_empty()).then_some(text)
@@ -514,6 +524,12 @@ where
                 ..
             }
             | DocumentBlock::AiSource {
+                line,
+                end_line,
+                source,
+                ..
+            }
+            | DocumentBlock::Transform {
                 line,
                 end_line,
                 source,
@@ -1109,9 +1125,22 @@ fn table_export_title(id: &Option<String>, caption: &Option<String>, headers: &[
     parts.join(": ")
 }
 
+fn transform_export_text(name: &str, text: &str) -> String {
+    let label = format!("Transform: {name}");
+    if text.is_empty() {
+        label
+    } else {
+        format!("{label}: {text}")
+    }
+}
+
 fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
     if let Some(table) = parse_ast_transform_table(line, line_number) {
         return table;
+    }
+
+    if let Some(transform) = parse_ast_transform_block(line, line_number) {
+        return transform;
     }
 
     if let Some(content) = line
@@ -1215,6 +1244,32 @@ fn parse_ast_html_block(line: &str, line_number: usize) -> DocumentBlock {
         html: line.to_string(),
         source: None,
     }
+}
+
+fn parse_ast_transform_block(html: &str, line_number: usize) -> Option<DocumentBlock> {
+    let class_attr = extract_quoted_attribute(html, "class")?;
+    if !class_attr
+        .split_whitespace()
+        .any(|class| class == "transform")
+    {
+        return None;
+    }
+    let name = class_attr
+        .split_whitespace()
+        .filter_map(|class| class.strip_prefix("transform-"))
+        .find(|name| !matches!(*name, "error" | "table"))
+        .unwrap_or("unknown")
+        .to_string();
+    let output_kind = if html.contains("<svg") { "svg" } else { "html" }.to_string();
+    Some(DocumentBlock::Transform {
+        line: line_number,
+        end_line: line_number,
+        name,
+        output_kind,
+        text: clean_inline_text(html),
+        html: html.to_string(),
+        source: None,
+    })
 }
 
 fn parse_ast_transform_table(html: &str, line_number: usize) -> Option<DocumentBlock> {
