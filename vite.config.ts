@@ -29,4 +29,17 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("/@codemirror/")) return "codemirror";
+          if (id.includes("/@tauri-apps/")) return "tauri";
+          if (id.includes("/vue/") || id.includes("/pinia/")) return "vue-vendor";
+          return "vendor";
+        },
+      },
+    },
+  },
 }));
