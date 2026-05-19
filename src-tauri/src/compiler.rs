@@ -308,7 +308,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         source_map: source_map.clone(),
         app_version: env!("CARGO_PKG_VERSION").to_string(),
     };
-    let table_summaries = collect_table_summaries(&table_formula_markdown);
+    let table_summaries = collect_table_summaries(&document_ast);
     let semantic = SemanticDocument {
         title,
         status,

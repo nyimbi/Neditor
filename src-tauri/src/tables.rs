@@ -1,6 +1,7 @@
 use crate::{
     calculations::eval_expression,
     diagnostics::{diag, DocumentDiagnostic},
+    document_ast::{DocumentAst, DocumentBlock},
     escape_html, format_value,
     markdown_tables::{
         is_markdown_table_row, is_markdown_table_separator, markdown_table_row,
@@ -177,42 +178,36 @@ pub(crate) fn evaluate_markdown_table_formulas(
     output.join("\n")
 }
 
-pub(crate) fn collect_table_summaries(text: &str) -> Vec<TableSummary> {
-    let lines = text.lines().collect::<Vec<_>>();
+pub(crate) fn collect_table_summaries(document_ast: &DocumentAst) -> Vec<TableSummary> {
     let mut tables = Vec::new();
-    let mut index = 0;
-    while index + 1 < lines.len() {
-        let header = lines[index].trim();
-        let separator = lines[index + 1].trim();
-        if is_markdown_table_row(header) && is_markdown_table_separator(separator) {
-            let columns = split_markdown_table_row(header);
-            let mut row_count = 0usize;
-            let mut numeric_columns = columns
+    for block in &document_ast.blocks {
+        if let DocumentBlock::Table {
+            line,
+            headers,
+            rows,
+            ..
+        } = block
+        {
+            let mut numeric_columns = headers
                 .iter()
                 .map(|column| (column.clone(), 0.0))
                 .collect::<BTreeMap<_, _>>();
-            index += 2;
-            while index < lines.len() && is_markdown_table_row(lines[index].trim()) {
-                let cells = split_markdown_table_row(lines[index].trim());
-                for (column_index, cell) in cells.iter().enumerate() {
-                    if let Some(column) = columns.get(column_index) {
+            for row in rows {
+                for (column_index, cell) in row.iter().enumerate() {
+                    if let Some(column) = headers.get(column_index) {
                         if let Ok(value) = cell.replace([',', '$', '%'], "").parse::<f64>() {
                             *numeric_columns.entry(column.clone()).or_insert(0.0) += value;
                         }
                     }
                 }
-                row_count += 1;
-                index += 1;
             }
             numeric_columns.retain(|_, value| *value != 0.0);
             tables.push(TableSummary {
-                line: index.saturating_sub(row_count + 1),
-                columns,
-                rows: row_count,
+                line: *line,
+                columns: headers.clone(),
+                rows: rows.len(),
                 numeric_columns,
             });
-        } else {
-            index += 1;
         }
     }
     tables
