@@ -2716,9 +2716,17 @@ ARR: Annual recurring revenue.
         assert!(!pdf_text.contains("<section"));
 
         let docx = render_docx_bytes(&response, &options).expect("docx footnotes");
+        let docx_content_types = zip_entry_text(&docx, "[Content_Types].xml");
         let docx_document = zip_entry_text(&docx, "word/document.xml");
+        let docx_relationships = zip_entry_text(&docx, "word/_rels/document.xml.rels");
+        let docx_footnotes = zip_entry_text(&docx, "word/footnotes.xml");
+        assert!(docx_content_types.contains("wordprocessingml.footnotes+xml"));
+        assert!(docx_relationships.contains(r#"Target="footnotes.xml""#));
         assert!(docx_document.contains("Footnotes"));
-        assert!(docx_document.contains("Reviewed by compliance."));
+        assert!(docx_document.contains(r#"<w:footnoteReference w:id="1""#));
+        assert!(docx_footnotes.contains(r#"<w:footnote w:id="1""#));
+        assert!(docx_footnotes.contains("Reviewed by compliance."));
+        assert!(docx_footnotes.contains("Includes second-line evidence."));
         assert!(!docx_document.contains("&lt;section"));
 
         let pptx = render_pptx_bytes(&response, &options).expect("pptx footnotes");

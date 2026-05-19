@@ -1,5 +1,7 @@
 use crate::{
-    document_ast::{export_body_text_from_ast, AstSourceRange, DocumentBlock, InlineNode},
+    document_ast::{
+        export_body_text_from_ast, AstSourceRange, DocumentBlock, FootnoteEntry, InlineNode,
+    },
     escape_css, escape_html, escape_pdf, escape_xml, metadata_string, render_export_template,
     sha256_hex, sha256_uri,
     tables::delimited_rows_for_export,
@@ -358,13 +360,17 @@ pub(crate) fn render_docx_bytes(
     let media = collect_docx_media(response);
     let hyperlinks = collect_docx_hyperlinks(response);
     let include_native_comments = docx_has_native_comments(response, options_value);
+    let include_native_footnotes = docx_has_native_footnotes(response);
     let mut cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(&mut cursor);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     zip.start_file("[Content_Types].xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_docx_content_types(&media, include_native_comments).as_bytes())
-        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        render_docx_content_types(&media, include_native_comments, include_native_footnotes)
+            .as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
     zip.add_directory("_rels/", options)
         .map_err(|err| err.to_string())?;
     zip.start_file("_rels/.rels", options)
@@ -392,7 +398,13 @@ pub(crate) fn render_docx_bytes(
     zip.start_file("word/_rels/document.xml.rels", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(
-        render_docx_document_relationships(&media, &hyperlinks, include_native_comments).as_bytes(),
+        render_docx_document_relationships(
+            &media,
+            &hyperlinks,
+            include_native_comments,
+            include_native_footnotes,
+        )
+        .as_bytes(),
     )
     .map_err(|err| err.to_string())?;
     if !media.is_empty() {
@@ -416,6 +428,12 @@ pub(crate) fn render_docx_bytes(
         zip.start_file("word/comments.xml", options)
             .map_err(|err| err.to_string())?;
         zip.write_all(render_docx_comments(response).as_bytes())
+            .map_err(|err| err.to_string())?;
+    }
+    if include_native_footnotes {
+        zip.start_file("word/footnotes.xml", options)
+            .map_err(|err| err.to_string())?;
+        zip.write_all(render_docx_footnotes(response).as_bytes())
             .map_err(|err| err.to_string())?;
     }
     zip.start_file("word/document.xml", options)
@@ -715,7 +733,11 @@ fn safe_bundle_path(path: &str) -> String {
     format!("{}-{filename}", &digest[..12])
 }
 
-fn render_docx_content_types(media: &[ExportMedia], include_comments: bool) -> String {
+fn render_docx_content_types(
+    media: &[ExportMedia],
+    include_comments: bool,
+    include_footnotes: bool,
+) -> String {
     let mut defaults = vec![
         (
             "rels".to_string(),
@@ -746,8 +768,13 @@ fn render_docx_content_types(media: &[ExportMedia], include_comments: bool) -> S
     } else {
         ""
     };
+    let footnotes_override = if include_footnotes {
+        r#"<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>"#
+    } else {
+        ""
+    };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>{comments_override}</Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>{comments_override}{footnotes_override}</Types>"#
     )
 }
 
@@ -762,6 +789,7 @@ fn render_docx_document_relationships(
     media: &[ExportMedia],
     hyperlinks: &[ExportHyperlink],
     include_comments: bool,
+    include_footnotes: bool,
 ) -> String {
     let media_relationships = media
         .iter()
@@ -788,8 +816,13 @@ fn render_docx_document_relationships(
     } else {
         ""
     };
+    let footnotes_relationship = if include_footnotes {
+        r#"<Relationship Id="rIdFootnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>"#
+    } else {
+        ""
+    };
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>{comments_relationship}{media_relationships}{hyperlink_relationships}</Relationships>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>{comments_relationship}{footnotes_relationship}{media_relationships}{hyperlink_relationships}</Relationships>"#
     )
 }
 
@@ -1657,6 +1690,23 @@ fn docx_has_native_comments(response: &CompileResponse, options: &Value) -> bool
     include_comments(options) && !response.semantic.comments.is_empty()
 }
 
+fn docx_has_native_footnotes(response: &CompileResponse) -> bool {
+    !docx_footnote_entries(response).is_empty()
+}
+
+fn docx_footnote_entries(response: &CompileResponse) -> Vec<&FootnoteEntry> {
+    response
+        .document_ast
+        .blocks
+        .iter()
+        .filter_map(|block| match block {
+            DocumentBlock::Footnotes { entries, .. } => Some(entries.iter()),
+            _ => None,
+        })
+        .flatten()
+        .collect()
+}
+
 fn render_docx_comments(response: &CompileResponse) -> String {
     let comments = response
         .semantic
@@ -1683,6 +1733,23 @@ fn render_docx_comments(response: &CompileResponse) -> String {
     )
 }
 
+fn render_docx_footnotes(response: &CompileResponse) -> String {
+    let entries = docx_footnote_entries(response)
+        .into_iter()
+        .map(|entry| {
+            format!(
+                r#"<w:footnote w:id="{}"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t>{}</w:t></w:r><w:r><w:t xml:space="preserve"> {}</w:t></w:r></w:p></w:footnote>"#,
+                entry.number,
+                entry.number,
+                escape_xml(&entry.text)
+            )
+        })
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote><w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>{entries}</w:footnotes>"#
+    )
+}
+
 fn render_docx_comment_references(response: &CompileResponse) -> String {
     response
         .semantic
@@ -1697,6 +1764,17 @@ fn render_docx_comment_references(response: &CompileResponse) -> String {
             )
         })
         .collect::<String>()
+}
+
+fn render_docx_footnote_references(entries: &[FootnoteEntry]) -> String {
+    let mut output = docx_heading(1, "Footnotes");
+    for entry in entries {
+        output.push_str(&format!(
+            r#"<w:p><w:r><w:t>Footnote {} </w:t></w:r><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="{}"/></w:r></w:p>"#,
+            entry.number, entry.number
+        ));
+    }
+    output
 }
 
 fn render_docx_header(response: &CompileResponse, options: &Value) -> String {
@@ -1843,16 +1921,7 @@ fn render_docx_block(
             text,
             ..
         } => docx_paragraph(&callout_export_line(callout_type, title, text)),
-        DocumentBlock::Footnotes { entries, .. } => {
-            let mut output = docx_heading(1, "Footnotes");
-            for entry in entries {
-                output.push_str(&docx_paragraph(&format!(
-                    "{}. {}",
-                    entry.number, entry.text
-                )));
-            }
-            output
-        }
+        DocumentBlock::Footnotes { entries, .. } => render_docx_footnote_references(entries),
         DocumentBlock::ReviewComment { comment, .. } => docx_paragraph(&format!(
             "Review comment: {} | {} | {}",
             comment.state, comment.author, comment.text
