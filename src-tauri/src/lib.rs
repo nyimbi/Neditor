@@ -1,5 +1,4 @@
 use chrono::Utc;
-use pulldown_cmark::{html, Options, Parser};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -20,6 +19,7 @@ mod filesystem;
 mod footnotes;
 mod generated_sections;
 mod git;
+mod html_preview;
 mod indexing;
 mod link_validation;
 mod markdown_tables;
@@ -74,6 +74,7 @@ use git::{
 };
 #[cfg(test)]
 use git::{run_git, GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRequest};
+use html_preview::markdown_to_html;
 use indexing::{collect_index_entries, strip_index_markers};
 use link_validation::{validate_image_paths, validate_link_paths, validate_logo_path};
 use provenance::{collect_ai_assisted_sections, collect_ai_sources, AiAssistedSection, AiSource};
@@ -355,7 +356,12 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     attach_source_ranges(&mut document_ast, |line, end_line| {
         ast_source_range_for_generated_lines(&source_map, line, end_line)
     });
-    let html = markdown_to_html(&layout_markdown, &glossary);
+    let preview_headings = extract_headings(&layout_markdown);
+    let heading_anchors = preview_headings
+        .iter()
+        .map(|heading| heading.anchor.as_str())
+        .collect::<Vec<_>>();
+    let html = markdown_to_html(&layout_markdown, &heading_anchors, &glossary);
     let title = metadata
         .get("title")
         .and_then(Value::as_str)
@@ -1256,142 +1262,6 @@ fn supported_transform(name: &str) -> bool {
 
 fn external_transform_supported(name: &str) -> bool {
     matches!(name, "pikchr" | "dot" | "graphviz" | "plantuml" | "d2")
-}
-
-fn markdown_to_html(markdown: &str, glossary: &BTreeMap<String, String>) -> String {
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_TABLES);
-    options.insert(Options::ENABLE_FOOTNOTES);
-    options.insert(Options::ENABLE_STRIKETHROUGH);
-    options.insert(Options::ENABLE_TASKLISTS);
-    options.insert(Options::ENABLE_HEADING_ATTRIBUTES);
-    let parser = Parser::new_ext(markdown, options);
-    let mut html_output = String::new();
-    html::push_html(&mut html_output, parser);
-    let html_with_heading_ids = add_heading_ids(&html_output, &extract_headings(markdown));
-    annotate_glossary_terms(&html_with_heading_ids, glossary)
-}
-
-fn add_heading_ids(html: &str, headings: &[Heading]) -> String {
-    if headings.is_empty() {
-        return html.to_string();
-    }
-    let mut output = String::with_capacity(html.len());
-    let mut rest = html;
-    let mut heading_index = 0usize;
-    while let Some(start) = rest.find("<h") {
-        output.push_str(&rest[..start]);
-        let candidate = &rest[start..];
-        let Some(level) = candidate
-            .as_bytes()
-            .get(2)
-            .and_then(|byte| char::from(*byte).to_digit(10))
-            .map(|digit| digit as usize)
-        else {
-            output.push_str("<h");
-            rest = &candidate[2..];
-            continue;
-        };
-        if !(1..=6).contains(&level) {
-            output.push_str("<h");
-            rest = &candidate[2..];
-            continue;
-        }
-        let Some(tag_end) = candidate.find('>') else {
-            output.push_str(candidate);
-            return output;
-        };
-        let tag = &candidate[..=tag_end];
-        if tag.contains(" id=") {
-            output.push_str(tag);
-        } else if let Some(heading) = headings.get(heading_index) {
-            output.push_str(&tag[..tag.len() - 1]);
-            output.push_str(&format!(" id=\"{}\">", escape_html(&heading.anchor)));
-        } else {
-            output.push_str(tag);
-        }
-        heading_index += 1;
-        rest = &candidate[tag_end + 1..];
-    }
-    output.push_str(rest);
-    output
-}
-
-fn annotate_glossary_terms(html: &str, glossary: &BTreeMap<String, String>) -> String {
-    if glossary.is_empty() {
-        return html.to_string();
-    }
-    let terms = glossary
-        .iter()
-        .filter(|(term, _)| !term.trim().is_empty())
-        .map(|(term, definition)| (term.as_str(), definition.as_str()))
-        .collect::<Vec<_>>();
-    if terms.is_empty() {
-        return html.to_string();
-    }
-
-    let mut output = String::with_capacity(html.len());
-    let mut text_segment = String::new();
-    let mut in_tag = false;
-    for ch in html.chars() {
-        if ch == '<' {
-            if !text_segment.is_empty() {
-                output.push_str(&annotate_glossary_text_segment(&text_segment, &terms));
-                text_segment.clear();
-            }
-            in_tag = true;
-            output.push(ch);
-        } else if ch == '>' {
-            in_tag = false;
-            output.push(ch);
-        } else if in_tag {
-            output.push(ch);
-        } else {
-            text_segment.push(ch);
-        }
-    }
-    if !text_segment.is_empty() {
-        output.push_str(&annotate_glossary_text_segment(&text_segment, &terms));
-    }
-    output
-}
-
-fn annotate_glossary_text_segment(segment: &str, terms: &[(&str, &str)]) -> String {
-    let mut output = String::with_capacity(segment.len());
-    let mut index = 0;
-    while index < segment.len() {
-        if let Some((term, definition)) = terms
-            .iter()
-            .filter(|(term, _)| segment[index..].starts_with(*term))
-            .filter(|(term, _)| glossary_term_has_boundaries(segment, index, index + term.len()))
-            .max_by_key(|(term, _)| term.len())
-        {
-            let matched = &segment[index..index + term.len()];
-            output.push_str(&format!(
-                "<span class=\"glossary-term\" tabindex=\"0\" title=\"{}\" data-definition=\"{}\">{}</span>",
-                escape_html(definition),
-                escape_html(definition),
-                matched
-            ));
-            index += term.len();
-        } else if let Some(ch) = segment[index..].chars().next() {
-            output.push(ch);
-            index += ch.len_utf8();
-        } else {
-            break;
-        }
-    }
-    output
-}
-
-fn glossary_term_has_boundaries(segment: &str, start: usize, end: usize) -> bool {
-    let before = segment[..start].chars().next_back();
-    let after = segment[end..].chars().next();
-    !before.is_some_and(is_word_char) && !after.is_some_and(is_word_char)
-}
-
-fn is_word_char(ch: char) -> bool {
-    ch.is_alphanumeric() || ch == '_'
 }
 
 pub(crate) fn extract_label(text: &str) -> Option<String> {
