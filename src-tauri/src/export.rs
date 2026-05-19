@@ -1715,6 +1715,11 @@ fn render_docx_block(
     hyperlinks: &[ExportHyperlink],
 ) -> String {
     match block {
+        DocumentBlock::Heading { level, text, .. }
+            if *level == 2 && text == "Table of Contents" =>
+        {
+            format!("{}{}", docx_heading(*level, text), docx_toc_field())
+        }
         DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
         DocumentBlock::Paragraph { text, inlines, .. } => {
             docx_paragraph_from_inlines(text, inlines, hyperlinks)
@@ -1822,6 +1827,11 @@ fn docx_heading(level: usize, text: &str) -> String {
         r#"<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr><w:r><w:t>{}</w:t></w:r></w:p>"#,
         escape_xml(text)
     )
+}
+
+fn docx_toc_field() -> String {
+    r#"<w:p><w:fldSimple w:instr="TOC \o &quot;1-3&quot; \h \z \u"><w:r><w:t>Update table of contents in Word to refresh page numbers.</w:t></w:r></w:fldSimple></w:p>"#
+        .to_string()
 }
 
 fn docx_paragraph(text: &str) -> String {
