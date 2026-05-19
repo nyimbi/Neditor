@@ -5107,6 +5107,11 @@ beta</pre>
         assert_ne!(north_bundle_path, south_bundle_path);
         assert_eq!(zip_entry_text(&bundle, &north_bundle_path), "North section");
         assert_eq!(zip_entry_text(&bundle, &south_bundle_path), "South section");
+        let include_map = zip_entry_text(&bundle, "include-map.json");
+        assert!(include_map.contains(&format!("\"bundle_path\": \"{north_bundle_path}\"")));
+        assert!(include_map.contains(&format!("\"bundle_path\": \"{south_bundle_path}\"")));
+        assert!(include_map.contains(&path_to_string(&north_section)));
+        assert!(include_map.contains(&path_to_string(&south_section)));
 
         fs::remove_dir_all(root).expect("clean bundle include fixture");
     }

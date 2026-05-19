@@ -31,6 +31,13 @@ struct ExportHyperlink {
     relationship_id: String,
 }
 
+struct BundleInclude {
+    source_path: String,
+    bundle_path: String,
+    hash: String,
+    bytes: Vec<u8>,
+}
+
 pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> String {
     let brand_color = options
         .get("brandColor")
@@ -563,13 +570,18 @@ pub(crate) fn render_markdown_bundle_bytes(
         zip.write_all(render_bundle_media_map(&media)?.as_bytes())
             .map_err(|err| err.to_string())?;
     }
-    for included in &manifest.included_files {
-        if let Ok(bytes) = fs::read(&included.path) {
-            let bundle_path = format!("includes/{}", safe_bundle_path(&included.path));
-            zip.start_file(bundle_path, options)
-                .map_err(|err| err.to_string())?;
-            zip.write_all(&bytes).map_err(|err| err.to_string())?;
-        }
+    let bundled_includes = collect_bundle_includes(manifest);
+    if !bundled_includes.is_empty() {
+        zip.start_file("include-map.json", options)
+            .map_err(|err| err.to_string())?;
+        zip.write_all(render_bundle_include_map(&bundled_includes)?.as_bytes())
+            .map_err(|err| err.to_string())?;
+    }
+    for included in bundled_includes {
+        zip.start_file(included.bundle_path, options)
+            .map_err(|err| err.to_string())?;
+        zip.write_all(&included.bytes)
+            .map_err(|err| err.to_string())?;
     }
     for item in media {
         zip.start_file(item.path, options)
@@ -578,6 +590,36 @@ pub(crate) fn render_markdown_bundle_bytes(
     }
     zip.finish().map_err(|err| err.to_string())?;
     Ok(cursor.into_inner())
+}
+
+fn collect_bundle_includes(manifest: &ExportManifest) -> Vec<BundleInclude> {
+    manifest
+        .included_files
+        .iter()
+        .filter_map(|included| {
+            let bytes = fs::read(&included.path).ok()?;
+            Some(BundleInclude {
+                source_path: included.path.clone(),
+                bundle_path: format!("includes/{}", safe_bundle_path(&included.path)),
+                hash: included.hash.clone(),
+                bytes,
+            })
+        })
+        .collect()
+}
+
+fn render_bundle_include_map(includes: &[BundleInclude]) -> Result<String, String> {
+    let entries = includes
+        .iter()
+        .map(|item| {
+            json!({
+                "source_path": item.source_path,
+                "bundle_path": item.bundle_path,
+                "hash": item.hash,
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::to_string_pretty(&entries).map_err(|err| err.to_string())
 }
 
 fn render_bundle_media_map(media: &[ExportMedia]) -> Result<String, String> {
