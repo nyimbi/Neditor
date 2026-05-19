@@ -2410,8 +2410,8 @@ function replaceTableFromPaste() {
   const headers = rows[0].map((cell, index) => cell.trim() || `Column ${index + 1}`);
   const bodyRows = rows.slice(1).map((row) => padTableRow(row, headers.length));
   tableDraft.value = {
-    id: current?.id || "",
-    caption: current?.caption || "",
+    id: parsed.id ?? current?.id ?? "",
+    caption: parsed.caption ?? current?.caption ?? "",
     headers,
     alignments: parsed.alignments
       ? padAlignments(parsed.alignments, headers.length)
@@ -2664,6 +2664,8 @@ function escapeTableCell(cell: string) {
 interface ParsedTablePaste {
   rows: string[][];
   alignments?: TableAlignment[];
+  id?: string;
+  caption?: string;
 }
 
 function parseTablePaste(text: string): ParsedTablePaste {
@@ -2684,6 +2686,7 @@ function parseMarkdownTablePaste(text: string) {
     const header = lines[index];
     const separator = lines[index + 1];
     if (!isMarkdownTableRow(header) || !isMarkdownTableSeparator(separator)) continue;
+    const caption = index > 0 ? parseMarkdownTableCaption(lines[index - 1]) : null;
     const rows = [splitMarkdownTableRow(header)];
     const alignments = splitMarkdownTableRow(separator).map(alignmentFromSeparator);
     let nextIndex = index + 2;
@@ -2695,9 +2698,23 @@ function parseMarkdownTablePaste(text: string) {
     return {
       rows: rows.map((row) => padTableRow(row, width)),
       alignments: padAlignments(alignments, width),
+      id: caption?.id,
+      caption: caption?.caption,
     };
   }
   return null;
+}
+
+function parseMarkdownTableCaption(line: string) {
+  const match = line.match(/^Table:\s*(.*?)\s*$/i);
+  if (!match) return null;
+  const rawCaption = match[1] || "";
+  const idMatch = rawCaption.match(/\s*\{#([^}]+)\}\s*$/);
+  const caption = (idMatch ? rawCaption.slice(0, idMatch.index).trim() : rawCaption.trim()) || "Untitled table";
+  return {
+    id: idMatch?.[1],
+    caption,
+  };
 }
 
 function parseDelimitedText(text: string, delimiter: "," | "\t") {
