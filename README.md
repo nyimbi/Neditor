@@ -12,14 +12,15 @@ closed document reopening, snapshots, AI paste cleanup, file
 open/save/save-as/revert/rename/duplicate/reveal, export readiness validation,
 and export commands for HTML, PDF, DOCX, PPTX, and Markdown bundle outputs.
 Save operations include a final on-disk hash guard so external edits are not
-silently overwritten between refresh polls.
+silently overwritten between watcher events.
 
 The compiler currently handles YAML front matter, document variables, include
 graphs, `calc`, `csv`, `tsv`, `json`, `yaml`, `glossary`, `timeline`, `chart`,
 captured external transform artifacts, BibTeX, CSL JSON, citations, glossary
 terms, automatic index terms, labels, cross-reference diagnostics, inline math,
 numbered block equations, table summaries, release metadata validation, export
-manifests, and source/include hashing.
+manifests, source maps, diagnostics evidence, source/include hashing, and final
+export artifact hashes.
 Figure syntax with labels and captions renders as semantic figures, and local
 image paths are validated with diagnostics. Citation parsing supports multiple
 citation keys with locator text without treating locators as missing keys.
@@ -27,7 +28,7 @@ Markdown tables plus CSV and TSV transform tables evaluate simple formula cells
 such as `=10+15` or `=SUM(2,3)`, and the transform registry covers the
 first-release diagram/data set with native renderers or clear setup diagnostics.
 
-External refresh checks the root document and captured include hashes. Clean
+Filesystem watchers track the root document and captured include hashes. Clean
 documents reload or recompile automatically; dirty documents keep local edits and
 show compare, accept external, keep local, and save-copy actions instead of
 overwriting user changes.
