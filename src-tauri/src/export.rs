@@ -1564,7 +1564,19 @@ fn render_docx_document(
         body.push_str(&docx_paragraph(&line));
     }
     body.push_str(&docx_page_break());
+    let mut skip_next_toc_body = false;
     for block in &response.document_ast.blocks {
+        if skip_next_toc_body {
+            skip_next_toc_body = false;
+            if is_generated_toc_body(block) {
+                continue;
+            }
+        }
+        if is_generated_toc_heading(block) {
+            body.push_str(&docx_generated_toc());
+            skip_next_toc_body = true;
+            continue;
+        }
         body.push_str(&render_docx_block(block, media, hyperlinks));
     }
     if docx_has_native_comments(response, options) {
@@ -1715,11 +1727,6 @@ fn render_docx_block(
     hyperlinks: &[ExportHyperlink],
 ) -> String {
     match block {
-        DocumentBlock::Heading { level, text, .. }
-            if *level == 2 && text == "Table of Contents" =>
-        {
-            format!("{}{}", docx_heading(*level, text), docx_toc_field())
-        }
         DocumentBlock::Heading { level, text, .. } => docx_heading(*level, text),
         DocumentBlock::Paragraph { text, inlines, .. } => {
             docx_paragraph_from_inlines(text, inlines, hyperlinks)
@@ -1819,6 +1826,14 @@ fn render_docx_block(
                 .collect::<String>()
         }
     }
+}
+
+fn docx_generated_toc() -> String {
+    format!(
+        "{}{}",
+        docx_heading(2, "Table of Contents"),
+        docx_toc_field()
+    )
 }
 
 fn docx_heading(level: usize, text: &str) -> String {
@@ -2817,6 +2832,10 @@ fn is_generated_toc_body(block: &DocumentBlock) -> bool {
         block,
         DocumentBlock::Paragraph { text, .. }
             if text.trim_start().starts_with("- [") && text.contains("](#")
+    ) || matches!(
+        block,
+        DocumentBlock::List { items, .. }
+            if items.iter().any(|item| item.contains("](#"))
     )
 }
 

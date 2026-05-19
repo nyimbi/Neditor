@@ -2507,6 +2507,7 @@ ARR: Annual recurring revenue.
         let docx = render_docx_bytes(&response, &json!({})).expect("docx bytes");
         let docx_document = zip_entry_text(&docx, "word/document.xml");
         assert!(docx_document.contains(r#"w:instr="TOC \o &quot;1-3&quot; \h \z \u""#));
+        assert!(!docx_document.contains("#alpha"));
     }
 
     #[test]
