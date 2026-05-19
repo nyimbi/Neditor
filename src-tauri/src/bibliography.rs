@@ -1,5 +1,7 @@
 use crate::diagnostics::DocumentDiagnostic;
-use crate::{collect_fence_bodies, diagnostics::diag, escape_html, path_to_string};
+use crate::{
+    compiler_support::collect_fence_bodies, diagnostics::diag, escape_html, path_to_string,
+};
 use serde::Serialize;
 use serde_json::Value;
 use std::{

@@ -1,5 +1,5 @@
 use crate::diagnostics::DocumentDiagnostic;
-use crate::{collect_fence_bodies, diagnostics::diag};
+use crate::{compiler_support::collect_fence_bodies, diagnostics::diag};
 use serde::Serialize;
 use std::collections::HashMap;
 
