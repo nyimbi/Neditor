@@ -102,6 +102,7 @@ mod compiler_core_tests;
 mod document_structure_tests;
 mod export_conformance_tests;
 mod export_option_tests;
+mod external_transform_tests;
 mod validation_tests;
 
 mod table_tests;
