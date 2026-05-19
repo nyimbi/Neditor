@@ -18,6 +18,7 @@ const MAX_TRANSFORM_INPUT_BYTES: usize = 1_048_576;
 const MAX_TRANSFORM_OUTPUT_BYTES: usize = 2_097_152;
 const MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES: usize = 64;
 const MAX_EXTERNAL_TRANSFORM_CACHE_FILE_BYTES: u64 = 4_194_304;
+const EXTERNAL_TRANSFORM_RENDERER_VERSION: &str = "external-render-v3";
 
 static EXTERNAL_TRANSFORM_CACHE: OnceLock<Mutex<HashMap<String, TransformArtifact>>> =
     OnceLock::new();
@@ -129,7 +130,9 @@ pub(crate) fn run_external_transform(
     }
     let source_hash = sha256_hex(request.body.as_bytes());
     let (engine_identity, engine_version) = external_engine_identity(&engine_path)?;
-    let cache_key = transform_cache_key(&request.name, input_mode, &engine_identity, &source_hash);
+    let renderer_identity = format!("{engine_identity};{EXTERNAL_TRANSFORM_RENDERER_VERSION}");
+    let cache_key =
+        transform_cache_key(&request.name, input_mode, &renderer_identity, &source_hash);
     if let Some(artifact) = cached_external_transform(&cache_key, &request.name, output_limit) {
         return Ok(artifact);
     }
@@ -141,7 +144,7 @@ pub(crate) fn run_external_transform(
         input_mode,
         timeout_ms,
         max_output_bytes: output_limit,
-        engine_identity: &engine_identity,
+        engine_identity: &renderer_identity,
         engine_version: &engine_version,
     })?;
     store_external_transform(artifact.clone());
@@ -449,14 +452,20 @@ fn execute_external_transform(
     }
 
     let output_text = String::from_utf8_lossy(&output.stdout).to_string();
-    let html = if output_text.trim_start().starts_with('<') {
+    let rendered_output = if output_text.trim_start().starts_with('<') {
         output_text
+            .lines()
+            .map(str::trim)
+            .collect::<Vec<_>>()
+            .join("")
     } else {
-        format!(
-            "<pre class=\"transform transform-external\">{}</pre>",
-            escape_html(&output_text)
-        )
+        format!("<pre>{}</pre>", escape_external_pre_text(&output_text))
     };
+    let html = format!(
+        "<section class=\"transform transform-{} transform-external\" data-transform=\"{}\">{rendered_output}</section>",
+        escape_html(name),
+        escape_html(name)
+    );
     let duration_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
     diagnostics.push(diag(
         "info",
@@ -484,6 +493,12 @@ fn execute_external_transform(
         html,
         diagnostics,
     })
+}
+
+fn escape_external_pre_text(text: &str) -> String {
+    escape_html(text)
+        .replace("\r\n", "&#10;")
+        .replace('\n', "&#10;")
 }
 
 fn transform_engine(

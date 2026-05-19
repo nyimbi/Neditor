@@ -837,9 +837,10 @@ fn render_transform(
             diagnostics.push(diagnostic.clone());
             artifact_diags.push(diagnostic);
             format!(
-                "<section class=\"transform transform-pending\"><strong>{}</strong><pre>{}</pre><p>{}</p></section>",
+                "<section class=\"transform transform-{} transform-pending\"><strong>{}</strong><pre>{}</pre><p>{}</p></section>",
                 escape_html(name),
-                escape_html(body),
+                escape_html(name),
+                escape_preformatted_transform_text(body),
                 escape_html(&message)
             )
         }
@@ -901,6 +902,12 @@ fn render_external_transform(
             None
         }
     }
+}
+
+fn escape_preformatted_transform_text(text: &str) -> String {
+    escape_html(text)
+        .replace("\r\n", "&#10;")
+        .replace('\n', "&#10;")
 }
 
 fn supported_transform(name: &str) -> bool {
@@ -4414,6 +4421,21 @@ flowchart LR
             .is_some_and(|path| path == "/bin/cat"));
         assert!(artifact.html.contains("digraph { a -&gt; b }"));
         assert!(response.html.contains("transform-external"));
+        assert!(response.html.contains("transform-dot"));
+        let ast_transform = response
+            .document_ast
+            .blocks
+            .iter()
+            .find_map(|block| match block {
+                DocumentBlock::Transform {
+                    name,
+                    execution_kind,
+                    ..
+                } if name == "dot" => Some(execution_kind),
+                _ => None,
+            })
+            .expect("dot AST transform");
+        assert_eq!(ast_transform.as_deref(), Some("external"));
         assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("dot external transform completed")));
@@ -4444,6 +4466,14 @@ flowchart LR
             .expect("dot artifact");
         assert_eq!(artifact.execution_kind, "embedded");
         assert!(artifact.html.contains("transform-pending"));
+        assert!(artifact.html.contains("transform-dot"));
+        assert!(response.document_ast.blocks.iter().any(|block| {
+            matches!(
+                block,
+                DocumentBlock::Transform { name, execution_kind, .. }
+                    if name == "dot" && execution_kind.as_deref() == Some("embedded")
+            )
+        }));
         assert!(response
             .diagnostics
             .iter()
