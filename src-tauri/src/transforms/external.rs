@@ -102,6 +102,7 @@ pub(crate) fn run_external_transform(
             engine_path.display()
         ));
     }
+    validate_external_engine_executable(&engine_path)?;
 
     let input_limit = request
         .max_input_bytes
@@ -153,6 +154,25 @@ pub(crate) fn run_external_transform(
 
 fn external_transform_supported(name: &str) -> bool {
     matches!(name, "pikchr" | "dot" | "graphviz" | "plantuml" | "d2")
+}
+
+#[cfg(unix)]
+fn validate_external_engine_executable(engine_path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let metadata = fs::metadata(engine_path).map_err(|err| err.to_string())?;
+    if metadata.permissions().mode() & 0o111 == 0 {
+        return Err(format!(
+            "Engine path is not executable: {}",
+            engine_path.display()
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn validate_external_engine_executable(_engine_path: &Path) -> Result<(), String> {
+    Ok(())
 }
 
 fn external_transform_cache() -> &'static Mutex<HashMap<String, TransformArtifact>> {

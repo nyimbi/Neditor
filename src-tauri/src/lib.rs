@@ -4333,6 +4333,32 @@ beta</pre>
 
     #[cfg(unix)]
     #[test]
+    fn external_transform_rejects_non_executable_engine_path() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let script = std::env::temp_dir().join(format!("neditor-not-executable-{unique}.sh"));
+        fs::write(&script, "#!/bin/sh\ncat\n").expect("write non-executable script");
+
+        let error = run_external_transform(ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "digraph {}".to_string(),
+            engine_path: Some(path_to_string(&script)),
+            trusted: true,
+            input_mode: Some("stdin".to_string()),
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        })
+        .unwrap_err();
+
+        let _ = fs::remove_file(script);
+        assert!(error.contains("not executable"));
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn external_transform_timeout_covers_blocked_stdin() {
         use std::os::unix::fs::PermissionsExt;
 
