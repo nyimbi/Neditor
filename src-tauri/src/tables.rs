@@ -123,8 +123,23 @@ pub(crate) fn evaluate_markdown_table_formulas(
     let mut output = Vec::new();
     let mut index = 0;
     let mut named_tables = HashMap::new();
+    let mut fence_marker = None;
     while index < lines.len() {
         let line = lines[index];
+        if let Some(marker) = fence_marker {
+            output.push(line.to_string());
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            index += 1;
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            output.push(line.to_string());
+            fence_marker = Some(marker);
+            index += 1;
+            continue;
+        }
         if index + 1 >= lines.len()
             || !is_markdown_table_row(line.trim())
             || !is_markdown_table_separator(lines[index + 1].trim())
@@ -176,6 +191,17 @@ pub(crate) fn evaluate_markdown_table_formulas(
         register_named_table(&mut named_tables, table_id.as_deref(), &rows);
     }
     output.join("\n")
+}
+
+fn fenced_code_marker(line: &str) -> Option<&'static str> {
+    let trimmed = line.trim_start();
+    if trimmed.starts_with("```") {
+        Some("```")
+    } else if trimmed.starts_with("~~~") {
+        Some("~~~")
+    } else {
+        None
+    }
 }
 
 pub(crate) fn collect_table_summaries(document_ast: &DocumentAst) -> Vec<TableSummary> {
