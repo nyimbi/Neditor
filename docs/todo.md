@@ -133,6 +133,13 @@ Recent local verification evidence from this buildout:
   --grep "edits table structure" --project chromium`: blocked locally by the
   macOS Chromium Mach bootstrap permission failure before app assertions;
   escalated local browser execution was rejected by the approval reviewer.
+- `gh run watch 26143491444 --exit-status`: diagnosed the first pushed
+  table-structure workflow failure; 13 browser tests passed and the new test
+  expected raw `74000` after currency formatting had correctly rendered
+  `$74000`.
+- `pnpm run test:unit`, `pnpm run build`, `pnpm exec playwright test --list`,
+  and `git diff --check`: passed again after tightening the table-structure
+  assertion to match currency formatting.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized

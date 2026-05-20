@@ -222,6 +222,11 @@ Additional table editor workflow verification:
 | `pnpm exec playwright test --list` | Pass | Listed 14 Chromium workflow tests, including `edits table structure with formats and cancels draft changes`. |
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test e2e/app-workflows.spec.ts --grep "edits table structure" --project chromium` | Blocked by sandbox | Chromium launched, then failed before app assertions with `bootstrap_check_in ... Permission denied (1100)`. Escalated local browser execution was rejected by the approval reviewer. |
 | `git diff --check` | Pass | No whitespace errors in the current diff. |
+| `gh run watch 26143491444 --exit-status` | Failure diagnosed | For `5a97d86`, 13 browser tests passed and the new table-structure test failed because the assertion expected raw `74000` after the Value column had been switched to currency format; the preview correctly rendered `$74000`. |
+| `pnpm run test:unit` | Pass | Re-run after fixing the table-structure assertion; 8 frontend unit tests passed. |
+| `pnpm run build` | Pass | Re-run after fixing the table-structure assertion; `vue-tsc --noEmit` and Vite build passed. |
+| `pnpm exec playwright test --list` | Pass | Re-run after fixing the table-structure assertion; still lists 14 Chromium workflow tests. |
+| `git diff --check` | Pass | No whitespace errors after fixing the table-structure assertion. |
 
 Current CI evidence log:
 

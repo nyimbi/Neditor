@@ -748,7 +748,7 @@ test("edits table structure with formats and cancels draft changes", async ({ pa
   await page.getByRole("button", { name: "Add row" }).click();
   await page.getByLabel("Item, row 2, column A").fill("Cost");
   await page.getByLabel("Value, row 2, column B").fill("74000");
-  await expect(markdownPreview).toHaveValue(/Cost\s+\|\s+74000/);
+  await expect(markdownPreview).toHaveValue(/Cost\s+\|\s+\$74000/);
 
   await page.getByRole("button", { name: "Remove row 2" }).click();
   await expect(markdownPreview).not.toHaveValue(/Cost/);
