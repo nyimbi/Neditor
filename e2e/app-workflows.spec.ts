@@ -174,6 +174,45 @@ async function installTauriMock(page: Page) {
       });
     }
 
+    function citationReferencesFromMarkdown(text: string) {
+      return text.split(/\r?\n/).flatMap((line, lineIndex) => {
+        const references: Array<{ key: string; locator: string | null; line: number; column: number; end_column: number }> = [];
+        const citationPattern = /\[[^\]\n]*@([A-Za-z0-9_:-]+)([^\]\n]*)\]/g;
+        for (const match of line.matchAll(citationPattern)) {
+          if (match.index === undefined) continue;
+          const locator = match[2]?.replace(/^,\s*/, "").trim() || null;
+          references.push({
+            key: match[1],
+            locator,
+            line: lineIndex + 1,
+            column: match.index + 1,
+            end_column: match.index + match[0].length + 1,
+          });
+        }
+        return references;
+      });
+    }
+
+    function glossaryFromMarkdown(text: string) {
+      const glossary: Record<string, string> = {};
+      const glossaryBlockPattern = /```glossary\s*\n([\s\S]*?)```/g;
+      for (const block of text.matchAll(glossaryBlockPattern)) {
+        for (const line of block[1].split(/\r?\n/)) {
+          const match = line.match(/^\s*([^:]+):\s*(.+?)\s*$/);
+          if (match) glossary[match[1].trim()] = match[2].trim();
+        }
+      }
+      return glossary;
+    }
+
+    function indexTermsFromMarkdown(text: string) {
+      const terms = new Set<string>();
+      for (const match of text.matchAll(/#index:([^}\n]+)/g)) {
+        terms.add(match[1].trim());
+      }
+      return Array.from(terms);
+    }
+
     function expandIncludes(text: string, filePath = "/workspace/market.md", depth = 0, seen = new Set<string>()) {
       const compiledLines: string[] = [];
       const includeGraph: Array<{ parent: string; child: string; depth: number }> = [];
@@ -216,6 +255,9 @@ async function installTauriMock(page: Page) {
       const title = titleFromMarkdown(text);
       const status = statusFromMarkdown(text);
       const headings = headingsFromMarkdown(expanded.compiled);
+      const citationReferences = citationReferencesFromMarkdown(expanded.compiled);
+      const glossary = glossaryFromMarkdown(expanded.compiled);
+      const indexTerms = indexTermsFromMarkdown(expanded.compiled);
       const sourceHash = hash(text);
       const metadata = { title, status, version: "1.0.0" };
       const diagnostics = expanded.diagnostics;
@@ -249,10 +291,10 @@ async function installTauriMock(page: Page) {
           table_summaries: [],
           figures: 0,
           equations: 0,
-          citations: [],
-          citation_references: [],
+          citations: citationReferences,
+          citation_references: citationReferences,
           duplicate_bibliography_keys: [],
-          glossary: {},
+          glossary,
           layout_directives: [],
           comments: [],
           change_notes: [],
@@ -279,7 +321,7 @@ async function installTauriMock(page: Page) {
         source_map: [],
         metadata,
         bibliography: [],
-        index_terms: [],
+        index_terms: indexTerms,
         formula_graph: [],
         formula_dependency_edges: [],
         transform_artifacts: [],
@@ -741,6 +783,49 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Command Target");
   await page.getByRole("button", { name: /Command Target Heading line/ }).click();
   await expect(page.locator(".cm-line").filter({ hasText: "## Command Target" })).toBeVisible();
+});
+
+test("runs command palette citation glossary and index navigation", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/reference-navigation.md",
+    [
+      "---",
+      "title: Reference Navigation",
+      "status: draft",
+      "---",
+      "",
+      "# Reference Navigation",
+      "",
+      "Citation target cites [@risk2026, p. 4] for the operating model.",
+      "",
+      "```glossary",
+      "ARR: Annual recurring revenue.",
+      "```",
+      "",
+      "Working capital{#index:Working Capital} should be easy to find.",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/reference-navigation.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("risk2026");
+  await page.getByRole("button", { name: "[@risk2026] Citation" }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("references");
+  await expect(page.locator(".cm-line").filter({ hasText: "Citation target cites" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("ARR");
+  await page.getByRole("button", { name: "ARR Glossary" }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("references");
+  await expect(page.locator(".cm-line").filter({ hasText: "ARR: Annual recurring revenue." })).toBeVisible();
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Working Capital");
+  await page.getByRole("button", { name: "Working Capital Index" }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("references");
+  await expect(page.locator(".cm-line").filter({ hasText: "Working capital" })).toBeVisible();
 });
 
 test("runs command palette insertion and table editor workflows", async ({ page }) => {

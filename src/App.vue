@@ -1491,6 +1491,7 @@ const commands = computed(() => [
     group: "Glossary",
     run: () => {
       store.sidebar = "references";
+      goToSearchTerm(term);
     },
   })),
   ...((active.value.compile?.index_terms || []).map((term) => ({
