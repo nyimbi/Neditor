@@ -92,7 +92,7 @@ If an engine is installed through a package manager shim, verify that the shim w
 | --- | --- | --- | --- |
 | Graphviz / DOT | stdin | SVG stdout | Uses `dot -Tsvg` semantics. |
 | D2 | stdin | SVG stdout | Uses SVG export profile. |
-| Pikchr | stdin | SVG stdout | Native fallback covers simple diagrams. `pikchr-cli` executables receive the source as a direct positional argument. |
+| Pikchr | stdin | SVG stdout | Native fallback covers simple diagrams. `pikchr-cli` executables receive a temporary `.pikchr` source file path as their positional argument. |
 | PlantUML | file | SVG sidecar | File mode avoids version-specific stdin behavior. |
 
 ## Troubleshooting

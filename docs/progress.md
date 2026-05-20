@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `9a6d52e Record the
-  passing browser workflow lane`
+- Latest inspected committed baseline before this update: `25f7b04 Keep
+  optional Pikchr proof compatible with CI`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -46,6 +46,8 @@ Recent pushed checkpoints visible in current git history:
 - `9a6d52e` recorded the first passing Linux browser workflow CI lane in the
   durable docs.
 - `5ce5b99` rewrote the active backlog around the latest survey and CI evidence.
+- `25f7b04` Unix-gated the external transform test cache helper and attempted a
+  `pikchr-cli` positional source compatibility path.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -97,12 +99,12 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `9a6d52e` is not green: Windows fails clippy on a
-  dead-code test helper in `src/transforms/external.rs`, and Ubuntu fails the
-  installed Pikchr conformance test because the installed `pikchr-cli` requires
-  a positional `<PIKCHR>` argument. A local fix is in progress to Unix-gate the
-  test helper and support `pikchr-cli` source-argument invocation; CI has not
-  yet verified that fix.
+- Latest pushed CI for commit `25f7b04` is not green: macOS desktop and browser
+  workflow jobs pass, Windows reaches Rust tests and fails four path-sensitive
+  file/workspace/media export tests, and Ubuntu still fails installed Pikchr
+  conformance because CI's `pikchr-cli` expects a positional source file path.
+  A local fix is in progress to normalize serialized paths and pass a temporary
+  `.pikchr` file path to `pikchr-cli`; CI has not yet verified that fix.
 - Initial browser-level workflow tests pass in Linux CI, but coverage is still
   narrow and local sandbox execution still fails before app assertions because
   Chromium cannot register its Mach bootstrap port.
@@ -175,10 +177,21 @@ Current CI follow-up:
 | `XDG_CACHE_HOME=.cache gh api repos/nyimbi/Neditor/actions/jobs/76858711971/logs` | Windows failure diagnosed | Clippy failed because `clear_external_transform_memory_cache_for_tests` in `src/transforms/external.rs:444` was dead code in the Windows lib-test target. |
 | `XDG_CACHE_HOME=.cache gh api repos/nyimbi/Neditor/actions/jobs/76858711986/logs` | Ubuntu failure diagnosed | `external_transform_conformance_runs_installed_engines` failed because the installed `pikchr-cli` requires a positional `<PIKCHR>` argument and exited with status 2. |
 | `cargo fmt --check` in `src-tauri` | Pass | Re-run after the external transform adapter fix. |
-| `cargo test --locked external_transform_adapters_shape_engine_specific_invocations --lib` in `src-tauri` | Pass | Covers the new `pikchr-cli` positional source adapter path. |
+| `cargo test --locked external_transform_adapters_shape_engine_specific_invocations --lib` in `src-tauri` | Pass | Covered the first attempted `pikchr-cli` positional raw-source adapter path. |
 | `cargo test --locked external_transform_tests --lib` in `src-tauri` | Pass | 8 external transform tests passed, including installed-engine conformance path and trust/timeout/error behavior. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Re-run after Unix-gating the test cache helper and adding the Pikchr adapter path. |
 | `cargo test --locked` in `src-tauri` | Pass | 126 Rust tests passed plus main/doc test targets with 0 tests. |
+| `gh run view 26132634911 --json status,conclusion,headSha,jobs` | Mixed CI result | For `25f7b04`, browser workflow and macOS desktop passed; Windows desktop failed Rust tests; Ubuntu desktop failed Rust tests. |
+| `XDG_CACHE_HOME=.cache gh api repos/nyimbi/Neditor/actions/jobs/76860838872/logs` | Windows failure diagnosed | Four Rust tests failed because serialized paths were not stable across Windows separators: file watch aliases, workspace listing, local figure media, and duplicate include bundle tests. |
+| `XDG_CACHE_HOME=.cache gh api repos/nyimbi/Neditor/actions/jobs/76860838881/logs` | Ubuntu follow-up diagnosed | The no-argument Pikchr failure moved forward, but `pikchr-cli` treated the raw source argument as a missing file path and exited with status 1. |
+| `cargo test --locked external_transform_adapters_shape_engine_specific_invocations --lib` in `src-tauri` | Pass | Covers `pikchr-cli` receiving a temporary `.pikchr` source path. |
+| `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | Covers slash-normalized watched paths and workspace listing on the local platform. |
+| `cargo test --locked media_export_tests --lib` in `src-tauri` | Pass | Covers slash-normalized manifest/include/media paths on the local platform. |
+| `cargo fmt --check` in `src-tauri` | Pass | Re-run after the latest Pikchr/path fixes; formatting is clean. |
+| `cargo test --locked external_transform_tests --lib` in `src-tauri` | Pass | 8 external transform tests passed with temporary source path delivery for `pikchr-cli`. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Re-run after the latest Pikchr/path fixes; no warnings. |
+| `cargo test --locked` in `src-tauri` | Pass | 126 Rust tests passed plus main/doc test targets with 0 tests. |
+| `git diff --check` | Pass | No whitespace errors in the current diff. |
 
 Relevant CI fixes already landed:
 

@@ -57,7 +57,7 @@ pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 pub(crate) fn path_to_string(path: &Path) -> String {
-    path.to_string_lossy().to_string()
+    path.to_string_lossy().replace('\\', "/")
 }
 
 pub(crate) fn escape_html(text: &str) -> String {

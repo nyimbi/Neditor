@@ -257,7 +257,7 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
     let pikchr_cli = std::env::temp_dir().join(format!("pikchr-cli-{unique}.sh"));
     fs::write(
         &pikchr_cli,
-        "#!/bin/sh\nif [ \"$#\" -ne 1 ]; then echo 'missing source argument' >&2; exit 2; fi\nprintf '<svg data-args=\"%s\">%s</svg>' \"$#\" \"$1\"\n",
+        "#!/bin/sh\nif [ \"$#\" -ne 1 ]; then echo 'missing source path' >&2; exit 2; fi\nif [ ! -f \"$1\" ]; then echo 'source path missing' >&2; exit 1; fi\nprintf '<svg data-args=\"%s\">' \"$#\"\ncat \"$1\"\nprintf '</svg>'\n",
     )
     .expect("write fake pikchr-cli");
     let mut permissions = fs::metadata(&pikchr_cli)
@@ -276,13 +276,14 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
         max_input_bytes: Some(1024),
         max_output_bytes: Some(2048),
     })
-    .expect("pikchr-cli positional source adapter transform");
+    .expect("pikchr-cli positional source path adapter transform");
     assert!(pikchr_artifact.html.contains(&pikchr_body));
     assert!(pikchr_artifact.diagnostics.iter().any(|diagnostic| {
-        diagnostic
-            .related
-            .iter()
-            .any(|related| related == "adapter_args: <source>")
+        diagnostic.related.iter().any(|related| {
+            related.starts_with("adapter_args: ")
+                && related.contains("neditor-pikchr-")
+                && related.ends_with(".pikchr")
+        })
     }));
 
     let engines = list_transform_engines();

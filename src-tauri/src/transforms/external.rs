@@ -165,7 +165,6 @@ struct ExternalEngineAdapter {
     input_mode: &'static str,
     args: Vec<String>,
     stdin: bool,
-    source_arg: bool,
     sidecar_output_suffix: Option<&'static str>,
 }
 
@@ -176,18 +175,6 @@ impl ExternalEngineAdapter {
             input_mode,
             args,
             stdin: input_mode == "stdin",
-            source_arg: false,
-            sidecar_output_suffix: None,
-        }
-    }
-
-    fn source_arg(engine: &'static str, input_mode: &'static str) -> Self {
-        Self {
-            engine,
-            input_mode,
-            args: Vec::new(),
-            stdin: false,
-            source_arg: true,
             sidecar_output_suffix: None,
         }
     }
@@ -203,18 +190,16 @@ impl ExternalEngineAdapter {
             input_mode,
             args,
             stdin: false,
-            source_arg: false,
             sidecar_output_suffix: Some(output_suffix),
         }
     }
 
     fn cache_identity(&self, engine_identity: &str) -> String {
         format!(
-            "{engine_identity};adapter={};mode={};args={};source_arg={}",
+            "{engine_identity};adapter={};mode={};args={}",
             self.engine,
             self.input_mode,
-            self.args.join("\u{1f}"),
-            self.source_arg
+            self.args.join("\u{1f}")
         )
     }
 }
@@ -260,11 +245,11 @@ fn external_engine_adapter(
             vec!["-tsvg".to_string(), temp],
             "svg",
         )),
-        ("pikchr", "stdin") if pikchr_uses_source_argument(engine_path) => {
-            Ok(ExternalEngineAdapter::source_arg("pikchr", "stdin"))
+        ("pikchr", "stdin") if pikchr_uses_source_file_argument(engine_path) => {
+            Ok(ExternalEngineAdapter::stdout("pikchr", "stdin", vec![temp]))
         }
-        ("pikchr", "file") if pikchr_uses_source_argument(engine_path) => {
-            Ok(ExternalEngineAdapter::source_arg("pikchr", "file"))
+        ("pikchr", "file") if pikchr_uses_source_file_argument(engine_path) => {
+            Ok(ExternalEngineAdapter::stdout("pikchr", "file", vec![temp]))
         }
         ("pikchr", "stdin") => Ok(ExternalEngineAdapter::stdout("pikchr", "stdin", Vec::new())),
         ("pikchr", "file") => Ok(ExternalEngineAdapter::stdout("pikchr", "file", vec![temp])),
@@ -273,7 +258,7 @@ fn external_engine_adapter(
     }
 }
 
-fn pikchr_uses_source_argument(engine_path: &Path) -> bool {
+fn pikchr_uses_source_file_argument(engine_path: &Path) -> bool {
     engine_path
         .file_stem()
         .and_then(|name| name.to_str())
@@ -283,12 +268,12 @@ fn pikchr_uses_source_argument(engine_path: &Path) -> bool {
         })
 }
 
-fn adapter_args_label(adapter: &ExternalEngineAdapter) -> String {
-    let mut args = adapter.args.clone();
-    if adapter.source_arg {
-        args.push("<source>".to_string());
-    }
-    args.join(" ")
+fn external_transform_requires_temp_input(
+    name: &str,
+    input_mode: &str,
+    engine_path: &Path,
+) -> bool {
+    input_mode == "file" || (name == "pikchr" && pikchr_uses_source_file_argument(engine_path))
 }
 
 fn external_engine_temp_suffix(name: &str) -> &'static str {
@@ -525,7 +510,7 @@ fn execute_external_transform(
     let mut temp_input = None;
     let mut temp_output = None;
 
-    if input_mode == "file" {
+    if external_transform_requires_temp_input(name, input_mode, request.engine_path) {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
@@ -549,9 +534,6 @@ fn execute_external_transform(
 
     let mut command = Command::new(request.engine_path);
     command.args(&adapter.args);
-    if adapter.source_arg {
-        command.arg(request.body);
-    }
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     if adapter.stdin {
         command.stdin(Stdio::piped());
@@ -714,7 +696,7 @@ fn execute_external_transform(
         .push(format!("adapter: {}", adapter.engine));
     diagnostic
         .related
-        .push(format!("adapter_args: {}", adapter_args_label(&adapter)));
+        .push(format!("adapter_args: {}", adapter.args.join(" ")));
     diagnostic
         .related
         .push(format!("engine_version: {}", request.engine_version));
@@ -902,7 +884,7 @@ fn transform_adapter_profile(name: &str) -> &'static str {
         "dot" | "graphviz" => "Graphviz DOT adapter: invokes -Tsvg and captures SVG from stdout.",
         "d2" => "D2 adapter: invokes input-to-stdout mode with '-' as the output target.",
         "plantuml" => "PlantUML adapter: uses -tsvg -pipe for stdin, or reads PlantUML's SVG sidecar for file mode.",
-        "pikchr" => "Pikchr adapter: passes stdin directly, a temporary Pikchr source file, or a direct source argument for pikchr-cli.",
+        "pikchr" => "Pikchr adapter: passes stdin directly, a temporary Pikchr source file, or a temporary source file path for pikchr-cli.",
         _ => "No external adapter; rendered by the embedded Rust engine.",
     }
 }
@@ -919,7 +901,7 @@ fn transform_failure_suggestion(name: &str) -> &'static str {
             "Check PlantUML syntax, Java availability, and -tsvg/-pipe support for the selected launcher."
         }
         "pikchr" => {
-            "Check Pikchr syntax; NEditor passes stdin, a temporary .pikchr file, or a direct source argument for pikchr-cli."
+            "Check Pikchr syntax; NEditor passes stdin, a temporary .pikchr file, or a temporary source file path for pikchr-cli."
         }
         _ => "Review the transform source and renderer diagnostics.",
     }

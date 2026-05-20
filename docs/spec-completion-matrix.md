@@ -193,16 +193,16 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed CI on commit `9a6d52e` is not green: Windows fails clippy on a
-  dead-code external-transform test helper, and Ubuntu fails installed Pikchr
-  conformance because the detected `pikchr-cli` contract requires a positional
-  argument. Local fixes for both blockers now pass focused Rust verification,
-  but follow-up CI has not confirmed them yet.
+- Latest pushed CI on commit `25f7b04` is not green: Windows reaches Rust tests
+  and fails four path-sensitive file/workspace/media export tests, while Ubuntu
+  still fails installed Pikchr conformance because CI's `pikchr-cli` expects a
+  positional source file path. Local fixes for both blockers now pass focused
+  Rust verification, but follow-up CI has not confirmed them yet.
 - Initial browser-level workflow test harness passes in Linux CI, but local
   sandbox execution is blocked at Chromium launch before app assertions.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, but full desktop CI is
-  blocked by the Windows and Ubuntu failures above.
+  blocked by the Windows path-normalization and Ubuntu Pikchr failures above.
 - Export tests rely heavily on package/text assertions; visual/rendered quality
   remains under-proven.
 - Optional external transform engines are proven most strongly on Linux; macOS

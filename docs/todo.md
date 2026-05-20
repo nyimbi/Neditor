@@ -24,7 +24,7 @@ Current survey inputs:
   watcher modules under `src-tauri/src/`
 - Backend tests under `src-tauri/src/tests/`
 - CI workflow: `.github/workflows/ci.yml`
-- Current GitHub Actions evidence for commit `9a6d52e`
+- Current GitHub Actions evidence for commits `9a6d52e` and `25f7b04`
 
 Status vocabulary:
 
@@ -74,39 +74,42 @@ modules after behavior is locked.
 
 Latest pushed commit inspected before this fix:
 
-- `9a6d52e Record the passing browser workflow lane`
+- `25f7b04 Keep optional Pikchr proof compatible with CI`
 
 Latest GitHub Actions run inspected:
 
-- Run `26131929125` on commit `9a6d52e`
+- Run `26132634911` on commit `25f7b04`
 - Overall result: failed
 - Browser workflow job: passed
 - macOS desktop job: passed
-- Windows desktop job: failed at Rust static analysis
+- Windows desktop job: failed at Rust backend tests
 - Ubuntu desktop job: failed at Rust backend tests
 
-CI evidence from run `26131929125`:
+CI evidence from run `26132634911`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`.
 - macOS desktop passed Rust formatting, Rust check, native-watch check, clippy,
   Rust tests, frontend unit tests, frontend build, and Tauri `--no-bundle`
   desktop build.
-- Windows desktop passed setup, Rust formatting, Rust check, and native-watch
-  check, then failed `cargo clippy --locked --all-targets -- -D warnings`
-  because `src/transforms/external.rs:444` defines
-  `clear_external_transform_memory_cache_for_tests` and clippy treats it as
-  dead code in the Windows lib-test target.
+- Windows desktop passed setup, Rust formatting, Rust check, native-watch check,
+  and clippy, then failed `cargo test --locked` in path-sensitive file,
+  workspace, and media export tests. The failing tests were
+  `stable_file_ipc_aliases_open_save_as_and_watch_paths`,
+  `workspace_listing_skips_hidden_and_build_artifacts`,
+  `export_packages_local_figure_media_relative_to_source_file`, and
+  `markdown_bundle_keeps_duplicate_include_basenames_distinct`.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, and clippy, then failed
   `cargo test --locked` in
-  `external_transform_conformance_runs_installed_engines` because the installed
-  `pikchr-cli` executable requires a positional `<PIKCHR>` argument and exited
-  with status 2 when NEditor invoked it using the current adapter mode.
-- Local changes now Unix-gate the cache-clearing test helper and add a
-  `pikchr-cli` source-argument adapter path. These changes pass focused local
-  verification, but the follow-up GitHub Actions run is still required before
-  the desktop CI blocker can be closed.
+  `external_transform_conformance_runs_installed_engines`. The prior
+  no-argument failure is fixed, but the follow-up run showed that CI's
+  `pikchr-cli` treats its positional argument as a file path and failed when
+  NEditor passed the raw source string.
+- Local changes now normalize IPC/export paths to slash-separated strings and
+  adapt `pikchr-cli` by passing a temporary `.pikchr` file path. These changes
+  pass focused local verification, but the follow-up GitHub Actions run is
+  still required before the desktop CI blocker can be closed.
 
 Recent local verification evidence from this buildout:
 
@@ -120,6 +123,17 @@ Recent local verification evidence from this buildout:
 - `pnpm tauri build --no-bundle`: passed locally.
 - `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test --list`: listed the
   current browser tests.
+- `cargo test --locked external_transform_tests --lib`: passed after the
+  `pikchr-cli` temporary source path fix.
+- `cargo test --locked file_command_tests --lib`: passed after slash-normalized
+  path serialization.
+- `cargo test --locked media_export_tests --lib`: passed after slash-normalized
+  path serialization.
+- `cargo clippy --locked --all-targets -- -D warnings`: passed after the
+  latest Pikchr/path fixes.
+- `cargo test --locked`: passed after the latest Pikchr/path fixes with 126
+  Rust tests.
+- `git diff --check`: passed after the latest documentation and code edits.
 
 Known local environment caveat:
 
@@ -131,12 +145,14 @@ Known local environment caveat:
 
 ### 1. Verify The Desktop CI Fix
 
-Status: local fix implemented; remote CI verification pending.
+Status: second local fix implemented; remote CI verification pending.
 
-The two latest desktop CI failures have local fixes. Push and verify the next
-GitHub Actions run before widening the feature surface.
+The latest desktop CI failures have local fixes. Push and verify the next
+GitHub Actions run before widening the feature surface. Keep the older run
+`26131929125` in mind because it explains why the Unix-only cache-helper fix
+exists, but the current blockers are from run `26132634911`.
 
-Windows failure:
+Resolved previous Windows clippy failure:
 
 - Command: `cargo clippy --locked --all-targets -- -D warnings`
 - Job: `Desktop build (windows-latest)`
@@ -154,25 +170,52 @@ Completion criteria:
 - The helper is compiled only where it is used, used by tests on every target,
   or annotated with a narrowly justified lint expectation.
 - `cargo clippy --locked --all-targets -- -D warnings` passes locally.
-- A follow-up Windows CI job reaches later workflow steps.
+- Follow-up Windows CI reached Rust backend tests in run `26132634911`.
+
+Current Windows failure:
+
+- Command: `cargo test --locked`
+- Job: `Desktop build (windows-latest)`
+- Run: `26132634911`
+- Failing tests:
+  `stable_file_ipc_aliases_open_save_as_and_watch_paths`,
+  `workspace_listing_skips_hidden_and_build_artifacts`,
+  `export_packages_local_figure_media_relative_to_source_file`, and
+  `markdown_bundle_keeps_duplicate_include_basenames_distinct`.
+- Failure shape: native Windows path separators caused unstable IPC/export
+  path identity and relative path assertions.
+
+Local fix:
+
+- `path_to_string` now serializes paths with `/` separators so file IPC,
+  workspace listings, manifests, include maps, media maps, and tests share the
+  same cross-platform path representation.
+
+Completion criteria:
+
+- Windows CI passes the four previously failing Rust tests.
+- The path normalization does not break local file commands, Git commands,
+  external engine execution, or export artifact references.
 
 Ubuntu failure:
 
 - Command: `cargo test --locked`
 - Job: `Desktop build (ubuntu-22.04)`
-- Run: `26131929125`
+- Run: `26132634911`
 - Failing test:
   `external_transform_conformance_runs_installed_engines`
-- Failure: `pikchr-cli` exits with status 2 and reports that required argument
-  `<PIKCHR>` was not provided.
+- Failure: `pikchr-cli` exits with status 1 and reports `No such file or
+  directory` after receiving the raw source as its positional argument. This
+  means CI's installed CLI contract is positional source file path, not
+  positional source text.
 
 Local fix:
 
 - The external Pikchr adapter now detects `pikchr-cli` executables and passes
-  the Pikchr source as a direct positional argument while preserving stdin/file
-  behavior for other Pikchr executables.
-- The adapter cache identity and diagnostics now include whether the source was
-  passed as an argument.
+  a temporary `.pikchr` source file path while preserving stdin/file behavior
+  for other Pikchr executables.
+- The adapter cache identity and diagnostics include the selected adapter args,
+  with runtime diagnostics exposing the temporary source path.
 
 Completion criteria:
 
