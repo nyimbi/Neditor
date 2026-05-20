@@ -25,7 +25,7 @@ is not "Complete".
 | 2 Source Prompt Extension | Split, preview-only, focus/source modes | Partial | `src/App.vue` mode controls; `e2e/app-workflows.spec.ts` covers split/source/preview modes; GitHub Actions browser job passed on commit `420af08` | Focus/export/review/presentation modes and desktop execution still need proof. |
 | 2 Source Prompt Extension | Local new/open/save/save-as flows | Partial | `src/stores/documents.ts`; `src-tauri/src/filesystem.rs`; file command tests | Browser/desktop workflow tests for dialogs and state transitions. |
 | 2 Source Prompt Extension | Window title reflects file and dirty state | Partial | `windowTitle` getter and `setWindowTitle` in `src/App.vue` | Desktop/browser assertion for title updates. |
-| 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler; browser CI run `26154535588` covers CodeMirror search keybinding and command-palette heading search/navigation; browser CI run `26155535210` covers command-palette citation, glossary, and index navigation | Document/workspace navigation commands and broader shortcut coverage. |
+| 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler; browser CI run `26154535588` covers CodeMirror search keybinding and command-palette heading search/navigation; browser CI run `26155535210` covers command-palette citation, glossary, and index navigation; browser CI run `26156393184` covers open-document switching and workspace-file command navigation | Broader shortcut coverage and native desktop command execution proof. |
 | 2 Source Prompt Extension | Light/dark/system theme and typography | Partial | Settings in `src/App.vue`; persisted preferences in store | Visual/accessibility verification across themes. |
 | 2 Source Prompt Extension | Cross-platform packaging | Partial | `.github/workflows/ci.yml`; `README.md` packaging note | Full bundle evidence for Windows/Linux and refreshed macOS bundle/DMG status. |
 | 3 Product Positioning | Local-first document workbench, not cloud suite | Partial | Local file/snapshot/Git/export design | User documentation and fixture workflows need to prove positioning. |
@@ -147,7 +147,7 @@ is not "Complete".
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
 | 19 Workspace/tab groups | Tabs, groups, pinning, recents, restore | Partial | `src/App.vue`; store persistence | Document-set grouping and workflow tests. |
-| 20 Command palette | Search commands/headings/citations/glossary/index | Partial | `commands` computed in `src/App.vue`; Playwright table insertion command test; browser CI run `26154535588` covers heading command navigation; browser CI run `26155535210` covers citation, glossary, and index command navigation | Document/workspace navigation commands, broader keyboard shortcuts, and non-sandboxed execution. |
+| 20 Command palette | Search commands/headings/citations/glossary/index/documents/workspace files | Partial | `commands` computed in `src/App.vue`; Playwright table insertion command test; browser CI run `26154535588` covers heading command navigation; browser CI run `26155535210` covers citation, glossary, and index command navigation; browser CI run `26156393184` covers open-document switching and workspace-file opening | Broader keyboard shortcuts and non-sandboxed/native execution. |
 | 21 Preferences | Theme, typography, export, Git, AI, transforms, recents | Partial | Settings UI; persisted workspace | Migration/schema tests and UI workflow. |
 | 22 Security/privacy | Local-first, trust-gated executable transforms, no shell | Partial | External transform runner/tests; local file design | Security review, platform proof, threat-model docs. |
 | 23 Accessibility | Keyboard, ARIA, contrast, reduced motion | Partial | Some labels/roles/settings in UI | Accessibility audit and automated/manual checks. |
@@ -193,11 +193,11 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed code CI on commit `5f75e44` is green across browser workflows and
+- Latest pushed code CI on commit `145942a` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26155535210` with 26
+- Browser-level workflow harness passes in Linux CI run `26156393184` with 27
   Chromium tests, including advanced table editor coverage, mocked file
   lifecycle coverage, save-as, recently closed reopening, and stale-save
   conflict copy/merge/keep-local/accept-external recovery plus watcher-originated
@@ -212,7 +212,8 @@ Current major verification gaps:
   pruning, synchronized editor/preview scrolling, preview heading
   click-to-source, persisted editor word-wrap and line-number settings,
   CodeMirror find/replace, smart list continuation, bracket auto-pairing, and
-  command-palette heading, citation, glossary, and index navigation.
+  command-palette heading, citation, glossary, index, open-document, and
+  workspace-file navigation.
   Local focused execution is
   currently blocked because the workspace-local Chromium headless-shell
   executable is missing from the Playwright cache.

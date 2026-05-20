@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `5f75e44 Prove command
-  palette reference navigation`
+- Latest inspected committed baseline before this update: `145942a Prove
+  command palette workspace navigation`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -119,6 +119,9 @@ Recent pushed checkpoints visible in current git history:
 - `5f75e44` added browser workflow proof for command-palette citation,
   glossary, and index navigation, and made glossary palette entries jump to the
   matching source term while opening the References panel.
+- `145942a` added browser workflow proof for command-palette open-document
+  switching and workspace-file opening, including active tab, editor, and file
+  sidebar state.
 
 ## Current Capability Snapshot
 
@@ -160,8 +163,9 @@ Implemented or substantially present, pending the conservative caveats in
   folder reopen/prune behavior, moved recently-closed path pruning,
   synchronized editor/preview scrolling, preview heading click-to-source,
   persisted editor word-wrap and line-number settings, CodeMirror find/replace,
-  smart list continuation, bracket auto-pairing, and command-palette heading
-  navigation, plus command-palette citation, glossary, and index navigation.
+  smart list continuation, bracket auto-pairing, command-palette heading
+  navigation, command-palette citation, glossary, and index navigation, plus
+  command-palette open-document switching and workspace-file opening.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -172,13 +176,13 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed code CI for commit `5f75e44` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26155535210`.
+- Latest pushed code CI for commit `145942a` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26156393184`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 26 Chromium tests in
-  run `26155535210`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 27 Chromium tests in
+  run `26156393184`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
   root-file conflicts, advanced table structure/format/cancel coverage, and AI
@@ -194,8 +198,9 @@ P0 gaps:
   folder reopen/prune behavior, moved recently-closed path pruning,
   synchronized editor/preview scrolling, preview heading click-to-source,
   editor word-wrap and line-number persistence, CodeMirror find/replace, smart
-  list continuation, bracket auto-pairing, and command-palette heading
-  navigation, citation navigation, glossary navigation, and index navigation.
+  list continuation, bracket auto-pairing, command-palette heading navigation,
+  citation navigation, glossary navigation, index navigation, open-document
+  switching, and workspace-file opening.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -377,6 +382,17 @@ Additional command palette reference navigation verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "citation glossary" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
 | `git diff --check` | Pass | No whitespace errors after adding command palette reference navigation coverage. |
 | `gh run watch 26155535210 --exit-status` | Pass | Commit `5f75e44` passed 26 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
+
+Additional command palette document/workspace navigation verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding command palette open-document and workspace-file workflow coverage. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the command palette document/workspace navigation update. |
+| `pnpm exec playwright test --list` | Pass | Listed 27 Chromium workflow tests, including command palette open-document switching and workspace-file opening. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "open document and workspace file" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
+| `git diff --check` | Pass | No whitespace errors after adding command palette document/workspace navigation coverage. |
+| `gh run watch 26156393184 --exit-status` | Pass | Commit `145942a` passed 27 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
 
 Current CI evidence log:
 
