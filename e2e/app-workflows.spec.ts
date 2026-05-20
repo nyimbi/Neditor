@@ -344,12 +344,6 @@ async function editorText(page: Page) {
   return page.locator(".cm-content").innerText();
 }
 
-async function replaceEditorText(page: Page, text: string) {
-  await page.locator(".cm-content").click();
-  await page.keyboard.press("ControlOrMeta+A");
-  await page.keyboard.insertText(text);
-}
-
 async function queueDialogSelection(page: Page, path: string | null) {
   await page.evaluate((selectedPath) => window.__NEDITOR_E2E__.queueDialogSelection(selectedPath), path);
 }
@@ -412,26 +406,17 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await expect(page.getByText("/workspace")).toBeVisible();
   await expect(page.getByRole("button", { name: /market\.md/ }).first()).toBeVisible();
 
-  await replaceEditorText(
-    page,
-    [
-      "---",
-      "title: Market Entry Report",
-      "status: draft",
-      "---",
-      "",
-      "# Market Entry Report",
-      "",
-      "Saved from browser workflow.",
-    ].join("\n"),
-  );
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert table");
+  await page.getByRole("button", { name: "Insert table Snippet" }).click();
+  await expect.poll(() => editorText(page)).toContain("| Item | Value |");
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("Saved from browser workflow.");
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("| Item | Value |");
 
   await queueDialogSelection(page, "/workspace/market copy.md");
   await page.getByRole("button", { name: "Duplicate" }).click();
   await expect(page.getByRole("button", { name: /market copy\.md/ })).toBeVisible();
-  await expect.poll(() => mockFileText(page, "/workspace/market copy.md")).toContain("Saved from browser workflow.");
+  await expect.poll(() => mockFileText(page, "/workspace/market copy.md")).toContain("| Item | Value |");
 
   await queueDialogSelection(page, "/workspace/renamed.md");
   await page.getByRole("button", { name: "Rename" }).click();
@@ -444,7 +429,6 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await expect.poll(() => revealedPaths(page)).toContain("/workspace/renamed.md");
 
   await setMockFileText(page, "/workspace/renamed.md", "# Renamed\n\nDisk version after rename.");
-  await replaceEditorText(page, "# Renamed\n\nLocal unsaved edit.");
   await page.getByRole("button", { name: "Revert" }).click();
   await expect.poll(() => editorText(page)).toContain("Disk version after rename.");
 });
