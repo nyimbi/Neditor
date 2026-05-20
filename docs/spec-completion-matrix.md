@@ -85,7 +85,7 @@ is not "Complete".
 | 9.1 Git-free snapshots | Local snapshots for non-Git users | Partial | `snapshot.rs`; snapshot UI/tests | Restore workflow through UI and storage-mode docs. |
 | 9.2 Export snapshots | Manifest with hashes/options/app/version/status/timestamp | Partial | `manifest.rs`; `export_commands.rs`; export command tests | Confirm all export targets write/consume manifests consistently. |
 | 9.3 Release workflow | Status values, badge, draft export warning, approval metadata, release tagging | Partial | Review UI; validation; Git tag command | Visual badge proof and workflow tests. |
-| 9.4 AI paste cleanup | Normalize chat output, code fences, bullets, tables, links, citations, insert modes | Partial | `ai_cleanup.rs`; AI modal; AI cleanup tests; shared insertion helper tests; initial Playwright modal test | Browser tests for all insert modes, clipboard behavior, provenance, and non-sandboxed execution. |
+| 9.4 AI paste cleanup | Normalize chat output, code fences, bullets, tables, links, citations, insert modes | Partial | `ai_cleanup.rs`; AI modal; AI cleanup tests; shared insertion helper tests; Playwright coverage for insert, quote, appendix, replace document, merge into section, and replace selection modes | Clipboard behavior, provenance workflows, citation TODOs, and non-sandboxed execution. |
 | 9.5 AI provenance | `ai-source`, AI-assisted sections, export appendix | Partial | `provenance.rs`; review/provenance tests; UI toggles | Workflow and export readiness proof for unreviewed content. |
 | 9.6 Includes | Include graph, diagnostics, re-render, export single doc | Partial | Document structure tests; compiler support | UI include graph/navigation and watcher workflow proof. |
 | 9.7 Business table editor | Visual editor, rows/cols, alignment, paste, sort, formats, readable Markdown, export | Partial | `src/lib/tables.ts`; table UI; frontend/backend tests; Playwright coverage for table insertion, pasted table import, numeric sorting, formula rows, merged-cell metadata, row/column add-remove behavior, column format totals, cancel-without-applying behavior, and apply-back-to-editor behavior | Remaining non-sandboxed browser execution and more export fixtures. |
@@ -193,18 +193,19 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed CI on commit `1ac72c1` is green across browser workflows and
+- Latest pushed CI on commit `dbd440d` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26140882880` with 13
+- Browser-level workflow harness passes in Linux CI run `26143632239` with 14
   Chromium tests, including advanced table editor coverage, mocked file
   lifecycle coverage, save-as, recently closed reopening, and stale-save
   conflict copy/merge/keep-local/accept-external recovery plus watcher-originated
   clean reload and dirty root-conflict coverage. Local test discovery now lists
-  14 Chromium tests after table structure/format/cancel coverage. Local focused
-  execution is blocked because workspace-local Chromium hits a Mach bootstrap
-  permission failure.
+  17 Chromium tests after AI paste quote, appendix, replace-document,
+  section-merge, and replace-selection coverage. Local focused execution is
+  blocked because workspace-local Chromium hits a Mach bootstrap permission
+  failure.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, and the desktop CI matrix
   is currently green, but desktop user journeys are still not covered by a

@@ -76,31 +76,32 @@ modules after behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `1ac72c1 Preserve reload status after watcher refresh`
+- `dbd440d Align table workflow proof with currency formatting`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26140882880` on commit `1ac72c1`
+- Run `26143632239` on commit `dbd440d`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26140882880`:
+CI evidence from run `26143632239`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 13 Chromium workflow tests, including advanced table paste import,
+  includes 14 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
-  behavior, the mocked file lifecycle flow, save-as to a new path, and reopening
-  that saved document from the recently closed list. It also now covers
-  stale-save conflict blocking, conflict compare visibility, saving unsaved
-  local edits to a copy without overwriting the disk edit, merging external
-  conflict text back into the original file, keeping local editor edits while
-  leaving the external disk edit untouched, accepting external disk content
-  into the active document, clean watcher-originated reload, and
-  watcher-originated dirty root-file conflicts.
+  behavior, row/column structure editing, column format totals,
+  cancel-without-applying behavior, the mocked file lifecycle flow, save-as to a
+  new path, and reopening that saved document from the recently closed list. It
+  also now covers stale-save conflict blocking, conflict compare visibility,
+  saving unsaved local edits to a copy without overwriting the disk edit,
+  merging external conflict text back into the original file, keeping local
+  editor edits while leaving the external disk edit untouched, accepting
+  external disk content into the active document, clean watcher-originated
+  reload, and watcher-originated dirty root-file conflicts.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -140,6 +141,15 @@ Recent local verification evidence from this buildout:
 - `pnpm run test:unit`, `pnpm run build`, `pnpm exec playwright test --list`,
   and `git diff --check`: passed again after tightening the table-structure
   assertion to match currency formatting.
+- `gh run view 26143632239 --json status,conclusion,headSha,jobs,url`: passed
+  for `dbd440d` across browser workflow tests and Ubuntu/macOS/Windows desktop
+  builds.
+- `pnpm run test:unit`: passed after adding AI paste quote, appendix, replace
+  document, section-merge, and replace-selection browser workflow coverage.
+- `pnpm run build`: passed after adding the AI paste mode browser workflow
+  coverage.
+- `pnpm exec playwright test --list`: listed 17 Chromium workflow tests after
+  adding the AI paste mode coverage.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -585,7 +595,9 @@ Status: backend cleanup and UI exist; governance workflows need proof.
 
 Finish:
 
-- Browser tests for all insert modes.
+- Browser tests for clipboard/rich paste and provenance toggles. Insert, quote,
+  appendix, replace document, merge into section, and replace selection mode
+  workflows are now covered in the browser harness locally.
 - Rich clipboard paste behavior where the runtime supports it.
 - Citation TODO insertion policy for unsupported factual claims.
 - Provenance block aliases.

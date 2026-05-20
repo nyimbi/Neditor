@@ -421,6 +421,14 @@ async function activeFileRowText(page: Page) {
   return page.locator(".sidebar .file-row.active").innerText();
 }
 
+async function insertCleanedAiPaste(page: Page, text: string, mode = "insert") {
+  await page.getByRole("button", { name: "AI Paste" }).click();
+  await page.getByRole("textbox", { name: "Original" }).fill(text);
+  await page.getByLabel("Insert mode").selectOption(mode);
+  await page.getByRole("button", { name: "Insert cleaned" }).click();
+  await expect(page.getByRole("dialog", { name: "AI paste cleanup" })).toBeHidden();
+}
+
 function externalApprovedDocument() {
   return [
     "---",
@@ -783,6 +791,43 @@ test("previews and inserts cleaned AI paste through the modal", async ({ page })
   await page.getByRole("button", { name: "Insert cleaned" }).click();
   await expect.poll(() => editorText(page)).toContain("Cleaned AI output");
   await expect(page.getByRole("dialog", { name: "AI paste cleanup" })).toBeHidden();
+});
+
+test("applies AI paste quote appendix and section merge modes", async ({ page }) => {
+  await insertCleanedAiPaste(page, "Assistant: Quote this.", "quote");
+  await expect.poll(() => editorText(page)).toContain("> Cleaned AI output");
+  await expect.poll(() => editorText(page)).toContain("> Assistant: Quote this.");
+
+  await insertCleanedAiPaste(page, "Assistant: Put this in an appendix.", "appendix");
+  await expect.poll(() => editorText(page)).toContain("## AI Draft Appendix");
+  await expect.poll(() => editorText(page)).toContain("Assistant: Put this in an appendix.");
+
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+End");
+  await insertCleanedAiPaste(page, "Assistant: Merge this into the active section.", "section");
+  await expect.poll(() => editorText(page)).toContain("Assistant: Merge this into the active section.");
+  await expect(page.locator(".status-bar")).toContainText("Merged cleaned AI paste into current section");
+});
+
+test("replaces the full document with cleaned AI paste", async ({ page }) => {
+  await insertCleanedAiPaste(page, "Assistant: Replace the whole draft.", "replace");
+
+  await expect.poll(() => editorText(page)).toContain("Cleaned AI output");
+  await expect.poll(() => editorText(page)).toContain("Assistant: Replace the whole draft.");
+  await expect.poll(() => editorText(page)).not.toContain("Original saved content.");
+  await expect.poll(() => editorText(page)).not.toContain("Market Entry Report");
+});
+
+test("replaces the selected source with cleaned AI paste", async ({ page }) => {
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+
+  await insertCleanedAiPaste(page, "Assistant: Replace the selected draft.", "selection");
+
+  await expect.poll(() => editorText(page)).toContain("Cleaned AI output");
+  await expect.poll(() => editorText(page)).toContain("Assistant: Replace the selected draft.");
+  await expect.poll(() => editorText(page)).not.toContain("Original saved content.");
+  await expect(page.locator(".status-bar")).toContainText("Inserted cleaned AI paste into selection");
 });
 
 test("opens export readiness from the export sidebar", async ({ page }) => {

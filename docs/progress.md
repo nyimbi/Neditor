@@ -133,7 +133,8 @@ Implemented or substantially present, pending the conservative caveats in
   column format totals, cancel behavior, save-as plus recently closed
   reopening, stale-save conflict copy/merge/keep-local/accept-external
   recovery, watcher-originated root reload/conflict behavior, AI paste cleanup
-  insertion, and export readiness.
+  insertion plus quote/appendix/replace-document/section/selection modes, and
+  export readiness.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -144,19 +145,20 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `1ac72c1` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26140882880`.
+- Latest pushed CI for commit `dbd440d` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26143632239`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 13 Chromium tests in
-  run `26140882880`, including mocked file lifecycle coverage, save-as plus
-  recently closed reopening, and stale-save conflict copy/merge/keep-local/
-  accept-external recovery, clean watcher reload, and watcher-originated dirty
-  root-file conflicts. This update raises local test discovery to 14 Chromium
-  tests by adding the table-structure workflow; local focused Playwright
-  execution is blocked by the workspace-local Chromium Mach bootstrap
-  permission failure.
+- Browser-level workflow tests pass in Linux CI with 14 Chromium tests in
+  run `26143632239`, including mocked file lifecycle coverage, save-as plus
+  recently closed reopening, stale-save conflict copy/merge/keep-local/
+  accept-external recovery, clean watcher reload, watcher-originated dirty
+  root-file conflicts, and advanced table structure/format/cancel coverage.
+  This update raises local test discovery to 17 Chromium tests by adding the AI
+  paste quote, appendix, replace-document, section-merge, and replace-selection
+  workflows; local focused Playwright execution is blocked by the workspace-local
+  Chromium Mach bootstrap permission failure.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -227,6 +229,15 @@ Additional table editor workflow verification:
 | `pnpm run build` | Pass | Re-run after fixing the table-structure assertion; `vue-tsc --noEmit` and Vite build passed. |
 | `pnpm exec playwright test --list` | Pass | Re-run after fixing the table-structure assertion; still lists 14 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors after fixing the table-structure assertion. |
+| `gh run view 26143632239 --json status,conclusion,headSha,jobs,url` | Pass | Commit `dbd440d` passed browser workflow tests and Ubuntu/macOS/Windows desktop builds. |
+
+Additional AI paste browser workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding AI paste quote, appendix, replace-document, section-merge, and replace-selection browser coverage. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
+| `pnpm exec playwright test --list` | Pass | Listed 17 Chromium workflow tests, including the AI paste mode workflows. |
 
 Current CI evidence log:
 
