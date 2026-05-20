@@ -67,8 +67,8 @@ NEditor is no longer a basic scaffold. The repository currently contains:
 - MIT licensing in `LICENSE`, `package.json`, `src-tauri/Cargo.toml`, and
   the Tauri desktop bundle metadata.
 - Frontend unit tests for table parsing/serialization, conflict diff alignment,
-  AI paste insertion modes, conflict merge-line composition, and local
-  verification script coverage.
+  AI paste insertion modes, conflict merge-line composition, explicit conflict
+  merge composition ordering, and local verification script coverage.
 - A Playwright browser workflow harness for the Vite-rendered workbench with a
   browser-side Tauri IPC mock.
 - References sidebar include graph navigation for parent-child include edges,
@@ -710,8 +710,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   Compare/Accept external/Keep local/Save copy actions, show local and external
   content in the compare dialog, preserve local edits as a separate copy without
   overwriting the disk edit, merge external conflict text back into the original
-  file, keep local editor edits while leaving the external disk edit untouched,
-  and accept external disk content into the active document.
+  file, compose merge output from selected local/external lines with reorder and
+  remove controls, keep local editor edits while leaving the external disk edit
+  untouched, and accept external disk content into the active document.
 - Watcher-originated root-file workflow: clean documents reload external edits
   automatically, while dirty documents open the non-destructive compare flow.
 - Included-file watcher workflow: clean master documents recompile when an
@@ -782,7 +783,8 @@ Required next coverage:
 - Theme/typography visual accessibility proof in a real browser/native runtime.
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
-- External conflict modal: more granular line-compose controls.
+- External conflict modal: native desktop proof and deeper manual UX QA for
+  the new line-composition tray.
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices,
   progress/cancellation behavior if needed, and rendered/manual proof.
@@ -1022,11 +1024,12 @@ Finish:
 ### 8. File Watcher And Conflict Workflows
 
 Status: backend and UI exist; stale-save conflict copy/merge/keep-local/
-accept-external workflow proof exists in archived browser workflow evidence.
-Clean watcher reload and watcher-originated dirty root-file conflict proof are
-also present in archived browser workflow evidence. Clean included-file
-recompile and dirty included-file conflict proof are also present in archived
-browser workflow run `26145509141`.
+accept-external workflows are covered by the local Playwright harness, with
+merge composition add/reorder/remove assertions now listed in the conflict
+merge workflow. Clean watcher reload and watcher-originated dirty root-file
+conflict proof are also present in archived browser workflow evidence. Clean
+included-file recompile and dirty included-file conflict proof are also present
+in archived browser workflow run `26145509141`.
 
 Finish:
 
@@ -1038,9 +1041,10 @@ Finish:
   run `26145509141` covers clean included-file recompile and dirty
   included-file conflict handling.
 - Save-race conflict when a file changes after the last watcher event but
-  before save. Browser archived workflow run `26139678118` covers the stale-save conflict path
-  through compare, save-copy preservation, merge-back recovery, keep-local, and
-  accept-external.
+  before save. The local Playwright harness lists the stale-save conflict path
+  through compare, save-copy preservation, merge-back recovery with explicit
+  line composition controls, keep-local, and accept-external; current-host
+  execution remains blocked by the missing Playwright Chromium binary.
 - Multi-tab watcher switching beyond the current tab-activation proof.
 - Stale watcher cleanup when tabs close or paths move beyond current
   recent-path cleanup coverage.

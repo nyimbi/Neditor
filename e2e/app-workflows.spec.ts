@@ -2223,6 +2223,16 @@ test("merges external conflict text back into the original file", async ({ page 
   await page.locator(".status-bar .conflict-actions").getByRole("button", { name: "Compare" }).click();
 
   const conflictDialog = page.getByRole("dialog", { name: "External file conflict" });
+  const mergeComposition = conflictDialog.getByRole("region", { name: "Merge composition" });
+  await expect(mergeComposition).toContainText("0 selected lines");
+  await conflictDialog.getByRole("button", { name: "Add external line 3 to merge" }).click();
+  await conflictDialog.getByRole("button", { name: "Add external line 8 to merge" }).click();
+  await expect(mergeComposition).toContainText("2 selected lines");
+  await expect(conflictDialog.getByLabel("Merged result")).toHaveValue("status: approved\nExternal disk edit.");
+  await mergeComposition.getByRole("button", { name: "Move external line 8 up" }).click();
+  await expect(conflictDialog.getByLabel("Merged result")).toHaveValue("External disk edit.\nstatus: approved");
+  await mergeComposition.getByRole("button", { name: "Remove external line 8" }).click();
+  await expect(conflictDialog.getByLabel("Merged result")).toHaveValue("status: approved");
   await conflictDialog.getByRole("button", { name: "Use external as merge base" }).click();
   await conflictDialog
     .getByLabel("Merged result")

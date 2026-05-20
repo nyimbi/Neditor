@@ -1220,6 +1220,19 @@ Additional index and glossary manager verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "citation glossary" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional external conflict composition verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the conflict merge composition tray and controls. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed, including merge composition ordering, duplicate prevention, blank-line preservation, remove, and reorder helpers. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails passed after adding labeled merge composition controls. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests; the external conflict merge workflow now contains merge composition add/reorder/remove assertions. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "merges external conflict" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

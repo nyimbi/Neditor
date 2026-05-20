@@ -11,7 +11,16 @@ import {
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
 import { migratePersistedWorkspace, normalizeCitationStyle, WORKSPACE_SCHEMA_VERSION } from "../src/lib/workspacePersistence.js";
-import { appendConflictMergeLine, applyAiPasteInsertion, quoteMarkdown } from "../src/lib/workflows.js";
+import {
+  appendConflictMergeLine,
+  appendConflictMergePart,
+  applyAiPasteInsertion,
+  moveConflictMergePart,
+  quoteMarkdown,
+  removeConflictMergePart,
+  renderConflictMergeParts,
+  type ConflictMergePart,
+} from "../src/lib/workflows.js";
 import {
   formatTableTotal,
   parseTableCellSpan,
@@ -122,6 +131,27 @@ test("conflict merge helpers compose selected local and external lines", () => {
 
   equal(merged, "alpha\nlocal\nexternal\nomega");
   equal(appendConflictMergeLine(merged, rows[1], "external"), merged);
+});
+
+test("conflict merge composition helpers preserve blank lines and ordering", () => {
+  const rows = buildConflictDiff("alpha\n\nlocal\nomega", "alpha\nexternal\n\nomega");
+  let parts: ConflictMergePart[] = [];
+
+  parts = appendConflictMergePart(parts, rows[0], "local");
+  parts = appendConflictMergePart(parts, rows[1], "external");
+  parts = appendConflictMergePart(parts, rows[2], "local");
+  parts = appendConflictMergePart(parts, rows[3], "local");
+  parts = appendConflictMergePart(parts, rows[4], "external");
+  parts = appendConflictMergePart(parts, rows[4], "external");
+
+  equal(parts.length, 5);
+  equal(renderConflictMergeParts(parts), "alpha\nexternal\n\nlocal\nomega");
+
+  parts = moveConflictMergePart(parts, parts[3].id, -1);
+  equal(renderConflictMergeParts(parts), "alpha\nexternal\nlocal\n\nomega");
+
+  parts = removeConflictMergePart(parts, parts[1].id);
+  equal(renderConflictMergeParts(parts), "alpha\nlocal\n\nomega");
 });
 
 test("AI paste insertion modes preserve workflow-specific output", () => {

@@ -1104,14 +1104,44 @@
             <div class="conflict-diff-head">External</div>
             <template v-for="row in conflictDiffRows" :key="row.key">
               <div :class="['conflict-diff-cell', `is-${row.kind}`]">
-                <button type="button" :disabled="row.localLine === null" :aria-label="row.localLine === null ? 'Use local line unavailable' : `Use local line ${row.localLine}`" @click="appendConflictMergeLine(row, 'local')">Use</button>
+                <button
+                  type="button"
+                  :disabled="row.localLine === null || isConflictMergePartSelected(row, 'local')"
+                  :aria-label="row.localLine === null ? 'Add local line unavailable' : `Add local line ${row.localLine} to merge`"
+                  @click="addConflictMergeLine(row, 'local')"
+                >
+                  Add
+                </button>
                 <pre><span>{{ row.localLine || "" }}</span>{{ row.local }}</pre>
               </div>
               <div :class="['conflict-diff-cell', `is-${row.kind}`]">
-                <button type="button" :disabled="row.externalLine === null" :aria-label="row.externalLine === null ? 'Use external line unavailable' : `Use external line ${row.externalLine}`" @click="appendConflictMergeLine(row, 'external')">Use</button>
+                <button
+                  type="button"
+                  :disabled="row.externalLine === null || isConflictMergePartSelected(row, 'external')"
+                  :aria-label="row.externalLine === null ? 'Add external line unavailable' : `Add external line ${row.externalLine} to merge`"
+                  @click="addConflictMergeLine(row, 'external')"
+                >
+                  Add
+                </button>
                 <pre><span>{{ row.externalLine || "" }}</span>{{ row.external }}</pre>
               </div>
             </template>
+          </section>
+          <section class="merge-composition" aria-label="Merge composition">
+            <header>
+              <strong>Merge composition</strong>
+              <span>{{ conflictMergeParts.length }} selected lines</span>
+            </header>
+            <p v-if="!conflictMergeParts.length" class="sidebar-hint">Add local and external lines in the order they should appear, then review the merged result before applying.</p>
+            <ol v-else>
+              <li v-for="(part, index) in conflictMergeParts" :key="part.id">
+                <span class="merge-source">{{ part.source }} {{ part.line }}</span>
+                <code>{{ part.text || "blank line" }}</code>
+                <button type="button" :disabled="index === 0" :aria-label="`Move ${part.source} line ${part.line} up`" @click="moveConflictLine(part.id, -1)">Up</button>
+                <button type="button" :disabled="index === conflictMergeParts.length - 1" :aria-label="`Move ${part.source} line ${part.line} down`" @click="moveConflictLine(part.id, 1)">Down</button>
+                <button type="button" :aria-label="`Remove ${part.source} line ${part.line}`" @click="removeConflictLine(part.id)">Remove</button>
+              </li>
+            </ol>
           </section>
           <label class="merge-editor">
             Merged result
@@ -1151,7 +1181,14 @@ import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
-import { appendConflictMergeLine as appendConflictMergeLineText } from "./lib/workflows";
+import {
+  appendConflictMergePart,
+  moveConflictMergePart,
+  removeConflictMergePart,
+  renderConflictMergeParts,
+  type ConflictMergePart,
+  type ConflictMergeSource,
+} from "./lib/workflows";
 import {
   compareTableCells,
   formatTableTotal,
@@ -1206,6 +1243,7 @@ const aiPreviewSignature = ref("");
 const commandPaletteOpen = ref(false);
 const conflictOpen = ref(false);
 const mergedConflictText = ref("");
+const conflictMergeParts = ref<ConflictMergePart[]>([]);
 const commandQuery = ref("");
 const reviewCommentText = ref("");
 const changeNoteText = ref("");
@@ -1802,6 +1840,14 @@ watch(
     editorView.dispatch({
       changes: { from: 0, to: editorView.state.doc.length, insert: text },
     });
+  },
+);
+
+watch(
+  () => store.externalConflict?.path || "",
+  () => {
+    conflictMergeParts.value = [];
+    mergedConflictText.value = "";
   },
 );
 
@@ -2850,20 +2896,40 @@ async function saveConflictCopy() {
   }
 }
 
-function seedConflictMerge(source: "local" | "external") {
+function seedConflictMerge(source: ConflictMergeSource) {
+  conflictMergeParts.value = [];
   mergedConflictText.value = source === "external" ? store.externalConflict?.externalText || "" : conflictDocument.value.text;
 }
 
 function clearConflictMerge() {
+  conflictMergeParts.value = [];
   mergedConflictText.value = "";
 }
 
-function appendConflictMergeLine(row: ConflictDiffRow, source: "local" | "external") {
-  mergedConflictText.value = appendConflictMergeLineText(mergedConflictText.value, row, source);
+function isConflictMergePartSelected(row: ConflictDiffRow, source: ConflictMergeSource) {
+  const line = source === "local" ? row.localLine : row.externalLine;
+  if (line === null) return false;
+  return conflictMergeParts.value.some((part) => part.id === `${source}:${line}:${row.key}`);
+}
+
+function addConflictMergeLine(row: ConflictDiffRow, source: ConflictMergeSource) {
+  conflictMergeParts.value = appendConflictMergePart(conflictMergeParts.value, row, source);
+  mergedConflictText.value = renderConflictMergeParts(conflictMergeParts.value);
+}
+
+function removeConflictLine(id: string) {
+  conflictMergeParts.value = removeConflictMergePart(conflictMergeParts.value, id);
+  mergedConflictText.value = renderConflictMergeParts(conflictMergeParts.value);
+}
+
+function moveConflictLine(id: string, direction: -1 | 1) {
+  conflictMergeParts.value = moveConflictMergePart(conflictMergeParts.value, id, direction);
+  mergedConflictText.value = renderConflictMergeParts(conflictMergeParts.value);
 }
 
 async function applyConflictMerge() {
   await store.applyConflictMerge(mergedConflictText.value);
+  conflictMergeParts.value = [];
   conflictOpen.value = false;
 }
 
@@ -4989,6 +5055,60 @@ select:hover {
 
 .conflict-diff-cell.is-external {
   background: #eaf6f0;
+}
+
+.merge-composition {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #c9d2dc;
+  background: #f8fafc;
+}
+
+.merge-composition header,
+.merge-composition li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.merge-composition header {
+  justify-content: space-between;
+}
+
+.merge-composition ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.merge-composition li {
+  padding: 6px;
+  border: 1px solid #dbe3ec;
+  background: #ffffff;
+}
+
+.merge-composition code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merge-composition button {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.merge-source {
+  min-width: 74px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
 }
 
 .merge-editor {
