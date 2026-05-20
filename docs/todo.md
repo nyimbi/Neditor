@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `3e0abb7 Render page-numbered TOCs in PDF exports`
+- `45ae04f Prove include graph guardrails`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -179,7 +179,13 @@ Most recent local verification evidence:
 - `cargo test --locked compiler_reports_circular_and_too_deep_includes --lib -- --nocapture`:
   passed and proves circular include diagnostics, include-chain graph depth, and
   maximum include depth enforcement.
-- `cargo test --locked`: passed locally with 159 Rust tests on this Unix host.
+- `cargo test --locked compiler_reports_unreadable_include_targets_with_context --lib -- --nocapture`:
+  passed and proves unreadable/invalid include target diagnostics carry source
+  file, line, suggestion, include target, and resolved path context.
+- `cargo test --locked named_table_formulas_survive_cross_target_exports --lib -- --nocapture`:
+  passed and proves named table/range formulas survive HTML, PDF, DOCX, PPTX,
+  Markdown bundle text, and Markdown bundle AST outputs.
+- `cargo test --locked`: passed locally with 161 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -918,8 +924,9 @@ Readiness should validate and report:
 - Draft/export warnings.
 - Includes and include graph. Export manifests and Markdown bundles now carry
   include graph evidence, and focused compiler coverage proves missing include,
-  circular include, and maximum include depth diagnostics. Remaining work is UI
-  navigation/editing proof and unreadable-file platform coverage.
+  circular include, maximum include depth, and invalid/unreadable include target
+  diagnostics. Remaining work is UI navigation/editing proof and broader
+  platform coverage.
 - Broken local links and missing media. Broad readiness audit test coverage
   exists.
 - Citations, bibliography files, missing keys, duplicate keys, and style
@@ -1104,7 +1111,9 @@ Finish:
 
 - Table editor workflows for paste, add/remove rows/columns, sort, format,
   totals, merged cells, readable Markdown output, and cancellation.
-- Named table/range references and formula dependency graph proof.
+- Named table/range references and formula dependency graph proof. Focused Rust
+  coverage now proves named table/range formulas compile and survive HTML, PDF,
+  DOCX, PPTX, Markdown bundle text, and Markdown bundle AST outputs.
 - Inline formulas and table-cell formulas in preview/export/readiness.
 - Data sources from front matter and external CSV/TSV/JSON/YAML paths.
 - Validation for malformed data source paths, broken formulas, circular or

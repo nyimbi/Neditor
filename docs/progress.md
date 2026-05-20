@@ -1039,6 +1039,25 @@ Additional include guard verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional invalid-include and table-formula export verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_reports_unreadable_include_targets_with_context --lib -- --nocapture` in `src-tauri` | Pass | Focused compiler test proves unreadable/invalid include target diagnostics include source file, source line, suggestion, original include target, and resolved path context. |
+| `cargo test --locked named_table_formulas_survive_cross_target_exports --lib -- --nocapture` in `src-tauri` | Pass | Focused export-conformance test proves named table/range formulas resolve and survive HTML, PDF, DOCX, PPTX, Markdown bundle text, and Markdown bundle AST outputs. |
+| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after the invalid-include diagnostic and named table formula export updates. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the invalid-include diagnostic and named table formula export updates. |
+| `cargo check --locked --features native-watch` in `src-tauri` | Pass | Native watcher feature still compiles after the invalid-include diagnostic and named table formula export updates. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after the invalid-include diagnostic and named table formula export updates. |
+| `cargo test --locked` in `src-tauri` | Pass | 161 Rust tests passed; 0 failed. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests still passed after the backend/documentation update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the backend/documentation update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files had all local links resolve. |
+| `pnpm run check:a11y` | Pass | Vue template accessibility guardrails still passed. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

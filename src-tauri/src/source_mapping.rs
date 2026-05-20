@@ -108,13 +108,22 @@ pub(crate) fn expand_includes(
                     );
                     visited.remove(&canonical);
                 }
-                Err(err) => diagnostics.push(diag(
-                    "error",
-                    format!("Unable to read include file: {err}"),
-                    Some(source_file.to_string()),
-                    Some(line_index + 1),
-                    Some("Check file permissions."),
-                )),
+                Err(err) => {
+                    let mut diagnostic = diag(
+                        "error",
+                        format!("Unable to read include file: {err}"),
+                        Some(source_file.to_string()),
+                        Some(line_index + 1),
+                        Some("Check file permissions."),
+                    );
+                    diagnostic
+                        .related
+                        .push(format!("Include target: {include_target}"));
+                    diagnostic
+                        .related
+                        .push(format!("Resolved path: {}", child.display()));
+                    diagnostics.push(diagnostic);
+                }
             }
         } else {
             let generated_line = *generated_line_count + 1;

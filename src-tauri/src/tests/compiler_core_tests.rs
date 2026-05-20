@@ -676,6 +676,55 @@ fn compiler_reports_circular_and_too_deep_includes() {
 }
 
 #[test]
+fn compiler_reports_unreadable_include_targets_with_context() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-unreadable-include-{unique}"));
+    let include_dir = root.join("chapters").join("directory.md");
+    fs::create_dir_all(&include_dir).expect("create directory include target");
+    let root_doc = root.join("root.md");
+    fs::write(&root_doc, "# Root\n!include chapters/directory.md\n")
+        .expect("write unreadable include root");
+
+    let response = compile(CompileRequest {
+        text: fs::read_to_string(&root_doc).expect("read unreadable include root"),
+        file_path: Some(path_to_string(&root_doc)),
+    });
+
+    let diagnostic = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic
+                .message
+                .starts_with("Unable to read include file:")
+        })
+        .expect("unreadable include diagnostic");
+    assert_eq!(diagnostic.severity, "error");
+    assert_eq!(diagnostic.line, Some(2));
+    assert_eq!(
+        diagnostic.source_file.as_deref(),
+        Some(path_to_string(&root_doc).as_str())
+    );
+    assert!(diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("Check file permissions")));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "Include target: chapters/directory.md"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related.contains("Resolved path:")));
+
+    fs::remove_dir_all(root).expect("clean unreadable include test dir");
+}
+
+#[test]
 fn compiler_reports_broken_local_markdown_links() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

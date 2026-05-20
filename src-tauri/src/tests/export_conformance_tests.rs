@@ -280,6 +280,76 @@ fn generated_toc_exports_page_numbers_for_pdf_and_docx() {
 }
 
 #[test]
+fn named_table_formulas_survive_cross_target_exports() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Formula Export\nstatus: approved\napprovedBy: QA\n---\n# Formula Export\n\nTable: Quarterly revenue {#tbl:quarterly}\n| Quarter | Revenue |\n| --- | ---: |\n| Q1 | 100 |\n| Q2 | 180 |\n| Total | =SUM(B1:B2) |\n\nTable: Board summary {#tbl:summary}\n| Metric | Value |\n| --- | ---: |\n| Revenue rollup | =SUM(tbl:quarterly!B1:B3) |\n| Reported total | =quarterly!B3 |\n".to_string(),
+        file_path: None,
+    });
+    let options = json!({});
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    assert!(response
+        .compiled_markdown
+        .contains("| Revenue rollup | 560 |"));
+    assert!(response
+        .compiled_markdown
+        .contains("| Reported total | 280 |"));
+    assert!(response.document_ast.blocks.iter().any(|block| {
+        matches!(
+            block,
+            DocumentBlock::Table { id, rows, .. }
+                if id.as_deref() == Some("tbl:summary")
+                    && rows.iter().any(|row| row == &vec![
+                        "Revenue rollup".to_string(),
+                        "560".to_string()
+                    ])
+                    && rows.iter().any(|row| row == &vec![
+                        "Reported total".to_string(),
+                        "280".to_string()
+                    ])
+        )
+    }));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("Revenue rollup"));
+    assert!(html.contains(">560</td>"));
+    assert!(html.contains(">280</td>"));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Board summary"));
+    assert!(pdf_text.contains("(Revenue rollup) Tj"));
+    assert!(pdf_text.contains("(560) Tj"));
+    assert!(pdf_text.contains("(280) Tj"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Board summary"));
+    assert!(docx_document.contains(">560<"));
+    assert!(docx_document.contains(">280<"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Board summary"));
+    assert!(pptx_slides.contains("<a:t>560</a:t>"));
+    assert!(pptx_slides.contains("<a:t>280</a:t>"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_options = options;
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
+    assert!(bundled_text.contains("Revenue rollup | 560"));
+    assert!(bundled_text.contains("Reported total | 280"));
+    assert!(bundled_ast.contains("\"id\": \"tbl:summary\""));
+    assert!(bundled_ast.contains("560"));
+    assert!(bundled_ast.contains("280"));
+}
+
+#[test]
 fn heading_appendix_and_decision_references_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Reference Export\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}, {@appendix-a}, and {@decision-record}.\n\n## Appendix A\nSupporting detail.\n\n## Decision Record\nUse local-first exports.\n".to_string(),
