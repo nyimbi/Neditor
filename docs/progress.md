@@ -143,6 +143,9 @@ Recent pushed checkpoints visible in current git history:
   matter and strengthens
   `example_fixture_tests::example_project_fixtures_compile_and_export` so the
   target-user requirement is backed by executable compile/export proof.
+- This update strengthens the Playwright AI paste workflow harness so
+  citation TODO insertion, draft review markers, and `ai-source` provenance
+  blocks are covered through the preview and insertion UI path.
 
 ## Current Capability Snapshot
 
@@ -186,6 +189,7 @@ Implemented or substantially present, pending the conservative caveats in
   reopening, stale-save conflict copy/merge/keep-local/accept-external
   recovery, watcher-originated root reload/conflict behavior, AI paste cleanup
   insertion plus quote/appendix/replace-document/section/selection modes,
+  citation TODO insertion, draft markers, provenance blocks,
   clean included-file recompile, dirty included-file conflict handling, and
   export readiness, restart-style workspace restore, restored scroll position
   handling, missing restored-file warnings, tab activation, dirty-close
@@ -589,8 +593,8 @@ Known packaging note from `README.md`:
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
    option matrices, progress/cancellation behavior if needed, remaining preview
-   modes, broader keyboard shortcuts, deeper workspace grouping, and the
-   remaining AI provenance/table export modes.
+   modes, broader keyboard shortcuts, deeper workspace grouping, AI review-state
+   workflows, and table export modes.
 2. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
 3. Use failures from workflow tests to drive implementation fixes.

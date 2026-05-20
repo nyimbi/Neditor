@@ -585,7 +585,8 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
 - AI paste cleanup workflow: preview, insertion, quote, appendix,
-  replace-selection, merge-into-section, and replace-document modes.
+  replace-selection, merge-into-section, replace-document, citation TODO,
+  draft-marker, and provenance-block modes.
 
 Required next coverage:
 
@@ -597,8 +598,7 @@ Required next coverage:
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
 - External conflict modal: more granular line-compose controls.
-- AI paste cleanup remaining proof: provenance, citation TODOs, clipboard, and
-  review-state flows.
+- AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices,
   progress/cancellation behavior if needed, and rendered/manual proof.
 - Remaining transform engine settings: disabled-engine and cross-platform
@@ -839,10 +839,10 @@ Status: backend cleanup and UI exist; governance workflows need proof.
 Finish:
 
 - Browser tests for clipboard/rich paste and provenance toggles. Insert, quote,
-  appendix, replace document, merge into section, and replace selection mode
-  workflows are now covered in the browser harness locally.
+  appendix, replace document, merge into section, replace selection, citation
+  TODO, draft marker, and provenance block workflows are now covered in the
+  browser harness locally.
 - Rich clipboard paste behavior where the runtime supports it.
-- Citation TODO insertion policy for unsupported factual claims.
 - Provenance block aliases.
 - AI-assisted section review-state toggles.
 - Readiness/export warnings for unreviewed AI content.

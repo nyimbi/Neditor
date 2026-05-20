@@ -578,11 +578,32 @@ async function installTauriMock(page: Page) {
         };
       }
       if (cmd === "cleanup_ai_paste") {
-        const request = args.request as { text: string };
+        const request = args.request as {
+          text: string;
+          add_provenance?: boolean;
+          mark_as_draft?: boolean;
+          insert_citation_todos?: boolean;
+        };
+        const issues = ["Normalized AI paste in browser workflow test."];
+        let cleanedMarkdown = `Cleaned AI output\n\n${request.text.trim()}`;
+        if (request.insert_citation_todos && /\d|revenue|growth|market|report/i.test(cleanedMarkdown)) {
+          cleanedMarkdown = `${cleanedMarkdown} <!-- TODO: citation needed -->`;
+          issues.push("Inserted 1 citation TODO marker.");
+        }
+        if (request.mark_as_draft) {
+          cleanedMarkdown = `<!-- ai-assisted: status=needs-review | reviewedBy= | reviewedAt= | source=AI paste cleanup | promptSummary=AI paste cleanup review required -->\n\n${cleanedMarkdown}`;
+          issues.push("Marked inserted content as draft.");
+        }
+        const provenanceBlock = request.add_provenance
+          ? "```ai-source\nprovider: unknown\nmodel: unknown\ndate: 2026-05-20\npromptSummary: AI paste cleanup\nreviewedBy: \nstatus: needs-review\n```"
+          : null;
+        if (provenanceBlock) {
+          cleanedMarkdown = `${cleanedMarkdown}\n\n${provenanceBlock}`;
+        }
         return {
-          cleaned_markdown: `Cleaned AI output\n\n${request.text.trim()}`,
-          issues: ["Normalized AI paste in browser workflow test."],
-          provenance_block: null,
+          cleaned_markdown: cleanedMarkdown,
+          issues,
+          provenance_block: provenanceBlock,
         };
       }
       if (cmd === "create_snapshot") return { snapshot_path: "/tmp/mock-snapshot.md" };
@@ -1602,6 +1623,29 @@ test("previews and inserts cleaned AI paste through the modal", async ({ page })
   await expect(page.getByRole("textbox", { name: "Cleaned preview" })).toHaveValue(/Cleaned AI output/);
   await page.getByRole("button", { name: "Insert cleaned" }).click();
   await expect.poll(() => editorText(page)).toContain("Cleaned AI output");
+  await expect(page.getByRole("dialog", { name: "AI paste cleanup" })).toBeHidden();
+});
+
+test("applies AI paste provenance citation TODO and draft governance toggles", async ({ page }) => {
+  await page.getByRole("button", { name: "AI Paste" }).click();
+  await page.getByRole("textbox", { name: "Original" }).fill("Revenue grew 24%.");
+
+  await expect(page.getByLabel("Mark as draft")).toBeChecked();
+  await expect(page.getByLabel("Add provenance block")).toBeChecked();
+  await expect(page.getByLabel("Insert citation TODOs")).toBeChecked();
+
+  await page.getByRole("button", { name: "Preview cleanup" }).click();
+  const preview = page.getByRole("textbox", { name: "Cleaned preview" });
+  await expect(preview).toHaveValue(/TODO: citation needed/);
+  await expect(preview).toHaveValue(/ai-assisted: status=needs-review/);
+  await expect(preview).toHaveValue(/```ai-source/);
+  await expect(page.getByText("Inserted 1 citation TODO marker.")).toBeVisible();
+  await expect(page.getByText("Marked inserted content as draft.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Insert cleaned" }).click();
+  await expect.poll(() => editorText(page)).toContain("Revenue grew 24%. <!-- TODO: citation needed -->");
+  await expect.poll(() => editorText(page)).toContain("ai-assisted: status=needs-review");
+  await expect.poll(() => editorText(page)).toContain("```ai-source");
   await expect(page.getByRole("dialog", { name: "AI paste cleanup" })).toBeHidden();
 });
 
