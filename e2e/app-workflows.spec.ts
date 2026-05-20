@@ -1665,7 +1665,8 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
 
   await page.locator(".cm-content").click();
   await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-  await page.keyboard.type(["# Blocked Export", "", "EXPORT_BLOCKER"].join("\n"));
+  await page.keyboard.insertText(["# Blocked Export", "", "EXPORT_BLOCKER"].join("\n"));
+  await expect.poll(() => editorText(page)).toContain("EXPORT_BLOCKER");
   await page.getByRole("button", { name: "Export document" }).click();
   await expect(page.locator("article.readiness").getByText("Needs attention", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Export readiness diagnostics" })).toContainText("PPTX export requires approved metadata before writing.");
