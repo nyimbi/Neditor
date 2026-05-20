@@ -724,7 +724,7 @@ test("switches tabs, guards dirty closes, and prunes stale recent document paths
   await queueDialogSelection(page, "/workspace/rename-source.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await queueDialogSelection(page, "/workspace/rename-target.md");
-  await page.getByRole("button", { name: "Rename" }).click();
+  await page.getByRole("button", { name: "Rename", exact: true }).click();
   await expect(page.locator(".document-tabs .tab.active")).toContainText("rename-target.md");
 
   await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
