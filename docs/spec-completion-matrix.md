@@ -130,7 +130,7 @@ explicit platform checks.
 | 10.4.13 OpenAPI | API docs | Partial | `structured.rs`; `compiler_renders_openapi_and_json_schema_tables` covers title/version, servers, operation IDs, tags, path and operation parameters, request bodies, responses, media types, and component schemas | Broader OpenAPI edge cases, visual/export fixture coverage, and UI proof. |
 | 10.4.14 JSON Schema | Schema docs | Partial | `structured.rs`; `compiler_renders_openapi_and_json_schema_tables` covers title/description, nested field paths, array item paths, required flags, descriptions, refs, enums, formats, defaults, and constraints | Broader composition edge cases and visual/export fixture coverage. |
 | 10.4.15 BibTeX | Bibliography rendering | Partial | `business.rs`; transform tests | Edge-case parsing and UI integration. |
-| 10.4.16 Glossary | Definitions and term rendering | Partial | `business.rs`; glossary/index tests | Hover/UI/export proof. |
+| 10.4.16 Glossary | Definitions and term rendering | Partial | `business.rs`; glossary/index tests; `compiler_generates_glossary_sections_from_marker_and_metadata` proves `[GLOSSARY]` marker replacement, front matter-driven generated glossary insertion, preview hover preservation, and DOCX glossary artifact text; Playwright harness lists command-palette insertion for the generated glossary section | Native workflow execution and richer manager UX. |
 | 10.4.17 Timeline | Timeline SVG | Partial | `business.rs`; transform tests | Visual/export fixture coverage. |
 | 10.5 Later transforms | roadmap, ADR, diff, QR, etc. | Partial | Several implemented in transform registry | Decide which are first-release, document supported syntax. |
 
@@ -143,7 +143,7 @@ explicit platform checks.
 | 13 Tables/data | Table editing, formulas, data sources | Partial | Table lib/UI/backend tests | Interaction tests and more data-source validation. |
 | 14 Equations | Math authoring/render/export | Partial | Rich block parsing/export tests | Formula/equation references across targets. |
 | 15 Bibliography/citations | BibTeX/CSL/citation rendering | Partial | Bibliography/citation tests | Citation manager UX and style fidelity. |
-| 16 Index/glossary | Index and glossary generation | Partial | Indexing/glossary modules/tests | UI and export appendix proof. |
+| 16 Index/glossary | Index and glossary generation | Partial | Indexing/glossary modules/tests; generated glossary marker and front matter section proof; export conformance covers glossary appendix output | Native workflow execution and richer index/glossary manager UX. |
 | 17 Layout/reflow | Layout model/directives/export mapping | Partial | Layout, paged document, export tests; rich block export tests now include block quotes, callouts, lists, code blocks, tables, figures, equations, and generated sections across target artifacts | Rendered visual QA and overflow/performance work. |
 | 18 Export system | Targets, options, manifest | Partial | Export modules/tests and UI; `export_option_matrix_is_preserved_across_targets_and_bundle_evidence` proves one explicit export option matrix across every target artifact family plus Markdown bundle manifest evidence; `rich_markdown_blocks_survive_cross_target_exports` proves common Markdown/business blocks across every export target artifact family | Artifact-level completion audit, more option combinations, rendered/manual QA, and cross-platform packaging proof. |
 

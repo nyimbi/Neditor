@@ -179,6 +179,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         &headings,
         &index_entries,
         &bibliography,
+        &glossary,
     );
     let index_marker_markdown = strip_index_markers(&with_toc);
     let transform_options = TransformExecutionOptions::from_compile_options(options);

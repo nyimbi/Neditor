@@ -591,7 +591,7 @@ Additional citation readiness verification:
 | `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests; execution still depends on local Chromium availability and host permissions. |
 | `git diff --check` | Pass | No whitespace errors in the current diff. |
 
-Additional duplicate bibliography source-location verification:
+Additional citation and generated-section verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
@@ -599,17 +599,18 @@ Additional duplicate bibliography source-location verification:
 | `cargo test --locked compiler_reports_csl_and_hayagriva_duplicate_key_locations --lib -- --nocapture` in `src-tauri` | Pass | Proved duplicate-key source ranges for CSL JSON array entries and Hayagriva YAML top-level entries, including preservation of duplicate Hayagriva keys before YAML map parsing can collapse them. |
 | `cargo test --locked compiler_reports_duplicate_keys_across_external_bibliography_files --lib -- --nocapture` in `src-tauri` | Pass | Proved multiple bibliography front matter paths can load separate BibTeX and CSL JSON files, and duplicate-key diagnostics point at the duplicate key in the second external file with first-file context. |
 | `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 14 citation tests passed, including BibTeX, CSL JSON, Hayagriva, external-file duplicate-key source ranges, numeric citation rendering, unsupported CSL-style fallback diagnostics, and citation export conformance. |
+| `cargo test --locked compiler_generates_glossary_sections_from_marker_and_metadata --lib -- --nocapture` in `src-tauri` | Pass | Proved `[GLOSSARY]` marker replacement, front matter-driven generated glossary insertion, preview hover preservation, and DOCX glossary artifact text. |
 | `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after carrying bibliography source metadata. |
 | `cargo check --locked` in `src-tauri` | Pass | Finished dev profile successfully. |
 | `cargo check --locked --features native-watch` in `src-tauri` | Pass | Finished dev profile successfully. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
-| `cargo test --locked` in `src-tauri` | Pass | 152 Rust tests passed; 0 failed. |
+| `cargo test --locked` in `src-tauri` | Pass | 153 Rust tests passed; 0 failed. |
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed after extending bibliography entry shape and numeric citation-style preference normalization. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed with duplicate source locations and numeric citation style controls in the References panel. |
 | `pnpm run check:docs` | Pass | Checked 13 Markdown files; local links resolve. |
 | `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed, with Pikchr missing as an explicit optional-engine gap. |
-| `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests, including the reference-navigation workflow with duplicate bibliography source locations. |
+| `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests, including reference-navigation and command-palette insertion coverage for `[GLOSSARY]` and other generated sections. |
 | `git diff --check` | Pass | No whitespace errors in the current diff. |
 
 Additional focused verification after workflow helper extraction:

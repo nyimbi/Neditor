@@ -6,6 +6,7 @@ use crate::{
     Heading,
 };
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 #[derive(Debug)]
 struct CaptionEntry {
@@ -19,6 +20,7 @@ pub(crate) fn inject_generated_sections(
     headings: &[Heading],
     index_entries: &[IndexEntry],
     bibliography: &[BibliographyEntry],
+    glossary: &BTreeMap<String, String>,
 ) -> String {
     let wants_toc = text.contains("[TOC]")
         || metadata
@@ -66,6 +68,18 @@ pub(crate) fn inject_generated_sections(
         let index = render_index_entries(index_entries);
         output = output.replace("[INDEX]", &format!("## Index\n\n{index}"));
     }
+    if output.contains("[GLOSSARY]")
+        || metadata_bool(
+            metadata,
+            &["glossary", "glossarySection", "glossary_section"],
+        )
+    {
+        let section = render_glossary_entries(glossary);
+        output = output.replace("[GLOSSARY]", &format!("## Glossary\n\n{section}"));
+        if !text.contains("[GLOSSARY]") {
+            output = format!("## Glossary\n\n{section}\n\n{output}");
+        }
+    }
     if output.contains("[BIBLIOGRAPHY]") {
         let references = render_bibliography_entries(bibliography, citation_style(metadata));
         output = output.replace(
@@ -74,6 +88,17 @@ pub(crate) fn inject_generated_sections(
         );
     }
     output
+}
+
+fn render_glossary_entries(glossary: &BTreeMap<String, String>) -> String {
+    if glossary.is_empty() {
+        return "_No glossary terms found._".to_string();
+    }
+    glossary
+        .iter()
+        .map(|(term, definition)| format!("- **{term}**: {definition}"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn render_bibliography_entries(bibliography: &[BibliographyEntry], style: &str) -> String {

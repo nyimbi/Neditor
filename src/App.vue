@@ -1239,6 +1239,7 @@ const indexSnippet = "[INDEX]\n";
 const bibliographySnippet = "[BIBLIOGRAPHY]\n";
 const listOfFiguresSnippet = "[LIST_OF_FIGURES]\n";
 const listOfTablesSnippet = "[LIST_OF_TABLES]\n";
+const glossarySectionSnippet = "[GLOSSARY]\n";
 const glossarySnippet = "```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n";
 const layoutSnippet = "```layout\ncolumns: 2\nsection: market-analysis\n```\n";
 const commentSnippet = "<!-- comment: unresolved | author: local | at: 2026-05-18T00:00:00Z | Review note. -->\n";
@@ -1518,6 +1519,7 @@ const commands = computed(() => [
   { name: "Insert bibliography", group: "Snippet", run: () => insertBlock(bibliographySnippet) },
   { name: "Insert list of figures", group: "Snippet", run: () => insertBlock(listOfFiguresSnippet) },
   { name: "Insert list of tables", group: "Snippet", run: () => insertBlock(listOfTablesSnippet) },
+  { name: "Insert glossary section", group: "Snippet", run: () => insertBlock(glossarySectionSnippet) },
   { name: "Insert glossary", group: "Snippet", run: () => insertBlock(glossarySnippet) },
   { name: "Insert layout directive", group: "Snippet", run: () => insertBlock(layoutSnippet) },
   { name: "Insert review comment", group: "Snippet", run: () => insertBlock(commentSnippet) },

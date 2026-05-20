@@ -71,12 +71,16 @@ Add markers where generated sections should appear:
 ```md
 [TOC]
 [INDEX]
+[GLOSSARY]
 [BIBLIOGRAPHY]
 [LIST_OF_FIGURES]
 [LIST_OF_TABLES]
 ```
 
 `toc: true` in front matter can also request a table of contents.
+`glossary: true`, `glossarySection: true`, or `glossary_section: true` can
+request a generated glossary section without placing `[GLOSSARY]` in the
+source.
 
 Generated sections are built from the compiled document model, so fenced
 examples are excluded from heading, caption, citation, and reference scans.
@@ -220,9 +224,9 @@ NRR: Net revenue retention.
 ```
 ````
 
-Add `[INDEX]` where the generated index should appear. Index terms can come
-from headings, glossary terms, bold terms, repeated proper nouns, and explicit
-index markers as support expands.
+Add `[GLOSSARY]` where the generated glossary should appear. Add `[INDEX]`
+where the generated index should appear. Index terms can come from headings,
+glossary terms, bold terms, repeated proper nouns, and explicit index markers.
 
 ## Review Comments And Change Notes
 

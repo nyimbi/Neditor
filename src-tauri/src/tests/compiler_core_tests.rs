@@ -396,6 +396,39 @@ fn compiler_adds_glossary_hover_terms_to_preview_html() {
 }
 
 #[test]
+fn compiler_generates_glossary_sections_from_marker_and_metadata() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Glossary Section\nstatus: approved\napprovedBy: QA\n---\n# Glossary Section\nARR informs planning.\n\n[GLOSSARY]\n\n```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response
+        .compiled_markdown
+        .contains("## Glossary\n\n- **ARR**: Annual recurring revenue."));
+    assert!(response
+        .compiled_markdown
+        .contains("- **CAC**: Customer acquisition cost."));
+    assert!(!response.compiled_markdown.contains("[GLOSSARY]"));
+    assert!(response.html.contains("<h2 id=\"glossary\">Glossary</h2>"));
+    assert!(response.html.contains("Annual recurring revenue."));
+    assert!(response.html.contains("class=\"glossary-term\""));
+
+    let docx = render_docx_bytes(&response, &json!({})).expect("docx glossary bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Glossary"));
+    assert!(docx_document.contains("Customer acquisition cost."));
+
+    let metadata_response = compile(CompileRequest {
+            text: "---\ntitle: Front Matter Glossary\nstatus: approved\napprovedBy: QA\nglossarySection: true\n---\n# Front Matter Glossary\n\n```glossary\nARR: Annual recurring revenue.\n```\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(metadata_response
+        .compiled_markdown
+        .starts_with("## Glossary\n\n- **ARR**: Annual recurring revenue."));
+}
+
+#[test]
 fn compiler_preserves_figure_float_semantics() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Floating Figure\nstatus: approved\napprovedBy: QA\n---\n# Floating Figure\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:float caption=\"Floating diagram\" float=\"right\"}\n".to_string(),

@@ -94,8 +94,8 @@ NEditor supports standard Markdown plus business-document extensions:
 
 - YAML front matter for metadata, layout, brand, release, citation, and export
   settings.
-- Generated sections such as `[TOC]`, `[INDEX]`, `[BIBLIOGRAPHY]`,
-  `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
+- Generated sections such as `[TOC]`, `[INDEX]`, `[GLOSSARY]`,
+  `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
 - Variables such as `{{client}}` and formula expressions such as
   `{{=margin | percent}}`.
 - Calculation blocks, tables, table formulas, and data transforms.
@@ -138,6 +138,8 @@ Research and business documents can keep reference metadata near the source.
 - Choose `title`, `author-year`, `key`, or `numeric` citation style from front
   matter, preferences, or the references panel.
 - Use `glossary` fenced blocks for terms and definitions.
+- Add `[GLOSSARY]` where the generated glossary should appear, or set
+  `glossarySection: true` in front matter.
 - Add `[INDEX]` where the generated index should appear.
 - Use labels and cross references for headings, figures, tables, equations,
   appendices, and decisions.

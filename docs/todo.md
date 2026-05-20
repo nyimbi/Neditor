@@ -149,7 +149,11 @@ Most recent local verification evidence:
   including BibTeX, CSL JSON, Hayagriva, external-file duplicate-key source
   ranges, numeric citation rendering, unsupported CSL-style fallback
   diagnostics, and citation export conformance.
-- `cargo test --locked`: passed locally with 152 Rust tests on this Unix host.
+- `cargo test --locked compiler_generates_glossary_sections_from_marker_and_metadata --lib -- --nocapture`:
+  passed and proves `[GLOSSARY]` marker replacement, front matter-driven
+  generated glossary insertion, preview hover preservation, and DOCX glossary
+  artifact text.
+- `cargo test --locked`: passed locally with 153 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -165,7 +169,8 @@ Most recent local verification evidence:
 - `pnpm exec playwright test --list`: listed 35 Chromium workflow tests,
   including the new large-document browser interaction workflow plus the
   existing harness proof for command-palette insertion of `[TOC]`, `[INDEX]`,
-  `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
+  `[GLOSSARY]`, `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and
+  `[LIST_OF_TABLES]`.
 - `./node_modules/.bin/tauri build --no-bundle`: passed and built the release
   desktop binary at `src-tauri/target/release/neditor`.
 - `git diff --check`: passed.
@@ -1101,8 +1106,12 @@ Finish:
 - Cross-reference links across preview, HTML, PDF, DOCX, PPTX, and bundle
   outputs.
 - Automatic index inclusion/exclusion.
-- Glossary definition preview, hover behavior, export appendix behavior, and
-  command-palette navigation.
+- Glossary definition preview, hover behavior, generated-section marker,
+  front matter insertion, export appendix behavior, and command-palette
+  navigation. Current focused coverage proves preview hover, `[GLOSSARY]`,
+  front matter insertion, DOCX artifact text, export appendices, and command
+  palette listing; remaining work is native workflow execution and richer
+  index/glossary manager UX.
 
 ### 15. Layout And Reflow
 
