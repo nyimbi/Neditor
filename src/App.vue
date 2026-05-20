@@ -1245,7 +1245,7 @@ const externalTransformTrustPrompts = computed<TransformTrustPrompt[]>(() => {
       securitySummary: engine.securitySummary,
     }));
 });
-const manifestPreview = computed(() => JSON.stringify(active.value.compile?.export_manifest || {}, null, 2));
+const manifestPreview = computed(() => JSON.stringify(store.exportReadiness?.manifest || active.value.compile?.export_manifest || {}, null, 2));
 const readinessLayoutSummary = computed(() => {
   const sections = store.exportReadiness?.paged_document.sections || [];
   const columnedSections = sections.filter((section) => (section.layout.columns || 1) > 1).length;
