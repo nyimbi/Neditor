@@ -9,6 +9,7 @@ import {
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
+import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
 import { appendConflictMergeLine, applyAiPasteInsertion, quoteMarkdown } from "../src/lib/workflows.js";
 import {
   formatTableTotal,
@@ -145,6 +146,44 @@ test("latest document task guard rejects stale and cancelled compile results", (
 
   cancelLatestDocumentTask(gate);
   ok(!isLatestDocumentTaskCurrent(gate, second, { id: "doc-1", text: "second draft" }));
+});
+
+test("preview debounce coalesces edits inside the spec timing budget", () => {
+  ok(PREVIEW_DEBOUNCE_MS <= 100);
+  const commits: string[] = [];
+  let nextHandle = 1;
+  const scheduled = new Map<number, { callback: () => void; delayMs: number }>();
+  const debounce = createDebouncedTextCommit((text) => commits.push(text), {
+    setTimeout(callback, delayMs) {
+      const handle = nextHandle;
+      nextHandle += 1;
+      scheduled.set(handle, { callback, delayMs });
+      return handle;
+    },
+    clearTimeout(handle) {
+      scheduled.delete(handle);
+    },
+  });
+
+  debounce.schedule("first");
+  debounce.schedule("second");
+  equal(commits.length, 0);
+  equal(scheduled.size, 1);
+  const [job] = [...scheduled.values()];
+  equal(job.delayMs, PREVIEW_DEBOUNCE_MS);
+  job.callback();
+  deepEqual(commits, ["second"]);
+  equal(scheduled.size, 0);
+
+  debounce.schedule("third");
+  debounce.flush("forced");
+  deepEqual(commits, ["second", "forced"]);
+  equal(scheduled.size, 0);
+
+  debounce.schedule("cancelled");
+  debounce.cancel();
+  equal(scheduled.size, 0);
+  deepEqual(commits, ["second", "forced"]);
 });
 
 test("local verification scripts expose frontend and browser checks", () => {

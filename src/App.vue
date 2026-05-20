@@ -1083,6 +1083,7 @@ import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searc
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
+import { createDebouncedTextCommit } from "./lib/debounce";
 import { appendConflictMergeLine as appendConflictMergeLineText } from "./lib/workflows";
 import {
   compareTableCells,
@@ -1114,7 +1115,10 @@ const editorHost = ref<HTMLElement | null>(null);
 const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
-let debounceHandle = 0;
+const previewTextCommit = createDebouncedTextCommit((text) => store.updateText(text), {
+  setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+  clearTimeout: (handle) => window.clearTimeout(handle),
+});
 let autosaveHandle = 0;
 let autoSnapshotHandle = 0;
 let scrollPersistHandle = 0;
@@ -1586,6 +1590,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   recordActiveScrollPosition(true);
   editorView?.destroy();
+  previewTextCommit.cancel();
   window.clearTimeout(autosaveHandle);
   window.clearTimeout(autoSnapshotHandle);
   window.clearTimeout(scrollPersistHandle);
@@ -1812,10 +1817,7 @@ function editorExtensions() {
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
-      window.clearTimeout(debounceHandle);
-      debounceHandle = window.setTimeout(() => {
-        store.updateText(update.state.doc.toString());
-      }, 120);
+      previewTextCommit.schedule(update.state.doc.toString());
     }),
     EditorView.theme({
       "&": {
@@ -2544,8 +2546,7 @@ function flushEditorTextToStore() {
   if (!editorView) return;
   const text = editorView.state.doc.toString();
   if (active.value.text === text) return;
-  window.clearTimeout(debounceHandle);
-  store.updateText(text);
+  previewTextCommit.flush(text);
 }
 
 async function exportDocument() {

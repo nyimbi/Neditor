@@ -113,8 +113,9 @@ Most recent local verification evidence:
 - `cargo test --locked export_command_tests --lib`: passed 13 export command
   tests, including direct-export dirty-Git warnings copied into response and
   sidecar manifests plus structured export progress-step reporting.
-- `pnpm run test:unit`: passed with 9 frontend unit tests, including latest
-  document task cancellation/stale-result guard coverage.
+- `pnpm run test:unit`: passed with 10 frontend unit tests, including latest
+  document task cancellation/stale-result guard coverage and preview debounce
+  timing/coalescing coverage.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
 - `pnpm run check:a11y`: passed and checked the Vue template for accessible
   button names, form-control labels, and dialog labeling.
@@ -674,7 +675,7 @@ Required next coverage:
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices,
   progress/cancellation behavior if needed, and rendered/manual proof.
-- Large-document preview debounce timing proof.
+- Large-document native/browser performance proof.
 - Remaining transform engine settings: disabled-engine and cross-platform
   executable edge cases beyond the mocked browser workflow.
 
@@ -1029,8 +1030,8 @@ Finish:
 ### 17. Performance And Large Documents
 
 Status: compiler, repeated export-loop, repeated edit/cache, export progress,
-and compile-result cancellation evidence exists; broader performance proof
-remains open.
+compile-result cancellation, and preview debounce timing evidence exists;
+broader performance proof remains open.
 
 Current evidence:
 
@@ -1054,11 +1055,16 @@ Current evidence:
   preview compilation so stale or cancelled compile results cannot overwrite
   newer editor state. The workbench also exposes a status-bar cancel action
   while preview compilation is pending.
+- `tests/frontend-unit.test.ts` covers the preview debounce helper, asserting
+  `PREVIEW_DEBOUNCE_MS` remains within the 100 ms small-document preview budget
+  and proving rapid edits coalesce before commit while explicit flushes commit
+  immediately.
 
 Finish:
 
-- Benchmarks or deeper stress tests for memory growth and UI debounce timing.
+- Benchmarks or deeper stress tests for memory growth.
 - Memory growth checks for long editing sessions and repeated exports.
+- Native/browser performance workflow proof for large-document interaction.
 
 ## P2 - Architecture And Maintainability
 

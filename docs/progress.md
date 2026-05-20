@@ -235,6 +235,9 @@ Recent pushed checkpoints visible in current git history:
 - This update adds latest-document task guards for preview compilation, a
   status-bar cancel action while compilation is pending, and frontend unit
   coverage proving stale or cancelled compile results are rejected.
+- This update extracts preview text commit debounce into a tested helper with
+  an explicit `PREVIEW_DEBOUNCE_MS` budget and frontend unit coverage for
+  rapid-edit coalescing plus immediate flush behavior.
 
 ## Current Capability Snapshot
 
@@ -612,7 +615,7 @@ Additional review/provenance readiness metadata verification:
 | `cargo test --locked export_readiness_and_manifest_report_progress_steps --lib` in `src-tauri` | Pass | Export progress-step test passed, proving readiness/export manifests expose compile, transform, readiness, render, and manifest stages. |
 | `cargo test --locked` in `src-tauri` | Pass | 139 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness still lists 34 Chromium workflow tests after the direct-export readiness change. |
-| `pnpm run test:unit` | Pass | 9 frontend unit tests passed, including latest-document task cancellation and stale-result guard coverage. |
+| `pnpm run test:unit` | Pass | 10 frontend unit tests passed, including latest-document task cancellation/stale-result guard coverage and preview debounce timing/coalescing coverage. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |
 | `pnpm run check:a11y` | Pass | Static Vue template accessibility guard passed for button names, form-control labels, and dialog labeling. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
