@@ -62,6 +62,98 @@ fn prepare_for_export_reports_review_change_note_audit_metadata() {
 }
 
 #[test]
+fn prepare_for_export_reports_ai_provenance_audit_metadata() {
+    let report = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: AI Audit\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# AI Audit\n```ai-source\nprovider: OpenAI\ndate: 2026-05-20\npromptSummary: Board pack outline\nreviewedBy: QA\nstatus: human-reviewed\n```\n\n<!-- ai-assisted: status=human-reviewed | reviewedBy=QA | source= | promptSummary= -->\n## Drafted Section\nReviewed content.\n"
+            .to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "includeManifest": true, "includeProvenance": true, "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 0);
+    assert_eq!(report.warning_count, 4);
+    assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
+    assert!(
+        report.diagnostics.iter().any(|diagnostic| {
+            diagnostic.message == "AI source block is missing provenance metadata."
+                && diagnostic
+                    .related
+                    .iter()
+                    .any(|related| related.contains("model=missing"))
+        }),
+        "{:#?}",
+        report.diagnostics
+    );
+    assert!(
+        report.diagnostics.iter().any(|diagnostic| {
+            diagnostic.message == "AI source is marked human-reviewed without reviewer metadata."
+                && diagnostic
+                    .related
+                    .iter()
+                    .any(|related| related.contains("reviewedAt=missing"))
+        }),
+        "{:#?}",
+        report.diagnostics
+    );
+    assert!(
+        report.diagnostics.iter().any(|diagnostic| {
+            diagnostic.message == "AI-assisted section marker is missing provenance metadata."
+                && diagnostic
+                    .related
+                    .iter()
+                    .any(|related| related.contains("source=missing"))
+        }),
+        "{:#?}",
+        report.diagnostics
+    );
+    assert!(
+        report.diagnostics.iter().any(|diagnostic| {
+            diagnostic.message
+                == "AI-assisted section is marked human-reviewed without reviewer metadata."
+                && diagnostic
+                    .related
+                    .iter()
+                    .any(|related| related.contains("reviewedAt=missing"))
+        }),
+        "{:#?}",
+        report.diagnostics
+    );
+    assert!(report
+        .manifest
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message
+            == "AI-assisted section marker is missing provenance metadata."));
+}
+
+#[test]
+fn prepare_for_export_reports_invalid_ai_review_statuses() {
+    let report = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: AI Status Audit\nversion: 1.0.0\nstatus: archived\n---\n# AI Status Audit\n```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-20\npromptSummary: Board pack outline\nreviewedBy: QA\nreviewedAt: 2026-05-20T10:00:00Z\nstatus: reviewed\n```\n\n<!-- ai-assisted: status=done | reviewedBy=QA | reviewedAt=2026-05-20T10:30:00Z | source=Claude | promptSummary=Drafted summary -->\n## Drafted Section\nReviewed content.\n"
+            .to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "includeManifest": true, "includeProvenance": true, "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 0);
+    assert_eq!(report.warning_count, 3);
+    assert!(report
+        .diagnostics
+        .iter()
+        .any(|diagnostic| { diagnostic.message == "Invalid AI source review status: reviewed" }));
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message == "Invalid AI-assisted section review status: done"
+    }));
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("AI-assisted sections that are not human-reviewed")));
+}
+
+#[test]
 fn export_document_blocks_compiler_errors_before_writing() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

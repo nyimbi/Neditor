@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `02d420f Prove
-  bibliography manager warning states`
+- Latest inspected committed baseline before this update: `a49cbe8 Expose
+  review audit gaps before export`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -194,6 +194,10 @@ Recent pushed checkpoints visible in current git history:
   and change notes missing author, timestamp, or text emit actionable
   diagnostics, mark readiness as not ready, and copy those diagnostics into the
   export manifest for auditability.
+- This update extends AI provenance readiness validation so incomplete
+  `ai-source` blocks, incomplete AI-assisted section markers, missing
+  human-review metadata, and invalid AI review statuses produce actionable
+  diagnostics that are also copied into the export manifest.
 
 ## Current Capability Snapshot
 
@@ -554,15 +558,16 @@ Additional references-panel bibliography verification:
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding bibliography-aware browser mock compilation. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding bibliography-aware browser mock compilation. |
 
-Additional review readiness metadata verification:
+Additional review/provenance readiness metadata verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after adding review/change-note audit metadata fields and readiness diagnostics. |
-| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 8 export command tests passed, including readiness and manifest diagnostics for malformed review comments and change notes. |
+| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after adding review/change-note and AI provenance readiness diagnostics. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 10 export command tests passed, including readiness and manifest diagnostics for malformed review comments, change notes, incomplete AI provenance metadata, and invalid AI review statuses. |
+| `cargo test --locked review_provenance_tests --lib` in `src-tauri` | Pass | 4 review/provenance tests passed after the stricter AI provenance validation. |
 | `cargo test --locked validation_tests --lib` in `src-tauri` | Pass | 4 validation tests passed after the readiness validation extension. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after the shared parser/validation changes. |
-| `cargo test --locked` in `src-tauri` | Pass | 131 Rust tests passed plus main/doc test targets with 0 tests. |
+| `cargo test --locked` in `src-tauri` | Pass | 133 Rust tests passed plus main/doc test targets with 0 tests. |
 | `pnpm exec playwright test --list` | Pass | Browser harness still lists 34 Chromium workflow tests after the readiness metadata change. |
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |

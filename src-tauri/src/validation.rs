@@ -263,6 +263,7 @@ pub(crate) fn validate_document(
             Some("Mark AI source blocks and AI-assisted section markers as human-reviewed after review."),
         ));
     }
+    validate_ai_provenance_metadata(&input, diagnostics);
 }
 
 pub(crate) fn validate_layout_directives(
@@ -329,6 +330,151 @@ fn first_pending_ai_review_line(input: &DocumentValidationInput<'_>) -> Option<u
                 .find(|section| section.status != "human-reviewed")
                 .map(|section| section.line)
         })
+}
+
+fn validate_ai_provenance_metadata(
+    input: &DocumentValidationInput<'_>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if let Some(source) = input.ai_sources.iter().find(|source| {
+        source.provider.trim().is_empty()
+            || source.model.trim().is_empty()
+            || source.date.trim().is_empty()
+            || source.prompt_summary.trim().is_empty()
+    }) {
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, source.line);
+        let mut diagnostic = diag(
+            "warning",
+            "AI source block is missing provenance metadata.",
+            source_file,
+            line,
+            Some("Record provider, model, date, and promptSummary in ai-source blocks."),
+        );
+        diagnostic
+            .related
+            .push(missing_ai_source_metadata_summary(source));
+        diagnostics.push(diagnostic);
+    }
+
+    if let Some(source) = input
+        .ai_sources
+        .iter()
+        .find(|source| !is_known_ai_review_status(&source.status))
+    {
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, source.line);
+        diagnostics.push(diag(
+            "warning",
+            format!("Invalid AI source review status: {}", source.status),
+            source_file,
+            line,
+            Some("Use unreviewed, needs-review, or human-reviewed."),
+        ));
+    }
+
+    if let Some(source) = input.ai_sources.iter().find(|source| {
+        source.status == "human-reviewed"
+            && (source.reviewed_by.trim().is_empty() || source.reviewed_at.trim().is_empty())
+    }) {
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, source.line);
+        let mut diagnostic = diag(
+            "warning",
+            "AI source is marked human-reviewed without reviewer metadata.",
+            source_file,
+            line,
+            Some("Add reviewedBy and reviewedAt to human-reviewed ai-source blocks."),
+        );
+        diagnostic.related.push(format!(
+            "AI source review metadata: reviewedBy={}, reviewedAt={}",
+            present_or_missing(&source.reviewed_by),
+            present_or_missing(&source.reviewed_at)
+        ));
+        diagnostics.push(diagnostic);
+    }
+
+    if let Some(section) = input.ai_assisted_sections.iter().find(|section| {
+        section.source.trim().is_empty() || section.prompt_summary.trim().is_empty()
+    }) {
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, section.line);
+        let mut diagnostic = diag(
+            "warning",
+            "AI-assisted section marker is missing provenance metadata.",
+            source_file,
+            line,
+            Some("Record source and promptSummary on AI-assisted section markers."),
+        );
+        diagnostic.related.push(format!(
+            "AI-assisted section metadata: source={}, promptSummary={}",
+            present_or_missing(&section.source),
+            present_or_missing(&section.prompt_summary)
+        ));
+        diagnostics.push(diagnostic);
+    }
+
+    if let Some(section) = input
+        .ai_assisted_sections
+        .iter()
+        .find(|section| !is_known_ai_review_status(&section.status))
+    {
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, section.line);
+        diagnostics.push(diag(
+            "warning",
+            format!(
+                "Invalid AI-assisted section review status: {}",
+                section.status
+            ),
+            source_file,
+            line,
+            Some("Use unreviewed, needs-review, or human-reviewed."),
+        ));
+    }
+
+    if let Some(section) = input.ai_assisted_sections.iter().find(|section| {
+        section.status == "human-reviewed"
+            && (section.reviewed_by.trim().is_empty() || section.reviewed_at.trim().is_empty())
+    }) {
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, section.line);
+        let mut diagnostic = diag(
+            "warning",
+            "AI-assisted section is marked human-reviewed without reviewer metadata.",
+            source_file,
+            line,
+            Some("Add reviewedBy and reviewedAt to human-reviewed AI-assisted section markers."),
+        );
+        diagnostic.related.push(format!(
+            "AI-assisted review metadata: reviewedBy={}, reviewedAt={}",
+            present_or_missing(&section.reviewed_by),
+            present_or_missing(&section.reviewed_at)
+        ));
+        diagnostics.push(diagnostic);
+    }
+}
+
+fn is_known_ai_review_status(status: &str) -> bool {
+    matches!(status, "unreviewed" | "needs-review" | "human-reviewed")
+}
+
+fn missing_ai_source_metadata_summary(source: &AiSource) -> String {
+    format!(
+        "AI source metadata: provider={}, model={}, date={}, promptSummary={}",
+        present_or_missing(&source.provider),
+        present_or_missing(&source.model),
+        present_or_missing(&source.date),
+        present_or_missing(&source.prompt_summary)
+    )
+}
+
+fn present_or_missing(value: &str) -> &'static str {
+    if value.trim().is_empty() {
+        "missing"
+    } else {
+        "present"
+    }
 }
 
 fn validate_layout_metadata(metadata: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {

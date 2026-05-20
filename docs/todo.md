@@ -743,6 +743,10 @@ Current evidence:
 - Readiness now reports malformed review comments and change notes when author,
   timestamp, or body text is missing, and the diagnostics are copied into the
   export manifest.
+- Readiness now reports incomplete AI provenance blocks and AI-assisted section
+  markers when required provenance fields, human-review metadata, or known
+  review statuses are missing, and the diagnostics are copied into the export
+  manifest.
 
 Readiness should validate and report:
 
@@ -759,7 +763,7 @@ Readiness should validate and report:
   timeouts, stderr, missing output, output limits, and cache identity.
 - Export target options and target-specific blockers.
 - Unresolved comments and malformed comment/change-note audit metadata.
-- AI provenance that is not human reviewed.
+- AI provenance that is not human reviewed or lacks required audit metadata.
 - Dirty Git state and export manifest state.
 
 Completion criteria:
