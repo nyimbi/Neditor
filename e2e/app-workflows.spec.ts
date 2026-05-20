@@ -364,6 +364,19 @@ async function activeFileRowText(page: Page) {
   return page.locator(".sidebar .file-row.active").innerText();
 }
 
+function externalApprovedDocument() {
+  return [
+    "---",
+    "title: Market Entry Report",
+    "status: approved",
+    "---",
+    "",
+    "# Market Entry Report",
+    "",
+    "External disk edit.",
+  ].join("\n");
+}
+
 test.beforeEach(async ({ page }) => {
   await installTauriMock(page);
   await page.goto("/");
@@ -472,20 +485,7 @@ test("blocks stale saves and preserves local conflict copies", async ({ page }) 
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await expect.poll(() => editorText(page)).toContain("status: in-review");
 
-  await setMockFileText(
-    page,
-    "/workspace/market.md",
-    [
-      "---",
-      "title: Market Entry Report",
-      "status: approved",
-      "---",
-      "",
-      "# Market Entry Report",
-      "",
-      "External disk edit.",
-    ].join("\n"),
-  );
+  await setMockFileText(page, "/workspace/market.md", externalApprovedDocument());
 
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Save blocked; resolve external changes first")).toBeVisible();
@@ -522,20 +522,7 @@ test("merges external conflict text back into the original file", async ({ page 
 
   await page.getByLabel("Sidebar panel").selectOption("review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
-  await setMockFileText(
-    page,
-    "/workspace/market.md",
-    [
-      "---",
-      "title: Market Entry Report",
-      "status: approved",
-      "---",
-      "",
-      "# Market Entry Report",
-      "",
-      "External disk edit.",
-    ].join("\n"),
-  );
+  await setMockFileText(page, "/workspace/market.md", externalApprovedDocument());
 
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.locator(".status-bar .conflict-actions").getByRole("button", { name: "Compare" }).click();
@@ -565,6 +552,47 @@ test("merges external conflict text back into the original file", async ({ page 
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("Local reviewer note retained.");
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: approved");
+});
+
+test("keeps local edits after reviewing an external conflict", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
+  await setMockFileText(page, "/workspace/market.md", externalApprovedDocument());
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  const conflictActions = page.locator(".status-bar .conflict-actions");
+  await expect(conflictActions.getByRole("button", { name: "Keep local" })).toBeVisible();
+  await conflictActions.getByRole("button", { name: "Keep local" }).click();
+
+  await expect(conflictActions).toHaveCount(0);
+  await expect.poll(() => editorText(page)).toContain("status: in-review");
+  await expect.poll(() => editorText(page)).not.toContain("External disk edit.");
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: approved");
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("External disk edit.");
+});
+
+test("accepts external conflict changes into the active document", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
+  await setMockFileText(page, "/workspace/market.md", externalApprovedDocument());
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  const conflictActions = page.locator(".status-bar .conflict-actions");
+  await expect(conflictActions.getByRole("button", { name: "Accept external" })).toBeVisible();
+  await conflictActions.getByRole("button", { name: "Accept external" }).click();
+
+  await expect(conflictActions).toHaveCount(0);
+  await expect.poll(() => editorText(page)).toContain("status: approved");
+  await expect.poll(() => editorText(page)).toContain("External disk edit.");
+  await expect.poll(() => editorText(page)).not.toContain("status: in-review");
+  await expect(page.locator(".document-tabs .tab.active")).not.toContainText("*");
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toBe(externalApprovedDocument());
 });
 
 test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {
