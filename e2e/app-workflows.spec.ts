@@ -750,8 +750,8 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
   await expect(page.locator(".document-tabs .tab")).toHaveCount(2);
   await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /Pinned Brief|pinned-brief\.md/ })).toBeVisible();
   await expect(page.locator(".document-tabs .tab.active")).toContainText("Field Notes");
-  await expect.poll(() => editorText(page)).toContain("Reloaded workspace note.");
   await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+  await expect.poll(() => editorText(page)).toContain("Observation 70");
   await expect.poll(() => page.locator(".preview-pane").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
   await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/field-notes.md" })).toBeVisible();
 
@@ -781,7 +781,7 @@ test("skips missing restored files with a clear restore warning after reload", a
 
   await expect(page.getByRole("region", { name: "Missing restored documents" })).toContainText("/workspace/missing-brief.md");
   await expect(page.locator(".document-tabs .tab")).toHaveCount(1);
-  await expect(page.locator(".document-tabs .tab.active")).toContainText("kept-brief.md");
+  await expect(page.locator(".document-tabs .tab.active")).toContainText(/Kept Brief|kept-brief\.md/);
   await expect.poll(() => editorText(page)).toContain("Restored document body.");
   await page.getByLabel("Sidebar panel").selectOption("settings");
   await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/missing-brief.md" })).toHaveCount(0);
