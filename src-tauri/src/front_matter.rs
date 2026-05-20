@@ -1,4 +1,7 @@
-use crate::{diagnostics::diag, path_to_string, DocumentDiagnostic, IncludeEdge};
+use crate::{
+    diagnostics::{diag, with_range},
+    path_to_string, DocumentDiagnostic, IncludeEdge,
+};
 use serde_json::{json, Value};
 use std::{
     fs,
@@ -21,16 +24,28 @@ pub(crate) fn parse_front_matter(
         consumed_lines += 1;
         if line.trim() == "---" {
             let body = lines.collect::<Vec<_>>().join("\n");
-            let metadata = serde_yaml::from_str::<Value>(&yaml).unwrap_or_else(|err| {
-                diagnostics.push(diag(
-                    "error",
-                    format!("Invalid YAML front matter: {err}"),
-                    source_file.clone(),
-                    None,
-                    Some("Fix the YAML syntax between the opening and closing --- markers."),
-                ));
-                json!({})
-            });
+            let metadata = match serde_yaml::from_str::<Value>(&yaml) {
+                Ok(metadata) if metadata.is_object() => metadata,
+                Ok(_) => {
+                    diagnostics.push(with_range(
+                        diag(
+                            "error",
+                            "YAML front matter must be a mapping.",
+                            source_file.clone(),
+                            Some(2),
+                            Some("Use key-value YAML metadata such as title: Report."),
+                        ),
+                        1,
+                        Some(2),
+                        first_front_matter_line_width(&yaml).max(1),
+                    ));
+                    json!({})
+                }
+                Err(err) => {
+                    diagnostics.push(front_matter_yaml_error(err, source_file.clone()));
+                    json!({})
+                }
+            };
             return (metadata, body, consumed_lines + 1);
         }
         yaml.push_str(line);
@@ -44,6 +59,32 @@ pub(crate) fn parse_front_matter(
         Some("Add a closing --- marker."),
     ));
     (json!({}), text.to_string(), 1)
+}
+
+fn front_matter_yaml_error(
+    err: serde_yaml::Error,
+    source_file: Option<String>,
+) -> DocumentDiagnostic {
+    let (line, column) = err
+        .location()
+        .map(|location| (location.line() + 1, location.column().max(1)))
+        .unwrap_or((2, 1));
+    with_range(
+        diag(
+            "error",
+            format!("Invalid YAML front matter: {err}"),
+            source_file,
+            Some(line),
+            Some("Fix the YAML syntax between the opening and closing --- markers."),
+        ),
+        column,
+        Some(line),
+        column + 1,
+    )
+}
+
+fn first_front_matter_line_width(yaml: &str) -> usize {
+    yaml.lines().next().unwrap_or("").chars().count()
 }
 
 pub(crate) fn merge_project_variables(

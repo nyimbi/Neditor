@@ -172,6 +172,49 @@ fn compiler_supports_default_document_variables() {
 }
 
 #[test]
+fn compiler_reports_malformed_front_matter_with_source_ranges() {
+    let invalid = compile(CompileRequest {
+        text: "---\ntitle: [unterminated\nstatus: approved\n---\n# Invalid\n".to_string(),
+        file_path: None,
+    });
+    let yaml_error = invalid
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.starts_with("Invalid YAML front matter:"))
+        .expect("invalid YAML front matter diagnostic");
+    assert_eq!(yaml_error.severity, "error");
+    assert_eq!(yaml_error.source_file.as_deref(), Some("untitled.md"));
+    assert!(yaml_error.line.is_some_and(|line| line >= 2));
+    assert!(yaml_error.column.is_some());
+    assert_eq!(yaml_error.end_line, yaml_error.line);
+    assert!(yaml_error.end_column.is_some());
+    assert!(yaml_error
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("Fix the YAML syntax")));
+
+    let non_mapping = compile(CompileRequest {
+        text: "---\n- title\n- status\n---\n# Non Mapping\n".to_string(),
+        file_path: None,
+    });
+    let shape_error = non_mapping
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message == "YAML front matter must be a mapping.")
+        .expect("non-mapping front matter diagnostic");
+    assert_eq!(shape_error.severity, "error");
+    assert_eq!(shape_error.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(shape_error.line, Some(2));
+    assert_eq!(shape_error.column, Some(1));
+    assert_eq!(shape_error.end_line, Some(2));
+    assert!(shape_error.end_column.is_some_and(|column| column > 1));
+    assert!(shape_error
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("key-value YAML")));
+}
+
+#[test]
 fn compiler_formats_document_variables_and_reports_bad_filters() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Variable Filters\nstatus: approved\napprovedBy: QA\nclient: acme holdings\nregion: ' east africa '\nbudget: 1234.6\nmargin: 0.275\n---\n# Variable Filters\nClient: {{client | title}}\nRegion: {{region | trim | upper}}\nBudget: {{budget | currency}}\nMargin: {{margin | percent}}\nRounded: {{budget | round}}\nMissing: {{owner | default:'strategy office' | title}}\nBad filter: {{client | snake}}\nBad numeric: {{client | currency}}\n".to_string(),

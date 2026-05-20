@@ -45,6 +45,10 @@ Common fields:
 | `layout` | Header, footer, page, margin, column, and flow options. |
 | `variables` | Project or document values used by `{{name}}` placeholders. |
 
+Front matter must be a YAML mapping. Invalid YAML and list/scalar front matter
+produce source-ranged diagnostics so malformed metadata is visible before
+preview or export.
+
 ## Includes
 
 Master documents can include child Markdown files:

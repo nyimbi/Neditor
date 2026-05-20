@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `798ce74 Support front matter structured data sources`
+- `ba9a916 Format document variables across exports`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -201,7 +201,10 @@ Most recent local verification evidence:
 - `cargo test --locked formatted_document_variables_survive_cross_target_exports --lib -- --nocapture`:
   passed and proves formatted document variables survive HTML, PDF, DOCX, PPTX,
   and Markdown bundle text outputs.
-- `cargo test --locked`: passed locally with 166 Rust tests on this Unix host.
+- `cargo test --locked compiler_reports_malformed_front_matter_with_source_ranges --lib -- --nocapture`:
+  passed and proves invalid YAML front matter and non-mapping YAML front matter
+  produce source-ranged diagnostics with actionable suggestions.
+- `cargo test --locked`: passed locally with 167 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -1398,6 +1401,8 @@ Current evidence:
   front matter, includes, generated sections, variables, variable filters,
   formulas, tables, figures, equations, citations, glossary/index, comments,
   AI provenance, transforms, and export readiness markers.
+- Front matter documentation now calls out that metadata must be a YAML mapping
+  and that invalid YAML/list/scalar metadata produces source-ranged diagnostics.
 - `pnpm run check:docs` discovers README plus all top-level docs Markdown files
   and checks missing local links.
 
