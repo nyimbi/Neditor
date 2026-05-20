@@ -95,7 +95,7 @@ Most recent local verification evidence:
 - `cargo check --locked --features native-watch`: passed in `src-tauri`.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed in
   `src-tauri`.
-- `cargo test --locked`: passed locally with 142 Rust tests on this Unix host.
+- `cargo test --locked`: passed locally with 143 Rust tests on this Unix host.
 - `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib`:
   passed and stress-compiles a large Markdown source with nested includes, 80
   tables, 80 CSV transform artifacts, 120 formula definitions, many source-map
@@ -820,23 +820,40 @@ Current evidence:
   reports, copy the warning into the response and sidecar manifest, and skip
   Git inspection for nonexistent source paths so unsaved/export-only documents
   do not inherit the app process working tree state.
+- `prepare_for_export_carries_broad_readiness_audit_to_manifest` now exercises
+  a broad readiness audit in one report: missing title/version, missing
+  approval metadata, unsupported layout metadata, citation source gaps,
+  unresolved comments, malformed change-note metadata, incomplete AI
+  provenance, pending AI review, broken image and link paths, inline and table
+  formula errors, figure/table/equation caption-label warnings, transform
+  timeout/path/trust/input-mode errors, and pending render/manifest progress.
 
 Readiness should validate and report:
 
-- Required metadata.
-- Release status and approval metadata.
+- Required metadata. Broad readiness audit test coverage exists.
+- Release status and approval metadata. Broad readiness audit test coverage
+  exists.
 - Draft/export warnings.
 - Includes and include graph.
-- Broken local links and missing media.
-- Citations, bibliography files, missing keys, duplicate keys, and style issues.
+- Broken local links and missing media. Broad readiness audit test coverage
+  exists.
+- Citations, bibliography files, missing keys, duplicate keys, and style
+  issues. Broad readiness audit test coverage now covers missing bibliography
+  source; separate citation tests cover missing and duplicate keys.
 - Formulas, table formulas, dependencies, circular references, and invalid
-  expressions.
-- Figures, captions, references, glossary, and index.
+  expressions. Broad readiness audit test coverage exists for inline and table
+  formula errors.
+- Figures, captions, references, glossary, and index. Broad readiness audit
+  test coverage exists for figure/table/equation caption-label warnings.
 - Transform engines, trust state, executable paths, adapter input mode,
-  timeouts, stderr, missing output, output limits, and cache identity.
+  timeouts, stderr, missing output, output limits, and cache identity. Broad
+  readiness audit test coverage exists for export settings; external transform
+  tests cover runtime stderr, missing output, output limits, and cache identity.
 - Export target options and target-specific blockers.
-- Unresolved comments and malformed comment/change-note audit metadata.
+- Unresolved comments and malformed comment/change-note audit metadata. Broad
+  readiness audit test coverage exists.
 - AI provenance that is not human reviewed or lacks required audit metadata.
+  Broad readiness audit test coverage exists.
 - Dirty Git state and export manifest state. Direct export and preflight export
   paths now both cover dirty Git; remaining work is broader readiness coverage
   and UI/native proof.

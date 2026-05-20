@@ -281,6 +281,12 @@ Recent pushed checkpoints visible in current git history:
   `export_conformance_fixture_maps_business_features` asserts legal
   disclaimer plus approval metadata across HTML, PDF, DOCX, PPTX, plain text,
   and Markdown bundle outputs.
+- This update adds
+  `prepare_for_export_carries_broad_readiness_audit_to_manifest`, which proves
+  one export readiness report and its manifest carry diagnostics for metadata,
+  approval, layout, citation source gaps, comments, change notes, AI
+  provenance, AI review status, broken links/media, inline and table formulas,
+  caption/label checks, transform settings, and pending progress state.
 
 ## Current Capability Snapshot
 
@@ -662,12 +668,13 @@ Additional review/provenance readiness metadata verification:
 | `cargo test --locked repeated_export_loop_keeps_large_artifacts_stable --lib` in `src-tauri` | Pass | Repeated export-loop stress test passed across HTML, PDF, DOCX, PPTX, and Markdown bundle rendering for a large compiled document. |
 | `cargo test --locked repeated_editing_sessions_reuse_external_transform_cache --lib` in `src-tauri` | Pass | Repeated editing/cache stress test passed with a trusted external DOT transform executed once and served from cache during subsequent edits. |
 | `cargo test --locked export_readiness_and_manifest_report_progress_steps --lib` in `src-tauri` | Pass | Export progress-step test passed, proving readiness/export manifests expose compile, transform, readiness, render, and manifest stages. |
+| `cargo test --locked prepare_for_export_carries_broad_readiness_audit_to_manifest --lib` in `src-tauri` | Pass | Broad readiness audit test passed, proving report/manifest parity for metadata, approval, layout, citations, comments, AI provenance, links/media, formulas, captions, transform settings, and progress state. |
 | `cargo test --locked export_conformance_fixture_maps_business_features --lib` in `src-tauri` | Pass | Export conformance fixture now proves legal disclaimer and approval metadata across HTML, PDF, DOCX package properties/body, PPTX package properties/slides, plain text, and Markdown bundle metadata. |
 | `cargo test --locked repeated_compile_export_cycles_keep_memory_growth_bounded --lib` in `src-tauri` | Pass | Repeated compile/export memory-growth stress passed with bounded retained summaries and process RSS growth sampling. |
 | `cargo test --locked git_restore_and_tag_reject_option_shaped_refs --lib` in `src-tauri` | Pass | Git tag/revision option-injection regression passed. |
 | `cargo test --locked git_restore_refuses_symlink_targets --lib` in `src-tauri` | Pass | Git restore refused a symlinked worktree file and left the outside target unchanged. |
 | `cargo test --locked git_history_diff_commit_tag_and_restore_workflow --lib` in `src-tauri` | Pass | Existing Git history, diff, commit, tag, and restore workflow still passed after the new guards. |
-| `cargo test --locked` in `src-tauri` | Pass | 142 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
+| `cargo test --locked` in `src-tauri` | Pass | 143 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
 | `npx playwright test e2e/app-workflows.spec.ts -g "keeps large document editing"` | Blocked | The large-document browser workflow is present, but this host is missing Playwright Chromium at `~/Library/Caches/ms-playwright/.../chrome-headless-shell`. |
 | `pnpm exec playwright test --list` | Pass | Browser harness lists 35 Chromium workflow tests, including the large-document interaction workflow. |
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed, including latest-document task cancellation/stale-result guard coverage, preview debounce timing/coalescing coverage, and workspace persistence migration/schema normalization. |

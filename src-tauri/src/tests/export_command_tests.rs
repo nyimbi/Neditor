@@ -1,4 +1,5 @@
 use super::*;
+use crate::export_commands::ExportReadinessReport;
 
 #[test]
 fn prepare_for_export_blocks_warning_cleanliness() {
@@ -623,6 +624,106 @@ fn prepare_for_export_validates_transform_engine_options() {
 }
 
 #[test]
+fn prepare_for_export_carries_broad_readiness_audit_to_manifest() {
+    let source = r#"---
+status: approved
+layout:
+  pageSize: billboard
+---
+# Readiness Audit
+
+Unsupported claim [@missing].
+
+Broken margin: {{=missing + }}
+
+<!-- comment: author: QA | at: 2026-05-20 | open | Resolve before release. -->
+<!-- change: author: QA | Updated claim without a timestamp. -->
+
+```ai-source
+provider: OpenAI
+date: 2026-05-20
+promptSummary: rough claim
+status: human-reviewed
+```
+
+<!-- ai-assisted: status=needs-review | source=OpenAI | promptSummary=Drafted unsupported claim -->
+## AI Draft
+
+![Missing](missing.png)
+
+<figure class="figure"><img src="data:image/svg+xml;base64,PHN2Zy8+" alt="No caption"/></figure>
+
+[Missing appendix](missing.md)
+
+| Metric | Value |
+| --- | ---: |
+| Revenue | 42 |
+| Broken | =SUM(BAD |
+
+<figure class="equation"><code>ROI = Gain / Cost</code></figure>
+"#;
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source.to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({
+            "includeManifest": true,
+            "warnOnDirtyGit": false,
+            "transformTimeoutMs": 50000,
+            "transformEnginePaths": { "dot": "dot" },
+            "trustedTransformEngines": { "dot": "yes" },
+            "transformInputModes": { "dot": "pipe" }
+        }),
+    });
+
+    assert!(!report.ready);
+    assert!(report.error_count > 0, "{:#?}", report.diagnostics);
+    assert!(report.warning_count > 0, "{:#?}", report.diagnostics);
+    assert_eq!(report.readiness.error_count, report.error_count);
+    assert_eq!(report.readiness.warning_count, report.warning_count);
+    assert_eq!(report.manifest.readiness.error_count, report.error_count);
+    assert_eq!(
+        report.manifest.readiness.warning_count,
+        report.warning_count
+    );
+    assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
+    assert_eq!(report.manifest.source_map.len(), report.source_map.len());
+    assert!(report.manifest.output_path.is_none());
+    assert!(report.manifest.output_hash.is_none());
+    assert!(report
+        .manifest
+        .progress_steps
+        .iter()
+        .any(|step| step.id == "render" && step.state == "pending"));
+
+    for expected in [
+        "Missing title metadata.",
+        "Missing version metadata.",
+        "Approved or published document is missing approval metadata.",
+        "Unsupported layout pageSize: billboard",
+        "Document contains citations but no bibliography source.",
+        "Inline formula error",
+        "Document has unresolved review comments.",
+        "Change note is missing audit metadata.",
+        "Document has AI-assisted sections that are not human-reviewed.",
+        "AI source block is missing provenance metadata.",
+        "AI source is marked human-reviewed without reviewer metadata.",
+        "Broken image path",
+        "Broken link path",
+        "Markdown table formula error",
+        "Figure is missing a stable label or caption.",
+        "Table is missing a stable label or caption.",
+        "Equation is missing a stable label or caption.",
+        "transformTimeoutMs must be between 1 and 30000.",
+        "transformEnginePaths.dot must be an absolute path.",
+        "trustedTransformEngines.dot must be true or false.",
+        "transformInputModes.dot must be stdin or file.",
+    ] {
+        assert_readiness_contains(&report, expected);
+    }
+}
+
+#[test]
 fn prepare_for_export_warns_on_dirty_git_tree() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -660,4 +761,24 @@ fn prepare_for_export_warns_on_dirty_git_tree() {
         .message
         .contains("Git working tree is dirty before export")));
     fs::remove_dir_all(root).expect("clean export git test dir");
+}
+
+fn assert_readiness_contains(report: &ExportReadinessReport, expected: &str) {
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains(expected)),
+        "readiness report missing {expected:?}: {:#?}",
+        report.diagnostics
+    );
+    assert!(
+        report
+            .manifest
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains(expected)),
+        "manifest missing {expected:?}: {:#?}",
+        report.manifest.diagnostics
+    );
 }
