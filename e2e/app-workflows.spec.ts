@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 async function installTauriMock(page: Page) {
   await page.addInitScript(() => {
     const callbacks = new Map<number, unknown>();
+    const eventListeners = new Map<string, number[]>();
     const stores = new Map<number, Map<string, unknown>>();
     const files = new Map<string, { text: string; hash: string; modified: string }>();
     const dialogSelections: Array<string | null> = [];
@@ -182,8 +183,21 @@ async function installTauriMock(page: Page) {
       }
       if (cmd === "plugin:store|get") return [undefined, false];
       if (cmd.startsWith("plugin:store|")) return null;
-      if (cmd === "plugin:event|listen") return callbackId++;
-      if (cmd === "plugin:event|unlisten") return null;
+      if (cmd === "plugin:event|listen") {
+        const eventName = args.event as string;
+        const handler = args.handler as number;
+        eventListeners.set(eventName, [...(eventListeners.get(eventName) || []), handler]);
+        return handler;
+      }
+      if (cmd === "plugin:event|unlisten") {
+        const eventName = args.event as string;
+        const id = args.eventId as number;
+        eventListeners.set(
+          eventName,
+          (eventListeners.get(eventName) || []).filter((listenerId) => listenerId !== id),
+        );
+        return null;
+      }
       if (cmd === "plugin:window|set_title") return null;
       if (cmd === "plugin:dialog|open") {
         return dialogSelections.length ? dialogSelections.shift() : "/workspace/market.md";
@@ -270,7 +284,36 @@ async function installTauriMock(page: Page) {
       }
       if (cmd === "list_snapshots") return [];
       if (cmd === "get_git_status") return { inside_repo: false, dirty: false, summary: [] };
-      if (cmd === "start_file_watcher") return { paths: [], native_watcher: false, watcher_error: null };
+      if (cmd === "start_file_watcher") {
+        const request = args.request as { root: string; included?: string[] };
+        const rootPath = normalizePath(request.root);
+        const rootFile = files.get(rootPath);
+        const includedFiles = (request.included || []).map((path) => {
+          const normalizedPath = normalizePath(path);
+          const file = files.get(normalizedPath);
+          return {
+            path: normalizedPath,
+            exists: Boolean(file),
+            hash: file?.hash || null,
+            modified: file?.modified || null,
+            role: "include",
+          };
+        });
+        return {
+          paths: [
+            {
+              path: rootPath,
+              exists: Boolean(rootFile),
+              hash: rootFile?.hash || null,
+              modified: rootFile?.modified || null,
+              role: "root",
+            },
+            ...includedFiles,
+          ],
+          native_watcher: true,
+          watcher_error: null,
+        };
+      }
       if (cmd === "stop_file_watcher") return null;
       if (cmd === "prepare_for_export") {
         const request = args.request as { text: string };
@@ -308,6 +351,16 @@ async function installTauriMock(page: Page) {
       },
       setFile(path: string, text: string) {
         setFile(path, text);
+      },
+      emitFileWatch(path: string, kind = "modify") {
+        const listeners = eventListeners.get("neditor-file-watch-event") || [];
+        for (const listenerId of listeners) {
+          const callback = callbacks.get(listenerId) as ((event: unknown) => void) | undefined;
+          callback?.({
+            event: "neditor-file-watch-event",
+            payload: { paths: [normalizePath(path)], kind },
+          });
+        }
       },
       revealedPaths() {
         return [...revealedPaths];
@@ -354,6 +407,10 @@ async function mockFileText(page: Page, path: string) {
 
 async function setMockFileText(page: Page, path: string, text: string) {
   await page.evaluate(({ selectedPath, content }) => window.__NEDITOR_E2E__.setFile(selectedPath, content), { selectedPath: path, content: text });
+}
+
+async function emitMockFileWatch(page: Page, path: string, kind = "modify") {
+  await page.evaluate(({ selectedPath, eventKind }) => window.__NEDITOR_E2E__.emitFileWatch(selectedPath, eventKind), { selectedPath: path, eventKind: kind });
 }
 
 async function revealedPaths(page: Page) {
@@ -593,6 +650,46 @@ test("accepts external conflict changes into the active document", async ({ page
   await expect.poll(() => editorText(page)).not.toContain("status: in-review");
   await expect(page.locator(".document-tabs .tab.active")).not.toContainText("*");
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toBe(externalApprovedDocument());
+});
+
+test("reloads clean documents after watcher-originated external edits", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.locator(".status-bar")).toContainText("Native watch: 1 path");
+
+  await setMockFileText(page, "/workspace/market.md", externalApprovedDocument());
+  await emitMockFileWatch(page, "/workspace/market.md");
+
+  await expect(page.locator(".status-bar")).toContainText("Reloaded external changes");
+  await expect(page.locator(".status-bar .conflict-actions")).toHaveCount(0);
+  await expect.poll(() => editorText(page)).toContain("status: approved");
+  await expect.poll(() => editorText(page)).toContain("External disk edit.");
+  await expect(page.locator(".document-tabs .tab.active")).not.toContainText("*");
+});
+
+test("opens a root-file conflict when watcher events arrive during local edits", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.locator(".status-bar")).toContainText("Native watch: 1 path");
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
+  await expect.poll(() => editorText(page)).toContain("status: in-review");
+
+  await setMockFileText(page, "/workspace/market.md", externalApprovedDocument());
+  await emitMockFileWatch(page, "/workspace/market.md");
+
+  await expect(page.getByText("External changes detected; compare before overwriting")).toBeVisible();
+  const conflictActions = page.locator(".status-bar .conflict-actions");
+  await expect(conflictActions.getByRole("button", { name: "Compare" })).toBeVisible();
+  await conflictActions.getByRole("button", { name: "Compare" }).click();
+
+  const conflictDialog = page.getByRole("dialog", { name: "External file conflict" });
+  await expect(conflictDialog).toBeVisible();
+  await expect(conflictDialog).toContainText("The root file changed outside NEditor while local edits are unsaved.");
+  await expect(conflictDialog).toContainText("status: in-review");
+  await expect(conflictDialog).toContainText("status: approved");
+  await expect(conflictDialog).toContainText("External disk edit.");
 });
 
 test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {
