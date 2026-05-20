@@ -851,6 +851,7 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
   const editorContent = page.locator(".cm-content");
+  await expect(page.locator(".status-bar")).toContainText("29 words | 189 characters | 1 min read");
   await page.getByLabel("Sidebar panel").selectOption("settings");
   await expect(page.getByLabel("Word wrap")).toBeChecked();
   await expect(page.getByLabel("Line numbers")).toBeChecked();

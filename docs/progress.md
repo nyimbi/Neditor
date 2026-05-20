@@ -150,6 +150,9 @@ Recent pushed checkpoints visible in current git history:
   actions for add-cursor-above, add-cursor-below, and select-next-occurrence,
   plus a Playwright workflow harness case for editing two lines through
   multiple cursors.
+- This update extends the editor ergonomics workflow harness with an exact
+  status-bar assertion for word count, character count, and reading-time
+  metrics.
 
 ## Current Capability Snapshot
 
@@ -201,10 +204,10 @@ Implemented or substantially present, pending the conservative caveats in
   folder reopen/prune behavior, moved recently-closed path pruning,
   synchronized editor/preview scrolling, preview heading click-to-source,
   persisted editor word-wrap and line-number settings, CodeMirror find/replace,
-  explicit multi-cursor command coverage, smart list continuation, bracket
-  auto-pairing, command-palette heading navigation, command-palette citation,
-  glossary, and index navigation, command-palette open-document switching and
-  workspace-file opening, plus
+  status-bar word/character/reading-time metrics, explicit multi-cursor command
+  coverage, smart list continuation, bracket auto-pairing, command-palette
+  heading navigation, command-palette citation, glossary, and index navigation,
+  command-palette open-document switching and workspace-file opening, plus
   transform engine settings trust/probe diagnostics, target-specific export
   readiness manifest preview, export output/manifest path reporting, export
   success/failure diagnostics, and blocked-readiness diagnostics before file
