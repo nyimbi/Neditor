@@ -64,8 +64,8 @@ is not "Complete".
 | 6.4 Preview | Live debounced preview | Partial | Store compile on editor update; debounce in `src/App.vue` | Large-document behavior and timing tests. |
 | 6.4 Preview | Scroll sync and heading click-to-source | Partial | Preview/editor scroll handlers; click handler | Browser tests. |
 | 6.4 Preview | Separate preview theme, inline warnings, transform blocks, export preview | Partial | Preview theme setting; diagnostics; transform rendering; modes | UI verification and visual tests. |
-| 6.5 File Operations | New, open file, open folder, save, save as, revert, rename, duplicate, reveal | Partial | Store actions and Rust file commands; file command tests; Playwright mocked file lifecycle covers open/save/duplicate/rename/pin/reveal/revert locally by test listing; latest CI run `26135510740` has not reached browser test execution yet | Explicit save-as workflow, CI proof for the sixth browser test, and native desktop dialog workflow tests. |
-| 6.5 File Operations | Recent docs/folders, workspace restore | Partial | Persisted workspace store; Playwright mocked file lifecycle covers workspace listing after open locally by test listing; latest CI run `26135510740` has not reached browser test execution yet | Recently closed, restart restore, and missing/moved/deleted restore workflow tests. |
+| 6.5 File Operations | New, open file, open folder, save, save as, revert, rename, duplicate, reveal | Partial | Store actions and Rust file commands; file command tests; Playwright mocked file lifecycle covers open/save/duplicate/rename/pin/reveal/revert in CI run `26136223804` | Explicit save-as workflow, stale-save conflict races, and native desktop dialog workflow tests. |
+| 6.5 File Operations | Recent docs/folders, workspace restore | Partial | Persisted workspace store; Playwright mocked file lifecycle covers workspace listing after open in CI run `26136223804` | Recently closed, restart restore, and missing/moved/deleted restore workflow tests. |
 | 6.5 File Operations | External change detection/conflict handling | Partial | Watch/conflict code and tests | Full UI workflow proof. |
 
 ## Compiler And Document Model
@@ -193,17 +193,15 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed CI on commit `443515b` is green across browser workflows and
+- Latest pushed CI on commit `12cd667` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26134248308`; the
-  local Playwright list now includes 6 Chromium tests, including advanced table
-  editor coverage and mocked file lifecycle coverage. Run `26135510740` on
-  commit `11dafc3` is still in progress at survey time and has not reached
-  browser test execution, so the sixth test remains unproven by CI. Local
-  execution is blocked because the macOS Playwright Chromium headless-shell
-  executable is missing from the local cache.
+- Browser-level workflow harness passes in Linux CI run `26136223804` with 6
+  Chromium tests, including advanced table editor coverage and mocked file
+  lifecycle coverage. Local focused execution is blocked because the macOS
+  Playwright Chromium headless-shell executable is missing from the local
+  cache.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, and the desktop CI matrix
   is currently green, but desktop user journeys are still not covered by a

@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `11dafc3 Stabilize
-  file lifecycle browser proof`
+- Latest inspected committed baseline before this update: `12cd667 Pin file
+  workflow documents from the active tab`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -60,10 +60,14 @@ Recent pushed checkpoints visible in current git history:
 - `e2f22d5` added a mocked Tauri file/dialog layer and browser workflow proof
   for open, edit, save, duplicate, rename, pin, reveal, workspace listing, and
   revert.
-- `f5d5e9a`, `5b7a756`, `85ad6db`, `613d880`, and `11dafc3` tightened that
-  workflow after CI exposed brittle selectors and edit-state assumptions; the
-  latest version asserts duplicate/rename state through mock file contents and
-  active-tab text.
+- `f5d5e9a`, `5b7a756`, `85ad6db`, and `613d880` tightened that workflow after
+  CI exposed brittle selectors and edit-state assumptions.
+- `11dafc3`, `a55970d`, `b7534f6`, and `12cd667` stabilized the mocked file
+  lifecycle browser proof by checking saved mock contents, activating the files
+  sidebar before workspace-row assertions, and pinning from the active document
+  tab.
+- `b2ccf83` refreshed the backlog, progress log, and completion matrix from
+  the then-current survey before the final browser proof fixes.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -117,18 +121,15 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `443515b` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26134248308`.
+- Latest pushed CI for commit `12cd667` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26136223804`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with five Chromium tests in
-  run `26134248308`. The local Playwright list now includes a sixth mocked
-  file lifecycle test. Run `26135510740` for commit `11dafc3` is still in
-  progress at this survey point, with the browser job in `Install Playwright
-  Chromium`; that run has not yet proven the sixth test. Coverage remains
-  incomplete, and local execution is blocked by the missing macOS Playwright
-  Chromium headless-shell executable in the local cache.
+- Browser-level workflow tests pass in Linux CI with six Chromium tests in run
+  `26136223804`, including the mocked file lifecycle test. Coverage remains
+  incomplete, and local focused Playwright execution is blocked by the missing
+  macOS Playwright Chromium headless-shell executable in the local cache.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -185,7 +186,7 @@ Additional browser workflow harness verification:
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test --list` | Pass | Listed 4 Chromium tests in `e2e/app-workflows.spec.ts`. |
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm run test:e2e` | Blocked by sandbox | Chromium launch failed before app assertions with `bootstrap_check_in ... Permission denied (1100)`. |
 
-Current CI follow-up:
+Current CI evidence log:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
@@ -231,7 +232,13 @@ Current CI follow-up:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding the mocked file lifecycle browser workflow. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "opens, saves, duplicates" --project chromium` | Blocked locally | Playwright could not launch because `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell` is missing. |
 | `git diff --check` | Pass | No whitespace errors after stabilizing the mocked file lifecycle workflow assertions. |
-| `gh run view 26135510740 --json status,conclusion,jobs` | In progress | For `11dafc3`, macOS and Ubuntu desktop passed. Windows passed Rust checks/tests plus frontend tests/build and was still building the Tauri shell. Browser workflow was still installing Playwright Chromium and had not reached `pnpm run test:e2e`. |
+| `gh run view 26135510740 --json status,conclusion,jobs` | Superseded failure | For `11dafc3`, the mocked lifecycle browser test still asserted the active tab text as a path even when front matter made the tab title `*Market Entry Report`. |
+| `gh run view 26135873103 --json status,conclusion,jobs` | Superseded failure | For `b2ccf83`, the same browser assertion shape remained brittle before the file-row assertion fix. |
+| `gh run view 26136003362 --json status,conclusion,jobs` | Superseded failure | For `a55970d`, the workflow tried to click workspace file rows while the sidebar was still in the review panel. |
+| `gh run view 26136129630 --json status,conclusion,jobs` | Superseded failure | For `b7534f6`, `getByLabel("Pin document")` matched multiple tab buttons. |
+| `pnpm exec playwright test --list` | Pass | Listed 6 Chromium browser workflow tests after the final active-tab pin selector fix. |
+| `git diff --check` | Pass | No whitespace errors after the final browser selector fix. |
+| `gh run watch 26136223804 --exit-status` | Pass | For `12cd667`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser CI installed Chromium and ran `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
 
 Relevant CI fixes already landed:
 
