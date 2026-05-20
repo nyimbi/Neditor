@@ -984,6 +984,25 @@ Known packaging note from `README.md`:
   `hdiutil create` with `Device not configured`; this needs refreshed
   classification as host-specific or config-specific.
 
+Additional equation caption verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_renders_block_and_inline_equations --lib -- --nocapture` in `src-tauri` | Pass | Focused compiler test proves the documented equation `caption` attribute renders as `Equation N: Caption`, is retained as `data-caption`, is captured in the document AST, and satisfies caption-label readiness for the equation. |
+| `cargo test --locked captioned_equations_survive_cross_target_exports --lib -- --nocapture` in `src-tauri` | Pass | Focused export-conformance test proves captioned equation text, stable equation references, and the human caption survive HTML, PDF, DOCX, PPTX, Markdown bundle text, and Markdown bundle AST outputs. |
+| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after the equation caption parser, AST, and tests were added. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the equation caption update. |
+| `cargo check --locked --features native-watch` in `src-tauri` | Pass | Native watcher feature still compiles after the equation caption update. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after preserving equation captions through rich-block rendering and AST parsing. |
+| `cargo test --locked` in `src-tauri` | Pass | 157 Rust tests passed; 0 failed. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests still passed after the backend/documentation update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the documentation and backend update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files had all local links resolve. |
+| `pnpm run check:a11y` | Pass | Vue template accessibility guardrails still passed. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

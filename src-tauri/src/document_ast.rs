@@ -1394,8 +1394,7 @@ fn parse_ast_html_block(line: &str, line_number: usize, end_line: usize) -> Docu
             line: line_number,
             end_line,
             id: extract_quoted_attribute(line, "id"),
-            caption: extract_between(line, "<figcaption>", "</figcaption>")
-                .map(|value| clean_inline_text(&value)),
+            caption: equation_caption_from_html(line),
             text: extract_between(line, "<code>", "</code>")
                 .map(|value| clean_inline_text(&value))
                 .unwrap_or_default(),
@@ -1713,6 +1712,16 @@ fn decode_html_entities(text: &str) -> String {
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&amp;", "&")
+}
+
+fn equation_caption_from_html(line: &str) -> Option<String> {
+    if let Some(value) = extract_quoted_attribute(line, "data-caption") {
+        let caption = clean_inline_text(&decode_html_entities(&value));
+        return (!caption.trim().is_empty()).then_some(caption);
+    }
+    extract_between(line, "<figcaption>", "</figcaption>")
+        .map(|value| clean_inline_text(&value))
+        .filter(|value| !value.trim().is_empty())
 }
 
 fn empty_as<'a>(value: &'a str, fallback: &'a str) -> &'a str {

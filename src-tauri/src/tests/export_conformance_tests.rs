@@ -201,6 +201,62 @@ fn rich_markdown_blocks_survive_cross_target_exports() {
 }
 
 #[test]
+fn captioned_equations_survive_cross_target_exports() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Captioned Equation\nstatus: approved\napprovedBy: QA\n---\n# Captioned Equation\n\n$$\nconfidence = signal / noise\n$$ {#eq:confidence caption=\"Confidence score\"}\n\nSee {@eq:confidence}.\n".to_string(),
+        file_path: None,
+    });
+    let options = json!({});
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message == "Equation is missing a stable label or caption."));
+    assert!(response.html.contains("Equation 1: Confidence score"));
+    assert!(response.html.contains("data-caption=\"Confidence score\""));
+    assert!(response.document_ast.blocks.iter().any(|block| {
+        matches!(
+            block,
+            DocumentBlock::Equation { id, caption, text, .. }
+                if id.as_deref() == Some("eq:confidence")
+                    && caption.as_deref() == Some("Confidence score")
+                    && text.contains("confidence = signal / noise")
+        )
+    }));
+    assert!(response
+        .compiled_markdown
+        .contains("[Equation confidence](#eq:confidence)"));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("Equation 1: Confidence score"));
+    assert!(html.contains(r##"<a href="#eq:confidence">Equation confidence</a>"##));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Equation confidence"));
+    assert!(pdf_text.contains("Confidence score"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Equation confidence"));
+    assert!(docx_document.contains("Confidence score"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Equation confidence"));
+    assert!(pptx_slides.contains("Confidence score"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_options = options;
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
+    assert!(bundled_text.contains("Equation: eq:confidence"));
+    assert!(bundled_text.contains("Confidence score"));
+    assert!(bundled_ast.contains("\"caption\": \"Confidence score\""));
+}
+
+#[test]
 fn heading_appendix_and_decision_references_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Reference Export\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}, {@appendix-a}, and {@decision-record}.\n\n## Appendix A\nSupporting detail.\n\n## Decision Record\nUse local-first exports.\n".to_string(),

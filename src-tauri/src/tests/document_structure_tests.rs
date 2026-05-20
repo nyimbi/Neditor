@@ -3,13 +3,16 @@ use super::*;
 #[test]
 fn compiler_renders_block_and_inline_equations() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: Math\nstatus: approved\napprovedBy: QA\n---\n# Math\nInline \\(ROI = x\\).\n\n$$\nROI = \\frac{Gain - Cost}{Cost}\n$$ {#eq:roi}\n\nSee {@eq:roi}.".to_string(),
+            text: "---\ntitle: Math\nstatus: approved\napprovedBy: QA\n---\n# Math\nInline \\(ROI = x\\).\n\n$$\nROI = \\frac{Gain - Cost}{Cost}\n$$ {#eq:roi caption=\"Return on investment\"}\n\nSee {@eq:roi}.".to_string(),
             file_path: None,
         });
 
     assert!(response.html.contains("class=\"equation\""));
     assert!(response.html.contains("id=\"eq:roi\""));
-    assert!(response.html.contains("Equation 1"));
+    assert!(response.html.contains("Equation 1: Return on investment"));
+    assert!(response
+        .html
+        .contains("data-caption=\"Return on investment\""));
     assert!(response.html.contains("class=\"math math-inline\""));
     assert!(response.html.contains("class=\"math-frac\""));
     assert!(response.html.contains("role=\"math\""));
@@ -23,9 +26,14 @@ fn compiler_renders_block_and_inline_equations() {
     assert!(response.document_ast.blocks.iter().any(|block| {
         matches!(
             block,
-            DocumentBlock::Equation { text, .. } if text.contains("\\frac")
+            DocumentBlock::Equation { caption, text, .. }
+                if caption.as_deref() == Some("Return on investment") && text.contains("\\frac")
         )
     }));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message == "Equation is missing a stable label or caption."));
     assert!(response
         .semantic
         .cross_references

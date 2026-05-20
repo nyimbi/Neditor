@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `6ef570e Expose unresolved citation keys before export`
+- `96e4165 Honor front matter index generation`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -166,7 +166,13 @@ Most recent local verification evidence:
 - `cargo test --locked front_matter_index_survives_cross_target_exports --lib -- --nocapture`:
   passed and proves `index: true` front matter-generated index content
   survives HTML, PDF, DOCX, PPTX, and Markdown bundle artifacts.
-- `cargo test --locked`: passed locally with 156 Rust tests on this Unix host.
+- `cargo test --locked compiler_renders_block_and_inline_equations --lib -- --nocapture`:
+  passed and proves documented equation captions render as numbered captions,
+  flow into the AST, and satisfy equation caption-label readiness.
+- `cargo test --locked captioned_equations_survive_cross_target_exports --lib -- --nocapture`:
+  passed and proves captioned equations survive HTML, PDF, DOCX, PPTX, and
+  Markdown bundle text/AST outputs.
+- `cargo test --locked`: passed locally with 157 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -838,8 +844,10 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   exclusion, preview HTML, and DOCX text.
 - Equations, numbering, references, and cross-target rendering.
   A focused rich-block export test now proves equation text and equation
-  references across the artifact family; remaining work is rendered visual QA
-  and more math syntax permutations.
+  references across the artifact family, and a focused captioned-equation
+  export test now proves equation captions survive HTML, PDF, DOCX, PPTX, and
+  Markdown bundle outputs. Remaining work is rendered visual QA and more math
+  syntax permutations.
 - Citations, bibliography, locators, missing keys, duplicate keys, and CSL
   behavior.
 - Cross references to headings, figures, tables, equations, appendices, and

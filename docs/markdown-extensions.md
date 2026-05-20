@@ -183,6 +183,8 @@ $$ {#eq:confidence caption="Confidence score"}
 
 Missing labels or captions can produce readiness warnings when the equation is
 used in a release-grade export.
+Captioned display equations render as numbered figures in preview and carry the
+human caption through HTML, PDF, DOCX, PPTX, and Markdown bundle exports.
 
 ## Citations And Bibliography
 

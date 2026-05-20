@@ -140,12 +140,15 @@ pub(crate) fn render_equations(markdown: &str) -> String {
         if trimmed == "$$" || trimmed.starts_with("$$ ") {
             let mut body = String::new();
             let mut label = String::new();
+            let mut caption = String::new();
             index += 1;
             while index < lines.len() {
                 let equation_line = lines[index];
                 let equation_trimmed = equation_line.trim();
                 if equation_trimmed.starts_with("$$") {
                     label = extract_label(equation_trimmed).unwrap_or_default();
+                    caption =
+                        extract_quoted_attribute(equation_trimmed, "caption").unwrap_or_default();
                     index += 1;
                     break;
                 }
@@ -159,13 +162,19 @@ pub(crate) fn render_equations(markdown: &str) -> String {
                 label
             };
             let latex = body.trim();
+            let rendered_caption = if caption.trim().is_empty() {
+                format!("Equation {equation_number}")
+            } else {
+                format!("Equation {equation_number}: {}", caption.trim())
+            };
             output.push_str(&format!(
-                "<figure class=\"equation\" id=\"{}\"><div class=\"math-rendered math-display\" role=\"math\" aria-label=\"{}\">{}</div><details class=\"math-source\"><summary>LaTeX</summary><pre><code>{}</code></pre></details><figcaption>Equation {}</figcaption></figure>\n",
+                "<figure class=\"equation\" id=\"{}\" data-caption=\"{}\"><div class=\"math-rendered math-display\" role=\"math\" aria-label=\"{}\">{}</div><details class=\"math-source\"><summary>LaTeX</summary><pre><code>{}</code></pre></details><figcaption>{}</figcaption></figure>\n",
                 escape_html(&id),
+                escape_html(caption.trim()),
                 escape_html(latex),
                 render_latex_visual(latex),
                 escape_html(latex),
-                equation_number
+                escape_html(&rendered_caption)
             ));
             equation_number += 1;
         } else {
