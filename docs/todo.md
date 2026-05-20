@@ -176,9 +176,10 @@ Recent local verification evidence from this buildout:
 - `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "restores
   workspace" --project chromium`: blocked locally because the Chromium
   headless-shell executable is missing from the Playwright cache.
-- `gh run view 26147556750 --json status,conclusion,headSha,jobs,url`: browser
-  workflow job passed on commit `655d65c` with 20 Chromium workflow tests,
-  including restart-style workspace restore.
+- `gh run view 26147556750 --json status,conclusion,headSha,jobs,url`: passed
+  on commit `655d65c` across the 20-test browser workflow job and the
+  Ubuntu/macOS/Windows desktop builds, including restart-style workspace
+  restore.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized

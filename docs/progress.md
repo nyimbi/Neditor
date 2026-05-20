@@ -146,8 +146,8 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `c0cefd1` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26145509141`.
+- Latest pushed code CI for commit `655d65c` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26147556750`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
@@ -263,7 +263,7 @@ Additional workspace restore workflow verification:
 | `pnpm exec playwright test --list` | Pass | Listed 20 Chromium workflow tests, including restart-style workspace restore for tabs, active document, pins, mode, sidebar, workspace root, and recent files. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "restores workspace" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the workspace cache. |
 | `git diff --check` | Pass | No whitespace errors after adding workspace restore persistence coverage. |
-| `gh run view 26147556750 --json status,conclusion,headSha,jobs,url` | Pass | Commit `655d65c` has a successful `Browser workflow tests` job with the 20-test Chromium suite, including restart-style workspace restore. |
+| `gh run view 26147556750 --json status,conclusion,headSha,jobs,url` | Pass | Commit `655d65c` passed the 20-test browser workflow job plus Ubuntu/macOS/Windows desktop builds. |
 
 Current CI evidence log:
 

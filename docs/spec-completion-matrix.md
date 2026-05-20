@@ -193,7 +193,7 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed CI on commit `c0cefd1` is green across browser workflows and
+- Latest pushed code CI on commit `655d65c` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
