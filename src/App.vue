@@ -2490,8 +2490,17 @@ async function applyConflictMerge() {
   conflictOpen.value = false;
 }
 
+function flushEditorTextToStore() {
+  if (!editorView) return;
+  const text = editorView.state.doc.toString();
+  if (active.value.text === text) return;
+  window.clearTimeout(debounceHandle);
+  store.updateText(text);
+}
+
 async function exportDocument() {
   if (store.exportBusy) return;
+  flushEditorTextToStore();
   await store.prepareForExport();
   if (store.exportReadiness && store.exportReadiness.error_count > 0) {
     store.sidebar = "exports";
