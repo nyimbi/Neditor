@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `12cd667 Pin file
-  workflow documents from the active tab`
+- Latest inspected committed baseline before this update: `138bf5d Assert
+  reopened file workflow by path row`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -68,6 +68,10 @@ Recent pushed checkpoints visible in current git history:
   tab.
 - `b2ccf83` refreshed the backlog, progress log, and completion matrix from
   the then-current survey before the final browser proof fixes.
+- `61eff87`, `44c9639`, and `138bf5d` added and stabilized browser workflow
+  proof for save-as to a new path and reopening that saved document from the
+  recently closed list. The settings recent-path lists now have accessible
+  section labels so repeated path buttons are unambiguous.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -121,15 +125,16 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `12cd667` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26136223804`.
+- Latest pushed CI for commit `138bf5d` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26137556147`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with six Chromium tests in run
-  `26136223804`, including the mocked file lifecycle test. Coverage remains
-  incomplete, and local focused Playwright execution is blocked by the missing
-  macOS Playwright Chromium headless-shell executable in the local cache.
+- Browser-level workflow tests pass in Linux CI with seven Chromium tests in
+  run `26137556147`, including mocked file lifecycle coverage and save-as plus
+  recently closed reopening. Coverage remains incomplete, and local focused
+  Playwright execution is blocked by the missing/default macOS Playwright cache
+  and the workspace-local Chromium Mach bootstrap permission failure.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -239,6 +244,14 @@ Current CI evidence log:
 | `pnpm exec playwright test --list` | Pass | Listed 6 Chromium browser workflow tests after the final active-tab pin selector fix. |
 | `git diff --check` | Pass | No whitespace errors after the final browser selector fix. |
 | `gh run watch 26136223804 --exit-status` | Pass | For `12cd667`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser CI installed Chromium and ran `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
+| `pnpm exec playwright test --list` | Pass | Listed 7 Chromium browser workflow tests after adding save-as and recently closed reopening. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "saves a document as a new file" --project chromium` | Blocked locally | Default Playwright cache still lacks the Chromium headless-shell executable. |
+| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test e2e/app-workflows.spec.ts --grep "saves a document as a new file" --project chromium` | Blocked locally | Workspace-local Chromium launched, then failed before assertions with `bootstrap_check_in ... Permission denied (1100)`. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding accessible recent-path sections. |
+| `git diff --check` | Pass | No whitespace errors after the save-as/recently closed workflow edits. |
+| `gh run view 26137235763 --json status,conclusion,jobs` | Superseded failure | For `61eff87`, the new path appeared in both Recent files and Recently closed, so the browser test needed a scoped recently-closed selector. |
+| `gh run view 26137384613 --json status,conclusion,jobs` | Superseded failure | For `44c9639`, reopened tab text reflected front matter title rather than the filesystem path; the test now proves path identity via the active workspace row. |
+| `gh run watch 26137556147 --exit-status` | Pass | For `138bf5d`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser CI installed Chromium and ran 7 tests through `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
 
 Relevant CI fixes already landed:
 

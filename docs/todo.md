@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `12cd667`
+  `138bf5d`
 
 Status vocabulary:
 
@@ -76,24 +76,25 @@ modules after behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `12cd667 Pin file workflow documents from the active tab`
+- `138bf5d Assert reopened file workflow by path row`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26136223804` on commit `12cd667`
+- Run `26137556147` on commit `138bf5d`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26136223804`:
+CI evidence from run `26137556147`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes six Chromium workflow tests, including advanced table paste import,
+  includes seven Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
-  behavior, and the mocked file lifecycle flow.
+  behavior, the mocked file lifecycle flow, save-as to a new path, and reopening
+  that saved document from the recently closed list.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -130,7 +131,11 @@ Recent local verification evidence from this buildout:
   fixture edits.
 - `pnpm exec playwright test --list`: passed after adding the mocked file
   lifecycle workflow, listing six Chromium workflow tests.
-- `gh run watch 26136223804 --exit-status`: passed for commit `12cd667` across
+- `pnpm exec playwright test --list`: passed after adding the mocked save-as
+  and recently closed workflow, listing seven Chromium workflow tests.
+- `pnpm run build`: passed after adding accessible recent-file list sections and
+  the new workflow proof.
+- `gh run watch 26137556147 --exit-status`: passed for commit `138bf5d` across
   browser workflows and Ubuntu/macOS/Windows desktop builds.
 - `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "opens, saves,
   duplicates" --project chromium`: blocked locally because the macOS
@@ -270,6 +275,10 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Mocked file lifecycle workflow: open, edit, save, duplicate, rename, pin,
   reveal, workspace listing, and revert against an in-memory Tauri file/dialog
   mock.
+- Mocked save-as and recently closed workflow: save the active document to a new
+  path, prove the saved contents, close the tab, reopen from the recently closed
+  list, clear that list entry, and prove the reopened path through the active
+  workspace row.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, and apply-back-to-editor behavior.
 - AI paste cleanup preview and insertion.
@@ -277,10 +286,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 
 Required next coverage:
 
-- Remaining file/workspace flows: explicit save-as behavior, tab activation,
-  recently closed reopen, missing-file restore, moved/deleted-file restore,
-  restart workspace restore, unsaved-document close behavior, and stale-save
-  conflict races.
+- Remaining file/workspace flows: tab activation, missing-file restore,
+  moved/deleted-file restore, restart workspace restore, unsaved-document close
+  behavior, stale-save conflict races, and native desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
 - Preview heading click-to-source and synchronized scrolling.
@@ -301,7 +309,8 @@ Required next coverage:
 Completion criteria:
 
 - Browser workflow tests continue passing in Linux CI; the mocked file
-  lifecycle workflow is CI-proven in run `26136223804`.
+  lifecycle workflow plus save-as/recently closed reopening are CI-proven in
+  run `26137556147`.
 - Local sandbox limitations remain documented but are not used as completion
   evidence.
 - Browser coverage failures drive implementation fixes rather than broad
