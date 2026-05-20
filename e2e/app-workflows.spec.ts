@@ -419,6 +419,7 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await queueDialogSelection(page, "/workspace/market copy.md");
   await page.getByRole("button", { name: "Duplicate" }).click();
   await expect.poll(() => mockFileText(page, "/workspace/market copy.md")).toContain("status: in-review");
+  await page.getByLabel("Sidebar panel").selectOption("files");
   await page.locator(".sidebar").getByRole("button", { name: /market copy\.md/ }).click();
   await expect.poll(() => activeFileRowText(page)).toContain("market copy.md");
 
