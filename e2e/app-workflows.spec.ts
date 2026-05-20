@@ -487,6 +487,10 @@ async function installTauriMock(page: Page) {
       setFile(path: string, text: string) {
         setFile(path, text);
       },
+      deleteFile(path: string) {
+        files.delete(normalizePath(path));
+        persistE2eState();
+      },
       emitFileWatch(path: string, kind = "modify") {
         const listeners = eventListeners.get("neditor-file-watch-event") || [];
         for (const listenerId of listeners) {
@@ -542,6 +546,10 @@ async function mockFileText(page: Page, path: string) {
 
 async function setMockFileText(page: Page, path: string, text: string) {
   await page.evaluate(({ selectedPath, content }) => window.__NEDITOR_E2E__.setFile(selectedPath, content), { selectedPath: path, content: text });
+}
+
+async function deleteMockFile(page: Page, path: string) {
+  await page.evaluate((selectedPath) => window.__NEDITOR_E2E__.deleteFile(selectedPath), path);
 }
 
 async function emitMockFileWatch(page: Page, path: string, kind = "modify") {
@@ -678,6 +686,19 @@ test("saves a document as a new file and reopens it from recently closed", async
 });
 
 test("restores workspace tabs, active document, pins, mode, and sidebar after reload", async ({ page }) => {
+  const longFieldNote = [
+    "---",
+    "title: Field Notes",
+    "status: draft",
+    "---",
+    "",
+    "# Field Notes",
+    "",
+    "Reloaded workspace note.",
+    "",
+    ...Array.from({ length: 70 }, (_, index) => [`## Observation ${index + 1}`, "", `Field observation ${index + 1}.`]).flat(),
+  ].join("\n");
+
   await setMockFileText(
     page,
     "/workspace/pinned-brief.md",
@@ -695,16 +716,7 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
   await setMockFileText(
     page,
     "/workspace/field-notes.md",
-    [
-      "---",
-      "title: Field Notes",
-      "status: draft",
-      "---",
-      "",
-      "# Field Notes",
-      "",
-      "Reloaded workspace note.",
-    ].join("\n"),
+    longFieldNote,
   );
 
   await queueDialogSelection(page, "/workspace/pinned-brief.md");
@@ -724,6 +736,11 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
 
   await page.getByLabel("View mode").selectOption("review");
   await page.getByLabel("Sidebar panel").selectOption("settings");
+  await page.locator(".cm-scroller").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
   await page.getByRole("button", { name: "Save Workspace" }).click();
 
   await page.reload();
@@ -734,11 +751,40 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
   await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /Pinned Brief|pinned-brief\.md/ })).toBeVisible();
   await expect(page.locator(".document-tabs .tab.active")).toContainText("Field Notes");
   await expect.poll(() => editorText(page)).toContain("Reloaded workspace note.");
+  await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+  await expect.poll(() => page.locator(".preview-pane").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
   await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/field-notes.md" })).toBeVisible();
 
   await page.getByLabel("Sidebar panel").selectOption("files");
   await expect(page.getByText("/workspace")).toBeVisible();
   await expect.poll(() => activeFileRowText(page)).toContain("field-notes.md");
+});
+
+test("skips missing restored files with a clear restore warning after reload", async ({ page }) => {
+  await setMockFileText(page, "/workspace/kept-brief.md", "# Kept Brief\n\nRestored document body.");
+  await setMockFileText(page, "/workspace/missing-brief.md", "# Missing Brief\n\nDeleted before restart.");
+
+  await queueDialogSelection(page, "/workspace/kept-brief.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueDialogSelection(page, "/workspace/missing-brief.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page
+    .locator(".document-tabs .tab")
+    .filter({ hasText: "Market Entry Report" })
+    .getByLabel("Close document")
+    .click();
+  await expect(page.locator(".document-tabs .tab")).toHaveCount(2);
+
+  await page.getByRole("button", { name: "Save Workspace" }).click();
+  await deleteMockFile(page, "/workspace/missing-brief.md");
+  await page.reload();
+
+  await expect(page.getByRole("region", { name: "Missing restored documents" })).toContainText("/workspace/missing-brief.md");
+  await expect(page.locator(".document-tabs .tab")).toHaveCount(1);
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("kept-brief.md");
+  await expect.poll(() => editorText(page)).toContain("Restored document body.");
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/missing-brief.md" })).toHaveCount(0);
 });
 
 test("blocks stale saves and preserves local conflict copies", async ({ page }) => {

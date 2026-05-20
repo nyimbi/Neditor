@@ -349,6 +349,8 @@ export interface OpenDocument {
   dirty: boolean;
   pinned?: boolean;
   modified?: string | null;
+  editorScrollRatio?: number;
+  previewScrollRatio?: number;
   compile?: CompileResponse;
 }
 

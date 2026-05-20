@@ -94,6 +94,7 @@ interface PersistedWorkspace {
   workspaceRoot?: string | null;
   openFiles?: string[];
   activePath?: string | null;
+  scrollPositions?: Record<string, PersistedScrollPosition>;
   mode?: "split" | "source" | "preview" | "focus" | "export" | "review" | "presentation";
   sidebar?: "files" | "outline" | "diagnostics" | "tables" | "references" | "exports" | "versioning" | "review" | "settings";
   transformEnginePaths?: Record<string, string>;
@@ -101,6 +102,11 @@ interface PersistedWorkspace {
   transformInputModes?: Record<string, "stdin" | "file">;
   transformTimeoutMs?: number;
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
+}
+
+interface PersistedScrollPosition {
+  editor?: number;
+  preview?: number;
 }
 
 interface FileMetadataResponse {
@@ -350,6 +356,11 @@ function clampPaneRatio(value: number) {
   return Math.min(Math.max(Number(value) || 0.5, 0.25), 0.75);
 }
 
+function clampScrollRatio(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.min(Math.max(value, 0), 1);
+}
+
 function normalizeExportDefaults(
   defaults: Partial<ExportDefaults> & {
     includeCoverPage?: boolean;
@@ -529,6 +540,7 @@ export const useDocumentsStore = defineStore("documents", {
     recentlyClosed: [] as string[],
     workspaceRoot: null as string | null,
     workspaceFiles: [] as WorkspaceFileEntry[],
+    missingWorkspaceFiles: [] as string[],
     gitHistory: [] as GitHistoryEntry[],
     gitDiffText: "",
     releaseTag: "",
@@ -621,7 +633,7 @@ export const useDocumentsStore = defineStore("documents", {
           this.transformTimeoutMs = Math.min(Math.max(persisted.transformTimeoutMs, 1), 30000);
         }
         if (persisted.openFiles?.length) {
-          await this.restoreWorkspace(persisted.openFiles, persisted.activePath || null, persisted.pinnedFiles || []);
+          await this.restoreWorkspace(persisted.openFiles, persisted.activePath || null, persisted.pinnedFiles || [], persisted.scrollPositions || {});
         }
       } catch (error) {
         this.lastError = error instanceof Error ? error.message : String(error);
@@ -661,6 +673,17 @@ export const useDocumentsStore = defineStore("documents", {
         mode: this.mode,
         sidebar: this.sidebar,
         openFiles: this.documents.map((document) => document.path).filter((path): path is string => Boolean(path)),
+        scrollPositions: Object.fromEntries(
+          this.documents
+            .filter((document) => document.path)
+            .map((document) => [
+              document.path as string,
+              {
+                editor: clampScrollRatio(document.editorScrollRatio),
+                preview: clampScrollRatio(document.previewScrollRatio),
+              },
+            ]),
+        ),
         pinnedFiles: this.documents
           .filter((document) => document.pinned && document.path)
           .map((document) => document.path as string),
@@ -673,11 +696,21 @@ export const useDocumentsStore = defineStore("documents", {
       await preferencesStore.set("workspace", workspace);
       await preferencesStore.save();
     },
-    async restoreWorkspace(paths: string[], activePath: string | null, pinnedFiles: string[] = []) {
+    async restoreWorkspace(
+      paths: string[],
+      activePath: string | null,
+      pinnedFiles: string[] = [],
+      scrollPositions: Record<string, PersistedScrollPosition> = {},
+    ) {
       const restored: OpenDocument[] = [];
+      const missing: string[] = [];
+      const seen = new Set<string>();
       for (const path of paths) {
+        if (seen.has(path)) continue;
+        seen.add(path);
         try {
           const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
+          const scrollPosition = scrollPositions[response.path] || scrollPositions[path] || {};
           restored.push({
             id: crypto.randomUUID(),
             path: response.path,
@@ -687,14 +720,26 @@ export const useDocumentsStore = defineStore("documents", {
             dirty: false,
             pinned: pinnedFiles.includes(response.path),
             modified: response.modified,
+            editorScrollRatio: clampScrollRatio(scrollPosition.editor),
+            previewScrollRatio: clampScrollRatio(scrollPosition.preview),
           });
         } catch {
+          missing.push(path);
           this.recentFiles = this.recentFiles.filter((recent) => recent !== path);
+          this.recentlyClosed = this.recentlyClosed.filter((recent) => recent !== path);
         }
       }
-      if (!restored.length) return;
+      this.missingWorkspaceFiles = missing;
+      if (missing.length) {
+        this.statusMessage = `${missing.length} restored ${missing.length === 1 ? "document was" : "documents were"} missing`;
+      }
+      if (!restored.length) {
+        if (missing.length) await this.persistWorkspace();
+        return;
+      }
       this.documents = restored;
       this.activeId = restored.find((document) => document.path === activePath)?.id || restored[0].id;
+      if (missing.length) await this.persistWorkspace();
     },
     newDocument() {
       const document: OpenDocument = {
@@ -732,6 +777,7 @@ export const useDocumentsStore = defineStore("documents", {
       this.statusMessage = `Opened ${document.title}`;
       this.rememberFile(document.path);
       this.recentlyClosed = this.recentlyClosed.filter((recent) => recent !== document.path);
+      this.missingWorkspaceFiles = this.missingWorkspaceFiles.filter((missing) => missing !== document.path);
       if (!this.workspaceRoot) {
         const folder = folderFromPath(document.path);
         if (folder) await this.openFolder(folder);
@@ -739,6 +785,13 @@ export const useDocumentsStore = defineStore("documents", {
       await this.compileActive();
       await this.refreshGitStatus();
       await this.persistWorkspace();
+    },
+    setDocumentScroll(id: string, scroll: { editor?: number; preview?: number }, persist = false) {
+      const document = this.documents.find((item) => item.id === id);
+      if (!document) return;
+      if (typeof scroll.editor === "number") document.editorScrollRatio = clampScrollRatio(scroll.editor);
+      if (typeof scroll.preview === "number") document.previewScrollRatio = clampScrollRatio(scroll.preview);
+      if (persist) void this.persistWorkspace();
     },
     async openFolder(path: string) {
       this.workspaceRoot = path;

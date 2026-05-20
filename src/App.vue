@@ -117,6 +117,14 @@
       </article>
     </section>
 
+    <section v-if="store.missingWorkspaceFiles.length" class="restore-warning" aria-label="Missing restored documents">
+      <strong>Missing restored documents</strong>
+      <p>These files were skipped during workspace restore.</p>
+      <ul>
+        <li v-for="path in store.missingWorkspaceFiles" :key="path">{{ path }}</li>
+      </ul>
+    </section>
+
     <main ref="workspacePane" class="workspace" :class="`mode-${store.mode}`" :style="workspaceStyle">
       <aside class="sidebar" aria-label="Document workspace">
         <template v-if="store.sidebar === 'files'">
@@ -1071,8 +1079,10 @@ let editorView: EditorView | null = null;
 let debounceHandle = 0;
 let autosaveHandle = 0;
 let autoSnapshotHandle = 0;
+let scrollPersistHandle = 0;
 let lastAutoSnapshotSignature = "";
 let syncingScroll = false;
+let restoringScroll = false;
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
 const aiInsertMode = ref<"insert" | "quote" | "replace" | "appendix" | "selection" | "section">("insert");
@@ -1517,9 +1527,11 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  recordActiveScrollPosition(true);
   editorView?.destroy();
   window.clearTimeout(autosaveHandle);
   window.clearTimeout(autoSnapshotHandle);
+  window.clearTimeout(scrollPersistHandle);
   window.removeEventListener("keydown", handleShortcut);
   stopPaneResize();
 });
@@ -2008,12 +2020,15 @@ function buildEditor() {
     }),
     parent: editorHost.value,
   });
+  void nextTick(() => restoreActiveScrollPosition());
 }
 
 function syncPreviewScrollFromEditor() {
   if (!editorView || !previewPane.value || syncingScroll) return;
   syncingScroll = true;
   syncScrollPosition(editorView.scrollDOM, previewPane.value);
+  recordActiveScrollPosition();
+  scheduleScrollPositionPersist();
   window.requestAnimationFrame(() => {
     syncingScroll = false;
   });
@@ -2023,15 +2038,58 @@ function syncEditorScrollFromPreview() {
   if (!editorView || !previewPane.value || syncingScroll) return;
   syncingScroll = true;
   syncScrollPosition(previewPane.value, editorView.scrollDOM);
+  recordActiveScrollPosition();
+  scheduleScrollPositionPersist();
   window.requestAnimationFrame(() => {
     syncingScroll = false;
   });
 }
 
 function syncScrollPosition(source: HTMLElement, target: HTMLElement) {
-  const sourceRange = Math.max(1, source.scrollHeight - source.clientHeight);
-  const targetRange = Math.max(0, target.scrollHeight - target.clientHeight);
-  target.scrollTop = (source.scrollTop / sourceRange) * targetRange;
+  applyScrollRatio(target, readScrollRatio(source));
+}
+
+function readScrollRatio(element: HTMLElement) {
+  const range = element.scrollHeight - element.clientHeight;
+  if (range <= 0) return 0;
+  return Math.min(Math.max(element.scrollTop / range, 0), 1);
+}
+
+function applyScrollRatio(element: HTMLElement, ratio = 0) {
+  const range = Math.max(0, element.scrollHeight - element.clientHeight);
+  element.scrollTop = range * Math.min(Math.max(ratio, 0), 1);
+}
+
+function restoreActiveScrollPosition() {
+  if (!editorView) return;
+  restoringScroll = true;
+  applyScrollRatio(editorView.scrollDOM, active.value.editorScrollRatio);
+  if (previewPane.value) {
+    applyScrollRatio(previewPane.value, active.value.previewScrollRatio ?? active.value.editorScrollRatio);
+  }
+  window.requestAnimationFrame(() => {
+    restoringScroll = false;
+  });
+}
+
+function recordActiveScrollPosition(persist = false) {
+  if (!editorView || restoringScroll) return;
+  store.setDocumentScroll(
+    active.value.id,
+    {
+      editor: readScrollRatio(editorView.scrollDOM),
+      preview: previewPane.value ? readScrollRatio(previewPane.value) : undefined,
+    },
+    persist,
+  );
+}
+
+function scheduleScrollPositionPersist() {
+  if (restoringScroll) return;
+  window.clearTimeout(scrollPersistHandle);
+  scrollPersistHandle = window.setTimeout(() => {
+    recordActiveScrollPosition(true);
+  }, 250);
 }
 
 function startPaneResize(event: PointerEvent) {
@@ -2082,6 +2140,7 @@ function runEditorCommand(command: (view: EditorView) => boolean) {
 }
 
 function activate(id: string) {
+  recordActiveScrollPosition(true);
   void store.activateDocument(id);
 }
 
@@ -3567,6 +3626,23 @@ select:hover {
   margin: 8px 0;
   color: #526171;
   font-size: 12px;
+}
+
+.restore-warning {
+  margin: 10px 0;
+  padding: 8px;
+  border: 1px solid #c88a1d;
+  background: #fff7e6;
+  color: #5b3a04;
+}
+
+.restore-warning p {
+  margin: 4px 0;
+}
+
+.restore-warning ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
 }
 
 .diagnostic {
