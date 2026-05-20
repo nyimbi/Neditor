@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `f13c3f3`
+  `5f75e44`
 
 Status vocabulary:
 
@@ -76,22 +76,22 @@ behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `f13c3f3 Prove editor ergonomics workflows`
+- `5f75e44 Prove command palette reference navigation`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26154535588` on commit `f13c3f3`
+- Run `26155535210` on commit `5f75e44`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26154535588`:
+CI evidence from run `26155535210`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 25 Chromium workflow tests, including advanced table paste import,
+  includes 26 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, row/column structure editing, column format totals,
   cancel-without-applying behavior, AI paste insert/quote/appendix/replace
@@ -111,7 +111,9 @@ CI evidence from run `26154535588`:
   both directions between editor and preview, clicking a rendered preview
   heading to jump back to the source line, persisted editor word-wrap and
   line-number settings, CodeMirror find/replace, smart list continuation,
-  bracket auto-pairing, and command-palette heading navigation.
+  bracket auto-pairing, command-palette heading navigation, command-palette
+  citation navigation, command-palette glossary navigation, and command-palette
+  index navigation.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -265,6 +267,19 @@ Recent local verification evidence from this buildout:
 - `git diff --check`: passed after adding editor ergonomics coverage.
 - `gh run watch 26154535588 --exit-status`: passed on commit `f13c3f3` across
   25 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
+- `pnpm run test:unit`: passed after adding command palette citation/glossary/
+  index navigation coverage.
+- `pnpm run build`: passed after adding command palette citation/glossary/index
+  navigation coverage.
+- `pnpm exec playwright test --list`: listed 26 Chromium workflow tests after
+  adding command palette citation, glossary, and index navigation coverage.
+- `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "citation
+  glossary" --project chromium`: blocked locally because the Chromium
+  headless-shell executable is missing from the Playwright cache.
+- `git diff --check`: passed after adding command palette reference navigation
+  coverage.
+- `gh run watch 26155535210 --exit-status`: passed on commit `5f75e44` across
+  26 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -480,6 +495,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   execute CodeMirror find/replace through the search keybinding, continue a
   Markdown list item, auto-pair brackets, and navigate a heading through the
   command palette.
+- Command palette reference navigation workflow: search and execute citation,
+  glossary, and index commands, open the References panel, and jump to the
+  matching source locations.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -492,8 +510,8 @@ Required next coverage:
   desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
-- Command palette citation commands, glossary/index commands, navigation
-  commands, and broader keyboard shortcut coverage.
+- Command palette document/workspace navigation commands and broader keyboard
+  shortcut coverage.
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
 - External conflict modal: more granular line-compose controls.
