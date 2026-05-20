@@ -804,6 +804,7 @@ Covered:
 - CodeMirror find and replace.
 - Word count, character count, and reading-time status-bar metrics.
 - Command-palette heading navigation.
+- Outline sidebar heading navigation to source.
 - Explicit multi-cursor command palette actions for add-cursor-above,
   add-cursor-below, and select-next-occurrence, with a browser harness workflow
   that edits matching lines through multiple cursors.
@@ -816,7 +817,7 @@ Finish:
 - Auto-pairing for quotes, code fences, and emphasis markers.
 - Spellcheck.
 - Word/character/reading-time local browser/native execution proof.
-- Outline navigation beyond command-palette heading search.
+- Outline navigation local browser/native execution proof.
 - Multi-cursor support local browser/native execution proof.
 - Vim/emacs keybindings classification: deferred unless intentionally added.
 

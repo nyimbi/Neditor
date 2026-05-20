@@ -153,6 +153,9 @@ Recent pushed checkpoints visible in current git history:
 - This update extends the editor ergonomics workflow harness with an exact
   status-bar assertion for word count, character count, and reading-time
   metrics.
+- This update adds outline-sidebar navigation coverage, proving the sidebar
+  can focus a deep heading back in the Markdown source outside the command
+  palette path.
 
 ## Current Capability Snapshot
 
@@ -207,7 +210,8 @@ Implemented or substantially present, pending the conservative caveats in
   status-bar word/character/reading-time metrics, explicit multi-cursor command
   coverage, smart list continuation, bracket auto-pairing, command-palette
   heading navigation, command-palette citation, glossary, and index navigation,
-  command-palette open-document switching and workspace-file opening, plus
+  outline-sidebar heading navigation, command-palette open-document switching
+  and workspace-file opening, plus
   transform engine settings trust/probe diagnostics, target-specific export
   readiness manifest preview, export output/manifest path reporting, export
   success/failure diagnostics, and blocked-readiness diagnostics before file

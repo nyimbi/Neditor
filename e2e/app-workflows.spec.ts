@@ -896,6 +896,33 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await expect(page.locator(".cm-line").filter({ hasText: "## Command Target" })).toBeVisible();
 });
 
+test("navigates source from the outline sidebar", async ({ page }) => {
+  const outlineDocument = [
+    "---",
+    "title: Outline Navigation",
+    "status: draft",
+    "---",
+    "",
+    "# Outline Navigation",
+    "",
+    ...Array.from({ length: 24 }, (_, index) => [`## Context ${index + 1}`, "", `Context paragraph ${index + 1}.`, ""]).flat(),
+    "## Outline Target",
+    "",
+    "The outline sidebar should focus this heading in source.",
+    "",
+  ].join("\n");
+
+  await setMockFileText(page, "/workspace/outline-navigation.md", outlineDocument);
+  await queueDialogSelection(page, "/workspace/outline-navigation.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByLabel("Sidebar panel").selectOption("outline");
+
+  await page.locator(".sidebar").getByRole("button", { name: "Outline Target" }).click();
+
+  await expect(page.locator(".cm-line").filter({ hasText: "## Outline Target" })).toBeVisible();
+  await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+});
+
 test("edits with explicit multi-cursor commands", async ({ page }) => {
   await setMockFileText(
     page,

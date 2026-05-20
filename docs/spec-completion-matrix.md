@@ -58,7 +58,7 @@ explicit platform checks.
 | --- | --- | --- | --- | --- |
 | 6.1 Application Shell | Tauri IPC commands exposed from Rust | Complete | `src-tauri/src/lib.rs`; `docs/ipc-command-coverage.md`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` verifies every spec 25.4 command is registered and documented | Keep coverage synchronized as new required IPC commands are added. |
 | 6.1 Application Shell | Vue SFC block order template/script/style | Partial | `src/App.vue` follows order | Preserve when modularizing; add lint/check if practical. |
-| 6.2 Primary Layout | Toolbar, status bar, sidebar, editor, preview | Partial | `src/App.vue` | Browser layout/accessibility checks across viewport sizes. |
+| 6.2 Primary Layout | Toolbar, status bar, sidebar, editor, preview | Partial | `src/App.vue`; Playwright harness covers outline-sidebar heading navigation to source | Browser layout/accessibility checks across viewport sizes and native execution proof. |
 | 6.2 Primary Layout | Export preview, review, presentation outline modes | Partial | Mode controls and sidebars in `src/App.vue` | Interaction tests and product QA for each mode. |
 | 6.3 Editor | CodeMirror 6 engine | Complete | CodeMirror dependencies and imports in `src/App.vue` | None beyond ongoing behavior tests. |
 | 6.3 Editor | Markdown highlighting, diagnostics gutter, decorations | Partial | CodeMirror markdown/linter/lintGutter/decorations | Tests for precise diagnostic navigation and visual states. |
