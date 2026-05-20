@@ -344,6 +344,65 @@ async function installTauriMock(page: Page) {
       return Array.from(terms);
     }
 
+    function transformArtifactsFromMarkdown(text: string, sourceFile: string) {
+      const artifacts: Array<{
+        id: string;
+        name: string;
+        output_kind: string;
+        source_hash: string;
+        source: string;
+        source_file: string;
+        source_line: number;
+        end_source_line: number;
+        options: Record<string, unknown>;
+        output_hash: string;
+        cache_key: string;
+        execution_kind: string;
+        engine_version: string | null;
+        engine_path: string | null;
+        input_mode: string;
+        duration_ms: number;
+        html: string;
+        diagnostics: unknown[];
+      }> = [];
+      const lines = text.split(/\r?\n/);
+      for (let index = 0; index < lines.length; index += 1) {
+        const fence = lines[index].match(/^```(chart|d2|mermaid|timeline|json|yaml)\s*$/);
+        if (!fence) continue;
+        const body: string[] = [];
+        let cursor = index + 1;
+        while (cursor < lines.length && lines[cursor] !== "```") {
+          body.push(lines[cursor]);
+          cursor += 1;
+        }
+        const name = fence[1];
+        const source = body.join("\n");
+        const id = `mock-${name}-${artifacts.length + 1}`;
+        artifacts.push({
+          id,
+          name,
+          output_kind: name === "d2" || name === "mermaid" ? "svg" : "html",
+          source_hash: hash(source),
+          source,
+          source_file: sourceFile,
+          source_line: index + 1,
+          end_source_line: Math.max(index + 1, cursor + 1),
+          options: {},
+          output_hash: hash(`${name}:${source}`),
+          cache_key: `${name}:${hash(source)}`,
+          execution_kind: name === "d2" ? "external" : "native",
+          engine_version: name === "d2" ? "mock-d2" : null,
+          engine_path: name === "d2" ? "/usr/local/bin/d2" : null,
+          input_mode: name === "d2" ? "stdin" : "inline",
+          duration_ms: 7,
+          html: `<figure class="transform transform-${name}" data-artifact-id="${id}"><figcaption>${name} transform</figcaption><pre>${escapeHtml(source)}</pre></figure>`,
+          diagnostics: [],
+        });
+        index = cursor;
+      }
+      return artifacts;
+    }
+
     function mockTransformEngines() {
       return [
         {
@@ -430,6 +489,7 @@ async function installTauriMock(page: Page) {
       const duplicateBibliographyKeys = duplicateBibliographyKeys(bibliography);
       const glossary = glossaryFromMarkdown(expanded.compiled);
       const indexTerms = indexTermsFromMarkdown(expanded.compiled);
+      const transformArtifacts = transformArtifactsFromMarkdown(expanded.compiled, filePath);
       const sourceHash = hash(text);
       const metadata = {
         title,
@@ -468,7 +528,7 @@ async function installTauriMock(page: Page) {
         layout_sections: [],
         export_target: "html",
         export_options: {},
-        transform_artifacts: [],
+        transform_artifacts: transformArtifacts,
         progress_steps: [
           {
             id: "compile",
@@ -484,7 +544,7 @@ async function installTauriMock(page: Page) {
       };
       return {
         compiled_markdown: expanded.compiled,
-        html: htmlFromMarkdown(expanded.compiled),
+        html: `${htmlFromMarkdown(expanded.compiled)}${transformArtifacts.map((artifact) => artifact.html).join("\n")}`,
         semantic: {
           title,
           status,
@@ -527,7 +587,7 @@ async function installTauriMock(page: Page) {
         index_terms: indexTerms,
         formula_graph: [],
         formula_dependency_edges: [],
-        transform_artifacts: [],
+        transform_artifacts: transformArtifacts,
         export_manifest: manifest,
       };
     }
@@ -2432,13 +2492,44 @@ test("replaces the selected source with cleaned AI paste", async ({ page }) => {
 });
 
 test("runs export readiness, success, and failure workflows", async ({ page }) => {
+  await page.locator(".cm-content").click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.keyboard.insertText(
+    [
+      "---",
+      "title: Export Preview",
+      "status: draft",
+      "---",
+      "",
+      "# Export Preview",
+      "",
+      "```d2",
+      "a -> b",
+      "```",
+    ].join("\n"),
+  );
+  await expect.poll(() => editorText(page)).toContain("a -> b");
+
   await page.getByLabel("Sidebar panel").selectOption("exports");
   await page.getByLabel("Target").selectOption("pptx");
+  await page.getByLabel("View mode").selectOption("export");
+  const exportPreview = page.getByRole("region", { name: "Export preview summary" });
+  await expect(exportPreview).toContainText("PPTX export preview");
+  await expect(exportPreview).toContainText("readiness not run");
+  await expect(exportPreview).toContainText("1 transform artifacts");
+  const transformPreview = page.getByRole("region", { name: "Transform artifact preview" });
+  await expect(transformPreview).toContainText("d2");
+  await expect(transformPreview).toContainText("svg via external");
+  await expect(transformPreview).toContainText("Cache d2:");
+  await transformPreview.getByRole("button", { name: "Go to source" }).click();
+  await expect(page.locator(".cm-line").filter({ hasText: "```d2" })).toBeVisible();
+
   await page.getByRole("button", { name: "Prepare for export" }).click();
 
   await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
   await expect(page.getByText("0 errors, 0 warnings, 1 info")).toBeVisible();
   await expect(page.locator(".sidebar").getByText('"export_target": "pptx"')).toBeVisible();
+  await expect(exportPreview).toContainText("ready");
 
   await queueDialogSelection(page, "/exports/market.pptx");
   await page.getByRole("button", { name: "Export document" }).click();

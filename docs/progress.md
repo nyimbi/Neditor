@@ -1181,6 +1181,19 @@ Additional preview diagnostic rendering verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "diagnostics to the source range" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional export and transform preview verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the export preview summary and transform artifact preview inventory. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests passed after the export/transform preview change. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked and all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails passed after adding export/transform preview regions. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 37 Chromium workflow tests; `runs export readiness, success, and failure workflows` now contains export preview and transform artifact assertions. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "export readiness" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

@@ -1118,8 +1118,11 @@ Finish:
 - Separate preview theme behavior.
 - Inline warning rendering. The preview now injects escaped diagnostic callouts
   into the rendered flow and delegates source jumps back to the editor.
-- Transform-aware preview artifacts.
-- Print/export preview mode behavior.
+- Transform-aware preview artifacts. The preview pane now summarizes transform
+  artifacts, cache keys, execution mode, diagnostics, and source jumps.
+- Print/export preview mode behavior. Export mode now adds an export preview
+  summary for the selected target, readiness state, manifest counts, and export
+  options.
 - Preview accessibility and keyboard navigation.
 
 ### 12. AI Paste Cleanup And Governance

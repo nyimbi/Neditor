@@ -956,6 +956,29 @@
         aria-label="Live preview"
         @scroll="syncEditorScrollFromPreview"
       >
+        <section v-if="store.mode === 'export'" class="export-preview-summary" aria-label="Export preview summary">
+          <div>
+            <strong>{{ exportPreviewSummary.targetLabel }}</strong>
+            <span>{{ exportPreviewSummary.readinessLabel }}</span>
+          </div>
+          <p>{{ exportPreviewSummary.manifestLabel }}</p>
+          <ul aria-label="Export preview options">
+            <li v-for="option in exportPreviewSummary.options" :key="option">{{ option }}</li>
+          </ul>
+        </section>
+        <section v-if="transformPreviewItems.length" class="transform-preview-summary" aria-label="Transform artifact preview">
+          <h2>Transform Artifacts</h2>
+          <article v-for="artifact in transformPreviewItems" :key="artifact.id">
+            <strong>{{ artifact.name }}</strong>
+            <p>{{ artifact.outputLabel }}</p>
+            <small>{{ artifact.cacheLabel }}</small>
+            <small v-if="artifact.locationLabel">{{ artifact.locationLabel }}</small>
+            <button v-if="artifact.sourceLine" type="button" @click="goToTransformArtifact(artifact)">Go to source</button>
+            <ul v-if="artifact.diagnostics.length" class="diagnostic-related">
+              <li v-for="diagnostic in artifact.diagnostics" :key="diagnostic.message">{{ diagnostic.message }}</li>
+            </ul>
+          </article>
+        </section>
         <article class="preview-document" :style="previewDocumentStyle" @click="handlePreviewClick" v-html="previewHtmlWithDiagnostics"></article>
       </section>
     </main>
@@ -1239,6 +1262,18 @@ interface PreviewDiagnosticItem extends DocumentDiagnostic {
   generatedLine: number;
 }
 
+interface TransformPreviewItem {
+  id: string;
+  name: string;
+  sourceFile?: string | null;
+  sourceLine?: number | null;
+  endSourceLine?: number | null;
+  diagnostics: DocumentDiagnostic[];
+  outputLabel: string;
+  cacheLabel: string;
+  locationLabel: string;
+}
+
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const codeFenceSnippet = "```markdown\n\n```\n";
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
@@ -1296,6 +1331,45 @@ const previewDiagnostics = computed<PreviewDiagnosticItem[]>(() => {
     .sort((left, right) => left.generatedLine - right.generatedLine || (left.line || 0) - (right.line || 0));
 });
 const previewHtmlWithDiagnostics = computed(() => inlinePreviewDiagnostics(active.value.compile?.html || "", previewDiagnostics.value));
+const exportPreviewSummary = computed(() => {
+  const manifest = store.exportReadiness?.manifest || active.value.compile?.export_manifest;
+  const readiness = store.exportReadiness;
+  const options = [
+    store.exportDefaults.includeManifest ? "Manifest" : "No manifest",
+    store.exportDefaults.coverPage ? "Cover" : "No cover",
+    store.exportDefaults.pageNumbers ? "Page numbers" : "No page numbers",
+    store.exportDefaults.includeComments ? "Comments" : "No comments",
+    store.exportDefaults.includeProvenance ? "AI provenance" : "No AI provenance",
+    store.exportDefaults.includeGlossary ? "Glossary" : "No glossary",
+    store.exportDefaults.layoutPreset,
+  ];
+  return {
+    targetLabel: `${store.exportTarget.toUpperCase()} export preview`,
+    readinessLabel: readiness ? (readiness.ready ? "ready" : `${readiness.error_count} errors, ${readiness.warning_count} warnings`) : "readiness not run",
+    manifestLabel: manifest
+      ? `${manifest.included_files.length} included files, ${manifest.transform_artifacts.length} transform artifacts, ${manifest.layout_sections.length} layout sections`
+      : "No export manifest yet",
+    options,
+  };
+});
+const transformPreviewItems = computed<TransformPreviewItem[]>(() =>
+  (active.value.compile?.transform_artifacts || []).map((artifact, index) => {
+    const locationLabel = artifact.source_line
+      ? `${artifact.source_file || active.value.path || "document"}: line ${artifact.source_line}`
+      : "";
+    return {
+      id: artifact.id || `${artifact.name}-${index}`,
+      name: artifact.name,
+      sourceFile: artifact.source_file || null,
+      sourceLine: artifact.source_line || null,
+      endSourceLine: artifact.end_source_line || artifact.source_line || null,
+      diagnostics: artifact.diagnostics || [],
+      outputLabel: `${artifact.output_kind} via ${artifact.execution_kind || "native"}${artifact.duration_ms ? ` in ${artifact.duration_ms} ms` : ""}`,
+      cacheLabel: artifact.cache_key ? `Cache ${artifact.cache_key}` : `Output ${artifact.output_hash}`,
+      locationLabel,
+    };
+  }),
+);
 const workspaceStyle = computed(() => ({ "--editor-ratio": String(store.editorPaneRatio) }));
 const paneSplitterVisible = computed(() => !["source", "focus", "preview", "export"].includes(store.mode));
 const wordStats = computed(() => {
@@ -3481,6 +3555,15 @@ function goToCrossReference(reference: { line: number; column?: number | null; e
   void goToSourceTarget(reference);
 }
 
+function goToTransformArtifact(artifact: TransformPreviewItem) {
+  if (!artifact.sourceLine) return;
+  void goToSourceTarget({
+    source_file: artifact.sourceFile || null,
+    line: artifact.sourceLine,
+    end_line: artifact.endSourceLine || artifact.sourceLine,
+  });
+}
+
 function handlePreviewClick(event: MouseEvent) {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -4130,6 +4213,62 @@ select:hover {
 }
 
 .preview-diagnostic button {
+  justify-self: start;
+}
+
+.export-preview-summary,
+.transform-preview-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px;
+  border: 1px solid #b9c6d4;
+  border-left: 4px solid #2f6f7e;
+  background: #f8fbfc;
+}
+
+.export-preview-summary div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.export-preview-summary p,
+.transform-preview-summary p {
+  margin: 0;
+}
+
+.export-preview-summary ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.export-preview-summary li {
+  padding: 2px 6px;
+  border: 1px solid #c9d2dc;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.transform-preview-summary h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.transform-preview-summary article {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #d6dde6;
+  background: #ffffff;
+}
+
+.transform-preview-summary button {
   justify-self: start;
 }
 
