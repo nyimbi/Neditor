@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `c362638 Expose
-  caption label gaps before export`
+- Latest inspected committed baseline before this update: `0fa5ee1 Summarize
+  export readiness in manifests`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -204,6 +204,10 @@ Recent pushed checkpoints visible in current git history:
 - This update adds an explicit export manifest readiness summary with ready,
   error, warning, and info counts so sidecar manifests carry portable
   preflight evidence without requiring consumers to recount diagnostics.
+- This update makes direct exports run the same dirty-Git readiness check as
+  preflight export reports, records that warning in the response and sidecar
+  manifest, and avoids falling back to the repo cwd when an unsaved/nonexistent
+  source path is exported.
 
 ## Current Capability Snapshot
 
@@ -568,17 +572,20 @@ Additional review/provenance readiness metadata verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after adding review/change-note, AI provenance, and caption/label readiness diagnostics. |
-| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 11 export command tests passed, including readiness and manifest diagnostics for malformed review comments, change notes, incomplete AI provenance metadata, invalid AI review statuses, missing figure/table/equation labels or captions, and explicit manifest readiness summaries. |
+| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after adding review/change-note, AI provenance, caption/label readiness diagnostics, and direct-export dirty-Git manifest warnings. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the direct-export readiness update. |
+| `cargo check --locked --features native-watch` in `src-tauri` | Pass | Native file watcher feature still compiles after the direct-export readiness update. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 12 export command tests passed, including readiness and manifest diagnostics for malformed review comments, change notes, incomplete AI provenance metadata, invalid AI review statuses, missing figure/table/equation labels or captions, explicit manifest readiness summaries, and direct-export dirty-Git manifest warnings. |
 | `cargo test --locked review_provenance_tests --lib` in `src-tauri` | Pass | 4 review/provenance tests passed after the stricter AI provenance validation. |
 | `cargo test --locked validation_tests --lib` in `src-tauri` | Pass | 4 validation tests passed after the readiness validation extension. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after the shared parser and export-readiness validation changes. |
-| `cargo test --locked` in `src-tauri` | Pass | 134 Rust tests passed plus main/doc test targets with 0 tests. |
-| `pnpm exec playwright test --list` | Pass | Browser harness still lists 34 Chromium workflow tests after the readiness metadata change. |
+| `cargo test --locked` in `src-tauri` | Pass | 135 Rust tests passed plus main/doc test targets with 0 tests. |
+| `pnpm exec playwright test --list` | Pass | Browser harness still lists 34 Chromium workflow tests after the direct-export readiness change. |
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |
-| `git diff --check` | Pass | No whitespace errors after the readiness metadata and documentation updates. |
-| Markdown local link resolution script | Pass | Updated markdown docs contain no broken local links. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
+| `git diff --check` | Pass | No whitespace errors after the readiness metadata, dirty-Git manifest, and documentation updates. |
+| Scoped markdown local link resolution script | Pass | Updated markdown docs contain no broken local links; a repo-wide pass still finds the pre-existing missing `docs/specification.md` `architecture.svg` image reference. |
 
 Archived remote workflow evidence log:
 

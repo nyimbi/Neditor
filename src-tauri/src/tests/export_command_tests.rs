@@ -394,6 +394,77 @@ fn export_document_writes_optional_sidecar_manifest() {
 }
 
 #[test]
+fn export_document_manifest_records_dirty_git_warning() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-export-dirty-git-test-{unique}"));
+    fs::create_dir_all(&root).expect("create dirty git export dir");
+    run_git(&root, &["init"]).expect("git init");
+    run_git(&root, &["config", "user.email", "neditor@example.test"]).expect("git email");
+    run_git(&root, &["config", "user.name", "NEditor Test"]).expect("git name");
+
+    let doc = root.join("doc.md");
+    let clean_source =
+        "---\ntitle: Dirty Git Export\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Ready\n";
+    fs::write(&doc, clean_source).expect("write clean doc");
+    run_git(&root, &["add", "doc.md"]).expect("git add doc");
+    run_git(&root, &["commit", "-m", "Initial document"]).expect("git commit doc");
+
+    let dirty_source =
+        "---\ntitle: Dirty Git Export\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Ready\n\nUncommitted export content.\n";
+    fs::write(&doc, dirty_source).expect("write dirty doc");
+    let output = root.join("dirty.html");
+
+    let response = export_document(ExportRequest {
+        text: dirty_source.to_string(),
+        file_path: Some(path_to_string(&doc)),
+        target: "html".to_string(),
+        output_path: path_to_string(&output),
+        options: json!({ "includeManifest": true }),
+    })
+    .expect("dirty git export should warn but still write");
+
+    assert!(output.exists());
+    assert!(!response.manifest.readiness.ready);
+    assert_eq!(response.manifest.readiness.error_count, 0);
+    assert_eq!(response.manifest.readiness.warning_count, 1);
+    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("Git working tree is dirty before export")));
+    assert!(response
+        .manifest
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic
+            .message
+            .contains("Git working tree is dirty before export")));
+
+    let manifest_path = response.manifest_path.expect("manifest path");
+    let manifest_text = fs::read_to_string(&manifest_path).expect("manifest file");
+    assert!(manifest_text.contains("\"ready\": false"));
+    assert!(manifest_text.contains("\"warning_count\": 1"));
+    assert!(manifest_text.contains("Git working tree is dirty before export"));
+
+    let suppressed_output = root.join("suppressed.html");
+    let suppressed = export_document(ExportRequest {
+        text: dirty_source.to_string(),
+        file_path: Some(path_to_string(&doc)),
+        target: "html".to_string(),
+        output_path: path_to_string(&suppressed_output),
+        options: json!({ "includeManifest": false, "warnOnDirtyGit": false }),
+    })
+    .expect("suppressed dirty git warning export");
+    assert!(suppressed.manifest.readiness.ready);
+    assert!(suppressed.diagnostics.iter().all(|diagnostic| !diagnostic
+        .message
+        .contains("Git working tree is dirty before export")));
+
+    fs::remove_dir_all(root).expect("clean dirty git export dir");
+}
+
+#[test]
 fn prepare_for_export_validates_target_and_options() {
     let ready_report = prepare_for_export(PrepareExportRequest {
         text: "---\ntitle: Ready Layout\nversion: 1.0.0\nstatus: archived\n---\n# Ready Layout\n\n{{section-break columns=2}}\nColumned content.".to_string(),

@@ -59,6 +59,7 @@ pub(crate) struct ExportReadinessReport {
 
 #[tauri::command]
 pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, String> {
+    let file_path = request.file_path.clone();
     let compile_response = compile_with_options(
         CompileRequest {
             text: request.text,
@@ -82,6 +83,9 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
     let mut diagnostics = compile_response.diagnostics.clone();
     validate_export_settings(&request.target, &request.options, &mut diagnostics);
     validate_captioned_business_objects(&compile_response.document_ast.blocks, &mut diagnostics);
+    if git_export_warnings_enabled(&request.options) {
+        validate_git_export_cleanliness(file_path.as_deref(), &mut diagnostics);
+    }
     if let Some(error) = diagnostics
         .iter()
         .find(|diagnostic| diagnostic.severity == "error")
@@ -205,6 +209,9 @@ fn validate_git_export_cleanliness(
     let Some(path) = file_path else {
         return;
     };
+    if !Path::new(path).exists() {
+        return;
+    }
     let Ok(status) = get_git_status(Some(path.to_string())) else {
         return;
     };

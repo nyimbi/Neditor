@@ -80,7 +80,7 @@ behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `c95ef42 Prove live preview updates and package MIT licensing`
+- `0fa5ee1 Summarize export readiness in manifests`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -90,9 +90,26 @@ explicit platform checks run outside GitHub Actions.
 
 Most recent local verification evidence:
 
+- `cargo fmt --check`: passed in `src-tauri`.
+- `cargo check --locked`: passed in `src-tauri`.
+- `cargo check --locked --features native-watch`: passed in `src-tauri`.
+- `cargo clippy --locked --all-targets -- -D warnings`: passed in
+  `src-tauri`.
+- `cargo test --locked`: passed locally with 135 Rust tests.
+- `cargo test --locked export_command_tests --lib`: passed 12 export command
+  tests, including direct-export dirty-Git warnings copied into response and
+  sidecar manifests.
+- `pnpm run test:unit`: passed with 8 frontend unit tests.
+- `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
 - `pnpm exec playwright test --list`: listed the browser workflow harness with
   command-palette insertion proof for `[TOC]`, `[INDEX]`, `[BIBLIOGRAPHY]`,
   `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
+- `./node_modules/.bin/tauri build --no-bundle`: passed and built the release
+  desktop binary at `src-tauri/target/release/neditor`.
+- `git diff --check`: passed.
+- Scoped markdown local link resolution for updated docs: passed. A repo-wide
+  link pass still finds the pre-existing missing `docs/specification.md`
+  `architecture.svg` image reference.
 - `pnpm exec playwright test --list`: listed the browser workflow harness with
   references-panel proof for resolved bibliography entries, missing citation
   keys, and duplicate bibliography keys.
@@ -751,6 +768,10 @@ Current evidence:
   labels or captions, and the diagnostics are copied into the export manifest.
 - Export manifests now include an explicit readiness summary with ready, error,
   warning, and info counts.
+- Direct exports now run the same dirty-Git readiness check as preflight
+  reports, copy the warning into the response and sidecar manifest, and skip
+  Git inspection for nonexistent source paths so unsaved/export-only documents
+  do not inherit the app process working tree state.
 
 Readiness should validate and report:
 
@@ -768,7 +789,9 @@ Readiness should validate and report:
 - Export target options and target-specific blockers.
 - Unresolved comments and malformed comment/change-note audit metadata.
 - AI provenance that is not human reviewed or lacks required audit metadata.
-- Dirty Git state and export manifest state.
+- Dirty Git state and export manifest state. Direct export and preflight export
+  paths now both cover dirty Git; remaining work is broader readiness coverage
+  and UI/native proof.
 
 Completion criteria:
 
