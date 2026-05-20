@@ -406,17 +406,16 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await expect(page.getByText("/workspace")).toBeVisible();
   await expect(page.getByRole("button", { name: /market\.md/ }).first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Commands" }).click();
-  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert table");
-  await page.getByRole("button", { name: "Insert table Snippet" }).click();
-  await expect.poll(() => editorText(page)).toContain("| Item | Value |");
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await page.getByLabel("Status").selectOption("in-review");
+  await expect.poll(() => editorText(page)).toContain("status: in-review");
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("| Item | Value |");
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: in-review");
 
   await queueDialogSelection(page, "/workspace/market copy.md");
   await page.getByRole("button", { name: "Duplicate" }).click();
   await expect(page.getByRole("button", { name: /market copy\.md/ })).toBeVisible();
-  await expect.poll(() => mockFileText(page, "/workspace/market copy.md")).toContain("| Item | Value |");
+  await expect.poll(() => mockFileText(page, "/workspace/market copy.md")).toContain("status: in-review");
 
   await queueDialogSelection(page, "/workspace/renamed.md");
   await page.getByRole("button", { name: "Rename" }).click();
