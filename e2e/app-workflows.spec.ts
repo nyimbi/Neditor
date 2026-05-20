@@ -407,7 +407,7 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await expect(page.getByRole("button", { name: /market\.md/ }).first()).toBeVisible();
 
   await page.getByLabel("Sidebar panel").selectOption("review");
-  await page.getByLabel("Status").selectOption("in-review");
+  await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await expect.poll(() => editorText(page)).toContain("status: in-review");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: in-review");
