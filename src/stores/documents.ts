@@ -8,6 +8,7 @@ import type {
   AiCleanupResponse,
   AiCleanupOptions,
   CompileResponse,
+  DocumentDiagnostic,
   ExportReadinessReport,
   GitHistoryEntry,
   GitStatus,
@@ -533,6 +534,9 @@ export const useDocumentsStore = defineStore("documents", {
     exportReadiness: null as ExportReadinessReport | null,
     exportBusy: false,
     exportProgress: "",
+    lastExportOutputPath: "",
+    lastExportManifestPath: "",
+    lastExportDiagnostics: [] as DocumentDiagnostic[],
     aiCleanupIssues: [] as string[],
     aiCleanupPreview: null as AiCleanupResponse | null,
     recentFiles: [] as string[],
@@ -1295,11 +1299,15 @@ export const useDocumentsStore = defineStore("documents", {
       if (this.exportBusy) return;
       const doc = this.activeDocument;
       this.exportBusy = true;
+      this.lastExportOutputPath = "";
+      this.lastExportManifestPath = "";
+      this.lastExportDiagnostics = [];
+      this.lastError = "";
       try {
         this.exportProgress = "Creating pre-export snapshot";
         await this.createSnapshot("pre-export");
         this.exportProgress = `Writing ${this.exportTarget.toUpperCase()} export`;
-        const response = await invoke<{ output_path: string; manifest_path?: string }>("export_document", {
+        const response = await invoke<{ output_path: string; manifest_path?: string | null; diagnostics?: DocumentDiagnostic[] }>("export_document", {
           request: {
             text: doc.text,
             file_path: doc.path,
@@ -1308,9 +1316,29 @@ export const useDocumentsStore = defineStore("documents", {
             options: this.exportOptionsForActive(),
           },
         });
-        this.statusMessage = `Exported ${response.output_path}${response.manifest_path ? " with manifest" : ""}`;
+        this.lastExportOutputPath = response.output_path;
+        this.lastExportManifestPath = response.manifest_path || "";
+        this.lastExportDiagnostics = response.diagnostics || [];
+        this.statusMessage = `Exported ${response.output_path}${response.manifest_path ? ` with manifest ${response.manifest_path}` : ""}`;
         this.exportProgress = "Refreshing export snapshots";
         await this.listSnapshots();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.lastError = message;
+        this.lastExportDiagnostics = [
+          {
+            severity: "error",
+            message,
+            source_file: doc.path,
+            line: null,
+            column: null,
+            end_line: null,
+            end_column: null,
+            suggestion: "Review export readiness diagnostics and target settings before retrying.",
+            related: [this.exportTarget],
+          },
+        ];
+        this.statusMessage = `Export failed: ${message}`;
       } finally {
         this.exportProgress = "";
         this.exportBusy = false;
@@ -1387,6 +1415,7 @@ export const useDocumentsStore = defineStore("documents", {
       if (this.exportBusy) return;
       const doc = this.activeDocument;
       this.exportBusy = true;
+      this.lastError = "";
       try {
         this.exportProgress = "Checking export readiness";
         this.exportReadiness = await invoke<ExportReadinessReport>("prepare_for_export", {

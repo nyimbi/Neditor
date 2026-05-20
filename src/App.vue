@@ -544,6 +544,25 @@
               <button v-if="canNavigateDiagnostic(diagnostic)" type="button" @click="goToSourceTarget(diagnostic)">Go to source</button>
             </article>
           </section>
+          <section v-if="store.lastExportOutputPath || store.lastExportDiagnostics.length" class="export-result" aria-label="Export result">
+            <h3>Last export</h3>
+            <p v-if="store.lastExportOutputPath">Output: {{ store.lastExportOutputPath }}</p>
+            <p v-if="store.lastExportManifestPath">Manifest: {{ store.lastExportManifestPath }}</p>
+            <article
+              v-for="diagnostic in store.lastExportDiagnostics"
+              :key="`export-${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.message}`"
+              class="diagnostic"
+              :class="diagnostic.severity"
+            >
+              <strong>{{ diagnostic.severity }}</strong>
+              <p>{{ diagnostic.message }}</p>
+              <small v-if="diagnosticLocation(diagnostic)">{{ diagnosticLocation(diagnostic) }}</small>
+              <small v-if="diagnostic.suggestion">{{ diagnostic.suggestion }}</small>
+              <ul v-if="diagnostic.related.length" class="diagnostic-related">
+                <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
+              </ul>
+            </article>
+          </section>
           <h3>Manifest</h3>
           <pre>{{ manifestPreview }}</pre>
           <h3>Snapshots</h3>

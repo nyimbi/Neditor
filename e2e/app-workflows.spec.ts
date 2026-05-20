@@ -545,17 +545,36 @@ async function installTauriMock(page: Page) {
       }
       if (cmd === "stop_file_watcher") return null;
       if (cmd === "prepare_for_export") {
-        const request = args.request as { text: string };
+        const request = args.request as { text: string; target?: string; options?: { includeManifest?: boolean } };
         const response = compileMarkdown(request.text);
+        const diagnostics = request.text.includes("EXPORT_BLOCKER")
+          ? [
+              {
+                severity: "error",
+                message: `${(request.target || "html").toUpperCase()} export requires approved metadata before writing.`,
+                source_file: "/workspace/market.md",
+                line: 3,
+                column: 1,
+                end_line: 3,
+                end_column: 16,
+                suggestion: "Set status: approved before exporting this target.",
+                related: [`target:${request.target || "html"}`],
+              },
+            ]
+          : [];
         return {
-          ready: true,
-          error_count: 0,
+          ready: diagnostics.length === 0,
+          error_count: diagnostics.filter((diagnostic) => diagnostic.severity === "error").length,
           warning_count: 0,
-          info_count: 0,
+          info_count: request.target === "pptx" ? 1 : 0,
           source_map: [],
           paged_document: response.paged_document,
-          diagnostics: [],
-          manifest: response.export_manifest,
+          diagnostics,
+          manifest: {
+            ...response.export_manifest,
+            export_target: request.target || "html",
+            export_options: request.options || {},
+          },
         };
       }
       if (cmd === "cleanup_ai_paste") {
@@ -567,7 +586,28 @@ async function installTauriMock(page: Page) {
         };
       }
       if (cmd === "create_snapshot") return { snapshot_path: "/tmp/mock-snapshot.md" };
-      if (cmd === "export_document") return { output_path: "/tmp/mock-export.html", manifest_path: "/tmp/mock-export.html.manifest.json" };
+      if (cmd === "export_document") {
+        const request = args.request as { output_path: string; target?: string; options?: { includeManifest?: boolean } };
+        if (request.output_path.includes("fail")) throw new Error(`Mock export writer failed for ${request.output_path}`);
+        const manifestPath = request.options?.includeManifest === false ? null : `${request.output_path}.manifest.json`;
+        return {
+          output_path: request.output_path,
+          manifest_path: manifestPath,
+          diagnostics: [
+            {
+              severity: "info",
+              message: `Mock ${request.target || "html"} export wrote ${request.output_path}`,
+              source_file: "/workspace/market.md",
+              line: null,
+              column: null,
+              end_line: null,
+              end_column: null,
+              suggestion: null,
+              related: manifestPath ? [manifestPath] : [],
+            },
+          ],
+        };
+      }
       return null;
     }
 
@@ -1600,10 +1640,35 @@ test("replaces the selected source with cleaned AI paste", async ({ page }) => {
   await expect.poll(() => editorText(page)).not.toContain("Original saved content.");
 });
 
-test("opens export readiness from the export sidebar", async ({ page }) => {
+test("runs export readiness, success, and failure workflows", async ({ page }) => {
   await page.getByLabel("Sidebar panel").selectOption("exports");
+  await page.getByLabel("Target").selectOption("pptx");
   await page.getByRole("button", { name: "Prepare for export" }).click();
 
   await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
-  await expect(page.getByText("0 errors, 0 warnings, 0 info")).toBeVisible();
+  await expect(page.getByText("0 errors, 0 warnings, 1 info")).toBeVisible();
+  await expect(page.locator(".sidebar").getByText('"export_target": "pptx"')).toBeVisible();
+
+  await queueDialogSelection(page, "/exports/market.pptx");
+  await page.getByRole("button", { name: "Export document" }).click();
+  const exportResult = page.getByRole("region", { name: "Export result" });
+  await expect(exportResult).toContainText("Output: /exports/market.pptx");
+  await expect(exportResult).toContainText("Manifest: /exports/market.pptx.manifest.json");
+  await expect(exportResult).toContainText("Mock pptx export wrote /exports/market.pptx");
+  await expect(page.locator(".status-bar")).toContainText("Exported /exports/market.pptx with manifest /exports/market.pptx.manifest.json");
+
+  await queueDialogSelection(page, "/exports/fail.pptx");
+  await page.getByRole("button", { name: "Export document" }).click();
+  await expect(exportResult).toContainText("Mock export writer failed for /exports/fail.pptx");
+  await expect(exportResult).toContainText("Review export readiness diagnostics and target settings before retrying.");
+  await expect(page.locator(".status-bar")).toContainText("Export failed: Mock export writer failed for /exports/fail.pptx");
+
+  await page.locator(".cm-content").click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.keyboard.type(["# Blocked Export", "", "EXPORT_BLOCKER"].join("\n"));
+  await page.getByRole("button", { name: "Export document" }).click();
+  await expect(page.locator("article.readiness").getByText("Needs attention", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Export readiness diagnostics" })).toContainText("PPTX export requires approved metadata before writing.");
+  await expect(page.getByRole("region", { name: "Export readiness diagnostics" })).toContainText("target:pptx");
+  await expect(page.locator(".status-bar")).toContainText("1 errors block export");
 });
