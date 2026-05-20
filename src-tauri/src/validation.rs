@@ -149,6 +149,7 @@ pub(crate) fn validate_document(
             .related
             .push(format!("First citation: {}", first.raw));
         diagnostics.push(diagnostic);
+        push_missing_citation_source_diagnostics(&input, diagnostics);
     }
     let mut reported_broken_citations = HashSet::new();
     for reference in input.citation_references {
@@ -264,6 +265,38 @@ pub(crate) fn validate_document(
         ));
     }
     validate_ai_provenance_metadata(&input, diagnostics);
+}
+
+fn push_missing_citation_source_diagnostics(
+    input: &DocumentValidationInput<'_>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let mut reported_missing_citations = HashSet::new();
+    for reference in input.citation_references {
+        if !reported_missing_citations.insert(reference.key.as_str()) {
+            continue;
+        }
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, reference.line);
+        let mut diagnostic = with_range(
+            diag(
+                "warning",
+                format!("Missing citation bibliography entry: {}", reference.key),
+                source_file,
+                line,
+                Some(
+                    "Add a bibliography source that defines this key, or remove the citation before export.",
+                ),
+            ),
+            reference.column,
+            line,
+            reference.end_column,
+        );
+        diagnostic
+            .related
+            .push(format!("Citation syntax: {}", reference.raw));
+        diagnostics.push(diagnostic);
+    }
 }
 
 pub(crate) fn validate_layout_directives(

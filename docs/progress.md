@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `18500c1 Prove
-  export option intent across artifacts`
+- Latest inspected committed baseline before this update: `5f56b1c Record
+  macOS optional engine evidence`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -325,6 +325,11 @@ Recent pushed checkpoints visible in current git history:
   arm64 evidence verifies Graphviz/DOT, D2, and PlantUML through the optional
   engine probe and `external_transform_conformance_runs_installed_engines`
   with `--nocapture`; Pikchr is explicitly recorded as missing on this host.
+- This update adds per-key missing-citation readiness diagnostics with precise
+  source ranges when citations are present but no bibliography source is
+  available. The new readiness proof verifies line, column, end-line, and
+  end-column details for each missing key and confirms those diagnostics are
+  copied into export manifests.
 
 ## Current Capability Snapshot
 
@@ -560,6 +565,25 @@ Additional external transform platform evidence:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed. |
 | `pnpm run check:docs` | Pass | Checked 13 Markdown files, including the new platform evidence doc; local links resolve. |
 | `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
+| `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests; execution still depends on local Chromium availability and host permissions. |
+| `git diff --check` | Pass | No whitespace errors in the current diff. |
+
+Additional citation readiness verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture` in `src-tauri` | Pass | Proved no-bibliography citation readiness emits the broad source warning plus one precise per-key diagnostic for each missing citation key, with line/column/end-column ranges and manifest parity. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 15 export command tests passed, including the new missing-citation readiness range coverage. |
+| `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after the validation change. |
+| `cargo check --locked` in `src-tauri` | Pass | Finished dev profile successfully. |
+| `cargo check --locked --features native-watch` in `src-tauri` | Pass | Finished dev profile successfully. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
+| `cargo test --locked` in `src-tauri` | Pass | 147 Rust tests passed; 0 failed. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests passed. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed. |
+| `pnpm run check:docs` | Pass | Checked 13 Markdown files; local links resolve. |
+| `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed, with Pikchr missing as an explicit optional-engine gap. |
 | `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests; execution still depends on local Chromium availability and host permissions. |
 | `git diff --check` | Pass | No whitespace errors in the current diff. |
 

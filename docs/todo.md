@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `3c10a2c Document storage and security boundaries`
+- `5f56b1c Record macOS optional engine evidence`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -125,9 +125,15 @@ Most recent local verification evidence:
 - `cargo test --locked git_history_diff_commit_tag_and_restore_workflow --lib`:
   passed after Git hardening and proves normal history, diff, commit, tag, and
   restore behavior still works.
-- `cargo test --locked export_command_tests --lib`: passed 13 export command
-  tests, including direct-export dirty-Git warnings copied into response and
-  sidecar manifests plus structured export progress-step reporting.
+- `cargo test --locked export_command_tests --lib`: passed 15 export command
+  tests, including direct-export dirty-Git warnings copied into response,
+  sidecar manifests, structured export progress-step reporting, and precise
+  no-bibliography citation readiness ranges.
+- `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture`:
+  passed and proves no-bibliography citation readiness emits a broad source
+  warning plus precise per-key missing citation diagnostics that are copied
+  into the export manifest.
+- `cargo test --locked`: passed locally with 147 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -1056,13 +1062,17 @@ Finish:
 ### 14. Bibliography, Citations, Index, Glossary, And Cross References
 
 Status: core support exists; UI and cross-target proof remain incomplete.
+Readiness now reports missing citation bibliography entries with precise
+source ranges when citations are present but no bibliography source is
+available.
 
 Finish:
 
 - BibTeX and CSL JSON import edge cases.
 - Duplicate bibliography key UI and readiness reporting.
 - Citation styles: title, author-year, key, and CSL-driven choices.
-- Missing citation diagnostics with precise ranges.
+- Remaining citation diagnostics: richer duplicate-key source locations and
+  style-specific warnings.
 - Cross-reference links across preview, HTML, PDF, DOCX, PPTX, and bundle
   outputs.
 - Automatic index inclusion/exclusion.

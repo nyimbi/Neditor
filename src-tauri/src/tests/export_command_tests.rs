@@ -200,6 +200,53 @@ fn prepare_for_export_reports_missing_caption_labels() {
 }
 
 #[test]
+fn prepare_for_export_reports_missing_citation_sources_with_precise_ranges() {
+    let report = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: Citation Audit\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Citation Audit\nClaim [@missing2026, p. 4; @other2026].\nRepeated [@missing2026].\n"
+            .to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 0);
+    assert_eq!(report.warning_count, 3);
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message == "Document contains citations but no bibliography source."
+            && diagnostic.source_file.as_deref() == Some("untitled.md")
+            && diagnostic.line == Some(9)
+            && diagnostic.column == Some(8)
+            && diagnostic.end_line == Some(9)
+            && diagnostic.end_column == Some(20)
+    }));
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message == "Missing citation bibliography entry: missing2026"
+            && diagnostic.source_file.as_deref() == Some("untitled.md")
+            && diagnostic.line == Some(9)
+            && diagnostic.column == Some(8)
+            && diagnostic.end_line == Some(9)
+            && diagnostic.end_column == Some(20)
+            && diagnostic
+                .related
+                .iter()
+                .any(|related| related.contains("@missing2026"))
+    }));
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message == "Missing citation bibliography entry: other2026"
+            && diagnostic.source_file.as_deref() == Some("untitled.md")
+            && diagnostic.line == Some(9)
+            && diagnostic.column == Some(28)
+            && diagnostic.end_line == Some(9)
+            && diagnostic.end_column == Some(38)
+    }));
+    assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
+    assert!(report.manifest.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message == "Missing citation bibliography entry: missing2026"
+    }));
+}
+
+#[test]
 fn export_readiness_and_manifest_report_progress_steps() {
     let source = "---\ntitle: Progress Ready\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\nversion: 1.0.0\n---\n# Progress Ready\n\n```chart\ntype: bar\ntitle: Progress data\ndata:\n  - region: East\n    revenue: 42\n  - region: West\n    revenue: 27\nx: region\ny: revenue\n```\n";
     let report = prepare_for_export(PrepareExportRequest {
