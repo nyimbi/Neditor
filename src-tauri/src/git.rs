@@ -1,5 +1,8 @@
 use crate::{
-    git_support::{git_cwd_for_path, git_pathspec, run_git},
+    git_support::{
+        git_cwd_for_path, git_pathspec, run_git, validate_git_restore_target,
+        validate_git_revision, validate_git_tag_name,
+    },
     git_types::{
         GitCommitRequest, GitHistoryEntry, GitPathRequest, GitRestoreRequest, GitStatus,
         GitTagRequest,
@@ -97,8 +100,10 @@ pub(crate) fn commit_document_changes(request: GitCommitRequest) -> Result<GitSt
 pub(crate) fn tag_release(request: GitTagRequest) -> Result<String, String> {
     let path = PathBuf::from(&request.path);
     let cwd = git_cwd_for_path(&path);
-    run_git(&cwd, &["tag", "-a", &request.tag, "-m", &request.message])?;
-    Ok(request.tag)
+    let tag = request.tag.trim();
+    validate_git_tag_name(tag)?;
+    run_git(&cwd, &["tag", "-a", tag, "-m", &request.message])?;
+    Ok(tag.to_string())
 }
 
 #[tauri::command]
@@ -106,10 +111,10 @@ pub(crate) fn restore_git_revision(request: GitRestoreRequest) -> Result<FileRes
     let path = PathBuf::from(&request.path);
     let cwd = git_cwd_for_path(&path);
     let file_name = git_pathspec(&path, request.path.as_str());
-    let content = run_git(
-        &cwd,
-        &["show", &format!("{}:{file_name}", request.revision)],
-    )?;
+    let revision = request.revision.trim();
+    validate_git_revision(revision)?;
+    validate_git_restore_target(&cwd, &path)?;
+    let content = run_git(&cwd, &["show", &format!("{revision}:{file_name}")])?;
     fs::write(&path, content.as_bytes()).map_err(|err| err.to_string())?;
     read_file(path_to_string(&path))
 }

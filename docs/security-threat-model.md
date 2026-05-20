@@ -23,6 +23,7 @@ workflows.
 | Filesystem boundary | User-selected paths | External disk edits and missing/moved files | Hash checks, stale-save blocking, conflict UI, snapshots before destructive recovery. |
 | Include boundary | Root document | Included Markdown/media/data files | Include graph tracking, diagnostics, source hashes. |
 | Export boundary | Compiler/export modules | Target artifact consumers | Readiness checks, manifests, output hashes, sidecar evidence. |
+| Git boundary | Opened repository worktree | User-controlled tags, revisions, and worktree paths | Argument-array invocation, pathspec separators, ref validation, symlink restore blocking, repository-contained restore targets. |
 | External transform boundary | Native transform fallback and trusted adapter | User-installed executables | Disabled by default, per-engine trust, executable checks, fixed adapters, no shell interpolation, timeout and output limits. |
 | Persistence boundary | Versioned schema helper | Old or malformed `settings.json` data | Migration, clamping, invalid value filtering. |
 
@@ -54,6 +55,20 @@ Mitigations:
 - Cache keys include source, engine path, input mode, and adapter behavior.
 - Failed external execution falls back to native rendering when available.
 - Diagnostics include setup, execution, stderr, timeout, and cache details.
+
+### Unsafe Git Restore Or Tag Input
+
+Threat: A malicious repository or malformed UI state turns a versioning action
+into an unintended Git option or writes restored content outside the worktree.
+
+Mitigations:
+
+- Git commands are invoked with argument arrays, not interpolated shell strings.
+- Path-oriented commands use `--` before pathspecs.
+- Release tags and restore revisions reject option-shaped and unsupported ref
+  syntax before invoking Git.
+- Restore writes reject symlink targets.
+- Restore target parents must resolve inside the Git repository root.
 
 ### Unsafe Persisted Preferences
 
@@ -111,5 +126,7 @@ Mitigations:
 - `compiler_falls_back_when_external_transform_is_untrusted`
 - `export_document_writes_optional_sidecar_manifest`
 - `export_document_manifest_records_dirty_git_warning`
+- `git_restore_and_tag_reject_option_shaped_refs`
+- `git_restore_refuses_symlink_targets`
 - `workspace persistence migration versions and normalizes saved settings`
 - `save_file_rejects_stale_expected_hash`

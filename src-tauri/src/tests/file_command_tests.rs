@@ -203,3 +203,78 @@ fn git_history_diff_commit_tag_and_restore_workflow() {
     assert_eq!(restored.text, "one\n");
     fs::remove_dir_all(root).expect("clean git test dir");
 }
+
+#[test]
+fn git_restore_and_tag_reject_option_shaped_refs() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-git-ref-safety-test-{unique}"));
+    fs::create_dir_all(&root).expect("create git ref safety test dir");
+    run_git(&root, &["init"]).expect("git init");
+    let doc = root.join("doc.md");
+    fs::write(&doc, "safe\n").expect("write doc");
+
+    let tag_error = tag_release(GitTagRequest {
+        path: path_to_string(&doc),
+        tag: "--force".to_string(),
+        message: "Unsafe release".to_string(),
+    })
+    .expect_err("option-shaped tag should be rejected before git invocation");
+    assert!(tag_error.contains("Git tag cannot start with '-'"));
+
+    let revision_error = restore_git_revision(GitRestoreRequest {
+        path: path_to_string(&doc),
+        revision: "--output=/tmp/neditor-ref-injection".to_string(),
+    })
+    .expect_err("option-shaped revision should be rejected before git invocation");
+    assert!(revision_error.contains("Git revision cannot start with '-'"));
+    assert_eq!(fs::read_to_string(&doc).expect("read doc"), "safe\n");
+
+    let syntax_error = restore_git_revision(GitRestoreRequest {
+        path: path_to_string(&doc),
+        revision: "HEAD@{1}".to_string(),
+    })
+    .expect_err("reflog syntax should be rejected for explicit restore refs");
+    assert!(syntax_error.contains("Git revision contains unsupported ref syntax"));
+    fs::remove_dir_all(root).expect("clean git ref safety test dir");
+}
+
+#[cfg(unix)]
+#[test]
+fn git_restore_refuses_symlink_targets() {
+    use std::os::unix::fs::symlink;
+
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-git-symlink-test-{unique}"));
+    let outside = std::env::temp_dir().join(format!("neditor-git-symlink-outside-{unique}.md"));
+    fs::create_dir_all(&root).expect("create git symlink test dir");
+    run_git(&root, &["init"]).expect("git init");
+    run_git(&root, &["config", "user.email", "neditor@example.test"]).expect("git email");
+    run_git(&root, &["config", "user.name", "NEditor Test"]).expect("git name");
+    let doc = root.join("doc.md");
+    fs::write(&doc, "tracked\n").expect("write tracked doc");
+    run_git(&root, &["add", "doc.md"]).expect("git add");
+    run_git(&root, &["commit", "-m", "Initial document"]).expect("git commit");
+
+    fs::write(&outside, "outside\n").expect("write outside target");
+    fs::remove_file(&doc).expect("remove tracked doc");
+    symlink(&outside, &doc).expect("link worktree doc to outside target");
+
+    let error = restore_git_revision(GitRestoreRequest {
+        path: path_to_string(&doc),
+        revision: "HEAD".to_string(),
+    })
+    .expect_err("restore should not follow symlink targets");
+    assert!(error.contains("Refusing to restore through a symlink"));
+    assert_eq!(
+        fs::read_to_string(&outside).expect("read outside target"),
+        "outside\n"
+    );
+    fs::remove_dir_all(root).expect("clean git symlink test dir");
+    fs::remove_file(outside).expect("clean outside target");
+}

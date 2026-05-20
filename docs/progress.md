@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `f6b3ea3 Stress
-  large document compilation`
+- Latest inspected committed baseline before this update: `3c10a2c Document
+  storage and security boundaries`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -31,6 +31,13 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- `3c10a2c` documented storage and security boundaries, linked them from the
+  README, and added markdown link checking for the new docs.
+- `2b252c5` versioned workspace persistence migrations and covered legacy
+  settings normalization in frontend unit tests.
+- `c10da06` bounded large-document performance evidence with repeated
+  compile/export memory-growth coverage.
+- `ca94c90` proved preview debounce timing and coalescing behavior.
 - `3214d1f` refreshed `docs/todo.md` from current evidence.
 - `a93a974` recorded the spec completion matrix and durable progress log.
 - `237f68c` logged the fresh verification baseline.
@@ -256,6 +263,10 @@ Recent pushed checkpoints visible in current git history:
   into the markdown link checker so local-first storage, sidecar evidence,
   trust boundaries, threat mitigations, and non-goals are auditable alongside
   the specification matrix.
+- This update hardens the Git versioning command surface: release tags and
+  restore revisions now reject option-shaped or unsupported ref syntax before
+  invoking Git, restore refuses symlink targets, and restore paths must resolve
+  inside the repository root before the document is overwritten.
 
 ## Current Capability Snapshot
 
@@ -267,8 +278,8 @@ Implemented or substantially present, pending the conservative caveats in
 - Markdown workbench UI with editor, live preview, sidebars, tabs, status bar,
   command palette, review/versioning/export/settings panels, and conflict UI.
 - File operations for local documents, workspace folder browsing, recent files,
-  recently closed documents, pinned tabs, workspace restore, snapshots, Git
-  history/diff/commit/tag/restore, and guarded saves.
+  recently closed documents, pinned tabs, workspace restore, snapshots,
+  validated Git history/diff/commit/tag/restore, and guarded saves.
 - Compiler pipeline for front matter, includes, variables, transforms,
   formulas, citations, bibliography, glossary, index, cross references, review
   comments, AI provenance, generated lists of figures/tables, semantic AST,
@@ -632,7 +643,10 @@ Additional review/provenance readiness metadata verification:
 | `cargo test --locked repeated_editing_sessions_reuse_external_transform_cache --lib` in `src-tauri` | Pass | Repeated editing/cache stress test passed with a trusted external DOT transform executed once and served from cache during subsequent edits. |
 | `cargo test --locked export_readiness_and_manifest_report_progress_steps --lib` in `src-tauri` | Pass | Export progress-step test passed, proving readiness/export manifests expose compile, transform, readiness, render, and manifest stages. |
 | `cargo test --locked repeated_compile_export_cycles_keep_memory_growth_bounded --lib` in `src-tauri` | Pass | Repeated compile/export memory-growth stress passed with bounded retained summaries and process RSS growth sampling. |
-| `cargo test --locked` in `src-tauri` | Pass | 140 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
+| `cargo test --locked git_restore_and_tag_reject_option_shaped_refs --lib` in `src-tauri` | Pass | Git tag/revision option-injection regression passed. |
+| `cargo test --locked git_restore_refuses_symlink_targets --lib` in `src-tauri` | Pass | Git restore refused a symlinked worktree file and left the outside target unchanged. |
+| `cargo test --locked git_history_diff_commit_tag_and_restore_workflow --lib` in `src-tauri` | Pass | Existing Git history, diff, commit, tag, and restore workflow still passed after the new guards. |
+| `cargo test --locked` in `src-tauri` | Pass | 142 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
 | `npx playwright test e2e/app-workflows.spec.ts -g "keeps large document editing"` | Blocked | The large-document browser workflow is present, but this host is missing Playwright Chromium at `~/Library/Caches/ms-playwright/.../chrome-headless-shell`. |
 | `pnpm exec playwright test --list` | Pass | Browser harness lists 35 Chromium workflow tests, including the large-document interaction workflow. |
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed, including latest-document task cancellation/stale-result guard coverage, preview debounce timing/coalescing coverage, and workspace persistence migration/schema normalization. |

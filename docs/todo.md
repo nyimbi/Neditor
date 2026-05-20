@@ -78,9 +78,9 @@ behavior is locked.
 
 ## Current Verification Snapshot
 
-Latest pushed code commit inspected:
+Latest pushed code commit inspected before this update:
 
-- `f6b3ea3 Stress large document compilation`
+- `3c10a2c Document storage and security boundaries`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -95,7 +95,7 @@ Most recent local verification evidence:
 - `cargo check --locked --features native-watch`: passed in `src-tauri`.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed in
   `src-tauri`.
-- `cargo test --locked`: passed locally with 140 Rust tests on Unix hosts.
+- `cargo test --locked`: passed locally with 142 Rust tests on this Unix host.
 - `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib`:
   passed and stress-compiles a large Markdown source with nested includes, 80
   tables, 80 CSV transform artifacts, 120 formula definitions, many source-map
@@ -113,6 +113,15 @@ Most recent local verification evidence:
 - `cargo test --locked repeated_compile_export_cycles_keep_memory_growth_bounded --lib`:
   passed and repeatedly compiles/exports large documents while bounding retained
   artifact summaries and process RSS growth on macOS/Linux hosts.
+- `cargo test --locked git_restore_and_tag_reject_option_shaped_refs --lib`:
+  passed and proves release tags and restore revisions reject option-shaped and
+  unsupported ref syntax before invoking Git.
+- `cargo test --locked git_restore_refuses_symlink_targets --lib`: passed and
+  proves restore refuses symlinked worktree files without modifying the outside
+  symlink target.
+- `cargo test --locked git_history_diff_commit_tag_and_restore_workflow --lib`:
+  passed after Git hardening and proves normal history, diff, commit, tag, and
+  restore behavior still works.
 - `cargo test --locked export_command_tests --lib`: passed 13 export command
   tests, including direct-export dirty-Git warnings copied into response and
   sidecar manifests plus structured export progress-step reporting.
