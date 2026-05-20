@@ -4,6 +4,9 @@ version: 0.3.0
 status: draft
 author: Policy Team
 classification: internal-draft
+targetPersona:
+  - Teams using AI chat output
+  - Product and engineering teams
 toc: true
 layout:
   header: "{{title}}"

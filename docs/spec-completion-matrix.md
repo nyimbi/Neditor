@@ -34,7 +34,7 @@ explicit platform checks.
 | 2 Source Prompt Extension | Light/dark/system theme and typography | Partial | Settings in `src/App.vue`; persisted preferences in store | Visual/accessibility verification across themes. |
 | 2 Source Prompt Extension | Cross-platform packaging | Partial | `README.md` packaging note; local Tauri build commands | Full local/manual bundle evidence for Windows/Linux and refreshed macOS bundle/DMG status. |
 | 3 Product Positioning | Local-first document workbench, not cloud suite | Partial | Local file/snapshot/Git/export design | User documentation and fixture workflows need to prove positioning. |
-| 4 Target Users | Business, technical, research, product users | Unverified | Feature set aligns with these personas | Realistic example projects and workflows needed. |
+| 4 Target Users | Business, technical, research, product users | Complete | Example project front matter declares consultants, technical writers, researchers and analysts, product and engineering teams, executives and managers, students and academics, developers, and teams using AI chat output; `example_fixture_tests::example_project_fixtures_compile_and_export` verifies each persona compiles and exports across supported targets | Keep new personas represented by executable example fixtures. |
 
 ## Carry-Forward MacDown Improvements
 

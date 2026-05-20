@@ -7,6 +7,8 @@ approvedBy: Board Secretary
 approvedAt: 2026-05-20T09:00:00Z
 classification: confidential
 client: Acme Holdings
+targetPersona:
+  - Executives and managers
 toc: true
 brand:
   name: Acme Holdings

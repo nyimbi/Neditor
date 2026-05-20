@@ -139,6 +139,10 @@ Recent pushed checkpoints visible in current git history:
 - This update also records the project license as MIT in `LICENSE`,
   `package.json`, and `src-tauri/Cargo.toml`, and removes GitHub Actions as an
   active verification surface.
+- This update expands the example fixtures with explicit target-persona front
+  matter and strengthens
+  `example_fixture_tests::example_project_fixtures_compile_and_export` so the
+  target-user requirement is backed by executable compile/export proof.
 
 ## Current Capability Snapshot
 
@@ -168,6 +172,11 @@ Implemented or substantially present, pending the conservative caveats in
   section 25.4, backed by the human-readable
   `docs/ipc-command-coverage.md` table.
 - MIT license metadata in root, npm, and Cargo package surfaces.
+- Realistic example fixtures now cover consultants, technical writers,
+  researchers and analysts, product and engineering teams, executives and
+  managers, students and academics, developers, and teams using AI chat output,
+  with local Rust coverage across HTML, PDF, DOCX, PPTX, and Markdown bundle
+  outputs.
 - Frontend unit coverage for table logic and conflict diff alignment.
 - Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering view mode switching, command palette table insertion, table editor

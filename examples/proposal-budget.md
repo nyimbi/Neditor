@@ -5,6 +5,9 @@ status: approved
 approvedBy: Commercial Director
 approvedAt: 2026-05-20T13:00:00Z
 classification: proposal
+targetPersona:
+  - Consultants
+  - Product and engineering teams
 toc: true
 brand:
   name: Meridian Advisory

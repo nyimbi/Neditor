@@ -6,6 +6,9 @@ approvedBy: Research Lead
 approvedAt: 2026-05-20T12:00:00Z
 classification: public-draft
 citationStyle: author-year
+targetPersona:
+  - Researchers and analysts
+  - Students and academics
 toc: true
 ---
 

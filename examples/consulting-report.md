@@ -6,6 +6,8 @@ status: approved
 approvedBy: Engagement Lead
 approvedAt: 2026-05-20T10:00:00Z
 classification: client-confidential
+targetPersona:
+  - Consultants
 toc: true
 brand:
   name: Meridian Advisory

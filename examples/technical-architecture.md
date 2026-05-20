@@ -5,6 +5,10 @@ status: approved
 approvedBy: Architecture Council
 approvedAt: 2026-05-20T11:00:00Z
 classification: internal
+targetPersona:
+  - Technical writers
+  - Product and engineering teams
+  - Developers
 toc: true
 layout:
   header: "{{title}}"

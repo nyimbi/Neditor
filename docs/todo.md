@@ -1056,22 +1056,30 @@ Needed docs:
 
 ### 25. Example Project Fixtures
 
-Status: needed.
+Status: complete for current fixture set.
 
-Create realistic sample projects:
+Current realistic sample projects:
 
-- Board paper.
-- Consulting report with includes.
-- Technical architecture document with diagrams.
-- Research report with bibliography and citations.
-- Proposal with budget tables and formulas.
-- AI-assisted draft with provenance and review workflow.
+- `examples/board-paper.md`: executives and managers; board paper, review
+  comment, chart, glossary, index.
+- `examples/consulting-report.md`: consultants; consulting report with includes
+  and roadmap.
+- `examples/technical-architecture.md`: technical writers, product and
+  engineering teams, developers; architecture document with diagrams, timeline,
+  and ADR.
+- `examples/research-report.md`: researchers and analysts, students and
+  academics; bibliography, citations, equation, and cross-reference.
+- `examples/proposal-budget.md`: consultants plus product and engineering
+  teams; budget table, `calc`, CSV, and formulas.
+- `examples/ai-assisted-draft.md`: teams using AI chat output plus product and
+  engineering teams; AI provenance and review workflow.
 
 Completion criteria:
 
-- Each fixture can be opened in the app.
-- Each fixture can compile and export to supported targets.
-- Fixtures support automated or manual QA for matrix rows.
+- Keep every target persona in `docs/specification.md` section 4 represented by
+  at least one executable fixture.
+- Keep every fixture exporting to HTML, PDF, DOCX, PPTX, and Markdown bundle.
+- Keep README links to the examples current.
 
 ## Recommended Execution Order
 
