@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `1293320 Preserve
-  Git export warnings in manifests`
+- Latest inspected committed baseline before this update: `c94b27c Add local
+  accessibility guardrails`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -214,6 +214,10 @@ Recent pushed checkpoints visible in current git history:
 - This update adds `pnpm run check:a11y` as a static accessibility guard for
   the Vue workbench template and fixes exposed labeling gaps in modal close
   buttons, command-palette search, and conflict merge-line controls.
+- This update adds
+  `performance_tests::compiler_stress_handles_large_documents_with_many_artifacts`,
+  which stress-compiles a large Markdown source with nested includes, many
+  tables, formulas, transform artifacts, source-map entries, and diagnostics.
 
 ## Current Capability Snapshot
 
@@ -585,7 +589,8 @@ Additional review/provenance readiness metadata verification:
 | `cargo test --locked review_provenance_tests --lib` in `src-tauri` | Pass | 4 review/provenance tests passed after the stricter AI provenance validation. |
 | `cargo test --locked validation_tests --lib` in `src-tauri` | Pass | 4 validation tests passed after the readiness validation extension. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after the shared parser and export-readiness validation changes. |
-| `cargo test --locked` in `src-tauri` | Pass | 135 Rust tests passed plus main/doc test targets with 0 tests. |
+| `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib` in `src-tauri` | Pass | Large-document compiler stress test passed with nested includes, 80 tables, 80 CSV transform artifacts, 120 formula definitions, many source-map entries, and many broken link/media diagnostics. |
+| `cargo test --locked` in `src-tauri` | Pass | 136 Rust tests passed plus main/doc test targets with 0 tests. |
 | `pnpm exec playwright test --list` | Pass | Browser harness still lists 34 Chromium workflow tests after the direct-export readiness change. |
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |

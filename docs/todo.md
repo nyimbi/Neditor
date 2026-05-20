@@ -95,7 +95,11 @@ Most recent local verification evidence:
 - `cargo check --locked --features native-watch`: passed in `src-tauri`.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed in
   `src-tauri`.
-- `cargo test --locked`: passed locally with 135 Rust tests.
+- `cargo test --locked`: passed locally with 136 Rust tests.
+- `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib`:
+  passed and stress-compiles a large Markdown source with nested includes, 80
+  tables, 80 CSV transform artifacts, 120 formula definitions, many source-map
+  entries, and many broken link/media diagnostics.
 - `cargo test --locked export_command_tests --lib`: passed 12 export command
   tests, including direct-export dirty-Git warnings copied into response and
   sidecar manifests.
@@ -1013,12 +1017,20 @@ Finish:
 
 ### 17. Performance And Large Documents
 
-Status: debounce/cache/progress code exists; stress evidence is missing.
+Status: initial compiler stress evidence exists; broader performance proof
+remains open.
+
+Current evidence:
+
+- `performance_tests::compiler_stress_handles_large_documents_with_many_artifacts`
+  stress-compiles a large Markdown document with nested includes, many tables,
+  formulas, native transform artifacts, source-map entries, and broken
+  link/media diagnostics.
 
 Finish:
 
-- Benchmarks or stress tests for large Markdown documents, deep include graphs,
-  many diagnostics, many tables, and many transform artifacts.
+- Benchmarks or deeper stress tests for repeated editing sessions, export
+  loops, memory growth, and UI debounce timing.
 - Debounce and cancellation behavior for compile/preview updates.
 - Progress reporting for expensive transforms and exports.
 - Cache behavior for repeated transform execution.

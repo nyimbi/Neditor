@@ -156,7 +156,7 @@ explicit platform checks.
 | 21 Preferences | Theme, typography, export, Git, AI, transforms, recents | Partial | Settings UI; persisted workspace; archived browser workflow run `26157446711` covers external transform path changes, input mode, timeout, trust prompt, denied trust reset, successful probe UI, and missing-executable diagnostics | Migration/schema tests and broader settings workflow coverage. |
 | 22 Security/privacy | Local-first, trust-gated executable transforms, no shell | Partial | External transform runner/tests; local file design; archived browser workflow run `26157446711` covers transform trust prompts, path-change trust clearing, denied trust reset, and missing executable diagnostics | Security review, platform proof, threat-model docs. |
 | 23 Accessibility | Keyboard, ARIA, contrast, reduced motion | Partial | Some labels/roles/settings in UI; `pnpm run check:a11y` statically checks Vue template button names, form-control labels, and dialog labeling; modal close buttons, command-palette search, and conflict merge-line controls now have explicit labels | Broader automated checks, keyboard-only/manual audit, and native workflow proof. |
-| 24 Performance | Large docs, debounced preview, transform cache, progress | Partial | Debounce/cache/progress code | Benchmarks/stress tests and cancellation behavior. |
+| 24 Performance | Large docs, debounced preview, transform cache, progress | Partial | Debounce/cache/progress code; `performance_tests::compiler_stress_handles_large_documents_with_many_artifacts` stress-compiles nested includes, many tables, formulas, transform artifacts, source maps, and diagnostics | Repeated editing/export loops, memory growth checks, UI debounce timing, and cancellation behavior. |
 
 ## Architecture, Storage, Phases, Acceptance
 
@@ -191,6 +191,9 @@ Current direct evidence:
 
 - Backend Rust tests cover many compiler/export/transform/table/file/Git/snapshot
   behaviors under `src-tauri/src/tests/`.
+- Backend Rust stress coverage now includes a large-document compiler stress
+  case for nested includes, many tables, formulas, transform artifacts, source
+  maps, and diagnostics.
 - Frontend unit tests cover table parsing/serialization and conflict diff
   alignment under `tests/frontend-unit.test.ts`.
 - Local verification covers Rust checks/tests, frontend unit tests, frontend
@@ -239,8 +242,9 @@ Current major verification gaps:
 - Optional external transform engines are proven most strongly on Linux; macOS
   and Windows evidence is missing or indirect.
 - Accessibility has an initial static guard, but full keyboard/manual audit
-  evidence is still missing. Performance is not proven by dedicated tests or
-  checklists.
+  evidence is still missing. Performance has initial compiler stress coverage,
+  but repeated editing/export loops, memory growth, UI debounce timing, and
+  cancellation behavior remain under-proven.
 
 ## Next Matrix Work
 

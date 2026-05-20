@@ -113,6 +113,7 @@ mod transform_tests;
 mod export_tests;
 
 mod media_export_tests;
+mod performance_tests;
 mod review_provenance_tests;
 
 fn zip_entry_text(bytes: &[u8], path: &str) -> String {
