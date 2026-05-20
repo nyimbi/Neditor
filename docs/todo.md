@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `96e4165 Honor front matter index generation`
+- `659426d Preserve equation captions through exports`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -172,7 +172,11 @@ Most recent local verification evidence:
 - `cargo test --locked captioned_equations_survive_cross_target_exports --lib -- --nocapture`:
   passed and proves captioned equations survive HTML, PDF, DOCX, PPTX, and
   Markdown bundle text/AST outputs.
-- `cargo test --locked`: passed locally with 157 Rust tests on this Unix host.
+- `cargo test --locked generated_toc_exports_page_numbers_for_pdf_and_docx --lib -- --nocapture`:
+  passed and proves front matter-generated TOCs keep depth/numbering, PDF
+  exports render page-numbered TOC entries, and DOCX exports emit a TOC field
+  instead of leaking Markdown TOC links.
+- `cargo test --locked`: passed locally with 158 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -853,6 +857,8 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
 - Cross references to headings, figures, tables, equations, appendices, and
   decision records.
 - Glossary, index, TOC, generated sections, and appendices.
+  A focused TOC export conformance test now proves front matter TOC
+  depth/numbering plus page-numbered PDF lines and DOCX TOC field output.
 - Review comments, change notes, release metadata, AI provenance, legal
   disclaimers, draft warnings, and approval metadata. The legal-disclaimer and
   approval-metadata path is now covered by the export conformance fixture.

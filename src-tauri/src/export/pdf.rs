@@ -1,7 +1,8 @@
 use super::*;
 
 pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> Vec<u8> {
-    let pages = build_pdf_pages(response, options);
+    let mut pages = build_pdf_pages(response, options);
+    apply_pdf_toc_page_numbers(&mut pages, response);
     let total_pages = pages.len().max(1);
     let mut objects = vec![
         String::new(),
@@ -151,6 +152,76 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
         .as_bytes(),
     );
     pdf
+}
+
+fn apply_pdf_toc_page_numbers(pages: &mut [PdfPage], response: &CompileResponse) {
+    let heading_pages = pdf_heading_page_numbers(pages, response);
+    if heading_pages.is_empty() {
+        return;
+    }
+    for page in pages {
+        for item in &mut page.items {
+            let PdfPageItem::Text(line) = item else {
+                continue;
+            };
+            let Some((prefix, label, anchor)) = parse_pdf_toc_item(line) else {
+                continue;
+            };
+            let Some(page_number) = heading_pages
+                .iter()
+                .find_map(|(candidate, page)| (candidate == &anchor).then_some(*page))
+            else {
+                continue;
+            };
+            *line = format!("{prefix}{label} .... {page_number}");
+        }
+    }
+}
+
+fn pdf_heading_page_numbers(pages: &[PdfPage], response: &CompileResponse) -> Vec<(String, usize)> {
+    let mut heading_index = 0usize;
+    let mut entries = Vec::new();
+    for (page_index, page) in pages.iter().enumerate() {
+        for item in &page.items {
+            let PdfPageItem::Text(line) = item else {
+                continue;
+            };
+            let Some((_, text)) = pdf_heading_text(line) else {
+                continue;
+            };
+            let Some(heading) = response.semantic.outline.get(heading_index) else {
+                return entries;
+            };
+            if heading.text == text {
+                entries.push((heading.anchor.clone(), page_index + 1));
+                heading_index += 1;
+            }
+        }
+    }
+    entries
+}
+
+fn pdf_heading_text(line: &str) -> Option<(usize, String)> {
+    let trimmed = line.trim_start();
+    let level = trimmed.chars().take_while(|ch| *ch == '#').count();
+    if !(1..=6).contains(&level) || trimmed.chars().nth(level) != Some(' ') {
+        return None;
+    }
+    Some((level, trimmed[level..].trim().to_string()))
+}
+
+fn parse_pdf_toc_item(line: &str) -> Option<(String, String, String)> {
+    let indent_len = line.len() - line.trim_start().len();
+    let indent = &line[..indent_len];
+    let trimmed = line.trim_start();
+    let after_marker = trimmed.strip_prefix("- ")?;
+    let label_start = after_marker.strip_prefix('[')?;
+    let label_end = label_start.find("](#")?;
+    let label = label_start[..label_end].to_string();
+    let anchor_start = label_end + "](#".len();
+    let anchor_end = label_start[anchor_start..].find(')')? + anchor_start;
+    let anchor = label_start[anchor_start..anchor_end].to_string();
+    Some((format!("{indent}- "), label, anchor))
 }
 
 fn pdf_text_line(font_size: u8, x: u32, y: i32, text: &str) -> String {

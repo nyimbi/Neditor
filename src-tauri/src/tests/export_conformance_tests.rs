@@ -257,6 +257,29 @@ fn captioned_equations_survive_cross_target_exports() {
 }
 
 #[test]
+fn generated_toc_exports_page_numbers_for_pdf_and_docx() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Page TOC\nstatus: approved\napprovedBy: QA\ntoc: true\ntocDepth: 2\ntocNumbered: true\n---\n# Alpha\nIntro.\n\n{{page-break}}\n\n## Beta\nDetails.\n".to_string(),
+        file_path: None,
+    });
+    let options = json!({});
+
+    assert!(response.compiled_markdown.contains("- [1 Alpha](#alpha)"));
+    assert!(response.compiled_markdown.contains("- [1.1 Beta](#beta)"));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("- 1 Alpha .... 2"));
+    assert!(pdf_text.contains("- 1.1 Beta .... 3"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains(r#"w:instr="TOC \o &quot;1-2&quot; \h \z \u""#));
+    assert!(docx_document.contains("Update table of contents in Word to refresh page numbers."));
+    assert!(!docx_document.contains("[1 Alpha](#alpha)"));
+}
+
+#[test]
 fn heading_appendix_and_decision_references_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Reference Export\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}, {@appendix-a}, and {@decision-record}.\n\n## Appendix A\nSupporting detail.\n\n## Decision Record\nUse local-first exports.\n".to_string(),

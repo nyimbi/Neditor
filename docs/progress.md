@@ -1003,6 +1003,24 @@ Additional equation caption verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional TOC export verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked generated_toc_exports_page_numbers_for_pdf_and_docx --lib -- --nocapture` in `src-tauri` | Pass | Focused export-conformance test proves front matter TOC depth/numbering, page-numbered PDF TOC entries such as `1 Alpha .... 2`, DOCX TOC field output, and suppression of raw Markdown TOC links in DOCX. |
+| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after the PDF TOC page-numbering update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the PDF TOC page-numbering update. |
+| `cargo check --locked --features native-watch` in `src-tauri` | Pass | Native watcher feature still compiles after the PDF TOC page-numbering update. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after adding PDF TOC post-pagination page-number rendering. |
+| `cargo test --locked` in `src-tauri` | Pass | 158 Rust tests passed; 0 failed. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests still passed after the backend/documentation update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the backend/documentation update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files had all local links resolve. |
+| `pnpm run check:a11y` | Pass | Vue template accessibility guardrails still passed. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
