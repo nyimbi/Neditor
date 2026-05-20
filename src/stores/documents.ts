@@ -1088,8 +1088,8 @@ export const useDocumentsStore = defineStore("documents", {
         targetDoc.modified = response.modified;
         targetDoc.dirty = false;
         this.externalConflict = null;
-        this.statusMessage = "Reloaded external changes";
         await this.compileActive();
+        this.statusMessage = "Reloaded external changes";
       } else if (includeChanged) {
         this.externalConflict = null;
         await this.compileActive();
