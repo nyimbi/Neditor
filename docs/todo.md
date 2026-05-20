@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `45ae04f Prove include graph guardrails`
+- `17b9358 Strengthen include and table formula export proof`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -185,7 +185,17 @@ Most recent local verification evidence:
 - `cargo test --locked named_table_formulas_survive_cross_target_exports --lib -- --nocapture`:
   passed and proves named table/range formulas survive HTML, PDF, DOCX, PPTX,
   Markdown bundle text, and Markdown bundle AST outputs.
-- `cargo test --locked`: passed locally with 161 Rust tests on this Unix host.
+- `cargo test --locked compiler_loads_front_matter_json_and_yaml_data_sources --lib -- --nocapture`:
+  passed and proves JSON/YAML files referenced from front matter render through
+  structured transform artifacts, preview HTML, include graph, and manifest
+  included-file evidence.
+- `cargo test --locked compiler_reports_malformed_front_matter_data_sources --lib -- --nocapture`:
+  passed and proves data source entries with missing paths, unsupported types,
+  and unreadable local files produce actionable diagnostics.
+- `cargo test --locked front_matter_data_sources_survive_cross_target_exports --lib -- --nocapture`:
+  passed and proves front matter CSV/TSV/JSON/YAML data sources survive HTML,
+  PDF, DOCX, PPTX, Markdown bundle text, and Markdown bundle manifest outputs.
+- `cargo test --locked`: passed locally with 164 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -1115,9 +1125,12 @@ Finish:
   coverage now proves named table/range formulas compile and survive HTML, PDF,
   DOCX, PPTX, Markdown bundle text, and Markdown bundle AST outputs.
 - Inline formulas and table-cell formulas in preview/export/readiness.
-- Data sources from front matter and external CSV/TSV/JSON/YAML paths.
+- Data sources from front matter and external CSV/TSV/JSON/YAML paths. Backend
+  coverage now proves CSV, TSV, JSON, and YAML local file sources through
+  compile, transform artifacts, manifests, and cross-target export outputs.
 - Validation for malformed data source paths, broken formulas, circular or
-  unsupported dependencies, and mixed span/formula tables.
+  unsupported dependencies, and mixed span/formula tables. Data source coverage
+  now proves missing path, unsupported type, and unreadable file diagnostics.
 - Export parity for large, merged, formatted, summarized, sorted, and
   formula-driven tables.
 

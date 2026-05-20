@@ -301,6 +301,114 @@ fn compiler_loads_front_matter_csv_data_sources() {
 }
 
 #[test]
+fn compiler_loads_front_matter_json_and_yaml_data_sources() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-structured-data-source-{unique}"));
+    fs::create_dir_all(root.join("data")).expect("create structured data dir");
+    fs::write(
+        root.join("data").join("accounts.json"),
+        r#"[{"name":"Acme","arr":1200},{"name":"Globex","arr":900}]"#,
+    )
+    .expect("write json data source");
+    fs::write(
+        root.join("data").join("settings.yml"),
+        "region: East Africa\nowner: Strategy Office\nthresholds:\n  warn: 0.7\n",
+    )
+    .expect("write yaml data source");
+    fs::write(
+        root.join("data").join("targets.tsv"),
+        "Metric\tValue\nARR\t300\n",
+    )
+    .expect("write tsv data source");
+
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Structured Data Sources\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Accounts\n    path: data/accounts.json\n  - title: Settings\n    file: data/settings.yml\ntsvFiles:\n  - data/targets.tsv\n---\n# Structured Data Sources\n".to_string(),
+        file_path: Some(path_to_string(&root.join("report.md"))),
+    });
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    assert!(response.html.contains("Data Source: Accounts"));
+    assert!(response
+        .html
+        .contains("class=\"transform-table transform-json\""));
+    assert!(response.html.contains("<td>Acme</td>"));
+    assert!(response.html.contains("<td>1200</td>"));
+    assert!(response.html.contains("Data Source: Settings"));
+    assert!(response.html.contains("transform-yaml structured-tree"));
+    assert!(response.html.contains("<dt>region</dt>"));
+    assert!(response.html.contains("Data Source: targets"));
+    assert!(response.html.contains("<td>ARR</td>"));
+    assert!(response.html.contains("<td>300</td>"));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "json" && artifact.source.contains("Globex")));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "yaml" && artifact.source.contains("thresholds")));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "tsv" && artifact.source.contains("Metric\tValue")));
+    assert!(response
+        .include_graph
+        .iter()
+        .any(|edge| edge.child.ends_with("data/accounts.json")));
+    assert!(response
+        .export_manifest
+        .included_files
+        .iter()
+        .any(|file| file.path.ends_with("data/settings.yml")));
+
+    fs::remove_dir_all(root).expect("clean structured data source test dir");
+}
+
+#[test]
+fn compiler_reports_malformed_front_matter_data_sources() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-bad-data-source-{unique}"));
+    fs::create_dir_all(root.join("data")).expect("create bad data source dir");
+
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Bad Data Sources\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Missing path\n    type: json\n  - path: data/report.xlsx\n    type: xlsx\n  - path: data/missing.json\n    type: json\n---\n# Bad Data Sources\n".to_string(),
+        file_path: Some(path_to_string(&root.join("report.md"))),
+    });
+
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.severity == "warning"
+            && diagnostic.message == "Data source entry is missing a path."
+    }));
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.severity == "warning"
+            && diagnostic
+                .message
+                .contains("Unsupported data source type 'xlsx'")
+            && diagnostic
+                .suggestion
+                .as_deref()
+                .is_some_and(|suggestion| suggestion.contains("csv, tsv, json, or yaml"))
+    }));
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.severity == "error"
+            && diagnostic.message.contains("Unable to read data source")
+            && diagnostic.message.contains("data/missing.json")
+    }));
+    assert!(response.transform_artifacts.is_empty());
+
+    fs::remove_dir_all(root).expect("clean bad data source test dir");
+}
+
+#[test]
 fn compiler_honors_toc_depth_and_numbering() {
     let response = compile(CompileRequest {
             text: "---\ntitle: TOC\nstatus: approved\napprovedBy: QA\ntoc: true\ntocDepth: 2\ntocNumbered: true\n---\n# Alpha\n## Beta\n### Gamma\n## Delta\n".to_string(),

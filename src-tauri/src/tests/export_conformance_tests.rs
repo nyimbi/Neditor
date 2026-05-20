@@ -350,6 +350,138 @@ fn named_table_formulas_survive_cross_target_exports() {
 }
 
 #[test]
+fn front_matter_data_sources_survive_cross_target_exports() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-data-source-export-{unique}"));
+    fs::create_dir_all(root.join("data")).expect("create data source export dir");
+    fs::write(
+        root.join("data").join("accounts.json"),
+        r#"[{"account":"Acme","region":"EA","arr":1200},{"account":"Globex","region":"WE","arr":900}]"#,
+    )
+    .expect("write export json data source");
+    fs::write(
+        root.join("data").join("settings.yaml"),
+        "owner: Strategy Office\ncadence: monthly\n",
+    )
+    .expect("write export yaml data source");
+    fs::write(
+        root.join("data").join("revenue.csv"),
+        "Metric,Value\nRevenue,450\n",
+    )
+    .expect("write export csv data source");
+    fs::write(
+        root.join("data").join("targets.tsv"),
+        "Metric\tValue\nPipeline\t375\n",
+    )
+    .expect("write export tsv data source");
+
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Data Source Export\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Accounts\n    path: data/accounts.json\n  - name: Settings\n    path: data/settings.yaml\ncsvFiles:\n  - data/revenue.csv\ntsvFiles:\n  - data/targets.tsv\n---\n# Data Source Export\n\nThe appendix is generated from local front matter data sources.\n".to_string(),
+        file_path: Some(path_to_string(&root.join("report.md"))),
+    });
+    let options = json!({});
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "json"));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "yaml"));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "csv"));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "tsv"));
+    assert!(response
+        .export_manifest
+        .included_files
+        .iter()
+        .any(|file| file.path.ends_with("data/accounts.json")));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("Data Source: Accounts"));
+    assert!(html.contains("<td>Acme</td>"));
+    assert!(html.contains("<td>1200</td>"));
+    assert!(html.contains("Data Source: Settings"));
+    assert!(html.contains("<dt>owner</dt>"));
+    assert!(html.contains("Data Source: revenue"));
+    assert!(html.contains("<td>Revenue</td>"));
+    assert!(html.contains("<td>450</td>"));
+    assert!(html.contains("Data Source: targets"));
+    assert!(html.contains("<td>Pipeline</td>"));
+    assert!(html.contains("<td>375</td>"));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Data Source: Accounts"));
+    assert!(pdf_text.contains("(Acme) Tj"));
+    assert!(pdf_text.contains("(1200) Tj"));
+    assert!(pdf_text.contains("Data Source: Settings"));
+    assert!(pdf_text.contains("Strategy Office"));
+    assert!(pdf_text.contains("(Revenue) Tj"));
+    assert!(pdf_text.contains("(450) Tj"));
+    assert!(pdf_text.contains("(Pipeline) Tj"));
+    assert!(pdf_text.contains("(375) Tj"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Data Source: Accounts"));
+    assert!(docx_document.contains(">Acme<"));
+    assert!(docx_document.contains(">1200<"));
+    assert!(docx_document.contains("Data Source: Settings"));
+    assert!(docx_document.contains("Strategy Office"));
+    assert!(docx_document.contains(">Revenue<"));
+    assert!(docx_document.contains(">450<"));
+    assert!(docx_document.contains(">Pipeline<"));
+    assert!(docx_document.contains(">375<"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Data Source: Accounts"));
+    assert!(pptx_slides.contains("<a:t>Acme</a:t>"));
+    assert!(pptx_slides.contains("<a:t>1200</a:t>"));
+    assert!(pptx_slides.contains("Data Source: Settings"));
+    assert!(pptx_slides.contains("Strategy Office"));
+    assert!(pptx_slides.contains("<a:t>Revenue</a:t>"));
+    assert!(pptx_slides.contains("<a:t>450</a:t>"));
+    assert!(pptx_slides.contains("<a:t>Pipeline</a:t>"));
+    assert!(pptx_slides.contains("<a:t>375</a:t>"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_options = options;
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_manifest = zip_entry_text(&bundle, "manifest.json");
+    assert!(bundled_text.contains("Data Source: Accounts"));
+    assert!(bundled_text.contains("Acme"));
+    assert!(bundled_text.contains("1200"));
+    assert!(bundled_text.contains("Data Source: Settings"));
+    assert!(bundled_text.contains("Strategy Office"));
+    assert!(bundled_text.contains("Revenue"));
+    assert!(bundled_text.contains("450"));
+    assert!(bundled_text.contains("Pipeline"));
+    assert!(bundled_text.contains("375"));
+    assert!(bundled_manifest.contains("data/accounts.json"));
+    assert!(bundled_manifest.contains("data/settings.yaml"));
+    assert!(bundled_manifest.contains("data/revenue.csv"));
+    assert!(bundled_manifest.contains("data/targets.tsv"));
+
+    fs::remove_dir_all(root).expect("clean data source export dir");
+}
+
+#[test]
 fn heading_appendix_and_decision_references_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Reference Export\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}, {@appendix-a}, and {@decision-record}.\n\n## Appendix A\nSupporting detail.\n\n## Decision Record\nUse local-first exports.\n".to_string(),

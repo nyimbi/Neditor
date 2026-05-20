@@ -133,6 +133,10 @@ pub(crate) fn render_front_matter_data_sources(
     collect_data_source_specs(metadata.get("csv_files"), Some("csv"), &mut specs);
     collect_data_source_specs(metadata.get("tsvFiles"), Some("tsv"), &mut specs);
     collect_data_source_specs(metadata.get("tsv_files"), Some("tsv"), &mut specs);
+    collect_data_source_specs(metadata.get("jsonFiles"), Some("json"), &mut specs);
+    collect_data_source_specs(metadata.get("json_files"), Some("json"), &mut specs);
+    collect_data_source_specs(metadata.get("yamlFiles"), Some("yaml"), &mut specs);
+    collect_data_source_specs(metadata.get("yaml_files"), Some("yaml"), &mut specs);
     if specs.is_empty() {
         return String::new();
     }
@@ -143,18 +147,29 @@ pub(crate) fn render_front_matter_data_sources(
         .unwrap_or_else(|| PathBuf::from("."));
     let mut rendered = Vec::new();
     for spec in specs {
+        if spec.path.trim().is_empty() {
+            diagnostics.push(diag(
+                "warning",
+                "Data source entry is missing a path.",
+                Some(root_file.to_string()),
+                None,
+                Some("Add a path/file value or remove the empty data source entry."),
+            ));
+            continue;
+        }
         let kind = spec
             .kind
             .as_deref()
             .or_else(|| data_source_kind_from_path(&spec.path))
-            .unwrap_or("csv");
-        if !matches!(kind, "csv" | "tsv") {
+            .unwrap_or("csv")
+            .to_ascii_lowercase();
+        if !matches!(kind.as_str(), "csv" | "tsv" | "json" | "yaml") {
             diagnostics.push(diag(
                 "warning",
                 format!("Unsupported data source type '{kind}' for {}", spec.path),
-                Some(spec.path.clone()),
+                Some(root_file.to_string()),
                 None,
-                Some("Use csv or tsv for first-release local data sources."),
+                Some("Use csv, tsv, json, or yaml for local data sources."),
             ));
             continue;
         }
@@ -214,24 +229,32 @@ fn collect_data_source_specs(
             }
         }
         Some(Value::Object(object)) => {
+            let name = object
+                .get("name")
+                .or_else(|| object.get("title"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string);
+            let kind = object
+                .get("type")
+                .or_else(|| object.get("kind"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string)
+                .or_else(|| default_kind.map(ToString::to_string));
             if let Some(path) = object
                 .get("path")
                 .or_else(|| object.get("file"))
                 .and_then(Value::as_str)
             {
                 specs.push(DataSourceSpec {
-                    name: object
-                        .get("name")
-                        .or_else(|| object.get("title"))
-                        .and_then(Value::as_str)
-                        .map(ToString::to_string),
+                    name,
                     path: path.to_string(),
-                    kind: object
-                        .get("type")
-                        .or_else(|| object.get("kind"))
-                        .and_then(Value::as_str)
-                        .map(ToString::to_string)
-                        .or_else(|| default_kind.map(ToString::to_string)),
+                    kind,
+                });
+            } else {
+                specs.push(DataSourceSpec {
+                    name,
+                    path: String::new(),
+                    kind,
                 });
             }
         }
@@ -240,10 +263,15 @@ fn collect_data_source_specs(
 }
 
 fn data_source_kind_from_path(path: &str) -> Option<&'static str> {
-    if path.to_ascii_lowercase().ends_with(".tsv") {
+    let path = path.to_ascii_lowercase();
+    if path.ends_with(".tsv") {
         Some("tsv")
-    } else if path.to_ascii_lowercase().ends_with(".csv") {
+    } else if path.ends_with(".csv") {
         Some("csv")
+    } else if path.ends_with(".json") {
+        Some("json")
+    } else if path.ends_with(".yaml") || path.ends_with(".yml") {
+        Some("yaml")
     } else {
         None
     }

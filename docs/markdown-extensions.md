@@ -147,6 +147,25 @@ Q2,18000,4000,=18000+4000
 ```
 ````
 
+Front matter can also pull local CSV, TSV, JSON, and YAML files into the
+document as generated data source sections:
+
+```yaml
+---
+dataSources:
+  - name: Accounts
+    path: data/accounts.json
+  - name: Settings
+    path: data/settings.yaml
+csvFiles:
+  - data/revenue.csv
+---
+```
+
+CSV/TSV sources render as tables, JSON arrays can render as structured tables,
+and nested JSON/YAML values render as structured trees. Missing paths,
+unsupported source types, and unreadable files are reported as diagnostics.
+
 The table editor can write clean Markdown after paste import, sorting, row and
 column edits, alignment, totals, formula rows, and merged-cell metadata edits.
 
