@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `13b3086`
+  `7702e89`
 
 Status vocabulary:
 
@@ -68,30 +68,30 @@ NEditor is no longer a basic scaffold. The repository currently contains:
 - CI jobs for browser workflows and desktop builds on macOS, Ubuntu, and
   Windows.
 
-The remaining work is primarily about current CI blockers, workflow proof,
-artifact fidelity, cross-platform validation, and reducing risk in oversized
-modules after behavior is locked.
+The remaining work is primarily about workflow proof, artifact fidelity,
+cross-platform validation, and reducing risk in oversized modules after
+behavior is locked.
 
 ## Current Verification Snapshot
 
 Latest pushed code commit inspected:
 
-- `13b3086 Keep stale workspace roots out of recents`
+- `7702e89 Prove preview navigation workflows`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26152255407` on commit `13b3086`
+- Run `26153224371` on commit `7702e89`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26152255407`:
+CI evidence from run `26153224371`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 23 Chromium workflow tests, including advanced table paste import,
+  includes 24 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, row/column structure editing, column format totals,
   cancel-without-applying behavior, AI paste insert/quote/appendix/replace
@@ -107,7 +107,9 @@ CI evidence from run `26152255407`:
   workspace restore, restored scroll positions, missing restored-file warnings,
   tab activation, dirty close confirmation, renamed recent cleanup, deleted
   recently-closed pruning, recent folder reopen/prune behavior, and externally
-  moved recently-closed path pruning.
+  moved recently-closed path pruning. It also covers synchronized scrolling in
+  both directions between editor and preview, and clicking a rendered preview
+  heading to jump back to the source line.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -238,6 +240,18 @@ Recent local verification evidence from this buildout:
   coverage.
 - `gh run watch 26152255407 --exit-status`: passed on commit `13b3086` across
   23 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
+- `pnpm run test:unit`: passed after adding preview scroll-sync and heading
+  navigation browser coverage.
+- `pnpm run build`: passed after adding preview scroll-sync and heading
+  navigation browser coverage.
+- `pnpm exec playwright test --list`: listed 24 Chromium workflow tests after
+  adding preview scroll sync and heading click-to-source coverage.
+- `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "syncs editor"
+  --project chromium`: blocked locally because the Chromium headless-shell
+  executable is missing from the Playwright cache.
+- `git diff --check`: passed after adding preview navigation coverage.
+- `gh run watch 26153224371 --exit-status`: passed on commit `7702e89` across
+  24 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -446,6 +460,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Recent folder and moved-path workflow: reopen a recent folder, prune a missing
   workspace root from recent folders, prune an externally moved recently closed
   path, and show the moved target through workspace refresh.
+- Preview navigation workflow: synchronize scroll from editor to preview,
+  synchronize scroll from preview back to editor, and click a rendered preview
+  heading to jump to the source line.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -458,7 +475,6 @@ Required next coverage:
   desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
-- Preview heading click-to-source and synchronized scrolling.
 - Command palette search, keybindings, heading commands, citation commands,
   glossary/index commands, and navigation commands.
 - Remaining table editor flows: non-sandboxed browser execution and export

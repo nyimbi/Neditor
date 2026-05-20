@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `13b3086 Keep stale
-  workspace roots out of recents`
+- Latest inspected committed baseline before this update: `7702e89 Prove preview
+  navigation workflows`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -109,6 +109,9 @@ Recent pushed checkpoints visible in current git history:
   missing workspace roots from recent folders, and pruning externally moved
   recently closed document paths while the moved target remains visible through
   workspace refresh.
+- `7702e89` added browser workflow proof for editor-to-preview scroll sync,
+  preview-to-editor scroll sync, and rendered preview heading click-through to
+  the CodeMirror source line.
 
 ## Current Capability Snapshot
 
@@ -147,7 +150,8 @@ Implemented or substantially present, pending the conservative caveats in
   export readiness, restart-style workspace restore, restored scroll position
   handling, missing restored-file warnings, tab activation, dirty-close
   confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
-  folder reopen/prune behavior, and moved recently-closed path pruning.
+  folder reopen/prune behavior, moved recently-closed path pruning,
+  synchronized editor/preview scrolling, and preview heading click-to-source.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -158,13 +162,13 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed code CI for commit `13b3086` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26152255407`.
+- Latest pushed code CI for commit `7702e89` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26153224371`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 23 Chromium tests in
-  run `26152255407`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 24 Chromium tests in
+  run `26153224371`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
   root-file conflicts, advanced table structure/format/cancel coverage, and AI
@@ -177,7 +181,8 @@ P0 gaps:
   workspace-local Chromium headless shell.
 - The same green browser run now also covers tab activation, dirty close
   confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
-  folder reopen/prune behavior, and moved recently-closed path pruning.
+  folder reopen/prune behavior, moved recently-closed path pruning,
+  synchronized editor/preview scrolling, and preview heading click-to-source.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -189,7 +194,8 @@ P1 gaps:
   optional-engine evidence remains incomplete.
 - File watcher/conflict flows need UI workflow tests.
 - Workspace/tab-group behavior needs restart and document-set grouping proof.
-- Editor and preview ergonomics need browser interaction proof.
+- Remaining editor and preview ergonomics need browser interaction proof beyond
+  covered scroll sync and heading click-to-source.
 - AI paste, citations, layout, accessibility, performance, table export
   fixtures, and non-sandboxed table/browser execution need workflow, artifact,
   or benchmark evidence before they can be considered complete.
@@ -326,6 +332,17 @@ Additional recent-folder and moved-path workflow verification:
 | `git diff --check` | Pass | No whitespace errors after adding recent-folder and moved-path coverage. |
 | `gh run watch 26152255407 --exit-status` | Pass | Commit `13b3086` passed 23 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
 
+Additional preview navigation workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding preview scroll-sync and heading navigation browser coverage. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the preview navigation workflow update. |
+| `pnpm exec playwright test --list` | Pass | Listed 24 Chromium workflow tests, including preview scroll sync and heading click-to-source coverage. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "syncs editor" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
+| `git diff --check` | Pass | No whitespace errors after adding preview navigation coverage. |
+| `gh run watch 26153224371 --exit-status` | Pass | Commit `7702e89` passed 24 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
+
 Current CI evidence log:
 
 | Command | Result | Evidence |
@@ -455,9 +472,8 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Expand browser coverage for workspace restore, conflicts, preview
-   navigation, scroll sync, transform settings, export progress, and the
-   remaining AI/table modes.
+1. Expand browser coverage for transform settings, export progress, command
+   navigation, remaining preview modes, and the remaining AI/table modes.
 2. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
 3. Use failures from workflow tests to drive implementation fixes.
