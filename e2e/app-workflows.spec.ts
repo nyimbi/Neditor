@@ -455,11 +455,12 @@ test("saves a document as a new file and reopens it from recently closed", async
   await expect(page.locator(".document-tabs .tab.active")).not.toContainText("market-approved.md");
 
   await page.getByLabel("Sidebar panel").selectOption("settings");
-  await page.getByRole("button", { name: "/workspace/market-approved.md" }).click();
+  const recentlyClosed = page.getByLabel("Recently closed documents");
+  await recentlyClosed.getByRole("button", { name: "/workspace/market-approved.md" }).click();
 
   await expect(page.locator(".document-tabs .tab.active")).toContainText("market-approved.md");
   await expect.poll(() => editorText(page)).toContain("status: approved");
-  await expect(page.getByRole("button", { name: "/workspace/market-approved.md" })).toHaveCount(0);
+  await expect(recentlyClosed.getByRole("button", { name: "/workspace/market-approved.md" })).toHaveCount(0);
 });
 
 test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {

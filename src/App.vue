@@ -766,18 +766,24 @@
             Preview line height
             <input v-model.number="store.previewLineHeight" type="number" min="1" max="2.4" step="0.05" />
           </label>
-          <h3>Recent files</h3>
-          <button v-for="path in store.recentFiles" :key="path" class="outline-row" type="button" @click="store.openPath(path)">
-            {{ path }}
-          </button>
-          <h3>Recent folders</h3>
-          <button v-for="path in store.recentFolders" :key="path" class="outline-row" type="button" @click="store.openFolder(path)">
-            {{ path }}
-          </button>
-          <h3>Recently closed</h3>
-          <button v-for="path in store.recentlyClosed" :key="path" class="outline-row" type="button" @click="store.openPath(path)">
-            {{ path }}
-          </button>
+          <section aria-label="Recent files">
+            <h3>Recent files</h3>
+            <button v-for="path in store.recentFiles" :key="path" class="outline-row" type="button" @click="store.openPath(path)">
+              {{ path }}
+            </button>
+          </section>
+          <section aria-label="Recent folders">
+            <h3>Recent folders</h3>
+            <button v-for="path in store.recentFolders" :key="path" class="outline-row" type="button" @click="store.openFolder(path)">
+              {{ path }}
+            </button>
+          </section>
+          <section aria-label="Recently closed documents">
+            <h3>Recently closed</h3>
+            <button v-for="path in store.recentlyClosed" :key="path" class="outline-row" type="button" @click="store.openPath(path)">
+              {{ path }}
+            </button>
+          </section>
           <h3>Transform engines</h3>
           <label>
             Timeout
