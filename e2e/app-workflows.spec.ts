@@ -250,6 +250,46 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await expect.poll(() => editorText(page)).toContain("Total");
 });
 
+test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {
+  await page.getByLabel("Sidebar panel").selectOption("tables");
+  await page.getByRole("button", { name: "New table" }).click();
+
+  await page.getByLabel("CSV/TSV paste").fill(
+    [
+      "Table: Regional sales {#tbl:sales}",
+      "| Region | Revenue | Margin |",
+      "| --- | ---: | ---: |",
+      "| West | 900 | 0.12 |",
+      "| East | 1200 | 0.18 |",
+    ].join("\n"),
+  );
+  await page.getByRole("button", { name: "Replace from paste" }).click();
+
+  const tableGrid = page.locator(".table-editor-grid");
+  const markdownPreview = page.getByLabel("Markdown preview");
+  await expect(markdownPreview).toHaveValue(/Table: Regional sales \{#tbl:sales\}/);
+  await expect(page.getByLabel("Revenue, row 1, column B")).toHaveValue("900");
+
+  await tableGrid.getByRole("button", { name: "Desc" }).nth(1).click();
+  await expect(page.getByLabel("Region, row 1, column A")).toHaveValue("East");
+  await expect(page.getByLabel("Revenue, row 1, column B")).toHaveValue("1200");
+
+  await page.getByRole("region", { name: "Table formula builder" }).getByLabel("Function").selectOption("AVG");
+  await page.getByRole("region", { name: "Table formula builder" }).getByLabel("Target").selectOption("2");
+  await page.getByRole("region", { name: "Table formula builder" }).getByLabel("Label").fill("Average");
+  await page.getByRole("button", { name: "Add formula row" }).click();
+  await expect(markdownPreview).toHaveValue(/Average\s+\|\s+\|\s+=AVG\(C1:C2\)/);
+
+  await page.getByRole("region", { name: "Merged table cells" }).getByLabel("Columns").fill("2");
+  await page.getByRole("button", { name: "Merge cell" }).click();
+  await expect(markdownPreview).toHaveValue(/East \{colspan=2\}/);
+
+  await page.getByRole("button", { name: "Insert table" }).click();
+  await expect.poll(() => editorText(page)).toContain("Table: Regional sales {#tbl:sales}");
+  await expect.poll(() => editorText(page)).toContain("East {colspan=2}");
+  await expect.poll(() => editorText(page)).toContain("=AVG(C1:C2)");
+});
+
 test("previews and inserts cleaned AI paste through the modal", async ({ page }) => {
   await page.getByRole("button", { name: "AI Paste" }).click();
   await page.getByRole("textbox", { name: "Original" }).fill("Assistant: Revenue grew 24%.");

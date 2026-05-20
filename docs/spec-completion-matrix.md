@@ -88,7 +88,7 @@ is not "Complete".
 | 9.4 AI paste cleanup | Normalize chat output, code fences, bullets, tables, links, citations, insert modes | Partial | `ai_cleanup.rs`; AI modal; AI cleanup tests; shared insertion helper tests; initial Playwright modal test | Browser tests for all insert modes, clipboard behavior, provenance, and non-sandboxed execution. |
 | 9.5 AI provenance | `ai-source`, AI-assisted sections, export appendix | Partial | `provenance.rs`; review/provenance tests; UI toggles | Workflow and export readiness proof for unreviewed content. |
 | 9.6 Includes | Include graph, diagnostics, re-render, export single doc | Partial | Document structure tests; compiler support | UI include graph/navigation and watcher workflow proof. |
-| 9.7 Business table editor | Visual editor, rows/cols, alignment, paste, sort, formats, readable Markdown, export | Partial | `src/lib/tables.ts`; table UI; frontend/backend tests; initial Playwright table-editor test | Broader browser interaction tests, non-sandboxed execution, and more export fixtures. |
+| 9.7 Business table editor | Visual editor, rows/cols, alignment, paste, sort, formats, readable Markdown, export | Partial | `src/lib/tables.ts`; table UI; frontend/backend tests; Playwright coverage for table insertion plus pasted table import, numeric sorting, formula rows, merged-cell metadata, and apply-back-to-editor behavior | Remaining browser tests for row/column removal, column formats, cancel behavior, non-sandboxed execution, and more export fixtures. |
 | 9.8 Calculations | Calc blocks, inline formulas, table formulas, named values/tables, dependency graph | Partial | `calculations.rs`; table tests; compiler tests | Named table/range coverage, circular dependency behavior, UI proof. |
 | 9.9 Equations | Inline/display math, numbering, references, export support | Partial | `rich_blocks.rs`; export tests | Cross-target artifact proof and editor UX tests. |
 | 9.10 TOC | Automatic TOC with marker/front matter | Partial | `generated_sections.rs`; document/export tests | Page-numbered target proof and UI controls. |
@@ -197,8 +197,9 @@ Current major verification gaps:
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Initial browser-level workflow test harness passes in Linux CI, but local
-  sandbox execution is blocked at Chromium launch before app assertions.
+- Browser-level workflow harness passes in Linux CI and now lists 5 Chromium
+  tests locally, including advanced table editor coverage. Local sandbox
+  execution is still blocked at Chromium launch before app assertions.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, and the desktop CI matrix
   is currently green, but desktop user journeys are still not covered by a

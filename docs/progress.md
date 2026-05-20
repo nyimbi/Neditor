@@ -93,7 +93,8 @@ Implemented or substantially present, pending the conservative caveats in
 - Frontend unit coverage for table logic and conflict diff alignment.
 - Initial Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering view mode switching, command palette table insertion, table editor
-  insertion, AI paste cleanup insertion, and export readiness.
+  insertion, advanced table paste/sort/formula/merge/apply behavior, AI paste
+  cleanup insertion, and export readiness.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -124,9 +125,9 @@ P1 gaps:
 - File watcher/conflict flows need UI workflow tests.
 - Workspace/tab-group behavior needs restart and document-set grouping proof.
 - Editor and preview ergonomics need browser interaction proof.
-- AI paste, table editor, citations, layout, accessibility, and performance
-  need workflow, artifact, or benchmark evidence before they can be considered
-  complete.
+- AI paste, citations, layout, accessibility, performance, and remaining table
+  editor/export fixture paths need workflow, artifact, or benchmark evidence
+  before they can be considered complete.
 
 P2/P3 gaps:
 
@@ -205,6 +206,9 @@ Current CI follow-up:
 | `git diff --check` | Pass | No whitespace errors after the latest documentation and fake-`d2` fixture edits. |
 | `gh run watch 26133595556 --exit-status` | Pass | For `33ee6a9`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Ubuntu passed optional engine install, Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle build. |
 | `git diff --check` | Pass | No whitespace errors after refreshing docs with the green CI result. |
+| `pnpm exec playwright test --list` | Pass | Listed 5 Chromium browser workflow tests, including the new advanced table paste/sort/formula/merge/apply flow. |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding the advanced table browser workflow. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding the advanced table browser workflow. |
 
 Relevant CI fixes already landed:
 

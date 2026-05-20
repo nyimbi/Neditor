@@ -257,6 +257,8 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Split, preview, and source view mode switching.
 - Command palette table snippet insertion.
 - Table editor insertion.
+- Table editor Markdown paste import, numeric sorting, custom formula rows,
+  merged-cell metadata, and apply-back-to-editor behavior.
 - AI paste cleanup preview and insertion.
 - Export readiness status.
 
@@ -269,8 +271,8 @@ Required next coverage:
 - Preview heading click-to-source and synchronized scrolling.
 - Command palette search, keybindings, heading commands, citation commands,
   glossary/index commands, and navigation commands.
-- Table editor paste CSV/Markdown, add/remove rows and columns, sort, column
-  formats, merged cells, totals, and apply/cancel behavior.
+- Remaining table editor flows: add/remove rows and columns, column formats,
+  cancel behavior, and export fixture proof for edited tables.
 - External conflict modal: compare, compose line merge, keep local, accept
   external, save local copy, and stale-save race handling.
 - AI paste cleanup modes: quote, appendix, replace selection, merge into
