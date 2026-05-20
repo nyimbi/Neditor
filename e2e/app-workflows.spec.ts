@@ -360,6 +360,10 @@ async function revealedPaths(page: Page) {
   return page.evaluate(() => window.__NEDITOR_E2E__.revealedPaths());
 }
 
+async function activeTabText(page: Page) {
+  return page.locator(".document-tabs .tab.active .tab-main").innerText();
+}
+
 test.beforeEach(async ({ page }) => {
   await installTauriMock(page);
   await page.goto("/");
@@ -414,12 +418,12 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
 
   await queueDialogSelection(page, "/workspace/market copy.md");
   await page.getByRole("button", { name: "Duplicate" }).click();
-  await expect(page.getByRole("button", { name: /market copy\.md/ })).toBeVisible();
   await expect.poll(() => mockFileText(page, "/workspace/market copy.md")).toContain("status: in-review");
+  await expect.poll(() => activeTabText(page)).toContain("market copy.md");
 
   await queueDialogSelection(page, "/workspace/renamed.md");
   await page.getByRole("button", { name: "Rename" }).click();
-  await expect(page.getByRole("button", { name: /renamed\.md/ })).toBeVisible();
+  await expect.poll(() => activeTabText(page)).toContain("renamed.md");
 
   await page.getByLabel("Pin document").click();
   await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /renamed\.md/ })).toBeVisible();
