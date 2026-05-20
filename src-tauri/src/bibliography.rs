@@ -67,7 +67,7 @@ pub(crate) fn collect_bibliography(
                 start_line: line + 1,
             }),
     );
-    if let Some(path) = metadata.get("bibliography").and_then(Value::as_str) {
+    for path in bibliography_source_paths(metadata) {
         let base = root_path
             .and_then(Path::parent)
             .map(Path::to_path_buf)
@@ -87,7 +87,7 @@ pub(crate) fn collect_bibliography(
                 ),
                 Some(path_to_string(&bibliography_path)),
                 None,
-                Some("Create the bibliography file or update front matter."),
+                Some("Create the bibliography file or update front matter bibliography paths."),
             )),
         }
     }
@@ -102,6 +102,40 @@ pub(crate) fn collect_bibliography(
             )
         })
         .collect()
+}
+
+fn bibliography_source_paths(metadata: &Value) -> Vec<&str> {
+    let mut paths = Vec::new();
+    for key in [
+        "bibliography",
+        "bibliographies",
+        "citationSources",
+        "citation_sources",
+    ] {
+        collect_bibliography_paths(metadata.get(key), &mut paths);
+    }
+    paths
+}
+
+fn collect_bibliography_paths<'a>(value: Option<&'a Value>, paths: &mut Vec<&'a str>) {
+    match value {
+        Some(Value::String(path)) => paths.push(path),
+        Some(Value::Array(values)) => {
+            for value in values {
+                collect_bibliography_paths(Some(value), paths);
+            }
+        }
+        Some(Value::Object(object)) => {
+            if let Some(path) = object
+                .get("path")
+                .or_else(|| object.get("file"))
+                .and_then(Value::as_str)
+            {
+                paths.push(path);
+            }
+        }
+        _ => {}
+    }
 }
 
 struct BibliographySource {

@@ -597,12 +597,13 @@ Additional duplicate bibliography source-location verification:
 | --- | --- | --- |
 | `cargo test --locked compiler_reports_duplicate_bibliography_keys --lib -- --nocapture` in `src-tauri` | Pass | Proved duplicate bibliography diagnostics point at the second duplicate entry and include the first occurrence in related context. |
 | `cargo test --locked compiler_reports_csl_and_hayagriva_duplicate_key_locations --lib -- --nocapture` in `src-tauri` | Pass | Proved duplicate-key source ranges for CSL JSON array entries and Hayagriva YAML top-level entries, including preservation of duplicate Hayagriva keys before YAML map parsing can collapse them. |
-| `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 10 citation tests passed, including BibTeX, CSL JSON, and Hayagriva duplicate-key source ranges plus citation export conformance. |
+| `cargo test --locked compiler_reports_duplicate_keys_across_external_bibliography_files --lib -- --nocapture` in `src-tauri` | Pass | Proved multiple bibliography front matter paths can load separate BibTeX and CSL JSON files, and duplicate-key diagnostics point at the duplicate key in the second external file with first-file context. |
+| `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 11 citation tests passed, including BibTeX, CSL JSON, Hayagriva, and external-file duplicate-key source ranges plus citation export conformance. |
 | `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after carrying bibliography source metadata. |
 | `cargo check --locked` in `src-tauri` | Pass | Finished dev profile successfully. |
 | `cargo check --locked --features native-watch` in `src-tauri` | Pass | Finished dev profile successfully. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
-| `cargo test --locked` in `src-tauri` | Pass | 148 Rust tests passed; 0 failed. |
+| `cargo test --locked` in `src-tauri` | Pass | 149 Rust tests passed; 0 failed. |
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed after extending bibliography entry shape. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed with duplicate source locations in the References panel. |
 | `pnpm run check:docs` | Pass | Checked 13 Markdown files; local links resolve. |

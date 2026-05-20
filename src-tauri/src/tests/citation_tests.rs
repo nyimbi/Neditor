@@ -251,6 +251,57 @@ fn compiler_reports_csl_and_hayagriva_duplicate_key_locations() {
 }
 
 #[test]
+fn compiler_reports_duplicate_keys_across_external_bibliography_files() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-multi-bib-test-{unique}"));
+    fs::create_dir_all(&root).expect("create multi bibliography test dir");
+    let primary = root.join("refs-primary.bib");
+    let secondary = root.join("refs-secondary.json");
+    fs::write(
+        &primary,
+        "@book{dup2026,\n title={Primary Entry},\n author={One},\n year={2026}\n}",
+    )
+    .expect("write primary bibliography");
+    fs::write(
+        &secondary,
+        "[\n{\"id\":\"dup2026\",\"title\":\"Secondary Entry\",\"author\":[{\"family\":\"Two\"}],\"issued\":{\"date-parts\":[[2026]]}}\n]",
+    )
+    .expect("write secondary bibliography");
+
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Multi Bibliography\nstatus: approved\napprovedBy: QA\nbibliography:\n  - refs-primary.bib\n  - refs-secondary.json\ncitationStyle: author-year\n---\n# Multi Bibliography\nClaim [@dup2026].\n[BIBLIOGRAPHY]"
+            .to_string(),
+        file_path: Some(path_to_string(&root.join("root.md"))),
+    });
+
+    assert_eq!(response.bibliography.len(), 2);
+    assert_eq!(
+        response.semantic.duplicate_bibliography_keys,
+        vec!["dup2026".to_string()]
+    );
+    let duplicate = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("Duplicate bibliography key"))
+        .expect("external duplicate bibliography diagnostic");
+    assert_eq!(
+        duplicate.source_file.as_deref(),
+        Some(path_to_string(&secondary).as_str())
+    );
+    assert_eq!(duplicate.line, Some(2));
+    assert_eq!(duplicate.column, Some(8));
+    assert_eq!(duplicate.end_column, Some(15));
+    assert!(duplicate.related.iter().any(|related| {
+        related.contains(&format!("First occurrence: {}:1", path_to_string(&primary)))
+    }));
+    assert!(response.html.contains("Two 2026"));
+    fs::remove_dir_all(root).expect("clean multi bibliography test dir");
+}
+
+#[test]
 fn citation_export_conformance_covers_required_cases() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Citation Export\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# Citation Export\nSingle [@porter1985].\nMultiple [@porter1985; @doe2026].\nLocator [@porter1985, p. 42].\nMissing [@missing2026].\nSecond [@doe2026].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}\n```\n\n[BIBLIOGRAPHY]\n".to_string(),

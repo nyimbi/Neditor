@@ -140,10 +140,15 @@ Most recent local verification evidence:
   passed and proves duplicate-key source ranges for CSL JSON array entries and
   Hayagriva YAML top-level entries, including duplicate Hayagriva keys that
   would otherwise be collapsed by YAML map parsing.
-- `cargo test --locked citation_tests --lib`: passed 10 citation tests,
-  including BibTeX, CSL JSON, and Hayagriva duplicate-key source ranges plus
-  citation export conformance.
-- `cargo test --locked`: passed locally with 148 Rust tests on this Unix host.
+- `cargo test --locked compiler_reports_duplicate_keys_across_external_bibliography_files --lib -- --nocapture`:
+  passed and proves multiple bibliography front matter paths can load separate
+  BibTeX and CSL JSON files, with duplicate-key diagnostics pointing at the
+  duplicate key in the second external file and related context for the first
+  file.
+- `cargo test --locked citation_tests --lib`: passed 11 citation tests,
+  including BibTeX, CSL JSON, Hayagriva, and external-file duplicate-key source
+  ranges plus citation export conformance.
+- `cargo test --locked`: passed locally with 149 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -1075,16 +1080,17 @@ Status: core support exists; UI and cross-target proof remain incomplete.
 Readiness now reports missing citation bibliography entries with precise
 source ranges when citations are present but no bibliography source is
 available. Duplicate bibliography entries now carry source locations, readiness
-points at duplicate entries for BibTeX, CSL JSON, and Hayagriva YAML, and the
-References panel displays duplicate entry locations.
+points at duplicate entries for BibTeX, CSL JSON, Hayagriva YAML, and multiple
+external bibliography files, and the References panel displays duplicate entry
+locations.
 
 Finish:
 
 - BibTeX and CSL JSON import edge cases.
 - Duplicate bibliography key UI and readiness reporting. Current coverage shows
   duplicate entry locations and source-range readiness diagnostics for BibTeX,
-  CSL JSON, and Hayagriva YAML; remaining work is richer external
-  bibliography-file duplicate edge cases.
+  CSL JSON, Hayagriva YAML, and separate external bibliography files; remaining
+  work is richer citation manager UX and CSL style validation.
 - Citation styles: title, author-year, key, and CSL-driven choices.
 - Remaining citation diagnostics: style-specific warnings and richer CSL style
   validation.
