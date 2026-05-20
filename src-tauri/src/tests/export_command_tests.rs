@@ -27,6 +27,12 @@ fn prepare_for_export_reports_review_change_note_audit_metadata() {
     assert!(!report.ready);
     assert_eq!(report.error_count, 0);
     assert_eq!(report.warning_count, 2);
+    assert_eq!(report.readiness.warning_count, report.warning_count);
+    assert_eq!(
+        report.manifest.readiness.warning_count,
+        report.warning_count
+    );
+    assert!(!report.manifest.readiness.ready);
     assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
     assert!(
         report.diagnostics.iter().any(|diagnostic| {
@@ -166,6 +172,8 @@ fn prepare_for_export_reports_missing_caption_labels() {
     assert!(!report.ready);
     assert_eq!(report.error_count, 0);
     assert_eq!(report.warning_count, 3);
+    assert_eq!(report.readiness.warning_count, 3);
+    assert_eq!(report.manifest.readiness.warning_count, 3);
     assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
     assert!(report.diagnostics.iter().any(|diagnostic| {
         diagnostic.message == "Figure is missing a stable label or caption."
@@ -274,6 +282,9 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(manifest_text.contains("\"source_hash\": \"sha256:"));
     assert!(manifest_text.contains("\"output_path\": "));
     assert!(manifest_text.contains("\"output_hash\": \"sha256:"));
+    assert!(manifest_text.contains("\"readiness\": {"));
+    assert!(manifest_text.contains("\"ready\": true"));
+    assert!(manifest_text.contains("\"error_count\": 0"));
     assert!(manifest_text.contains("\"diagnostics\": []"));
     assert!(manifest_text.contains("\"source_map\": ["));
     assert!(manifest_text.contains("\"layout_sections\": ["));
@@ -291,6 +302,9 @@ fn export_document_writes_optional_sidecar_manifest() {
         .as_deref()
         .is_some_and(|hash| hash.starts_with("sha256:")));
     assert!(response.manifest.diagnostics.is_empty());
+    assert!(response.manifest.readiness.ready);
+    assert_eq!(response.manifest.readiness.error_count, 0);
+    assert_eq!(response.manifest.readiness.warning_count, 0);
     assert!(!response.manifest.source_map.is_empty());
 
     let docx_output = root.join("ready.docx");

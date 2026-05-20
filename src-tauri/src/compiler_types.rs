@@ -104,9 +104,41 @@ pub(crate) struct ExportManifest {
     pub(crate) export_target: String,
     pub(crate) export_options: Value,
     pub(crate) transform_artifacts: Vec<Value>,
+    pub(crate) readiness: ExportReadinessSummary,
     pub(crate) diagnostics: Vec<DocumentDiagnostic>,
     pub(crate) source_map: Vec<SourceMapEntry>,
     pub(crate) app_version: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct ExportReadinessSummary {
+    pub(crate) ready: bool,
+    pub(crate) error_count: usize,
+    pub(crate) warning_count: usize,
+    pub(crate) info_count: usize,
+}
+
+pub(crate) fn export_readiness_summary(
+    diagnostics: &[DocumentDiagnostic],
+) -> ExportReadinessSummary {
+    let error_count = diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == "error")
+        .count();
+    let warning_count = diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == "warning")
+        .count();
+    let info_count = diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == "info")
+        .count();
+    ExportReadinessSummary {
+        ready: error_count == 0 && warning_count == 0,
+        error_count,
+        warning_count,
+        info_count,
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]

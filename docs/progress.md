@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `a026494 Expose AI
-  provenance gaps before export`
+- Latest inspected committed baseline before this update: `c362638 Expose
+  caption label gaps before export`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -201,6 +201,9 @@ Recent pushed checkpoints visible in current git history:
 - This update extends export readiness validation so figures, tables, and
   equations missing stable labels or captions produce actionable diagnostics
   that are copied into the export manifest before artifact writes.
+- This update adds an explicit export manifest readiness summary with ready,
+  error, warning, and info counts so sidecar manifests carry portable
+  preflight evidence without requiring consumers to recount diagnostics.
 
 ## Current Capability Snapshot
 
@@ -566,7 +569,7 @@ Additional review/provenance readiness metadata verification:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after adding review/change-note, AI provenance, and caption/label readiness diagnostics. |
-| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 11 export command tests passed, including readiness and manifest diagnostics for malformed review comments, change notes, incomplete AI provenance metadata, invalid AI review statuses, and missing figure/table/equation labels or captions. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 11 export command tests passed, including readiness and manifest diagnostics for malformed review comments, change notes, incomplete AI provenance metadata, invalid AI review statuses, missing figure/table/equation labels or captions, and explicit manifest readiness summaries. |
 | `cargo test --locked review_provenance_tests --lib` in `src-tauri` | Pass | 4 review/provenance tests passed after the stricter AI provenance validation. |
 | `cargo test --locked validation_tests --lib` in `src-tauri` | Pass | 4 validation tests passed after the readiness validation extension. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after the shared parser and export-readiness validation changes. |

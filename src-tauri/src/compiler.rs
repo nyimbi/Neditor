@@ -7,8 +7,8 @@ use crate::{
     compile_options::apply_compile_options,
     compiler_support::{citation_style, collect_fence_bodies, collect_glossary, extract_headings},
     compiler_types::{
-        CompileRequest, CompileResponse, CompileWithOptionsRequest, ExportManifest,
-        SemanticDocument, SourceMapEntry,
+        export_readiness_summary, CompileRequest, CompileResponse, CompileWithOptionsRequest,
+        ExportManifest, SemanticDocument, SourceMapEntry,
     },
     diagnostics::DocumentDiagnostic,
     document_ast::{
@@ -305,6 +305,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
                 })
             })
             .collect(),
+        readiness: export_readiness_summary(&diagnostics),
         diagnostics: diagnostics.clone(),
         source_map: source_map.clone(),
         app_version: env!("CARGO_PKG_VERSION").to_string(),

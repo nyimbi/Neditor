@@ -290,6 +290,13 @@ export interface ManifestLayoutSection {
   footer?: string | null;
 }
 
+export interface ExportReadinessSummary {
+  ready: boolean;
+  error_count: number;
+  warning_count: number;
+  info_count: number;
+}
+
 export interface ExportManifest {
   document_title: string;
   document_version: string;
@@ -304,6 +311,7 @@ export interface ExportManifest {
   export_target: string;
   export_options: Record<string, unknown>;
   transform_artifacts: Array<Record<string, unknown>>;
+  readiness: ExportReadinessSummary;
   diagnostics: DocumentDiagnostic[];
   source_map: Array<{ generated_line: number; source_file: string; source_line: number }>;
   app_version: string;
@@ -420,6 +428,7 @@ export interface ExportReadinessReport {
   error_count: number;
   warning_count: number;
   info_count: number;
+  readiness: ExportReadinessSummary;
   source_map: Array<{ generated_line: number; source_file: string; source_line: number }>;
   paged_document: PagedDocument;
   diagnostics: DocumentDiagnostic[];

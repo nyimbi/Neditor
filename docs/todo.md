@@ -749,6 +749,8 @@ Current evidence:
   manifest.
 - Readiness now reports figures, tables, and equations that are missing stable
   labels or captions, and the diagnostics are copied into the export manifest.
+- Export manifests now include an explicit readiness summary with ready, error,
+  warning, and info counts.
 
 Readiness should validate and report:
 

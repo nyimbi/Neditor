@@ -1,5 +1,6 @@
 use crate::{
     compile_with_options,
+    compiler_types::{export_readiness_summary, ExportReadinessSummary},
     diagnostics::{diag, DocumentDiagnostic},
     export::{
         render_docx_bytes, render_full_html, render_markdown_bundle_bytes, render_pdf_bytes,
@@ -49,6 +50,7 @@ pub(crate) struct ExportReadinessReport {
     pub(crate) error_count: usize,
     pub(crate) warning_count: usize,
     pub(crate) info_count: usize,
+    pub(crate) readiness: ExportReadinessSummary,
     pub(crate) source_map: Vec<SourceMapEntry>,
     pub(crate) paged_document: PagedDocument,
     pub(crate) diagnostics: Vec<DocumentDiagnostic>,
@@ -89,6 +91,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
             error.message
         ));
     }
+    manifest.readiness = export_readiness_summary(&diagnostics);
     manifest.diagnostics = diagnostics.clone();
 
     let output_path = PathBuf::from(&request.output_path);
@@ -172,27 +175,15 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
     if git_export_warnings_enabled(&request.options) {
         validate_git_export_cleanliness(request.file_path.as_deref(), &mut response.diagnostics);
     }
+    response.export_manifest.readiness = export_readiness_summary(&response.diagnostics);
     response.export_manifest.diagnostics = response.diagnostics.clone();
-    let error_count = response
-        .diagnostics
-        .iter()
-        .filter(|diagnostic| diagnostic.severity == "error")
-        .count();
-    let warning_count = response
-        .diagnostics
-        .iter()
-        .filter(|diagnostic| diagnostic.severity == "warning")
-        .count();
-    let info_count = response
-        .diagnostics
-        .iter()
-        .filter(|diagnostic| diagnostic.severity == "info")
-        .count();
+    let readiness = response.export_manifest.readiness.clone();
     ExportReadinessReport {
-        ready: error_count == 0 && warning_count == 0,
-        error_count,
-        warning_count,
-        info_count,
+        ready: readiness.ready,
+        error_count: readiness.error_count,
+        warning_count: readiness.warning_count,
+        info_count: readiness.info_count,
+        readiness,
         source_map: response.source_map,
         paged_document: response.paged_document,
         diagnostics: response.diagnostics,
