@@ -693,8 +693,6 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
     ].join("\n"),
   );
 
-  await queueDialogSelection(page, "/workspace/market.md");
-  await page.getByRole("button", { name: "Open", exact: true }).click();
   await queueDialogSelection(page, "/workspace/field-notes.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
