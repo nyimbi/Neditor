@@ -617,6 +617,63 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
 });
 
+test("syncs editor and preview scrolling and jumps preview headings to source", async ({ page }) => {
+  const longPreviewDocument = [
+    "---",
+    "title: Preview Navigation",
+    "status: draft",
+    "---",
+    "",
+    "# Preview Navigation",
+    "",
+    "Opening context for preview navigation.",
+    "",
+    ...Array.from({ length: 36 }, (_, index) => [
+      `## Section ${index + 1}`,
+      "",
+      `Narrative paragraph ${index + 1} with enough text to create scrollable preview content.`,
+      "",
+    ]).flat(),
+    "## Navigation Target",
+    "",
+    "The preview heading click should focus this source line.",
+    "",
+    ...Array.from({ length: 24 }, (_, index) => [
+      `## Follow-up ${index + 1}`,
+      "",
+      `Trailing paragraph ${index + 1} keeps the target away from the document end.`,
+      "",
+    ]).flat(),
+  ].join("\n");
+
+  await setMockFileText(page, "/workspace/preview-navigation.md", longPreviewDocument);
+  await queueDialogSelection(page, "/workspace/preview-navigation.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const editorScroller = page.locator(".cm-scroller");
+  const previewPane = page.locator(".preview-pane");
+
+  await expect(page.getByRole("heading", { name: "Preview Navigation" })).toBeVisible();
+  await editorScroller.evaluate((element) => {
+    element.scrollTop = element.scrollHeight * 0.55;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await expect.poll(() => previewPane.evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+
+  await previewPane.evaluate((element) => {
+    element.scrollTop = 0;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await expect.poll(() => editorScroller.evaluate((element) => element.scrollTop)).toBeLessThan(20);
+
+  const targetHeading = page.getByRole("heading", { name: "Navigation Target" });
+  await targetHeading.scrollIntoViewIfNeeded();
+  await targetHeading.click();
+
+  await expect(page.locator(".cm-line").filter({ hasText: "## Navigation Target" })).toBeVisible();
+  await expect.poll(() => editorScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+});
+
 test("runs command palette insertion and table editor workflows", async ({ page }) => {
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert table");
