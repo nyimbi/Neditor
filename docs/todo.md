@@ -949,6 +949,10 @@ Current evidence:
   Markdown bundles include `include-graph.json` in addition to `manifest.json`
   and `include-map.json`; focused Rust coverage proves both include directives
   and front matter data-source edges appear in export evidence.
+- PPTX readiness now has target-specific validation: unapproved presentation
+  exports are blocked unless status is approved/published and `approvedBy` plus
+  `approvedAt` are present, and the diagnostic is copied into manifest
+  readiness.
 
 Readiness should validate and report:
 
@@ -977,7 +981,9 @@ Readiness should validate and report:
   timeouts, stderr, missing output, output limits, and cache identity. Broad
   readiness audit test coverage exists for export settings; external transform
   tests cover runtime stderr, missing output, output limits, and cache identity.
-- Export target options and target-specific blockers.
+- Export target options and target-specific blockers. Focused Rust coverage now
+  proves the PPTX approved-metadata blocker; more target-specific option
+  combinations remain.
 - Unresolved comments and malformed comment/change-note audit metadata. Broad
   readiness audit test coverage exists.
 - AI provenance that is not human reviewed or lacks required audit metadata.

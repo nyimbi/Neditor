@@ -1233,6 +1233,22 @@ Additional external conflict composition verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "merges external conflict" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional target-specific PPTX readiness verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked prepare_for_export_reports_target_specific_pptx_blockers --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust readiness proof blocks PPTX export for in-review documents missing `approvedBy` and `approvedAt`, records `target:pptx` related context, copies readiness into the manifest, and keeps the same source ready for PDF. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 16 export command tests passed after adding the PPTX target-specific blocker. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the export readiness update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after aligning the browser export workflow mock with the PPTX approved-metadata blocker. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests still pass after the export workflow update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the readiness matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after the export workflow update. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests; the export readiness workflow now exercises the PPTX approved-metadata blocker instead of a synthetic token. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "export readiness" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

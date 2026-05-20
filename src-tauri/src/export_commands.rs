@@ -9,6 +9,7 @@ use crate::{
         render_pptx_bytes,
     },
     git::get_git_status,
+    metadata_string,
     paged_document::PagedDocument,
     path_to_string, sha256_uri,
     validation::validate_captioned_business_objects,
@@ -86,6 +87,11 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
     }
     let mut diagnostics = compile_response.diagnostics.clone();
     validate_export_settings(&request.target, &request.options, &mut diagnostics);
+    validate_target_specific_export_readiness(
+        &request.target,
+        &compile_response.metadata,
+        &mut diagnostics,
+    );
     validate_captioned_business_objects(&compile_response.document_ast.blocks, &mut diagnostics);
     if git_export_warnings_enabled(&request.options) {
         validate_git_export_cleanliness(file_path.as_deref(), &mut diagnostics);
@@ -191,6 +197,11 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
     response.export_manifest.export_target = request.target.clone();
     response.export_manifest.export_options = request.options.clone();
     validate_export_settings(&request.target, &request.options, &mut response.diagnostics);
+    validate_target_specific_export_readiness(
+        &request.target,
+        &response.metadata,
+        &mut response.diagnostics,
+    );
     validate_captioned_business_objects(&response.document_ast.blocks, &mut response.diagnostics);
     if git_export_warnings_enabled(&request.options) {
         validate_git_export_cleanliness(request.file_path.as_deref(), &mut response.diagnostics);
@@ -325,6 +336,45 @@ fn validate_export_settings(
         }
     }
     validate_transform_export_settings(options, diagnostics);
+}
+
+fn validate_target_specific_export_readiness(
+    target: &str,
+    metadata: &Value,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if target != "pptx" {
+        return;
+    }
+
+    let status = metadata_string(metadata, "status").unwrap_or_else(|| "draft".to_string());
+    let approved_by_missing = metadata_string(metadata, "approvedBy")
+        .map(|value| value.trim().is_empty())
+        .unwrap_or(true);
+    let approved_at_missing = metadata_string(metadata, "approvedAt")
+        .map(|value| value.trim().is_empty())
+        .unwrap_or(true);
+    if !matches!(status.as_str(), "approved" | "published")
+        || approved_by_missing
+        || approved_at_missing
+    {
+        let mut diagnostic = diag(
+            "error",
+            "PPTX export requires approved metadata before writing.",
+            None,
+            None,
+            Some("Set status to approved or published and add approvedBy plus approvedAt before exporting a presentation."),
+        );
+        diagnostic.related.push("target:pptx".to_string());
+        diagnostic.related.push(format!("status:{status}"));
+        if approved_by_missing {
+            diagnostic.related.push("missing:approvedBy".to_string());
+        }
+        if approved_at_missing {
+            diagnostic.related.push("missing:approvedAt".to_string());
+        }
+        diagnostics.push(diagnostic);
+    }
 }
 
 fn validate_transform_export_settings(options: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {

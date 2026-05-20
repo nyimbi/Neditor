@@ -884,17 +884,21 @@ async function installTauriMock(page: Page) {
           suggestion: string;
           related: string[];
         }> = [];
-        if (request.text.includes("EXPORT_BLOCKER")) {
+        const approvedMetadata =
+          /^status:\s*(approved|published)\s*$/m.test(request.text) &&
+          /^approvedBy:\s*\S.+$/m.test(request.text) &&
+          /^approvedAt:\s*\S.+$/m.test(request.text);
+        if ((request.target || "html") === "pptx" && !approvedMetadata) {
           diagnostics.push({
             severity: "error",
-            message: `${(request.target || "html").toUpperCase()} export requires approved metadata before writing.`,
+            message: "PPTX export requires approved metadata before writing.",
             source_file: "/workspace/market.md",
             line: 3,
             column: 1,
             end_line: 3,
             end_column: 16,
-            suggestion: "Set status: approved before exporting this target.",
-            related: [`target:${request.target || "html"}`],
+            suggestion: "Set status to approved or published and add approvedBy plus approvedAt before exporting a presentation.",
+            related: ["target:pptx"],
           });
         }
         const pendingAiLine =
@@ -2669,7 +2673,10 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
     [
       "---",
       "title: Export Preview",
-      "status: draft",
+      "version: 1.0.0",
+      "status: approved",
+      "approvedBy: QA",
+      "approvedAt: 2026-05-21",
       "---",
       "",
       "# Export Preview",
@@ -2718,8 +2725,8 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
 
   await page.locator(".cm-content").click();
   await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-  await page.keyboard.insertText(["# Blocked Export", "", "EXPORT_BLOCKER"].join("\n"));
-  await expect.poll(() => editorText(page)).toContain("EXPORT_BLOCKER");
+  await page.keyboard.insertText(["---", "title: Blocked Export", "version: 1.0.0", "status: in-review", "---", "", "# Blocked Export"].join("\n"));
+  await expect.poll(() => editorText(page)).toContain("status: in-review");
   await page.getByRole("button", { name: "Export document" }).click();
   await expect(page.locator("article.readiness").getByText("Needs attention", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Export readiness diagnostics" })).toContainText("PPTX export requires approved metadata before writing.");

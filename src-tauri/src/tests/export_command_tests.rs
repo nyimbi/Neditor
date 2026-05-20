@@ -641,6 +641,60 @@ fn prepare_for_export_validates_target_and_options() {
 }
 
 #[test]
+fn prepare_for_export_reports_target_specific_pptx_blockers() {
+    let draft_presentation =
+        "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: in-review\n---\n# Board Deck\n"
+            .to_string();
+    let report = prepare_for_export(PrepareExportRequest {
+        text: draft_presentation.clone(),
+        file_path: None,
+        target: "pptx".to_string(),
+        options: json!({ "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 1, "{:#?}", report.diagnostics);
+    assert_eq!(report.warning_count, 0, "{:#?}", report.diagnostics);
+    let diagnostic = report
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic
+                .message
+                .contains("PPTX export requires approved metadata")
+        })
+        .expect("pptx readiness diagnostic");
+    assert_eq!(diagnostic.severity, "error");
+    assert!(diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("approvedBy plus approvedAt")));
+    assert!(diagnostic.related.iter().any(|item| item == "target:pptx"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|item| item == "status:in-review"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|item| item == "missing:approvedBy"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|item| item == "missing:approvedAt"));
+    assert_eq!(report.manifest.readiness.error_count, 1);
+    assert!(!report.manifest.readiness.ready);
+
+    let pdf_report = prepare_for_export(PrepareExportRequest {
+        text: draft_presentation,
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "warnOnDirtyGit": false }),
+    });
+    assert!(pdf_report.ready, "{:#?}", pdf_report.diagnostics);
+}
+
+#[test]
 fn prepare_for_export_validates_transform_engine_options() {
     let report = prepare_for_export(PrepareExportRequest {
         text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),
