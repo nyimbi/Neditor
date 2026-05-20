@@ -464,6 +464,110 @@ test("saves a document as a new file and reopens it from recently closed", async
   await expect.poll(() => activeFileRowText(page)).toContain("market-approved.md");
 });
 
+test("blocks stale saves and preserves local conflict copies", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
+  await expect.poll(() => editorText(page)).toContain("status: in-review");
+
+  await setMockFileText(
+    page,
+    "/workspace/market.md",
+    [
+      "---",
+      "title: Market Entry Report",
+      "status: approved",
+      "---",
+      "",
+      "# Market Entry Report",
+      "",
+      "External disk edit.",
+    ].join("\n"),
+  );
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Save blocked; resolve external changes first")).toBeVisible();
+
+  const conflictActions = page.locator(".status-bar .conflict-actions");
+  await expect(conflictActions.getByRole("button", { name: "Compare" })).toBeVisible();
+  await expect(conflictActions.getByRole("button", { name: "Accept external" })).toBeVisible();
+  await expect(conflictActions.getByRole("button", { name: "Keep local" })).toBeVisible();
+  await expect(conflictActions.getByRole("button", { name: "Save copy" })).toBeVisible();
+
+  await conflictActions.getByRole("button", { name: "Compare" }).click();
+  const conflictDialog = page.getByRole("dialog", { name: "External file conflict" });
+  await expect(conflictDialog).toBeVisible();
+  await expect(conflictDialog).toContainText("The root file changed outside NEditor before save.");
+  await expect(conflictDialog).toContainText("status: in-review");
+  await expect(conflictDialog).toContainText("status: approved");
+  await expect(conflictDialog).toContainText("External disk edit.");
+
+  await queueDialogSelection(page, "/workspace/market local copy.md");
+  await conflictDialog.getByRole("button", { name: "Save copy" }).click();
+
+  await expect(conflictDialog).toBeHidden();
+  await expect(page.getByText("Saved local edits as a copy")).toBeVisible();
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("External disk edit.");
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: approved");
+  await expect.poll(() => mockFileText(page, "/workspace/market local copy.md")).toContain("status: in-review");
+  await page.getByLabel("Sidebar panel").selectOption("files");
+  await expect.poll(() => activeFileRowText(page)).toContain("market local copy.md");
+});
+
+test("merges external conflict text back into the original file", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
+  await setMockFileText(
+    page,
+    "/workspace/market.md",
+    [
+      "---",
+      "title: Market Entry Report",
+      "status: approved",
+      "---",
+      "",
+      "# Market Entry Report",
+      "",
+      "External disk edit.",
+    ].join("\n"),
+  );
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.locator(".status-bar .conflict-actions").getByRole("button", { name: "Compare" }).click();
+
+  const conflictDialog = page.getByRole("dialog", { name: "External file conflict" });
+  await conflictDialog.getByRole("button", { name: "Use external as merge base" }).click();
+  await conflictDialog
+    .getByLabel("Merged result")
+    .fill(
+      [
+        "---",
+        "title: Market Entry Report",
+        "status: approved",
+        "---",
+        "",
+        "# Market Entry Report",
+        "",
+        "External disk edit.",
+        "Local reviewer note retained.",
+      ].join("\n"),
+    );
+  await conflictDialog.getByRole("button", { name: "Apply merged text" }).click();
+
+  await expect(conflictDialog).toBeHidden();
+  await expect(page.getByText("Merged external changes into the working document")).toBeVisible();
+  await expect.poll(() => editorText(page)).toContain("Local reviewer note retained.");
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("Local reviewer note retained.");
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: approved");
+});
+
 test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {
   await page.getByLabel("Sidebar panel").selectOption("tables");
   await page.getByRole("button", { name: "New table" }).click();
