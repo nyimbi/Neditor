@@ -2180,7 +2180,10 @@ test("recompiles clean master documents after included files change", async ({ p
   const preview = page.getByRole("region", { name: "Live preview" });
   await expect(preview).toContainText("Original included risk note.");
   await page.getByLabel("Sidebar panel").selectOption("references");
-  await expect(page.getByRole("button", { name: "/workspace/chapters/risk.md" })).toBeVisible();
+  const includeGraph = page.getByRole("region", { name: "Include graph" });
+  await expect(includeGraph).toContainText("Depth 1");
+  await expect(includeGraph).toContainText("market.md");
+  await expect(includeGraph).toContainText("chapters/risk.md");
 
   await setMockFileText(page, "/workspace/chapters/risk.md", "## Risk Notes\n\nUpdated included risk note.");
   await emitMockFileWatch(page, "/workspace/chapters/risk.md");
@@ -2188,6 +2191,43 @@ test("recompiles clean master documents after included files change", async ({ p
   await expect(preview).toContainText("Updated included risk note.");
   await expect.poll(() => editorText(page)).toContain("!include chapters/risk.md");
   await expect.poll(() => editorText(page)).not.toContain("Updated included risk note.");
+});
+
+test("navigates include graph entries from references and commands", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/market.md",
+    [
+      "---",
+      "title: Market Entry Report",
+      "status: draft",
+      "---",
+      "",
+      "# Market Entry Report",
+      "",
+      "!include chapters/risk.md",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Open include chapters/risk.md");
+  await page.getByRole("button", { name: /Open include chapters\/risk\.md Include depth 1/ }).click();
+  await expect.poll(() => editorText(page)).toContain("Original included risk note.");
+
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByLabel("Sidebar panel").selectOption("references");
+
+  const includeGraph = page.getByRole("region", { name: "Include graph" });
+  await expect(includeGraph).toContainText("market.md");
+  await expect(includeGraph).toContainText("chapters/risk.md");
+  await includeGraph.getByRole("button", { name: "Go to include directive for /workspace/chapters/risk.md" }).click();
+  await expect.poll(() => editorText(page)).toContain("!include chapters/risk.md");
+
+  await includeGraph.getByRole("button", { name: "Open include /workspace/chapters/risk.md" }).click();
+  await expect.poll(() => editorText(page)).toContain("Original included risk note.");
 });
 
 test("opens included-file conflicts without overwriting dirty master drafts", async ({ page }) => {

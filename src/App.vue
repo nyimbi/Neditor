@@ -475,16 +475,26 @@
             {{ edge.from }} -> {{ edge.to }}
           </p>
           <h3>Includes</h3>
-          <button
-            v-for="edge in active.compile?.include_graph || []"
-            :key="`${edge.parent}-${edge.child}`"
-            class="outline-row"
-            :style="{ paddingLeft: `${edge.depth * 12 + 8}px` }"
-            type="button"
-            @click="store.openPath(edge.child)"
-          >
-            {{ edge.child }}
-          </button>
+          <p v-if="!includeGraphItems.length" class="sidebar-hint">No included files in this document.</p>
+          <section v-else class="include-graph" aria-label="Include graph">
+            <article
+              v-for="edge in includeGraphItems"
+              :key="`${edge.parent}-${edge.child}`"
+              class="include-edge"
+              :style="{ marginLeft: `${Math.max(0, edge.depth - 1) * 12}px` }"
+            >
+              <small>Depth {{ edge.depth }}</small>
+              <p>
+                <span>{{ edge.parentLabel }}</span>
+                <span aria-hidden="true"> -&gt; </span>
+                <strong>{{ edge.childLabel }}</strong>
+              </p>
+              <div class="include-actions">
+                <button type="button" :aria-label="`Open include ${edge.child}`" @click="openIncludeChild(edge)">Open include</button>
+                <button type="button" :aria-label="`Go to include directive for ${edge.child}`" @click="goToIncludeDirective(edge)">Go to directive</button>
+              </div>
+            </article>
+          </section>
           <h3>Cross references</h3>
           <button
             v-for="reference in active.compile?.semantic.cross_references || []"
@@ -1216,6 +1226,15 @@ interface TransformTrustPrompt {
   securitySummary: string;
 }
 
+interface IncludeGraphItem {
+  parent: string;
+  child: string;
+  depth: number;
+  parentLabel: string;
+  childLabel: string;
+  commandLabel: string;
+}
+
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const codeFenceSnippet = "```markdown\n\n```\n";
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
@@ -1374,6 +1393,27 @@ const figureBlocks = computed<FigureListItem[]>(() =>
     ];
   }),
 );
+const includeGraphItems = computed<IncludeGraphItem[]>(() => {
+  const seen = new Set<string>();
+  return (active.value.compile?.include_graph || [])
+    .filter((edge) => {
+      const key = `${edge.parent}\n${edge.child}\n${edge.depth}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => left.depth - right.depth || left.parent.localeCompare(right.parent) || left.child.localeCompare(right.child))
+    .map((edge) => {
+      const parentLabel = displayDocumentPath(edge.parent);
+      const childLabel = displayDocumentPath(edge.child);
+      return {
+        ...edge,
+        parentLabel,
+        childLabel,
+        commandLabel: `Open include ${childLabel}`,
+      };
+    });
+});
 const groupedDocuments = computed<DocumentTabGroup[]>(() => {
   const groups = new Map<string, DocumentTabGroup>();
   for (const document of store.documents) {
@@ -1552,6 +1592,11 @@ const commands = computed(() => [
       group: "Workspace file",
       run: () => void store.openPath(entry.path),
     })),
+  ...includeGraphItems.value.map((edge) => ({
+    name: edge.commandLabel,
+    group: `Include depth ${edge.depth}`,
+    run: () => void openIncludeChild(edge),
+  })),
   ...((active.value.compile?.document_ast.blocks || []).flatMap((block) => {
     if (block.kind !== "heading") return [];
     const line = block.source?.source_line || block.line;
@@ -2334,6 +2379,77 @@ function folderLabel(folder: string) {
 
 function normalizeDocumentPath(path: string) {
   return path.replace(/\\/g, "/");
+}
+
+function displayDocumentPath(path: string) {
+  const normalized = normalizeDocumentPath(path);
+  const workspaceRoot = store.workspaceRoot ? normalizeDocumentPath(store.workspaceRoot) : "";
+  if (workspaceRoot && normalized === workspaceRoot) return folderLabel(workspaceRoot);
+  if (workspaceRoot && normalized.startsWith(`${workspaceRoot}/`)) return normalized.slice(workspaceRoot.length + 1);
+  return normalized;
+}
+
+async function openIncludeChild(edge: IncludeGraphItem) {
+  await store.openPath(edge.child);
+}
+
+async function goToIncludeDirective(edge: IncludeGraphItem) {
+  await store.openPath(edge.parent);
+  await nextTick();
+  const line = findIncludeDirectiveLine(active.value.text, edge.parent, edge.child);
+  if (!line) return;
+  await goToSourceTarget({
+    source_file: edge.parent,
+    line,
+    column: 1,
+    end_line: line,
+    end_column: Math.max(2, includeDirectiveLineText(active.value.text, line).length + 1),
+  });
+}
+
+function findIncludeDirectiveLine(text: string, parentPath: string, childPath: string) {
+  const normalizedChild = normalizeDocumentPath(childPath);
+  const lines = text.split(/\r?\n/);
+  return (
+    lines.findIndex((line) => {
+      const target = includeDirectiveTarget(line);
+      return Boolean(target && normalizeDocumentPath(resolveIncludePath(parentPath, target)) === normalizedChild);
+    }) + 1
+  );
+}
+
+function includeDirectiveLineText(text: string, line: number) {
+  return text.split(/\r?\n/)[line - 1] || "";
+}
+
+function includeDirectiveTarget(line: string) {
+  const trimmed = line.trim();
+  const bang = trimmed.match(/^!include\s+(.+)$/);
+  if (bang) return unquoteIncludeTarget(bang[1]);
+  const braces = trimmed.match(/^\{\{\s*include\s+(.+?)\s*\}\}$/);
+  if (braces) return unquoteIncludeTarget(braces[1]);
+  const comment = trimmed.match(/^<!--\s*include:\s*(.+?)\s*-->$/);
+  if (comment) return unquoteIncludeTarget(comment[1]);
+  return "";
+}
+
+function unquoteIncludeTarget(target: string) {
+  return target.trim().replace(/^["']|["']$/g, "");
+}
+
+function resolveIncludePath(parentPath: string, target: string) {
+  if (target.startsWith("/")) return normalizeDocumentPath(target);
+  const parentFolder = folderFromDocumentPath(parentPath);
+  const stack: string[] = [];
+  for (const part of `${parentFolder}/${target}`.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      stack.pop();
+    } else {
+      stack.push(part);
+    }
+  }
+  return `/${stack.join("/")}`;
 }
 
 async function openDocument() {
@@ -3798,6 +3914,41 @@ select:hover {
 .file-row.active {
   background: #e5edf7;
   color: #174a88;
+}
+
+.sidebar-hint {
+  margin: 6px 0 12px;
+  color: #526171;
+  font-size: 12px;
+}
+
+.include-graph {
+  display: grid;
+  gap: 8px;
+}
+
+.include-edge {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-left: 3px solid #2f6f7e;
+  background: #ffffff;
+}
+
+.include-edge p {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.include-edge small {
+  color: #526171;
+}
+
+.include-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .workspace-root {

@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `929043c Constrain
-  snapshot restores to active documents`
+- Latest inspected committed baseline before this update: `25bc28f Prove
+  snapshot and release workflows in the workbench`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -31,6 +31,12 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
+  create/list/restore controls, and browser harness coverage for snapshot
+  restore plus release tagging workflows.
+- `929043c` constrained snapshot restores to active-document snapshot stores and
+  matching metadata.
+- `a57767b` surfaced malformed front matter diagnostics with source ranges.
 - `2231776` added the first-user guide, Markdown extensions reference, README
   links, and automatic top-level docs link checking.
 - `1c532ee` constrained Git restore/tag inputs to explicit safe refs, blocked
@@ -1146,6 +1152,20 @@ Additional versioning workflow verification:
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 36 Chromium workflow tests, including `runs snapshot restore and release tagging workflows`. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "snapshot restore" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
+Additional include graph navigation verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding References-sidebar include graph navigation and command-palette include entries. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests passed after the include navigation changes. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked and all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails passed after adding the include graph region and navigation buttons. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 37 Chromium workflow tests, including `navigates include graph entries from references and commands`. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "include graph" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. Attempting `pnpm exec playwright install chromium` with escalation was rejected before the command ran. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting remained clean; this slice did not edit Rust sources. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
 ## Next Execution Order

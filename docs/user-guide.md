@@ -86,7 +86,10 @@ stripped when included into a master document. Missing includes, circular
 includes, and unsafe include depth emit diagnostics.
 
 NEditor tracks the include graph for preview, export manifests, and snapshot
-metadata. File watchers recompile master documents when included files change.
+metadata. The References sidebar shows parent-to-child include edges with
+depth, opens included files directly, and jumps back to the include directive in
+the parent document. File watchers recompile master documents when included
+files change.
 
 ## Markdown Extensions
 

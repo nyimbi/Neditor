@@ -1,6 +1,6 @@
 # NEditor Current Completion Backlog
 
-Updated: 2026-05-20
+Updated: 2026-05-21
 
 This is the active, evidence-based backlog for finishing NEditor against
 `docs/specification.md` and `docs/external-transforms.md`. It replaces the stale
@@ -71,6 +71,8 @@ NEditor is no longer a basic scaffold. The repository currently contains:
   verification script coverage.
 - A Playwright browser workflow harness for the Vite-rendered workbench with a
   browser-side Tauri IPC mock.
+- References sidebar include graph navigation for parent-child include edges,
+  open-child actions, directive jumps, and command-palette include entries.
 - Local verification commands for frontend logic, browser workflows, Rust
   checks/tests, native-watch compilation, static analysis, frontend builds, and
   Tauri desktop compilation.
@@ -83,7 +85,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `929043c Constrain snapshot restores to active documents`
+- `25bc28f Prove snapshot and release workflows in the workbench`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -953,10 +955,12 @@ Readiness should validate and report:
   exists.
 - Draft/export warnings.
 - Includes and include graph. Export manifests and Markdown bundles now carry
-  include graph evidence, and focused compiler coverage proves missing include,
+  include graph evidence, focused compiler coverage proves missing include,
   circular include, maximum include depth, and invalid/unreadable include target
-  diagnostics. Remaining work is UI navigation/editing proof and broader
-  platform coverage.
+  diagnostics, and the workbench now exposes parent-child include graph
+  navigation from the References sidebar and command palette. Remaining work is
+  current-host browser execution, native workflow proof, and broader platform
+  coverage.
 - Broken local links and missing media. Broad readiness audit test coverage
   exists.
 - Citations, bibliography files, missing keys, duplicate keys, and style
