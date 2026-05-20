@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `138bf5d Assert
-  reopened file workflow by path row`
+- Latest inspected committed baseline before this update: `25c7d1e Stabilize
+  conflict merge workflow proof`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -72,6 +72,10 @@ Recent pushed checkpoints visible in current git history:
   proof for save-as to a new path and reopening that saved document from the
   recently closed list. The settings recent-path lists now have accessible
   section labels so repeated path buttons are unambiguous.
+- `3cb1b84` and `25c7d1e` added and stabilized browser workflow proof for
+  stale-save conflict recovery: save blocking when disk content changed, compare
+  dialog visibility, local conflict-copy preservation, and merge-back recovery
+  into the original file.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -113,8 +117,9 @@ Implemented or substantially present, pending the conservative caveats in
 - Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering view mode switching, command palette table insertion, table editor
   insertion, mocked file lifecycle operations, advanced table
-  paste/sort/formula/merge/apply behavior, AI paste cleanup insertion, and
-  export readiness.
+  paste/sort/formula/merge/apply behavior, save-as plus recently closed
+  reopening, stale-save conflict copy/merge recovery, AI paste cleanup
+  insertion, and export readiness.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -125,16 +130,17 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `138bf5d` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26137556147`.
+- Latest pushed CI for commit `25c7d1e` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26138672512`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with seven Chromium tests in
-  run `26137556147`, including mocked file lifecycle coverage and save-as plus
-  recently closed reopening. Coverage remains incomplete, and local focused
-  Playwright execution is blocked by the missing/default macOS Playwright cache
-  and the workspace-local Chromium Mach bootstrap permission failure.
+- Browser-level workflow tests pass in Linux CI with nine Chromium tests in
+  run `26138672512`, including mocked file lifecycle coverage, save-as plus
+  recently closed reopening, and stale-save conflict copy/merge recovery.
+  Coverage remains incomplete, and local focused Playwright execution is blocked
+  by the missing/default macOS Playwright cache and the workspace-local Chromium
+  Mach bootstrap permission failure.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -252,6 +258,15 @@ Current CI evidence log:
 | `gh run view 26137235763 --json status,conclusion,jobs` | Superseded failure | For `61eff87`, the new path appeared in both Recent files and Recently closed, so the browser test needed a scoped recently-closed selector. |
 | `gh run view 26137384613 --json status,conclusion,jobs` | Superseded failure | For `44c9639`, reopened tab text reflected front matter title rather than the filesystem path; the test now proves path identity via the active workspace row. |
 | `gh run watch 26137556147 --exit-status` | Pass | For `138bf5d`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser CI installed Chromium and ran 7 tests through `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
+| `pnpm exec playwright test --list` | Pass | Listed 9 Chromium browser workflow tests after adding stale-save conflict copy and merge recovery workflows. |
+| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test e2e/app-workflows.spec.ts --grep "stale saves\|external conflict" --project chromium` | Blocked locally | Workspace-local Chromium launched, then failed before assertions with `bootstrap_check_in ... Permission denied (1100)`. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding stale-save conflict browser workflows. |
+| `git diff --check` | Pass | No whitespace errors after the stale-save conflict browser workflow edits. |
+| `gh run watch 26138478934 --exit-status` | Superseded failure | For `3cb1b84`, 8 browser tests passed but the merge test asserted a transient status message that compile refresh could overwrite. |
+| `pnpm exec playwright test --list` | Pass | Listed 9 Chromium browser workflow tests after stabilizing the conflict merge assertion. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after removing the transient status assertion. |
+| `git diff --check` | Pass | No whitespace errors after stabilizing the conflict merge workflow proof. |
+| `gh run watch 26138672512 --exit-status` | Pass | For `25c7d1e`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser CI installed Chromium and ran 9 tests through `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
 
 Relevant CI fixes already landed:
 
