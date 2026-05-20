@@ -196,7 +196,7 @@ fn external_transforms_are_trust_gated_and_limited() {
 fn external_transform_adapters_shape_engine_specific_invocations() {
     let d2 = write_executable_script(
         "d2-adapter",
-        "#!/bin/sh\nprintf '<svg data-args=\"%s\">d2</svg>' \"$*\"\n",
+        "#!/bin/sh\ncat >/dev/null\nprintf '<svg data-args=\"%s\">d2</svg>' \"$*\"\n",
     );
     let d2_artifact = run_external_transform(ExternalTransformRequest {
         name: "d2".to_string(),

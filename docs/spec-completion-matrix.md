@@ -193,16 +193,19 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed CI on commit `25f7b04` is not green: Windows reaches Rust tests
-  and fails four path-sensitive file/workspace/media export tests, while Ubuntu
-  still fails installed Pikchr conformance because CI's `pikchr-cli` expects a
-  positional source file path. Local fixes for both blockers now pass focused
-  Rust verification, but follow-up CI has not confirmed them yet.
+- Latest pushed CI on commit `5c29914` is not green: Windows has passed the
+  formerly failing path-sensitive Rust tests, frontend tests, and frontend
+  build; Ubuntu now passes installed Pikchr conformance but fails
+  `external_transform_adapters_shape_engine_specific_invocations` because the
+  fake `d2` adapter fixture exited without consuming stdin. The local fixture
+  fix now drains fake `d2` stdin and passes focused/full Rust verification, but
+  follow-up CI has not confirmed it yet.
 - Initial browser-level workflow test harness passes in Linux CI, but local
   sandbox execution is blocked at Chromium launch before app assertions.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, but full desktop CI is
-  blocked by the Windows path-normalization and Ubuntu Pikchr failures above.
+  blocked by the Ubuntu fake-`d2` fixture failure above until the follow-up CI
+  run verifies the fix.
 - Export tests rely heavily on package/text assertions; visual/rendered quality
   remains under-proven.
 - Optional external transform engines are proven most strongly on Linux; macOS

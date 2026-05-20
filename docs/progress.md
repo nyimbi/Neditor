@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `25f7b04 Keep
-  optional Pikchr proof compatible with CI`
+- Latest inspected committed baseline before this update: `5c29914 Keep CI
+  paths and Pikchr invocation portable`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -48,6 +48,8 @@ Recent pushed checkpoints visible in current git history:
 - `5ce5b99` rewrote the active backlog around the latest survey and CI evidence.
 - `25f7b04` Unix-gated the external transform test cache helper and attempted a
   `pikchr-cli` positional source compatibility path.
+- `5c29914` normalized serialized file/export paths to `/` separators and
+  changed the `pikchr-cli` adapter to pass a temporary `.pikchr` source file.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -99,12 +101,12 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `25f7b04` is not green: macOS desktop and browser
-  workflow jobs pass, Windows reaches Rust tests and fails four path-sensitive
-  file/workspace/media export tests, and Ubuntu still fails installed Pikchr
-  conformance because CI's `pikchr-cli` expects a positional source file path.
-  A local fix is in progress to normalize serialized paths and pass a temporary
-  `.pikchr` file path to `pikchr-cli`; CI has not yet verified that fix.
+- Latest pushed CI for commit `5c29914` is not green: browser workflow and
+  macOS desktop jobs pass; Windows has passed the formerly failing Rust tests,
+  frontend tests, and frontend build; Ubuntu now passes installed Pikchr
+  conformance but fails the fake-`d2` adapter fixture with a Linux stdin
+  `Broken pipe (os error 32)`. A local fixture fix now drains fake `d2` stdin
+  before printing SVG output; CI has not yet verified that fix.
 - Initial browser-level workflow tests pass in Linux CI, but coverage is still
   narrow and local sandbox execution still fails before app assertions because
   Chromium cannot register its Mach bootstrap port.
@@ -192,6 +194,13 @@ Current CI follow-up:
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Re-run after the latest Pikchr/path fixes; no warnings. |
 | `cargo test --locked` in `src-tauri` | Pass | 126 Rust tests passed plus main/doc test targets with 0 tests. |
 | `git diff --check` | Pass | No whitespace errors in the current diff. |
+| `gh run view 26133136580 --json status,conclusion,headSha,jobs` | Mixed CI result | For `5c29914`, browser workflow and macOS desktop passed; Windows passed Rust tests, frontend unit tests, and frontend build before continuing the Tauri shell build; Ubuntu failed one Rust fixture test. |
+| `XDG_CACHE_HOME=.cache gh api repos/nyimbi/Neditor/actions/jobs/76862375005/logs` | Ubuntu fixture failure diagnosed | `external_transform_conformance_runs_installed_engines` passed, but `external_transform_adapters_shape_engine_specific_invocations` failed because the fake `d2` script did not consume stdin before exiting. |
+| `cargo test --locked external_transform_adapters_shape_engine_specific_invocations --lib` in `src-tauri` | Pass | Re-run after making the fake `d2` adapter consume stdin. |
+| `cargo test --locked external_transform_tests --lib` in `src-tauri` | Pass | 8 external transform tests passed after the fake `d2` stdin fixture fix. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Re-run after the fake `d2` stdin fixture fix; no warnings. |
+| `cargo test --locked` in `src-tauri` | Pass | 126 Rust tests passed plus main/doc test targets with 0 tests after the fake `d2` stdin fixture fix. |
+| `git diff --check` | Pass | No whitespace errors after the latest documentation and fake-`d2` fixture edits. |
 
 Relevant CI fixes already landed:
 
@@ -244,7 +253,7 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Push the local external-transform CI fix and verify a green CI run across
+1. Push the local fake-`d2` fixture fix and verify a green CI run across
    browser workflows and the desktop matrix.
 2. Expand browser coverage for file operations, workspace restore, conflicts,
    preview navigation, scroll sync, transform settings, export progress, and

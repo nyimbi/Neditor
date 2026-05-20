@@ -24,7 +24,8 @@ Current survey inputs:
   watcher modules under `src-tauri/src/`
 - Backend tests under `src-tauri/src/tests/`
 - CI workflow: `.github/workflows/ci.yml`
-- Current GitHub Actions evidence for commits `9a6d52e` and `25f7b04`
+- Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`, and
+  `5c29914`
 
 Status vocabulary:
 
@@ -74,18 +75,19 @@ modules after behavior is locked.
 
 Latest pushed commit inspected before this fix:
 
-- `25f7b04 Keep optional Pikchr proof compatible with CI`
+- `5c29914 Keep CI paths and Pikchr invocation portable`
 
 Latest GitHub Actions run inspected:
 
-- Run `26132634911` on commit `25f7b04`
-- Overall result: failed
+- Run `26133136580` on commit `5c29914`
+- Overall result: failed while the Windows desktop job was still finishing
 - Browser workflow job: passed
 - macOS desktop job: passed
-- Windows desktop job: failed at Rust backend tests
+- Windows desktop job: in progress at inspection time, but the formerly
+  failing Rust backend tests, frontend tests, and frontend build had passed
 - Ubuntu desktop job: failed at Rust backend tests
 
-CI evidence from run `26132634911`:
+CI evidence from run `26133136580`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`.
@@ -93,23 +95,22 @@ CI evidence from run `26132634911`:
   Rust tests, frontend unit tests, frontend build, and Tauri `--no-bundle`
   desktop build.
 - Windows desktop passed setup, Rust formatting, Rust check, native-watch check,
-  and clippy, then failed `cargo test --locked` in path-sensitive file,
-  workspace, and media export tests. The failing tests were
-  `stable_file_ipc_aliases_open_save_as_and_watch_paths`,
-  `workspace_listing_skips_hidden_and_build_artifacts`,
-  `export_packages_local_figure_media_relative_to_source_file`, and
-  `markdown_bundle_keeps_duplicate_include_basenames_distinct`.
+  clippy, Rust tests, frontend unit tests, and frontend build. That proves the
+  slash-normalized path serialization fixed the four earlier Windows Rust-test
+  failures from run `26132634911`.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, and clippy, then failed
   `cargo test --locked` in
-  `external_transform_conformance_runs_installed_engines`. The prior
-  no-argument failure is fixed, but the follow-up run showed that CI's
-  `pikchr-cli` treats its positional argument as a file path and failed when
-  NEditor passed the raw source string.
-- Local changes now normalize IPC/export paths to slash-separated strings and
-  adapt `pikchr-cli` by passing a temporary `.pikchr` file path. These changes
-  pass focused local verification, but the follow-up GitHub Actions run is
-  still required before the desktop CI blocker can be closed.
+  `external_transform_adapters_shape_engine_specific_invocations`.
+  `external_transform_conformance_runs_installed_engines` passed, proving the
+  `pikchr-cli` temporary source-file invocation fixed the prior installed
+  Pikchr conformance blocker.
+- The current Ubuntu failure is a test-fixture portability issue: the fake `d2`
+  adapter exited without reading stdin, which Linux surfaces as
+  `Broken pipe (os error 32)` from the writer thread. Local changes now make the
+  fake `d2` adapter consume stdin before printing its SVG. Focused and full
+  Rust verification pass locally; the follow-up GitHub Actions run is still
+  required before the desktop CI blocker can be closed.
 
 Recent local verification evidence from this buildout:
 
@@ -131,9 +132,10 @@ Recent local verification evidence from this buildout:
   path serialization.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed after the
   latest Pikchr/path fixes.
-- `cargo test --locked`: passed after the latest Pikchr/path fixes with 126
-  Rust tests.
-- `git diff --check`: passed after the latest documentation and code edits.
+- `cargo test --locked`: passed after the latest Pikchr/path and fake-`d2`
+  fixture fixes with 126 Rust tests.
+- `git diff --check`: passed after the latest documentation and fake-`d2`
+  fixture edits.
 
 Known local environment caveat:
 
@@ -145,12 +147,13 @@ Known local environment caveat:
 
 ### 1. Verify The Desktop CI Fix
 
-Status: second local fix implemented; remote CI verification pending.
+Status: third local fix implemented; remote CI verification pending.
 
 The latest desktop CI failures have local fixes. Push and verify the next
-GitHub Actions run before widening the feature surface. Keep the older run
-`26131929125` in mind because it explains why the Unix-only cache-helper fix
-exists, but the current blockers are from run `26132634911`.
+GitHub Actions run before widening the feature surface. Keep the older runs
+`26131929125` and `26132634911` in mind because they explain why the Unix-only
+cache-helper, slash-normalized path serialization, and `pikchr-cli` temporary
+source-file fixes exist. The current blocker is from run `26133136580`.
 
 Resolved previous Windows clippy failure:
 
@@ -172,7 +175,7 @@ Completion criteria:
 - `cargo clippy --locked --all-targets -- -D warnings` passes locally.
 - Follow-up Windows CI reached Rust backend tests in run `26132634911`.
 
-Current Windows failure:
+Resolved Windows path failure:
 
 - Command: `cargo test --locked`
 - Job: `Desktop build (windows-latest)`
@@ -193,11 +196,13 @@ Local fix:
 
 Completion criteria:
 
-- Windows CI passes the four previously failing Rust tests.
+- Windows CI passes the four previously failing Rust tests. Run `26133136580`
+  reached and passed Windows Rust tests, frontend unit tests, and frontend
+  build; wait for the full Windows desktop job result in the follow-up run.
 - The path normalization does not break local file commands, Git commands,
   external engine execution, or export artifact references.
 
-Ubuntu failure:
+Resolved Ubuntu installed-Pikchr failure:
 
 - Command: `cargo test --locked`
 - Job: `Desktop build (ubuntu-22.04)`
@@ -219,11 +224,36 @@ Local fix:
 
 Completion criteria:
 
-- The Pikchr external adapter detects the installed CLI contract correctly, or
-  the CI-installed executable is replaced with a compatible engine invocation.
+- The Pikchr external adapter detects the installed CLI contract correctly.
+  Run `26133136580` reached and passed
+  `external_transform_conformance_runs_installed_engines`.
 - The test still proves real installed-engine conformance; do not weaken it
   into a mock-only pass.
 - Linux CI passes optional-engine installation, clippy, and Rust tests.
+
+Current Ubuntu fixture failure:
+
+- Command: `cargo test --locked`
+- Job: `Desktop build (ubuntu-22.04)`
+- Run: `26133136580`
+- Failing test:
+  `external_transform_adapters_shape_engine_specific_invocations`
+- Failure: the fake `d2` adapter exited successfully without consuming stdin,
+  so Linux reported `Broken pipe (os error 32)` while the test writer thread
+  was still sending source input.
+
+Local fix:
+
+- The fake `d2` adapter now drains stdin with `cat >/dev/null` before printing
+  the SVG fixture output. This preserves real adapter stdin behavior while
+  making the fixture portable on Linux.
+
+Completion criteria:
+
+- Ubuntu CI passes `external_transform_adapters_shape_engine_specific_invocations`.
+- The real installed-engine conformance test remains enabled and passing.
+- Do not mask stdin write failures in production adapter code to compensate for
+  a mock that ignores stdin.
 
 ### 2. Keep The Browser Workflow Lane Passing While Expanding It
 
@@ -376,12 +406,14 @@ Completion criteria:
 
 ### 7. External Transform Platform Evidence
 
-Status: Linux evidence exists but currently fails Pikchr conformance; macOS and
-Windows optional-engine evidence is incomplete.
+Status: Linux installed-engine evidence now reaches Pikchr conformance locally
+and in the latest CI run; the active Linux blocker is a fake-`d2` fixture stdin
+failure. macOS and Windows optional-engine evidence is incomplete.
 
 Finish:
 
-- Fix Linux Pikchr installed-engine conformance.
+- Verify the Linux fake-`d2` stdin fixture fix in CI while keeping installed
+  Pikchr conformance passing.
 - Keep Graphviz/DOT, D2, PlantUML, and Pikchr as real optional-engine CI proof
   where available.
 - Add macOS manual or CI evidence for all optional engines.
