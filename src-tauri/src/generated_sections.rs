@@ -1,9 +1,17 @@
 use crate::{
     bibliography::BibliographyEntry,
+    compiler_support::fenced_code_marker,
+    document_ast::{extract_label, extract_quoted_attribute},
     indexing::{render_index_entries, IndexEntry},
     Heading,
 };
 use serde_json::Value;
+
+#[derive(Debug)]
+struct CaptionEntry {
+    id: Option<String>,
+    label: String,
+}
 
 pub(crate) fn inject_generated_sections(
     text: &str,
@@ -33,6 +41,27 @@ pub(crate) fn inject_generated_sections(
             output = format!("## Table of Contents\n\n{toc}\n\n{output}");
         }
     }
+    if output.contains("[LIST_OF_FIGURES]")
+        || metadata_bool(metadata, &["listOfFigures", "list_of_figures"])
+    {
+        let list = render_caption_list("Figure", &collect_figure_entries(&output));
+        output = output.replace(
+            "[LIST_OF_FIGURES]",
+            &format!("## List of Figures\n\n{list}"),
+        );
+        if !text.contains("[LIST_OF_FIGURES]") {
+            output = format!("## List of Figures\n\n{list}\n\n{output}");
+        }
+    }
+    if output.contains("[LIST_OF_TABLES]")
+        || metadata_bool(metadata, &["listOfTables", "list_of_tables"])
+    {
+        let list = render_caption_list("Table", &collect_table_entries(&output));
+        output = output.replace("[LIST_OF_TABLES]", &format!("## List of Tables\n\n{list}"));
+        if !text.contains("[LIST_OF_TABLES]") {
+            output = format!("## List of Tables\n\n{list}\n\n{output}");
+        }
+    }
     if output.contains("[INDEX]") {
         let index = render_index_entries(index_entries);
         output = output.replace("[INDEX]", &format!("## Index\n\n{index}"));
@@ -47,6 +76,149 @@ pub(crate) fn inject_generated_sections(
             "[BIBLIOGRAPHY]",
             &format!("## Bibliography\n\n{references}"),
         );
+    }
+    output
+}
+
+fn metadata_bool(metadata: &Value, keys: &[&str]) -> bool {
+    keys.iter()
+        .any(|key| metadata.get(*key).and_then(Value::as_bool).unwrap_or(false))
+}
+
+fn render_caption_list(kind: &str, entries: &[CaptionEntry]) -> String {
+    if entries.is_empty() {
+        return "- No entries.".to_string();
+    }
+    entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            let text = format!("{kind} {}: {}", index + 1, entry.label);
+            if let Some(id) = &entry.id {
+                format!("- [{text}](#{id})")
+            } else {
+                format!("- {text}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn collect_figure_entries(text: &str) -> Vec<CaptionEntry> {
+    let mut entries = Vec::new();
+    let mut fence_marker = None;
+    for line in text.lines() {
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
+            continue;
+        }
+        if let Some(entry) = figure_entry_from_line(line) {
+            entries.push(entry);
+        }
+    }
+    entries
+}
+
+fn figure_entry_from_line(line: &str) -> Option<CaptionEntry> {
+    let image_start = line.find("![")?;
+    let alt_start = image_start + 2;
+    let alt_end = line[alt_start..].find(']')? + alt_start;
+    let alt = clean_inline_text(&line[alt_start..alt_end]);
+    let after_alt = line[alt_end..].trim_start();
+    if !after_alt.starts_with("](") {
+        return None;
+    }
+    let attrs = line[alt_end..].split_once('{').map(|(_, attrs)| attrs)?;
+    let attrs = attrs.trim_end_matches('}').trim();
+    let caption = extract_quoted_attribute(attrs, "caption")
+        .map(|value| clean_inline_text(&value))
+        .filter(|value| !value.is_empty())
+        .or_else(|| (!alt.is_empty()).then_some(alt))?;
+    let labelled_attrs = ["{", attrs, "}"].concat();
+    Some(CaptionEntry {
+        id: extract_label(&labelled_attrs),
+        label: caption,
+    })
+}
+
+fn collect_table_entries(text: &str) -> Vec<CaptionEntry> {
+    let mut entries = Vec::new();
+    let mut fence_marker = None;
+    let mut pending_caption: Option<CaptionEntry> = None;
+    for line in text.lines() {
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
+            pending_caption = None;
+            continue;
+        }
+        if let Some(caption) = table_caption_entry(line) {
+            pending_caption = Some(caption);
+            continue;
+        }
+        if line.trim_start().starts_with('|') {
+            if let Some(caption) = pending_caption.take() {
+                entries.push(caption);
+            }
+        } else if !line.trim().is_empty() {
+            pending_caption = None;
+        }
+    }
+    entries
+}
+
+fn table_caption_entry(line: &str) -> Option<CaptionEntry> {
+    let trimmed = line.trim();
+    if !trimmed.to_ascii_lowercase().starts_with("table:") {
+        return None;
+    }
+    let id = extract_label(trimmed);
+    let label = extract_quoted_attribute(trimmed, "caption")
+        .map(|value| clean_inline_text(&value))
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            let without_prefix = trimmed.trim_start_matches(|ch: char| ch != ':');
+            let without_prefix = without_prefix.trim_start_matches(':').trim();
+            let before_attrs = without_prefix.split("{#").next().unwrap_or("").trim();
+            (!before_attrs.is_empty()).then(|| clean_inline_text(before_attrs))
+        })?;
+    Some(CaptionEntry { id, label })
+}
+
+fn clean_inline_text(text: &str) -> String {
+    strip_html_tags(
+        text.split("{#")
+            .next()
+            .unwrap_or(text)
+            .replace("**", "")
+            .replace(['*', '`'], "")
+            .trim(),
+    )
+    .trim()
+    .to_string()
+}
+
+fn strip_html_tags(text: &str) -> String {
+    let mut output = String::new();
+    let mut in_tag = false;
+    for ch in text.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => output.push(ch),
+            _ => {}
+        }
     }
     output
 }

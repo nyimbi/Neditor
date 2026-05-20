@@ -179,6 +179,10 @@ Recent pushed checkpoints visible in current git history:
   front matter document set, dragging a loose tab into an existing document
   set, saving the generated `documentSet` front matter, and closing that group
   without disturbing other open groups.
+- This update adds generated `[LIST_OF_FIGURES]` and `[LIST_OF_TABLES]`
+  support, including front matter aliases, fence-aware caption scanning,
+  numbered anchor links, and Rust compiler/export proof for compiled Markdown,
+  preview HTML, and DOCX artifact text.
 
 ## Current Capability Snapshot
 
@@ -194,8 +198,8 @@ Implemented or substantially present, pending the conservative caveats in
   history/diff/commit/tag/restore, and guarded saves.
 - Compiler pipeline for front matter, includes, variables, transforms,
   formulas, citations, bibliography, glossary, index, cross references, review
-  comments, AI provenance, semantic AST, paged document model, diagnostics,
-  source maps, and export manifests.
+  comments, AI provenance, generated lists of figures/tables, semantic AST,
+  paged document model, diagnostics, source maps, and export manifests.
 - Export modules for HTML, PDF, DOCX, PPTX, and Markdown bundle outputs.
 - Transform registry with Rust-native renderers/fallbacks and trust-gated
   external adapters for Graphviz/DOT, D2, PlantUML, and Pikchr.
@@ -515,6 +519,13 @@ Additional document grouping workflow verification:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the grouping workflow. |
 | `git diff --check` | Pass | No whitespace errors after adding the grouping workflow and docs. |
 | Markdown local link resolution script | Pass | Updated markdown docs contain no broken local links. |
+
+Additional caption-list export verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after generated-section changes. |
+| `cargo test --locked compiler_generates_lists_of_figures_and_tables --lib` in `src-tauri` | Pass | Focused test proves generated list markers, numbering, anchors, fenced-example exclusion, preview HTML, and DOCX artifact text. |
 
 Archived remote workflow evidence log:
 

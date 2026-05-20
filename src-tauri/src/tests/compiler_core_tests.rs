@@ -315,6 +315,68 @@ fn compiler_honors_toc_depth_and_numbering() {
 }
 
 #[test]
+fn compiler_generates_lists_of_figures_and_tables() {
+    let response = compile(CompileRequest {
+        text: [
+            "---",
+            "title: Caption Lists",
+            "status: approved",
+            "approvedBy: QA",
+            "---",
+            "# Caption Lists",
+            "",
+            "[LIST_OF_FIGURES]",
+            "",
+            "[LIST_OF_TABLES]",
+            "",
+            "![Architecture](architecture.svg){#fig:architecture caption=\"System architecture\"}",
+            "",
+            "![Fallback alt](fallback.svg){#fig:fallback}",
+            "",
+            "Table: Revenue by region {#tbl:revenue}",
+            "| Region | Revenue |",
+            "| --- | ---: |",
+            "| East | 120 |",
+            "",
+            "```md",
+            "![Example](example.svg){#fig:example caption=\"Example only\"}",
+            "Table: Example table {#tbl:example}",
+            "| A | B |",
+            "| --- | --- |",
+            "```",
+        ]
+        .join("\n"),
+        file_path: None,
+    });
+
+    assert!(response
+        .compiled_markdown
+        .contains("## List of Figures\n\n- [Figure 1: System architecture](#fig:architecture)"));
+    assert!(response
+        .compiled_markdown
+        .contains("- [Figure 2: Fallback alt](#fig:fallback)"));
+    assert!(response
+        .compiled_markdown
+        .contains("## List of Tables\n\n- [Table 1: Revenue by region](#tbl:revenue)"));
+    assert!(!response
+        .compiled_markdown
+        .contains("Figure 3: Example only"));
+    assert!(!response
+        .compiled_markdown
+        .contains("Table 2: Example table"));
+    assert!(response.html.contains("List of Figures"));
+    assert!(response.html.contains("Figure 1: System architecture"));
+    assert!(response.html.contains("Table 1: Revenue by region"));
+
+    let docx = render_docx_bytes(&response, &json!({})).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("List of Figures"));
+    assert!(docx_document.contains("Figure 1: System architecture"));
+    assert!(docx_document.contains("List of Tables"));
+    assert!(docx_document.contains("Table 1: Revenue by region"));
+}
+
+#[test]
 fn compiler_adds_glossary_hover_terms_to_preview_html() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Glossary Hover\nstatus: approved\napprovedBy: QA\n---\n# Glossary Hover\nARR informs planning.\n\n```glossary\nARR: Annual recurring revenue.\n```\n".to_string(),

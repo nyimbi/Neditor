@@ -100,7 +100,7 @@ explicit platform checks.
 | 9.11 Index | Automatic index and exclusions | Partial | `indexing.rs`; compiler tests | UI/export proof for index options. |
 | 9.12 Bibliography | BibTeX/CSL JSON, citation syntax, rendered bibliography | Partial | `bibliography.rs`; citation tests | CSL style fidelity, UI manager workflow, duplicate-key UI. |
 | 9.13 Cross references | Figures/tables/equations/headings, broken ref diagnostics, export links | Partial | `references.rs`; citation/export tests | Full cross-target proof. |
-| 9.14 Captions | Figures/table captions, numbering, list support | Partial | AST/export/table/figure tests | List of figures/tables proof and UI workflow. |
+| 9.14 Captions | Figures/table captions, numbering, list support | Partial | AST/export/table/figure tests; `compiler_generates_lists_of_figures_and_tables` covers `[LIST_OF_FIGURES]`, `[LIST_OF_TABLES]`, caption numbering, anchor links, fenced-example exclusion, preview HTML, and DOCX artifact text | UI workflow and broader cross-target rendered proof. |
 | 9.15 Advanced layout | Page size/orientation/margins/columns/breaks/headers/footers/keeps/floats | Partial | `layout.rs`; `paged_document.rs`; export tests | Rendered/manual QA and overflow hardening. |
 | 9.16 Brand templates | Brand name/color/logo/font/header/footer/watermark/legal disclaimer | Partial | Settings UI; export option tests | Template/profile persistence and cross-target visual proof. |
 | 9.17 Review comments/change notes | Comments, unresolved validation, exports | Partial | `review.rs`; review UI; export conformance tests | UI workflow tests and native target fidelity. |

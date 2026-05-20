@@ -90,6 +90,9 @@ explicit platform checks run outside GitHub Actions.
 
 Most recent local verification evidence:
 
+- `cargo test --locked compiler_generates_lists_of_figures_and_tables --lib`:
+  passed.
+- `cargo fmt --check`: passed in `src-tauri`.
 - `pnpm exec playwright test --list`: listed 34 Chromium workflow tests,
   including document-set and folder tab grouping.
 - `pnpm run test:unit`: passed with 8 frontend unit tests.
@@ -697,6 +700,9 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   pagination/splitting.
 - Figures, captions, cover crop/fit, relative media packaging, duplicate media
   names, and missing media diagnostics.
+- Generated `[LIST_OF_FIGURES]` and `[LIST_OF_TABLES]` sections now have a
+  focused compiler/export artifact test for numbering, anchors, fenced-example
+  exclusion, preview HTML, and DOCX text.
 - Equations, numbering, references, and cross-target rendering.
 - Citations, bibliography, locators, missing keys, duplicate keys, and CSL
   behavior.
