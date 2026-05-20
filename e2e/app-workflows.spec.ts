@@ -296,6 +296,21 @@ async function installTauriMock(page: Page) {
       const sourceHash = hash(text);
       const metadata = { title, status, version: "1.0.0" };
       const diagnostics = expanded.diagnostics;
+      const diagnosticLineIndex = expanded.compiled.split("\n").findIndex((line) => line.includes("DIAGNOSTIC_TARGET"));
+      if (diagnosticLineIndex >= 0) {
+        const line = expanded.compiled.split("\n")[diagnosticLineIndex] || "";
+        diagnostics.push({
+          severity: "warning",
+          message: "Mock diagnostic target needs review.",
+          source_file: filePath,
+          line: diagnosticLineIndex + 1,
+          column: Math.max(1, line.indexOf("DIAGNOSTIC_TARGET") + 1),
+          end_line: diagnosticLineIndex + 1,
+          end_column: Math.max(1, line.indexOf("DIAGNOSTIC_TARGET") + "DIAGNOSTIC_TARGET".length + 1),
+          suggestion: "Resolve the marked diagnostic target before publishing.",
+          related: ["mock-diagnostic"],
+        });
+      }
       const manifest = {
         document_title: title,
         document_version: "1.0.0",
@@ -956,6 +971,36 @@ test("navigates source from the outline sidebar", async ({ page }) => {
   await page.locator(".sidebar").getByRole("button", { name: "Outline Target" }).click();
 
   await expect(page.locator(".cm-line").filter({ hasText: "## Outline Target" })).toBeVisible();
+  await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+});
+
+test("navigates compiler diagnostics to the source range", async ({ page }) => {
+  const diagnosticDocument = [
+    "---",
+    "title: Diagnostic Navigation",
+    "status: draft",
+    "---",
+    "",
+    "# Diagnostic Navigation",
+    "",
+    ...Array.from({ length: 20 }, (_, index) => [`## Section ${index + 1}`, "", `Context paragraph ${index + 1}.`, ""]).flat(),
+    "## Diagnostic Target",
+    "",
+    "This line contains DIAGNOSTIC_TARGET for source navigation.",
+    "",
+  ].join("\n");
+
+  await setMockFileText(page, "/workspace/diagnostic-navigation.md", diagnosticDocument);
+  await queueDialogSelection(page, "/workspace/diagnostic-navigation.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByLabel("Sidebar panel").selectOption("diagnostics");
+
+  const diagnostic = page.locator(".sidebar .diagnostic").filter({ hasText: "Mock diagnostic target needs review." });
+  await expect(diagnostic).toContainText("/workspace/diagnostic-navigation.md: line");
+  await expect(diagnostic).toContainText("Resolve the marked diagnostic target before publishing.");
+  await diagnostic.getByRole("button", { name: "Go to source" }).click();
+
+  await expect(page.locator(".cm-line").filter({ hasText: "DIAGNOSTIC_TARGET" })).toBeVisible();
   await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
 });
 

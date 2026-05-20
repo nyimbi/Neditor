@@ -808,6 +808,7 @@ Covered:
 - Word count, character count, and reading-time status-bar metrics.
 - Command-palette heading navigation.
 - Outline sidebar heading navigation to source.
+- Diagnostics-panel source navigation with line/column metadata.
 - Explicit multi-cursor command palette actions for add-cursor-above,
   add-cursor-below, and select-next-occurrence, with a browser harness workflow
   that edits matching lines through multiple cursors.
@@ -815,7 +816,7 @@ Covered:
 Finish:
 
 - Markdown syntax highlighting.
-- Diagnostics gutter accuracy and click/navigation behavior.
+- Diagnostics gutter/range visual-state local browser/native execution proof.
 - Broader Markdown shortcut edge cases.
 - Markdown shortcut local browser/native execution proof.
 - Spellcheck behavior local browser/native execution proof.

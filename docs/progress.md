@@ -161,6 +161,9 @@ Recent pushed checkpoints visible in current git history:
 - This update adds explicit Markdown format commands for bold, italic, inline
   code, and code fences, with workflow harness coverage for quote pairing,
   emphasis pairing, inline-code pairing, and fence insertion.
+- This update adds diagnostics-panel workflow coverage for a compiler
+  diagnostic with line/column metadata and source navigation back into the
+  editor.
 
 ## Current Capability Snapshot
 
@@ -217,7 +220,8 @@ Implemented or substantially present, pending the conservative caveats in
   smart list continuation, bracket/quote/emphasis/inline-code pairing,
   code-fence insertion, command-palette heading navigation, command-palette
   citation, glossary, and index navigation, outline-sidebar heading navigation,
-  command-palette open-document switching and workspace-file opening, plus
+  diagnostics-panel source navigation, command-palette open-document switching
+  and workspace-file opening, plus
   transform engine settings trust/probe diagnostics, target-specific export
   readiness manifest preview, export output/manifest path reporting, export
   success/failure diagnostics, and blocked-readiness diagnostics before file
