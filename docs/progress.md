@@ -136,6 +136,9 @@ Recent pushed checkpoints visible in current git history:
   which parse `docs/specification.md` section 25.4, the coverage table, and the
   Tauri `generate_handler!` registration so required IPC commands cannot drift
   out of the app shell unnoticed.
+- This update also records the project license as MIT in `LICENSE`,
+  `package.json`, and `src-tauri/Cargo.toml`, and removes GitHub Actions as an
+  active verification surface.
 
 ## Current Capability Snapshot
 
@@ -164,6 +167,7 @@ Implemented or substantially present, pending the conservative caveats in
 - Executable coverage for the initial Tauri IPC command list in specification
   section 25.4, backed by the human-readable
   `docs/ipc-command-coverage.md` table.
+- MIT license metadata in root, npm, and Cargo package surfaces.
 - Frontend unit coverage for table logic and conflict diff alignment.
 - Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering view mode switching, command palette table insertion, table editor
@@ -187,22 +191,25 @@ Implemented or substantially present, pending the conservative caveats in
   readiness manifest preview, export output/manifest path reporting, export
   success/failure diagnostics, and blocked-readiness diagnostics before file
   write.
-- CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
-  native-watch check, clippy, frontend unit tests, frontend build, and Tauri
-  no-bundle compile.
-- CI browser workflow job on Ubuntu with Playwright Chromium installation and
-  `pnpm run test:e2e`.
+- Local verification scripts for Rust formatting/check/test, native-watch
+  compilation, clippy, frontend unit tests, frontend build, Playwright browser
+  workflows, and Tauri no-bundle desktop compilation.
 
 ## Active Known Gaps
 
 P0 gaps:
 
-- Latest pushed code CI for commit `02e832a` is green: browser workflow, Ubuntu
+- GitHub Actions is not an active verification surface for NEditor. The
+  `.github/workflows/ci.yml` workflow has been removed, and completion gates now
+  rely on local verification evidence plus explicit rendered/manual/platform
+  proof where required.
+
+- Archived remote workflow evidence for commit `02e832a` was green: browser workflow, Ubuntu
   desktop, macOS desktop, and Windows desktop all passed in run `26159396761`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
-  in current CI.
-- Browser-level workflow tests pass in Linux CI with 28 Chromium tests in
+  in that retired workflow.
+- Browser-level workflow tests previously passed in Linux Actions with 28 Chromium tests in
   run `26159396761`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
@@ -351,7 +358,7 @@ Additional tab and stale-recent workflow verification:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
 | `pnpm exec playwright test --list` | Pass | Listed 22 Chromium workflow tests, including tab activation, dirty close confirmation, renamed recent cleanup, and deleted recently-closed pruning coverage. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "switches tabs" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
-| `pnpm exec playwright install chromium` | Interrupted | The install attempt produced no output for several minutes, so the hung process tree was terminated and CI remains the browser execution source of truth. |
+| `pnpm exec playwright install chromium` | Interrupted | The install attempt produced no output for several minutes, so the hung process tree was terminated; browser workflow proof still needs a local host where Playwright can launch Chromium. |
 | `git diff --check` | Pass | No whitespace errors after adding tab and stale-recent coverage. |
 | `gh run view 26150151349 --json status,conclusion,headSha,jobs` | Superseded failure | Commit `44c49f5` ran 20 passing browser workflows before the new tab/stale-recent test exposed title and dirty-close mock assumptions. |
 | `gh run view 26150581320 --job 76916713881 --log` | Superseded failure diagnosed | Commit `3fe0c78` still failed because the Tauri dialog mock handled `plugin:dialog\|confirm`, while installed `@tauri-apps/plugin-dialog` implements `confirm()` through `plugin:dialog\|message`. |
@@ -443,7 +450,7 @@ Additional export readiness/result workflow verification:
 | `git diff --check` | Pass | No whitespace errors after the export workflow fixes. |
 | `gh run watch 26159396761 --exit-status` | Pass | Commit `02e832a` passed 28 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
 
-Current CI evidence log:
+Archived remote workflow evidence log:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
@@ -521,13 +528,12 @@ Current CI evidence log:
 | `gh run list --branch main --limit 5 --json databaseId,headSha,status,conclusion,displayTitle,createdAt,url` | Pass | Latest pushed run for `1ac72c1` completed successfully as run `26140882880`. |
 | `gh run view 26140882880 --json jobs,conclusion,status,headSha,url` | Pass | Browser workflow tests and Ubuntu/macOS/Windows desktop builds all passed for `1ac72c1`. |
 
-Relevant CI fixes already landed:
+Archived remote-workflow fixes from before GitHub Actions was retired:
 
-- `.github/workflows/ci.yml` now installs pnpm with `pnpm/action-setup@v4`
-  before `actions/setup-node@v4` in both the desktop matrix and browser
-  workflow job.
-- `tests/frontend-unit.test.ts` now asserts that the CI workflow keeps the pnpm
-  setup step and both frontend test commands.
+- The removed workflow had installed pnpm before Node setup after earlier
+  cache failures.
+- `tests/frontend-unit.test.ts` now verifies local package scripts instead of
+  enforcing any GitHub Actions workflow.
 - `e2e/app-workflows.spec.ts` now scopes the readiness `Ready` assertion to
   `article.readiness` with an exact text match so the browser workflow remains
   strict without matching the status-bar message.

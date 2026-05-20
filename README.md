@@ -1,7 +1,5 @@
 # NEditor
 
-![CI](https://github.com/nyimbi/Neditor/actions/workflows/ci.yml/badge.svg)
-
 NEditor is a local-first Markdown workbench for serious business documents:
 board papers, consulting reports, technical architecture notes, research
 briefs, proposals, export packs, and AI-assisted drafts that still need human
@@ -191,10 +189,10 @@ cd src-tauri && cargo test --locked
 ./node_modules/.bin/tauri build --no-bundle
 ```
 
-GitHub Actions runs browser workflow tests plus desktop build jobs on Ubuntu,
-macOS, and Windows. The CI workflow covers Rust formatting/check/test, native
-watch compilation, clippy, frontend unit tests, frontend build, Playwright
-browser workflows, and Tauri `--no-bundle` desktop compilation.
+NEditor uses local verification rather than GitHub Actions. Run the commands
+above before publishing a slice. Browser workflow tests are available through
+`pnpm run test:e2e` when Playwright's local browser dependencies are installed
+and the host allows Chromium to launch.
 
 `cargo check` and `cargo test` require crates.io access the first time Rust
 dependencies are resolved. After dependencies are present, the project is
@@ -219,8 +217,8 @@ bundle compilation.
 NEditor is under active development and already has a broad implemented surface:
 compiler, workbench UI, local file flows, conflict handling, transform registry,
 review governance, AI cleanup, export readiness, export targets, example
-fixtures, and CI coverage. The remaining hardening work is tracked
-conservatively in:
+fixtures, and local verification coverage. The remaining hardening work is
+tracked conservatively in:
 
 - [Specification](docs/specification.md)
 - [External transform setup](docs/external-transforms.md)
@@ -230,3 +228,7 @@ conservatively in:
 
 Rows in the completion matrix move to complete only when current code, tests,
 workflow evidence, artifacts, and platform checks prove the requirement.
+
+## License
+
+NEditor is released under the [MIT License](LICENSE).

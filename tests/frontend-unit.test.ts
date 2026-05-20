@@ -124,13 +124,14 @@ test("AI paste insertion modes preserve workflow-specific output", () => {
   equal(applyAiPasteInsertion("# Report", "Cleaned", "appendix"), "# Report\n\n## AI Draft Appendix\n\nCleaned\n");
 });
 
-test("CI keeps frontend logic tests in the desktop platform matrix", () => {
-  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+test("local verification scripts expose frontend and browser checks", () => {
+  const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
+    scripts: Record<string, string>;
+  };
+  const { scripts } = packageJson;
 
-  ok(workflow.includes("- macos-latest"));
-  ok(workflow.includes("- ubuntu-22.04"));
-  ok(workflow.includes("- windows-latest"));
-  ok(workflow.includes("uses: pnpm/action-setup@v4"));
-  ok(workflow.includes("run: pnpm run test:unit"));
-  ok(workflow.includes("run: pnpm run test:e2e"));
+  equal(scripts.check, "vue-tsc --noEmit");
+  equal(scripts.build, "vue-tsc --noEmit && vite build");
+  equal(scripts["test:unit"], "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js");
+  equal(scripts["test:e2e"], "playwright test");
 });

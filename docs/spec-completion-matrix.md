@@ -15,19 +15,24 @@ Status vocabulary:
 This matrix is intentionally conservative. If evidence is indirect, the status
 is not "Complete".
 
+GitHub Actions is not an active verification surface for this project. Any
+older run IDs in this matrix are historical context only; current completion
+requires local command evidence, committed artifacts, rendered/manual QA, or
+explicit platform checks.
+
 ## Core Product Scope
 
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
 | 1 Purpose | Local-first business Markdown workbench | Partial | `README.md`; Tauri/Vue/Rust project layout; compiler/export modules | Full buildout still needs requirement-by-requirement verification and workflow tests. |
 | 2 Source Prompt Extension | Tauri 2, Vue 3, Pinia, Vite, vanilla CSS | Complete | `package.json`; `src/main.ts`; `src/App.vue`; `src-tauri/Cargo.toml` | Keep dependency admission docs current as test dependencies are added. |
-| 2 Source Prompt Extension | Side-by-side Markdown editor and live preview | Partial | `src/App.vue` editor/preview panes; CodeMirror setup; browser CI run `26153224371` covers synchronized editor/preview scrolling and preview heading click-to-source | Live typing/debounce proof and desktop execution. |
-| 2 Source Prompt Extension | Split, preview-only, focus/source modes | Partial | `src/App.vue` mode controls; `e2e/app-workflows.spec.ts` covers split/source/preview modes; GitHub Actions browser job passed on commit `420af08` | Focus/export/review/presentation modes and desktop execution still need proof. |
+| 2 Source Prompt Extension | Side-by-side Markdown editor and live preview | Partial | `src/App.vue` editor/preview panes; CodeMirror setup; archived browser workflow run `26153224371` covers synchronized editor/preview scrolling and preview heading click-to-source | Live typing/debounce proof and desktop execution. |
+| 2 Source Prompt Extension | Split, preview-only, focus/source modes | Partial | `src/App.vue` mode controls; `e2e/app-workflows.spec.ts` covers split/source/preview modes; archived browser workflow evidence passed on commit `420af08` | Focus/export/review/presentation modes and desktop execution still need proof. |
 | 2 Source Prompt Extension | Local new/open/save/save-as flows | Partial | `src/stores/documents.ts`; `src-tauri/src/filesystem.rs`; file command tests | Browser/desktop workflow tests for dialogs and state transitions. |
 | 2 Source Prompt Extension | Window title reflects file and dirty state | Partial | `windowTitle` getter and `setWindowTitle` in `src/App.vue` | Desktop/browser assertion for title updates. |
-| 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler; browser CI run `26154535588` covers CodeMirror search keybinding and command-palette heading search/navigation; browser CI run `26155535210` covers command-palette citation, glossary, and index navigation; browser CI run `26156393184` covers open-document switching and workspace-file command navigation | Broader shortcut coverage and native desktop command execution proof. |
+| 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler; archived browser workflow run `26154535588` covers CodeMirror search keybinding and command-palette heading search/navigation; archived browser workflow run `26155535210` covers command-palette citation, glossary, and index navigation; archived browser workflow run `26156393184` covers open-document switching and workspace-file command navigation | Broader shortcut coverage and native desktop command execution proof. |
 | 2 Source Prompt Extension | Light/dark/system theme and typography | Partial | Settings in `src/App.vue`; persisted preferences in store | Visual/accessibility verification across themes. |
-| 2 Source Prompt Extension | Cross-platform packaging | Partial | `.github/workflows/ci.yml`; `README.md` packaging note | Full bundle evidence for Windows/Linux and refreshed macOS bundle/DMG status. |
+| 2 Source Prompt Extension | Cross-platform packaging | Partial | `README.md` packaging note; local Tauri build commands | Full local/manual bundle evidence for Windows/Linux and refreshed macOS bundle/DMG status. |
 | 3 Product Positioning | Local-first document workbench, not cloud suite | Partial | Local file/snapshot/Git/export design | User documentation and fixture workflows need to prove positioning. |
 | 4 Target Users | Business, technical, research, product users | Unverified | Feature set aligns with these personas | Realistic example projects and workflows needed. |
 
@@ -35,12 +40,12 @@ is not "Complete".
 
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
-| 5.1 External File Refresh | Watch open files | Partial | `src-tauri/src/filesystem_watch.rs`; `src/stores/documents.ts`; native-watch CI check; stale-save conflict recovery is browser-proven in CI run `26139678118`; clean root-file watcher reload is browser-proven in CI run `26140882880`; clean included-file recompile and dirty included-file conflict flows are browser-proven in CI run `26145509141` | Desktop workflow tests. |
-| 5.1 External File Refresh | Non-destructive conflicts: compare, accept external, keep local, save copy | Partial | Conflict modal in `src/App.vue`; `src/lib/conflict.ts`; frontend unit diff test; browser CI run `26139678118` covers stale-save compare visibility, local-copy preservation, merge-back recovery, keep-local, and accept-external; browser CI run `26140882880` covers watcher-originated dirty root-file conflict compare visibility | Included-file conflict resolution tests and more granular line-compose controls. |
-| 5.1 External File Refresh | Watch included files and recompile master docs | Partial | Watch setup includes manifest included files; include tests; browser CI run `26145509141` covers clean included-file recompile and dirty included-file conflict workflows | Deeper include graph navigation edits. |
+| 5.1 External File Refresh | Watch open files | Partial | `src-tauri/src/filesystem_watch.rs`; `src/stores/documents.ts`; native-watch local check; stale-save conflict recovery is browser-proven in archived workflow run `26139678118`; clean root-file watcher reload is browser-proven in archived workflow run `26140882880`; clean included-file recompile and dirty included-file conflict flows are browser-proven in archived workflow run `26145509141` | Desktop workflow tests. |
+| 5.1 External File Refresh | Non-destructive conflicts: compare, accept external, keep local, save copy | Partial | Conflict modal in `src/App.vue`; `src/lib/conflict.ts`; frontend unit diff test; archived browser workflow run `26139678118` covers stale-save compare visibility, local-copy preservation, merge-back recovery, keep-local, and accept-external; archived browser workflow run `26140882880` covers watcher-originated dirty root-file conflict compare visibility | Included-file conflict resolution tests and more granular line-compose controls. |
+| 5.1 External File Refresh | Watch included files and recompile master docs | Partial | Watch setup includes manifest included files; include tests; archived browser workflow run `26145509141` covers clean included-file recompile and dirty included-file conflict workflows | Deeper include graph navigation edits. |
 | 5.2 Build Toolchain Lessons | Pinned local JS/Rust dependencies | Partial | `pnpm-lock.yaml`; `src-tauri/Cargo.lock`; README commands | Confirm no hidden global dependency remains in packaging and optional engines. |
 | 5.2 Build Toolchain Lessons | Diagnostics for missing external engines | Partial | `transforms/external.rs`; external transform tests | Cross-platform diagnostic proof and UI workflow coverage. |
-| 5.3 Business Export Customization | HTML/PDF/DOCX/PPTX exports | Partial | `src-tauri/src/export/*`; export tests; browser CI run `26159396761` covers export invocation success/failure, output and manifest path UI reporting, and readiness-blocked export before write | Artifact-level conformance, target-specific option matrices, and rendered/manual checks for each target. |
+| 5.3 Business Export Customization | HTML/PDF/DOCX/PPTX exports | Partial | `src-tauri/src/export/*`; export tests; archived browser workflow run `26159396761` covers export invocation success/failure, output and manifest path UI reporting, and readiness-blocked export before write | Artifact-level conformance, target-specific option matrices, and rendered/manual checks for each target. |
 | 5.3 Business Export Customization | Page numbering, headers/footers, logo, brand color, cover, watermark, presets, metadata | Partial | Export option tests; export shared helpers; frontend settings | Completion matrix rows for each option and visual artifact proof. |
 | 5.4 Master Documents And Includes | Include syntaxes, relative resolution, strip child front matter, circular diagnostics | Partial | Compiler/document structure tests | Add completion evidence for max depth, invalid include files, navigation, and UI include graph. |
 | 5.5 Table Of Contents | `[TOC]`, front matter TOC, depth, numbering, export formatting | Partial | Generated sections and export tests | Page-numbered TOC proof for PDF/DOCX where supported; browser preview tests. |
@@ -57,16 +62,16 @@ is not "Complete".
 | 6.2 Primary Layout | Export preview, review, presentation outline modes | Partial | Mode controls and sidebars in `src/App.vue` | Interaction tests and product QA for each mode. |
 | 6.3 Editor | CodeMirror 6 engine | Complete | CodeMirror dependencies and imports in `src/App.vue` | None beyond ongoing behavior tests. |
 | 6.3 Editor | Markdown highlighting, diagnostics gutter, decorations | Partial | CodeMirror markdown/linter/lintGutter/decorations | Tests for precise diagnostic navigation and visual states. |
-| 6.3 Editor | Line numbers, word wrap, spellcheck, find/replace, word count | Partial | Settings and CodeMirror extensions; status bar stats; browser CI run `26154535588` covers line-number and word-wrap persistence plus CodeMirror find/replace | Spellcheck proof and word/character/reading-time UI proof. |
-| 6.3 Editor | Smart list continuation and auto-pairing | Partial | `continueMarkdownList`; `closeBrackets`; browser CI run `26154535588` covers basic Markdown list continuation and bracket auto-pairing | Broader Markdown shortcuts, quote pairing, emphasis pairing, and code-fence pairing proof. |
+| 6.3 Editor | Line numbers, word wrap, spellcheck, find/replace, word count | Partial | Settings and CodeMirror extensions; status bar stats; archived browser workflow run `26154535588` covers line-number and word-wrap persistence plus CodeMirror find/replace | Spellcheck proof and word/character/reading-time UI proof. |
+| 6.3 Editor | Smart list continuation and auto-pairing | Partial | `continueMarkdownList`; `closeBrackets`; archived browser workflow run `26154535588` covers basic Markdown list continuation and bracket auto-pairing | Broader Markdown shortcuts, quote pairing, emphasis pairing, and code-fence pairing proof. |
 | 6.3 Editor | Multi-cursor support | Unverified | CodeMirror may support it by default | Decide complete/deferred and document. |
 | 6.3 Editor | Vim/emacs keybindings | Deferred | Spec says later if feasible | Record deferred unless implemented later. |
 | 6.4 Preview | Live debounced preview | Partial | Store compile on editor update; debounce in `src/App.vue` | Large-document behavior and timing tests. |
-| 6.4 Preview | Scroll sync and heading click-to-source | Partial | Preview/editor scroll handlers; click handler; browser CI run `26153224371` covers editor-to-preview scroll sync, preview-to-editor scroll sync, and rendered preview heading click-through to the source line | Desktop workflow proof and edge cases for non-heading anchors. |
+| 6.4 Preview | Scroll sync and heading click-to-source | Partial | Preview/editor scroll handlers; click handler; archived browser workflow run `26153224371` covers editor-to-preview scroll sync, preview-to-editor scroll sync, and rendered preview heading click-through to the source line | Desktop workflow proof and edge cases for non-heading anchors. |
 | 6.4 Preview | Separate preview theme, inline warnings, transform blocks, export preview | Partial | Preview theme setting; diagnostics; transform rendering; modes | UI verification and visual tests. |
-| 6.5 File Operations | New, open file, open folder, save, save as, revert, rename, duplicate, reveal | Partial | Store actions and Rust file commands; file command tests; Playwright mocked workflows cover open/save/save-as/duplicate/rename/pin/reveal/revert in CI run `26137556147`; stale-save conflict copy/merge/keep-local/accept-external recovery in CI run `26139678118`; watcher-originated root reload/conflict proof in CI run `26140882880`; included-file watcher conflict proof in CI run `26145509141` | Native desktop dialog workflow tests. |
-| 6.5 File Operations | Recent docs/folders, workspace restore | Partial | Persisted workspace store; Playwright mocked workflows cover workspace listing after open and recently closed reopening in CI run `26137556147`; browser CI run `26147556750` covers restart-style restore for open tabs, active tab, pinned state, mode/sidebar, workspace root, and recent files; browser CI run `26148828614` covers scroll restore and missing-restored-file warning coverage; browser CI run `26151184228` covers tab activation, dirty close confirmation, renamed recent cleanup, and deleted recently-closed pruning coverage; browser CI run `26152255407` covers recent folder reopen/prune behavior and externally moved recently-closed path pruning | Native desktop dialog/recent-folder proof and deeper folder/document-set grouping behavior. |
-| 6.5 File Operations | External change detection/conflict handling | Partial | Watch/conflict code and tests; browser CI run `26139678118` covers stale-save conflict blocking, compare, save-copy preservation, merge-back recovery, keep-local, and accept-external; browser CI run `26140882880` covers clean root reload and watcher-originated dirty root conflict; browser CI run `26145509141` covers clean included-file recompile and dirty included-file conflict flows | Desktop workflow proof. |
+| 6.5 File Operations | New, open file, open folder, save, save as, revert, rename, duplicate, reveal | Partial | Store actions and Rust file commands; file command tests; Playwright mocked workflows cover open/save/save-as/duplicate/rename/pin/reveal/revert in archived workflow run `26137556147`; stale-save conflict copy/merge/keep-local/accept-external recovery in archived workflow run `26139678118`; watcher-originated root reload/conflict proof in archived workflow run `26140882880`; included-file watcher conflict proof in archived workflow run `26145509141` | Native desktop dialog workflow tests. |
+| 6.5 File Operations | Recent docs/folders, workspace restore | Partial | Persisted workspace store; Playwright mocked workflows cover workspace listing after open and recently closed reopening in archived workflow run `26137556147`; archived browser workflow run `26147556750` covers restart-style restore for open tabs, active tab, pinned state, mode/sidebar, workspace root, and recent files; archived browser workflow run `26148828614` covers scroll restore and missing-restored-file warning coverage; archived browser workflow run `26151184228` covers tab activation, dirty close confirmation, renamed recent cleanup, and deleted recently-closed pruning coverage; archived browser workflow run `26152255407` covers recent folder reopen/prune behavior and externally moved recently-closed path pruning | Native desktop dialog/recent-folder proof and deeper folder/document-set grouping behavior. |
+| 6.5 File Operations | External change detection/conflict handling | Partial | Watch/conflict code and tests; archived browser workflow run `26139678118` covers stale-save conflict blocking, compare, save-copy preservation, merge-back recovery, keep-local, and accept-external; archived browser workflow run `26140882880` covers clean root reload and watcher-originated dirty root conflict; archived browser workflow run `26145509141` covers clean included-file recompile and dirty included-file conflict flows | Desktop workflow proof. |
 
 ## Compiler And Document Model
 
@@ -83,7 +88,7 @@ is not "Complete".
 | --- | --- | --- | --- | --- |
 | 9.1 Git versioning | Detect repo, branch/dirty, commit, history, diff, restore, tag | Partial | `git.rs`; `git_support.rs`; versioning UI; git workflow test | Browser/desktop workflow tests and Git-free UX validation. |
 | 9.1 Git-free snapshots | Local snapshots for non-Git users | Partial | `snapshot.rs`; snapshot UI/tests | Restore workflow through UI and storage-mode docs. |
-| 9.2 Export snapshots | Manifest with hashes/options/app/version/status/timestamp | Partial | `manifest.rs`; `export_commands.rs`; export command tests; browser CI run `26159396761` covers manifest path reporting and target-specific readiness manifest preview | Confirm all export targets write/consume manifests consistently. |
+| 9.2 Export snapshots | Manifest with hashes/options/app/version/status/timestamp | Partial | `manifest.rs`; `export_commands.rs`; export command tests; archived browser workflow run `26159396761` covers manifest path reporting and target-specific readiness manifest preview | Confirm all export targets write/consume manifests consistently. |
 | 9.3 Release workflow | Status values, badge, draft export warning, approval metadata, release tagging | Partial | Review UI; validation; Git tag command | Visual badge proof and workflow tests. |
 | 9.4 AI paste cleanup | Normalize chat output, code fences, bullets, tables, links, citations, insert modes | Partial | `ai_cleanup.rs`; AI modal; AI cleanup tests; shared insertion helper tests; Playwright coverage for insert, quote, appendix, replace document, merge into section, and replace selection modes | Clipboard behavior, provenance workflows, citation TODOs, and non-sandboxed execution. |
 | 9.5 AI provenance | `ai-source`, AI-assisted sections, export appendix | Partial | `provenance.rs`; review/provenance tests; UI toggles | Workflow and export readiness proof for unreviewed content. |
@@ -101,7 +106,7 @@ is not "Complete".
 | 9.17 Review comments/change notes | Comments, unresolved validation, exports | Partial | `review.rs`; review UI; export conformance tests | UI workflow tests and native target fidelity. |
 | 9.18 Document variables | Front matter/project/data variables | Partial | `variables.rs`; project variable tests | Filter coverage and docs. |
 | 9.19 Pikchr diagrams | Native fallback/external setup and diagnostics | Partial | `transforms/diagram.rs`; `external.rs`; transform tests | Cross-platform optional engine proof. |
-| 9.20 Validation | One-click prepare report across metadata/includes/citations/formulas/figures/transforms/settings/links/comments | Partial | `validation.rs`; `export_commands.rs`; readiness UI; browser CI run `26159396761` covers target-specific readiness diagnostics and blocked export behavior | Full readiness completeness audit and non-sandboxed/native execution. |
+| 9.20 Validation | One-click prepare report across metadata/includes/citations/formulas/figures/transforms/settings/links/comments | Partial | `validation.rs`; `export_commands.rs`; readiness UI; archived browser workflow run `26159396761` covers target-specific readiness diagnostics and blocked export behavior | Full readiness completeness audit and non-sandboxed/native execution. |
 
 ## Fenced-Code Transform System
 
@@ -110,7 +115,7 @@ is not "Complete".
 | 10.1 Architecture | Registry, option validation, artifact cache, diagnostics | Partial | `transforms/renderer.rs`; `transforms/options.rs`; `transforms/external.rs` | More option validation coverage and structured artifact use in exports. |
 | 10.2 Safety | No network, no shell, trust, timeout, output limits, source hash cache | Partial | External transform runner and tests | Cross-platform process behavior and cache identity hardening. |
 | 10.3 Core transforms | `calc`, `mermaid`, `pikchr` | Partial | Renderer and transform tests | Fidelity limitations documented; optional engine proof for Pikchr. |
-| 10.4.1 DOT/Graphviz | SVG diagrams and engines | Partial | Native fallback; external adapter; Linux CI conformance | Engine variants and Windows/macOS proof. |
+| 10.4.1 DOT/Graphviz | SVG diagrams and engines | Partial | Native fallback; external adapter; Linux installed-engine conformance | Engine variants and Windows/macOS proof. |
 | 10.4.2 PlantUML | SVG/PNG enterprise diagrams | Partial | External adapter and fallback | Real PlantUML cross-platform proof; PNG support decision. |
 | 10.4.3 D2 | SVG diagrams | Partial | External adapter and fallback | Cross-platform proof. |
 | 10.4.4 Vega-Lite | Charts | Partial | Native SVG subset in `visual_data.rs` | Document supported subset; broader Vega-Lite support or clear diagnostics. |
@@ -147,9 +152,9 @@ is not "Complete".
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
 | 19 Workspace/tab groups | Tabs, groups, pinning, recents, restore | Partial | `src/App.vue`; store persistence | Document-set grouping and workflow tests. |
-| 20 Command palette | Search commands/headings/citations/glossary/index/documents/workspace files | Partial | `commands` computed in `src/App.vue`; Playwright table insertion command test; browser CI run `26154535588` covers heading command navigation; browser CI run `26155535210` covers citation, glossary, and index command navigation; browser CI run `26156393184` covers open-document switching and workspace-file opening | Broader keyboard shortcuts and non-sandboxed/native execution. |
-| 21 Preferences | Theme, typography, export, Git, AI, transforms, recents | Partial | Settings UI; persisted workspace; browser CI run `26157446711` covers external transform path changes, input mode, timeout, trust prompt, denied trust reset, successful probe UI, and missing-executable diagnostics | Migration/schema tests and broader settings workflow coverage. |
-| 22 Security/privacy | Local-first, trust-gated executable transforms, no shell | Partial | External transform runner/tests; local file design; browser CI run `26157446711` covers transform trust prompts, path-change trust clearing, denied trust reset, and missing executable diagnostics | Security review, platform proof, threat-model docs. |
+| 20 Command palette | Search commands/headings/citations/glossary/index/documents/workspace files | Partial | `commands` computed in `src/App.vue`; Playwright table insertion command test; archived browser workflow run `26154535588` covers heading command navigation; archived browser workflow run `26155535210` covers citation, glossary, and index command navigation; archived browser workflow run `26156393184` covers open-document switching and workspace-file opening | Broader keyboard shortcuts and non-sandboxed/native execution. |
+| 21 Preferences | Theme, typography, export, Git, AI, transforms, recents | Partial | Settings UI; persisted workspace; archived browser workflow run `26157446711` covers external transform path changes, input mode, timeout, trust prompt, denied trust reset, successful probe UI, and missing-executable diagnostics | Migration/schema tests and broader settings workflow coverage. |
+| 22 Security/privacy | Local-first, trust-gated executable transforms, no shell | Partial | External transform runner/tests; local file design; archived browser workflow run `26157446711` covers transform trust prompts, path-change trust clearing, denied trust reset, and missing executable diagnostics | Security review, platform proof, threat-model docs. |
 | 23 Accessibility | Keyboard, ARIA, contrast, reduced motion | Partial | Some labels/roles/settings in UI | Accessibility audit and automated/manual checks. |
 | 24 Performance | Large docs, debounced preview, transform cache, progress | Partial | Debounce/cache/progress code | Benchmarks/stress tests and cancellation behavior. |
 
@@ -166,17 +171,17 @@ is not "Complete".
 | 27 Implementation phases | Phase deliverables | Partial | Most phase surfaces exist | Phase completion must be proven by matrix and tests. |
 | 28 Acceptance criteria | Concrete app acceptance | Partial | Current build/test surfaces | Fresh baseline plus workflow/export proof required. |
 | 29 Non-goals | Cloud collaboration and overreach controls | Partial | Local-first design | Document current non-goals in user docs. |
-| 30 Architecture decisions | Licensing, editor, parser, PDF/DOCX/PPTX/citations/formulas/transforms/snapshots/dependency gate | Partial | Implementation follows many decisions; dependency doc exists | Keep dependency admission current and document deviations. |
+| 30 Architecture decisions | Licensing, editor, parser, PDF/DOCX/PPTX/citations/formulas/transforms/snapshots/dependency gate | Partial | `LICENSE`; `package.json`; `src-tauri/Cargo.toml`; implementation follows many decisions; dependency doc exists | Keep dependency admission current and document deviations. |
 | 31 First milestone | Prove architecture with representative features | Partial | Current code strongly exceeds first milestone in breadth | Still unverified until fresh baseline and workflow tests pass. |
 
 ## External Transform Setup Matrix
 
 | Setup doc section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
-| Safety model | Real executable paths, per-engine trust, bounded execution, cache keys, fallback | Partial | `transforms/external.rs`; external transform tests; browser CI run `26157446711` covers settings-level path change trust clearing, trust prompts, denied trust reset, input mode/timeout probe details, cache identity display, and missing-executable diagnostics | Cross-platform process proof and deeper executable edge cases. |
-| macOS setup | Graphviz, D2, Pikchr, Java/PlantUML paths | Unverified | Documentation exists | Add manual/CI evidence on macOS. |
-| Linux setup | Packages and optional engines | Partial | CI installs Linux engines and sets env vars | Keep installed-engine conformance stable. |
-| Windows setup | Winget paths and shim guidance | Unverified | Documentation exists | Add manual/CI evidence on Windows. |
+| Safety model | Real executable paths, per-engine trust, bounded execution, cache keys, fallback | Partial | `transforms/external.rs`; external transform tests; archived browser workflow run `26157446711` covers settings-level path change trust clearing, trust prompts, denied trust reset, input mode/timeout probe details, cache identity display, and missing-executable diagnostics | Cross-platform process proof and deeper executable edge cases. |
+| macOS setup | Graphviz, D2, Pikchr, Java/PlantUML paths | Unverified | Documentation exists | Add manual evidence on macOS. |
+| Linux setup | Packages and optional engines | Partial | Historical workflow installed Linux engines; current proof requires local installed-engine checks | Keep installed-engine conformance stable. |
+| Windows setup | Winget paths and shim guidance | Unverified | Documentation exists | Add manual evidence on Windows. |
 | Engine defaults | stdin/file modes by engine | Partial | Adapter profiles and tests | Cross-platform confirmation, especially PlantUML file mode. |
 | Troubleshooting | Permission, empty output, timeout, trust disabled, cache stale | Partial | Diagnostics/failure hints | UI docs and platform-specific cases. |
 
@@ -188,16 +193,17 @@ Current direct evidence:
   behaviors under `src-tauri/src/tests/`.
 - Frontend unit tests cover table parsing/serialization and conflict diff
   alignment under `tests/frontend-unit.test.ts`.
-- CI runs on macOS, Ubuntu, and Windows and includes Rust checks/tests, frontend
-  unit tests, frontend build, and Tauri no-bundle compile.
+- Local verification covers Rust checks/tests, frontend unit tests, frontend
+  build, and Tauri no-bundle compile when run on the current host.
 
 Current major verification gaps:
 
-- Latest pushed code CI on commit `02e832a` is green across browser workflows and
+- Archived remote workflow evidence on commit `02e832a` was green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
-  fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26159396761` with 28
+  fake-`d2` stdin fixture failure were resolved there. This is historical
+  evidence only, not the current verification source.
+- Browser-level workflow harness previously passed in Linux Actions run `26159396761` with 28
   Chromium tests, including advanced table editor coverage, mocked file
   lifecycle coverage, save-as, recently closed reopening, and stale-save
   conflict copy/merge/keep-local/accept-external recovery plus watcher-originated
@@ -221,9 +227,9 @@ Current major verification gaps:
   installation in the sandbox fails with `EPERM` while creating
   `/Users/nyimbiodero/Library/Caches/ms-playwright/__dirlock`.
 - No desktop WebDriver/Tauri-driver workflow test harness.
-- Current committed browser workflow evidence exists, and the desktop CI matrix
-  is currently green, but desktop user journeys are still not covered by a
-  WebDriver/Tauri-driver harness.
+- Current committed browser workflow tests exist, but local browser execution
+  depends on Playwright browser installation and host permissions; desktop user
+  journeys are still not covered by a WebDriver/Tauri-driver harness.
 - Export tests rely heavily on package/text assertions; visual/rendered quality
   remains under-proven.
 - Optional external transform engines are proven most strongly on Linux; macOS

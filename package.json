@@ -2,6 +2,7 @@
   "name": "neditor",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "packageManager": "pnpm@11.1.2",
   "type": "module",
   "scripts": {

@@ -5,7 +5,7 @@ Updated: 2026-05-20
 This is the active, evidence-based backlog for finishing NEditor against
 `docs/specification.md` and `docs/external-transforms.md`. It replaces the stale
 todo state from earlier implementation phases. Do not treat broad implemented
-surfaces as complete until the current code, tests, CI, artifacts, and workflow
+surfaces as complete until the current code, tests, artifacts, local workflow
 checks prove the exact requirement.
 
 ## Survey Basis
@@ -23,10 +23,8 @@ Current survey inputs:
 - Backend compiler, export, transform, file, Git, snapshot, validation, and
   watcher modules under `src-tauri/src/`
 - Backend tests under `src-tauri/src/tests/`
-- CI workflow: `.github/workflows/ci.yml`
-- Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
-  `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `02e832a`
+- Local verification scripts in `package.json`, `playwright.config.ts`, and
+  Rust/Cargo checks under `src-tauri`
 
 Status vocabulary:
 
@@ -63,13 +61,15 @@ NEditor is no longer a basic scaffold. The repository currently contains:
 - An executable IPC coverage guard for the initial command surface in
   specification section 25.4, plus `docs/ipc-command-coverage.md` as the
   human-readable command evidence table.
+- MIT licensing in `LICENSE`, `package.json`, and `src-tauri/Cargo.toml`.
 - Frontend unit tests for table parsing/serialization, conflict diff alignment,
-  AI paste insertion modes, conflict merge-line composition, and CI workflow
-  command coverage.
+  AI paste insertion modes, conflict merge-line composition, and local
+  verification script coverage.
 - A Playwright browser workflow harness for the Vite-rendered workbench with a
   browser-side Tauri IPC mock.
-- CI jobs for browser workflows and desktop builds on macOS, Ubuntu, and
-  Windows.
+- Local verification commands for frontend logic, browser workflows, Rust
+  checks/tests, native-watch compilation, static analysis, frontend builds, and
+  Tauri desktop compilation.
 
 The remaining work is primarily about workflow proof, artifact fidelity,
 cross-platform validation, and reducing risk in oversized modules after
@@ -81,16 +81,22 @@ Latest pushed code commit inspected:
 
 - `02e832a Export current editor state before readiness`
 
-Latest fully completed green GitHub Actions run inspected:
+Remote GitHub Actions are not an active verification surface for this project.
+Older run references below are retained only as historical debugging context and
+must not be used as completion evidence for new work. Current completion proof
+comes from local command output, committed artifacts, rendered/manual QA, and
+explicit platform checks run outside GitHub Actions.
 
-- Run `26159396761` on commit `02e832a`
-- Overall result: passed
-- Browser workflow job: passed
-- Ubuntu desktop job: passed
-- macOS desktop job: passed
-- Windows desktop job: passed
+Most recent local verification evidence:
 
-CI evidence from run `26159396761`:
+- `cargo test --locked spec_25_4_ipc_commands_are_registered_and_documented --lib`: passed.
+- `cargo test --locked`: passed locally with 129 Rust tests.
+- `cargo fmt --check`: passed in `src-tauri`.
+- `cargo clippy --locked --all-targets -- -D warnings`: passed in `src-tauri`.
+- `git diff --check`: passed.
+- Markdown local link resolution for README and updated docs: passed.
+
+Archived remote workflow evidence from retired GitHub Actions:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
@@ -393,20 +399,29 @@ Known local environment caveat:
 
 - Full Playwright execution in this macOS sandbox reaches Chromium launch, then
   fails before app assertions because Chromium cannot register its Mach
-  bootstrap port. Linux CI is the current browser workflow source of truth.
+  bootstrap port. This remains a local host limitation, not a reason to use
+  GitHub Actions as a source of truth.
 
 ## P0 - Immediate Blockers
 
-### 1. Verify The Desktop CI Fix
+### 1. Keep Local Verification Green
 
-Status: complete for current CI.
+Status: active.
 
-The latest desktop CI failures are fixed and verified in GitHub Actions run
-`26134248308`. Earlier green run `26133595556` first proved the desktop matrix
-fixes; keep older runs `26131929125`, `26132634911`, and `26133136580` in mind
-because they explain why the Unix-only cache-helper, slash-normalized path
-serialization, `pikchr-cli` temporary source-file, and fake-`d2` stdin-drain
-fixes exist.
+GitHub Actions has been removed from the project. The local baseline must stay
+green before claiming a slice is complete:
+
+- `pnpm run test:unit`
+- `pnpm run build`
+- `cd src-tauri && cargo fmt --check`
+- `cd src-tauri && cargo check --locked`
+- `cd src-tauri && cargo check --locked --features native-watch`
+- `cd src-tauri && cargo clippy --locked --all-targets -- -D warnings`
+- `cd src-tauri && cargo test --locked`
+- `./node_modules/.bin/tauri build --no-bundle`
+
+Older remote run notes in this file explain past fixes only; do not use them as
+current completion evidence.
 
 Resolved previous Windows clippy failure:
 
@@ -426,7 +441,7 @@ Completion criteria:
 - The helper is compiled only where it is used, used by tests on every target,
   or annotated with a narrowly justified lint expectation.
 - `cargo clippy --locked --all-targets -- -D warnings` passes locally.
-- Follow-up Windows CI reached Rust backend tests in run `26132634911`.
+- Archived Windows remote workflow reached Rust backend tests in run `26132634911`.
 
 Resolved Windows path failure:
 
@@ -449,7 +464,7 @@ Local fix:
 
 Completion criteria:
 
-- Windows CI passes the four previously failing Rust tests and the full desktop
+- Archived Windows remote workflow passes the four previously failing Rust tests and the full desktop
   job in runs `26133595556` and `26134248308`.
 - The path normalization does not break local file commands, Git commands,
   external engine execution, or export artifact references.
@@ -481,7 +496,8 @@ Completion criteria:
   `external_transform_conformance_runs_installed_engines`.
 - The test still proves real installed-engine conformance; do not weaken it
   into a mock-only pass.
-- Linux CI passes optional-engine installation, clippy, and Rust tests.
+- Local installed-engine checks pass where the optional engines are installed;
+  otherwise record the missing engine as an explicit platform gap.
 
 Resolved Ubuntu fixture failure:
 
@@ -502,7 +518,7 @@ Local fix:
 
 Completion criteria:
 
-- Ubuntu CI passes `external_transform_adapters_shape_engine_specific_invocations`.
+- Local Ubuntu/Linux proof passes `external_transform_adapters_shape_engine_specific_invocations` where optional engines are installed.
   Verified in runs `26133595556` and `26134248308`.
 - The real installed-engine conformance test remains enabled and passing.
 - Do not mask stdin write failures in production adapter code to compensate for
@@ -590,10 +606,8 @@ Required next coverage:
 
 Completion criteria:
 
-- Browser workflow tests continue passing in Linux CI; the mocked file
-  lifecycle workflow, save-as/recently closed reopening, and stale-save
-  conflict copy/merge/keep-local/accept-external workflows are CI-proven in run
-  `26139678118`.
+- Browser workflow tests run locally with `pnpm run test:e2e` on hosts where
+  Playwright browser installation and Chromium launch are available.
 - Local sandbox limitations remain documented but are not used as completion
   evidence.
 - Browser coverage failures drive implementation fixes rather than broad
@@ -620,8 +634,8 @@ Completion criteria:
 
 - Use Tauri-driver/WebDriver or another project-appropriate desktop smoke
   harness without weakening the browser harness.
-- Add CI only after the smoke harness is stable enough not to create persistent
-  noise.
+- Do not add GitHub Actions for this smoke harness; keep it local/manual unless
+  the project policy changes.
 
 ### 4. Maintain The Requirement Matrix And Progress Log
 
@@ -637,7 +651,7 @@ Required maintenance:
 
 - Update all three whenever a verified slice changes the evidence.
 - Keep completion claims conservative.
-- Link requirement rows to exact code paths, tests, CI jobs, manual artifacts,
+- Link requirement rows to exact code paths, tests, local command output, manual artifacts,
   or screenshots.
 - Record failed verification as directly as passed verification.
 
@@ -713,12 +727,12 @@ optional-engine evidence is incomplete.
 
 Finish:
 
-- Preserve Linux installed-engine conformance in CI while expanding optional
-  engine proof beyond Linux.
-- Keep Graphviz/DOT, D2, PlantUML, and Pikchr as real optional-engine CI proof
+- Preserve installed-engine conformance locally where engines are available
+  while expanding optional engine proof beyond Linux.
+- Keep Graphviz/DOT, D2, PlantUML, and Pikchr as real optional-engine proof
   where available.
-- Add macOS manual or CI evidence for all optional engines.
-- Add Windows manual or CI evidence for all optional engines.
+- Add macOS manual evidence for all optional engines.
+- Add Windows manual evidence for all optional engines.
 - Confirm Windows `.exe` paths and package-manager shims.
 - Confirm PlantUML file mode on all platforms.
 - Confirm Pikchr stdin/file/argument mode for each supported executable shape.
@@ -730,22 +744,23 @@ Finish:
 ### 8. File Watcher And Conflict Workflows
 
 Status: backend and UI exist; stale-save conflict copy/merge/keep-local/
-accept-external workflow proof is present in browser CI. Clean watcher reload
-and watcher-originated dirty root-file conflict proof are also present in
-browser CI. Clean included-file recompile and dirty included-file conflict proof
-are also present in browser CI run `26145509141`.
+accept-external workflow proof exists in archived browser workflow evidence.
+Clean watcher reload and watcher-originated dirty root-file conflict proof are
+also present in archived browser workflow evidence. Clean included-file
+recompile and dirty included-file conflict proof are also present in archived
+browser workflow run `26145509141`.
 
 Finish:
 
-- Clean external reload for unchanged local documents. Browser CI run
+- Clean external reload for unchanged local documents. Browser archived workflow run
   `26140882880` covers this for root-file changes.
-- Dirty root-file conflict through UI. Browser CI run `26140882880` covers this
+- Dirty root-file conflict through UI. Browser archived workflow run `26140882880` covers this
   for watcher-originated root-file changes.
 - Dirty included-file conflict and master recompilation through UI. Browser CI
   run `26145509141` covers clean included-file recompile and dirty
   included-file conflict handling.
 - Save-race conflict when a file changes after the last watcher event but
-  before save. Browser CI run `26139678118` covers the stale-save conflict path
+  before save. Browser archived workflow run `26139678118` covers the stale-save conflict path
   through compare, save-copy preservation, merge-back recovery, keep-local, and
   accept-external.
 - Multi-tab watcher switching beyond the current tab-activation proof.
@@ -764,21 +779,21 @@ Finish:
 - Explicit document-set grouping from front matter metadata if required by the
   spec interpretation.
 - Restart restore of previous workspace, active tab, mode/sidebar state, and
-  pinned state. Browser CI run `26147556750` covers this workflow.
-- Scroll position restore. Browser CI run `26148828614` covers this workflow.
+  pinned state. Browser archived workflow run `26147556750` covers this workflow.
+- Scroll position restore. Browser archived workflow run `26148828614` covers this workflow.
 - Recently closed behavior for renamed and deleted files, plus dirty unsaved
-  close confirmation. Browser CI run `26151184228` covers this workflow.
+  close confirmation. Browser archived workflow run `26151184228` covers this workflow.
 - Recent folder reopening and stale recent-folder pruning, plus externally
-  moved recently-closed file pruning. Browser CI run `26152255407` covers this
+  moved recently-closed file pruning. Browser archived workflow run `26152255407` covers this
   workflow.
-- Clear UX for missing documents during restore. Browser CI run `26148828614`
+- Clear UX for missing documents during restore. Browser archived workflow run `26148828614`
   covers this workflow.
 - Matrix entry that split editor panes are deferred/later if not implemented.
 
 ### 10. Editor Ergonomics
 
 Status: CodeMirror is integrated; browser proof now covers the first
-interaction slice in CI run `26154535588`.
+interaction slice in archived workflow run `26154535588`.
 
 Covered:
 
@@ -961,7 +976,7 @@ Constraints:
 
 ### 20. Backend Modularization
 
-Status: continue opportunistically after green CI.
+Status: continue opportunistically after local verification is green.
 
 Large/high-risk files:
 
@@ -1083,7 +1098,8 @@ true:
 - `docs/spec-completion-matrix.md` has current evidence for every requirement.
 - `docs/progress.md` has current verification results.
 - Backend tests, frontend tests, typecheck/build, clippy, native-watch check,
-  browser workflow tests, and desktop compile pass on the current commit in CI.
+  browser workflow tests where locally runnable, and desktop compile pass on
+  the current commit through local verification.
 - Browser workflow coverage proves the main mocked-IPC frontend journeys.
 - Desktop workflow coverage proves the main native Tauri journeys.
 - Export fixtures prove the required business-document outputs.

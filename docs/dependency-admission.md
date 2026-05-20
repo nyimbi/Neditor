@@ -29,7 +29,7 @@ This record satisfies the dependency admission gate in `docs/specification.md`.
 | Package | Version | License expectation | Purpose | Packaging | Simpler in-house alternative | Export/security impact |
 | --- | --- | --- | --- | --- | --- | --- |
 | `@tauri-apps/cli` | `^2` | MIT/Apache-2.0 | Tauri development/build CLI | Dev-only | Required by Tauri | Build-time only |
-| `@playwright/test` | `^1.60.0` | Apache-2.0 | Browser workflow testing for the Vite-rendered workbench | Dev-only | Manual browser QA or DOM-only tests would miss interaction regressions | Test-only; CI installs Chromium for the browser workflow job |
+| `@playwright/test` | `^1.60.0` | Apache-2.0 | Browser workflow testing for the Vite-rendered workbench | Dev-only | Manual browser QA or DOM-only tests would miss interaction regressions | Test-only; local Playwright browser installation is required before running browser workflows |
 | `@vitejs/plugin-vue` | `^5.2.1` | MIT | Vue SFC compilation | Dev-only | Required for Vue/Vite | Build-time only |
 | `typescript` | `~5.6.2` | Apache-2.0 | Type checking | Dev-only | Not appropriate | Build-time only |
 | `vite` | `^6.0.3` | MIT | Frontend build server/bundler | Dev-only | Required by scaffold | Build-time only |
@@ -54,4 +54,4 @@ This record satisfies the dependency admission gate in `docs/specification.md`.
 | `pulldown-cmark` | `0.13` | MIT | Markdown-to-HTML preview/export | Linked library | In-house Markdown parser is not practical | HTML output must escape safely |
 | `sha2` | `0.10` | MIT/Apache-2.0 | Source/include/export hashes | Linked library | In-house SHA-256 is inappropriate | Manifest integrity |
 | `zip` | `2.4` | MIT | Minimal DOCX/PPTX package writing | Linked library | Handwriting ZIP is inappropriate | Export artifact integrity |
-| `notify` | `8.2.0` | CC0-1.0 | Rust watcher backend for root/include refresh when the `native-watch` feature is enabled | Optional linked library, disabled by default | Tauri fs watcher remains the default UI path; Rust watcher gives the backend an event source for packaged/native workflows | Local filesystem events only; feature is covered by CI because macOS requires platform watcher crates not always present offline |
+| `notify` | `8.2.0` | CC0-1.0 | Rust watcher backend for root/include refresh when the `native-watch` feature is enabled | Optional linked library, disabled by default | Tauri fs watcher remains the default UI path; Rust watcher gives the backend an event source for packaged/native workflows | Local filesystem events only; verify with `cargo check --locked --features native-watch` |
