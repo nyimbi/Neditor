@@ -131,6 +131,11 @@ Recent pushed checkpoints visible in current git history:
   output and manifest path reporting, success and writer-failure diagnostics,
   blocked export diagnostics before file write, and an immediate editor-state
   flush before export readiness runs.
+- This update adds `docs/ipc-command-coverage.md` and
+  `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented`,
+  which parse `docs/specification.md` section 25.4, the coverage table, and the
+  Tauri `generate_handler!` registration so required IPC commands cannot drift
+  out of the app shell unnoticed.
 
 ## Current Capability Snapshot
 
@@ -156,6 +161,9 @@ Implemented or substantially present, pending the conservative caveats in
   and review/release metadata.
 - Backend test coverage across many compiler, export, transform, table,
   validation, media, file, Git, snapshot, review, and provenance paths.
+- Executable coverage for the initial Tauri IPC command list in specification
+  section 25.4, backed by the human-readable
+  `docs/ipc-command-coverage.md` table.
 - Frontend unit coverage for table logic and conflict diff alignment.
 - Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering view mode switching, command palette table insertion, table editor

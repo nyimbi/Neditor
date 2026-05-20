@@ -51,7 +51,7 @@ is not "Complete".
 
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
-| 6.1 Application Shell | Tauri IPC commands exposed from Rust | Partial | `src-tauri/src/lib.rs` command registrations | Verify command coverage against 25.4 and UI workflow. |
+| 6.1 Application Shell | Tauri IPC commands exposed from Rust | Complete | `src-tauri/src/lib.rs`; `docs/ipc-command-coverage.md`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` verifies every spec 25.4 command is registered and documented | Keep coverage synchronized as new required IPC commands are added. |
 | 6.1 Application Shell | Vue SFC block order template/script/style | Partial | `src/App.vue` follows order | Preserve when modularizing; add lint/check if practical. |
 | 6.2 Primary Layout | Toolbar, status bar, sidebar, editor, preview | Partial | `src/App.vue` | Browser layout/accessibility checks across viewport sizes. |
 | 6.2 Primary Layout | Export preview, review, presentation outline modes | Partial | Mode controls and sidebars in `src/App.vue` | Interaction tests and product QA for each mode. |
@@ -158,10 +158,10 @@ is not "Complete".
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
 | 25.1 Frontend architecture | Views/stores/components | Partial | App/store exist; few extracted components | Modularize oversized frontend after workflow tests. |
-| 25.1.1 Tauri contract | File ops, compile, export, snapshots, Git, transform commands | Partial | `src-tauri/src/lib.rs`; store invokes commands | Command matrix and UI workflow proof. |
+| 25.1.1 Tauri contract | File ops, compile, export, snapshots, Git, transform commands | Partial | `src-tauri/src/lib.rs`; `docs/ipc-command-coverage.md`; store invokes commands; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` covers initial spec IPC registration | Broader UI workflow proof for every extended command path. |
 | 25.2 State stores | Documents/workspace/editor/preview/compiler/diagnostics/exports/preferences/versioning/transforms/bibliography/AI | Partial | Mostly centralized in `documents.ts` | Split store by domain after behavior is locked. |
-| 25.3 Rust backend | Filesystem, watcher, compiler, transform, export, Git, snapshot, diagnostics, external runner | Partial | Rust modules exist | Continue modularization and command coverage audit. |
-| 25.4 IPC commands | Required command list | Partial | Command registrations include required list and more | Produce explicit command coverage table. |
+| 25.3 Rust backend | Filesystem, watcher, compiler, transform, export, Git, snapshot, diagnostics, external runner | Partial | Rust modules exist; initial IPC command coverage audit is executable via `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` | Continue modularization and deeper command behavior coverage. |
+| 25.4 IPC commands | Required command list | Complete | `docs/ipc-command-coverage.md`; `src-tauri/src/lib.rs`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` parses the spec, coverage table, and Tauri handler registration | Keep the table and guardrail test current if the spec command list changes. |
 | 26 Data storage | Preferences, recents, brand profiles, transform paths, snapshots, sidecars | Partial | Store plugin usage, snapshot/export manifest modules | Storage docs, migration tests, sidecar behavior proof. |
 | 27 Implementation phases | Phase deliverables | Partial | Most phase surfaces exist | Phase completion must be proven by matrix and tests. |
 | 28 Acceptance criteria | Concrete app acceptance | Partial | Current build/test surfaces | Fresh baseline plus workflow/export proof required. |
