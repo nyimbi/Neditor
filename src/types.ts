@@ -238,7 +238,17 @@ export interface CompileResponse {
   include_graph: Array<{ parent: string; child: string; depth: number }>;
   source_map: Array<{ generated_line: number; source_file: string; source_line: number }>;
   metadata: Record<string, unknown>;
-  bibliography: Array<{ key: string; title: string; author?: string | null; issued?: string | null; raw: string }>;
+  bibliography: Array<{
+    key: string;
+    title: string;
+    author?: string | null;
+    issued?: string | null;
+    raw: string;
+    source_file?: string | null;
+    line?: number | null;
+    column?: number | null;
+    end_column?: number | null;
+  }>;
   index_terms: string[];
   formula_graph: Array<{
     name: string;

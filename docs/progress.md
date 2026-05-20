@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `5f56b1c Record
-  macOS optional engine evidence`
+- Latest inspected committed baseline before this update: `6ef570e Expose
+  unresolved citation keys before export`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -330,6 +330,10 @@ Recent pushed checkpoints visible in current git history:
   available. The new readiness proof verifies line, column, end-line, and
   end-column details for each missing key and confirms those diagnostics are
   copied into export manifests.
+- This update carries source locations through bibliography entries, points
+  duplicate-key readiness diagnostics at the duplicate entry with the first
+  occurrence in related context, and shows duplicate bibliography source
+  locations in the References panel.
 
 ## Current Capability Snapshot
 
@@ -585,6 +589,25 @@ Additional citation readiness verification:
 | `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed, with Pikchr missing as an explicit optional-engine gap. |
 | `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests; execution still depends on local Chromium availability and host permissions. |
+| `git diff --check` | Pass | No whitespace errors in the current diff. |
+
+Additional duplicate bibliography source-location verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_reports_duplicate_bibliography_keys --lib -- --nocapture` in `src-tauri` | Pass | Proved duplicate bibliography diagnostics point at the second duplicate entry and include the first occurrence in related context. |
+| `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 9 citation tests passed, including duplicate-key source ranges and citation export conformance. |
+| `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after carrying bibliography source metadata. |
+| `cargo check --locked` in `src-tauri` | Pass | Finished dev profile successfully. |
+| `cargo check --locked --features native-watch` in `src-tauri` | Pass | Finished dev profile successfully. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
+| `cargo test --locked` in `src-tauri` | Pass | 147 Rust tests passed; 0 failed. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests passed after extending bibliography entry shape. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed with duplicate source locations in the References panel. |
+| `pnpm run check:docs` | Pass | Checked 13 Markdown files; local links resolve. |
+| `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed, with Pikchr missing as an explicit optional-engine gap. |
+| `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests, including the reference-navigation workflow with duplicate bibliography source locations. |
 | `git diff --check` | Pass | No whitespace errors in the current diff. |
 
 Additional focused verification after workflow helper extraction:

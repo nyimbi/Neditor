@@ -121,13 +121,7 @@ pub(crate) fn validate_document(
         .map(|entry| entry.key.as_str())
         .collect::<HashSet<_>>();
     for key in input.duplicate_bibliography_keys {
-        diagnostics.push(diag(
-            "error",
-            format!("Duplicate bibliography key: {key}"),
-            None,
-            None,
-            Some("Keep bibliography keys unique so citations resolve deterministically."),
-        ));
+        push_duplicate_bibliography_diagnostic(&input, key, diagnostics);
     }
     if !input.citation_references.is_empty() && !input.has_bibliography_source {
         let first = &input.citation_references[0];
@@ -297,6 +291,60 @@ fn push_missing_citation_source_diagnostics(
             .push(format!("Citation syntax: {}", reference.raw));
         diagnostics.push(diagnostic);
     }
+}
+
+fn push_duplicate_bibliography_diagnostic(
+    input: &DocumentValidationInput<'_>,
+    key: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let entries = input
+        .bibliography
+        .iter()
+        .filter(|entry| entry.key == key)
+        .collect::<Vec<_>>();
+    let primary = entries.get(1).or_else(|| entries.first());
+    let (source_file, line) = primary
+        .and_then(|entry| bibliography_entry_location(entry, input.source_map))
+        .unwrap_or((None, None));
+    let mut diagnostic = diag(
+        "error",
+        format!("Duplicate bibliography key: {key}"),
+        source_file,
+        line,
+        Some("Keep bibliography keys unique so citations resolve deterministically."),
+    );
+    if let Some(entry) = primary {
+        if let (Some(column), Some(end_column)) = (entry.column, entry.end_column) {
+            let end_line = diagnostic.line;
+            diagnostic = with_range(diagnostic, column, end_line, end_column);
+        }
+    }
+    diagnostic
+        .related
+        .push(format!("Duplicate occurrences: {}", entries.len()));
+    if let Some(first) = entries.first() {
+        if let Some((source_file, line)) = bibliography_entry_location(first, input.source_map) {
+            diagnostic.related.push(format!(
+                "First occurrence: {}:{}",
+                source_file.unwrap_or_else(|| "document".to_string()),
+                line.unwrap_or(first.line.unwrap_or_default())
+            ));
+        }
+    }
+    diagnostics.push(diagnostic);
+}
+
+fn bibliography_entry_location(
+    entry: &BibliographyEntry,
+    source_map: &[SourceMapEntry],
+) -> Option<(Option<String>, Option<usize>)> {
+    if entry.source_file.is_some() {
+        return Some((entry.source_file.clone(), entry.line));
+    }
+    entry
+        .line
+        .map(|line| diagnostic_location_for_generated_line(source_map, line))
 }
 
 pub(crate) fn validate_layout_directives(

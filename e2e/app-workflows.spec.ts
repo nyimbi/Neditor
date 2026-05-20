@@ -201,20 +201,45 @@ async function installTauriMock(page: Page) {
       });
     }
 
-    function bibliographyFromMarkdown(text: string) {
-      const entries: Array<{ key: string; title: string; author: string | null; issued: string | null }> = [];
+    function bibliographyFromMarkdown(text: string, sourceFile: string) {
+      const entries: Array<{
+        key: string;
+        title: string;
+        author: string | null;
+        issued: string | null;
+        raw: string;
+        source_file: string;
+        line: number;
+        column: number;
+        end_column: number;
+      }> = [];
       for (const fence of text.matchAll(/```(?:bibtex|bibliography)\s*\n([\s\S]*?)```/g)) {
+        const bodyStart = (fence.index || 0) + fence[0].indexOf(fence[1]);
         for (const entry of fence[1].matchAll(/@\w+\s*\{\s*([^,\s]+)\s*,([\s\S]*?)(?=\n@\w+\s*\{|$)/g)) {
           const body = entry[2] || "";
+          const key = entry[1].trim();
+          const keyOffset = bodyStart + (entry.index || 0) + entry[0].indexOf(entry[1]);
+          const location = sourcePositionAtOffset(text, keyOffset);
           entries.push({
-            key: entry[1].trim(),
-            title: bibtexField(body, "title") || entry[1].trim(),
+            key,
+            title: bibtexField(body, "title") || key,
             author: bibtexField(body, "author"),
             issued: bibtexField(body, "year"),
+            raw: entry[0],
+            source_file: sourceFile,
+            line: location.line,
+            column: location.column,
+            end_column: location.column + key.length,
           });
         }
       }
       return entries;
+    }
+
+    function sourcePositionAtOffset(text: string, offset: number) {
+      const before = text.slice(0, offset);
+      const lines = before.split("\n");
+      return { line: lines.length, column: lines[lines.length - 1].length + 1 };
     }
 
     function bibtexField(body: string, field: string) {
@@ -327,7 +352,7 @@ async function installTauriMock(page: Page) {
       const documentSet = frontMatterValue(text, "documentSet") || frontMatterValue(text, "document_set") || frontMatterValue(text, "set");
       const headings = headingsFromMarkdown(expanded.compiled);
       const citationReferences = citationReferencesFromMarkdown(expanded.compiled);
-      const bibliography = bibliographyFromMarkdown(expanded.compiled);
+      const bibliography = bibliographyFromMarkdown(expanded.compiled, filePath);
       const duplicateBibliographyKeys = duplicateBibliographyKeys(bibliography);
       const glossary = glossaryFromMarkdown(expanded.compiled);
       const indexTerms = indexTermsFromMarkdown(expanded.compiled);
@@ -1280,6 +1305,8 @@ test("runs command palette citation glossary and index navigation", async ({ pag
   await expect(page.getByText("@missing2026")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Duplicate keys" })).toBeVisible();
   await expect(page.getByText("dup2026")).toBeVisible();
+  await expect(page.getByText("/workspace/reference-navigation.md:17")).toBeVisible();
+  await expect(page.getByText("/workspace/reference-navigation.md:22")).toBeVisible();
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("ARR");

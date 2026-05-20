@@ -1,6 +1,6 @@
 use crate::diagnostics::DocumentDiagnostic;
 use crate::{
-    compiler_support::{collect_fence_bodies, fenced_code_marker},
+    compiler_support::{collect_fence_bodies_with_lines, fenced_code_marker},
     diagnostics::diag,
     escape_html, path_to_string,
 };
@@ -19,6 +19,10 @@ pub(crate) struct BibliographyEntry {
     pub(crate) author: Option<String>,
     pub(crate) issued: Option<String>,
     pub(crate) raw: String,
+    pub(crate) source_file: Option<String>,
+    pub(crate) line: Option<usize>,
+    pub(crate) column: Option<usize>,
+    pub(crate) end_column: Option<usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -37,9 +41,32 @@ pub(crate) fn collect_bibliography(
     root_path: Option<&Path>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> Vec<BibliographyEntry> {
-    let mut sources = collect_fence_bodies(text, "bibtex");
-    sources.extend(collect_fence_bodies(text, "hayagriva"));
-    sources.extend(collect_fence_bodies(text, "bibliography"));
+    let mut sources = collect_fence_bodies_with_lines(text, "bibtex")
+        .into_iter()
+        .map(|(line, body)| BibliographySource {
+            body,
+            source_file: None,
+            start_line: line + 1,
+        })
+        .collect::<Vec<_>>();
+    sources.extend(
+        collect_fence_bodies_with_lines(text, "hayagriva")
+            .into_iter()
+            .map(|(line, body)| BibliographySource {
+                body,
+                source_file: None,
+                start_line: line + 1,
+            }),
+    );
+    sources.extend(
+        collect_fence_bodies_with_lines(text, "bibliography")
+            .into_iter()
+            .map(|(line, body)| BibliographySource {
+                body,
+                source_file: None,
+                start_line: line + 1,
+            }),
+    );
     if let Some(path) = metadata.get("bibliography").and_then(Value::as_str) {
         let base = root_path
             .and_then(Path::parent)
@@ -47,7 +74,11 @@ pub(crate) fn collect_bibliography(
             .unwrap_or_else(|| PathBuf::from("."));
         let bibliography_path = base.join(path);
         match fs::read_to_string(&bibliography_path) {
-            Ok(contents) => sources.push(contents),
+            Ok(contents) => sources.push(BibliographySource {
+                body: contents,
+                source_file: Some(path_to_string(&bibliography_path)),
+                start_line: 1,
+            }),
             Err(err) => diagnostics.push(diag(
                 "error",
                 format!(
@@ -63,32 +94,72 @@ pub(crate) fn collect_bibliography(
 
     sources
         .into_iter()
-        .flat_map(|body| parse_bibliography_source(&body))
+        .flat_map(|source| {
+            parse_bibliography_source_with_origin(
+                &source.body,
+                source.source_file.as_deref(),
+                source.start_line,
+            )
+        })
         .collect()
 }
 
+struct BibliographySource {
+    body: String,
+    source_file: Option<String>,
+    start_line: usize,
+}
+
 pub(crate) fn parse_bibliography_source(body: &str) -> Vec<BibliographyEntry> {
-    if let Ok(entries) = parse_csl_json_bibliography(body) {
+    parse_bibliography_source_with_origin(body, None, 1)
+}
+
+fn parse_bibliography_source_with_origin(
+    body: &str,
+    source_file: Option<&str>,
+    start_line: usize,
+) -> Vec<BibliographyEntry> {
+    if let Ok(entries) = parse_csl_json_bibliography(body, source_file, start_line) {
         return entries;
     }
-    if let Ok(entries) = parse_hayagriva_yaml_bibliography(body) {
+    if let Ok(entries) = parse_hayagriva_yaml_bibliography(body, source_file, start_line) {
         return entries;
     }
-    body.split('@')
-        .filter_map(|entry| {
-            let (kind_and_key, rest) = entry.split_once('{')?;
-            let (key, raw) = rest.split_once(',')?;
-            let title =
-                bibtex_field(raw, "title").unwrap_or_else(|| kind_and_key.trim().to_string());
-            Some(BibliographyEntry {
-                key: key.trim().to_string(),
-                title,
-                author: bibtex_field(raw, "author"),
-                issued: bibtex_issued_year(raw),
-                raw: raw.to_string(),
-            })
-        })
-        .collect()
+    let mut entries = Vec::new();
+    let mut search_from = 0usize;
+    while let Some(relative_at) = body[search_from..].find('@') {
+        let at = search_from + relative_at;
+        let next_at = body[at + 1..]
+            .find('@')
+            .map(|relative| at + 1 + relative)
+            .unwrap_or(body.len());
+        let entry = &body[at + 1..next_at];
+        if let Some((kind_and_key, rest)) = entry.split_once('{') {
+            if let Some((raw_key, raw)) = rest.split_once(',') {
+                let key = raw_key.trim();
+                if !key.is_empty() {
+                    let key_offset =
+                        at + 1 + kind_and_key.len() + 1 + leading_whitespace_len(raw_key);
+                    let (line, column) = source_position_for_offset(body, start_line, key_offset);
+                    let title = bibtex_field(raw, "title")
+                        .unwrap_or_else(|| kind_and_key.trim().to_string());
+                    entries.push(BibliographyEntry {
+                        key: key.to_string(),
+                        title,
+                        author: bibtex_field(raw, "author"),
+                        issued: bibtex_issued_year(raw),
+                        raw: raw.to_string(),
+                        source_file: source_file.map(ToString::to_string),
+                        line: Some(line),
+                        column: Some(column),
+                        end_column: Some(column + key.len()),
+                    });
+                }
+            }
+        }
+        search_from = next_at;
+    }
+    entries
 }
 
 pub(crate) fn duplicate_bibliography_keys(bibliography: &[BibliographyEntry]) -> Vec<String> {
@@ -104,6 +175,8 @@ pub(crate) fn duplicate_bibliography_keys(bibliography: &[BibliographyEntry]) ->
 
 fn parse_hayagriva_yaml_bibliography(
     body: &str,
+    source_file: Option<&str>,
+    start_line: usize,
 ) -> Result<Vec<BibliographyEntry>, serde_yaml::Error> {
     let value = serde_yaml::from_str::<Value>(body)?;
     let entries = value
@@ -116,19 +189,28 @@ fn parse_hayagriva_yaml_bibliography(
                 .and_then(Value::as_str)
                 .unwrap_or(key)
                 .to_string();
+            let location = bibliography_key_location(body, key, start_line);
             BibliographyEntry {
                 key: key.to_string(),
                 title,
                 author: yaml_author(entry),
                 issued: yaml_issued_year(entry),
                 raw: serde_yaml::to_string(entry).unwrap_or_default(),
+                source_file: source_file.map(ToString::to_string),
+                line: location.map(|location| location.0),
+                column: location.map(|location| location.1),
+                end_column: location.map(|location| location.1 + key.len()),
             }
         })
         .collect();
     Ok(entries)
 }
 
-fn parse_csl_json_bibliography(body: &str) -> Result<Vec<BibliographyEntry>, serde_json::Error> {
+fn parse_csl_json_bibliography(
+    body: &str,
+    source_file: Option<&str>,
+    start_line: usize,
+) -> Result<Vec<BibliographyEntry>, serde_json::Error> {
     let value = serde_json::from_str::<Value>(body)?;
     let entries = value
         .as_array()
@@ -144,16 +226,51 @@ fn parse_csl_json_bibliography(body: &str) -> Result<Vec<BibliographyEntry>, ser
                 .and_then(Value::as_str)
                 .unwrap_or(key)
                 .to_string();
+            let location = bibliography_key_location(body, key, start_line);
             Some(BibliographyEntry {
                 key: key.to_string(),
                 title,
                 author: csl_author(entry),
                 issued: csl_issued_year(entry),
                 raw: entry.to_string(),
+                source_file: source_file.map(ToString::to_string),
+                line: location.map(|location| location.0),
+                column: location.map(|location| location.1),
+                end_column: location.map(|location| location.1 + key.len()),
             })
         })
         .collect();
     Ok(entries)
+}
+
+fn leading_whitespace_len(text: &str) -> usize {
+    text.len() - text.trim_start().len()
+}
+
+fn source_position_for_offset(body: &str, start_line: usize, offset: usize) -> (usize, usize) {
+    let mut line = start_line;
+    let mut column = 1usize;
+    for (index, ch) in body.char_indices() {
+        if index >= offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    (line, column)
+}
+
+fn bibliography_key_location(body: &str, key: &str, start_line: usize) -> Option<(usize, usize)> {
+    for (index, line) in body.lines().enumerate() {
+        if let Some(column) = line.find(key) {
+            return Some((start_line + index, column + 1));
+        }
+    }
+    None
 }
 
 fn yaml_author(entry: &Value) -> Option<String> {

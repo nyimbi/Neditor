@@ -192,10 +192,19 @@ fn compiler_reports_duplicate_bibliography_keys() {
         response.semantic.duplicate_bibliography_keys,
         vec!["porter1985".to_string()]
     );
-    assert!(response
+    let duplicate = response
         .diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.message.contains("Duplicate bibliography key")));
+        .find(|diagnostic| diagnostic.message.contains("Duplicate bibliography key"))
+        .expect("duplicate bibliography diagnostic");
+    assert_eq!(duplicate.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(duplicate.line, Some(11));
+    assert_eq!(duplicate.column, Some(10));
+    assert_eq!(duplicate.end_column, Some(20));
+    assert!(duplicate
+        .related
+        .iter()
+        .any(|related| related.contains("First occurrence: untitled.md:10")));
 }
 
 #[test]

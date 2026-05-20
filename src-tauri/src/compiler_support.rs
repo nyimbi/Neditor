@@ -82,7 +82,7 @@ pub(crate) fn fenced_code_marker(line: &str) -> Option<&'static str> {
     }
 }
 
-fn collect_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(usize, String)> {
+pub(crate) fn collect_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(usize, String)> {
     let mut bodies = Vec::new();
     let mut lines = text.lines().enumerate();
     while let Some((line_index, line)) = lines.next() {

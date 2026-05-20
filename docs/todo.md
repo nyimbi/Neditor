@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `5f56b1c Record macOS optional engine evidence`
+- `6ef570e Expose unresolved citation keys before export`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -133,6 +133,11 @@ Most recent local verification evidence:
   passed and proves no-bibliography citation readiness emits a broad source
   warning plus precise per-key missing citation diagnostics that are copied
   into the export manifest.
+- `cargo test --locked compiler_reports_duplicate_bibliography_keys --lib -- --nocapture`:
+  passed and proves duplicate bibliography diagnostics point at the duplicate
+  entry while recording the first occurrence in related context.
+- `cargo test --locked citation_tests --lib`: passed 9 citation tests,
+  including duplicate-key source ranges and citation export conformance.
 - `cargo test --locked`: passed locally with 147 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
@@ -1064,15 +1069,19 @@ Finish:
 Status: core support exists; UI and cross-target proof remain incomplete.
 Readiness now reports missing citation bibliography entries with precise
 source ranges when citations are present but no bibliography source is
-available.
+available. Duplicate bibliography entries now carry source locations, readiness
+points at the duplicate entry, and the References panel displays duplicate
+entry locations.
 
 Finish:
 
 - BibTeX and CSL JSON import edge cases.
-- Duplicate bibliography key UI and readiness reporting.
+- Duplicate bibliography key UI and readiness reporting. Current coverage shows
+  duplicate entry locations and source-range readiness diagnostics; remaining
+  work is richer external bibliography and CSL/YAML duplicate edge cases.
 - Citation styles: title, author-year, key, and CSL-driven choices.
-- Remaining citation diagnostics: richer duplicate-key source locations and
-  style-specific warnings.
+- Remaining citation diagnostics: style-specific warnings and richer CSL style
+  validation.
 - Cross-reference links across preview, HTML, PDF, DOCX, PPTX, and bundle
   outputs.
 - Automatic index inclusion/exclusion.

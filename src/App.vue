@@ -411,7 +411,13 @@
           </template>
           <template v-if="active.compile?.semantic.duplicate_bibliography_keys.length">
             <h3>Duplicate keys</h3>
-            <p v-for="key in active.compile.semantic.duplicate_bibliography_keys" :key="key" class="error">{{ key }}</p>
+            <article v-for="(entry, index) in duplicateBibliographyEntries" :key="`${entry.key}-${entry.line || index}`" class="snapshot-row">
+              <button class="outline-row" type="button" @click="goToSourceTarget(entry)">
+                @{{ entry.key }}
+              </button>
+              <small>{{ entry.locationLabel }}</small>
+              <small>{{ entry.title }}</small>
+            </article>
           </template>
           <h3>Glossary</h3>
           <dl>
@@ -1291,6 +1297,15 @@ const missingCitationKeys = computed(() => {
 const resolvedCitationEntries = computed(() => {
   const citedKeys = new Set((active.value.compile?.semantic.citation_references || []).map((citation) => citation.key));
   return (active.value.compile?.bibliography || []).filter((entry) => citedKeys.has(entry.key));
+});
+const duplicateBibliographyEntries = computed(() => {
+  const duplicateKeys = new Set(active.value.compile?.semantic.duplicate_bibliography_keys || []);
+  return (active.value.compile?.bibliography || [])
+    .filter((entry) => duplicateKeys.has(entry.key))
+    .map((entry) => ({
+      ...entry,
+      locationLabel: entry.line ? `${entry.source_file || active.value.path || "document"}:${entry.line}` : "Source location unavailable",
+    }));
 });
 const reviewSummary = computed(() => {
   const semantic = active.value.compile?.semantic;
