@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
+  <title id="title">NEditor review and AI governance screenshot</title>
+  <desc id="desc">Review status, unresolved comments, AI provenance, and release evidence.</desc>
+  <rect width="1280" height="760" fill="#f8fafc"/>
+  <rect x="32" y="28" width="1216" height="704" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+  <rect x="32" y="28" width="1216" height="54" rx="18" fill="#111827"/>
+  <text x="64" y="61" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="700" fill="#f9fafb">NEditor Review</text>
+  <rect x="62" y="112" width="348" height="560" rx="14" fill="#f8fafc" stroke="#d7dee8"/>
+  <text x="90" y="154" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#111827">Release workflow</text>
+  <rect x="90" y="190" width="130" height="34" rx="17" fill="#fef3c7" stroke="#f59e0b"/>
+  <text x="116" y="212" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="800" fill="#92400e">in-review</text>
+  <rect x="90" y="262" width="278" height="82" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="112" y="292" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="800" fill="#111827">Approval metadata</text>
+  <text x="112" y="318" font-family="Inter, Arial, sans-serif" font-size="13" fill="#64748b">owner: Strategy Team</text>
+  <text x="112" y="338" font-family="Inter, Arial, sans-serif" font-size="13" fill="#64748b">version: 1.0.0</text>
+  <rect x="90" y="372" width="278" height="82" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="112" y="402" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="800" fill="#111827">Comments</text>
+  <text x="112" y="428" font-family="Inter, Arial, sans-serif" font-size="13" fill="#dc2626">2 unresolved</text>
+  <text x="212" y="428" font-family="Inter, Arial, sans-serif" font-size="13" fill="#16a34a">5 resolved</text>
+  <rect x="90" y="482" width="278" height="82" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="112" y="512" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="800" fill="#111827">AI review</text>
+  <text x="112" y="538" font-family="Inter, Arial, sans-serif" font-size="13" fill="#dc2626">1 pending source</text>
+  <text x="226" y="538" font-family="Inter, Arial, sans-serif" font-size="13" fill="#16a34a">3 reviewed</text>
+  <rect x="444" y="112" width="360" height="560" rx="14" fill="#0f172a" stroke="#1e293b"/>
+  <text x="474" y="154" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#f8fafc">Source governance</text>
+  <text x="474" y="206" font-family="Menlo, Consolas, monospace" font-size="13" fill="#86efac">```ai-source</text>
+  <text x="474" y="236" font-family="Menlo, Consolas, monospace" font-size="13" fill="#bfdbfe">provider: OpenAI</text>
+  <text x="474" y="266" font-family="Menlo, Consolas, monospace" font-size="13" fill="#bfdbfe">model: ChatGPT</text>
+  <text x="474" y="296" font-family="Menlo, Consolas, monospace" font-size="13" fill="#bfdbfe">promptSummary: draft options</text>
+  <text x="474" y="326" font-family="Menlo, Consolas, monospace" font-size="13" fill="#fca5a5">status: needs-review</text>
+  <text x="474" y="356" font-family="Menlo, Consolas, monospace" font-size="13" fill="#86efac">```</text>
+  <rect x="474" y="420" width="274" height="74" rx="10" fill="#1e293b" stroke="#334155"/>
+  <text x="496" y="450" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" fill="#f8fafc">Inline review comment</text>
+  <text x="496" y="474" font-family="Inter, Arial, sans-serif" font-size="13" fill="#cbd5e1">Clarify assumption before approval.</text>
+  <rect x="838" y="112" width="350" height="560" rx="14" fill="#ffffff" stroke="#d7dee8"/>
+  <text x="868" y="154" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#111827">Export appendices</text>
+  <rect x="868" y="202" width="270" height="56" rx="10" fill="#eff6ff" stroke="#60a5fa"/>
+  <text x="890" y="236" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" fill="#1d4ed8">Comments appendix included</text>
+  <rect x="868" y="282" width="270" height="56" rx="10" fill="#f5f3ff" stroke="#a78bfa"/>
+  <text x="890" y="316" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" fill="#6d28d9">AI provenance appendix included</text>
+  <rect x="868" y="362" width="270" height="56" rx="10" fill="#ecfdf5" stroke="#22c55e"/>
+  <text x="890" y="396" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" fill="#166534">Glossary appendix included</text>
+  <text x="868" y="492" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="800" fill="#111827">Release guardrails</text>
+  <rect x="868" y="520" width="240" height="10" rx="5" fill="#cbd5e1"/>
+  <rect x="868" y="548" width="286" height="10" rx="5" fill="#e2e8f0"/>
+  <rect x="868" y="576" width="210" height="10" rx="5" fill="#e2e8f0"/>
+</svg>
