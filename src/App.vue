@@ -421,16 +421,33 @@
             </article>
           </template>
           <h3>Glossary</h3>
-          <dl>
-            <template v-for="(definition, term) in active.compile?.semantic.glossary || {}" :key="term">
-              <dt>{{ term }}</dt>
-              <dd>{{ definition }}</dd>
-            </template>
-          </dl>
+          <section class="reference-manager" aria-label="Glossary manager">
+            <div class="reference-actions">
+              <button type="button" @click="insertBlock(glossarySectionSnippet)">Insert generated glossary</button>
+              <button type="button" @click="insertBlock(glossarySnippet)">Insert glossary definitions</button>
+              <button type="button" @click="store.exportDefaults.includeGlossary = true">Include glossary in exports</button>
+            </div>
+            <p v-if="!glossaryEntries.length" class="sidebar-hint">No glossary terms detected.</p>
+            <article v-for="entry in glossaryEntries" :key="entry.term" class="snapshot-row">
+              <p>{{ entry.term }}</p>
+              <small>{{ entry.definition }}</small>
+              <div class="reference-actions">
+                <button type="button" @click="goToSearchTerm(entry.term)">Find term</button>
+                <button type="button" :aria-label="`Add ${entry.term} to index`" @click="insertIndexMarkerForTerm(entry.term)">Add to index</button>
+              </div>
+            </article>
+          </section>
           <h3>Index</h3>
-          <button v-for="term in active.compile?.index_terms || []" :key="term" class="outline-row" type="button" @click="goToSearchTerm(term)">
-            {{ term }}
-          </button>
+          <section class="reference-manager" aria-label="Index manager">
+            <div class="reference-actions">
+              <button type="button" @click="insertBlock(indexSnippet)">Insert generated index</button>
+              <button type="button" @click="setFrontMatterField('index', 'true')">Enable front matter index</button>
+            </div>
+            <p v-if="!indexTerms.length" class="sidebar-hint">No index terms detected.</p>
+            <button v-for="term in indexTerms" :key="term" class="outline-row" type="button" @click="goToSearchTerm(term)">
+              {{ term }}
+            </button>
+          </section>
           <h3>Tables</h3>
           <article v-for="table in active.compile?.semantic.table_summaries || []" :key="table.line" class="snapshot-row">
             <p>{{ table.rows }} rows | {{ table.columns.join(", ") }}</p>
@@ -1429,6 +1446,12 @@ const duplicateBibliographyEntries = computed(() => {
       locationLabel: entry.line ? `${entry.source_file || active.value.path || "document"}:${entry.line}` : "Source location unavailable",
     }));
 });
+const glossaryEntries = computed(() =>
+  Object.entries(active.value.compile?.semantic.glossary || {})
+    .map(([term, definition]) => ({ term, definition }))
+    .sort((left, right) => left.term.localeCompare(right.term)),
+);
+const indexTerms = computed(() => [...(active.value.compile?.index_terms || [])].sort((left, right) => left.localeCompare(right)));
 const reviewSummary = computed(() => {
   const semantic = active.value.compile?.semantic;
   const comments = semantic?.comments || [];
@@ -3097,6 +3120,10 @@ function insertFigureSnippet(position: FigureCropPosition = "center") {
   insertBlock(formatFigureSnippet(position));
 }
 
+function insertIndexMarkerForTerm(term: string) {
+  insertBlock(`#index:${term}`);
+}
+
 function formatFigureSnippet(position: FigureCropPosition) {
   return `![Figure alt](assets/figure.png){#fig:figure caption="Figure caption" fit="cover" position="${position}"}`;
 }
@@ -4126,6 +4153,18 @@ select:hover {
 }
 
 .include-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reference-manager {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+
+.reference-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;

@@ -1621,6 +1621,21 @@ test("runs command palette citation glossary and index navigation", async ({ pag
   await page.getByRole("button", { name: "Working Capital Index" }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("references");
   await expect(page.locator(".cm-line").filter({ hasText: "Working capital" })).toBeVisible();
+
+  const glossaryManager = page.getByRole("region", { name: "Glossary manager" });
+  await expect(glossaryManager).toContainText("ARR");
+  await expect(glossaryManager).toContainText("Annual recurring revenue.");
+  await glossaryManager.getByRole("button", { name: "Add ARR to index" }).click();
+  await expect.poll(() => editorText(page)).toContain("#index:ARR");
+
+  const indexManager = page.getByRole("region", { name: "Index manager" });
+  await indexManager.getByRole("button", { name: "Insert generated index" }).click();
+  await expect.poll(() => editorText(page)).toContain("[INDEX]");
+  await indexManager.getByRole("button", { name: "Enable front matter index" }).click();
+  await expect.poll(() => editorText(page)).toContain("index: true");
+
+  await glossaryManager.getByRole("button", { name: "Insert generated glossary" }).click();
+  await expect.poll(() => editorText(page)).toContain("[GLOSSARY]");
 });
 
 test("runs command palette open document and workspace file navigation", async ({ page }) => {

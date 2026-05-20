@@ -1198,14 +1198,18 @@ Finish:
 - Automatic index inclusion/exclusion. Current focused coverage proves
   `[INDEX]`, `index: true`, `index.enabled: true`, linked heading/glossary/bold/
   proper-noun/explicit terms, exclusion settings, marker stripping, and
-  cross-target export artifacts; remaining work is native workflow execution
-  and richer index manager UX.
+  cross-target export artifacts. The References sidebar now provides an Index
+  manager for generated index insertion, front matter index enablement, and
+  detected-term navigation; remaining work is native workflow execution and
+  rendered/manual UX QA.
 - Glossary definition preview, hover behavior, generated-section marker,
   front matter insertion, export appendix behavior, and command-palette
   navigation. Current focused coverage proves preview hover, `[GLOSSARY]`,
   front matter insertion, DOCX artifact text, export appendices, and command
-  palette listing; remaining work is native workflow execution and richer
-  index/glossary manager UX.
+  palette listing. The References sidebar now provides a Glossary manager for
+  generated glossary insertion, definition templates, export glossary enablement,
+  term navigation, and adding glossary terms to the index; remaining work is
+  native workflow execution and rendered/manual UX QA.
 
 ### 15. Layout And Reflow
 
