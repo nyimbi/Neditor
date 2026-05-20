@@ -94,6 +94,8 @@ interface PersistedWorkspace {
   workspaceRoot?: string | null;
   openFiles?: string[];
   activePath?: string | null;
+  mode?: "split" | "source" | "preview" | "focus" | "export" | "review" | "presentation";
+  sidebar?: "files" | "outline" | "diagnostics" | "tables" | "references" | "exports" | "versioning" | "review" | "settings";
   transformEnginePaths?: Record<string, string>;
   trustedTransformEngines?: Record<string, boolean>;
   transformInputModes?: Record<string, "stdin" | "file">;
@@ -603,6 +605,15 @@ export const useDocumentsStore = defineStore("documents", {
         this.recentFolders = persisted.recentFolders || [];
         this.recentlyClosed = persisted.recentlyClosed || [];
         this.workspaceRoot = persisted.workspaceRoot || null;
+        if (persisted.mode && ["split", "source", "preview", "focus", "export", "review", "presentation"].includes(persisted.mode)) {
+          this.mode = persisted.mode;
+        }
+        if (
+          persisted.sidebar &&
+          ["files", "outline", "diagnostics", "tables", "references", "exports", "versioning", "review", "settings"].includes(persisted.sidebar)
+        ) {
+          this.sidebar = persisted.sidebar;
+        }
         this.transformEnginePaths = persisted.transformEnginePaths || {};
         this.trustedTransformEngines = persisted.trustedTransformEngines || {};
         this.transformInputModes = persisted.transformInputModes || {};
@@ -647,6 +658,8 @@ export const useDocumentsStore = defineStore("documents", {
         recentFolders: this.recentFolders.slice(0, 12),
         recentlyClosed: this.recentlyClosed.slice(0, 20),
         workspaceRoot: this.workspaceRoot,
+        mode: this.mode,
+        sidebar: this.sidebar,
         openFiles: this.documents.map((document) => document.path).filter((path): path is string => Boolean(path)),
         pinnedFiles: this.documents
           .filter((document) => document.pinned && document.path)

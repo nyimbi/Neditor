@@ -168,6 +168,14 @@ Recent local verification evidence from this buildout:
   coverage.
 - `gh run watch 26145509141 --exit-status`: passed for commit `c0cefd1` across
   19 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
+- `pnpm run test:unit`: passed after adding workspace mode/sidebar persistence.
+- `pnpm run build`: passed after adding workspace mode/sidebar persistence and
+  the restart-style browser workflow mock support.
+- `pnpm exec playwright test --list`: listed 20 Chromium workflow tests after
+  adding restart-style workspace restore coverage.
+- `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "restores
+  workspace" --project chromium`: blocked locally because the Chromium
+  headless-shell executable is missing from the Playwright cache.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -377,8 +385,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 Required next coverage:
 
 - Remaining file/workspace flows: tab activation, missing-file restore,
-  moved/deleted-file restore, restart workspace restore, unsaved-document close
-  behavior, multi-tab watcher switching, and native desktop dialog behavior.
+  moved/deleted-file restore, pushed restart workspace restore proof,
+  unsaved-document close behavior, multi-tab watcher switching, and native
+  desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
 - Preview heading click-to-source and synchronized scrolling.
@@ -569,8 +578,10 @@ Finish:
 - Folder/workspace/project grouping behavior.
 - Explicit document-set grouping from front matter metadata if required by the
   spec interpretation.
-- Restart restore of previous workspace, active tab, scroll/mode state, and
-  pinned state.
+- Restart restore of previous workspace, active tab, mode/sidebar state, and
+  pinned state. Local Playwright discovery now includes this workflow; pushed CI
+  evidence is pending for this slice.
+- Scroll position restore.
 - Recently closed behavior for unsaved, moved, renamed, and deleted files.
 - Clear UX for missing documents during restore.
 - Matrix entry that split editor panes are deferred/later if not implemented.

@@ -1607,6 +1607,13 @@ watch(
 );
 
 watch(
+  () => [store.mode, store.sidebar],
+  () => {
+    void store.persistWorkspace();
+  },
+);
+
+watch(
   () => [
     store.exportDefaults.includeManifest,
     store.exportDefaults.includeStyles,

@@ -4,12 +4,34 @@ async function installTauriMock(page: Page) {
   await page.addInitScript(() => {
     const callbacks = new Map<number, unknown>();
     const eventListeners = new Map<string, number[]>();
-    const stores = new Map<number, Map<string, unknown>>();
-    const files = new Map<string, { text: string; hash: string; modified: string }>();
+    const e2eStateKey = "__neditor_e2e_state__";
+    const persistentState = (() => {
+      try {
+        const encoded = window.sessionStorage.getItem(e2eStateKey);
+        if (encoded) return JSON.parse(encoded) as { files?: Array<[string, { text: string; hash: string; modified: string }]>; stores?: Record<string, Record<string, unknown>> };
+      } catch {
+        // Fall back to an in-memory mock if session storage is unavailable.
+      }
+      return { files: [], stores: {} as Record<string, Record<string, unknown>> };
+    })();
+    const storesByPath = new Map<string, Map<string, unknown>>(
+      Object.entries(persistentState.stores || {}).map(([path, values]) => [path, new Map(Object.entries(values))]),
+    );
+    const storeResources = new Map<number, Map<string, unknown>>();
+    const files = new Map<string, { text: string; hash: string; modified: string }>(persistentState.files || []);
     const dialogSelections: Array<string | null> = [];
     const revealedPaths: string[] = [];
     let callbackId = 1;
     let storeId = 1;
+
+    function persistE2eState() {
+      try {
+        const stores = Object.fromEntries(Array.from(storesByPath.entries()).map(([path, values]) => [path, Object.fromEntries(values.entries())]));
+        window.sessionStorage.setItem(e2eStateKey, JSON.stringify({ files: Array.from(files.entries()), stores }));
+      } catch {
+        // The browser tests can still exercise the current page without persistence.
+      }
+    }
 
     function hash(text: string) {
       let value = 0;
@@ -70,6 +92,7 @@ async function installTauriMock(page: Page) {
         hash: hash(text),
         modified: new Date(0).toISOString(),
       });
+      persistE2eState();
     }
 
     function readMockFile(path: string) {
@@ -79,31 +102,33 @@ async function installTauriMock(page: Page) {
       return { path: normalized, ...file };
     }
 
-    setFile(
-      "/workspace/market.md",
-      [
-        "---",
-        "title: Market Entry Report",
-        "status: draft",
-        "---",
-        "",
-        "# Market Entry Report",
-        "",
-        "Original saved content.",
-      ].join("\n"),
-    );
-    setFile(
-      "/workspace/chapters/risk.md",
-      [
-        "---",
-        "title: Risk Include",
-        "---",
-        "",
-        "## Risk Notes",
-        "",
-        "Original included risk note.",
-      ].join("\n"),
-    );
+    if (!files.size) {
+      setFile(
+        "/workspace/market.md",
+        [
+          "---",
+          "title: Market Entry Report",
+          "status: draft",
+          "---",
+          "",
+          "# Market Entry Report",
+          "",
+          "Original saved content.",
+        ].join("\n"),
+      );
+      setFile(
+        "/workspace/chapters/risk.md",
+        [
+          "---",
+          "title: Risk Include",
+          "---",
+          "",
+          "## Risk Notes",
+          "",
+          "Original included risk note.",
+        ].join("\n"),
+      );
+    }
 
     function escapeHtml(text: string) {
       return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -263,12 +288,35 @@ async function installTauriMock(page: Page) {
 
     async function invoke(cmd: string, args: Record<string, unknown> = {}) {
       if (cmd === "plugin:store|load") {
+        const path = String(args.path || "settings.json");
+        if (!storesByPath.has(path)) storesByPath.set(path, new Map());
         const rid = storeId;
         storeId += 1;
-        stores.set(rid, new Map());
+        storeResources.set(rid, storesByPath.get(path) as Map<string, unknown>);
         return rid;
       }
-      if (cmd === "plugin:store|get") return [undefined, false];
+      if (cmd === "plugin:store|get") {
+        const store = storeResources.get(args.rid as number);
+        const key = String(args.key || "");
+        const exists = Boolean(store?.has(key));
+        return [exists ? store?.get(key) : undefined, exists];
+      }
+      if (cmd === "plugin:store|set") {
+        const store = storeResources.get(args.rid as number);
+        if (store) store.set(String(args.key || ""), args.value);
+        persistE2eState();
+        return null;
+      }
+      if (cmd === "plugin:store|save") {
+        persistE2eState();
+        return null;
+      }
+      if (cmd === "plugin:store|has") return Boolean(storeResources.get(args.rid as number)?.has(String(args.key || "")));
+      if (cmd === "plugin:store|clear") {
+        storeResources.get(args.rid as number)?.clear();
+        persistE2eState();
+        return null;
+      }
       if (cmd.startsWith("plugin:store|")) return null;
       if (cmd === "plugin:event|listen") {
         const eventName = args.event as string;
@@ -627,6 +675,51 @@ test("saves a document as a new file and reopens it from recently closed", async
   await expect(recentlyClosed.getByRole("button", { name: "/workspace/market-approved.md" })).toHaveCount(0);
   await page.getByLabel("Sidebar panel").selectOption("files");
   await expect.poll(() => activeFileRowText(page)).toContain("market-approved.md");
+});
+
+test("restores workspace tabs, active document, pins, mode, and sidebar after reload", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/field-notes.md",
+    [
+      "---",
+      "title: Field Notes",
+      "status: draft",
+      "---",
+      "",
+      "# Field Notes",
+      "",
+      "Reloaded workspace note.",
+    ].join("\n"),
+  );
+
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueDialogSelection(page, "/workspace/field-notes.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const marketTab = page.locator(".document-tabs .tab").filter({ hasText: "Market Entry Report" });
+  await marketTab.getByLabel("Pin document").click();
+  await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /Market Entry Report/ })).toBeVisible();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("Field Notes");
+
+  await page.getByLabel("View mode").selectOption("review");
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await page.getByRole("button", { name: "Save Workspace" }).click();
+
+  await page.reload();
+
+  await expect(page.getByLabel("View mode")).toHaveValue("review");
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("settings");
+  await expect(page.locator(".document-tabs .tab")).toHaveCount(2);
+  await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /Market Entry Report/ })).toBeVisible();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("Field Notes");
+  await expect.poll(() => editorText(page)).toContain("Reloaded workspace note.");
+  await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/field-notes.md" })).toBeVisible();
+
+  await page.getByLabel("Sidebar panel").selectOption("files");
+  await expect(page.getByText("/workspace")).toBeVisible();
+  await expect.poll(() => activeFileRowText(page)).toContain("field-notes.md");
 });
 
 test("blocks stale saves and preserves local conflict copies", async ({ page }) => {

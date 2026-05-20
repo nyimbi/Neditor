@@ -159,7 +159,11 @@ P0 gaps:
   paste insert/quote/appendix/replace-document/section-merge/replace-selection
   workflows, clean included-file recompilation, and dirty included-file
   conflict handling. Local focused Playwright execution is blocked by the
-  workspace-local Chromium Mach bootstrap permission failure.
+  missing workspace-local Chromium headless shell.
+- Local browser workflow discovery now lists 20 Chromium tests after adding a
+  restart-style workspace restore workflow for open tabs, active tab, pinned
+  state, mode/sidebar persistence, workspace root, and recent files. Pushed CI
+  evidence is pending for this slice.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -251,6 +255,16 @@ Additional included-file watcher workflow verification:
 | `pnpm exec playwright test --list` | Pass | Listed 19 Chromium workflow tests, including clean included-file recompile and dirty included-file conflict workflows. |
 | `git diff --check` | Pass | No whitespace errors after adding included-file watcher workflow coverage. |
 | `gh run watch 26145509141 --exit-status` | Pass | Commit `c0cefd1` passed 19 browser workflow tests and Ubuntu/macOS/Windows desktop builds. |
+
+Additional workspace restore workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after persisting mode/sidebar with the workspace restore state. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
+| `pnpm exec playwright test --list` | Pass | Listed 20 Chromium workflow tests, including restart-style workspace restore for tabs, active document, pins, mode, sidebar, workspace root, and recent files. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "restores workspace" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the workspace cache. |
+| `git diff --check` | Pass | No whitespace errors after adding workspace restore persistence coverage. |
 
 Current CI evidence log:
 
