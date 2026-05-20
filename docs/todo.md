@@ -176,6 +176,9 @@ Recent local verification evidence from this buildout:
 - `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "restores
   workspace" --project chromium`: blocked locally because the Chromium
   headless-shell executable is missing from the Playwright cache.
+- `gh run view 26147556750 --json status,conclusion,headSha,jobs,url`: browser
+  workflow job passed on commit `655d65c` with 20 Chromium workflow tests,
+  including restart-style workspace restore.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -385,9 +388,8 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 Required next coverage:
 
 - Remaining file/workspace flows: tab activation, missing-file restore,
-  moved/deleted-file restore, pushed restart workspace restore proof,
-  unsaved-document close behavior, multi-tab watcher switching, and native
-  desktop dialog behavior.
+  moved/deleted-file restore, unsaved-document close behavior, multi-tab watcher
+  switching, and native desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
 - Preview heading click-to-source and synchronized scrolling.
@@ -579,8 +581,7 @@ Finish:
 - Explicit document-set grouping from front matter metadata if required by the
   spec interpretation.
 - Restart restore of previous workspace, active tab, mode/sidebar state, and
-  pinned state. Local Playwright discovery now includes this workflow; pushed CI
-  evidence is pending for this slice.
+  pinned state. Browser CI run `26147556750` covers this workflow.
 - Scroll position restore.
 - Recently closed behavior for unsaved, moved, renamed, and deleted files.
 - Clear UX for missing documents during restore.
