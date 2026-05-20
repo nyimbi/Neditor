@@ -937,7 +937,7 @@
       <form class="modal" @submit.prevent="cleanAiPaste">
         <header>
           <h2>Paste from AI Chat</h2>
-          <button type="button" @click="closeAiPaste">x</button>
+          <button type="button" aria-label="Close AI paste cleanup" @click="closeAiPaste">x</button>
         </header>
         <section class="compare-grid ai-paste-grid">
           <label>
@@ -983,9 +983,9 @@
       <div class="modal command-modal">
         <header>
           <h2>Command Palette</h2>
-          <button type="button" @click="commandPaletteOpen = false">x</button>
+          <button type="button" aria-label="Close command palette" @click="commandPaletteOpen = false">x</button>
         </header>
-        <input v-model="commandQuery" autofocus placeholder="Search commands, headings, citations, glossary, index terms" />
+        <input v-model="commandQuery" autofocus aria-label="Search commands, headings, citations, glossary, and index terms" placeholder="Search commands, headings, citations, glossary, index terms" />
         <button
           v-for="command in filteredCommands"
           :key="command.name"
@@ -1003,7 +1003,7 @@
       <div class="modal conflict-modal">
         <header>
           <h2>External Changes</h2>
-          <button type="button" @click="conflictOpen = false">x</button>
+          <button type="button" aria-label="Close external file conflict" @click="conflictOpen = false">x</button>
         </header>
         <p>{{ store.externalConflict.message }}</p>
         <p class="conflict-path">{{ store.externalConflict.path }}</p>
@@ -1019,11 +1019,11 @@
             <div class="conflict-diff-head">External</div>
             <template v-for="row in conflictDiffRows" :key="row.key">
               <div :class="['conflict-diff-cell', `is-${row.kind}`]">
-                <button type="button" :disabled="row.localLine === null" @click="appendConflictMergeLine(row, 'local')">Use</button>
+                <button type="button" :disabled="row.localLine === null" :aria-label="row.localLine === null ? 'Use local line unavailable' : `Use local line ${row.localLine}`" @click="appendConflictMergeLine(row, 'local')">Use</button>
                 <pre><span>{{ row.localLine || "" }}</span>{{ row.local }}</pre>
               </div>
               <div :class="['conflict-diff-cell', `is-${row.kind}`]">
-                <button type="button" :disabled="row.externalLine === null" @click="appendConflictMergeLine(row, 'external')">Use</button>
+                <button type="button" :disabled="row.externalLine === null" :aria-label="row.externalLine === null ? 'Use external line unavailable' : `Use external line ${row.externalLine}`" @click="appendConflictMergeLine(row, 'external')">Use</button>
                 <pre><span>{{ row.externalLine || "" }}</span>{{ row.external }}</pre>
               </div>
             </template>

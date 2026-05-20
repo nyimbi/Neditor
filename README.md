@@ -181,6 +181,8 @@ manager fetches in restricted-network environments.
 ```sh
 pnpm run test:unit
 pnpm run build
+pnpm run check:docs
+pnpm run check:a11y
 cd src-tauri && cargo fmt --check
 cd src-tauri && cargo check --locked
 cd src-tauri && cargo check --locked --features native-watch

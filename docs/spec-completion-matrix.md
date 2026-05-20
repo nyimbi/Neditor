@@ -155,7 +155,7 @@ explicit platform checks.
 | 20 Command palette | Search commands/headings/citations/glossary/index/documents/workspace files | Partial | `commands` computed in `src/App.vue`; Playwright table insertion command test; archived browser workflow run `26154535588` covers heading command navigation; archived browser workflow run `26155535210` covers citation, glossary, and index command navigation; archived browser workflow run `26156393184` covers open-document switching and workspace-file opening | Broader keyboard shortcuts and non-sandboxed/native execution. |
 | 21 Preferences | Theme, typography, export, Git, AI, transforms, recents | Partial | Settings UI; persisted workspace; archived browser workflow run `26157446711` covers external transform path changes, input mode, timeout, trust prompt, denied trust reset, successful probe UI, and missing-executable diagnostics | Migration/schema tests and broader settings workflow coverage. |
 | 22 Security/privacy | Local-first, trust-gated executable transforms, no shell | Partial | External transform runner/tests; local file design; archived browser workflow run `26157446711` covers transform trust prompts, path-change trust clearing, denied trust reset, and missing executable diagnostics | Security review, platform proof, threat-model docs. |
-| 23 Accessibility | Keyboard, ARIA, contrast, reduced motion | Partial | Some labels/roles/settings in UI | Accessibility audit and automated/manual checks. |
+| 23 Accessibility | Keyboard, ARIA, contrast, reduced motion | Partial | Some labels/roles/settings in UI; `pnpm run check:a11y` statically checks Vue template button names, form-control labels, and dialog labeling; modal close buttons, command-palette search, and conflict merge-line controls now have explicit labels | Broader automated checks, keyboard-only/manual audit, and native workflow proof. |
 | 24 Performance | Large docs, debounced preview, transform cache, progress | Partial | Debounce/cache/progress code | Benchmarks/stress tests and cancellation behavior. |
 
 ## Architecture, Storage, Phases, Acceptance
@@ -197,6 +197,8 @@ Current direct evidence:
   build, and Tauri no-bundle compile when run on the current host.
 - `pnpm run check:docs` now checks README plus the docs set for missing local
   links, including the `docs/specification.md` architecture figure target.
+- `pnpm run check:a11y` now checks static Vue template accessibility guardrails
+  for accessible control names and dialog labeling.
 
 Current major verification gaps:
 
@@ -236,7 +238,9 @@ Current major verification gaps:
   remains under-proven.
 - Optional external transform engines are proven most strongly on Linux; macOS
   and Windows evidence is missing or indirect.
-- Accessibility and performance are not proven by dedicated tests or checklists.
+- Accessibility has an initial static guard, but full keyboard/manual audit
+  evidence is still missing. Performance is not proven by dedicated tests or
+  checklists.
 
 ## Next Matrix Work
 

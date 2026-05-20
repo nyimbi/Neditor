@@ -211,6 +211,9 @@ Recent pushed checkpoints visible in current git history:
 - This update restores the `docs/specification.md` architecture figure target
   with `docs/architecture.svg` and adds `pnpm run check:docs` as a repeatable
   repo-wide local markdown link guard.
+- This update adds `pnpm run check:a11y` as a static accessibility guard for
+  the Vue workbench template and fixes exposed labeling gaps in modal close
+  buttons, command-palette search, and conflict merge-line controls.
 
 ## Current Capability Snapshot
 
@@ -586,6 +589,7 @@ Additional review/provenance readiness metadata verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness still lists 34 Chromium workflow tests after the direct-export readiness change. |
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guard passed for button names, form-control labels, and dialog labeling. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
 | `git diff --check` | Pass | No whitespace errors after the readiness metadata, dirty-Git manifest, and documentation updates. |
 | `pnpm run check:docs` | Pass | Repo-wide markdown link guard checked README plus all docs and found no missing local links after adding `docs/architecture.svg`. |

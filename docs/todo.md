@@ -101,6 +101,8 @@ Most recent local verification evidence:
   sidecar manifests.
 - `pnpm run test:unit`: passed with 8 frontend unit tests.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
+- `pnpm run check:a11y`: passed and checked the Vue template for accessible
+  button names, form-control labels, and dialog labeling.
 - `pnpm run check:docs`: passed and checked README plus all docs for missing
   local links.
 - `pnpm exec playwright test --list`: listed the browser workflow harness with
@@ -989,7 +991,14 @@ Finish:
 
 ### 16. Accessibility
 
-Status: many controls have labels/roles; no full accessibility audit exists.
+Status: partial automated guard exists; full accessibility audit remains open.
+
+Current evidence:
+
+- `pnpm run check:a11y` checks `src/App.vue` for accessible button names,
+  form-control labels, and dialog labels/modal state.
+- Modal close buttons, command-palette search, and conflict merge-line controls
+  now have explicit labels exposed to assistive technology.
 
 Finish:
 
@@ -1000,7 +1009,7 @@ Finish:
 - High contrast and reduced motion behavior.
 - Screen-reader labels for diagnostics, status messages, table cells, conflict
   diff rows, and export progress.
-- Automated checks where practical plus manual checklist evidence.
+- Broader automated checks where practical plus manual checklist evidence.
 
 ### 17. Performance And Large Documents
 
