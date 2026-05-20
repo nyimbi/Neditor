@@ -320,6 +320,11 @@ Recent pushed checkpoints visible in current git history:
   metadata and setup docs now describe engine file size, modified time,
   adapter arguments, input mode, renderer version, and source hash as part of
   cache identity.
+- This update adds `pnpm run check:engines` and
+  `docs/external-transform-platform-evidence.md`. The current macOS Darwin
+  arm64 evidence verifies Graphviz/DOT, D2, and PlantUML through the optional
+  engine probe and `external_transform_conformance_runs_installed_engines`
+  with `--nocapture`; Pikchr is explicitly recorded as missing on this host.
 
 ## Current Capability Snapshot
 
@@ -356,6 +361,9 @@ Implemented or substantially present, pending the conservative caveats in
   (path/size/modified time), adapter arguments, input mode, renderer version,
   and source hash, with a regression test proving same-path executable rewrites
   do not serve stale cached output.
+- Optional external engine platform evidence can now be refreshed locally with
+  `pnpm run check:engines`; the latest macOS record proves dot, d2, and
+  PlantUML execution paths and records the missing Pikchr gap.
 - Rust-native structured-document transforms for JSON, YAML, OpenAPI, and JSON
   Schema, including nested schema/reference output for API and schema docs.
 - Business features including AI paste cleanup, table editor logic, formula
@@ -460,8 +468,9 @@ P1 gaps:
   package/text evidence across every export target.
 - Export readiness has browser workflow coverage for the target-specific
   status/diagnostic path, but still needs a requirement-by-requirement audit.
-- Optional external transform evidence is strongest on Linux; macOS and Windows
-  optional-engine evidence remains incomplete.
+- Optional external transform evidence now includes current macOS Graphviz/DOT,
+  D2, and PlantUML proof. macOS Pikchr and all Windows optional-engine evidence
+  remain incomplete.
 - File watcher/conflict flows need UI workflow tests.
 - Workspace/tab-group behavior now has browser harness proof for restart
   restore and document-set grouping; native desktop proof and deeper drag/reorder
@@ -537,6 +546,19 @@ Additional external transform cache identity verification:
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed. |
 | `pnpm run check:docs` | Pass | Checked 12 Markdown files; local links resolve. |
+| `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
+| `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests; execution still depends on local Chromium availability and host permissions. |
+| `git diff --check` | Pass | No whitespace errors in the current diff. |
+
+Additional external transform platform evidence:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:engines` | Partial pass | On Darwin arm64, Graphviz/DOT was installed at `/opt/homebrew/bin/dot` with version `14.1.5`, D2 was installed at `/opt/homebrew/bin/d2` with version `0.7.1`, PlantUML was installed at `/opt/homebrew/bin/plantuml` with version `1.2026.3`, and Pikchr was missing. The command exits successfully because optional engines may be absent. |
+| `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture` in `src-tauri` | Partial pass | The installed-engine conformance test verified `dot`, `d2`, and `plantuml` through NEditor's external transform execution path and skipped `pikchr` because it is not installed on this host. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests passed after adding `check:engines` to the local verification script contract. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed. |
+| `pnpm run check:docs` | Pass | Checked 13 Markdown files, including the new platform evidence doc; local links resolve. |
 | `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
 | `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests; execution still depends on local Chromium availability and host permissions. |
 | `git diff --check` | Pass | No whitespace errors in the current diff. |

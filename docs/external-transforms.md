@@ -9,6 +9,9 @@ NEditor can render several fenced-code transforms with native Rust fallbacks. Fo
 
 External engines are never trusted by default. Configure the executable path in Settings, enable trust for the specific engine, and keep the timeout/input-mode defaults unless the document requires otherwise.
 
+Current platform evidence is tracked in
+[External transform platform evidence](external-transform-platform-evidence.md).
+
 ## Safety Model
 
 - Engine paths must point to real executable files.

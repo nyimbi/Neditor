@@ -179,10 +179,10 @@ explicit platform checks.
 | Setup doc section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
 | Safety model | Real executable paths, per-engine trust, bounded execution, cache keys, fallback | Partial | `transforms/external.rs`; external transform tests; `external_transform_cache_invalidates_when_trusted_executable_changes`; archived browser workflow run `26157446711` covers settings-level path change trust clearing, trust prompts, denied trust reset, input mode/timeout probe details, cache identity display, and missing-executable diagnostics | Cross-platform process proof and deeper executable edge cases. |
-| macOS setup | Graphviz, D2, Pikchr, Java/PlantUML paths | Unverified | Documentation exists | Add manual evidence on macOS. |
+| macOS setup | Graphviz, D2, Pikchr, Java/PlantUML paths | Partial | `docs/external-transform-platform-evidence.md`; `pnpm run check:engines` reports Graphviz/DOT, D2, PlantUML, and Java on this Darwin arm64 host; `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture` verified dot, d2, and plantuml through the external transform execution path | Install and verify Pikchr on macOS. |
 | Linux setup | Packages and optional engines | Partial | Historical workflow installed Linux engines; current proof requires local installed-engine checks | Keep installed-engine conformance stable. |
 | Windows setup | Winget paths and shim guidance | Unverified | Documentation exists | Add manual evidence on Windows. |
-| Engine defaults | stdin/file modes by engine | Partial | Adapter profiles and tests | Cross-platform confirmation, especially PlantUML file mode. |
+| Engine defaults | stdin/file modes by engine | Partial | Adapter profiles and tests; macOS installed-engine conformance verified dot stdin, d2 stdin, and PlantUML file mode in `docs/external-transform-platform-evidence.md` | Cross-platform confirmation and macOS Pikchr proof. |
 | Troubleshooting | Permission, empty output, timeout, trust disabled, cache stale | Partial | Diagnostics/failure hints | UI docs and platform-specific cases. |
 
 ## Verification Coverage Summary

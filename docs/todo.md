@@ -892,8 +892,9 @@ Completion criteria:
 
 ### 7. External Transform Platform Evidence
 
-Status: Linux installed-engine evidence now passes in CI; macOS and Windows
-optional-engine evidence is incomplete.
+Status: Linux installed-engine evidence passed historically, and this macOS
+host now has current local Graphviz/DOT, D2, and PlantUML evidence. Pikchr on
+macOS and all Windows optional-engine evidence remain incomplete.
 
 Finish:
 
@@ -901,7 +902,10 @@ Finish:
   while expanding optional engine proof beyond Linux.
 - Keep Graphviz/DOT, D2, PlantUML, and Pikchr as real optional-engine proof
   where available.
-- Add macOS manual evidence for all optional engines.
+- macOS evidence now verifies Graphviz/DOT, D2, and PlantUML through
+  `pnpm run check:engines` and
+  `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture`;
+  Pikchr remains missing on this host.
 - Add Windows manual evidence for all optional engines.
 - Confirm Windows `.exe` paths and package-manager shims.
 - Confirm PlantUML file mode on all platforms.
@@ -912,6 +916,8 @@ Finish:
   proves same-path executable rewrites do not serve stale cached output.
 - Preserve diagnostics for missing executable, non-executable path, timeout,
   bad syntax, sidecar not produced, output limit, and stderr warnings.
+- Keep `docs/external-transform-platform-evidence.md` current when optional
+  engines are installed, upgraded, or verified on another platform.
 
 ### 8. File Watcher And Conflict Workflows
 

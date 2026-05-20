@@ -183,6 +183,7 @@ pnpm run test:unit
 pnpm run build
 pnpm run check:docs
 pnpm run check:a11y
+pnpm run check:engines
 cd src-tauri && cargo fmt --check
 cd src-tauri && cargo check --locked
 cd src-tauri && cargo check --locked --features native-watch
@@ -195,6 +196,10 @@ NEditor uses local verification rather than GitHub Actions. Run the commands
 above before publishing a slice. Browser workflow tests are available through
 `pnpm run test:e2e` when Playwright's local browser dependencies are installed
 and the host allows Chromium to launch.
+
+`pnpm run check:engines` probes optional external transform engines and reports
+installed/missing Graphviz/DOT, D2, PlantUML, Java-backed PlantUML, and Pikchr
+paths without failing just because an optional engine is absent.
 
 `cargo check` and `cargo test` require crates.io access the first time Rust
 dependencies are resolved. After dependencies are present, the project is
