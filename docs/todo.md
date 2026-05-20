@@ -802,6 +802,7 @@ Covered:
 - Basic Markdown list continuation.
 - Basic bracket auto-pairing.
 - CodeMirror find and replace.
+- Spellcheck and sentence autocapitalization editor attributes.
 - Word count, character count, and reading-time status-bar metrics.
 - Command-palette heading navigation.
 - Outline sidebar heading navigation to source.
@@ -815,7 +816,7 @@ Finish:
 - Diagnostics gutter accuracy and click/navigation behavior.
 - Broader Markdown shortcuts.
 - Auto-pairing for quotes, code fences, and emphasis markers.
-- Spellcheck.
+- Spellcheck behavior local browser/native execution proof.
 - Word/character/reading-time local browser/native execution proof.
 - Outline navigation local browser/native execution proof.
 - Multi-cursor support local browser/native execution proof.

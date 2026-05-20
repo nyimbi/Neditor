@@ -156,6 +156,8 @@ Recent pushed checkpoints visible in current git history:
 - This update adds outline-sidebar navigation coverage, proving the sidebar
   can focus a deep heading back in the Markdown source outside the command
   palette path.
+- This update adds editor workflow harness assertions for the CodeMirror
+  `spellcheck` and `autocapitalize` content attributes.
 
 ## Current Capability Snapshot
 
@@ -206,10 +208,11 @@ Implemented or substantially present, pending the conservative caveats in
   confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
   folder reopen/prune behavior, moved recently-closed path pruning,
   synchronized editor/preview scrolling, preview heading click-to-source,
-  persisted editor word-wrap and line-number settings, CodeMirror find/replace,
-  status-bar word/character/reading-time metrics, explicit multi-cursor command
-  coverage, smart list continuation, bracket auto-pairing, command-palette
-  heading navigation, command-palette citation, glossary, and index navigation,
+  persisted editor word-wrap and line-number settings, spellcheck/autocapitalize
+  editor attributes, CodeMirror find/replace, status-bar
+  word/character/reading-time metrics, explicit multi-cursor command coverage,
+  smart list continuation, bracket auto-pairing, command-palette heading
+  navigation, command-palette citation, glossary, and index navigation,
   outline-sidebar heading navigation, command-palette open-document switching
   and workspace-file opening, plus
   transform engine settings trust/probe diagnostics, target-specific export

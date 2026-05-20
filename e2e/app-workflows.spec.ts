@@ -852,6 +852,8 @@ test("persists editor settings and runs search plus heading commands", async ({ 
 
   const editorContent = page.locator(".cm-content");
   await expect(page.locator(".status-bar")).toContainText("29 words | 189 characters | 1 min read");
+  await expect(editorContent).toHaveAttribute("spellcheck", "true");
+  await expect(editorContent).toHaveAttribute("autocapitalize", "sentences");
   await page.getByLabel("Sidebar panel").selectOption("settings");
   await expect(page.getByLabel("Word wrap")).toBeChecked();
   await expect(page.getByLabel("Line numbers")).toBeChecked();
