@@ -189,6 +189,10 @@ Recent local verification evidence from this buildout:
 - `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "restores
   workspace\|skips missing" --project chromium`: blocked locally because the
   Chromium headless-shell executable is missing from the Playwright cache.
+- `gh run view 26148828614 --json status,conclusion,headSha,jobs,url`: passed
+  on commit `5a13fe2` across the 21-test browser workflow job and the
+  Ubuntu/macOS/Windows desktop builds, including scroll restore and
+  missing-restored-file warning coverage.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -397,10 +401,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 
 Required next coverage:
 
-- Remaining file/workspace flows: tab activation, pushed scroll/missing restore
-  CI proof, moved/renamed/deleted recently-closed behavior, unsaved-document
-  close behavior, multi-tab watcher switching, and native desktop dialog
-  behavior.
+- Remaining file/workspace flows: tab activation, moved/renamed/deleted
+  recently-closed behavior, unsaved-document close behavior, multi-tab watcher
+  switching, and native desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
 - Preview heading click-to-source and synchronized scrolling.
@@ -593,11 +596,10 @@ Finish:
   spec interpretation.
 - Restart restore of previous workspace, active tab, mode/sidebar state, and
   pinned state. Browser CI run `26147556750` covers this workflow.
-- Scroll position restore. Local Playwright discovery now includes this
-  workflow; pushed CI evidence is pending for this slice.
+- Scroll position restore. Browser CI run `26148828614` covers this workflow.
 - Recently closed behavior for unsaved, moved, renamed, and deleted files.
-- Clear UX for missing documents during restore. Local Playwright discovery now
-  includes this workflow; pushed CI evidence is pending for this slice.
+- Clear UX for missing documents during restore. Browser CI run `26148828614`
+  covers this workflow.
 - Matrix entry that split editor panes are deferred/later if not implemented.
 
 ### 10. Editor Ergonomics

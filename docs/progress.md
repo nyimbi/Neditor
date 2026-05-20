@@ -151,8 +151,8 @@ P0 gaps:
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 20 Chromium tests in
-  run `26147556750`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 21 Chromium tests in
+  run `26148828614`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
   root-file conflicts, advanced table structure/format/cancel coverage, and AI
@@ -160,11 +160,9 @@ P0 gaps:
   workflows, clean included-file recompilation, and dirty included-file
   conflict handling, plus restart-style workspace restore for open tabs, active
   tab, pinned state, mode/sidebar persistence, workspace root, and recent
-  files. Local focused Playwright execution is blocked by the missing
+  files, scroll-position restore, and missing-restored-file warning coverage.
+  Local focused Playwright execution remains blocked by the missing
   workspace-local Chromium headless shell.
-- Local browser workflow discovery now lists 21 Chromium tests after adding
-  scroll-position restore and missing-restored-file warning coverage. Pushed CI
-  evidence is pending for this slice.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -276,6 +274,7 @@ Additional missing-file and scroll restore workflow verification:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
 | `pnpm exec playwright test --list` | Pass | Listed 21 Chromium workflow tests, including missing restored-file warning coverage and scroll-position restore in the workspace reload workflow. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "restores workspace\|skips missing" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
+| `gh run view 26148828614 --json status,conclusion,headSha,jobs,url` | Pass | Commit `5a13fe2` passed the 21-test browser workflow job plus Ubuntu, macOS, and Windows desktop builds. |
 | `git diff --check` | Pass | No whitespace errors after adding scroll and missing-file restore coverage. |
 
 Current CI evidence log:
