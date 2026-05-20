@@ -864,6 +864,17 @@ test("syncs editor and preview scrolling and jumps preview headings to source", 
   await expect.poll(() => editorScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
 });
 
+test("updates the live preview after source edits", async ({ page }) => {
+  const editorContent = page.locator(".cm-content");
+  await editorContent.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("\n\n## Live Typing Target\nLive preview text from source editing.");
+
+  await expect.poll(() => editorText(page)).toContain("## Live Typing Target");
+  await expect(page.getByRole("heading", { name: "Live Typing Target" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Live preview text from source editing.");
+});
+
 test("persists editor settings and runs search plus heading commands", async ({ page }) => {
   await setMockFileText(
     page,

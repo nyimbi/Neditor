@@ -61,7 +61,8 @@ NEditor is no longer a basic scaffold. The repository currently contains:
 - An executable IPC coverage guard for the initial command surface in
   specification section 25.4, plus `docs/ipc-command-coverage.md` as the
   human-readable command evidence table.
-- MIT licensing in `LICENSE`, `package.json`, and `src-tauri/Cargo.toml`.
+- MIT licensing in `LICENSE`, `package.json`, `src-tauri/Cargo.toml`, and
+  the Tauri desktop bundle metadata.
 - Frontend unit tests for table parsing/serialization, conflict diff alignment,
   AI paste insertion modes, conflict merge-line composition, and local
   verification script coverage.
@@ -563,6 +564,8 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Preview navigation workflow: synchronize scroll from editor to preview,
   synchronize scroll from preview back to editor, and click a rendered preview
   heading to jump to the source line.
+- Live preview update workflow: type a heading and paragraph in the source and
+  verify the preview renders the new content.
 - Editor ergonomics workflow: persist word-wrap and line-number settings,
   execute CodeMirror find/replace through the search keybinding, continue a
   Markdown list item, auto-pair brackets, and navigate a heading through the
@@ -610,6 +613,7 @@ Required next coverage:
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices,
   progress/cancellation behavior if needed, and rendered/manual proof.
+- Large-document preview debounce timing proof.
 - Remaining transform engine settings: disabled-engine and cross-platform
   executable edge cases beyond the mocked browser workflow.
 

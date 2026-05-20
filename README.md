@@ -231,4 +231,5 @@ workflow evidence, artifacts, and platform checks prove the requirement.
 
 ## License
 
-NEditor is released under the [MIT License](LICENSE).
+NEditor is released under the [MIT License](LICENSE). The npm package,
+Cargo crate, and desktop bundle metadata all declare MIT licensing.

@@ -137,8 +137,8 @@ Recent pushed checkpoints visible in current git history:
   Tauri `generate_handler!` registration so required IPC commands cannot drift
   out of the app shell unnoticed.
 - This update also records the project license as MIT in `LICENSE`,
-  `package.json`, and `src-tauri/Cargo.toml`, and removes GitHub Actions as an
-  active verification surface.
+  `package.json`, `src-tauri/Cargo.toml`, and the Tauri desktop bundle
+  metadata, and removes GitHub Actions as an active verification surface.
 - This update expands the example fixtures with explicit target-persona front
   matter and strengthens
   `example_fixture_tests::example_project_fixtures_compile_and_export` so the
@@ -173,6 +173,8 @@ Recent pushed checkpoints visible in current git history:
 - This update adds workflow harness coverage for app theme, preview theme, high
   contrast, reduced motion, editor typography, preview typography, and reload
   persistence.
+- This update adds workflow harness coverage for live preview updates after
+  typing new source content.
 
 ## Current Capability Snapshot
 
@@ -201,7 +203,8 @@ Implemented or substantially present, pending the conservative caveats in
 - Executable coverage for the initial Tauri IPC command list in specification
   section 25.4, backed by the human-readable
   `docs/ipc-command-coverage.md` table.
-- MIT license metadata in root, npm, and Cargo package surfaces.
+- MIT license metadata in root, npm, Cargo, and Tauri desktop bundle package
+  surfaces.
 - Realistic example fixtures now cover consultants, technical writers,
   researchers and analysts, product and engineering teams, executives and
   managers, students and academics, developers, and teams using AI chat output,
@@ -224,9 +227,9 @@ Implemented or substantially present, pending the conservative caveats in
   handling, missing restored-file warnings, tab activation, dirty-close
   confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
   folder reopen/prune behavior, moved recently-closed path pruning,
-  synchronized editor/preview scrolling, preview heading click-to-source,
-  persisted editor word-wrap and line-number settings, spellcheck/autocapitalize
-  editor attributes, CodeMirror find/replace, status-bar
+  live preview updates from source edits, synchronized editor/preview scrolling,
+  preview heading click-to-source, persisted editor word-wrap and line-number
+  settings, spellcheck/autocapitalize editor attributes, CodeMirror find/replace, status-bar
   word/character/reading-time metrics, explicit multi-cursor command coverage,
   smart list continuation, bracket/quote/emphasis/inline-code pairing,
   code-fence insertion, command-palette heading navigation, command-palette
