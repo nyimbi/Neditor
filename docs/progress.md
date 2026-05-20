@@ -596,12 +596,13 @@ Additional duplicate bibliography source-location verification:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `cargo test --locked compiler_reports_duplicate_bibliography_keys --lib -- --nocapture` in `src-tauri` | Pass | Proved duplicate bibliography diagnostics point at the second duplicate entry and include the first occurrence in related context. |
-| `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 9 citation tests passed, including duplicate-key source ranges and citation export conformance. |
+| `cargo test --locked compiler_reports_csl_and_hayagriva_duplicate_key_locations --lib -- --nocapture` in `src-tauri` | Pass | Proved duplicate-key source ranges for CSL JSON array entries and Hayagriva YAML top-level entries, including preservation of duplicate Hayagriva keys before YAML map parsing can collapse them. |
+| `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 10 citation tests passed, including BibTeX, CSL JSON, and Hayagriva duplicate-key source ranges plus citation export conformance. |
 | `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after carrying bibliography source metadata. |
 | `cargo check --locked` in `src-tauri` | Pass | Finished dev profile successfully. |
 | `cargo check --locked --features native-watch` in `src-tauri` | Pass | Finished dev profile successfully. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
-| `cargo test --locked` in `src-tauri` | Pass | 147 Rust tests passed; 0 failed. |
+| `cargo test --locked` in `src-tauri` | Pass | 148 Rust tests passed; 0 failed. |
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed after extending bibliography entry shape. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed with duplicate source locations in the References panel. |
 | `pnpm run check:docs` | Pass | Checked 13 Markdown files; local links resolve. |

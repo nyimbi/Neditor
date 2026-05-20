@@ -7,7 +7,7 @@ use crate::{
 use serde::Serialize;
 use serde_json::Value;
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -178,6 +178,31 @@ fn parse_hayagriva_yaml_bibliography(
     source_file: Option<&str>,
     start_line: usize,
 ) -> Result<Vec<BibliographyEntry>, serde_yaml::Error> {
+    let spans = hayagriva_entry_spans(body, start_line);
+    if !spans.is_empty() {
+        return Ok(spans
+            .into_iter()
+            .map(|span| {
+                let entry = serde_yaml::from_str::<Value>(&span.body).unwrap_or(Value::Null);
+                BibliographyEntry {
+                    key: span.key.clone(),
+                    title: entry
+                        .get("title")
+                        .and_then(Value::as_str)
+                        .unwrap_or(&span.key)
+                        .to_string(),
+                    author: yaml_author(&entry),
+                    issued: yaml_issued_year(&entry),
+                    raw: span.body,
+                    source_file: source_file.map(ToString::to_string),
+                    line: Some(span.line),
+                    column: Some(span.column),
+                    end_column: Some(span.column + span.key.len()),
+                }
+            })
+            .collect());
+    }
+
     let value = serde_yaml::from_str::<Value>(body)?;
     let entries = value
         .as_object()
@@ -212,6 +237,7 @@ fn parse_csl_json_bibliography(
     start_line: usize,
 ) -> Result<Vec<BibliographyEntry>, serde_json::Error> {
     let value = serde_json::from_str::<Value>(body)?;
+    let mut occurrence_counts = BTreeMap::<String, usize>::new();
     let entries = value
         .as_array()
         .into_iter()
@@ -221,12 +247,15 @@ fn parse_csl_json_bibliography(
                 .get("id")
                 .or_else(|| entry.get("citation-key"))
                 .and_then(Value::as_str)?;
+            let occurrence = occurrence_counts.entry(key.to_string()).or_insert(0);
+            let location =
+                bibliography_key_location_for_occurrence(body, key, start_line, *occurrence);
+            *occurrence += 1;
             let title = entry
                 .get("title")
                 .and_then(Value::as_str)
                 .unwrap_or(key)
                 .to_string();
-            let location = bibliography_key_location(body, key, start_line);
             Some(BibliographyEntry {
                 key: key.to_string(),
                 title,
@@ -241,6 +270,62 @@ fn parse_csl_json_bibliography(
         })
         .collect();
     Ok(entries)
+}
+
+struct HayagrivaEntrySpan {
+    key: String,
+    body: String,
+    line: usize,
+    column: usize,
+}
+
+fn hayagriva_entry_spans(body: &str, start_line: usize) -> Vec<HayagrivaEntrySpan> {
+    let mut starts = Vec::new();
+    let mut byte_offset = 0usize;
+    for (line_index, line) in body.lines().enumerate() {
+        let trimmed = line.trim();
+        if !line
+            .chars()
+            .next()
+            .map(|ch| ch.is_whitespace())
+            .unwrap_or(false)
+            && !trimmed.is_empty()
+            && !trimmed.starts_with('#')
+            && trimmed.ends_with(':')
+        {
+            let key = trimmed.trim_end_matches(':').trim();
+            if !key.is_empty()
+                && key
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | ':' | '.'))
+            {
+                let column = line.find(key).map(|index| index + 1).unwrap_or(1);
+                starts.push((byte_offset, line_index, key.to_string(), column));
+            }
+        }
+        byte_offset += line.len() + 1;
+    }
+    starts
+        .iter()
+        .enumerate()
+        .map(|(index, (offset, line_index, key, column))| {
+            let next_offset = starts
+                .get(index + 1)
+                .map(|(next_offset, _, _, _)| *next_offset)
+                .unwrap_or(body.len());
+            let raw = &body[*offset..next_offset];
+            let body_start = raw
+                .find('\n')
+                .map(|newline| newline + 1)
+                .unwrap_or(raw.len());
+            HayagrivaEntrySpan {
+                key: key.clone(),
+                body: raw[body_start..].trim_end().to_string(),
+                line: start_line + line_index,
+                column: *column,
+            }
+        })
+        .collect()
 }
 
 fn leading_whitespace_len(text: &str) -> usize {
@@ -265,9 +350,22 @@ fn source_position_for_offset(body: &str, start_line: usize, offset: usize) -> (
 }
 
 fn bibliography_key_location(body: &str, key: &str, start_line: usize) -> Option<(usize, usize)> {
+    bibliography_key_location_for_occurrence(body, key, start_line, 0)
+}
+
+fn bibliography_key_location_for_occurrence(
+    body: &str,
+    key: &str,
+    start_line: usize,
+    occurrence: usize,
+) -> Option<(usize, usize)> {
+    let mut seen = 0usize;
     for (index, line) in body.lines().enumerate() {
         if let Some(column) = line.find(key) {
-            return Some((start_line + index, column + 1));
+            if seen == occurrence {
+                return Some((start_line + index, column + 1));
+            }
+            seen += 1;
         }
     }
     None

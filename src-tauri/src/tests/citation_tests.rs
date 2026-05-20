@@ -208,6 +208,49 @@ fn compiler_reports_duplicate_bibliography_keys() {
 }
 
 #[test]
+fn compiler_reports_csl_and_hayagriva_duplicate_key_locations() {
+    let csl = compile(CompileRequest {
+        text: "---\ntitle: CSL Duplicate\nstatus: approved\napprovedBy: QA\n---\n# CSL Duplicate\nClaim [@dup2026].\n\n```bibliography\n[\n{\"id\":\"dup2026\",\"title\":\"First Entry\"},\n{\"id\":\"dup2026\",\"title\":\"Second Entry\"}\n]\n```\n[BIBLIOGRAPHY]"
+            .to_string(),
+        file_path: None,
+    });
+    let csl_duplicate = csl
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("Duplicate bibliography key"))
+        .expect("CSL duplicate diagnostic");
+    assert_eq!(csl_duplicate.line, Some(12));
+    assert_eq!(csl_duplicate.column, Some(8));
+    assert_eq!(csl_duplicate.end_column, Some(15));
+    assert!(csl_duplicate
+        .related
+        .iter()
+        .any(|related| related.contains("First occurrence: untitled.md:11")));
+
+    let hayagriva = compile(CompileRequest {
+        text: "---\ntitle: Hayagriva Duplicate\nstatus: approved\napprovedBy: QA\n---\n# Hayagriva Duplicate\nClaim [@dup2026].\n\n```hayagriva\ndup2026:\n  type: article\n  title: First Entry\ndup2026:\n  type: article\n  title: Second Entry\n```\n[BIBLIOGRAPHY]"
+            .to_string(),
+        file_path: None,
+    });
+    assert_eq!(
+        hayagriva.semantic.duplicate_bibliography_keys,
+        vec!["dup2026".to_string()]
+    );
+    let hayagriva_duplicate = hayagriva
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("Duplicate bibliography key"))
+        .expect("Hayagriva duplicate diagnostic");
+    assert_eq!(hayagriva_duplicate.line, Some(13));
+    assert_eq!(hayagriva_duplicate.column, Some(1));
+    assert_eq!(hayagriva_duplicate.end_column, Some(8));
+    assert!(hayagriva_duplicate
+        .related
+        .iter()
+        .any(|related| related.contains("First occurrence: untitled.md:10")));
+}
+
+#[test]
 fn citation_export_conformance_covers_required_cases() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Citation Export\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# Citation Export\nSingle [@porter1985].\nMultiple [@porter1985; @doe2026].\nLocator [@porter1985, p. 42].\nMissing [@missing2026].\nSecond [@doe2026].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}\n```\n\n[BIBLIOGRAPHY]\n".to_string(),
