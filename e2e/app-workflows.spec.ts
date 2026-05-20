@@ -1355,6 +1355,14 @@ test("navigates compiler diagnostics to the source range", async ({ page }) => {
   await setMockFileText(page, "/workspace/diagnostic-navigation.md", diagnosticDocument);
   await queueDialogSelection(page, "/workspace/diagnostic-navigation.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const previewDiagnostic = page.locator(".preview-diagnostic").filter({ hasText: "Mock diagnostic target needs review." });
+  await expect(previewDiagnostic).toContainText("Resolve the marked diagnostic target before publishing.");
+  await expect(previewDiagnostic).toContainText("/workspace/diagnostic-navigation.md: line");
+  await previewDiagnostic.getByRole("button", { name: "Go to source" }).click();
+  await expect(page.locator(".cm-line").filter({ hasText: "DIAGNOSTIC_TARGET" })).toBeVisible();
+  await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+
   await page.getByLabel("Sidebar panel").selectOption("diagnostics");
 
   const diagnostic = page.locator(".sidebar .diagnostic").filter({ hasText: "Mock diagnostic target needs review." });

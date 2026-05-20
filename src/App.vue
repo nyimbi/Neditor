@@ -956,7 +956,7 @@
         aria-label="Live preview"
         @scroll="syncEditorScrollFromPreview"
       >
-        <article class="preview-document" :style="previewDocumentStyle" @click="handlePreviewClick" v-html="active.compile?.html || ''"></article>
+        <article class="preview-document" :style="previewDocumentStyle" @click="handlePreviewClick" v-html="previewHtmlWithDiagnostics"></article>
       </section>
     </main>
 
@@ -1235,6 +1235,10 @@ interface IncludeGraphItem {
   commandLabel: string;
 }
 
+interface PreviewDiagnosticItem extends DocumentDiagnostic {
+  generatedLine: number;
+}
+
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const codeFenceSnippet = "```markdown\n\n```\n";
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
@@ -1281,6 +1285,17 @@ const previewDocumentStyle = computed(() => ({
   fontSize: `${clampUiFontSize(store.previewFontSize)}px`,
   lineHeight: String(clampUiLineHeight(store.previewLineHeight)),
 }));
+const previewDiagnostics = computed<PreviewDiagnosticItem[]>(() => {
+  const diagnostics = active.value.compile?.diagnostics || [];
+  return diagnostics
+    .filter((diagnostic) => Boolean(diagnostic.line))
+    .map((diagnostic) => ({
+      ...diagnostic,
+      generatedLine: previewGeneratedLineForDiagnostic(diagnostic),
+    }))
+    .sort((left, right) => left.generatedLine - right.generatedLine || (left.line || 0) - (right.line || 0));
+});
+const previewHtmlWithDiagnostics = computed(() => inlinePreviewDiagnostics(active.value.compile?.html || "", previewDiagnostics.value));
 const workspaceStyle = computed(() => ({ "--editor-ratio": String(store.editorPaneRatio) }));
 const paneSplitterVisible = computed(() => !["source", "focus", "preview", "export"].includes(store.mode));
 const wordStats = computed(() => {
@@ -2155,6 +2170,73 @@ function canNavigateDiagnostic(diagnostic: DocumentDiagnostic) {
 function diagnosticLocation(diagnostic: DocumentDiagnostic) {
   const parts = [diagnostic.source_file, diagnostic.line ? `line ${diagnostic.line}` : ""].filter(Boolean);
   return parts.join(": ");
+}
+
+function previewGeneratedLineForDiagnostic(diagnostic: DocumentDiagnostic) {
+  const compile = active.value.compile;
+  const sourceLine = diagnostic.line || 1;
+  const sourceFile = diagnostic.source_file ? normalizeDocumentPath(diagnostic.source_file) : "";
+  const sourceMap = compile?.source_map || [];
+  const exact = sourceMap.find((entry) => {
+    const fileMatches = !sourceFile || normalizeDocumentPath(entry.source_file) === sourceFile;
+    return fileMatches && entry.source_line === sourceLine;
+  });
+  if (exact) return Math.max(1, exact.generated_line);
+  const nearest = sourceMap
+    .filter((entry) => !sourceFile || normalizeDocumentPath(entry.source_file) === sourceFile)
+    .filter((entry) => entry.source_line >= sourceLine)
+    .sort((left, right) => left.source_line - right.source_line)[0];
+  return Math.max(1, nearest?.generated_line || sourceLine);
+}
+
+function inlinePreviewDiagnostics(html: string, diagnostics: PreviewDiagnosticItem[]) {
+  if (!diagnostics.length) return html;
+  const lines = html.split("\n");
+  const diagnosticsByLine = new Map<number, PreviewDiagnosticItem[]>();
+  const maxLine = Math.max(1, lines.length);
+  for (const diagnostic of diagnostics) {
+    const line = Math.max(1, Math.min(diagnostic.generatedLine || 1, maxLine + 1));
+    diagnosticsByLine.set(line, [...(diagnosticsByLine.get(line) || []), diagnostic]);
+  }
+  const output: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    output.push(...(diagnosticsByLine.get(index + 1) || []).map(renderPreviewDiagnostic));
+    output.push(lines[index]);
+  }
+  output.push(...(diagnosticsByLine.get(maxLine + 1) || []).map(renderPreviewDiagnostic));
+  return output.join("\n");
+}
+
+function renderPreviewDiagnostic(diagnostic: PreviewDiagnosticItem) {
+  const location = diagnosticLocation(diagnostic);
+  const related = diagnostic.related.length
+    ? `<ul>${diagnostic.related.map((item) => `<li>${escapePreviewHtml(item)}</li>`).join("")}</ul>`
+    : "";
+  const sourceFile = diagnostic.source_file || active.value.path || "";
+  return [
+    `<aside class="preview-diagnostic ${escapePreviewAttribute(diagnostic.severity)}" role="note" aria-label="${escapePreviewAttribute(
+      `${diagnostic.severity} preview diagnostic`,
+    )}">`,
+    `<strong>${escapePreviewHtml(diagnostic.severity)}</strong>`,
+    `<p>${escapePreviewHtml(diagnostic.message)}</p>`,
+    location ? `<small>${escapePreviewHtml(location)}</small>` : "",
+    diagnostic.suggestion ? `<small>${escapePreviewHtml(diagnostic.suggestion)}</small>` : "",
+    related,
+    `<button type="button" class="preview-diagnostic-jump" data-source-file="${escapePreviewAttribute(sourceFile)}" data-line="${escapePreviewAttribute(
+      String(diagnostic.line || ""),
+    )}" data-column="${escapePreviewAttribute(String(diagnostic.column || ""))}" data-end-line="${escapePreviewAttribute(
+      String(diagnostic.end_line || diagnostic.line || ""),
+    )}" data-end-column="${escapePreviewAttribute(String(diagnostic.end_column || ""))}">Go to source</button>`,
+    "</aside>",
+  ].join("");
+}
+
+function escapePreviewHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escapePreviewAttribute(value: string) {
+  return escapePreviewHtml(value).replace(/"/g, "&quot;");
 }
 
 function buildEditor() {
@@ -3402,6 +3484,21 @@ function goToCrossReference(reference: { line: number; column?: number | null; e
 function handlePreviewClick(event: MouseEvent) {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  const diagnosticJump = target.closest<HTMLButtonElement>("button.preview-diagnostic-jump");
+  if (diagnosticJump) {
+    event.preventDefault();
+    const line = Number(diagnosticJump.dataset.line || 0);
+    if (line) {
+      void goToSourceTarget({
+        source_file: diagnosticJump.dataset.sourceFile || null,
+        line,
+        column: Number(diagnosticJump.dataset.column || 0) || null,
+        end_line: Number(diagnosticJump.dataset.endLine || 0) || line,
+        end_column: Number(diagnosticJump.dataset.endColumn || 0) || null,
+      });
+    }
+    return;
+  }
   const link = target.closest("a[href^='#']");
   const heading = target.closest("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
   const anchor = heading?.id || link?.getAttribute("href")?.slice(1) || "";
@@ -3998,6 +4095,42 @@ select:hover {
   padding-left: 18px;
   color: #526171;
   font-size: 12px;
+}
+
+.preview-diagnostic {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+  padding: 8px 10px;
+  border-left: 4px solid #6386b4;
+  background: #f7f9fc;
+}
+
+.preview-diagnostic.warning {
+  border-color: #c68a1a;
+  background: #fff7e6;
+}
+
+.preview-diagnostic.error {
+  border-color: #c24141;
+  background: #fff1f1;
+}
+
+.preview-diagnostic p,
+.preview-diagnostic ul {
+  margin: 0;
+}
+
+.preview-diagnostic ul {
+  padding-left: 18px;
+}
+
+.preview-diagnostic small {
+  color: #526171;
+}
+
+.preview-diagnostic button {
+  justify-self: start;
 }
 
 .progress-steps {

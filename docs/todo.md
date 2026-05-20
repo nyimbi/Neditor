@@ -1116,7 +1116,8 @@ Finish:
 - Editor/preview synchronized scrolling.
 - Preview heading click jumps to source.
 - Separate preview theme behavior.
-- Inline warning rendering.
+- Inline warning rendering. The preview now injects escaped diagnostic callouts
+  into the rendered flow and delegates source jumps back to the editor.
 - Transform-aware preview artifacts.
 - Print/export preview mode behavior.
 - Preview accessibility and keyboard navigation.
