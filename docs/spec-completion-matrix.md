@@ -148,8 +148,8 @@ is not "Complete".
 | --- | --- | --- | --- | --- |
 | 19 Workspace/tab groups | Tabs, groups, pinning, recents, restore | Partial | `src/App.vue`; store persistence | Document-set grouping and workflow tests. |
 | 20 Command palette | Search commands/headings/citations/glossary/index/documents/workspace files | Partial | `commands` computed in `src/App.vue`; Playwright table insertion command test; browser CI run `26154535588` covers heading command navigation; browser CI run `26155535210` covers citation, glossary, and index command navigation; browser CI run `26156393184` covers open-document switching and workspace-file opening | Broader keyboard shortcuts and non-sandboxed/native execution. |
-| 21 Preferences | Theme, typography, export, Git, AI, transforms, recents | Partial | Settings UI; persisted workspace | Migration/schema tests and UI workflow. |
-| 22 Security/privacy | Local-first, trust-gated executable transforms, no shell | Partial | External transform runner/tests; local file design | Security review, platform proof, threat-model docs. |
+| 21 Preferences | Theme, typography, export, Git, AI, transforms, recents | Partial | Settings UI; persisted workspace; browser CI run `26157446711` covers external transform path changes, input mode, timeout, trust prompt, denied trust reset, successful probe UI, and missing-executable diagnostics | Migration/schema tests and broader settings workflow coverage. |
+| 22 Security/privacy | Local-first, trust-gated executable transforms, no shell | Partial | External transform runner/tests; local file design; browser CI run `26157446711` covers transform trust prompts, path-change trust clearing, denied trust reset, and missing executable diagnostics | Security review, platform proof, threat-model docs. |
 | 23 Accessibility | Keyboard, ARIA, contrast, reduced motion | Partial | Some labels/roles/settings in UI | Accessibility audit and automated/manual checks. |
 | 24 Performance | Large docs, debounced preview, transform cache, progress | Partial | Debounce/cache/progress code | Benchmarks/stress tests and cancellation behavior. |
 
@@ -173,7 +173,7 @@ is not "Complete".
 
 | Setup doc section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
-| Safety model | Real executable paths, per-engine trust, bounded execution, cache keys, fallback | Partial | `transforms/external.rs`; external transform tests | Cross-platform process proof and UI workflow tests. |
+| Safety model | Real executable paths, per-engine trust, bounded execution, cache keys, fallback | Partial | `transforms/external.rs`; external transform tests; browser CI run `26157446711` covers settings-level path change trust clearing, trust prompts, denied trust reset, input mode/timeout probe details, cache identity display, and missing-executable diagnostics | Cross-platform process proof and deeper executable edge cases. |
 | macOS setup | Graphviz, D2, Pikchr, Java/PlantUML paths | Unverified | Documentation exists | Add manual/CI evidence on macOS. |
 | Linux setup | Packages and optional engines | Partial | CI installs Linux engines and sets env vars | Keep installed-engine conformance stable. |
 | Windows setup | Winget paths and shim guidance | Unverified | Documentation exists | Add manual/CI evidence on Windows. |
@@ -193,11 +193,11 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed code CI on commit `145942a` is green across browser workflows and
+- Latest pushed code CI on commit `976016c` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26156393184` with 27
+- Browser-level workflow harness passes in Linux CI run `26157446711` with 28
   Chromium tests, including advanced table editor coverage, mocked file
   lifecycle coverage, save-as, recently closed reopening, and stale-save
   conflict copy/merge/keep-local/accept-external recovery plus watcher-originated
@@ -213,7 +213,8 @@ Current major verification gaps:
   click-to-source, persisted editor word-wrap and line-number settings,
   CodeMirror find/replace, smart list continuation, bracket auto-pairing, and
   command-palette heading, citation, glossary, index, open-document, and
-  workspace-file navigation.
+  workspace-file navigation, plus transform engine settings trust/probe
+  diagnostics.
   Local focused execution is
   currently blocked because the workspace-local Chromium headless-shell
   executable is missing from the Playwright cache.

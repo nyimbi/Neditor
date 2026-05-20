@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `145942a Prove
-  command palette workspace navigation`
+- Latest inspected committed baseline before this update: `976016c Stabilize
+  denied transform trust proof`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -122,6 +122,10 @@ Recent pushed checkpoints visible in current git history:
 - `145942a` added browser workflow proof for command-palette open-document
   switching and workspace-file opening, including active tab, editor, and file
   sidebar state.
+- `3b7a2fe` and `976016c` added and stabilized browser workflow proof for
+  external transform engine settings: path-change trust clearing, trust
+  prompts, denied trust reset, input mode and timeout persistence, successful
+  probe details, cache identity, and missing-executable diagnostics.
 
 ## Current Capability Snapshot
 
@@ -164,8 +168,9 @@ Implemented or substantially present, pending the conservative caveats in
   synchronized editor/preview scrolling, preview heading click-to-source,
   persisted editor word-wrap and line-number settings, CodeMirror find/replace,
   smart list continuation, bracket auto-pairing, command-palette heading
-  navigation, command-palette citation, glossary, and index navigation, plus
-  command-palette open-document switching and workspace-file opening.
+  navigation, command-palette citation, glossary, and index navigation,
+  command-palette open-document switching and workspace-file opening, plus
+  transform engine settings trust/probe diagnostics.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -176,13 +181,13 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed code CI for commit `145942a` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26156393184`.
+- Latest pushed code CI for commit `976016c` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26157446711`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 27 Chromium tests in
-  run `26156393184`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 28 Chromium tests in
+  run `26157446711`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
   root-file conflicts, advanced table structure/format/cancel coverage, and AI
@@ -200,7 +205,8 @@ P0 gaps:
   editor word-wrap and line-number persistence, CodeMirror find/replace, smart
   list continuation, bracket auto-pairing, command-palette heading navigation,
   citation navigation, glossary navigation, index navigation, open-document
-  switching, and workspace-file opening.
+  switching, workspace-file opening, and transform engine settings trust/probe
+  diagnostics.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -394,6 +400,17 @@ Additional command palette document/workspace navigation verification:
 | `git diff --check` | Pass | No whitespace errors after adding command palette document/workspace navigation coverage. |
 | `gh run watch 26156393184 --exit-status` | Pass | Commit `145942a` passed 27 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
 
+Additional transform settings workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding transform engine trust/probe browser workflow coverage. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the transform settings workflow update. |
+| `pnpm exec playwright test --list` | Pass | Listed 28 Chromium workflow tests, including transform engine trust/probe diagnostics coverage. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "transform engine trust" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
+| `git diff --check` | Pass | No whitespace errors after adding and stabilizing transform settings workflow coverage. |
+| `gh run watch 26157446711 --exit-status` | Pass | Commit `976016c` passed 28 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
+
 Current CI evidence log:
 
 | Command | Result | Evidence |
@@ -523,9 +540,9 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Expand browser coverage for transform settings, export progress,
-   document/workspace command navigation, remaining preview modes, and the
-   remaining AI/table modes.
+1. Expand browser coverage for export progress, remaining preview modes,
+   broader keyboard shortcuts, deeper workspace grouping, and the remaining
+   AI/table modes.
 2. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
 3. Use failures from workflow tests to drive implementation fixes.

@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `145942a`
+  `976016c`
 
 Status vocabulary:
 
@@ -76,22 +76,22 @@ behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `145942a Prove command palette workspace navigation`
+- `976016c Stabilize denied transform trust proof`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26156393184` on commit `145942a`
+- Run `26157446711` on commit `976016c`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26156393184`:
+CI evidence from run `26157446711`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 27 Chromium workflow tests, including advanced table paste import,
+  includes 28 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, row/column structure editing, column format totals,
   cancel-without-applying behavior, AI paste insert/quote/appendix/replace
@@ -113,8 +113,8 @@ CI evidence from run `26156393184`:
   line-number settings, CodeMirror find/replace, smart list continuation,
   bracket auto-pairing, command-palette heading navigation, command-palette
   citation navigation, command-palette glossary navigation, command-palette
-  index navigation, command-palette open-document switching, and command-palette
-  workspace-file opening.
+  index navigation, command-palette open-document switching, command-palette
+  workspace-file opening, and transform engine settings trust/probe diagnostics.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -294,6 +294,23 @@ Recent local verification evidence from this buildout:
   navigation coverage.
 - `gh run watch 26156393184 --exit-status`: passed on commit `145942a` across
   27 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
+- `pnpm run test:unit`: passed after adding transform engine trust/probe
+  browser workflow coverage.
+- `pnpm run build`: passed after adding transform engine trust/probe browser
+  workflow coverage.
+- `pnpm exec playwright test --list`: listed 28 Chromium workflow tests after
+  adding transform settings trust/probe diagnostics coverage.
+- `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "transform
+  engine trust" --project chromium`: blocked locally because the Chromium
+  headless-shell executable is missing from the Playwright cache.
+- `git diff --check`: passed after adding and stabilizing transform settings
+  workflow coverage.
+- `gh run watch 26157312901 --exit-status`: failed on commit `3b7a2fe` after
+  27 browser workflows passed; the new transform-settings workflow reached the
+  denied-trust branch, where Playwright `check()` conflicted with the expected
+  checkbox reset.
+- `gh run watch 26157446711 --exit-status`: passed on commit `976016c` across
+  28 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -515,6 +532,10 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Command palette document/workspace navigation workflow: switch to an
   already-open document from the palette, open a workspace file by relative
   path, and verify active tab, editor, and file-sidebar state.
+- Transform engine settings workflow: path changes clear trust, trust prompts
+  appear for used external transform fences, denied trust resets the checkbox,
+  input mode and timeout feed probe requests, successful probes show diagnostics
+  and cache identity, and missing executables surface failure diagnostics.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -536,8 +557,8 @@ Required next coverage:
   review-state flows.
 - Export flow progress, target-specific readiness checks, manifest path
   reporting, and error diagnostics.
-- Transform engine settings: path change clears trust, trust prompt, probe
-  success/failure UI, and disabled/missing executable diagnostics.
+- Remaining transform engine settings: disabled-engine and cross-platform
+  executable edge cases beyond the mocked browser workflow.
 
 Completion criteria:
 
@@ -1011,8 +1032,8 @@ Completion criteria:
 
 ## Recommended Execution Order
 
-1. Expand browser workflow coverage for workspace restore, conflicts, preview
-   navigation/scroll sync, transform settings, export progress, and remaining
+1. Expand browser workflow coverage for export progress, broader keyboard
+   shortcuts, deeper workspace grouping, remaining preview modes, and remaining
    AI/table modes.
 2. Add desktop WebDriver/Tauri smoke tests.
 3. Use workflow failures to close real implementation gaps.
