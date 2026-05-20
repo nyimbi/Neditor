@@ -155,6 +155,8 @@ NEditor is built for drafts that need evidence before publication.
 
 - Set release status in front matter, for example `draft`, `in-review`,
   `approved`, `published`, or `archived`.
+- Use the titlebar release badge and Review panel summary to see the current
+  document status while editing.
 - Add approval metadata before release-grade exports.
 - Use inline review comments and change notes to keep audit context near the
   text.
@@ -216,6 +218,10 @@ Snapshot restore is document-scoped. The app restores only Markdown snapshots
 from the active document's configured snapshot store, and it checks matching
 snapshot metadata before loading the older text back into the editor as an
 unsaved change.
+
+The Versioning panel shows Git status, diff, history, release tagging controls,
+and the active document's snapshots together so teams can recover a draft,
+inspect changes, and tag an approved release from one workflow.
 
 See [Storage model](storage-model.md) and
 [Security threat model](security-threat-model.md) for persistence and trust

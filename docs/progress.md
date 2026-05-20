@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `a57767b Surface
-  malformed front matter with source ranges`
+- Latest inspected committed baseline before this update: `929043c Constrain
+  snapshot restores to active documents`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -1133,6 +1133,19 @@ Additional snapshot restore hardening verification:
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`, proving the updated Tauri command shape compiles in the desktop app. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
+Additional versioning workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the release badge, Versioning-panel snapshot controls, and browser workflow mock coverage. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests still passed after the versioning workflow UI and mock harness update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files had all local links resolve after documenting the versioning workflow update. |
+| `pnpm run check:a11y` | Pass | Vue template accessibility guardrails still passed after adding the release status badge and Versioning-panel snapshot controls. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 36 Chromium workflow tests, including `runs snapshot restore and release tagging workflows`. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "snapshot restore" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
 ## Next Execution Order

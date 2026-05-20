@@ -47,7 +47,7 @@
       </section>
 
       <section class="window-meta" aria-label="Document status">
-        <span>{{ active.compile?.semantic.status || "draft" }}</span>
+        <span role="status" class="release-badge" :class="releaseStatusClass" :aria-label="`Release status ${releaseStatus}`">{{ releaseStatus }}</span>
         <span v-if="store.gitStatus?.inside_repo">{{ store.gitStatus.branch || "detached" }}{{ store.gitStatus.dirty ? " dirty" : " clean" }}</span>
       </section>
     </header>
@@ -622,6 +622,15 @@
             <p>{{ entry.subject }}</p>
             <small>{{ entry.revision.slice(0, 12) }} | {{ entry.author }} | {{ entry.date }}</small>
             <button type="button" @click="store.restoreGitRevision(entry.revision)">Restore</button>
+          </article>
+          <h3>Snapshots</h3>
+          <button type="button" @click="store.snapshotActive()">Create snapshot</button>
+          <button type="button" @click="store.listSnapshots">Refresh snapshots</button>
+          <article v-for="snapshot in store.snapshots" :key="`version-${snapshot.snapshot_path}`" class="snapshot-row">
+            <p>{{ snapshot.label || "snapshot" }}</p>
+            <small>{{ snapshot.created_at || snapshot.snapshot_path }}</small>
+            <small>{{ snapshot.document_version || "unversioned" }} | {{ snapshot.status || "unknown" }} | {{ snapshot.author || "unknown author" }}</small>
+            <button type="button" @click="store.restoreSnapshot(snapshot.snapshot_path)">Restore snapshot</button>
           </article>
         </template>
 
@@ -1261,6 +1270,8 @@ const wordStats = computed(() => {
   const minutes = words ? Math.max(1, Math.ceil(words / 220)) : 0;
   return `${words} words | ${text.length} characters | ${minutes} min read`;
 });
+const releaseStatus = computed(() => active.value.compile?.semantic.status || "draft");
+const releaseStatusClass = computed(() => `release-${releaseStatus.value.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`);
 const watchStatus = computed(() => {
   if (store.watchDriver === "off" || !store.watchedPaths.length) return "";
   const label = store.watchDriver === "native" ? "Native watch" : "Plugin watch";
@@ -3424,6 +3435,7 @@ select:hover {
 .app-shell[data-high-contrast="true"] .trust-prompt,
 .app-shell[data-high-contrast="true"] .status-bar,
 .app-shell[data-high-contrast="true"] .sidebar,
+.app-shell[data-high-contrast="true"] .release-badge,
 .app-shell[data-high-contrast="true"] button,
 .app-shell[data-high-contrast="true"] select,
 .app-shell[data-high-contrast="true"] input,
@@ -3573,6 +3585,56 @@ select:hover {
 .status-bar {
   color: #526171;
   font-size: 12px;
+}
+
+.window-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.release-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid #9fb0c2;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #253142;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.release-draft {
+  border-color: #c68a1a;
+  background: #fff7df;
+  color: #714b00;
+}
+
+.release-in-review {
+  border-color: #4575b4;
+  background: #e8f1ff;
+  color: #164071;
+}
+
+.release-approved {
+  border-color: #2f855a;
+  background: #e7f7ed;
+  color: #19543a;
+}
+
+.release-published {
+  border-color: #5d55a5;
+  background: #f0edff;
+  color: #3b3474;
+}
+
+.release-archived {
+  border-color: #7b8794;
+  background: #eef1f4;
+  color: #3d4852;
 }
 
 .command-bar {

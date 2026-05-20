@@ -8,17 +8,54 @@ async function installTauriMock(page: Page) {
     const persistentState = (() => {
       try {
         const encoded = window.sessionStorage.getItem(e2eStateKey);
-        if (encoded) return JSON.parse(encoded) as { files?: Array<[string, { text: string; hash: string; modified: string }]>; stores?: Record<string, Record<string, unknown>> };
+        if (encoded)
+          return JSON.parse(encoded) as {
+            files?: Array<[string, { text: string; hash: string; modified: string }]>;
+            snapshots?: Array<
+              [
+                string,
+                {
+                  text: string;
+                  hash: string;
+                  modified: string;
+                  metadata_path: string;
+                  created_at: string;
+                  label: string;
+                  sourcePath: string | null;
+                  documentVersion: string | null;
+                  status: string | null;
+                  author: string | null;
+                  includeGraphHash: string | null;
+                },
+              ]
+            >;
+            stores?: Record<string, Record<string, unknown>>;
+            releaseTags?: string[];
+          };
       } catch {
         // Fall back to an in-memory mock if session storage is unavailable.
       }
-      return { files: [], stores: {} as Record<string, Record<string, unknown>> };
+      return { files: [], snapshots: [], stores: {} as Record<string, Record<string, unknown>>, releaseTags: [] };
     })();
     const storesByPath = new Map<string, Map<string, unknown>>(
       Object.entries(persistentState.stores || {}).map(([path, values]) => [path, new Map(Object.entries(values))]),
     );
     const storeResources = new Map<number, Map<string, unknown>>();
     const files = new Map<string, { text: string; hash: string; modified: string }>(persistentState.files || []);
+    const snapshots = new Map<string, {
+      text: string;
+      hash: string;
+      modified: string;
+      metadata_path: string;
+      created_at: string;
+      label: string;
+      sourcePath: string | null;
+      documentVersion: string | null;
+      status: string | null;
+      author: string | null;
+      includeGraphHash: string | null;
+    }>(persistentState.snapshots || []);
+    const releaseTags: string[] = persistentState.releaseTags || [];
     const dialogSelections: Array<string | null> = [];
     const confirmResponses: boolean[] = [];
     const revealedPaths: string[] = [];
@@ -28,7 +65,7 @@ async function installTauriMock(page: Page) {
     function persistE2eState() {
       try {
         const stores = Object.fromEntries(Array.from(storesByPath.entries()).map(([path, values]) => [path, Object.fromEntries(values.entries())]));
-        window.sessionStorage.setItem(e2eStateKey, JSON.stringify({ files: Array.from(files.entries()), stores }));
+        window.sessionStorage.setItem(e2eStateKey, JSON.stringify({ files: Array.from(files.entries()), snapshots: Array.from(snapshots.entries()), stores, releaseTags }));
       } catch {
         // The browser tests can still exercise the current page without persistence.
       }
@@ -101,6 +138,40 @@ async function installTauriMock(page: Page) {
       const file = files.get(normalized);
       if (!file) throw new Error(`Mock file not found: ${normalized}`);
       return { path: normalized, ...file };
+    }
+
+    function snapshotWorkspaceId(filePath?: string | null) {
+      return filePath ? hash(normalizePath(filePath)) : "unsaved";
+    }
+
+    function snapshotRoot(filePath?: string | null, storage?: string | null) {
+      const workspaceId = snapshotWorkspaceId(filePath);
+      if (storage === "project-local" && filePath) return `${dirname(normalizePath(filePath))}/.neditor/snapshots/${workspaceId}`;
+      return `/app-data/neditor/snapshots/${workspaceId}`;
+    }
+
+    function snapshotListItem(path: string, item: {
+      hash: string;
+      metadata_path: string;
+      created_at: string;
+      label: string;
+      sourcePath: string | null;
+      documentVersion: string | null;
+      status: string | null;
+      author: string | null;
+      includeGraphHash: string | null;
+    }) {
+      return {
+        snapshot_path: path,
+        metadata_path: item.metadata_path,
+        hash: item.hash,
+        created_at: item.created_at,
+        label: item.label,
+        document_version: item.documentVersion,
+        status: item.status,
+        author: item.author,
+        include_graph_hash: item.includeGraphHash,
+      };
     }
 
     if (!files.size) {
@@ -350,6 +421,9 @@ async function installTauriMock(page: Page) {
       const title = titleFromMarkdown(text);
       const status = statusFromMarkdown(text);
       const documentSet = frontMatterValue(text, "documentSet") || frontMatterValue(text, "document_set") || frontMatterValue(text, "set");
+      const version = frontMatterValue(text, "version") || "1.0.0";
+      const approvedBy = frontMatterValue(text, "approvedBy");
+      const approvedAt = frontMatterValue(text, "approvedAt");
       const headings = headingsFromMarkdown(expanded.compiled);
       const citationReferences = citationReferencesFromMarkdown(expanded.compiled);
       const bibliography = bibliographyFromMarkdown(expanded.compiled, filePath);
@@ -360,7 +434,9 @@ async function installTauriMock(page: Page) {
       const metadata = {
         title,
         status,
-        version: "1.0.0",
+        version,
+        ...(approvedBy ? { approvedBy } : {}),
+        ...(approvedAt ? { approvedAt } : {}),
         ...(documentSet ? { documentSet, document_set: documentSet } : {}),
       };
       const diagnostics = expanded.diagnostics;
@@ -381,7 +457,7 @@ async function installTauriMock(page: Page) {
       }
       const manifest = {
         document_title: title,
-        document_version: "1.0.0",
+        document_version: version,
         status,
         exported_at: new Date(0).toISOString(),
         source_hash: sourceHash,
@@ -603,8 +679,43 @@ async function installTauriMock(page: Page) {
           ...entries,
         ].sort((left, right) => left.relative_path.localeCompare(right.relative_path));
       }
-      if (cmd === "list_snapshots") return [];
-      if (cmd === "get_git_status") return { inside_repo: false, dirty: false, summary: [] };
+      if (cmd === "list_snapshots") {
+        const request = args.request as { file_path?: string | null; storage?: string | null };
+        const filePath = request.file_path ? normalizePath(request.file_path) : null;
+        const root = snapshotRoot(filePath, request.storage);
+        return Array.from(snapshots.entries())
+          .filter(([path, item]) => path.startsWith(`${root}/`) && (!filePath || item.sourcePath === filePath))
+          .map(([path, item]) => snapshotListItem(path, item))
+          .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)));
+      }
+      if (cmd === "get_git_status") {
+        return {
+          inside_repo: true,
+          branch: "main",
+          dirty: false,
+          summary: releaseTags.length ? [`tag ${releaseTags[releaseTags.length - 1]}`] : ["clean working tree"],
+        };
+      }
+      if (cmd === "git_history") {
+        return [
+          { revision: "abc123def456", subject: "Update market report", author: "NEditor", date: "2026-05-20T00:00:00Z" },
+          { revision: "001122334455", subject: "Initial market report", author: "NEditor", date: "2026-05-19T00:00:00Z" },
+        ];
+      }
+      if (cmd === "git_diff") return "diff --git a/market.md b/market.md\n+Mock diff for browser workflow\n";
+      if (cmd === "commit_document_changes") return null;
+      if (cmd === "tag_release") {
+        const request = args.request as { tag: string };
+        releaseTags.push(request.tag);
+        persistE2eState();
+        return request.tag;
+      }
+      if (cmd === "restore_git_revision") {
+        const request = args.request as { path: string; revision: string };
+        const text = `---\ntitle: Market Entry Report\nstatus: draft\n---\n\n# Market Entry Report\n\nRestored from ${request.revision}.\n`;
+        setFile(request.path, text);
+        return readMockFile(request.path);
+      }
       if (cmd === "start_file_watcher") {
         const request = args.request as { root: string; included?: string[] };
         const rootPath = normalizePath(request.root);
@@ -710,7 +821,42 @@ async function installTauriMock(page: Page) {
           provenance_block: provenanceBlock,
         };
       }
-      if (cmd === "create_snapshot") return { snapshot_path: "/tmp/mock-snapshot.md" };
+      if (cmd === "create_snapshot") {
+        const request = args.request as { text: string; file_path?: string | null; label?: string | null; storage?: string | null };
+        const filePath = request.file_path ? normalizePath(request.file_path) : null;
+        const root = snapshotRoot(filePath, request.storage);
+        const label = (request.label || "snapshot").replace(/[^a-z0-9_-]/gi, "") || "snapshot";
+        const ordinal = String(snapshots.size + 1).padStart(3, "0");
+        const snapshotPath = `${root}/20260520T0000${ordinal}Z-${label}.md`;
+        const createdAt = `2026-05-20T00:00:${String(snapshots.size + 1).padStart(2, "0")}Z`;
+        const compiled = compileMarkdown(request.text, filePath || "/workspace/market.md");
+        snapshots.set(snapshotPath, {
+          text: request.text,
+          hash: hash(request.text),
+          modified: createdAt,
+          metadata_path: snapshotPath.replace(/\.md$/, ".json"),
+          created_at: createdAt,
+          label,
+          sourcePath: filePath,
+          documentVersion: String(compiled.metadata.version || "unversioned"),
+          status: String(compiled.semantic.status || "draft"),
+          author: frontMatterValue(request.text, "author") || null,
+          includeGraphHash: hash(JSON.stringify(compiled.include_graph)),
+        });
+        persistE2eState();
+        return { snapshot_path: snapshotPath, metadata_path: snapshotPath.replace(/\.md$/, ".json"), hash: hash(request.text) };
+      }
+      if (cmd === "restore_snapshot") {
+        const request = args.request as { snapshot_path: string; file_path?: string | null; storage?: string | null };
+        const snapshotPath = normalizePath(request.snapshot_path);
+        const item = snapshots.get(snapshotPath);
+        const filePath = request.file_path ? normalizePath(request.file_path) : null;
+        if (!snapshotPath.endsWith(".md")) throw new Error("Snapshot restore requires a Markdown snapshot file.");
+        if (!snapshotPath.startsWith(`${snapshotRoot(filePath, request.storage)}/`)) throw new Error("Snapshot restore path must stay inside the configured snapshot store.");
+        if (!item) throw new Error("Snapshot restore requires matching snapshot metadata.");
+        if (item.sourcePath !== filePath) throw new Error("Snapshot metadata does not match the active document.");
+        return { path: snapshotPath, text: item.text, hash: item.hash, modified: item.modified };
+      }
       if (cmd === "export_document") {
         const request = args.request as { output_path: string; target?: string; options?: { includeManifest?: boolean } };
         if (request.output_path.includes("fail")) throw new Error(`Mock export writer failed for ${request.output_path}`);
@@ -1522,6 +1668,50 @@ test("saves a document as a new file and reopens it from recently closed", async
   await expect(recentlyClosed.getByRole("button", { name: "/workspace/market-approved.md" })).toHaveCount(0);
   await page.getByLabel("Sidebar panel").selectOption("files");
   await expect.poll(() => activeFileRowText(page)).toContain("market-approved.md");
+});
+
+test("runs snapshot restore and release tagging workflows", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.getByRole("status", { name: "Release status draft" })).toBeVisible();
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  const sidebar = page.locator(".sidebar");
+  await sidebar.getByLabel("Status").selectOption("approved");
+  await sidebar.getByLabel("Version").fill("2.0.0");
+  await sidebar.getByLabel("Version").press("Tab");
+  await sidebar.getByLabel("Approved by").fill("QA Lead");
+  await sidebar.getByLabel("Approved by").press("Tab");
+  await sidebar.getByRole("button", { name: "Set approval time" }).click();
+
+  await expect.poll(() => editorText(page)).toContain("status: approved");
+  await expect.poll(() => editorText(page)).toContain("version: 2.0.0");
+  await expect.poll(() => editorText(page)).toContain("approvedBy: QA Lead");
+  await expect.poll(() => editorText(page)).toContain("approvedAt:");
+  await expect(page.getByRole("status", { name: "Release status approved" })).toBeVisible();
+
+  await page.getByLabel("Sidebar panel").selectOption("versioning");
+  await expect(sidebar).toContainText("main | clean");
+  await expect(sidebar).toContainText("Mock diff for browser workflow");
+
+  await sidebar.getByRole("button", { name: "Create snapshot" }).click();
+  await expect(page.locator(".status-bar")).toContainText("Snapshot saved to");
+  await expect(sidebar.locator(".snapshot-row").filter({ hasText: "manual" })).toBeVisible();
+  await expect(sidebar).toContainText("2.0.0 | approved");
+
+  await page.locator(".cm-content").click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+End" : "Control+End");
+  await page.keyboard.insertText("\n\nPost-snapshot change.");
+  await expect.poll(() => editorText(page)).toContain("Post-snapshot change.");
+
+  await sidebar.getByRole("button", { name: "Restore snapshot" }).first().click();
+  await expect.poll(() => editorText(page)).not.toContain("Post-snapshot change.");
+  await expect.poll(() => editorText(page)).toContain("approvedBy: QA Lead");
+  await expect(page.locator(".status-bar")).toContainText("Restored snapshot");
+
+  await sidebar.getByLabel("Release tag").fill("v2.0.0");
+  await sidebar.getByRole("button", { name: "Tag release" }).click();
+  await expect(page.locator(".status-bar")).toContainText("Tagged release v2.0.0");
 });
 
 test("switches tabs, guards dirty closes, and prunes stale recent document paths", async ({ page }) => {

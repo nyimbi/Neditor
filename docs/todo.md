@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `a57767b Surface malformed front matter with source ranges`
+- `929043c Constrain snapshot restores to active documents`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -214,6 +214,11 @@ Most recent local verification evidence:
   timing/coalescing coverage, and workspace persistence migration/schema
   normalization.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
+- `pnpm exec playwright test --list`: listed 36 Chromium workflow tests,
+  including the new snapshot restore and release tagging workflow.
+- `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "snapshot restore" --project chromium`:
+  blocked before assertions because the local Playwright Chromium headless-shell
+  executable is missing from this host cache.
 - `./node_modules/.bin/tauri build --no-bundle`: passed and built the release
   desktop binary after the snapshot restore IPC request update.
 - `pnpm run check:a11y`: passed and checked the Vue template for accessible
@@ -223,11 +228,11 @@ Most recent local verification evidence:
 - `npx playwright test e2e/app-workflows.spec.ts -g "keeps large document editing"`:
   not run to completion on this host because the Playwright Chromium binary is
   not installed; the large-document browser workflow is present in the harness.
-- `pnpm exec playwright test --list`: listed 35 Chromium workflow tests,
+- `pnpm exec playwright test --list`: listed 36 Chromium workflow tests,
   including the new large-document browser interaction workflow plus the
   existing harness proof for command-palette insertion of `[TOC]`, `[INDEX]`,
   `[GLOSSARY]`, `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and
-  `[LIST_OF_TABLES]`.
+  `[LIST_OF_TABLES]`, and the snapshot restore/release tagging workflow.
 - `./node_modules/.bin/tauri build --no-bundle`: passed and built the release
   desktop binary at `src-tauri/target/release/neditor`.
 - `git diff --check`: passed.
