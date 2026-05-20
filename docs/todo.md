@@ -771,6 +771,12 @@ Current evidence:
 - DOCX/PPTX custom package properties now include approval metadata and legal
   disclaimer fields alongside status, version, classification, client, source
   hash, and app version.
+- `export_option_matrix_is_preserved_across_targets_and_bundle_evidence` now
+  proves one explicit target option matrix across HTML, PDF, DOCX, PPTX, plain
+  text, and Markdown bundle outputs. The matrix covers omitted styles, syntax
+  highlighting, cover page, page numbers, glossary/comment/provenance
+  appendices, PPTX agenda, compact layout preset, watermark, legal disclaimer
+  carry-through, and exact Markdown bundle `export_options` evidence.
 
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
 
@@ -799,6 +805,7 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
 Needed proof:
 
 - Package/text assertions where appropriate.
+- More target-specific option combinations beyond the current focused matrix.
 - Rendered or manually inspected representative PDF/DOCX/PPTX artifacts.
 - Fixture exports tied back to matrix rows.
 

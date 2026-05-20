@@ -329,3 +329,155 @@ fn export_appendix_options_control_target_outputs() {
     assert!(!text_without_appendix.contains("Review Comments"));
     assert!(!text_without_appendix.contains("AI Provenance"));
 }
+
+#[test]
+fn export_option_matrix_is_preserved_across_targets_and_bundle_evidence() {
+    let response = compile(CompileRequest {
+        text: r##"---
+title: Option Matrix Report
+status: approved
+approvedBy: QA
+approvedAt: 2026-05-20T09:00:00Z
+version: 1.0.0
+toc: true
+legalDisclaimer: "Internal proof only."
+brand:
+  name: Matrix Brand
+  color: "#123456"
+---
+
+# Option Matrix Report
+
+[TOC]
+
+This report proves target-specific export options from one semantic document.
+
+```js
+const total = 42; // evidence
+```
+
+<!-- comment: author: QA | at: 2026-05-20 | resolved | Check option parity. -->
+<!-- change: author: QA | at: 2026-05-20T10:00:00Z | Confirmed target matrix. -->
+
+```glossary
+SLA: Service-level agreement.
+```
+
+```ai-source
+provider: OpenAI
+model: gpt-5.4
+date: 2026-05-20
+promptSummary: option matrix synthesis
+reviewedBy: QA
+reviewedAt: 2026-05-20T09:30:00Z
+status: human-reviewed
+```
+"##
+        .to_string(),
+        file_path: None,
+    });
+    let options = json!({
+        "includeStyles": false,
+        "includeSyntaxHighlighting": false,
+        "coverPage": false,
+        "pageNumbers": false,
+        "includeGlossary": false,
+        "includeComments": false,
+        "includeProvenance": false,
+        "includeAgenda": false,
+        "layoutPreset": "compact",
+        "watermark": "INTERNAL"
+    });
+
+    let html = render_full_html(&response, &options);
+    assert!(!html.contains("<style>"));
+    assert!(!html.contains("class=\"cover\""));
+    assert!(!html.contains("syn-keyword"));
+    assert!(!html.contains("class=\"export-glossary\""));
+    assert!(!html.contains("class=\"export-comments\""));
+    assert!(!html.contains("class=\"export-provenance\""));
+    assert!(html.contains("class=\"export-legal\""));
+    assert!(html.contains("Internal proof only."));
+
+    let pdf = String::from_utf8_lossy(&render_pdf_bytes(&response, &options)).into_owned();
+    assert!(!pdf.contains("Page 1 of"));
+    assert!(!pdf.contains("Glossary"));
+    assert!(!pdf.contains("Review Comments"));
+    assert!(!pdf.contains("AI Provenance"));
+    assert!(pdf.contains("Legal Disclaimer"));
+    assert!(pdf.contains("Internal proof only."));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
+    assert!(!docx_footer.contains("PAGE"));
+    assert!(!docx_document.contains("Glossary"));
+    assert!(!docx_document.contains("Review Comments"));
+    assert!(!docx_document.contains("AI Provenance"));
+    assert!(docx_document.contains("Legal Disclaimer"));
+    assert!(docx_document.contains("Internal proof only."));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(!pptx_slides.contains("Agenda"));
+    assert!(!pptx_slides.contains("Glossary"));
+    assert!(!pptx_slides.contains("Review Comments"));
+    assert!(!pptx_slides.contains("AI Provenance"));
+    assert!(pptx_slides.contains("Legal Disclaimer"));
+    assert!(pptx_slides.contains("Internal proof only."));
+
+    let exported_text = export::export_text(&response, &options);
+    assert!(!exported_text.contains("Cover: Option Matrix Report"));
+    assert!(!exported_text.contains("Page 1 of"));
+    assert!(exported_text.contains("Layout preset: compact"));
+    assert!(exported_text.contains("Syntax highlighting: omitted"));
+    assert!(!exported_text.contains("Glossary"));
+    assert!(!exported_text.contains("Review Comments"));
+    assert!(!exported_text.contains("AI Provenance"));
+    assert!(exported_text.contains("Legal Disclaimer"));
+    assert!(exported_text.contains("Internal proof only."));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_target = "markdown-bundle".to_string();
+    bundle_manifest.export_options = options.clone();
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_manifest = zip_entry_text(&bundle, "manifest.json");
+    assert!(bundled_text.contains("Layout preset: compact"));
+    assert!(bundled_text.contains("Syntax highlighting: omitted"));
+    assert!(!bundled_text.contains("Glossary"));
+    assert!(!bundled_text.contains("Review Comments"));
+    assert!(!bundled_text.contains("AI Provenance"));
+    let manifest_json: Value =
+        serde_json::from_str(&bundled_manifest).expect("bundle manifest json");
+    assert_eq!(
+        manifest_json
+            .pointer("/export_target")
+            .and_then(Value::as_str),
+        Some("markdown-bundle")
+    );
+    assert_eq!(
+        manifest_json
+            .pointer("/export_options/includeStyles")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        manifest_json
+            .pointer("/export_options/includeSyntaxHighlighting")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        manifest_json
+            .pointer("/export_options/includeAgenda")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        manifest_json
+            .pointer("/export_options/layoutPreset")
+            .and_then(Value::as_str),
+        Some("compact")
+    );
+}

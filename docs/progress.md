@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `2231776 Make
-  NEditor usable from first-read docs`
+- Latest inspected committed baseline before this update: `5c1caee Render
+  richer API schema transform references`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -298,6 +298,14 @@ Recent pushed checkpoints visible in current git history:
   JSON Schema output now includes root metadata, nested field paths, array item
   paths, required flags, descriptions, refs, enums, formats, defaults, and
   numeric/string constraints.
+- This update adds
+  `export_option_matrix_is_preserved_across_targets_and_bundle_evidence`,
+  which runs one explicit export option matrix through HTML, PDF, DOCX, PPTX,
+  plain text, and Markdown bundle evidence. It proves styles, syntax
+  highlighting, cover pages, page numbers, glossary/comment/provenance
+  appendices, PPTX agenda generation, layout preset, watermark, legal
+  disclaimer output, and Markdown bundle `export_options` are honored from the
+  same compiled document.
 
 ## Current Capability Snapshot
 
@@ -322,6 +330,9 @@ Implemented or substantially present, pending the conservative caveats in
 - Export manifests now include included-file hashes, media hashes, source maps,
   diagnostics, readiness summaries, progress steps, layout sections, transform
   metadata, and the include graph used to build the deliverable.
+- Export option fidelity now has backend package/text proof across HTML, PDF,
+  DOCX, PPTX, plain text, and Markdown bundle manifests for one target-specific
+  option matrix.
 - Transform registry with Rust-native renderers/fallbacks and trust-gated
   external adapters for Graphviz/DOT, D2, PlantUML, and Pikchr.
 - Rust-native structured-document transforms for JSON, YAML, OpenAPI, and JSON
@@ -423,7 +434,9 @@ P0 gaps:
 
 P1 gaps:
 
-- Export fidelity requires stricter artifact-level and visual/manual proof.
+- Export fidelity still requires broader artifact-level and visual/manual
+  proof, but target-specific option matrix preservation now has backend
+  package/text evidence across every export target.
 - Export readiness has browser workflow coverage for the target-specific
   status/diagnostic path, but still needs a requirement-by-requirement audit.
 - Optional external transform evidence is strongest on Linux; macOS and Windows
@@ -461,6 +474,21 @@ Fresh baseline recorded on 2026-05-20:
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
 | `cargo test --locked` in `src-tauri` | Pass | 126 Rust tests passed; 0 failed. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
+
+Additional export option matrix verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after adding the option-matrix conformance test. |
+| `cargo test --locked export_option_tests --lib` in `src-tauri` | Pass | 9 export option tests passed, including `export_option_matrix_is_preserved_across_targets_and_bundle_evidence`. |
+| `cargo test --locked` in `src-tauri` | Pass | 144 Rust tests passed; 0 failed. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests passed. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed. |
+| `pnpm run check:docs` | Pass | Checked 12 Markdown files; local links resolve. |
+| `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
+| `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests; execution still depends on local Chromium availability and host permissions. |
+| `git diff --check` | Pass | No whitespace errors in the current diff. |
 
 Additional focused verification after workflow helper extraction:
 
