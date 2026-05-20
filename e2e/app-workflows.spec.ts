@@ -136,13 +136,21 @@ async function installTauriMock(page: Page) {
     }
 
     function titleFromMarkdown(text: string) {
-      const frontMatterTitle = text.match(/^---[\s\S]*?\ntitle:\s*(.+?)\n[\s\S]*?---/);
-      if (frontMatterTitle) return frontMatterTitle[1].replace(/^["']|["']$/g, "").trim();
+      const frontMatterTitle = frontMatterValue(text, "title");
+      if (frontMatterTitle) return frontMatterTitle;
       return text.match(/^#\s+(.+)$/m)?.[1].trim() || "Untitled";
     }
 
     function statusFromMarkdown(text: string) {
-      return text.match(/^---[\s\S]*?\nstatus:\s*(.+?)\n[\s\S]*?---/)?.[1].trim() || "draft";
+      return frontMatterValue(text, "status") || "draft";
+    }
+
+    function frontMatterValue(text: string, key: string) {
+      const frontMatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+      if (!frontMatter) return "";
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = frontMatter[1].match(new RegExp(`^${escapedKey}:\\s*(.+?)\\s*$`, "m"));
+      return match?.[1].replace(/^["']|["']$/g, "").trim() || "";
     }
 
     function htmlFromMarkdown(text: string) {
@@ -289,12 +297,18 @@ async function installTauriMock(page: Page) {
       const expanded = expandIncludes(text, filePath);
       const title = titleFromMarkdown(text);
       const status = statusFromMarkdown(text);
+      const documentSet = frontMatterValue(text, "documentSet") || frontMatterValue(text, "document_set") || frontMatterValue(text, "set");
       const headings = headingsFromMarkdown(expanded.compiled);
       const citationReferences = citationReferencesFromMarkdown(expanded.compiled);
       const glossary = glossaryFromMarkdown(expanded.compiled);
       const indexTerms = indexTermsFromMarkdown(expanded.compiled);
       const sourceHash = hash(text);
-      const metadata = { title, status, version: "1.0.0" };
+      const metadata = {
+        title,
+        status,
+        version: "1.0.0",
+        ...(documentSet ? { documentSet, document_set: documentSet } : {}),
+      };
       const diagnostics = expanded.diagnostics;
       const diagnosticLineIndex = expanded.compiled.split("\n").findIndex((line) => line.includes("DIAGNOSTIC_TARGET"));
       if (diagnosticLineIndex >= 0) {
@@ -354,7 +368,7 @@ async function installTauriMock(page: Page) {
           cross_references: [],
         },
         document_ast: {
-          metadata: { title, status, version: "1.0.0", source_hash: sourceHash },
+          metadata: { ...metadata, source_hash: sourceHash },
           blocks: headings.map((heading) => ({
             kind: "heading",
             level: heading.level,
@@ -1475,6 +1489,99 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
   await page.getByLabel("Sidebar panel").selectOption("files");
   await expect(page.getByText("/workspace")).toBeVisible();
   await expect.poll(() => activeFileRowText(page)).toContain("field-notes.md");
+});
+
+test("groups documents by document set and folder", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/board/executive-summary.md",
+    [
+      "---",
+      "title: Executive Summary",
+      "status: draft",
+      "documentSet: Board Pack",
+      "---",
+      "",
+      "# Executive Summary",
+      "",
+      "Board pack introduction.",
+    ].join("\n"),
+  );
+  await setMockFileText(
+    page,
+    "/workspace/board/risk-register.md",
+    [
+      "---",
+      "title: Risk Register",
+      "status: draft",
+      "document_set: Board Pack",
+      "---",
+      "",
+      "# Risk Register",
+      "",
+      "Board risk notes.",
+    ].join("\n"),
+  );
+  await setMockFileText(
+    page,
+    "/workspace/research/interview-notes.md",
+    [
+      "---",
+      "title: Interview Notes",
+      "status: draft",
+      "---",
+      "",
+      "# Interview Notes",
+      "",
+      "Research notes remain grouped by folder.",
+    ].join("\n"),
+  );
+  await setMockFileText(
+    page,
+    "/workspace/loose-note.md",
+    [
+      "---",
+      "title: Loose Note",
+      "status: draft",
+      "---",
+      "",
+      "# Loose Note",
+      "",
+      "This note will move into the board pack.",
+    ].join("\n"),
+  );
+
+  for (const path of [
+    "/workspace/board/executive-summary.md",
+    "/workspace/board/risk-register.md",
+    "/workspace/research/interview-notes.md",
+    "/workspace/loose-note.md",
+  ]) {
+    await queueDialogSelection(page, path);
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+  }
+
+  const boardPack = page.getByLabel("Board Pack tabs");
+  await expect(boardPack).toContainText("2");
+  await expect(boardPack.getByRole("button", { name: /Executive Summary/ })).toBeVisible();
+  await expect(boardPack.getByRole("button", { name: /Risk Register/ })).toBeVisible();
+
+  const researchGroup = page.getByLabel("research tabs");
+  await expect(researchGroup).toContainText("1");
+  await expect(researchGroup.getByRole("button", { name: /Interview Notes/ })).toBeVisible();
+
+  const looseTab = page.locator(".document-tabs .tab").filter({ hasText: "Loose Note" });
+  await looseTab.dragTo(boardPack);
+  await expect(boardPack).toContainText("3");
+  await expect(boardPack.getByRole("button", { name: /Loose Note/ })).toBeVisible();
+  await expect.poll(() => editorText(page)).toContain("documentSet: Board Pack");
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => mockFileText(page, "/workspace/loose-note.md")).toContain("documentSet: Board Pack");
+
+  await boardPack.getByLabel("Close tab group").click();
+  await expect(page.getByLabel("Board Pack tabs")).toHaveCount(0);
+  await expect(researchGroup.getByRole("button", { name: /Interview Notes/ })).toBeVisible();
 });
 
 test("skips missing restored files with a clear restore warning after reload", async ({ page }) => {

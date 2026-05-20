@@ -80,7 +80,7 @@ behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `02e832a Export current editor state before readiness`
+- `c95ef42 Prove live preview updates and package MIT licensing`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -90,6 +90,12 @@ explicit platform checks run outside GitHub Actions.
 
 Most recent local verification evidence:
 
+- `pnpm exec playwright test --list`: listed 34 Chromium workflow tests,
+  including document-set and folder tab grouping.
+- `pnpm run test:unit`: passed with 8 frontend unit tests.
+- `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
+- `git diff --check`: passed.
+- Markdown local link resolution for updated docs: passed.
 - `cargo test --locked spec_25_4_ipc_commands_are_registered_and_documented --lib`: passed.
 - `cargo test --locked`: passed locally with 129 Rust tests.
 - `cargo fmt --check`: passed in `src-tauri`.
@@ -592,6 +598,10 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Theme and typography workflow: app theme, preview theme, high contrast,
   reduced motion, editor typography, preview typography, and reload
   persistence.
+- Document grouping workflow: group tabs by folder and front matter document
+  set, drag a loose document into an existing document set, save the generated
+  `documentSet` front matter, and close a tab group without disturbing other
+  groups.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -603,7 +613,8 @@ Required next coverage:
 
 - Remaining file/workspace flows: multi-tab watcher switching and native
   desktop dialog behavior.
-- Deeper workspace folder browsing and document-set grouping behavior.
+- Deeper workspace folder browsing, native document-set proof, and remaining
+  tab drag/reorder edge cases.
 - Focus, export, review, and presentation mode local browser/native execution proof.
 - Broader keyboard shortcut coverage.
 - Theme/typography visual accessibility proof in a real browser/native runtime.
@@ -788,9 +799,12 @@ and restore logic exist; spec-level proof is incomplete.
 
 Finish:
 
-- Folder/workspace/project grouping behavior.
-- Explicit document-set grouping from front matter metadata if required by the
-  spec interpretation.
+- Folder/workspace/project grouping behavior. The browser harness now covers
+  folder grouping for open documents and document-set grouping from front
+  matter metadata.
+- Remaining document-set edge cases: native execution proof, saved workspace
+  package evidence, and deeper drag/reorder behavior beyond moving a loose tab
+  into an existing set.
 - Restart restore of previous workspace, active tab, mode/sidebar state, and
   pinned state. Browser archived workflow run `26147556750` covers this workflow.
 - Scroll position restore. Browser archived workflow run `26148828614` covers this workflow.

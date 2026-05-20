@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `02e832a Export
-  current editor state before readiness`
+- Latest inspected committed baseline before this update: `c95ef42 Prove live
+  preview updates and package MIT licensing`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -175,6 +175,10 @@ Recent pushed checkpoints visible in current git history:
   persistence.
 - This update adds workflow harness coverage for live preview updates after
   typing new source content.
+- This update adds workflow harness coverage for tab grouping by folder and
+  front matter document set, dragging a loose tab into an existing document
+  set, saving the generated `documentSet` front matter, and closing that group
+  without disturbing other open groups.
 
 ## Current Capability Snapshot
 
@@ -223,8 +227,9 @@ Implemented or substantially present, pending the conservative caveats in
   insertion plus quote/appendix/replace-document/section/selection modes,
   citation TODO insertion, draft markers, provenance blocks,
   clean included-file recompile, dirty included-file conflict handling, and
-  export readiness, restart-style workspace restore, restored scroll position
-  handling, missing restored-file warnings, tab activation, dirty-close
+  export readiness, restart-style workspace restore, folder/document-set tab
+  grouping, drag-to-document-set front matter updates, close-group behavior,
+  restored scroll position handling, missing restored-file warnings, tab activation, dirty-close
   confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
   folder reopen/prune behavior, moved recently-closed path pruning,
   live preview updates from source edits, synchronized editor/preview scrolling,
@@ -294,7 +299,9 @@ P1 gaps:
 - Optional external transform evidence is strongest on Linux; macOS and Windows
   optional-engine evidence remains incomplete.
 - File watcher/conflict flows need UI workflow tests.
-- Workspace/tab-group behavior needs restart and document-set grouping proof.
+- Workspace/tab-group behavior now has browser harness proof for restart
+  restore and document-set grouping; native desktop proof and deeper drag/reorder
+  edge cases remain.
 - Remaining editor and preview ergonomics need browser interaction proof beyond
   covered scroll sync and heading click-to-source.
 - AI paste, citations, layout, accessibility, performance, table export
@@ -498,6 +505,16 @@ Additional export readiness/result workflow verification:
 | `pnpm exec playwright install chromium` | Blocked locally | Browser install is sandbox-blocked by `EPERM` while creating `/Users/nyimbiodero/Library/Caches/ms-playwright/__dirlock`. |
 | `git diff --check` | Pass | No whitespace errors after the export workflow fixes. |
 | `gh run watch 26159396761 --exit-status` | Pass | Commit `02e832a` passed 28 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
+
+Additional document grouping workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm exec playwright test --list` | Pass | Listed 34 Chromium workflow tests, including `groups documents by document set and folder`. |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding document-set metadata to the browser mock. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the grouping workflow. |
+| `git diff --check` | Pass | No whitespace errors after adding the grouping workflow and docs. |
+| Markdown local link resolution script | Pass | Updated markdown docs contain no broken local links. |
 
 Archived remote workflow evidence log:
 
