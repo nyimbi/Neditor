@@ -188,3 +188,81 @@ fn repeated_export_loop_keeps_large_artifacts_stable() {
         "repeated export loop took {elapsed:?}"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn repeated_editing_sessions_reuse_external_transform_cache() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-edit-cache-stress-{unique}"));
+    fs::create_dir_all(&root).expect("create edit cache stress dir");
+    let counter_path = root.join("graphviz-count.txt");
+    let graphviz = write_executable_script(
+        "graphviz-cache-stress",
+        &format!(
+            "#!/bin/sh\ncount_file=\"{}\"\ncount=0\nif [ -f \"$count_file\" ]; then count=$(cat \"$count_file\"); fi\ncount=$((count + 1))\nprintf '%s' \"$count\" > \"$count_file\"\nprintf '<svg><text>'\ncat\nprintf '</text></svg>'\n",
+            path_to_string(&counter_path)
+        ),
+    );
+    let graphviz_path = path_to_string(&graphviz);
+    let graph_body = format!("digraph Cache{unique} {{ alpha -> beta; }}");
+    let options = json!({
+        "transformEnginePaths": { "dot": graphviz_path },
+        "trustedTransformEngines": { "dot": true },
+        "transformInputModes": { "dot": "stdin" },
+        "transformTimeoutMs": 1000
+    });
+
+    let mut previous_cache_key: Option<String> = None;
+    let started_at = Instant::now();
+    for iteration in 0..8 {
+        let text = format!(
+            "---\ntitle: Editing Cache Stress\nversion: 1.0.{iteration}\nstatus: draft\n---\n# Editing Cache Stress\n\nRevision {iteration} keeps the diagram stable while the document changes.\n\n```dot\n{graph_body}\n```\n\n```csv caption=\"Edit data {iteration}\"\nRegion,Revenue\nNorth,{}\nSouth,{}\n```\n",
+            100 + iteration,
+            80 + iteration
+        );
+        let response = compile_with_options(
+            CompileRequest {
+                text,
+                file_path: Some(path_to_string(&root.join("editing-cache.md"))),
+            },
+            &options,
+        );
+        let dot_artifact = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == "dot")
+            .expect("dot artifact");
+
+        assert!(response.html.contains(&format!("Revision {iteration}")));
+        assert!(dot_artifact.html.contains(&graph_body));
+        assert_eq!(dot_artifact.execution_kind, "external");
+        assert_eq!(dot_artifact.input_mode, "stdin");
+        if let Some(previous) = &previous_cache_key {
+            assert_eq!(&dot_artifact.cache_key, previous);
+            assert_eq!(dot_artifact.duration_ms, Some(0));
+            assert!(response
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message.contains("served from cache")));
+        } else {
+            previous_cache_key = Some(dot_artifact.cache_key.clone());
+            transforms::external::clear_external_transform_memory_cache_for_tests();
+        }
+        assert_eq!(
+            fs::read_to_string(&counter_path).expect("counter text"),
+            "1",
+            "external transform should execute only once despite repeated edits"
+        );
+    }
+    let elapsed = started_at.elapsed();
+
+    assert!(
+        elapsed.as_secs() < 20,
+        "repeated editing cache stress took {elapsed:?}"
+    );
+    fs::remove_dir_all(root).expect("clean edit cache stress dir");
+    let _ = fs::remove_file(graphviz);
+}

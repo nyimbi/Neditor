@@ -223,6 +223,10 @@ Recent pushed checkpoints visible in current git history:
   which repeatedly renders a large compiled document through HTML, PDF, DOCX,
   PPTX, and Markdown bundle outputs with structural and artifact-size
   assertions.
+- This update adds
+  `performance_tests::repeated_editing_sessions_reuse_external_transform_cache`,
+  which repeatedly recompiles edited document text while proving a stable
+  trusted external DOT transform is served from cache after the first run.
 
 ## Current Capability Snapshot
 
@@ -596,7 +600,8 @@ Additional review/provenance readiness metadata verification:
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after the shared parser and export-readiness validation changes. |
 | `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib` in `src-tauri` | Pass | Large-document compiler stress test passed with nested includes, 80 tables, 80 CSV transform artifacts, 120 formula definitions, many source-map entries, and many broken link/media diagnostics. |
 | `cargo test --locked repeated_export_loop_keeps_large_artifacts_stable --lib` in `src-tauri` | Pass | Repeated export-loop stress test passed across HTML, PDF, DOCX, PPTX, and Markdown bundle rendering for a large compiled document. |
-| `cargo test --locked` in `src-tauri` | Pass | 137 Rust tests passed plus main/doc test targets with 0 tests. |
+| `cargo test --locked repeated_editing_sessions_reuse_external_transform_cache --lib` in `src-tauri` | Pass | Repeated editing/cache stress test passed with a trusted external DOT transform executed once and served from cache during subsequent edits. |
+| `cargo test --locked` in `src-tauri` | Pass | 138 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness still lists 34 Chromium workflow tests after the direct-export readiness change. |
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |
