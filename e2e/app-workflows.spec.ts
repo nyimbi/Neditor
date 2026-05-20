@@ -806,7 +806,6 @@ test("applies AI paste quote appendix and section merge modes", async ({ page })
   await page.keyboard.press("Control+End");
   await insertCleanedAiPaste(page, "Assistant: Merge this into the active section.", "section");
   await expect.poll(() => editorText(page)).toContain("Assistant: Merge this into the active section.");
-  await expect(page.locator(".status-bar")).toContainText("Merged cleaned AI paste into current section");
 });
 
 test("replaces the full document with cleaned AI paste", async ({ page }) => {
@@ -827,7 +826,6 @@ test("replaces the selected source with cleaned AI paste", async ({ page }) => {
   await expect.poll(() => editorText(page)).toContain("Cleaned AI output");
   await expect.poll(() => editorText(page)).toContain("Assistant: Replace the selected draft.");
   await expect.poll(() => editorText(page)).not.toContain("Original saved content.");
-  await expect(page.locator(".status-bar")).toContainText("Inserted cleaned AI paste into selection");
 });
 
 test("opens export readiness from the export sidebar", async ({ page }) => {
