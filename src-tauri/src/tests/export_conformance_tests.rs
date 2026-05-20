@@ -482,6 +482,70 @@ fn front_matter_data_sources_survive_cross_target_exports() {
 }
 
 #[test]
+fn formatted_document_variables_survive_cross_target_exports() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Variable Export\nstatus: approved\napprovedBy: QA\nclient: acme holdings\nregion: ' east africa '\nbudget: 1234.5\nmargin: 0.275\n---\n# Variable Export\n\nClient: {{client | title}}\nRegion: {{region | trim | upper}}\nBudget: {{budget | currency}}\nMargin: {{margin | percent}}\nOwner: {{owner | default:'strategy office' | title}}\n".to_string(),
+        file_path: None,
+    });
+    let options = json!({});
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    assert!(response.compiled_markdown.contains("Client: Acme Holdings"));
+    assert!(response.compiled_markdown.contains("Region: EAST AFRICA"));
+    assert!(response.compiled_markdown.contains("Budget: $1234.50"));
+    assert!(response.compiled_markdown.contains("Margin: 27.50%"));
+    assert!(response
+        .compiled_markdown
+        .contains("Owner: Strategy Office"));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("Client: Acme Holdings"));
+    assert!(html.contains("Region: EAST AFRICA"));
+    assert!(html.contains("Budget: $1234.50"));
+    assert!(html.contains("Margin: 27.50%"));
+    assert!(html.contains("Owner: Strategy Office"));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Client: Acme Holdings"));
+    assert!(pdf_text.contains("Region: EAST AFRICA"));
+    assert!(pdf_text.contains("Budget: $1234.50"));
+    assert!(pdf_text.contains("Margin: 27.50%"));
+    assert!(pdf_text.contains("Owner:"));
+    assert!(pdf_text.contains("Strategy"));
+    assert!(pdf_text.contains("Office"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Client: Acme Holdings"));
+    assert!(docx_document.contains("Region: EAST AFRICA"));
+    assert!(docx_document.contains("Budget: $1234.50"));
+    assert!(docx_document.contains("Margin: 27.50%"));
+    assert!(docx_document.contains("Owner: Strategy Office"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Client: Acme Holdings"));
+    assert!(pptx_slides.contains("Region: EAST AFRICA"));
+    assert!(pptx_slides.contains("Budget: $1234.50"));
+    assert!(pptx_slides.contains("Margin: 27.50%"));
+    assert!(pptx_slides.contains("Owner: Strategy Office"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_options = options;
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    assert!(bundled_text.contains("Client: Acme Holdings"));
+    assert!(bundled_text.contains("Region: EAST AFRICA"));
+    assert!(bundled_text.contains("Budget: $1234.50"));
+    assert!(bundled_text.contains("Margin: 27.50%"));
+    assert!(bundled_text.contains("Owner: Strategy Office"));
+}
+
+#[test]
 fn heading_appendix_and_decision_references_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Reference Export\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}, {@appendix-a}, and {@decision-record}.\n\n## Appendix A\nSupporting detail.\n\n## Decision Record\nUse local-first exports.\n".to_string(),

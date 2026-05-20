@@ -94,9 +94,16 @@ values with `{{name}}` syntax:
 
 ```md
 Prepared for {{client}}.
+Prepared for {{client | title}} in {{region | trim | upper}}.
+Budget: {{budget | currency}}
+Fallback owner: {{owner | default:"strategy office" | title}}
 ```
 
-Inline formulas use `{{= expression }}` and can include format filters:
+Document variable filters include `default`, `trim`, `upper`, `lower`, `title`,
+`number`, `round`, `percent`, and `currency`. Unsupported filters and numeric
+filters applied to non-numeric values produce source-ranged diagnostics.
+
+Inline formulas use `{{= expression }}` and can include numeric format filters:
 
 ```md
 Margin: {{=margin | percent}}

@@ -172,6 +172,58 @@ fn compiler_supports_default_document_variables() {
 }
 
 #[test]
+fn compiler_formats_document_variables_and_reports_bad_filters() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Variable Filters\nstatus: approved\napprovedBy: QA\nclient: acme holdings\nregion: ' east africa '\nbudget: 1234.6\nmargin: 0.275\n---\n# Variable Filters\nClient: {{client | title}}\nRegion: {{region | trim | upper}}\nBudget: {{budget | currency}}\nMargin: {{margin | percent}}\nRounded: {{budget | round}}\nMissing: {{owner | default:'strategy office' | title}}\nBad filter: {{client | snake}}\nBad numeric: {{client | currency}}\n".to_string(),
+        file_path: None,
+    });
+
+    assert!(response.compiled_markdown.contains("Client: Acme Holdings"));
+    assert!(response.compiled_markdown.contains("Region: EAST AFRICA"));
+    assert!(response.compiled_markdown.contains("Budget: $1234.60"));
+    assert!(response.compiled_markdown.contains("Margin: 27.50%"));
+    assert!(response.compiled_markdown.contains("Rounded: 1235"));
+    assert!(response
+        .compiled_markdown
+        .contains("Missing: Strategy Office"));
+    assert!(response
+        .compiled_markdown
+        .contains("Bad filter: acme holdings"));
+    assert!(response
+        .compiled_markdown
+        .contains("Bad numeric: acme holdings"));
+
+    let unsupported = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic
+                .message
+                .contains("Unsupported document variable filter 'snake' for client")
+        })
+        .expect("unsupported variable filter diagnostic");
+    assert_eq!(unsupported.severity, "warning");
+    assert_eq!(unsupported.source_file.as_deref(), Some("untitled.md"));
+    assert!(unsupported.column.is_some());
+    assert!(unsupported
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("supported filters")));
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .message
+            .contains("Cannot apply numeric document variable filter 'currency' to client")
+            && diagnostic
+                .suggestion
+                .as_deref()
+                .is_some_and(|suggestion| suggestion.contains("numeric values"))
+    }));
+    assert!(!response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("Missing document variable: owner")));
+}
+
+#[test]
 fn calc_blocks_resolve_forward_refs_and_report_cycles() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Calc Graph\nstatus: approved\napprovedBy: QA\n---\n# Calc Graph\n```calc\nprofit = revenue - cost\ncost = 40\nrevenue = 100\ncycle_a = cycle_b + 1\ncycle_b = cycle_a + 1\n```\n\nProfit: {{=profit | round}}\n".to_string(),

@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `17b9358 Strengthen include and table formula export proof`
+- `798ce74 Support front matter structured data sources`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -195,7 +195,13 @@ Most recent local verification evidence:
 - `cargo test --locked front_matter_data_sources_survive_cross_target_exports --lib -- --nocapture`:
   passed and proves front matter CSV/TSV/JSON/YAML data sources survive HTML,
   PDF, DOCX, PPTX, Markdown bundle text, and Markdown bundle manifest outputs.
-- `cargo test --locked`: passed locally with 164 Rust tests on this Unix host.
+- `cargo test --locked compiler_formats_document_variables_and_reports_bad_filters --lib -- --nocapture`:
+  passed and proves document variable defaults, chained text filters, numeric
+  filters, unsupported-filter diagnostics, and nonnumeric-filter diagnostics.
+- `cargo test --locked formatted_document_variables_survive_cross_target_exports --lib -- --nocapture`:
+  passed and proves formatted document variables survive HTML, PDF, DOCX, PPTX,
+  and Markdown bundle text outputs.
+- `cargo test --locked`: passed locally with 166 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -1389,9 +1395,9 @@ Current evidence:
   review and AI governance, transform trust, export manifests, versioning, and
   troubleshooting.
 - `docs/markdown-extensions.md` now provides a readable syntax reference for
-  front matter, includes, generated sections, variables, formulas, tables,
-  figures, equations, citations, glossary/index, comments, AI provenance,
-  transforms, and export readiness markers.
+  front matter, includes, generated sections, variables, variable filters,
+  formulas, tables, figures, equations, citations, glossary/index, comments,
+  AI provenance, transforms, and export readiness markers.
 - `pnpm run check:docs` discovers README plus all top-level docs Markdown files
   and checks missing local links.
 
