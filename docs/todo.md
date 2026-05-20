@@ -801,6 +801,8 @@ Covered:
 - Word wrap toggle and persistence.
 - Basic Markdown list continuation.
 - Basic bracket auto-pairing.
+- Quote, bold, italic, inline-code pairing, and code-fence insertion through
+  explicit Markdown commands.
 - CodeMirror find and replace.
 - Spellcheck and sentence autocapitalization editor attributes.
 - Word count, character count, and reading-time status-bar metrics.
@@ -814,8 +816,8 @@ Finish:
 
 - Markdown syntax highlighting.
 - Diagnostics gutter accuracy and click/navigation behavior.
-- Broader Markdown shortcuts.
-- Auto-pairing for quotes, code fences, and emphasis markers.
+- Broader Markdown shortcut edge cases.
+- Markdown shortcut local browser/native execution proof.
 - Spellcheck behavior local browser/native execution proof.
 - Word/character/reading-time local browser/native execution proof.
 - Outline navigation local browser/native execution proof.

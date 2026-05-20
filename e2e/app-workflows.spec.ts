@@ -892,6 +892,40 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await page.keyboard.type("(");
   await expect.poll(() => editorText(page)).toContain("()");
 
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Bold selection");
+  await page.getByRole("button", { name: /Bold selection Markdown/ }).click();
+  await page.keyboard.type("bold shortcut");
+  await expect.poll(() => editorText(page)).toContain("**bold shortcut**");
+
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Italic selection");
+  await page.getByRole("button", { name: /Italic selection Markdown/ }).click();
+  await page.keyboard.type("italic shortcut");
+  await expect.poll(() => editorText(page)).toContain("*italic shortcut*");
+
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Inline code selection");
+  await page.getByRole("button", { name: /Inline code selection Markdown/ }).click();
+  await page.keyboard.type("code shortcut");
+  await expect.poll(() => editorText(page)).toContain("`code shortcut`");
+
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type('"');
+  await expect.poll(() => editorText(page)).toContain('""');
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert code fence");
+  await page.getByRole("button", { name: /Insert code fence Snippet/ }).click();
+  await expect.poll(() => editorText(page)).toContain("```markdown\n\n```");
+
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Command Target");
   await page.getByRole("button", { name: /Command Target Heading line/ }).click();

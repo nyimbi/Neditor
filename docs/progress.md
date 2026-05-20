@@ -158,6 +158,9 @@ Recent pushed checkpoints visible in current git history:
   palette path.
 - This update adds editor workflow harness assertions for the CodeMirror
   `spellcheck` and `autocapitalize` content attributes.
+- This update adds explicit Markdown format commands for bold, italic, inline
+  code, and code fences, with workflow harness coverage for quote pairing,
+  emphasis pairing, inline-code pairing, and fence insertion.
 
 ## Current Capability Snapshot
 
@@ -211,10 +214,10 @@ Implemented or substantially present, pending the conservative caveats in
   persisted editor word-wrap and line-number settings, spellcheck/autocapitalize
   editor attributes, CodeMirror find/replace, status-bar
   word/character/reading-time metrics, explicit multi-cursor command coverage,
-  smart list continuation, bracket auto-pairing, command-palette heading
-  navigation, command-palette citation, glossary, and index navigation,
-  outline-sidebar heading navigation, command-palette open-document switching
-  and workspace-file opening, plus
+  smart list continuation, bracket/quote/emphasis/inline-code pairing,
+  code-fence insertion, command-palette heading navigation, command-palette
+  citation, glossary, and index navigation, outline-sidebar heading navigation,
+  command-palette open-document switching and workspace-file opening, plus
   transform engine settings trust/probe diagnostics, target-specific export
   readiness manifest preview, export output/manifest path reporting, export
   success/failure diagnostics, and blocked-readiness diagnostics before file

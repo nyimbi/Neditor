@@ -71,6 +71,7 @@
       <button type="button" title="Bold" @click="wrapSelection('**')"><strong>B</strong></button>
       <button type="button" title="Italic" @click="wrapSelection('*')"><em>I</em></button>
       <button type="button" title="Code" @click="wrapSelection('`')">Code</button>
+      <button type="button" title="Code fence" @click="insertBlock(codeFenceSnippet)">Fence</button>
       <button type="button" title="Heading" @click="insertAtLineStart('## ')">H2</button>
       <button type="button" title="Link" @click="wrapSelection('[', '](https://)')">Link</button>
       <button type="button" title="Table" @click="insertBlock(tableSnippet)">Table</button>
@@ -1177,6 +1178,7 @@ interface TransformTrustPrompt {
 }
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
+const codeFenceSnippet = "```markdown\n\n```\n";
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
 const figureCropPositionGrid: Record<FigureCropPosition, { x: -1 | 0 | 1; y: -1 | 0 | 1 }> = {
   center: { x: 0, y: 0 },
@@ -1450,8 +1452,12 @@ const commands = computed(() => [
   { name: "Select next occurrence", group: "Edit", run: () => runEditorCommand(selectNextOccurrence) },
   { name: "Add cursor above", group: "Edit", run: () => runEditorCommand(addCursorAbove) },
   { name: "Add cursor below", group: "Edit", run: () => runEditorCommand(addCursorBelow) },
+  { name: "Bold selection", group: "Markdown", run: () => wrapSelection("**") },
+  { name: "Italic selection", group: "Markdown", run: () => wrapSelection("*") },
+  { name: "Inline code selection", group: "Markdown", run: () => wrapSelection("`") },
   { name: "Add review comment", group: "Review", run: () => (store.sidebar = "review") },
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
+  { name: "Insert code fence", group: "Snippet", run: () => insertBlock(codeFenceSnippet) },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
   { name: "Insert cover figure", group: "Snippet", run: () => insertFigureSnippet() },
   ...figureCropPositions
