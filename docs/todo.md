@@ -116,9 +116,10 @@ Most recent local verification evidence:
 - `cargo test --locked export_command_tests --lib`: passed 13 export command
   tests, including direct-export dirty-Git warnings copied into response and
   sidecar manifests plus structured export progress-step reporting.
-- `pnpm run test:unit`: passed with 10 frontend unit tests, including latest
-  document task cancellation/stale-result guard coverage and preview debounce
-  timing/coalescing coverage.
+- `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
+  document task cancellation/stale-result guard coverage, preview debounce
+  timing/coalescing coverage, and workspace persistence migration/schema
+  normalization.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
 - `pnpm run check:a11y`: passed and checked the Vue template for accessible
   button names, form-control labels, and dialog labeling.
@@ -1128,9 +1129,12 @@ Candidate split:
 - Transforms and preferences.
 - AI cleanup and review governance.
 
-Constraints:
-
-- Preserve persisted workspace schema or add migrations.
+- Current migration evidence: `src/lib/workspacePersistence.ts` owns the
+  schema version and normalizes/clamps persisted settings before the store uses
+  them; `tests/frontend-unit.test.ts` covers legacy aliases, limits, records,
+  transform settings, AI cleanup defaults, and scroll-position normalization.
+- Preserve persisted workspace schema and keep migrations explicit as domains
+  are split.
 - Split only with regression tests around the moved behavior.
 
 ### 20. Backend Modularization

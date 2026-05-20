@@ -246,6 +246,11 @@ Recent pushed checkpoints visible in current git history:
   a 120-section document, waits for preview update, checks elapsed browser
   time, and verifies editor-to-preview scroll sync. This host still needs the
   Playwright Chromium binary before that browser workflow can execute locally.
+- This update extracts workspace persistence migration into
+  `src/lib/workspacePersistence.ts` with an explicit schema version, normalized
+  settings, legacy key aliases, clamped persisted values, and frontend unit
+  coverage for preferences, recents, transform settings, AI cleanup defaults,
+  and scroll positions.
 
 ## Current Capability Snapshot
 
@@ -625,7 +630,7 @@ Additional review/provenance readiness metadata verification:
 | `cargo test --locked` in `src-tauri` | Pass | 140 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
 | `npx playwright test e2e/app-workflows.spec.ts -g "keeps large document editing"` | Blocked | The large-document browser workflow is present, but this host is missing Playwright Chromium at `~/Library/Caches/ms-playwright/.../chrome-headless-shell`. |
 | `pnpm exec playwright test --list` | Pass | Browser harness lists 35 Chromium workflow tests, including the large-document interaction workflow. |
-| `pnpm run test:unit` | Pass | 10 frontend unit tests passed, including latest-document task cancellation/stale-result guard coverage and preview debounce timing/coalescing coverage. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests passed, including latest-document task cancellation/stale-result guard coverage, preview debounce timing/coalescing coverage, and workspace persistence migration/schema normalization. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |
 | `pnpm run check:a11y` | Pass | Static Vue template accessibility guard passed for button names, form-control labels, and dialog labeling. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |

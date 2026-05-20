@@ -5,6 +5,27 @@ import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/p
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
+import {
+  clampAutosaveDelay,
+  clampFontSize,
+  clampLineHeight,
+  clampPaneRatio,
+  clampScrollRatio,
+  clampSnapshotInterval,
+  migratePersistedWorkspace,
+  normalizeAiCleanupDefaults,
+  normalizeBibliographyDefaults,
+  normalizeBrandProfileDefaults,
+  normalizeCitationStyle,
+  normalizeExportDefaults,
+  normalizeGitIntegrationPreferences,
+  normalizePersistedWorkspaceForSave,
+  type ExportDefaults,
+  type PersistedScrollPosition,
+  type PersistedWorkspace,
+  type PreviewTheme,
+  type SnapshotStorage,
+} from "../lib/workspacePersistence";
 import type {
   AiCleanupResponse,
   AiCleanupOptions,
@@ -24,93 +45,6 @@ import type {
 let preferencesStore: Store | null = null;
 let unwatchFileChanges: UnlistenFn | UnwatchFn | null = null;
 let unwatchFileErrors: UnlistenFn | null = null;
-
-type CitationStyle = "title" | "author-year" | "key";
-type LayoutPreset = "business" | "compact" | "presentation";
-type PreviewTheme = "match" | "light" | "dark";
-type SnapshotStorage = "app-data" | "project-local";
-
-interface ExportDefaults {
-  includeManifest: boolean;
-  includeStyles: boolean;
-  includeSyntaxHighlighting: boolean;
-  coverPage: boolean;
-  pageNumbers: boolean;
-  layoutPreset: LayoutPreset;
-  includeComments: boolean;
-  includeProvenance: boolean;
-  includeGlossary: boolean;
-  includeAgenda: boolean;
-}
-
-interface BibliographyDefaults {
-  citationStyle: CitationStyle;
-}
-
-interface BrandProfileDefaults {
-  name: string;
-  color: string;
-  logo: string;
-  font: string;
-  header: string;
-  footer: string;
-  watermark: string;
-  legalDisclaimer: string;
-}
-
-interface GitIntegrationPreferences {
-  enabled: boolean;
-  warnOnDirtyExport: boolean;
-}
-
-interface PersistedWorkspace {
-  theme?: "system" | "light" | "dark";
-  previewTheme?: PreviewTheme;
-  editorPaneRatio?: number;
-  wordWrap?: boolean;
-  lineNumbers?: boolean;
-  highContrast?: boolean;
-  reducedMotion?: boolean;
-  autosave?: boolean;
-  autosaveDelayMs?: number;
-  autoSnapshot?: boolean;
-  snapshotIntervalMs?: number;
-  snapshotStorage?: SnapshotStorage;
-  editorFont?: string;
-  previewFont?: string;
-  editorFontSize?: number;
-  previewFontSize?: number;
-  editorLineHeight?: number;
-  previewLineHeight?: number;
-  exportTarget?: "html" | "pdf" | "docx" | "pptx" | "markdown-bundle";
-  exportDefaults?: Partial<ExportDefaults> & {
-    includeCoverPage?: boolean;
-    includePageNumbers?: boolean;
-  };
-  bibliographyDefaults?: Partial<BibliographyDefaults>;
-  brandProfileDefaults?: Partial<BrandProfileDefaults>;
-  gitIntegration?: Partial<GitIntegrationPreferences>;
-  recentFiles?: string[];
-  recentFolders?: string[];
-  recentlyClosed?: string[];
-  pinnedFiles?: string[];
-  workspaceRoot?: string | null;
-  openFiles?: string[];
-  activePath?: string | null;
-  scrollPositions?: Record<string, PersistedScrollPosition>;
-  mode?: "split" | "source" | "preview" | "focus" | "export" | "review" | "presentation";
-  sidebar?: "files" | "outline" | "diagnostics" | "tables" | "references" | "exports" | "versioning" | "review" | "settings";
-  transformEnginePaths?: Record<string, string>;
-  trustedTransformEngines?: Record<string, boolean>;
-  transformInputModes?: Record<string, "stdin" | "file">;
-  transformTimeoutMs?: number;
-  aiCleanupDefaults?: Partial<AiCleanupOptions>;
-}
-
-interface PersistedScrollPosition {
-  editor?: number;
-  preview?: number;
-}
 
 interface FileMetadataResponse {
   path?: string;
@@ -339,107 +273,6 @@ function stringifyWatchEventKind(kind: WatchEvent["type"]) {
   return Object.keys(kind)[0] || "other";
 }
 
-function clampLineHeight(value: number) {
-  return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
-}
-
-function clampFontSize(value: number) {
-  return Math.min(Math.max(Number(value) || 14, 12), 22);
-}
-
-function clampAutosaveDelay(value: number) {
-  return Math.min(Math.max(Number(value) || 1500, 500), 30000);
-}
-
-function clampSnapshotInterval(value: number) {
-  return Math.min(Math.max(Number(value) || 300000, 30000), 3600000);
-}
-
-function clampPaneRatio(value: number) {
-  return Math.min(Math.max(Number(value) || 0.5, 0.25), 0.75);
-}
-
-function clampScrollRatio(value: number | undefined) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
-  return Math.min(Math.max(value, 0), 1);
-}
-
-function normalizeExportDefaults(
-  defaults: Partial<ExportDefaults> & {
-    includeCoverPage?: boolean;
-    includePageNumbers?: boolean;
-  },
-): ExportDefaults {
-  return {
-    includeManifest: typeof defaults.includeManifest === "boolean" ? defaults.includeManifest : true,
-    includeStyles: typeof defaults.includeStyles === "boolean" ? defaults.includeStyles : true,
-    includeSyntaxHighlighting:
-      typeof defaults.includeSyntaxHighlighting === "boolean" ? defaults.includeSyntaxHighlighting : true,
-    coverPage:
-      typeof defaults.coverPage === "boolean"
-        ? defaults.coverPage
-        : typeof defaults.includeCoverPage === "boolean"
-          ? defaults.includeCoverPage
-          : true,
-    pageNumbers:
-      typeof defaults.pageNumbers === "boolean"
-        ? defaults.pageNumbers
-        : typeof defaults.includePageNumbers === "boolean"
-          ? defaults.includePageNumbers
-          : true,
-    layoutPreset: normalizeLayoutPreset(defaults.layoutPreset),
-    includeComments: typeof defaults.includeComments === "boolean" ? defaults.includeComments : true,
-    includeProvenance: typeof defaults.includeProvenance === "boolean" ? defaults.includeProvenance : true,
-    includeGlossary: typeof defaults.includeGlossary === "boolean" ? defaults.includeGlossary : true,
-    includeAgenda: typeof defaults.includeAgenda === "boolean" ? defaults.includeAgenda : true,
-  };
-}
-
-function normalizeCitationStyle(value: unknown): CitationStyle {
-  return value === "author-year" || value === "key" || value === "title" ? value : "title";
-}
-
-function normalizeLayoutPreset(value: unknown): LayoutPreset {
-  return value === "compact" || value === "presentation" || value === "business" ? value : "business";
-}
-
-function normalizeBibliographyDefaults(defaults: Partial<BibliographyDefaults>): BibliographyDefaults {
-  return {
-    citationStyle: normalizeCitationStyle(defaults.citationStyle),
-  };
-}
-
-function normalizeBrandProfileDefaults(defaults: Partial<BrandProfileDefaults>): BrandProfileDefaults {
-  return {
-    name: typeof defaults.name === "string" ? defaults.name : "",
-    color: typeof defaults.color === "string" && defaults.color.trim() ? defaults.color.trim() : "#275DA8",
-    logo: typeof defaults.logo === "string" ? defaults.logo : "",
-    font: typeof defaults.font === "string" ? defaults.font : "",
-    header: typeof defaults.header === "string" ? defaults.header : "",
-    footer: typeof defaults.footer === "string" ? defaults.footer : "",
-    watermark: typeof defaults.watermark === "string" ? defaults.watermark : "",
-    legalDisclaimer: typeof defaults.legalDisclaimer === "string" ? defaults.legalDisclaimer : "",
-  };
-}
-
-function normalizeGitIntegrationPreferences(defaults: Partial<GitIntegrationPreferences>): GitIntegrationPreferences {
-  return {
-    enabled: typeof defaults.enabled === "boolean" ? defaults.enabled : true,
-    warnOnDirtyExport: typeof defaults.warnOnDirtyExport === "boolean" ? defaults.warnOnDirtyExport : true,
-  };
-}
-
-function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>): AiCleanupOptions {
-  return {
-    addProvenance: typeof defaults.addProvenance === "boolean" ? defaults.addProvenance : true,
-    markAsDraft: typeof defaults.markAsDraft === "boolean" ? defaults.markAsDraft : true,
-    insertCitationTodos: typeof defaults.insertCitationTodos === "boolean" ? defaults.insertCitationTodos : true,
-    preserveHeadings: typeof defaults.preserveHeadings === "boolean" ? defaults.preserveHeadings : false,
-    convertNumberedLists: typeof defaults.convertNumberedLists === "boolean" ? defaults.convertNumberedLists : true,
-    convertTables: typeof defaults.convertTables === "boolean" ? defaults.convertTables : true,
-  };
-}
-
 function externalTransformProbeBody(name: string) {
   switch (name) {
     case "dot":
@@ -598,7 +431,7 @@ export const useDocumentsStore = defineStore("documents", {
     async loadPreferences() {
       try {
         preferencesStore = await Store.load("settings.json");
-        const persisted = (await preferencesStore.get<PersistedWorkspace>("workspace")) || {};
+        const persisted = migratePersistedWorkspace(await preferencesStore.get<unknown>("workspace"));
         if (persisted.theme) this.theme = persisted.theme;
         if (persisted.previewTheme === "match" || persisted.previewTheme === "light" || persisted.previewTheme === "dark") this.previewTheme = persisted.previewTheme;
         if (typeof persisted.editorPaneRatio === "number") this.editorPaneRatio = clampPaneRatio(persisted.editorPaneRatio);
@@ -703,7 +536,7 @@ export const useDocumentsStore = defineStore("documents", {
         transformInputModes: this.transformInputModes,
         transformTimeoutMs: this.transformTimeoutMs,
       };
-      await preferencesStore.set("workspace", workspace);
+      await preferencesStore.set("workspace", normalizePersistedWorkspaceForSave(workspace));
       await preferencesStore.save();
     },
     async restoreWorkspace(
