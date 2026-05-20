@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `0fa5ee1 Summarize
-  export readiness in manifests`
+- Latest inspected committed baseline before this update: `1293320 Preserve
+  Git export warnings in manifests`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -208,6 +208,9 @@ Recent pushed checkpoints visible in current git history:
   preflight export reports, records that warning in the response and sidecar
   manifest, and avoids falling back to the repo cwd when an unsaved/nonexistent
   source path is exported.
+- This update restores the `docs/specification.md` architecture figure target
+  with `docs/architecture.svg` and adds `pnpm run check:docs` as a repeatable
+  repo-wide local markdown link guard.
 
 ## Current Capability Snapshot
 
@@ -585,7 +588,7 @@ Additional review/provenance readiness metadata verification:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
 | `git diff --check` | Pass | No whitespace errors after the readiness metadata, dirty-Git manifest, and documentation updates. |
-| Scoped markdown local link resolution script | Pass | Updated markdown docs contain no broken local links; a repo-wide pass still finds the pre-existing missing `docs/specification.md` `architecture.svg` image reference. |
+| `pnpm run check:docs` | Pass | Repo-wide markdown link guard checked README plus all docs and found no missing local links after adding `docs/architecture.svg`. |
 
 Archived remote workflow evidence log:
 

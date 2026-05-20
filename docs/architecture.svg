@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">NEditor local-first architecture</title>
+  <desc id="desc">Diagram showing the Vue workbench communicating through Tauri IPC with the Rust compiler, export, storage, Git, and external transform layers.</desc>
+  <rect width="960" height="540" fill="#f8fafc"/>
+  <text x="480" y="48" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#0f172a">NEditor Local-First Architecture</text>
+  <g font-family="Arial, sans-serif" font-size="18" fill="#0f172a">
+    <rect x="70" y="110" width="230" height="110" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="185" y="150" text-anchor="middle" font-weight="700">Vue Workbench</text>
+    <text x="185" y="180" text-anchor="middle" font-size="14">Editor, preview, panels</text>
+    <text x="185" y="202" text-anchor="middle" font-size="14">Pinia workspace state</text>
+
+    <rect x="365" y="110" width="230" height="110" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="480" y="150" text-anchor="middle" font-weight="700">Tauri IPC</text>
+    <text x="480" y="180" text-anchor="middle" font-size="14">File, compile, export</text>
+    <text x="480" y="202" text-anchor="middle" font-size="14">Git, snapshots, transforms</text>
+
+    <rect x="660" y="110" width="230" height="110" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="775" y="150" text-anchor="middle" font-weight="700">Rust Core</text>
+    <text x="775" y="180" text-anchor="middle" font-size="14">Compiler and semantic AST</text>
+    <text x="775" y="202" text-anchor="middle" font-size="14">Diagnostics and manifests</text>
+
+    <rect x="70" y="320" width="180" height="92" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="160" y="356" text-anchor="middle" font-weight="700">Local Files</text>
+    <text x="160" y="384" text-anchor="middle" font-size="14">Markdown, media, includes</text>
+
+    <rect x="290" y="320" width="180" height="92" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="380" y="356" text-anchor="middle" font-weight="700">Exports</text>
+    <text x="380" y="384" text-anchor="middle" font-size="14">HTML, PDF, DOCX, PPTX</text>
+
+    <rect x="510" y="320" width="180" height="92" rx="10" fill="#ccfbf1" stroke="#0f766e" stroke-width="2"/>
+    <text x="600" y="356" text-anchor="middle" font-weight="700">Versioning</text>
+    <text x="600" y="384" text-anchor="middle" font-size="14">Git and snapshots</text>
+
+    <rect x="730" y="320" width="180" height="92" rx="10" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+    <text x="820" y="356" text-anchor="middle" font-weight="700">Transforms</text>
+    <text x="820" y="384" text-anchor="middle" font-size="14">Native and trusted engines</text>
+  </g>
+  <g fill="none" stroke="#475569" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M300 165h65"/>
+    <path d="M595 165h65"/>
+    <path d="M775 220v48c0 22-18 40-40 40H225c-22 0-40-18-40-40v-48"/>
+    <path d="M775 220v70"/>
+    <path d="M480 220v70"/>
+    <path d="M185 220v70"/>
+  </g>
+  <g fill="#475569">
+    <path d="M360 165l-12-7v14z"/>
+    <path d="M655 165l-12-7v14z"/>
+    <path d="M775 315l7-12h-14z"/>
+    <path d="M480 315l7-12h-14z"/>
+    <path d="M185 315l7-12h-14z"/>
+  </g>
+  <text x="480" y="486" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#475569">Documents stay local; optional external engines are explicit, trusted, and bounded.</text>
+</svg>

@@ -80,7 +80,7 @@ behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `0fa5ee1 Summarize export readiness in manifests`
+- `1293320 Preserve Git export warnings in manifests`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -101,15 +101,16 @@ Most recent local verification evidence:
   sidecar manifests.
 - `pnpm run test:unit`: passed with 8 frontend unit tests.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
+- `pnpm run check:docs`: passed and checked README plus all docs for missing
+  local links.
 - `pnpm exec playwright test --list`: listed the browser workflow harness with
   command-palette insertion proof for `[TOC]`, `[INDEX]`, `[BIBLIOGRAPHY]`,
   `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
 - `./node_modules/.bin/tauri build --no-bundle`: passed and built the release
   desktop binary at `src-tauri/target/release/neditor`.
 - `git diff --check`: passed.
-- Scoped markdown local link resolution for updated docs: passed. A repo-wide
-  link pass still finds the pre-existing missing `docs/specification.md`
-  `architecture.svg` image reference.
+- Repo-wide markdown local link resolution: passed after adding
+  `docs/architecture.svg` and the `check:docs` guard.
 - `pnpm exec playwright test --list`: listed the browser workflow harness with
   references-panel proof for resolved bibliography entries, missing citation
   keys, and duplicate bibliography keys.
@@ -1130,6 +1131,12 @@ Finish:
 ### 24. User Documentation
 
 Status: README and technical docs exist; first-user docs are incomplete.
+
+Current evidence:
+
+- `docs/specification.md` now has a checked-in `docs/architecture.svg` target
+  for the figure/caption example.
+- `pnpm run check:docs` checks README and the docs set for missing local links.
 
 Needed docs:
 

@@ -195,6 +195,8 @@ Current direct evidence:
   alignment under `tests/frontend-unit.test.ts`.
 - Local verification covers Rust checks/tests, frontend unit tests, frontend
   build, and Tauri no-bundle compile when run on the current host.
+- `pnpm run check:docs` now checks README plus the docs set for missing local
+  links, including the `docs/specification.md` architecture figure target.
 
 Current major verification gaps:
 
