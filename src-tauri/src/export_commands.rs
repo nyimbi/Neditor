@@ -337,6 +337,55 @@ fn validate_export_settings(
         }
     }
     validate_transform_export_settings(options, diagnostics);
+    validate_target_specific_export_options(target, options, diagnostics);
+}
+
+fn validate_target_specific_export_options(
+    target: &str,
+    options: &Value,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if target != "pptx" && bool_option_enabled(options, "includeAgenda") {
+        let mut diagnostic = diag(
+            "info",
+            "includeAgenda is only used for PPTX exports.",
+            None,
+            None,
+            Some("Disable includeAgenda for this target or switch the export target to pptx."),
+        );
+        diagnostic.related.push(format!("target:{target}"));
+        diagnostic.related.push("option:includeAgenda".to_string());
+        diagnostics.push(diagnostic);
+    }
+
+    if matches!(target, "markdown-bundle" | "markdown") {
+        for option in [
+            "includeStyles",
+            "includeSyntaxHighlighting",
+            "coverPage",
+            "pageNumbers",
+        ] {
+            if bool_option_enabled(options, option) {
+                let mut diagnostic = diag(
+                    "info",
+                    format!("{option} is recorded in the Markdown bundle manifest but does not render bundle content."),
+                    None,
+                    None,
+                    Some("Keep the option for manifest parity or disable it to reduce bundle export noise."),
+                );
+                diagnostic.related.push(format!("target:{target}"));
+                diagnostic.related.push(format!("option:{option}"));
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+}
+
+fn bool_option_enabled(options: &Value, option: &str) -> bool {
+    options
+        .get(option)
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
 }
 
 fn validate_export_output_path(

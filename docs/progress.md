@@ -1261,6 +1261,18 @@ Additional direct-export target extension verification:
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional target-specific option audit verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked prepare_for_export_reports_target_specific_option_info --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust readiness proof reports non-blocking info diagnostics for `includeAgenda` on PDF and render-only options on Markdown bundle exports, keeps readiness true, and copies info counts into manifest readiness. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 18 export command tests passed after adding target-specific option info diagnostics. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after adding target-specific option audits. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after adding target-specific option audits. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

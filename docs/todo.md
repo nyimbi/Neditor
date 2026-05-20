@@ -956,6 +956,9 @@ Current evidence:
   exports are blocked unless status is approved/published and `approvedBy` plus
   `approvedAt` are present, and the diagnostic is copied into manifest
   readiness.
+- Target-specific option audits now report non-blocking info diagnostics when
+  valid options are ignored by the selected target, including non-PPTX agenda
+  options and Markdown bundle render-only options.
 
 Readiness should validate and report:
 
@@ -987,6 +990,9 @@ Readiness should validate and report:
 - Export target options and target-specific blockers. Focused Rust coverage now
   proves the PPTX approved-metadata blocker; more target-specific option
   combinations remain.
+- Target-specific option no-op visibility. Focused Rust coverage now proves
+  valid-but-ignored options are surfaced as info diagnostics without blocking
+  readiness.
 - Target/output extension consistency. Focused Rust coverage now proves direct
   exports refuse mismatched target extensions before writing artifacts.
 - Unresolved comments and malformed comment/change-note audit metadata. Broad

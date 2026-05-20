@@ -723,6 +723,73 @@ fn prepare_for_export_reports_target_specific_pptx_blockers() {
 }
 
 #[test]
+fn prepare_for_export_reports_target_specific_option_info() {
+    let source = "---\ntitle: Option Audit\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Option Audit\n".to_string();
+    let pdf_report = prepare_for_export(PrepareExportRequest {
+        text: source.clone(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "warnOnDirtyGit": false, "includeAgenda": true }),
+    });
+
+    assert!(pdf_report.ready, "{:#?}", pdf_report.diagnostics);
+    assert_eq!(pdf_report.error_count, 0);
+    assert_eq!(pdf_report.warning_count, 0);
+    assert_eq!(pdf_report.info_count, 1);
+    assert_eq!(pdf_report.manifest.readiness.info_count, 1);
+    let agenda_diagnostic = pdf_report
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("includeAgenda is only used"))
+        .expect("agenda target option diagnostic");
+    assert_eq!(agenda_diagnostic.severity, "info");
+    assert!(agenda_diagnostic
+        .related
+        .iter()
+        .any(|item| item == "target:pdf"));
+    assert!(agenda_diagnostic
+        .related
+        .iter()
+        .any(|item| item == "option:includeAgenda"));
+
+    let bundle_report = prepare_for_export(PrepareExportRequest {
+        text: source,
+        file_path: None,
+        target: "markdown-bundle".to_string(),
+        options: json!({
+            "warnOnDirtyGit": false,
+            "includeAgenda": true,
+            "includeStyles": true,
+            "includeSyntaxHighlighting": true,
+            "coverPage": true,
+            "pageNumbers": true
+        }),
+    });
+
+    assert!(bundle_report.ready, "{:#?}", bundle_report.diagnostics);
+    assert_eq!(bundle_report.error_count, 0);
+    assert_eq!(bundle_report.warning_count, 0);
+    assert_eq!(bundle_report.info_count, 5);
+    assert_eq!(bundle_report.manifest.readiness.info_count, 5);
+    for option in [
+        "includeAgenda",
+        "includeStyles",
+        "includeSyntaxHighlighting",
+        "coverPage",
+        "pageNumbers",
+    ] {
+        assert!(
+            bundle_report.diagnostics.iter().any(|diagnostic| diagnostic
+                .related
+                .iter()
+                .any(|item| item == &format!("option:{option}"))),
+            "missing info diagnostic for {option}: {:#?}",
+            bundle_report.diagnostics
+        );
+    }
+}
+
+#[test]
 fn prepare_for_export_validates_transform_engine_options() {
     let report = prepare_for_export(PrepareExportRequest {
         text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),
