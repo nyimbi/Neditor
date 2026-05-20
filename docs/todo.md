@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `7702e89`
+  `f13c3f3`
 
 Status vocabulary:
 
@@ -76,22 +76,22 @@ behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `7702e89 Prove preview navigation workflows`
+- `f13c3f3 Prove editor ergonomics workflows`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26153224371` on commit `7702e89`
+- Run `26154535588` on commit `f13c3f3`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26153224371`:
+CI evidence from run `26154535588`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 24 Chromium workflow tests, including advanced table paste import,
+  includes 25 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, row/column structure editing, column format totals,
   cancel-without-applying behavior, AI paste insert/quote/appendix/replace
@@ -108,8 +108,10 @@ CI evidence from run `26153224371`:
   tab activation, dirty close confirmation, renamed recent cleanup, deleted
   recently-closed pruning, recent folder reopen/prune behavior, and externally
   moved recently-closed path pruning. It also covers synchronized scrolling in
-  both directions between editor and preview, and clicking a rendered preview
-  heading to jump back to the source line.
+  both directions between editor and preview, clicking a rendered preview
+  heading to jump back to the source line, persisted editor word-wrap and
+  line-number settings, CodeMirror find/replace, smart list continuation,
+  bracket auto-pairing, and command-palette heading navigation.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -252,6 +254,17 @@ Recent local verification evidence from this buildout:
 - `git diff --check`: passed after adding preview navigation coverage.
 - `gh run watch 26153224371 --exit-status`: passed on commit `7702e89` across
   24 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
+- `pnpm run test:unit`: passed after adding editor ergonomics browser coverage.
+- `pnpm run build`: passed after adding editor ergonomics browser coverage.
+- `pnpm exec playwright test --list`: listed 25 Chromium workflow tests after
+  adding editor settings, find/replace, list continuation, bracket auto-pairing,
+  and command-palette heading navigation coverage.
+- `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "persists editor
+  settings" --project chromium`: blocked locally because the Chromium
+  headless-shell executable is missing from the Playwright cache.
+- `git diff --check`: passed after adding editor ergonomics coverage.
+- `gh run watch 26154535588 --exit-status`: passed on commit `f13c3f3` across
+  25 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -463,6 +476,10 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Preview navigation workflow: synchronize scroll from editor to preview,
   synchronize scroll from preview back to editor, and click a rendered preview
   heading to jump to the source line.
+- Editor ergonomics workflow: persist word-wrap and line-number settings,
+  execute CodeMirror find/replace through the search keybinding, continue a
+  Markdown list item, auto-pair brackets, and navigate a heading through the
+  command palette.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -475,8 +492,8 @@ Required next coverage:
   desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
-- Command palette search, keybindings, heading commands, citation commands,
-  glossary/index commands, and navigation commands.
+- Command palette citation commands, glossary/index commands, navigation
+  commands, and broader keyboard shortcut coverage.
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
 - External conflict modal: more granular line-compose controls.
@@ -677,20 +694,27 @@ Finish:
 
 ### 10. Editor Ergonomics
 
-Status: CodeMirror is integrated; interaction proof is incomplete.
+Status: CodeMirror is integrated; browser proof now covers the first
+interaction slice in CI run `26154535588`.
 
-Audit and finish:
+Covered:
+
+- Line numbers toggle and persistence.
+- Word wrap toggle and persistence.
+- Basic Markdown list continuation.
+- Basic bracket auto-pairing.
+- CodeMirror find and replace.
+- Command-palette heading navigation.
+
+Finish:
 
 - Markdown syntax highlighting.
 - Diagnostics gutter accuracy and click/navigation behavior.
-- Line numbers toggle and persistence.
-- Word wrap toggle and persistence.
-- Smart list continuation and Markdown shortcuts.
-- Auto-pairing for brackets, quotes, code fences, and emphasis markers.
-- Find and replace.
+- Broader Markdown shortcuts.
+- Auto-pairing for quotes, code fences, and emphasis markers.
 - Spellcheck.
 - Word count, character count, and reading-time status.
-- Outline navigation.
+- Outline navigation beyond command-palette heading search.
 - Multi-cursor support classification: complete if CodeMirror default behavior
   is acceptable and verified, otherwise deferred with rationale.
 - Vim/emacs keybindings classification: deferred unless intentionally added.

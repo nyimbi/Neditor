@@ -25,7 +25,7 @@ is not "Complete".
 | 2 Source Prompt Extension | Split, preview-only, focus/source modes | Partial | `src/App.vue` mode controls; `e2e/app-workflows.spec.ts` covers split/source/preview modes; GitHub Actions browser job passed on commit `420af08` | Focus/export/review/presentation modes and desktop execution still need proof. |
 | 2 Source Prompt Extension | Local new/open/save/save-as flows | Partial | `src/stores/documents.ts`; `src-tauri/src/filesystem.rs`; file command tests | Browser/desktop workflow tests for dialogs and state transitions. |
 | 2 Source Prompt Extension | Window title reflects file and dirty state | Partial | `windowTitle` getter and `setWindowTitle` in `src/App.vue` | Desktop/browser assertion for title updates. |
-| 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler | Test coverage for command execution and keybindings. |
+| 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler; browser CI run `26154535588` covers CodeMirror search keybinding and command-palette heading search/navigation | Citation, glossary, index, navigation command coverage and broader shortcut coverage. |
 | 2 Source Prompt Extension | Light/dark/system theme and typography | Partial | Settings in `src/App.vue`; persisted preferences in store | Visual/accessibility verification across themes. |
 | 2 Source Prompt Extension | Cross-platform packaging | Partial | `.github/workflows/ci.yml`; `README.md` packaging note | Full bundle evidence for Windows/Linux and refreshed macOS bundle/DMG status. |
 | 3 Product Positioning | Local-first document workbench, not cloud suite | Partial | Local file/snapshot/Git/export design | User documentation and fixture workflows need to prove positioning. |
@@ -57,8 +57,8 @@ is not "Complete".
 | 6.2 Primary Layout | Export preview, review, presentation outline modes | Partial | Mode controls and sidebars in `src/App.vue` | Interaction tests and product QA for each mode. |
 | 6.3 Editor | CodeMirror 6 engine | Complete | CodeMirror dependencies and imports in `src/App.vue` | None beyond ongoing behavior tests. |
 | 6.3 Editor | Markdown highlighting, diagnostics gutter, decorations | Partial | CodeMirror markdown/linter/lintGutter/decorations | Tests for precise diagnostic navigation and visual states. |
-| 6.3 Editor | Line numbers, word wrap, spellcheck, find/replace, word count | Partial | Settings and CodeMirror extensions; status bar stats | Browser tests for toggles and find/replace. |
-| 6.3 Editor | Smart list continuation and auto-pairing | Partial | `continueMarkdownList`; `closeBrackets` | Unit/browser tests for editor behavior. |
+| 6.3 Editor | Line numbers, word wrap, spellcheck, find/replace, word count | Partial | Settings and CodeMirror extensions; status bar stats; browser CI run `26154535588` covers line-number and word-wrap persistence plus CodeMirror find/replace | Spellcheck proof and word/character/reading-time UI proof. |
+| 6.3 Editor | Smart list continuation and auto-pairing | Partial | `continueMarkdownList`; `closeBrackets`; browser CI run `26154535588` covers basic Markdown list continuation and bracket auto-pairing | Broader Markdown shortcuts, quote pairing, emphasis pairing, and code-fence pairing proof. |
 | 6.3 Editor | Multi-cursor support | Unverified | CodeMirror may support it by default | Decide complete/deferred and document. |
 | 6.3 Editor | Vim/emacs keybindings | Deferred | Spec says later if feasible | Record deferred unless implemented later. |
 | 6.4 Preview | Live debounced preview | Partial | Store compile on editor update; debounce in `src/App.vue` | Large-document behavior and timing tests. |
@@ -193,11 +193,11 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed code CI on commit `7702e89` is green across browser workflows and
+- Latest pushed code CI on commit `f13c3f3` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26153224371` with 24
+- Browser-level workflow harness passes in Linux CI run `26154535588` with 25
   Chromium tests, including advanced table editor coverage, mocked file
   lifecycle coverage, save-as, recently closed reopening, and stale-save
   conflict copy/merge/keep-local/accept-external recovery plus watcher-originated
@@ -209,8 +209,10 @@ Current major verification gaps:
   missing-restored-file warning coverage, tab activation, dirty close
   confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
   folder reopen/prune behavior, and externally moved recently-closed path
-  pruning, synchronized editor/preview scrolling, and preview heading
-  click-to-source.
+  pruning, synchronized editor/preview scrolling, preview heading
+  click-to-source, persisted editor word-wrap and line-number settings,
+  CodeMirror find/replace, smart list continuation, bracket auto-pairing, and
+  command-palette heading navigation.
   Local focused execution is
   currently blocked because the workspace-local Chromium headless-shell
   executable is missing from the Playwright cache.

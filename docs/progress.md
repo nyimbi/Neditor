@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `7702e89 Prove preview
-  navigation workflows`
+- Latest inspected committed baseline before this update: `f13c3f3 Prove editor
+  ergonomics workflows`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -112,6 +112,9 @@ Recent pushed checkpoints visible in current git history:
 - `7702e89` added browser workflow proof for editor-to-preview scroll sync,
   preview-to-editor scroll sync, and rendered preview heading click-through to
   the CodeMirror source line.
+- `f13c3f3` added browser workflow proof for persisted editor word-wrap and
+  line-number settings, CodeMirror find/replace, smart list continuation,
+  bracket auto-pairing, and command-palette heading search/navigation.
 
 ## Current Capability Snapshot
 
@@ -151,7 +154,10 @@ Implemented or substantially present, pending the conservative caveats in
   handling, missing restored-file warnings, tab activation, dirty-close
   confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
   folder reopen/prune behavior, moved recently-closed path pruning,
-  synchronized editor/preview scrolling, and preview heading click-to-source.
+  synchronized editor/preview scrolling, preview heading click-to-source,
+  persisted editor word-wrap and line-number settings, CodeMirror find/replace,
+  smart list continuation, bracket auto-pairing, and command-palette heading
+  navigation.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -162,13 +168,13 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed code CI for commit `7702e89` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26153224371`.
+- Latest pushed code CI for commit `f13c3f3` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26154535588`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 24 Chromium tests in
-  run `26153224371`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 25 Chromium tests in
+  run `26154535588`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
   root-file conflicts, advanced table structure/format/cancel coverage, and AI
@@ -182,7 +188,10 @@ P0 gaps:
 - The same green browser run now also covers tab activation, dirty close
   confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
   folder reopen/prune behavior, moved recently-closed path pruning,
-  synchronized editor/preview scrolling, and preview heading click-to-source.
+  synchronized editor/preview scrolling, preview heading click-to-source,
+  editor word-wrap and line-number persistence, CodeMirror find/replace, smart
+  list continuation, bracket auto-pairing, and command-palette heading
+  navigation.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -343,6 +352,17 @@ Additional preview navigation workflow verification:
 | `git diff --check` | Pass | No whitespace errors after adding preview navigation coverage. |
 | `gh run watch 26153224371 --exit-status` | Pass | Commit `7702e89` passed 24 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
 
+Additional editor ergonomics workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding editor ergonomics browser coverage. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the editor ergonomics workflow update. |
+| `pnpm exec playwright test --list` | Pass | Listed 25 Chromium workflow tests, including persisted editor settings, find/replace, list continuation, bracket auto-pairing, and command-palette heading navigation coverage. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "persists editor settings" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
+| `git diff --check` | Pass | No whitespace errors after adding editor ergonomics coverage. |
+| `gh run watch 26154535588 --exit-status` | Pass | Commit `f13c3f3` passed 25 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
+
 Current CI evidence log:
 
 | Command | Result | Evidence |
@@ -472,8 +492,9 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Expand browser coverage for transform settings, export progress, command
-   navigation, remaining preview modes, and the remaining AI/table modes.
+1. Expand browser coverage for transform settings, export progress, remaining
+   command navigation modes, remaining preview modes, and the remaining AI/table
+   modes.
 2. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
 3. Use failures from workflow tests to drive implementation fixes.
