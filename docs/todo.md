@@ -113,7 +113,8 @@ Most recent local verification evidence:
 - `cargo test --locked export_command_tests --lib`: passed 13 export command
   tests, including direct-export dirty-Git warnings copied into response and
   sidecar manifests plus structured export progress-step reporting.
-- `pnpm run test:unit`: passed with 8 frontend unit tests.
+- `pnpm run test:unit`: passed with 9 frontend unit tests, including latest
+  document task cancellation/stale-result guard coverage.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
 - `pnpm run check:a11y`: passed and checked the Vue template for accessible
   button names, form-control labels, and dialog labeling.
@@ -1027,8 +1028,9 @@ Finish:
 
 ### 17. Performance And Large Documents
 
-Status: compiler, repeated export-loop, repeated edit/cache, and export
-progress evidence exists; broader performance proof remains open.
+Status: compiler, repeated export-loop, repeated edit/cache, export progress,
+and compile-result cancellation evidence exists; broader performance proof
+remains open.
 
 Current evidence:
 
@@ -1048,11 +1050,14 @@ Current evidence:
   proves readiness/export manifests carry compile, transform, readiness,
   render, and manifest progress steps, and the export UI displays readiness and
   last-export progress steps.
+- `tests/frontend-unit.test.ts` covers the latest-document task guard used by
+  preview compilation so stale or cancelled compile results cannot overwrite
+  newer editor state. The workbench also exposes a status-bar cancel action
+  while preview compilation is pending.
 
 Finish:
 
 - Benchmarks or deeper stress tests for memory growth and UI debounce timing.
-- Debounce and cancellation behavior for compile/preview updates.
 - Memory growth checks for long editing sessions and repeated exports.
 
 ## P2 - Architecture And Maintainability

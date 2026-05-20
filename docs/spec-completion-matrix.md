@@ -156,7 +156,7 @@ explicit platform checks.
 | 21 Preferences | Theme, typography, export, Git, AI, transforms, recents | Partial | Settings UI; persisted workspace; archived browser workflow run `26157446711` covers external transform path changes, input mode, timeout, trust prompt, denied trust reset, successful probe UI, and missing-executable diagnostics | Migration/schema tests and broader settings workflow coverage. |
 | 22 Security/privacy | Local-first, trust-gated executable transforms, no shell | Partial | External transform runner/tests; local file design; archived browser workflow run `26157446711` covers transform trust prompts, path-change trust clearing, denied trust reset, and missing executable diagnostics | Security review, platform proof, threat-model docs. |
 | 23 Accessibility | Keyboard, ARIA, contrast, reduced motion | Partial | Some labels/roles/settings in UI; `pnpm run check:a11y` statically checks Vue template button names, form-control labels, and dialog labeling; modal close buttons, command-palette search, and conflict merge-line controls now have explicit labels | Broader automated checks, keyboard-only/manual audit, and native workflow proof. |
-| 24 Performance | Large docs, debounced preview, transform cache, progress | Partial | Debounce/cache/progress code; `performance_tests::compiler_stress_handles_large_documents_with_many_artifacts` stress-compiles nested includes, many tables, formulas, transform artifacts, source maps, and diagnostics; `performance_tests::repeated_export_loop_keeps_large_artifacts_stable` repeatedly renders a large compiled document across HTML, PDF, DOCX, PPTX, and Markdown bundle outputs with structural and artifact-size assertions; `performance_tests::repeated_editing_sessions_reuse_external_transform_cache` repeatedly recompiles edited document text while proving a stable trusted external DOT transform is served from cache after the first run; `export_command_tests::export_readiness_and_manifest_report_progress_steps` proves readiness/export manifests carry compile, transform, readiness, render, and manifest progress steps; the export UI now displays readiness and last-export progress steps | Memory growth checks, UI debounce timing, cancellation behavior, and native/browser performance workflow proof. |
+| 24 Performance | Large docs, debounced preview, transform cache, progress | Partial | Debounce/cache/progress code; `performance_tests::compiler_stress_handles_large_documents_with_many_artifacts` stress-compiles nested includes, many tables, formulas, transform artifacts, source maps, and diagnostics; `performance_tests::repeated_export_loop_keeps_large_artifacts_stable` repeatedly renders a large compiled document across HTML, PDF, DOCX, PPTX, and Markdown bundle outputs with structural and artifact-size assertions; `performance_tests::repeated_editing_sessions_reuse_external_transform_cache` repeatedly recompiles edited document text while proving a stable trusted external DOT transform is served from cache after the first run; `export_command_tests::export_readiness_and_manifest_report_progress_steps` proves readiness/export manifests carry compile, transform, readiness, render, and manifest progress steps; the export UI now displays readiness and last-export progress steps; `tests/frontend-unit.test.ts` covers latest-document task cancellation so stale/cancelled compile results cannot overwrite newer editor state | Memory growth checks, UI debounce timing, and native/browser performance workflow proof. |
 
 ## Architecture, Storage, Phases, Acceptance
 
@@ -243,9 +243,9 @@ Current major verification gaps:
   and Windows evidence is missing or indirect.
 - Accessibility has an initial static guard, but full keyboard/manual audit
   evidence is still missing. Performance now has compiler, repeated export
-  loop, repeated edit/cache, and export progress reporting coverage, but memory
-  growth, UI debounce timing, cancellation behavior, and native/browser
-  performance workflow proof remain under-proven.
+  loop, repeated edit/cache, export progress reporting, and compile-result
+  cancellation coverage, but memory growth, UI debounce timing, and
+  native/browser performance workflow proof remain under-proven.
 
 ## Next Matrix Work
 

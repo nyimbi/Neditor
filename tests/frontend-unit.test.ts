@@ -2,6 +2,12 @@ import { deepEqual, equal, ok } from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import {
+  beginLatestDocumentTask,
+  cancelLatestDocumentTask,
+  isLatestDocumentTaskCurrent,
+  type LatestDocumentTaskGate,
+} from "../src/lib/asyncGuards.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { appendConflictMergeLine, applyAiPasteInsertion, quoteMarkdown } from "../src/lib/workflows.js";
 import {
@@ -122,6 +128,23 @@ test("AI paste insertion modes preserve workflow-specific output", () => {
   equal(applyAiPasteInsertion("# Report", "Cleaned", "replace"), "Cleaned");
   equal(applyAiPasteInsertion("# Report", "Cleaned", "quote"), "# Report\n\n> Cleaned\n");
   equal(applyAiPasteInsertion("# Report", "Cleaned", "appendix"), "# Report\n\n## AI Draft Appendix\n\nCleaned\n");
+});
+
+test("latest document task guard rejects stale and cancelled compile results", () => {
+  const gate: LatestDocumentTaskGate = { sequence: 0 };
+  const firstDocument = { id: "doc-1", text: "first draft" };
+  const first = beginLatestDocumentTask(gate, firstDocument);
+
+  ok(isLatestDocumentTaskCurrent(gate, first, firstDocument));
+  ok(!isLatestDocumentTaskCurrent(gate, first, { id: "doc-1", text: "second draft" }));
+  ok(!isLatestDocumentTaskCurrent(gate, first, { id: "doc-2", text: "first draft" }));
+
+  const second = beginLatestDocumentTask(gate, { id: "doc-1", text: "second draft" });
+  ok(!isLatestDocumentTaskCurrent(gate, first, { id: "doc-1", text: "first draft" }));
+  ok(isLatestDocumentTaskCurrent(gate, second, { id: "doc-1", text: "second draft" }));
+
+  cancelLatestDocumentTask(gate);
+  ok(!isLatestDocumentTaskCurrent(gate, second, { id: "doc-1", text: "second draft" }));
 });
 
 test("local verification scripts expose frontend and browser checks", () => {

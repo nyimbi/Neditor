@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/plugin-fs";
 import { Store } from "@tauri-apps/plugin-store";
+import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import type {
   AiCleanupResponse,
@@ -533,6 +534,9 @@ export const useDocumentsStore = defineStore("documents", {
     transformProbeResults: {} as Record<string, TransformProbeResult>,
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
+    compileTaskGate: { sequence: 0 },
+    compileBusy: false,
+    compileProgress: "",
     exportBusy: false,
     exportProgress: "",
     lastExportOutputPath: "",
@@ -977,17 +981,38 @@ export const useDocumentsStore = defineStore("documents", {
     async compileActive() {
       const doc = this.activeDocument;
       if (!doc) return;
+      const snapshot = beginLatestDocumentTask(this.compileTaskGate, doc);
+      this.compileBusy = true;
+      this.compileProgress = "Compiling preview";
       try {
-        doc.compile = await invoke<CompileResponse>("compile_document_with_options", {
-          request: { text: doc.text, file_path: doc.path, options: this.compileOptionsForActive() },
+        const compile = await invoke<CompileResponse>("compile_document_with_options", {
+          request: { text: snapshot.text, file_path: doc.path, options: this.compileOptionsForActive() },
         });
+        if (!isLatestDocumentTaskCurrent(this.compileTaskGate, snapshot, this.activeDocument)) {
+          return;
+        }
+        doc.compile = compile;
         doc.title = String(doc.compile.semantic.title || titleFromPath(doc.path));
         this.statusMessage = `${doc.compile.diagnostics.length} diagnostics`;
         this.lastError = "";
         await this.syncFileWatcher();
       } catch (error) {
-        this.lastError = error instanceof Error ? error.message : String(error);
+        if (isLatestDocumentTaskCurrent(this.compileTaskGate, snapshot, this.activeDocument)) {
+          this.lastError = error instanceof Error ? error.message : String(error);
+        }
+      } finally {
+        if (isLatestDocumentTaskCurrent(this.compileTaskGate, snapshot, this.activeDocument)) {
+          this.compileBusy = false;
+          this.compileProgress = "";
+        }
       }
+    },
+    cancelActiveCompile() {
+      if (!this.compileBusy) return;
+      cancelLatestDocumentTask(this.compileTaskGate);
+      this.compileBusy = false;
+      this.compileProgress = "";
+      this.statusMessage = "Cancelled preview compile";
     },
     async syncFileWatcher() {
       const doc = this.activeDocument;

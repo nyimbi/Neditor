@@ -943,6 +943,10 @@
       </span>
       <span>{{ wordStats }}</span>
       <span v-if="watchStatus">{{ watchStatus }}</span>
+      <span v-if="store.compileProgress" class="compile-actions">
+        {{ store.compileProgress }}
+        <button type="button" @click="store.cancelActiveCompile">Cancel compile</button>
+      </span>
       <span v-if="store.exportProgress">{{ store.exportProgress }}</span>
       <span v-if="store.lastError" class="error">{{ store.lastError }}</span>
     </footer>
@@ -4272,7 +4276,8 @@ select:hover {
   border-bottom: 0;
 }
 
-.conflict-actions {
+.conflict-actions,
+.compile-actions {
   display: inline-flex;
   align-items: center;
   gap: 6px;
