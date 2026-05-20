@@ -827,6 +827,10 @@ Current evidence:
   provenance, pending AI review, broken image and link paths, inline and table
   formula errors, figure/table/equation caption-label warnings, transform
   timeout/path/trust/input-mode errors, and pending render/manifest progress.
+- Export manifests now carry the include graph as first-class evidence, and
+  Markdown bundles include `include-graph.json` in addition to `manifest.json`
+  and `include-map.json`; focused Rust coverage proves both include directives
+  and front matter data-source edges appear in export evidence.
 
 Readiness should validate and report:
 
@@ -834,7 +838,8 @@ Readiness should validate and report:
 - Release status and approval metadata. Broad readiness audit test coverage
   exists.
 - Draft/export warnings.
-- Includes and include graph.
+- Includes and include graph. Export manifests and Markdown bundles now carry
+  include graph evidence; remaining work is UI navigation/editing proof.
 - Broken local links and missing media. Broad readiness audit test coverage
   exists.
 - Citations, bibliography files, missing keys, duplicate keys, and style

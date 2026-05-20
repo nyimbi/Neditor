@@ -283,6 +283,11 @@ fn compiler_loads_front_matter_csv_data_sources() {
         .any(|edge| edge.child.ends_with("data/revenue.csv")));
     assert!(response
         .export_manifest
+        .include_graph
+        .iter()
+        .any(|edge| edge.child.ends_with("data/revenue.csv") && edge.depth == 0));
+    assert!(response
+        .export_manifest
         .included_files
         .iter()
         .any(|file| file.path.ends_with("data/revenue.csv")));

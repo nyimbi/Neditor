@@ -70,6 +70,14 @@ pub(crate) fn render_markdown_bundle_bytes(
             .as_bytes(),
     )
     .map_err(|err| err.to_string())?;
+    zip.start_file("include-graph.json", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(
+        serde_json::to_string_pretty(&manifest.include_graph)
+            .map_err(|err| err.to_string())?
+            .as_bytes(),
+    )
+    .map_err(|err| err.to_string())?;
     zip.start_file("diagnostics.json", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(

@@ -35,6 +35,14 @@ fn markdown_bundle_keeps_duplicate_include_basenames_distinct() {
     assert_ne!(north_bundle_path, south_bundle_path);
     assert_eq!(zip_entry_text(&bundle, &north_bundle_path), "North section");
     assert_eq!(zip_entry_text(&bundle, &south_bundle_path), "South section");
+    let manifest = zip_entry_text(&bundle, "manifest.json");
+    assert!(manifest.contains("\"include_graph\""));
+    assert!(manifest.contains(&path_to_string(&north_section)));
+    assert!(manifest.contains(&path_to_string(&south_section)));
+    let include_graph = zip_entry_text(&bundle, "include-graph.json");
+    assert!(include_graph.contains(&path_to_string(&root_doc)));
+    assert!(include_graph.contains(&path_to_string(&north_section)));
+    assert!(include_graph.contains(&path_to_string(&south_section)));
     let include_map = zip_entry_text(&bundle, "include-map.json");
     assert!(include_map.contains(&format!("\"bundle_path\": \"{north_bundle_path}\"")));
     assert!(include_map.contains(&format!("\"bundle_path\": \"{south_bundle_path}\"")));

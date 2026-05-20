@@ -193,8 +193,8 @@ transform engine settings, and draft watermark behavior.
 
 When `includeManifest` is enabled, NEditor writes sidecar evidence beside the
 artifact. The manifest records source hashes, include hashes, export options,
-diagnostics, readiness summary, layout sections, progress steps, output path,
-and output hash.
+include graph edges, diagnostics, readiness summary, layout sections, progress
+steps, output path, and output hash.
 
 ## Versioning And Snapshots
 

@@ -287,6 +287,10 @@ Recent pushed checkpoints visible in current git history:
   approval, layout, citation source gaps, comments, change notes, AI
   provenance, AI review status, broken links/media, inline and table formulas,
   caption/label checks, transform settings, and pending progress state.
+- This update carries the compiler include graph into export manifests and
+  Markdown bundles, adding `include_graph` manifest evidence plus an
+  `include-graph.json` bundle entry so exported audit packs preserve parent,
+  child, and depth relationships instead of only flat included-file hashes.
 
 ## Current Capability Snapshot
 
@@ -308,6 +312,9 @@ Implemented or substantially present, pending the conservative caveats in
 - Export package metadata now records status, version, classification, client,
   approval metadata, legal disclaimer, source hash, and app version where the
   target format supports custom properties.
+- Export manifests now include included-file hashes, media hashes, source maps,
+  diagnostics, readiness summaries, progress steps, layout sections, transform
+  metadata, and the include graph used to build the deliverable.
 - Transform registry with Rust-native renderers/fallbacks and trust-gated
   external adapters for Graphviz/DOT, D2, PlantUML, and Pikchr.
 - Business features including AI paste cleanup, table editor logic, formula
@@ -669,6 +676,7 @@ Additional review/provenance readiness metadata verification:
 | `cargo test --locked repeated_editing_sessions_reuse_external_transform_cache --lib` in `src-tauri` | Pass | Repeated editing/cache stress test passed with a trusted external DOT transform executed once and served from cache during subsequent edits. |
 | `cargo test --locked export_readiness_and_manifest_report_progress_steps --lib` in `src-tauri` | Pass | Export progress-step test passed, proving readiness/export manifests expose compile, transform, readiness, render, and manifest stages. |
 | `cargo test --locked prepare_for_export_carries_broad_readiness_audit_to_manifest --lib` in `src-tauri` | Pass | Broad readiness audit test passed, proving report/manifest parity for metadata, approval, layout, citations, comments, AI provenance, links/media, formulas, captions, transform settings, and progress state. |
+| `cargo test --locked compiler_loads_front_matter_csv_data_sources --lib` and `cargo test --locked markdown_bundle_keeps_duplicate_include_basenames_distinct --lib` in `src-tauri` | Pass | Include-graph manifest tests passed, proving data-source/include edges appear in export manifests and Markdown bundles include both `manifest.json` include graph data and `include-graph.json`. |
 | `cargo test --locked export_conformance_fixture_maps_business_features --lib` in `src-tauri` | Pass | Export conformance fixture now proves legal disclaimer and approval metadata across HTML, PDF, DOCX package properties/body, PPTX package properties/slides, plain text, and Markdown bundle metadata. |
 | `cargo test --locked repeated_compile_export_cycles_keep_memory_growth_bounded --lib` in `src-tauri` | Pass | Repeated compile/export memory-growth stress passed with bounded retained summaries and process RSS growth sampling. |
 | `cargo test --locked git_restore_and_tag_reject_option_shaped_refs --lib` in `src-tauri` | Pass | Git tag/revision option-injection regression passed. |

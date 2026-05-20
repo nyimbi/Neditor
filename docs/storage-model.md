@@ -72,10 +72,10 @@ The manifest includes:
 
 - Document title, version, status, and source hash.
 - Export target, options, output path, and output hash.
-- Included file hashes.
+- Included file hashes and include graph edges.
 - Transform artifact metadata.
 - Readiness summary and diagnostics.
-- Source map and layout sections.
+- Source map, include graph, and layout sections.
 - Progress steps for compile, transform, readiness, render, and manifest work.
 
 `export_document_writes_optional_sidecar_manifest` proves sidecar behavior for

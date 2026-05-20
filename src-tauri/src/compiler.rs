@@ -277,6 +277,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         output_path: None,
         output_hash: None,
         included_files,
+        include_graph: include_graph.clone(),
         media_files,
         layout_sections,
         export_target: "preview".to_string(),

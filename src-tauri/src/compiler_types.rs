@@ -75,7 +75,7 @@ pub(crate) struct Heading {
     pub(crate) line: usize,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct IncludeEdge {
     pub(crate) parent: String,
     pub(crate) child: String,
@@ -99,6 +99,7 @@ pub(crate) struct ExportManifest {
     pub(crate) output_path: Option<String>,
     pub(crate) output_hash: Option<String>,
     pub(crate) included_files: Vec<ManifestFile>,
+    pub(crate) include_graph: Vec<IncludeEdge>,
     pub(crate) media_files: Vec<ManifestFile>,
     pub(crate) layout_sections: Vec<ManifestLayoutSection>,
     pub(crate) export_target: String,

@@ -306,6 +306,7 @@ export interface ExportManifest {
   output_path?: string | null;
   output_hash?: string | null;
   included_files: ManifestFile[];
+  include_graph: Array<{ parent: string; child: string; depth: number }>;
   media_files: ManifestFile[];
   layout_sections: ManifestLayoutSection[];
   export_target: string;
