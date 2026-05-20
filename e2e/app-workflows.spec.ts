@@ -406,7 +406,7 @@ test("runs command palette insertion and table editor workflows", async ({ page 
 
 test("opens, saves, duplicates, renames, reveals, and reverts mocked files", async ({ page }) => {
   await queueDialogSelection(page, "/workspace/market.md");
-  await page.getByRole("button", { name: "Open" }).click();
+  await page.getByRole("button", { name: "Open", exact: true }).click();
 
   await expect.poll(() => editorText(page)).toContain("Original saved content.");
   await expect(page.getByText("/workspace")).toBeVisible();
@@ -425,7 +425,7 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
       "Saved from browser workflow.",
     ].join("\n"),
   );
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("Saved from browser workflow.");
 
   await queueDialogSelection(page, "/workspace/market copy.md");
