@@ -87,6 +87,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
     }
     let mut diagnostics = compile_response.diagnostics.clone();
     validate_export_settings(&request.target, &request.options, &mut diagnostics);
+    validate_export_output_path(&request.target, &request.output_path, &mut diagnostics);
     validate_target_specific_export_readiness(
         &request.target,
         &compile_response.metadata,
@@ -336,6 +337,50 @@ fn validate_export_settings(
         }
     }
     validate_transform_export_settings(options, diagnostics);
+}
+
+fn validate_export_output_path(
+    target: &str,
+    output_path: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(expected_extension) = expected_export_extension(target) else {
+        return;
+    };
+    let actual_extension = Path::new(output_path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if actual_extension == expected_extension {
+        return;
+    }
+    let suggestion = format!(
+        "Choose an output path ending in .{} or change the export target.",
+        expected_extension
+    );
+    diagnostics.push(diag(
+        "error",
+        format!(
+            "{} export target must write to .{} files.",
+            target.to_ascii_uppercase(),
+            expected_extension
+        ),
+        Some(output_path.to_string()),
+        None,
+        Some(&suggestion),
+    ));
+}
+
+fn expected_export_extension(target: &str) -> Option<&'static str> {
+    match target {
+        "html" => Some("html"),
+        "pdf" => Some("pdf"),
+        "docx" => Some("docx"),
+        "pptx" => Some("pptx"),
+        "markdown-bundle" | "markdown" => Some("zip"),
+        _ => None,
+    }
 }
 
 fn validate_target_specific_export_readiness(

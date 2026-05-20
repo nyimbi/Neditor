@@ -330,6 +330,34 @@ fn export_document_blocks_invalid_options_before_writing() {
 }
 
 #[test]
+fn export_document_blocks_target_extension_mismatches_before_writing() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-export-extension-test-{unique}"));
+    fs::create_dir_all(&root).expect("create export extension dir");
+    let output = root.join("board-deck.pdf");
+
+    let error = export_document(ExportRequest {
+        text: "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Board Deck\n".to_string(),
+        file_path: None,
+        target: "pptx".to_string(),
+        output_path: path_to_string(&output),
+        options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+    })
+    .expect_err("mismatched target extension should block export");
+
+    assert!(
+        error.contains("PPTX export target must write to .pptx files"),
+        "{error}"
+    );
+    assert!(!output.exists());
+    assert!(!PathBuf::from(format!("{}.manifest.json", output.display())).exists());
+    fs::remove_dir_all(root).expect("clean export extension dir");
+}
+
+#[test]
 fn export_document_writes_optional_sidecar_manifest() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

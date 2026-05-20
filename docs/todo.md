@@ -938,6 +938,9 @@ Current evidence:
   reports, copy the warning into the response and sidecar manifest, and skip
   Git inspection for nonexistent source paths so unsaved/export-only documents
   do not inherit the app process working tree state.
+- Direct exports now block target/output extension mismatches before writing,
+  preventing artifacts and sidecar manifests from being created under the wrong
+  target extension.
 - `prepare_for_export_carries_broad_readiness_audit_to_manifest` now exercises
   a broad readiness audit in one report: missing title/version, missing
   approval metadata, unsupported layout metadata, citation source gaps,
@@ -984,6 +987,8 @@ Readiness should validate and report:
 - Export target options and target-specific blockers. Focused Rust coverage now
   proves the PPTX approved-metadata blocker; more target-specific option
   combinations remain.
+- Target/output extension consistency. Focused Rust coverage now proves direct
+  exports refuse mismatched target extensions before writing artifacts.
 - Unresolved comments and malformed comment/change-note audit metadata. Broad
   readiness audit test coverage exists.
 - AI provenance that is not human reviewed or lacks required audit metadata.

@@ -1249,6 +1249,18 @@ Additional target-specific PPTX readiness verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "export readiness" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional direct-export target extension verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked export_document_blocks_target_extension_mismatches_before_writing --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust export proof blocks a `target: "pptx"` export to `board-deck.pdf`, returns a target-extension validation error, and writes neither artifact nor sidecar manifest. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 17 export command tests passed after adding pre-write target/output extension validation. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the extension validation update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after adding output extension validation. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
