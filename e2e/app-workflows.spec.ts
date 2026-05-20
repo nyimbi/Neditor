@@ -1251,6 +1251,21 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await expect.poll(() => editorText(page)).toContain("| Item | Value |");
 
   await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert table of contents");
+  await page.getByRole("button", { name: "Insert table of contents Snippet" }).click();
+  await expect.poll(() => editorText(page)).toContain("[TOC]");
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert index");
+  await page.getByRole("button", { name: "Insert index Snippet" }).click();
+  await expect.poll(() => editorText(page)).toContain("[INDEX]");
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert bibliography");
+  await page.getByRole("button", { name: "Insert bibliography Snippet" }).click();
+  await expect.poll(() => editorText(page)).toContain("[BIBLIOGRAPHY]");
+
+  await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert list of figures");
   await page.getByRole("button", { name: "Insert list of figures Snippet" }).click();
   await expect.poll(() => editorText(page)).toContain("[LIST_OF_FIGURES]");

@@ -1204,6 +1204,9 @@ const figureCropPositionPoints: Record<FigureCropPosition, { x: number; y: numbe
 };
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
 const equationSnippet = "$$\nE = mc^2\n$$ {#eq:energy}\n";
+const tocSnippet = "[TOC]\n";
+const indexSnippet = "[INDEX]\n";
+const bibliographySnippet = "[BIBLIOGRAPHY]\n";
 const listOfFiguresSnippet = "[LIST_OF_FIGURES]\n";
 const listOfTablesSnippet = "[LIST_OF_TABLES]\n";
 const glossarySnippet = "```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n";
@@ -1471,6 +1474,9 @@ const commands = computed(() => [
     })),
   { name: "Insert calculation", group: "Snippet", run: () => insertBlock(calcSnippet) },
   { name: "Insert equation", group: "Snippet", run: () => insertBlock(equationSnippet) },
+  { name: "Insert table of contents", group: "Snippet", run: () => insertBlock(tocSnippet) },
+  { name: "Insert index", group: "Snippet", run: () => insertBlock(indexSnippet) },
+  { name: "Insert bibliography", group: "Snippet", run: () => insertBlock(bibliographySnippet) },
   { name: "Insert list of figures", group: "Snippet", run: () => insertBlock(listOfFiguresSnippet) },
   { name: "Insert list of tables", group: "Snippet", run: () => insertBlock(listOfTablesSnippet) },
   { name: "Insert glossary", group: "Snippet", run: () => insertBlock(glossarySnippet) },

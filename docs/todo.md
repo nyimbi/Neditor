@@ -91,7 +91,8 @@ explicit platform checks run outside GitHub Actions.
 Most recent local verification evidence:
 
 - `pnpm exec playwright test --list`: listed the browser workflow harness with
-  command-palette insertion proof for generated figure/table list markers.
+  command-palette insertion proof for `[TOC]`, `[INDEX]`, `[BIBLIOGRAPHY]`,
+  `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
 - `pnpm run test:unit`: passed with 8 frontend unit tests.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
 - `cargo test --locked compiler_generates_lists_of_figures_and_tables --lib`:
@@ -609,8 +610,8 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   set, drag a loose document into an existing document set, save the generated
   `documentSet` front matter, and close a tab group without disturbing other
   groups.
-- Generated-section insertion workflow: command-palette insertion for
-  `[LIST_OF_FIGURES]` and `[LIST_OF_TABLES]`.
+- Generated-section insertion workflow: command-palette insertion for `[TOC]`,
+  `[INDEX]`, `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
