@@ -7,7 +7,9 @@ use crate::{
     },
     git::get_git_status,
     paged_document::PagedDocument,
-    path_to_string, sha256_uri, CompileRequest, ExportManifest, SourceMapEntry,
+    path_to_string, sha256_uri,
+    validation::validate_captioned_business_objects,
+    CompileRequest, ExportManifest, SourceMapEntry,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -77,6 +79,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
     }
     let mut diagnostics = compile_response.diagnostics.clone();
     validate_export_settings(&request.target, &request.options, &mut diagnostics);
+    validate_captioned_business_objects(&compile_response.document_ast.blocks, &mut diagnostics);
     if let Some(error) = diagnostics
         .iter()
         .find(|diagnostic| diagnostic.severity == "error")
@@ -165,6 +168,7 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
     response.export_manifest.export_target = request.target.clone();
     response.export_manifest.export_options = request.options.clone();
     validate_export_settings(&request.target, &request.options, &mut response.diagnostics);
+    validate_captioned_business_objects(&response.document_ast.blocks, &mut response.diagnostics);
     if git_export_warnings_enabled(&request.options) {
         validate_git_export_cleanliness(request.file_path.as_deref(), &mut response.diagnostics);
     }

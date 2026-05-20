@@ -317,6 +317,119 @@ pub(crate) fn validate_layout_directives(
     }
 }
 
+pub(crate) fn validate_captioned_business_objects(
+    blocks: &[DocumentBlock],
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    for block in blocks {
+        match block {
+            DocumentBlock::Figure {
+                id,
+                caption,
+                line,
+                source,
+                ..
+            } if missing_label_or_caption(id, caption) => {
+                push_caption_diagnostic(
+                    diagnostics,
+                    CaptionDiagnosticInput {
+                        kind: "Figure",
+                        message: "Figure is missing a stable label or caption.",
+                        suggestion:
+                            "Add a figure label such as {#fig:name} and a caption attribute before export.",
+                        id,
+                        caption,
+                        fallback_line: *line,
+                        source: source.as_ref(),
+                    },
+                );
+            }
+            DocumentBlock::Table {
+                id,
+                caption,
+                line,
+                source,
+                ..
+            } if missing_label_or_caption(id, caption) => {
+                push_caption_diagnostic(
+                    diagnostics,
+                    CaptionDiagnosticInput {
+                        kind: "Table",
+                        message: "Table is missing a stable label or caption.",
+                        suggestion:
+                            "Add a table caption such as Table: Caption {{#tbl:name}} before export.",
+                        id,
+                        caption,
+                        fallback_line: *line,
+                        source: source.as_ref(),
+                    },
+                );
+            }
+            DocumentBlock::Equation {
+                id,
+                caption,
+                line,
+                source,
+                ..
+            } if missing_label_or_caption(id, caption) => {
+                push_caption_diagnostic(
+                    diagnostics,
+                    CaptionDiagnosticInput {
+                        kind: "Equation",
+                        message: "Equation is missing a stable label or caption.",
+                        suggestion:
+                            "Add an equation label such as {#eq:name} and a caption before export.",
+                        id,
+                        caption,
+                        fallback_line: *line,
+                        source: source.as_ref(),
+                    },
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+fn missing_label_or_caption(id: &Option<String>, caption: &Option<String>) -> bool {
+    id.as_deref().unwrap_or("").trim().is_empty()
+        || caption.as_deref().unwrap_or("").trim().is_empty()
+}
+
+struct CaptionDiagnosticInput<'a> {
+    kind: &'a str,
+    message: &'a str,
+    suggestion: &'a str,
+    id: &'a Option<String>,
+    caption: &'a Option<String>,
+    fallback_line: usize,
+    source: Option<&'a crate::document_ast::AstSourceRange>,
+}
+
+fn push_caption_diagnostic(
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+    input: CaptionDiagnosticInput<'_>,
+) {
+    let (source_file, line) = input
+        .source
+        .map(|source| (Some(source.source_file.clone()), Some(source.source_line)))
+        .unwrap_or((None, Some(input.fallback_line)));
+    let mut diagnostic = diag(
+        "warning",
+        input.message,
+        source_file,
+        line,
+        Some(input.suggestion),
+    );
+    diagnostic.related.push(format!(
+        "{} metadata: label={}, caption={}",
+        input.kind,
+        present_or_missing(input.id.as_deref().unwrap_or_default()),
+        present_or_missing(input.caption.as_deref().unwrap_or_default())
+    ));
+    diagnostics.push(diagnostic);
+}
+
 fn first_pending_ai_review_line(input: &DocumentValidationInput<'_>) -> Option<usize> {
     input
         .ai_sources

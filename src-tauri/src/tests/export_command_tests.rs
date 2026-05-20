@@ -154,6 +154,43 @@ fn prepare_for_export_reports_invalid_ai_review_statuses() {
 }
 
 #[test]
+fn prepare_for_export_reports_missing_caption_labels() {
+    let report = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: Caption Audit\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Caption Audit\n<figure class=\"figure\"><img src=\"data:image/svg+xml;base64,PHN2Zy8+\" alt=\"Architecture\"/></figure>\n\n| Metric | Value |\n| --- | ---: |\n| Revenue | 42 |\n\n<figure class=\"equation\"><code>ROI = Gain / Cost</code></figure>\n"
+            .to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 0);
+    assert_eq!(report.warning_count, 3);
+    assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message == "Figure is missing a stable label or caption."
+            && diagnostic
+                .related
+                .iter()
+                .any(|related| related.contains("label=missing"))
+            && diagnostic
+                .related
+                .iter()
+                .any(|related| related.contains("caption=missing"))
+    }));
+    assert!(report
+        .diagnostics
+        .iter()
+        .any(|diagnostic| { diagnostic.message == "Table is missing a stable label or caption." }));
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message == "Equation is missing a stable label or caption."
+    }));
+    assert!(report.manifest.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message == "Figure is missing a stable label or caption."
+    }));
+}
+
+#[test]
 fn export_document_blocks_compiler_errors_before_writing() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

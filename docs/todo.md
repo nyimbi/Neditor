@@ -747,6 +747,8 @@ Current evidence:
   markers when required provenance fields, human-review metadata, or known
   review statuses are missing, and the diagnostics are copied into the export
   manifest.
+- Readiness now reports figures, tables, and equations that are missing stable
+  labels or captions, and the diagnostics are copied into the export manifest.
 
 Readiness should validate and report:
 
