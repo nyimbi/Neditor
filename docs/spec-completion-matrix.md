@@ -127,8 +127,8 @@ explicit platform checks.
 | 10.4.10 TSV | Tables and formulas | Partial | `tables.rs`; transform tests | Data source workflow and UI proof. |
 | 10.4.11 JSON | Structured rendering | Partial | `structured.rs`; transform tests | Large/nested docs and schema interactions. |
 | 10.4.12 YAML | Structured rendering | Partial | `structured.rs`; transform tests | Large/nested docs and schema interactions. |
-| 10.4.13 OpenAPI | API docs | Partial | `structured.rs`; transform tests | Richer endpoint/schema rendering. |
-| 10.4.14 JSON Schema | Schema docs | Partial | `structured.rs`; transform tests | Richer schema rendering. |
+| 10.4.13 OpenAPI | API docs | Partial | `structured.rs`; `compiler_renders_openapi_and_json_schema_tables` covers title/version, servers, operation IDs, tags, path and operation parameters, request bodies, responses, media types, and component schemas | Broader OpenAPI edge cases, visual/export fixture coverage, and UI proof. |
+| 10.4.14 JSON Schema | Schema docs | Partial | `structured.rs`; `compiler_renders_openapi_and_json_schema_tables` covers title/description, nested field paths, array item paths, required flags, descriptions, refs, enums, formats, defaults, and constraints | Broader composition edge cases and visual/export fixture coverage. |
 | 10.4.15 BibTeX | Bibliography rendering | Partial | `business.rs`; transform tests | Edge-case parsing and UI integration. |
 | 10.4.16 Glossary | Definitions and term rendering | Partial | `business.rs`; glossary/index tests | Hover/UI/export proof. |
 | 10.4.17 Timeline | Timeline SVG | Partial | `business.rs`; transform tests | Visual/export fixture coverage. |

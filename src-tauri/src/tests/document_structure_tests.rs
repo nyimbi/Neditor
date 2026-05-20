@@ -652,7 +652,7 @@ fn compiler_builds_document_ast_blocks_for_exports() {
 #[test]
 fn compiler_renders_openapi_and_json_schema_tables() {
     let response = compile(CompileRequest {
-        text: r#"---
+        text: r##"---
 title: API
 status: approved
 approvedBy: QA
@@ -661,30 +661,117 @@ approvedBy: QA
 
 ```openapi
 openapi: 3.1.0
+info:
+  title: Ledger API
+  version: 1.0.0
+servers:
+  - url: https://api.example.test
+    description: Production
 paths:
   /accounts:
+    parameters:
+      - name: tenant
+        in: header
+        required: true
+        schema:
+          type: string
     get:
       summary: List accounts
+      operationId: listAccounts
+      tags:
+        - Accounts
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        "200":
+          description: Account list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Account"
+    post:
+      summary: Create account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Account"
+      responses:
+        "201":
+          description: Created account
+components:
+  schemas:
+    Account:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Account id
+        status:
+          type: string
+          enum: [active, suspended]
+        owner:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
 ```
 
 ```json-schema
 {
+  "title": "Account",
+  "description": "Account payload",
   "type": "object",
-  "required": ["id"],
+  "required": ["id", "transactions"],
   "properties": {
-    "id": { "type": "string", "description": "Account id" },
-    "balance": { "type": "number" }
+    "id": { "type": "string", "format": "uuid", "description": "Account id" },
+    "balance": { "type": "number", "minimum": 0, "default": 0 },
+    "transactions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["amount"],
+        "properties": {
+          "amount": { "type": "number" },
+          "kind": { "type": "string", "enum": ["credit", "debit"] }
+        }
+      }
+    }
   }
 }
 ```
-"#
+"##
         .to_string(),
         file_path: None,
     });
 
+    assert!(response.html.contains("Ledger API"));
+    assert!(response.html.contains("https://api.example.test"));
     assert!(response.html.contains("List accounts"));
+    assert!(response.html.contains("listAccounts"));
+    assert!(response.html.contains("tenant"));
+    assert!(response.html.contains("limit"));
+    assert!(response.html.contains("application/json"));
+    assert!(response.html.contains("array&lt;ref Account&gt;"));
+    assert!(response.html.contains("Component schemas"));
+    assert!(response.html.contains("owner.email"));
     assert!(response.html.contains("Account id"));
     assert!(response.html.contains("<td>yes</td>"));
+    assert!(response.html.contains("transactions[]"));
+    assert!(response.html.contains("format: uuid"));
+    assert!(response.html.contains("minimum: 0"));
+    assert!(response.html.contains("enum: credit, debit"));
 }
 
 #[test]

@@ -263,7 +263,7 @@ Common transform names:
 | `chart` | Bar, line, pie, area, and KPI charts. |
 | `mermaid`, `pikchr`, `dot`, `graphviz`, `d2`, `plantuml` | Diagrams with native fallback or trusted external engine support. |
 | `csv`, `tsv`, `json`, `yaml` | Structured data rendering. |
-| `openapi`, `json-schema` | API and schema documentation. |
+| `openapi`, `json-schema` | API operations, request/response contracts, component schemas, nested fields, and schema constraints. |
 | `bibtex`, `glossary`, `timeline`, `roadmap`, `adr`, `diff`, `qr` | Business-document artifacts and generated sections. |
 | `vega-lite`, `geojson`, `topojson`, `stl` | Visual data previews with static export fallbacks. |
 

@@ -54,6 +54,9 @@ NEditor is no longer a basic scaffold. The repository currently contains:
   output, diagnostics, export manifests, and multiple export targets.
 - Native Rust renderers or fallbacks for the required transform family, plus
   trust-gated external adapters for Graphviz/DOT, D2, PlantUML, and Pikchr.
+- Richer Rust-native OpenAPI and JSON Schema transform rendering for API
+  operations, parameters, request/response bodies, component schemas, nested
+  schema fields, array items, refs, enums, formats, defaults, and constraints.
 - Export modules for HTML, PDF, DOCX, PPTX, and Markdown bundles.
 - Backend tests across compiler, exports, transforms, tables, media packaging,
   validation, file commands, Git workflows, snapshots, review/provenance, and

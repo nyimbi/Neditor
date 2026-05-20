@@ -291,6 +291,13 @@ Recent pushed checkpoints visible in current git history:
   Markdown bundles, adding `include_graph` manifest evidence plus an
   `include-graph.json` bundle entry so exported audit packs preserve parent,
   child, and depth relationships instead of only flat included-file hashes.
+- This update expands the Rust-native OpenAPI and JSON Schema transforms from
+  minimal tables into richer reference renderers: OpenAPI output now includes
+  API title/version, servers, operation IDs, tags, path and operation
+  parameters, request bodies, responses, media types, and component schemas;
+  JSON Schema output now includes root metadata, nested field paths, array item
+  paths, required flags, descriptions, refs, enums, formats, defaults, and
+  numeric/string constraints.
 
 ## Current Capability Snapshot
 
@@ -317,6 +324,8 @@ Implemented or substantially present, pending the conservative caveats in
   metadata, and the include graph used to build the deliverable.
 - Transform registry with Rust-native renderers/fallbacks and trust-gated
   external adapters for Graphviz/DOT, D2, PlantUML, and Pikchr.
+- Rust-native structured-document transforms for JSON, YAML, OpenAPI, and JSON
+  Schema, including nested schema/reference output for API and schema docs.
 - Business features including AI paste cleanup, table editor logic, formula
   handling, diagrams, citations, captions, layout directives, export readiness,
   and review/release metadata.
@@ -677,6 +686,7 @@ Additional review/provenance readiness metadata verification:
 | `cargo test --locked export_readiness_and_manifest_report_progress_steps --lib` in `src-tauri` | Pass | Export progress-step test passed, proving readiness/export manifests expose compile, transform, readiness, render, and manifest stages. |
 | `cargo test --locked prepare_for_export_carries_broad_readiness_audit_to_manifest --lib` in `src-tauri` | Pass | Broad readiness audit test passed, proving report/manifest parity for metadata, approval, layout, citations, comments, AI provenance, links/media, formulas, captions, transform settings, and progress state. |
 | `cargo test --locked compiler_loads_front_matter_csv_data_sources --lib` and `cargo test --locked markdown_bundle_keeps_duplicate_include_basenames_distinct --lib` in `src-tauri` | Pass | Include-graph manifest tests passed, proving data-source/include edges appear in export manifests and Markdown bundles include both `manifest.json` include graph data and `include-graph.json`. |
+| `cargo test --locked compiler_renders_openapi_and_json_schema_tables --lib` in `src-tauri` | Pass | Structured transform test passed, proving richer OpenAPI operation/server/parameter/request/response/component rendering and nested JSON Schema field/constraint rendering. |
 | `cargo test --locked export_conformance_fixture_maps_business_features --lib` in `src-tauri` | Pass | Export conformance fixture now proves legal disclaimer and approval metadata across HTML, PDF, DOCX package properties/body, PPTX package properties/slides, plain text, and Markdown bundle metadata. |
 | `cargo test --locked repeated_compile_export_cycles_keep_memory_growth_bounded --lib` in `src-tauri` | Pass | Repeated compile/export memory-growth stress passed with bounded retained summaries and process RSS growth sampling. |
 | `cargo test --locked git_restore_and_tag_reject_option_shaped_refs --lib` in `src-tauri` | Pass | Git tag/revision option-injection regression passed. |
