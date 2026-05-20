@@ -158,6 +158,13 @@ Recent local verification evidence from this buildout:
 - `gh run view 26144430209 --json status,conclusion,headSha,jobs,url`: passed
   for `3b17c03` across 17 browser workflow tests and Ubuntu/macOS/Windows
   desktop builds.
+- `pnpm run test:unit`: passed after adding include-aware browser mock
+  compilation and included-file watcher workflow tests.
+- `pnpm run build`: passed after adding include-aware browser mock compilation
+  and included-file watcher workflow tests.
+- `pnpm exec playwright test --list`: listed 19 Chromium workflow tests after
+  adding clean included-file recompile and dirty included-file conflict
+  coverage.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -355,6 +362,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   and accept external disk content into the active document.
 - Watcher-originated root-file workflow: clean documents reload external edits
   automatically, while dirty documents open the non-destructive compare flow.
+- Included-file watcher workflow: clean master documents recompile when an
+  included file changes, and dirty master documents open the non-destructive
+  included-file compare flow before accepting the updated include.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -365,9 +375,7 @@ Required next coverage:
 
 - Remaining file/workspace flows: tab activation, missing-file restore,
   moved/deleted-file restore, restart workspace restore, unsaved-document close
-  behavior, included file conflicts, multi-tab watcher switching, and native
-  desktop dialog
-  behavior.
+  behavior, multi-tab watcher switching, and native desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
 - Preview heading click-to-source and synchronized scrolling.
@@ -375,8 +383,7 @@ Required next coverage:
   glossary/index commands, and navigation commands.
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
-- External conflict modal: included-file conflict behavior and more granular
-  line-compose controls.
+- External conflict modal: more granular line-compose controls.
 - AI paste cleanup modes: quote, appendix, replace selection, merge into
   current section, replace document, provenance, citation TODOs, clipboard, and
   review-state flows.
@@ -529,7 +536,8 @@ Finish:
 Status: backend and UI exist; stale-save conflict copy/merge/keep-local/
 accept-external workflow proof is present in browser CI. Clean watcher reload
 and watcher-originated dirty root-file conflict proof are also present in
-browser CI; included-file watcher flows are still missing.
+browser CI. Clean included-file recompile and dirty included-file conflict proof
+are now present in the local browser workflow harness and pending pushed CI.
 
 Finish:
 
@@ -537,7 +545,9 @@ Finish:
   `26140882880` covers this for root-file changes.
 - Dirty root-file conflict through UI. Browser CI run `26140882880` covers this
   for watcher-originated root-file changes.
-- Dirty included-file conflict and master recompilation through UI.
+- Dirty included-file conflict and master recompilation through UI. Local
+  Playwright discovery now includes clean included-file recompile and dirty
+  included-file conflict coverage; pushed CI evidence is pending for this slice.
 - Save-race conflict when a file changes after the last watcher event but
   before save. Browser CI run `26139678118` covers the stale-save conflict path
   through compare, save-copy preservation, merge-back recovery, keep-local, and

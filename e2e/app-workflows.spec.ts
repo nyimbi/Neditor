@@ -23,8 +23,45 @@ async function installTauriMock(page: Page) {
       return path.replace(/\\/g, "/");
     }
 
+    function dirname(path: string) {
+      const normalized = normalizePath(path);
+      const index = normalized.lastIndexOf("/");
+      if (index <= 0) return "/";
+      return normalized.slice(0, index);
+    }
+
+    function resolveRelativePath(basePath: string, target: string) {
+      if (target.startsWith("/")) return normalizePath(target);
+      const parts = `${dirname(basePath)}/${target}`.split("/");
+      const stack: string[] = [];
+      for (const part of parts) {
+        if (!part || part === ".") continue;
+        if (part === "..") {
+          stack.pop();
+        } else {
+          stack.push(part);
+        }
+      }
+      return `/${stack.join("/")}`;
+    }
+
     function titleFromPath(path: string) {
       return normalizePath(path).split("/").pop() || path;
+    }
+
+    function includeTarget(line: string) {
+      const trimmed = line.trim();
+      const bang = trimmed.match(/^!include\s+(.+)$/);
+      if (bang) return bang[1].trim().replace(/^["']|["']$/g, "");
+      const braces = trimmed.match(/^\{\{\s*include\s+(.+?)\s*\}\}$/);
+      if (braces) return braces[1].trim().replace(/^["']|["']$/g, "");
+      const comment = trimmed.match(/^<!--\s*include:\s*(.+?)\s*-->$/);
+      if (comment) return comment[1].trim().replace(/^["']|["']$/g, "");
+      return "";
+    }
+
+    function stripFrontMatter(text: string) {
+      return text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
     }
 
     function setFile(path: string, text: string) {
@@ -53,6 +90,18 @@ async function installTauriMock(page: Page) {
         "# Market Entry Report",
         "",
         "Original saved content.",
+      ].join("\n"),
+    );
+    setFile(
+      "/workspace/chapters/risk.md",
+      [
+        "---",
+        "title: Risk Include",
+        "---",
+        "",
+        "## Risk Notes",
+        "",
+        "Original included risk note.",
       ].join("\n"),
     );
 
@@ -99,13 +148,51 @@ async function installTauriMock(page: Page) {
       });
     }
 
-    function compileMarkdown(text: string) {
+    function expandIncludes(text: string, filePath = "/workspace/market.md", depth = 0, seen = new Set<string>()) {
+      const compiledLines: string[] = [];
+      const includeGraph: Array<{ parent: string; child: string; depth: number }> = [];
+      const includedFiles = new Map<string, { path: string; hash: string }>();
+      const diagnostics: unknown[] = [];
+      for (const line of text.split(/\r?\n/)) {
+        const target = includeTarget(line);
+        if (!target) {
+          compiledLines.push(line);
+          continue;
+        }
+        const childPath = resolveRelativePath(filePath, target);
+        includeGraph.push({ parent: normalizePath(filePath), child: childPath, depth });
+        const file = files.get(childPath);
+        if (!file) {
+          diagnostics.push({ severity: "error", message: `Missing include file: ${childPath}`, source: childPath });
+          continue;
+        }
+        includedFiles.set(childPath, { path: childPath, hash: file.hash });
+        if (seen.has(childPath)) {
+          diagnostics.push({ severity: "error", message: `Circular include detected: ${childPath}`, source: childPath });
+          continue;
+        }
+        const child = expandIncludes(stripFrontMatter(file.text), childPath, depth + 1, new Set([...seen, childPath]));
+        compiledLines.push(child.compiled);
+        child.includeGraph.forEach((edge) => includeGraph.push(edge));
+        child.includedFiles.forEach((included) => includedFiles.set(included.path, included));
+        child.diagnostics.forEach((diagnostic) => diagnostics.push(diagnostic));
+      }
+      return {
+        compiled: compiledLines.join("\n"),
+        includeGraph,
+        includedFiles: Array.from(includedFiles.values()),
+        diagnostics,
+      };
+    }
+
+    function compileMarkdown(text: string, filePath = "/workspace/market.md") {
+      const expanded = expandIncludes(text, filePath);
       const title = titleFromMarkdown(text);
       const status = statusFromMarkdown(text);
-      const headings = headingsFromMarkdown(text);
+      const headings = headingsFromMarkdown(expanded.compiled);
       const sourceHash = hash(text);
       const metadata = { title, status, version: "1.0.0" };
-      const diagnostics: unknown[] = [];
+      const diagnostics = expanded.diagnostics;
       const manifest = {
         document_title: title,
         document_version: "1.0.0",
@@ -114,7 +201,7 @@ async function installTauriMock(page: Page) {
         source_hash: sourceHash,
         output_path: null,
         output_hash: null,
-        included_files: [],
+        included_files: expanded.includedFiles,
         media_files: [],
         layout_sections: [],
         export_target: "html",
@@ -125,8 +212,8 @@ async function installTauriMock(page: Page) {
         app_version: "e2e-mock",
       };
       return {
-        compiled_markdown: text,
-        html: htmlFromMarkdown(text),
+        compiled_markdown: expanded.compiled,
+        html: htmlFromMarkdown(expanded.compiled),
         semantic: {
           title,
           status,
@@ -162,7 +249,7 @@ async function installTauriMock(page: Page) {
         },
         paged_document: { sections: [] },
         diagnostics,
-        include_graph: [],
+        include_graph: expanded.includeGraph,
         source_map: [],
         metadata,
         bibliography: [],
@@ -246,8 +333,8 @@ async function installTauriMock(page: Page) {
         return null;
       }
       if (cmd === "compile_document_with_options") {
-        const request = args.request as { text: string };
-        return compileMarkdown(request.text);
+        const request = args.request as { text: string; file_path?: string | null };
+        return compileMarkdown(request.text, request.file_path || "/workspace/market.md");
       }
       if (cmd === "list_transform_engines") return [];
       if (cmd === "list_workspace_files") {
@@ -698,6 +785,79 @@ test("opens a root-file conflict when watcher events arrive during local edits",
   await expect(conflictDialog).toContainText("status: in-review");
   await expect(conflictDialog).toContainText("status: approved");
   await expect(conflictDialog).toContainText("External disk edit.");
+});
+
+test("recompiles clean master documents after included files change", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/market.md",
+    [
+      "---",
+      "title: Market Entry Report",
+      "status: draft",
+      "---",
+      "",
+      "# Market Entry Report",
+      "",
+      "!include chapters/risk.md",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const preview = page.getByRole("region", { name: "Live preview" });
+  await expect(preview).toContainText("Original included risk note.");
+  await page.getByLabel("Sidebar panel").selectOption("files");
+  await expect(page.getByRole("button", { name: "/workspace/chapters/risk.md" })).toBeVisible();
+
+  await setMockFileText(page, "/workspace/chapters/risk.md", "## Risk Notes\n\nUpdated included risk note.");
+  await emitMockFileWatch(page, "/workspace/chapters/risk.md");
+
+  await expect(preview).toContainText("Updated included risk note.");
+  await expect.poll(() => editorText(page)).toContain("!include chapters/risk.md");
+  await expect.poll(() => editorText(page)).not.toContain("Updated included risk note.");
+});
+
+test("opens included-file conflicts without overwriting dirty master drafts", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/market.md",
+    [
+      "---",
+      "title: Market Entry Report",
+      "status: draft",
+      "---",
+      "",
+      "# Market Entry Report",
+      "",
+      "!include chapters/risk.md",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Original included risk note.");
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
+  await expect.poll(() => editorText(page)).toContain("status: in-review");
+
+  await setMockFileText(page, "/workspace/chapters/risk.md", "## Risk Notes\n\nDirty included risk note.");
+  await emitMockFileWatch(page, "/workspace/chapters/risk.md");
+
+  const conflictActions = page.locator(".status-bar .conflict-actions");
+  await expect(conflictActions.getByRole("button", { name: "Compare" })).toBeVisible();
+  await conflictActions.getByRole("button", { name: "Compare" }).click();
+
+  const conflictDialog = page.getByRole("dialog", { name: "External file conflict" });
+  await expect(conflictDialog).toContainText("An included file changed while local edits are unsaved.");
+  await expect(conflictDialog).toContainText("/workspace/chapters/risk.md");
+  await expect(conflictDialog).toContainText("Dirty included risk note.");
+
+  await conflictActions.getByRole("button", { name: "Accept external" }).click();
+  await expect(conflictDialog).toBeHidden();
+  await expect.poll(() => editorText(page)).toContain("status: in-review");
+  await expect.poll(() => editorText(page)).toContain("!include chapters/risk.md");
+  await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Dirty included risk note.");
 });
 
 test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {

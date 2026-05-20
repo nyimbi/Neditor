@@ -133,7 +133,8 @@ Implemented or substantially present, pending the conservative caveats in
   column format totals, cancel behavior, save-as plus recently closed
   reopening, stale-save conflict copy/merge/keep-local/accept-external
   recovery, watcher-originated root reload/conflict behavior, AI paste cleanup
-  insertion plus quote/appendix/replace-document/section/selection modes, and
+  insertion plus quote/appendix/replace-document/section/selection modes,
+  clean included-file recompile, dirty included-file conflict handling, and
   export readiness.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
@@ -158,6 +159,10 @@ P0 gaps:
   paste insert/quote/appendix/replace-document/section-merge/replace-selection
   workflows. Local focused Playwright execution is blocked by the
   workspace-local Chromium Mach bootstrap permission failure.
+- Local browser workflow discovery now lists 19 Chromium tests after adding
+  include-aware mock compilation, clean included-file recompile coverage, and
+  dirty included-file conflict coverage. Pushed CI evidence is pending for this
+  slice.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -239,6 +244,15 @@ Additional AI paste browser workflow verification:
 | `pnpm exec playwright test --list` | Pass | Listed 17 Chromium workflow tests, including the AI paste mode workflows. |
 | `gh run view 26144290812 --job 76896091795 --log` | Failure diagnosed | First pushed AI paste browser run had 15 passing tests; the two failures were transient status-bar assertions after the editor mutations had succeeded. |
 | `gh run view 26144430209 --json status,conclusion,headSha,jobs,url` | Pass | Commit `3b17c03` passed 17 browser workflow tests and Ubuntu/macOS/Windows desktop builds. |
+
+Additional included-file watcher workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding include-aware browser mock compilation and included-file watcher workflows. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
+| `pnpm exec playwright test --list` | Pass | Listed 19 Chromium workflow tests, including clean included-file recompile and dirty included-file conflict workflows. |
+| `git diff --check` | Pass | No whitespace errors after adding included-file watcher workflow coverage. |
 
 Current CI evidence log:
 
