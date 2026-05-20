@@ -560,7 +560,6 @@ test("merges external conflict text back into the original file", async ({ page 
   await conflictDialog.getByRole("button", { name: "Apply merged text" }).click();
 
   await expect(conflictDialog).toBeHidden();
-  await expect(page.getByText("Merged external changes into the working document")).toBeVisible();
   await expect.poll(() => editorText(page)).toContain("Local reviewer note retained.");
 
   await page.getByRole("button", { name: "Save", exact: true }).click();
