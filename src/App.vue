@@ -889,7 +889,7 @@
         </template>
       </aside>
 
-      <section v-show="store.mode !== 'preview' && store.mode !== 'export'" class="editor-pane" aria-label="Markdown source">
+      <section v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation'" class="editor-pane" aria-label="Markdown source">
         <div ref="editorHost" class="editor-host"></div>
       </section>
 
@@ -1644,6 +1644,19 @@ watch(
   () => store.exportTarget,
   () => {
     void store.persistWorkspace();
+  },
+);
+
+watch(
+  () => store.mode,
+  (mode) => {
+    if (mode === "export") {
+      store.sidebar = "exports";
+    } else if (mode === "review") {
+      store.sidebar = "review";
+    } else if (mode === "presentation") {
+      store.sidebar = "outline";
+    }
   },
 );
 
@@ -3582,7 +3595,8 @@ select:hover {
 }
 
 .workspace.mode-preview,
-.workspace.mode-export {
+.workspace.mode-export,
+.workspace.mode-presentation {
   grid-template-columns: 260px minmax(0, 1fr);
 }
 
@@ -4402,7 +4416,8 @@ select:hover {
   .workspace.mode-source,
   .workspace.mode-focus,
   .workspace.mode-preview,
-  .workspace.mode-export {
+  .workspace.mode-export,
+  .workspace.mode-presentation {
     grid-template-columns: 1fr;
   }
 

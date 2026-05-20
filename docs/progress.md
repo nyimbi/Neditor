@@ -164,6 +164,10 @@ Recent pushed checkpoints visible in current git history:
 - This update adds diagnostics-panel workflow coverage for a compiler
   diagnostic with line/column metadata and source navigation back into the
   editor.
+- This update wires export, review, and presentation modes to their expected
+  sidebars and hides the source pane for presentation outline mode, with
+  workflow harness coverage for split, source, preview, focus, export, review,
+  and presentation modes.
 
 ## Current Capability Snapshot
 
@@ -200,8 +204,9 @@ Implemented or substantially present, pending the conservative caveats in
   outputs.
 - Frontend unit coverage for table logic and conflict diff alignment.
 - Playwright browser workflow harness for Vite with mocked Tauri IPC,
-  covering view mode switching, command palette table insertion, table editor
-  insertion, mocked file lifecycle operations, advanced table
+  covering split/source/preview/focus/export/review/presentation view mode
+  switching, command palette table insertion, table editor insertion, mocked
+  file lifecycle operations, advanced table
   paste/sort/formula/merge/apply behavior, row/column structure editing,
   column format totals, cancel behavior, save-as plus recently closed
   reopening, stale-save conflict copy/merge/keep-local/accept-external

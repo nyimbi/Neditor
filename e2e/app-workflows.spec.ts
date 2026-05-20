@@ -782,6 +782,29 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await page.getByLabel("View mode").selectOption("split");
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
+
+  await page.getByLabel("View mode").selectOption("focus");
+  await expect(page.getByRole("region", { name: "Markdown source" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Live preview" })).toBeHidden();
+
+  await page.getByLabel("View mode").selectOption("export");
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
+  await expect(page.getByRole("region", { name: "Markdown source" })).toBeHidden();
+  await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Export" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByText("Manifest")).toBeVisible();
+
+  await page.getByLabel("View mode").selectOption("review");
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("review");
+  await expect(page.getByRole("region", { name: "Markdown source" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Review" })).toBeVisible();
+
+  await page.getByLabel("View mode").selectOption("presentation");
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("outline");
+  await expect(page.getByRole("region", { name: "Markdown source" })).toBeHidden();
+  await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Outline" })).toBeVisible();
 });
 
 test("syncs editor and preview scrolling and jumps preview headings to source", async ({ page }) => {

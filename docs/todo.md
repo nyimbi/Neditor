@@ -581,6 +581,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   manifest preview, export output and manifest path reporting, success
   diagnostics, writer-failure diagnostics, blocked-readiness diagnostics before
   file write, and immediate editor edits flushed before readiness checks.
+- View mode workflow: split, source, preview, focus, export preview, review,
+  and presentation outline modes, including sidebar routing for export, review,
+  and presentation.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -593,7 +596,7 @@ Required next coverage:
 - Remaining file/workspace flows: multi-tab watcher switching and native
   desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
-- Focus, export, review, and presentation modes.
+- Focus, export, review, and presentation mode local browser/native execution proof.
 - Broader keyboard shortcut coverage.
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
