@@ -145,20 +145,19 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `dbd440d` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26143632239`.
+- Latest pushed CI for commit `3b17c03` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26144430209`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 14 Chromium tests in
-  run `26143632239`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 17 Chromium tests in
+  run `26144430209`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
-  root-file conflicts, and advanced table structure/format/cancel coverage.
-  This update raises local test discovery to 17 Chromium tests by adding the AI
-  paste quote, appendix, replace-document, section-merge, and replace-selection
-  workflows; local focused Playwright execution is blocked by the workspace-local
-  Chromium Mach bootstrap permission failure.
+  root-file conflicts, advanced table structure/format/cancel coverage, and AI
+  paste insert/quote/appendix/replace-document/section-merge/replace-selection
+  workflows. Local focused Playwright execution is blocked by the
+  workspace-local Chromium Mach bootstrap permission failure.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -238,6 +237,8 @@ Additional AI paste browser workflow verification:
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding AI paste quote, appendix, replace-document, section-merge, and replace-selection browser coverage. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
 | `pnpm exec playwright test --list` | Pass | Listed 17 Chromium workflow tests, including the AI paste mode workflows. |
+| `gh run view 26144290812 --job 76896091795 --log` | Failure diagnosed | First pushed AI paste browser run had 15 passing tests; the two failures were transient status-bar assertions after the editor mutations had succeeded. |
+| `gh run view 26144430209 --json status,conclusion,headSha,jobs,url` | Pass | Commit `3b17c03` passed 17 browser workflow tests and Ubuntu/macOS/Windows desktop builds. |
 
 Current CI evidence log:
 

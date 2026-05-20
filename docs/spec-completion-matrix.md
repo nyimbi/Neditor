@@ -193,19 +193,18 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed CI on commit `dbd440d` is green across browser workflows and
+- Latest pushed CI on commit `3b17c03` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26143632239` with 14
+- Browser-level workflow harness passes in Linux CI run `26144430209` with 17
   Chromium tests, including advanced table editor coverage, mocked file
   lifecycle coverage, save-as, recently closed reopening, and stale-save
   conflict copy/merge/keep-local/accept-external recovery plus watcher-originated
-  clean reload and dirty root-conflict coverage. Local test discovery now lists
-  17 Chromium tests after AI paste quote, appendix, replace-document,
-  section-merge, and replace-selection coverage. Local focused execution is
-  blocked because workspace-local Chromium hits a Mach bootstrap permission
-  failure.
+  clean reload, dirty root-conflict coverage, and AI paste insert/quote/
+  appendix/replace-document/section-merge/replace-selection coverage. Local
+  focused execution is blocked because workspace-local Chromium hits a Mach
+  bootstrap permission failure.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, and the desktop CI matrix
   is currently green, but desktop user journeys are still not covered by a

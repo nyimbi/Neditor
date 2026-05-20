@@ -76,32 +76,33 @@ modules after behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `dbd440d Align table workflow proof with currency formatting`
+- `3b17c03 Keep AI paste workflow assertions stable`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26143632239` on commit `dbd440d`
+- Run `26144430209` on commit `3b17c03`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26143632239`:
+CI evidence from run `26144430209`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 14 Chromium workflow tests, including advanced table paste import,
+  includes 17 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, row/column structure editing, column format totals,
-  cancel-without-applying behavior, the mocked file lifecycle flow, save-as to a
-  new path, and reopening that saved document from the recently closed list. It
-  also now covers stale-save conflict blocking, conflict compare visibility,
-  saving unsaved local edits to a copy without overwriting the disk edit,
-  merging external conflict text back into the original file, keeping local
-  editor edits while leaving the external disk edit untouched, accepting
-  external disk content into the active document, clean watcher-originated
-  reload, and watcher-originated dirty root-file conflicts.
+  cancel-without-applying behavior, AI paste insert/quote/appendix/replace
+  document/section merge/replace selection modes, the mocked file lifecycle
+  flow, save-as to a new path, and reopening that saved document from the
+  recently closed list. It also now covers stale-save conflict blocking,
+  conflict compare visibility, saving unsaved local edits to a copy without
+  overwriting the disk edit, merging external conflict text back into the
+  original file, keeping local editor edits while leaving the external disk edit
+  untouched, accepting external disk content into the active document, clean
+  watcher-originated reload, and watcher-originated dirty root-file conflicts.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -150,6 +151,13 @@ Recent local verification evidence from this buildout:
   coverage.
 - `pnpm exec playwright test --list`: listed 17 Chromium workflow tests after
   adding the AI paste mode coverage.
+- `gh run view 26144290812 --job 76896091795 --log`: diagnosed the first
+  pushed AI paste mode workflow failure; 15 browser tests passed and the two
+  new mode tests only failed because compile statistics replaced transient
+  status-bar messages before assertion.
+- `gh run view 26144430209 --json status,conclusion,headSha,jobs,url`: passed
+  for `3b17c03` across 17 browser workflow tests and Ubuntu/macOS/Windows
+  desktop builds.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
