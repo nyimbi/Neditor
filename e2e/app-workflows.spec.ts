@@ -956,6 +956,56 @@ test("updates the live preview after source edits", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Live preview text from source editing.");
 });
 
+test("keeps large document editing and preview updates responsive", async ({ page }) => {
+  const largeDocument = [
+    "---",
+    "title: Large Interaction Report",
+    "status: draft",
+    "---",
+    "",
+    "# Large Interaction Report",
+    "",
+    "Opening context for the large-document interaction path.",
+    "",
+    ...Array.from({ length: 120 }, (_, index) => [
+      `## Large Section ${index + 1}`,
+      "",
+      `Narrative paragraph ${index + 1} with enough business-report text to keep the editor and preview panes scrollable during the interaction test.`,
+      "",
+      `| Metric | Value |`,
+      `| --- | ---: |`,
+      `| Revenue | ${1000 + index} |`,
+      `| Cost | ${400 + index} |`,
+      "",
+    ]).flat(),
+  ].join("\n");
+
+  await setMockFileText(page, "/workspace/large-interaction.md", largeDocument);
+  await queueDialogSelection(page, "/workspace/large-interaction.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const editorContent = page.locator(".cm-content");
+  const editorScroller = page.locator(".cm-scroller");
+  const previewPane = page.locator(".preview-pane");
+  await expect(page.getByRole("heading", { name: "Large Interaction Report" })).toBeVisible();
+
+  await editorContent.click();
+  await page.keyboard.press("Control+End");
+  const startedAt = await page.evaluate(() => performance.now());
+  await page.keyboard.insertText("\n\n## Large Interaction Target\nLarge document edit landed.");
+
+  await expect.poll(() => editorText(page)).toContain("Large document edit landed.");
+  await expect(previewPane).toContainText("Large document edit landed.");
+  const elapsedMs = await page.evaluate((start) => performance.now() - start, startedAt);
+  expect(elapsedMs, "large document edit should reach preview promptly in the browser harness").toBeLessThan(3000);
+
+  await editorScroller.evaluate((element) => {
+    element.scrollTop = element.scrollHeight * 0.7;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await expect.poll(() => previewPane.evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+});
+
 test("persists editor settings and runs search plus heading commands", async ({ page }) => {
   await setMockFileText(
     page,

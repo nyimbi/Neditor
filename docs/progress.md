@@ -238,6 +238,14 @@ Recent pushed checkpoints visible in current git history:
 - This update extracts preview text commit debounce into a tested helper with
   an explicit `PREVIEW_DEBOUNCE_MS` budget and frontend unit coverage for
   rapid-edit coalescing plus immediate flush behavior.
+- This update adds
+  `performance_tests::repeated_compile_export_cycles_keep_memory_growth_bounded`,
+  which repeatedly compiles and exports large documents while retaining only
+  summary data and bounding process RSS growth on macOS/Linux hosts.
+- This update adds a Playwright large-document interaction workflow that edits
+  a 120-section document, waits for preview update, checks elapsed browser
+  time, and verifies editor-to-preview scroll sync. This host still needs the
+  Playwright Chromium binary before that browser workflow can execute locally.
 
 ## Current Capability Snapshot
 
@@ -613,8 +621,10 @@ Additional review/provenance readiness metadata verification:
 | `cargo test --locked repeated_export_loop_keeps_large_artifacts_stable --lib` in `src-tauri` | Pass | Repeated export-loop stress test passed across HTML, PDF, DOCX, PPTX, and Markdown bundle rendering for a large compiled document. |
 | `cargo test --locked repeated_editing_sessions_reuse_external_transform_cache --lib` in `src-tauri` | Pass | Repeated editing/cache stress test passed with a trusted external DOT transform executed once and served from cache during subsequent edits. |
 | `cargo test --locked export_readiness_and_manifest_report_progress_steps --lib` in `src-tauri` | Pass | Export progress-step test passed, proving readiness/export manifests expose compile, transform, readiness, render, and manifest stages. |
-| `cargo test --locked` in `src-tauri` | Pass | 139 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
-| `pnpm exec playwright test --list` | Pass | Browser harness still lists 34 Chromium workflow tests after the direct-export readiness change. |
+| `cargo test --locked repeated_compile_export_cycles_keep_memory_growth_bounded --lib` in `src-tauri` | Pass | Repeated compile/export memory-growth stress passed with bounded retained summaries and process RSS growth sampling. |
+| `cargo test --locked` in `src-tauri` | Pass | 140 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
+| `npx playwright test e2e/app-workflows.spec.ts -g "keeps large document editing"` | Blocked | The large-document browser workflow is present, but this host is missing Playwright Chromium at `~/Library/Caches/ms-playwright/.../chrome-headless-shell`. |
+| `pnpm exec playwright test --list` | Pass | Browser harness lists 35 Chromium workflow tests, including the large-document interaction workflow. |
 | `pnpm run test:unit` | Pass | 10 frontend unit tests passed, including latest-document task cancellation/stale-result guard coverage and preview debounce timing/coalescing coverage. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |
 | `pnpm run check:a11y` | Pass | Static Vue template accessibility guard passed for button names, form-control labels, and dialog labeling. |

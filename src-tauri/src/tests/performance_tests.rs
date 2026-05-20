@@ -1,6 +1,74 @@
 use super::*;
 use std::time::Instant;
 
+#[cfg(target_os = "linux")]
+fn current_resident_set_kb() -> Option<u64> {
+    let statm = fs::read_to_string("/proc/self/statm").ok()?;
+    let resident_pages = statm.split_whitespace().nth(1)?.parse::<u64>().ok()?;
+    Some(resident_pages * 4)
+}
+
+#[cfg(target_os = "macos")]
+fn current_resident_set_kb() -> Option<u64> {
+    use std::mem::{size_of, zeroed};
+    use std::os::raw::{c_int, c_void};
+
+    #[repr(C)]
+    struct ProcTaskInfo {
+        pti_virtual_size: u64,
+        pti_resident_size: u64,
+        pti_total_user: u64,
+        pti_total_system: u64,
+        pti_threads_user: u64,
+        pti_threads_system: u64,
+        pti_policy: i32,
+        pti_faults: i32,
+        pti_pageins: i32,
+        pti_cow_faults: i32,
+        pti_messages_sent: i32,
+        pti_messages_received: i32,
+        pti_syscalls_mach: i32,
+        pti_syscalls_unix: i32,
+        pti_csw: i32,
+        pti_threadnum: i32,
+        pti_numrunning: i32,
+        pti_priority: i32,
+    }
+
+    #[link(name = "proc")]
+    extern "C" {
+        fn proc_pidinfo(
+            pid: c_int,
+            flavor: c_int,
+            arg: u64,
+            buffer: *mut c_void,
+            buffersize: c_int,
+        ) -> c_int;
+    }
+
+    const PROC_PIDTASKINFO: c_int = 4;
+    let mut info: ProcTaskInfo = unsafe { zeroed() };
+    let expected_size = size_of::<ProcTaskInfo>() as c_int;
+    let result = unsafe {
+        proc_pidinfo(
+            std::process::id() as c_int,
+            PROC_PIDTASKINFO,
+            0,
+            &mut info as *mut ProcTaskInfo as *mut c_void,
+            expected_size,
+        )
+    };
+    if result != expected_size {
+        return None;
+    }
+    Some(info.pti_resident_size / 1024)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn current_resident_set_kb() -> Option<u64> {
+    None
+}
+
 #[test]
 fn compiler_stress_handles_large_documents_with_many_artifacts() {
     let unique = SystemTime::now()
@@ -186,6 +254,107 @@ fn repeated_export_loop_keeps_large_artifacts_stable() {
     assert!(
         elapsed.as_secs() < 20,
         "repeated export loop took {elapsed:?}"
+    );
+}
+
+#[test]
+fn repeated_compile_export_cycles_keep_memory_growth_bounded() {
+    let options = json!({
+        "includeSyntaxHighlighting": true,
+        "includeManifest": true,
+        "includeCoverPage": true,
+        "includePageNumbers": true,
+        "includeToc": true,
+        "watermark": "INTERNAL"
+    });
+    let mut retained_summaries = Vec::new();
+    let baseline_rss_kb = current_resident_set_kb();
+    let mut peak_rss_growth_kb = 0;
+    let mut rss_samples = 0;
+    let started_at = Instant::now();
+
+    for iteration in 0..10 {
+        let mut text = format!(
+            "---\ntitle: Memory Growth Stress {iteration}\nversion: 1.0.{iteration}\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\ntoc: true\n---\n# Memory Growth Stress {iteration}\n\n[TOC]\n\n"
+        );
+        text.push_str("```calc\n");
+        for metric in 0..60 {
+            text.push_str(&format!(
+                "memory_metric_{metric}_{iteration} = {} + {iteration}\n",
+                metric + 10
+            ));
+        }
+        text.push_str(&format!(
+            "memory_total = SUM(memory_metric_1_{iteration}, memory_metric_2_{iteration}, memory_metric_3_{iteration})\n```\n\n"
+        ));
+        for section in 0..36 {
+            text.push_str(&format!(
+                "## Memory Section {section}\n\nParagraph {section} iteration {iteration} keeps enough text in circulation to exercise repeated compile/export allocation paths without retaining full artifacts between cycles.\n\nTable: Memory metrics {section} {{#tbl:memory-{iteration}-{section}}}\n| Metric | Value |\n| --- | ---: |\n| Revenue | {} |\n| Cost | {} |\n| Margin | =SUM(B1:B2) |\n\n```csv caption=\"Memory data {iteration}-{section}\"\nRegion,Revenue\nEast,{}\nWest,{}\n```\n\n",
+                800 + section + iteration,
+                300 + section,
+                175 + iteration,
+                125 + section
+            ));
+        }
+
+        let response = compile_with_options(
+            CompileRequest {
+                text,
+                file_path: None,
+            },
+            &options,
+        );
+        let html = render_full_html(&response, &options);
+        let pdf = render_pdf_bytes(&response, &options);
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+            .expect("markdown bundle bytes");
+        let lengths = [html.len(), pdf.len(), docx.len(), pptx.len(), bundle.len()];
+
+        assert!(response.semantic.headings.len() >= 36);
+        assert!(response.semantic.tables >= 36);
+        assert!(response.transform_artifacts.len() >= 36);
+        for (target, length) in ["html", "pdf", "docx", "pptx", "bundle"]
+            .iter()
+            .zip(lengths)
+        {
+            assert!(
+                length > 1024,
+                "{target} artifact was unexpectedly small on iteration {iteration}: {length}"
+            );
+        }
+
+        retained_summaries.push((
+            response.semantic.headings.len(),
+            response.semantic.tables,
+            response.transform_artifacts.len(),
+            lengths,
+        ));
+
+        if let (Some(baseline), Some(current)) = (baseline_rss_kb, current_resident_set_kb()) {
+            rss_samples += 1;
+            peak_rss_growth_kb = peak_rss_growth_kb.max(current.saturating_sub(baseline));
+        }
+    }
+
+    assert_eq!(retained_summaries.len(), 10);
+    assert!(retained_summaries.iter().all(
+        |(_, table_count, transform_count, lengths)| *table_count >= 36
+            && *transform_count >= 36
+            && lengths.iter().all(|length| *length > 1024)
+    ));
+    assert!(
+        peak_rss_growth_kb < 196_608,
+        "repeated compile/export cycles grew resident memory by {peak_rss_growth_kb} KiB"
+    );
+    if !cfg!(windows) {
+        assert!(rss_samples > 0, "expected at least one process RSS sample");
+    }
+    let elapsed = started_at.elapsed();
+    assert!(
+        elapsed.as_secs() < 30,
+        "repeated compile/export memory stress took {elapsed:?}"
     );
 }
 

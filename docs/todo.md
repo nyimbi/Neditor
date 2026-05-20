@@ -95,7 +95,7 @@ Most recent local verification evidence:
 - `cargo check --locked --features native-watch`: passed in `src-tauri`.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed in
   `src-tauri`.
-- `cargo test --locked`: passed locally with 139 Rust tests on Unix hosts.
+- `cargo test --locked`: passed locally with 140 Rust tests on Unix hosts.
 - `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib`:
   passed and stress-compiles a large Markdown source with nested includes, 80
   tables, 80 CSV transform artifacts, 120 formula definitions, many source-map
@@ -110,6 +110,9 @@ Most recent local verification evidence:
 - `cargo test --locked export_readiness_and_manifest_report_progress_steps --lib`:
   passed and proves readiness/export manifests carry compile, transform,
   readiness, render, and manifest progress steps.
+- `cargo test --locked repeated_compile_export_cycles_keep_memory_growth_bounded --lib`:
+  passed and repeatedly compiles/exports large documents while bounding retained
+  artifact summaries and process RSS growth on macOS/Linux hosts.
 - `cargo test --locked export_command_tests --lib`: passed 13 export command
   tests, including direct-export dirty-Git warnings copied into response and
   sidecar manifests plus structured export progress-step reporting.
@@ -121,9 +124,13 @@ Most recent local verification evidence:
   button names, form-control labels, and dialog labeling.
 - `pnpm run check:docs`: passed and checked README plus all docs for missing
   local links.
-- `pnpm exec playwright test --list`: listed the browser workflow harness with
-  command-palette insertion proof for `[TOC]`, `[INDEX]`, `[BIBLIOGRAPHY]`,
-  `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
+- `npx playwright test e2e/app-workflows.spec.ts -g "keeps large document editing"`:
+  not run to completion on this host because the Playwright Chromium binary is
+  not installed; the large-document browser workflow is present in the harness.
+- `pnpm exec playwright test --list`: listed 35 Chromium workflow tests,
+  including the new large-document browser interaction workflow plus the
+  existing harness proof for command-palette insertion of `[TOC]`, `[INDEX]`,
+  `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
 - `./node_modules/.bin/tauri build --no-bundle`: passed and built the release
   desktop binary at `src-tauri/target/release/neditor`.
 - `git diff --check`: passed.
@@ -675,7 +682,8 @@ Required next coverage:
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices,
   progress/cancellation behavior if needed, and rendered/manual proof.
-- Large-document native/browser performance proof.
+- Run the large-document browser performance workflow on a host with Playwright
+  Chromium installed, plus native desktop performance proof.
 - Remaining transform engine settings: disabled-engine and cross-platform
   executable edge cases beyond the mocked browser workflow.
 
@@ -1030,8 +1038,9 @@ Finish:
 ### 17. Performance And Large Documents
 
 Status: compiler, repeated export-loop, repeated edit/cache, export progress,
-compile-result cancellation, and preview debounce timing evidence exists;
-broader performance proof remains open.
+compile-result cancellation, preview debounce timing, and repeated
+compile/export memory-growth evidence exists; broader performance proof remains
+open.
 
 Current evidence:
 
@@ -1059,12 +1068,20 @@ Current evidence:
   `PREVIEW_DEBOUNCE_MS` remains within the 100 ms small-document preview budget
   and proving rapid edits coalesce before commit while explicit flushes commit
   immediately.
+- `performance_tests::repeated_compile_export_cycles_keep_memory_growth_bounded`
+  repeatedly compiles and renders large documents through HTML, PDF, DOCX,
+  PPTX, and Markdown bundle paths while retaining only summaries and asserting
+  process RSS growth remains bounded on macOS/Linux hosts.
+- `e2e/app-workflows.spec.ts` includes a large-document editing workflow that
+  appends source text, waits for preview update, checks elapsed browser time,
+  and verifies editor-to-preview scroll sync. Local execution still requires
+  installing the Playwright Chromium binary.
 
 Finish:
 
-- Benchmarks or deeper stress tests for memory growth.
-- Memory growth checks for long editing sessions and repeated exports.
-- Native/browser performance workflow proof for large-document interaction.
+- Deeper long-running memory profiling beyond bounded test loops.
+- Run the large-document browser workflow where Playwright Chromium is
+  installed, and add native desktop performance proof.
 
 ## P2 - Architecture And Maintainability
 
