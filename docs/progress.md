@@ -146,23 +146,20 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `3b17c03` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26144430209`.
+- Latest pushed CI for commit `c0cefd1` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26145509141`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 17 Chromium tests in
-  run `26144430209`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 19 Chromium tests in
+  run `26145509141`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
   root-file conflicts, advanced table structure/format/cancel coverage, and AI
   paste insert/quote/appendix/replace-document/section-merge/replace-selection
-  workflows. Local focused Playwright execution is blocked by the
+  workflows, clean included-file recompilation, and dirty included-file
+  conflict handling. Local focused Playwright execution is blocked by the
   workspace-local Chromium Mach bootstrap permission failure.
-- Local browser workflow discovery now lists 19 Chromium tests after adding
-  include-aware mock compilation, clean included-file recompile coverage, and
-  dirty included-file conflict coverage. Pushed CI evidence is pending for this
-  slice.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -253,6 +250,7 @@ Additional included-file watcher workflow verification:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
 | `pnpm exec playwright test --list` | Pass | Listed 19 Chromium workflow tests, including clean included-file recompile and dirty included-file conflict workflows. |
 | `git diff --check` | Pass | No whitespace errors after adding included-file watcher workflow coverage. |
+| `gh run watch 26145509141 --exit-status` | Pass | Commit `c0cefd1` passed 19 browser workflow tests and Ubuntu/macOS/Windows desktop builds. |
 
 Current CI evidence log:
 

@@ -76,22 +76,22 @@ modules after behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `3b17c03 Keep AI paste workflow assertions stable`
+- `c0cefd1 Stabilize included-file watcher proof`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26144430209` on commit `3b17c03`
+- Run `26145509141` on commit `c0cefd1`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26144430209`:
+CI evidence from run `26145509141`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 17 Chromium workflow tests, including advanced table paste import,
+  includes 19 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, row/column structure editing, column format totals,
   cancel-without-applying behavior, AI paste insert/quote/appendix/replace
@@ -102,7 +102,8 @@ CI evidence from run `26144430209`:
   overwriting the disk edit, merging external conflict text back into the
   original file, keeping local editor edits while leaving the external disk edit
   untouched, accepting external disk content into the active document, clean
-  watcher-originated reload, and watcher-originated dirty root-file conflicts.
+  watcher-originated reload, watcher-originated dirty root-file conflicts,
+  clean included-file recompile, and dirty included-file conflicts.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -165,6 +166,8 @@ Recent local verification evidence from this buildout:
 - `pnpm exec playwright test --list`: listed 19 Chromium workflow tests after
   adding clean included-file recompile and dirty included-file conflict
   coverage.
+- `gh run watch 26145509141 --exit-status`: passed for commit `c0cefd1` across
+  19 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -537,7 +540,7 @@ Status: backend and UI exist; stale-save conflict copy/merge/keep-local/
 accept-external workflow proof is present in browser CI. Clean watcher reload
 and watcher-originated dirty root-file conflict proof are also present in
 browser CI. Clean included-file recompile and dirty included-file conflict proof
-are now present in the local browser workflow harness and pending pushed CI.
+are also present in browser CI run `26145509141`.
 
 Finish:
 
@@ -545,9 +548,9 @@ Finish:
   `26140882880` covers this for root-file changes.
 - Dirty root-file conflict through UI. Browser CI run `26140882880` covers this
   for watcher-originated root-file changes.
-- Dirty included-file conflict and master recompilation through UI. Local
-  Playwright discovery now includes clean included-file recompile and dirty
-  included-file conflict coverage; pushed CI evidence is pending for this slice.
+- Dirty included-file conflict and master recompilation through UI. Browser CI
+  run `26145509141` covers clean included-file recompile and dirty
+  included-file conflict handling.
 - Save-race conflict when a file changes after the last watcher event but
   before save. Browser CI run `26139678118` covers the stale-save conflict path
   through compare, save-copy preservation, merge-back recovery, keep-local, and

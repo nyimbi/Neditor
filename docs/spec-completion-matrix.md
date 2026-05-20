@@ -35,9 +35,9 @@ is not "Complete".
 
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
-| 5.1 External File Refresh | Watch open files | Partial | `src-tauri/src/filesystem_watch.rs`; `src/stores/documents.ts`; native-watch CI check; stale-save conflict recovery is browser-proven in CI run `26139678118`; clean root-file watcher reload is browser-proven in CI run `26140882880`; local browser harness now covers clean included-file recompile and dirty included-file conflict flows | Desktop workflow tests and pushed included-file watcher CI proof. |
+| 5.1 External File Refresh | Watch open files | Partial | `src-tauri/src/filesystem_watch.rs`; `src/stores/documents.ts`; native-watch CI check; stale-save conflict recovery is browser-proven in CI run `26139678118`; clean root-file watcher reload is browser-proven in CI run `26140882880`; clean included-file recompile and dirty included-file conflict flows are browser-proven in CI run `26145509141` | Desktop workflow tests. |
 | 5.1 External File Refresh | Non-destructive conflicts: compare, accept external, keep local, save copy | Partial | Conflict modal in `src/App.vue`; `src/lib/conflict.ts`; frontend unit diff test; browser CI run `26139678118` covers stale-save compare visibility, local-copy preservation, merge-back recovery, keep-local, and accept-external; browser CI run `26140882880` covers watcher-originated dirty root-file conflict compare visibility | Included-file conflict resolution tests and more granular line-compose controls. |
-| 5.1 External File Refresh | Watch included files and recompile master docs | Partial | Watch setup includes manifest included files; include tests; local Playwright discovery includes clean included-file recompile and dirty included-file conflict tests | Pushed CI proof and deeper include graph navigation edits. |
+| 5.1 External File Refresh | Watch included files and recompile master docs | Partial | Watch setup includes manifest included files; include tests; browser CI run `26145509141` covers clean included-file recompile and dirty included-file conflict workflows | Deeper include graph navigation edits. |
 | 5.2 Build Toolchain Lessons | Pinned local JS/Rust dependencies | Partial | `pnpm-lock.yaml`; `src-tauri/Cargo.lock`; README commands | Confirm no hidden global dependency remains in packaging and optional engines. |
 | 5.2 Build Toolchain Lessons | Diagnostics for missing external engines | Partial | `transforms/external.rs`; external transform tests | Cross-platform diagnostic proof and UI workflow coverage. |
 | 5.3 Business Export Customization | HTML/PDF/DOCX/PPTX exports | Partial | `src-tauri/src/export/*`; export tests | Artifact-level conformance and rendered/manual checks for each target. |
@@ -64,9 +64,9 @@ is not "Complete".
 | 6.4 Preview | Live debounced preview | Partial | Store compile on editor update; debounce in `src/App.vue` | Large-document behavior and timing tests. |
 | 6.4 Preview | Scroll sync and heading click-to-source | Partial | Preview/editor scroll handlers; click handler | Browser tests. |
 | 6.4 Preview | Separate preview theme, inline warnings, transform blocks, export preview | Partial | Preview theme setting; diagnostics; transform rendering; modes | UI verification and visual tests. |
-| 6.5 File Operations | New, open file, open folder, save, save as, revert, rename, duplicate, reveal | Partial | Store actions and Rust file commands; file command tests; Playwright mocked workflows cover open/save/save-as/duplicate/rename/pin/reveal/revert in CI run `26137556147`; stale-save conflict copy/merge/keep-local/accept-external recovery in CI run `26139678118`; watcher-originated root reload/conflict proof in CI run `26140882880` | Native desktop dialog workflow tests and included-file watcher conflict flows. |
+| 6.5 File Operations | New, open file, open folder, save, save as, revert, rename, duplicate, reveal | Partial | Store actions and Rust file commands; file command tests; Playwright mocked workflows cover open/save/save-as/duplicate/rename/pin/reveal/revert in CI run `26137556147`; stale-save conflict copy/merge/keep-local/accept-external recovery in CI run `26139678118`; watcher-originated root reload/conflict proof in CI run `26140882880`; included-file watcher conflict proof in CI run `26145509141` | Native desktop dialog workflow tests. |
 | 6.5 File Operations | Recent docs/folders, workspace restore | Partial | Persisted workspace store; Playwright mocked workflows cover workspace listing after open and recently closed reopening in CI run `26137556147` | Restart restore, missing/moved/deleted restore workflow tests, and fuller recent folder behavior. |
-| 6.5 File Operations | External change detection/conflict handling | Partial | Watch/conflict code and tests; browser CI run `26139678118` covers stale-save conflict blocking, compare, save-copy preservation, merge-back recovery, keep-local, and accept-external; browser CI run `26140882880` covers clean root reload and watcher-originated dirty root conflict; local harness covers included-file recompile/conflict flows | Pushed included-file watcher CI proof and desktop workflow proof. |
+| 6.5 File Operations | External change detection/conflict handling | Partial | Watch/conflict code and tests; browser CI run `26139678118` covers stale-save conflict blocking, compare, save-copy preservation, merge-back recovery, keep-local, and accept-external; browser CI run `26140882880` covers clean root reload and watcher-originated dirty root conflict; browser CI run `26145509141` covers clean included-file recompile and dirty included-file conflict flows | Desktop workflow proof. |
 
 ## Compiler And Document Model
 
@@ -193,21 +193,19 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed CI on commit `3b17c03` is green across browser workflows and
+- Latest pushed CI on commit `c0cefd1` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26144430209` with 17
+- Browser-level workflow harness passes in Linux CI run `26145509141` with 19
   Chromium tests, including advanced table editor coverage, mocked file
   lifecycle coverage, save-as, recently closed reopening, and stale-save
   conflict copy/merge/keep-local/accept-external recovery plus watcher-originated
   clean reload, dirty root-conflict coverage, and AI paste insert/quote/
-  appendix/replace-document/section-merge/replace-selection coverage. Local
+  appendix/replace-document/section-merge/replace-selection coverage, clean
+  included-file recompile, and dirty included-file conflict handling. Local
   focused execution is blocked because workspace-local Chromium hits a Mach
   bootstrap permission failure.
-- Local browser workflow discovery now lists 19 Chromium tests after adding
-  clean included-file recompile and dirty included-file conflict coverage;
-  pushed CI proof is pending for that slice.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, and the desktop CI matrix
   is currently green, but desktop user journeys are still not covered by a
