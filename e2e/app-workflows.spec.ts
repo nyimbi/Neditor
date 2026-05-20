@@ -213,6 +213,41 @@ async function installTauriMock(page: Page) {
       return Array.from(terms);
     }
 
+    function mockTransformEngines() {
+      return [
+        {
+          name: "d2",
+          execution: "external",
+          available: false,
+          bundled: false,
+          installationLabel: "Install D2 locally",
+          setupHint: "Choose a trusted d2 executable path.",
+          securitySummary: "Runs only with explicit trust, timeout, and output limits.",
+          adapterProfile: "d2-cli",
+          diagnosticProfile: {
+            versionProbe: "d2 --version",
+            failureHint: "Check that the configured D2 executable exists and is trusted.",
+            stderrHint: "D2 writes syntax and executable errors to stderr.",
+            successRelated: ["External D2 probe succeeded."],
+            failureRelated: ["External D2 probe failed."],
+            cacheKeyIncludes: ["path", "input_mode", "timeout"],
+          },
+          defaultCommand: "d2",
+          requiresExecution: true,
+          preferenceKey: "transform.d2.path",
+          inputModes: ["stdin", "file"],
+          limits: {
+            timeoutMs: 5000,
+            maxTimeoutMs: 30000,
+            maxInputBytes: 65536,
+            maxOutputBytes: 1048576,
+          },
+          cacheScope: "external",
+          exportTargets: ["html", "pdf", "docx", "pptx"],
+        },
+      ];
+    }
+
     function expandIncludes(text: string, filePath = "/workspace/market.md", depth = 0, seen = new Set<string>()) {
       const compiledLines: string[] = [];
       const includeGraph: Array<{ parent: string; child: string; depth: number }> = [];
@@ -428,7 +463,21 @@ async function installTauriMock(page: Page) {
         const request = args.request as { text: string; file_path?: string | null };
         return compileMarkdown(request.text, request.file_path || "/workspace/market.md");
       }
-      if (cmd === "list_transform_engines") return [];
+      if (cmd === "list_transform_engines") return mockTransformEngines();
+      if (cmd === "run_external_transform") {
+        const request = args.request as { name: string; engine_path?: string; trusted?: boolean; input_mode?: string; timeout_ms?: number };
+        if (!request.engine_path) throw new Error(`${request.name} engine path is not configured.`);
+        if (!request.trusted) throw new Error(`${request.name} external transform is not trusted.`);
+        if (request.engine_path.includes("missing")) throw new Error(`${request.name} executable not found at ${request.engine_path}.`);
+        return {
+          diagnostics: [
+            {
+              message: `${request.name} probe ok via ${request.input_mode || "stdin"} with timeout ${request.timeout_ms || 0}`,
+            },
+          ],
+          cache_key: `${request.name}:${request.engine_path}:${request.input_mode || "stdin"}:${request.timeout_ms || 0}`,
+        };
+      }
       if (cmd === "list_workspace_files") {
         const request = args.request as { root: string };
         const root = normalizePath(request.root).replace(/\/$/, "");
@@ -852,6 +901,72 @@ test("runs command palette open document and workspace file navigation", async (
   await expect.poll(() => editorText(page)).toContain("Workspace command body.");
   await page.getByLabel("Sidebar panel").selectOption("files");
   await expect.poll(() => activeFileRowText(page)).toContain("workspace-target.md");
+});
+
+test("manages external transform engine trust and probe diagnostics", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/diagram.md",
+    [
+      "# Diagram Probe",
+      "",
+      "```d2",
+      "direction: right",
+      "A -> B",
+      "```",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/diagram.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect.poll(() => editorText(page)).toContain("A -> B");
+
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  const engine = page.locator(".engine-row").filter({ has: page.getByRole("heading", { name: "d2" }) });
+  const enginePath = engine.getByLabel("Engine path");
+  const trusted = engine.getByLabel("Trusted");
+
+  await expect(engine).toContainText("Runs only with explicit trust");
+  await expect(engine).toContainText("Version probe: d2 --version");
+
+  await enginePath.fill("/usr/local/bin/d2");
+  await enginePath.dispatchEvent("change");
+  await expect(trusted).not.toBeChecked();
+  await expect(engine).toContainText("Probe required after engine path change.");
+  await expect(engine).toContainText("Trust was cleared because the executable path changed.");
+  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/usr/local/bin/d2");
+
+  await queueConfirmResponse(page, true);
+  await page.getByRole("region", { name: "External transform trust prompts" }).getByRole("button", { name: "Trust" }).click();
+  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toBeHidden();
+  await expect(trusted).toBeChecked();
+
+  await engine.getByLabel("Input").selectOption("file");
+  await page.getByLabel("Timeout").fill("7750");
+  await page.getByLabel("Timeout").dispatchEvent("change");
+  await engine.getByRole("button", { name: "Probe" }).click();
+  await expect(engine).toContainText("Probe passed");
+  await expect(engine).toContainText("d2 probe ok via file with timeout 7750");
+  await expect(engine).toContainText("Cache: d2:/usr/local/bin/d2:file:7750");
+
+  await enginePath.fill("/missing/d2");
+  await enginePath.dispatchEvent("change");
+  await expect(trusted).not.toBeChecked();
+  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/missing/d2");
+
+  await queueConfirmResponse(page, true);
+  await trusted.check();
+  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toBeHidden();
+  await engine.getByRole("button", { name: "Probe" }).click();
+  await expect(engine).toContainText("Probe failed");
+  await expect(engine).toContainText("d2 executable not found at /missing/d2.");
+
+  await enginePath.fill("/opt/bin/d2");
+  await enginePath.dispatchEvent("change");
+  await expect(trusted).not.toBeChecked();
+  await queueConfirmResponse(page, false);
+  await trusted.check();
+  await expect(trusted).not.toBeChecked();
+  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/opt/bin/d2");
 });
 
 test("runs command palette insertion and table editor workflows", async ({ page }) => {
