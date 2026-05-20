@@ -146,6 +146,47 @@ fn export_document_writes_optional_sidecar_manifest() {
         .as_deref()
         .is_some_and(|hash| hash.starts_with("sha256:")));
 
+    for (target, extension, expected) in [
+        ("pdf", "pdf", "PDF-1.4"),
+        ("pptx", "pptx", "PK"),
+        ("markdown-bundle", "zip", "PK"),
+    ] {
+        let target_output = root.join(format!("ready-{target}.{extension}"));
+        let target_response = export_document(ExportRequest {
+            text: source.to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+            target: target.to_string(),
+            output_path: path_to_string(&target_output),
+            options: json!({ "includeManifest": true }),
+        })
+        .unwrap_or_else(|error| panic!("successful {target} export with manifest: {error}"));
+        let target_manifest_path = target_response
+            .manifest_path
+            .as_deref()
+            .map(PathBuf::from)
+            .expect("target manifest path");
+        let target_manifest_text =
+            fs::read_to_string(&target_manifest_path).expect("target manifest file");
+        let target_bytes = fs::read(&target_output).expect("target output bytes");
+
+        assert!(target_output.exists());
+        assert!(String::from_utf8_lossy(&target_bytes).contains(expected));
+        assert!(target_manifest_text.contains(&format!("\"export_target\": \"{target}\"")));
+        assert!(target_manifest_text.contains("\"document_title\": \"Manifest Ready\""));
+        assert!(target_manifest_text.contains("\"output_path\": "));
+        assert!(target_manifest_text.contains("\"output_hash\": \"sha256:"));
+        assert_eq!(target_response.manifest.export_target, target);
+        assert_eq!(
+            target_response.manifest.output_path.as_deref(),
+            Some(path_to_string(&target_output).as_str())
+        );
+        assert!(target_response
+            .manifest
+            .output_hash
+            .as_deref()
+            .is_some_and(|hash| hash.starts_with("sha256:")));
+    }
+
     let no_manifest_output = root.join("ready-no-manifest.html");
     let no_manifest = export_document(ExportRequest {
         text: source.to_string(),
