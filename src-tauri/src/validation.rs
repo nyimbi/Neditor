@@ -1,5 +1,6 @@
 use crate::{
     bibliography::{BibliographyEntry, CitationReference},
+    compiler_support::{citation_style_value, supported_citation_style},
     diagnostics::{diag, with_range, DocumentDiagnostic},
     document_ast::DocumentBlock,
     layout::{
@@ -115,6 +116,7 @@ pub(crate) fn validate_document(
         }
     }
     validate_layout_metadata(metadata, diagnostics);
+    validate_citation_style_metadata(metadata, diagnostics);
     let known_keys = input
         .bibliography
         .iter()
@@ -291,6 +293,22 @@ fn push_missing_citation_source_diagnostics(
             .push(format!("Citation syntax: {}", reference.raw));
         diagnostics.push(diagnostic);
     }
+}
+
+fn validate_citation_style_metadata(metadata: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {
+    let Some(style) = citation_style_value(metadata) else {
+        return;
+    };
+    if supported_citation_style(style) {
+        return;
+    }
+    diagnostics.push(diag(
+        "warning",
+        format!("Unsupported citation style: {style}"),
+        None,
+        None,
+        Some("Use title, author-year, key, or numeric; unsupported CSL style names fall back to title rendering."),
+    ));
 }
 
 fn push_duplicate_bibliography_diagnostic(

@@ -201,8 +201,13 @@ Use `[BIBLIOGRAPHY]` where references should render:
 [BIBLIOGRAPHY]
 ```
 
-Diagnostics cover missing keys and duplicate bibliography keys. The references
-panel exposes resolved entries and problems.
+Set `citationStyle` to `title`, `author-year`, `key`, or `numeric` in front
+matter. Unsupported `citationStyle` or `cslStyle` names produce a warning and
+fall back to title rendering until a native CSL adapter is added.
+
+Diagnostics cover missing keys, duplicate bibliography keys, missing
+bibliography sources, and unsupported citation styles. The references panel
+exposes resolved entries and problems.
 
 ## Glossary And Index
 

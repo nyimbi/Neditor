@@ -135,13 +135,16 @@ Research and business documents can keep reference metadata near the source.
 
 - Use citation syntax such as `[@porter1985]` or `[@porter1985, p. 42]`.
 - Add `[BIBLIOGRAPHY]` where the rendered references should appear.
+- Choose `title`, `author-year`, `key`, or `numeric` citation style from front
+  matter, preferences, or the references panel.
 - Use `glossary` fenced blocks for terms and definitions.
 - Add `[INDEX]` where the generated index should appear.
 - Use labels and cross references for headings, figures, tables, equations,
   appendices, and decisions.
 
 The references panel surfaces resolved bibliography entries, missing citation
-keys, and duplicate bibliography keys.
+keys, and duplicate bibliography keys. Unsupported citation-style warnings are
+reported with the rest of the document diagnostics.
 
 ## Review, Release, And AI Governance
 

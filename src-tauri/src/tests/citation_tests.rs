@@ -139,6 +139,57 @@ fn compile_options_do_not_override_document_citation_style() {
 }
 
 #[test]
+fn compile_options_supply_numeric_default_citation_style() {
+    let response = compile_with_options(
+            CompileRequest {
+                text: "Claim [@porter1985].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n```".to_string(),
+                file_path: None,
+            },
+            &json!({ "defaultCitationStyle": "numeric" }),
+        );
+
+    assert_eq!(
+        response
+            .metadata
+            .get("citationStyle")
+            .and_then(Value::as_str),
+        Some("numeric")
+    );
+    assert!(response.html.contains("[1]"));
+}
+
+#[test]
+fn compiler_renders_numeric_citations_and_numbered_bibliography() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Numeric Citations\nstatus: approved\napprovedBy: QA\ncitationStyle: numeric\n---\n# Numeric Citations\nSingle [@porter1985].\nMultiple [@porter1985, p. 42; @doe2026].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}\n```\n\n[BIBLIOGRAPHY]\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.html.contains("[1]"));
+    assert!(response.html.contains("[1, p. 42; 2]"));
+    assert!(response.html.contains("[1] <strong>porter1985</strong>"));
+    assert!(response.html.contains("[2] <strong>doe2026</strong>"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("Unsupported citation style")));
+}
+
+#[test]
+fn compiler_warns_and_falls_back_for_unsupported_csl_style() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Unsupported CSL\nstatus: approved\napprovedBy: QA\ncslStyle: apa\n---\n# Unsupported CSL\nClaim [@porter1985].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter},\n year={1985}\n}\n```\n[BIBLIOGRAPHY]".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("Unsupported citation style: apa")));
+    assert!(response.html.contains("(Competitive Advantage)"));
+    assert!(!response.html.contains("(Porter 1985)"));
+}
+
+#[test]
 fn compiler_loads_csl_json_bibliography() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

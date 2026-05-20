@@ -2,7 +2,7 @@ import type { AiCleanupOptions } from "../types.js";
 
 export const WORKSPACE_SCHEMA_VERSION = 2;
 
-export type CitationStyle = "title" | "author-year" | "key";
+export type CitationStyle = "title" | "author-year" | "key" | "numeric";
 export type LayoutPreset = "business" | "compact" | "presentation";
 export type PreviewTheme = "match" | "light" | "dark";
 export type SnapshotStorage = "app-data" | "project-local";
@@ -175,7 +175,7 @@ export function clampScrollRatio(value: number | undefined) {
 }
 
 export function normalizeCitationStyle(value: unknown): CitationStyle {
-  return value === "author-year" || value === "key" || value === "title" ? value : "title";
+  return value === "author-year" || value === "key" || value === "numeric" || value === "title" ? value : "title";
 }
 
 export function normalizeLayoutPreset(value: unknown): LayoutPreset {

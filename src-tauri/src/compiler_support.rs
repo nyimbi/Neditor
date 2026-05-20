@@ -52,12 +52,24 @@ pub(crate) fn collect_glossary(text: &str) -> BTreeMap<String, String> {
 }
 
 pub(crate) fn citation_style(metadata: &Value) -> &str {
+    let style = citation_style_value(metadata).unwrap_or("title");
+    if supported_citation_style(style) {
+        style
+    } else {
+        "title"
+    }
+}
+
+pub(crate) fn citation_style_value(metadata: &Value) -> Option<&str> {
     metadata
         .get("citationStyle")
         .or_else(|| metadata.get("cslStyle"))
         .or_else(|| metadata.get("citation_style"))
         .and_then(Value::as_str)
-        .unwrap_or("title")
+}
+
+pub(crate) fn supported_citation_style(style: &str) -> bool {
+    matches!(style, "title" | "author-year" | "key" | "numeric")
 }
 
 pub(crate) fn collect_fence_bodies(text: &str, target: &str) -> Vec<String> {

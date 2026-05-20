@@ -10,7 +10,7 @@ import {
 } from "../src/lib/asyncGuards.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
-import { migratePersistedWorkspace, WORKSPACE_SCHEMA_VERSION } from "../src/lib/workspacePersistence.js";
+import { migratePersistedWorkspace, normalizeCitationStyle, WORKSPACE_SCHEMA_VERSION } from "../src/lib/workspacePersistence.js";
 import { appendConflictMergeLine, applyAiPasteInsertion, quoteMarkdown } from "../src/lib/workflows.js";
 import {
   formatTableTotal,
@@ -247,6 +247,8 @@ test("workspace persistence migration versions and normalizes saved settings", (
     includeAgenda: true,
   });
   deepEqual(migrated.bibliographyDefaults, { citationStyle: "author-year" });
+  equal(normalizeCitationStyle("numeric"), "numeric");
+  equal(normalizeCitationStyle("apa"), "title");
   equal(migrated.brandProfileDefaults?.color, "#123456");
   equal(migrated.brandProfileDefaults?.watermark, "Draft");
   deepEqual(migrated.gitIntegration, { enabled: false, warnOnDirtyExport: true });

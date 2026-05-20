@@ -575,10 +575,7 @@ pub(crate) fn render_citations(
     bibliography: &[BibliographyEntry],
     style: &str,
 ) -> String {
-    let entries = bibliography
-        .iter()
-        .map(|entry| (entry.key.as_str(), entry))
-        .collect::<HashMap<_, _>>();
+    let context = CitationRenderContext::new(bibliography);
     let mut lines = Vec::new();
     let mut fence_marker = None;
     for line in markdown.lines() {
@@ -594,7 +591,7 @@ pub(crate) fn render_citations(
             fence_marker = Some(marker);
             continue;
         }
-        lines.push(render_citation_line(line, &entries, style));
+        lines.push(render_citation_line(line, &context, style));
     }
     let mut output = lines.join("\n");
     if markdown.ends_with('\n') {
@@ -603,11 +600,28 @@ pub(crate) fn render_citations(
     output
 }
 
-fn render_citation_line(
-    line: &str,
-    entries: &HashMap<&str, &BibliographyEntry>,
-    style: &str,
-) -> String {
+struct CitationRenderContext<'a> {
+    entries: HashMap<&'a str, &'a BibliographyEntry>,
+    numbers: HashMap<&'a str, usize>,
+}
+
+impl<'a> CitationRenderContext<'a> {
+    fn new(bibliography: &'a [BibliographyEntry]) -> Self {
+        Self {
+            entries: bibliography
+                .iter()
+                .map(|entry| (entry.key.as_str(), entry))
+                .collect(),
+            numbers: bibliography
+                .iter()
+                .enumerate()
+                .map(|(index, entry)| (entry.key.as_str(), index + 1))
+                .collect(),
+        }
+    }
+}
+
+fn render_citation_line(line: &str, context: &CitationRenderContext<'_>, style: &str) -> String {
     let mut output = String::with_capacity(line.len());
     let mut rest = line;
     while let Some(start) = rest.find('[') {
@@ -620,7 +634,7 @@ fn render_citation_line(
         let inside = &after_start[..end];
         if inside.contains('@') {
             let references = citation_references_from_bracket(inside, 0, 1);
-            output.push_str(&render_citation_span(&references, entries, style));
+            output.push_str(&render_citation_span(&references, context, style));
         } else {
             output.push('[');
             output.push_str(inside);
@@ -634,7 +648,7 @@ fn render_citation_line(
 
 fn render_citation_span(
     references: &[CitationReference],
-    entries: &HashMap<&str, &BibliographyEntry>,
+    context: &CitationRenderContext<'_>,
     style: &str,
 ) -> String {
     if references.is_empty() {
@@ -648,11 +662,7 @@ fn render_citation_span(
     let label = references
         .iter()
         .map(|reference| {
-            let mut label = citation_label(
-                reference,
-                entries.get(reference.key.as_str()).copied(),
-                style,
-            );
+            let mut label = citation_label(reference, context, style);
             if let Some(locator) = &reference.locator {
                 label.push_str(", ");
                 label.push_str(locator);
@@ -664,7 +674,8 @@ fn render_citation_span(
     let details = references
         .iter()
         .map(|reference| {
-            let title = entries
+            let title = context
+                .entries
                 .get(reference.key.as_str())
                 .map(|entry| entry.title.as_str())
                 .unwrap_or("missing bibliography entry");
@@ -675,20 +686,33 @@ fn render_citation_span(
         })
         .collect::<Vec<_>>()
         .join("; ");
+    let display_label = if style == "numeric" {
+        format!("[{label}]")
+    } else {
+        format!("({label})")
+    };
     format!(
-        "<span class=\"citation\" tabindex=\"0\" title=\"{}\" aria-label=\"Citation: {}\" data-citation-keys=\"{}\">({})</span>",
+        "<span class=\"citation\" tabindex=\"0\" title=\"{}\" aria-label=\"Citation: {}\" data-citation-keys=\"{}\">{}</span>",
         escape_html(&details),
         escape_html(&details),
         escape_html(&keys),
-        escape_html(&label)
+        escape_html(&display_label)
     )
 }
 
 fn citation_label(
     reference: &CitationReference,
-    entry: Option<&BibliographyEntry>,
+    context: &CitationRenderContext<'_>,
     style: &str,
 ) -> String {
+    if style == "numeric" {
+        return context
+            .numbers
+            .get(reference.key.as_str())
+            .map(|number| number.to_string())
+            .unwrap_or_else(|| reference.key.clone());
+    }
+    let entry = context.entries.get(reference.key.as_str()).copied();
     let Some(entry) = entry else {
         return reference.key.clone();
     };

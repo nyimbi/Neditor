@@ -384,6 +384,7 @@
               <option value="title">Title</option>
               <option value="author-year">Author-year</option>
               <option value="key">Key</option>
+              <option value="numeric">Numeric</option>
             </select>
           </label>
           <h3>Citations</h3>
@@ -767,6 +768,7 @@
               <option value="title">Title</option>
               <option value="author-year">Author-year</option>
               <option value="key">Key</option>
+              <option value="numeric">Numeric</option>
             </select>
           </label>
           <h3>Brand profile defaults</h3>
@@ -2355,7 +2357,7 @@ function inputValue(event: Event) {
 }
 
 function setCitationStyle(style: string) {
-  const supported = new Set(["title", "author-year", "key"]);
+  const supported = new Set(["title", "author-year", "key", "numeric"]);
   if (!supported.has(style)) return;
   store.updateText(upsertFrontMatterField(active.value.text, "citationStyle", style));
 }

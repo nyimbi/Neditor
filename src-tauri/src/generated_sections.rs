@@ -1,6 +1,6 @@
 use crate::{
     bibliography::BibliographyEntry,
-    compiler_support::fenced_code_marker,
+    compiler_support::{citation_style, fenced_code_marker},
     document_ast::{extract_label, extract_quoted_attribute},
     indexing::{render_index_entries, IndexEntry},
     Heading,
@@ -67,17 +67,37 @@ pub(crate) fn inject_generated_sections(
         output = output.replace("[INDEX]", &format!("## Index\n\n{index}"));
     }
     if output.contains("[BIBLIOGRAPHY]") {
-        let references = bibliography
-            .iter()
-            .map(|entry| format!("- **{}**. {}", entry.key, entry.title))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let references = render_bibliography_entries(bibliography, citation_style(metadata));
         output = output.replace(
             "[BIBLIOGRAPHY]",
             &format!("## Bibliography\n\n{references}"),
         );
     }
     output
+}
+
+fn render_bibliography_entries(bibliography: &[BibliographyEntry], style: &str) -> String {
+    bibliography
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| match style {
+            "numeric" => format!("- [{}] **{}**. {}", index + 1, entry.key, entry.title),
+            "author-year" => {
+                let author_year = [entry.author.as_deref(), entry.issued.as_deref()]
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                if author_year.is_empty() {
+                    format!("- **{}**. {}", entry.key, entry.title)
+                } else {
+                    format!("- **{}**. {}. {}", entry.key, author_year, entry.title)
+                }
+            }
+            _ => format!("- **{}**. {}", entry.key, entry.title),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn metadata_bool(metadata: &Value, keys: &[&str]) -> bool {

@@ -145,10 +145,11 @@ Most recent local verification evidence:
   BibTeX and CSL JSON files, with duplicate-key diagnostics pointing at the
   duplicate key in the second external file and related context for the first
   file.
-- `cargo test --locked citation_tests --lib`: passed 11 citation tests,
-  including BibTeX, CSL JSON, Hayagriva, and external-file duplicate-key source
-  ranges plus citation export conformance.
-- `cargo test --locked`: passed locally with 149 Rust tests on this Unix host.
+- `cargo test --locked citation_tests --lib`: passed 14 citation tests,
+  including BibTeX, CSL JSON, Hayagriva, external-file duplicate-key source
+  ranges, numeric citation rendering, unsupported CSL-style fallback
+  diagnostics, and citation export conformance.
+- `cargo test --locked`: passed locally with 152 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -1082,7 +1083,9 @@ source ranges when citations are present but no bibliography source is
 available. Duplicate bibliography entries now carry source locations, readiness
 points at duplicate entries for BibTeX, CSL JSON, Hayagriva YAML, and multiple
 external bibliography files, and the References panel displays duplicate entry
-locations.
+locations. Citation style handling now supports title, author-year, key, and
+numeric styles, and unsupported CSL/style names produce a warning before
+falling back to title rendering.
 
 Finish:
 
@@ -1090,10 +1093,11 @@ Finish:
 - Duplicate bibliography key UI and readiness reporting. Current coverage shows
   duplicate entry locations and source-range readiness diagnostics for BibTeX,
   CSL JSON, Hayagriva YAML, and separate external bibliography files; remaining
-  work is richer citation manager UX and CSL style validation.
-- Citation styles: title, author-year, key, and CSL-driven choices.
-- Remaining citation diagnostics: style-specific warnings and richer CSL style
-  validation.
+  work is richer citation manager UX.
+- Citation styles: title, author-year, key, numeric, and CSL-driven choices.
+- Remaining citation diagnostics: richer CSL style validation and a future
+  Rust-native CSL/Hayagriva adapter for named CSL styles beyond the built-in
+  options.
 - Cross-reference links across preview, HTML, PDF, DOCX, PPTX, and bundle
   outputs.
 - Automatic index inclusion/exclusion.

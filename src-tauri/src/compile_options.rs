@@ -1,3 +1,4 @@
+use crate::compiler_support::supported_citation_style;
 use serde_json::{json, Value};
 
 pub(crate) fn apply_compile_options(metadata: &mut Value, options: Option<&Value>) {
@@ -15,7 +16,7 @@ fn apply_default_citation_style(
     let Some(style) = options
         .and_then(|value| value.get("defaultCitationStyle"))
         .and_then(Value::as_str)
-        .filter(|style| matches!(*style, "title" | "author-year" | "key"))
+        .filter(|style| supported_citation_style(style))
     else {
         return;
     };
