@@ -16,7 +16,10 @@ use crate::{
     },
     footnotes::render_footnotes,
     front_matter::{merge_project_variables, parse_front_matter, render_front_matter_data_sources},
-    generated_sections::inject_generated_sections,
+    generated_sections::{
+        generated_glossary_section_requested, generated_index_section_requested,
+        inject_generated_sections,
+    },
     html_preview::markdown_to_html,
     indexing::{collect_index_entries, strip_index_markers},
     link_validation::{validate_image_paths, validate_link_paths, validate_logo_path},
@@ -168,6 +171,10 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         .iter()
         .map(|entry| entry.term.clone())
         .collect::<Vec<_>>();
+    let generated_index_requested =
+        reference_markdown.contains("[INDEX]") || generated_index_section_requested(&metadata);
+    let generated_glossary_requested = reference_markdown.contains("[GLOSSARY]")
+        || generated_glossary_section_requested(&metadata);
     let layout_directives = collect_fence_bodies(&interpolated, "layout");
     let comments = collect_comments(&interpolated);
     let change_notes = collect_change_notes(&interpolated);
@@ -250,6 +257,10 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
             citation_references: &citation_references,
             bibliography: &bibliography,
             duplicate_bibliography_keys: &duplicate_bibliography_keys,
+            generated_index_requested,
+            index_terms: &index_terms,
+            generated_glossary_requested,
+            glossary_term_count: glossary.len(),
             comments: &comments,
             change_notes: &change_notes,
             ai_sources: &ai_sources,

@@ -959,6 +959,9 @@ Current evidence:
 - Target-specific option audits now report non-blocking info diagnostics when
   valid options are ignored by the selected target, including non-PPTX agenda
   options and Markdown bundle render-only options.
+- Readiness now warns when generated index or glossary sections are requested
+  but no index terms or glossary entries exist, and the diagnostics are copied
+  into export manifest readiness.
 
 Readiness should validate and report:
 
@@ -982,7 +985,9 @@ Readiness should validate and report:
   expressions. Broad readiness audit test coverage exists for inline and table
   formula errors.
 - Figures, captions, references, glossary, and index. Broad readiness audit
-  test coverage exists for figure/table/equation caption-label warnings.
+  test coverage exists for figure/table/equation caption-label warnings, and
+  focused readiness coverage now reports requested-but-empty generated index
+  and glossary sections.
 - Transform engines, trust state, executable paths, adapter input mode,
   timeouts, stderr, missing output, output limits, and cache identity. Broad
   readiness audit test coverage exists for export settings; external transform
@@ -1221,16 +1226,19 @@ Finish:
   proper-noun/explicit terms, exclusion settings, marker stripping, and
   cross-target export artifacts. The References sidebar now provides an Index
   manager for generated index insertion, front matter index enablement, and
-  detected-term navigation; remaining work is native workflow execution and
-  rendered/manual UX QA.
+  detected-term navigation. Readiness now warns when a generated index is
+  requested without any terms, and copies the warning into export manifests;
+  remaining work is native workflow execution and rendered/manual UX QA.
 - Glossary definition preview, hover behavior, generated-section marker,
   front matter insertion, export appendix behavior, and command-palette
   navigation. Current focused coverage proves preview hover, `[GLOSSARY]`,
   front matter insertion, DOCX artifact text, export appendices, and command
   palette listing. The References sidebar now provides a Glossary manager for
   generated glossary insertion, definition templates, export glossary enablement,
-  term navigation, and adding glossary terms to the index; remaining work is
-  native workflow execution and rendered/manual UX QA.
+  term navigation, and adding glossary terms to the index. Readiness now warns
+  when a generated glossary is requested without entries, and copies the warning
+  into export manifests; remaining work is native workflow execution and
+  rendered/manual UX QA.
 
 ### 15. Layout And Reflow
 

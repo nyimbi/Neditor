@@ -64,19 +64,14 @@ pub(crate) fn inject_generated_sections(
             output = format!("## List of Tables\n\n{list}\n\n{output}");
         }
     }
-    if output.contains("[INDEX]") || index_section_requested(metadata) {
+    if output.contains("[INDEX]") || generated_index_section_requested(metadata) {
         let index = render_index_entries(index_entries);
         output = output.replace("[INDEX]", &format!("## Index\n\n{index}"));
         if !text.contains("[INDEX]") {
             output = format!("## Index\n\n{index}\n\n{output}");
         }
     }
-    if output.contains("[GLOSSARY]")
-        || metadata_bool(
-            metadata,
-            &["glossary", "glossarySection", "glossary_section"],
-        )
-    {
+    if output.contains("[GLOSSARY]") || generated_glossary_section_requested(metadata) {
         let section = render_glossary_entries(glossary);
         output = output.replace("[GLOSSARY]", &format!("## Glossary\n\n{section}"));
         if !text.contains("[GLOSSARY]") {
@@ -133,7 +128,7 @@ fn metadata_bool(metadata: &Value, keys: &[&str]) -> bool {
         .any(|key| metadata.get(*key).and_then(Value::as_bool).unwrap_or(false))
 }
 
-fn index_section_requested(metadata: &Value) -> bool {
+pub(crate) fn generated_index_section_requested(metadata: &Value) -> bool {
     metadata_bool(metadata, &["indexSection", "index_section"])
         || metadata
             .get("index")
@@ -148,6 +143,13 @@ fn index_section_requested(metadata: &Value) -> bool {
                     .and_then(Value::as_bool)
             })
             .unwrap_or(false)
+}
+
+pub(crate) fn generated_glossary_section_requested(metadata: &Value) -> bool {
+    metadata_bool(
+        metadata,
+        &["glossary", "glossarySection", "glossary_section"],
+    )
 }
 
 fn render_caption_list(kind: &str, entries: &[CaptionEntry]) -> String {

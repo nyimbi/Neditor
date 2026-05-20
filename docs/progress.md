@@ -1273,6 +1273,19 @@ Additional target-specific option audit verification:
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional generated reference-section readiness verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked prepare_for_export_reports_empty_generated_reference_sections --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust readiness proof reports warnings when `index: true` and `glossarySection: true` request generated sections without any index terms or glossary entries, and copies both diagnostics into manifest readiness. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 19 export command tests passed after adding generated index/glossary readiness diagnostics. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 173 Rust library tests passed, covering compiler, export, transform, table, citation, validation, performance, and file command paths after the shared validation update. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after adding generated reference-section validation. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after wiring generated section request detection into compiler validation. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

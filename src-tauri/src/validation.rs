@@ -21,6 +21,10 @@ pub(crate) struct DocumentValidationInput<'a> {
     pub(crate) citation_references: &'a [CitationReference],
     pub(crate) bibliography: &'a [BibliographyEntry],
     pub(crate) duplicate_bibliography_keys: &'a [String],
+    pub(crate) generated_index_requested: bool,
+    pub(crate) index_terms: &'a [String],
+    pub(crate) generated_glossary_requested: bool,
+    pub(crate) glossary_term_count: usize,
     pub(crate) comments: &'a [ReviewComment],
     pub(crate) change_notes: &'a [ChangeNote],
     pub(crate) ai_sources: &'a [AiSource],
@@ -147,6 +151,7 @@ pub(crate) fn validate_document(
         diagnostics.push(diagnostic);
         push_missing_citation_source_diagnostics(&input, diagnostics);
     }
+    validate_generated_reference_sections(&input, diagnostics);
     let mut reported_broken_citations = HashSet::new();
     for reference in input.citation_references {
         if !known_keys.is_empty()
@@ -261,6 +266,34 @@ pub(crate) fn validate_document(
         ));
     }
     validate_ai_provenance_metadata(&input, diagnostics);
+}
+
+fn validate_generated_reference_sections(
+    input: &DocumentValidationInput<'_>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if input.generated_index_requested && input.index_terms.is_empty() {
+        let mut diagnostic = diag(
+            "warning",
+            "Generated index was requested but no index terms were found.",
+            None,
+            None,
+            Some("Add headings, glossary terms, bold key terms, or explicit {#index:Term} markers before final export."),
+        );
+        diagnostic.related.push("index terms: 0".to_string());
+        diagnostics.push(diagnostic);
+    }
+    if input.generated_glossary_requested && input.glossary_term_count == 0 {
+        let mut diagnostic = diag(
+            "warning",
+            "Generated glossary was requested but no glossary entries were found.",
+            None,
+            None,
+            Some("Add a glossary fenced block or disable the generated glossary section before final export."),
+        );
+        diagnostic.related.push("glossary entries: 0".to_string());
+        diagnostics.push(diagnostic);
+    }
 }
 
 fn push_missing_citation_source_diagnostics(

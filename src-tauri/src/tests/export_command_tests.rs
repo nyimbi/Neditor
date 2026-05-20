@@ -247,6 +247,39 @@ fn prepare_for_export_reports_missing_citation_sources_with_precise_ranges() {
 }
 
 #[test]
+fn prepare_for_export_reports_empty_generated_reference_sections() {
+    let report = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: Empty Reference Sections\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\nindex: true\nglossarySection: true\n---\nplain text only.\n"
+            .to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 0);
+    assert_eq!(report.warning_count, 2, "{:#?}", report.diagnostics);
+    assert_eq!(report.manifest.readiness.warning_count, 2);
+    assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
+    assert_readiness_contains(
+        &report,
+        "Generated index was requested but no index terms were found.",
+    );
+    assert_readiness_contains(
+        &report,
+        "Generated glossary was requested but no glossary entries were found.",
+    );
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .related
+        .iter()
+        .any(|related| related == "index terms: 0")));
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .related
+        .iter()
+        .any(|related| related == "glossary entries: 0")));
+}
+
+#[test]
 fn export_readiness_and_manifest_report_progress_steps() {
     let source = "---\ntitle: Progress Ready\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\nversion: 1.0.0\n---\n# Progress Ready\n\n```chart\ntype: bar\ntitle: Progress data\ndata:\n  - region: East\n    revenue: 42\n  - region: West\n    revenue: 27\nx: region\ny: revenue\n```\n";
     let report = prepare_for_export(PrepareExportRequest {
