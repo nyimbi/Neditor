@@ -140,7 +140,8 @@ Research and business documents can keep reference metadata near the source.
 - Use `glossary` fenced blocks for terms and definitions.
 - Add `[GLOSSARY]` where the generated glossary should appear, or set
   `glossarySection: true` in front matter.
-- Add `[INDEX]` where the generated index should appear.
+- Add `[INDEX]` where the generated index should appear, or set `index: true`
+  / `index.enabled: true` in front matter.
 - Use labels and cross references for headings, figures, tables, equations,
   appendices, and decisions.
 

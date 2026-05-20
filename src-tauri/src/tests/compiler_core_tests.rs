@@ -502,6 +502,31 @@ fn compiler_generates_linked_index_with_exclusions_and_proper_terms() {
 }
 
 #[test]
+fn compiler_generates_index_from_front_matter_without_marker() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Front Matter Index\nstatus: approved\napprovedBy: QA\nindex:\n  enabled: true\n  exclude:\n    - secret plan\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Secret Plan should stay out. Working capital{#index:Liquidity} marker.\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.compiled_markdown.starts_with("## Index\n\n"));
+    assert!(response
+        .compiled_markdown
+        .contains("- [Acme Strategy](#market-analysis)"));
+    assert!(response
+        .compiled_markdown
+        .contains("- [Liquidity](#follow-up)"));
+    assert!(response
+        .compiled_markdown
+        .contains("- [Working Capital](#market-analysis)"));
+    assert!(!response
+        .index_terms
+        .iter()
+        .any(|term| term == "Secret Plan"));
+    assert!(!response.compiled_markdown.contains("{#index:Liquidity}"));
+    assert!(response.html.contains("<h2 id=\"index\">Index</h2>"));
+}
+
+#[test]
 fn compiler_parses_review_comment_metadata() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Review\nstatus: approved\napprovedBy: QA\n---\n# Review\n<!-- comment: unresolved | author: Dana | at: 2026-05-18T10:00:00Z | Clarify the risk note. -->\n<!-- change: author: Dana | at: 2026-05-18T11:00:00Z | Updated the risk note. -->\n".to_string(),

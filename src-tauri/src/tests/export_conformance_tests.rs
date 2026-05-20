@@ -248,6 +248,55 @@ fn heading_appendix_and_decision_references_survive_cross_target_exports() {
 }
 
 #[test]
+fn front_matter_index_survives_cross_target_exports() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Index Export\nstatus: approved\napprovedBy: QA\nindex: true\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Working capital{#index:Liquidity} marker.\n".to_string(),
+            file_path: None,
+        });
+    let options = json!({});
+
+    assert!(response.compiled_markdown.starts_with("## Index\n\n"));
+    assert!(response
+        .compiled_markdown
+        .contains("- [Acme Strategy](#market-analysis)"));
+    assert!(response
+        .compiled_markdown
+        .contains("- [Liquidity](#follow-up)"));
+    assert!(!response.compiled_markdown.contains("[INDEX]"));
+    assert!(!response.compiled_markdown.contains("{#index:Liquidity}"));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("<h2 id=\"index\">Index</h2>"));
+    assert!(html.contains(r##"<a href="#market-analysis">Acme Strategy</a>"##));
+    assert!(html.contains(r##"<a href="#follow-up">Liquidity</a>"##));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Index"));
+    assert!(pdf_text.contains("Acme Strategy"));
+    assert!(pdf_text.contains("Liquidity"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx index bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Index"));
+    assert!(docx_document.contains("Acme Strategy"));
+    assert!(docx_document.contains("Liquidity"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx index bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Index"));
+    assert!(pptx_slides.contains("Acme Strategy"));
+    assert!(pptx_slides.contains("Liquidity"));
+
+    let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+        .expect("index bundle bytes");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    assert!(bundled_text.contains("Index"));
+    assert!(bundled_text.contains("Acme Strategy"));
+    assert!(bundled_text.contains("Liquidity"));
+}
+
+#[test]
 fn export_conformance_fixture_maps_business_features() {
     let response = compile(CompileRequest {
         text: include_str!("../../fixtures/export/business_report.md").to_string(),

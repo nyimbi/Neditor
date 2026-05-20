@@ -77,7 +77,9 @@ Add markers where generated sections should appear:
 [LIST_OF_TABLES]
 ```
 
-`toc: true` in front matter can also request a table of contents.
+`toc: true` in front matter can also request a table of contents. `index:
+true`, `indexSection: true`, `index_section: true`, or `index.enabled: true`
+can request a generated index without placing `[INDEX]` in the source.
 `glossary: true`, `glossarySection: true`, or `glossary_section: true` can
 request a generated glossary section without placing `[GLOSSARY]` in the
 source.

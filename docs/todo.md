@@ -159,7 +159,14 @@ Most recent local verification evidence:
 - `cargo test --locked cross_references_resolve_heading_appendix_and_decision_anchors --lib -- --nocapture`:
   passed and proves unprefixed appendix/decision anchors render as Appendix
   and Decision labels instead of generic section labels.
-- `cargo test --locked`: passed locally with 154 Rust tests on this Unix host.
+- `cargo test --locked compiler_generates_index_from_front_matter_without_marker --lib -- --nocapture`:
+  passed and proves `index.enabled: true` front matter generates an index
+  without `[INDEX]`, preserves linked terms, honors exclusion settings, and
+  strips inline index markers.
+- `cargo test --locked front_matter_index_survives_cross_target_exports --lib -- --nocapture`:
+  passed and proves `index: true` front matter-generated index content
+  survives HTML, PDF, DOCX, PPTX, and Markdown bundle artifacts.
+- `cargo test --locked`: passed locally with 156 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -1113,7 +1120,11 @@ Finish:
   outputs. Current focused coverage proves table, figure, equation, section,
   appendix, and decision references across target artifacts, with appendix and
   decision anchors rendered as semantic labels instead of generic sections.
-- Automatic index inclusion/exclusion.
+- Automatic index inclusion/exclusion. Current focused coverage proves
+  `[INDEX]`, `index: true`, `index.enabled: true`, linked heading/glossary/bold/
+  proper-noun/explicit terms, exclusion settings, marker stripping, and
+  cross-target export artifacts; remaining work is native workflow execution
+  and richer index manager UX.
 - Glossary definition preview, hover behavior, generated-section marker,
   front matter insertion, export appendix behavior, and command-palette
   navigation. Current focused coverage proves preview hover, `[GLOSSARY]`,

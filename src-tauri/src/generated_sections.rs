@@ -64,9 +64,12 @@ pub(crate) fn inject_generated_sections(
             output = format!("## List of Tables\n\n{list}\n\n{output}");
         }
     }
-    if output.contains("[INDEX]") {
+    if output.contains("[INDEX]") || index_section_requested(metadata) {
         let index = render_index_entries(index_entries);
         output = output.replace("[INDEX]", &format!("## Index\n\n{index}"));
+        if !text.contains("[INDEX]") {
+            output = format!("## Index\n\n{index}\n\n{output}");
+        }
     }
     if output.contains("[GLOSSARY]")
         || metadata_bool(
@@ -128,6 +131,23 @@ fn render_bibliography_entries(bibliography: &[BibliographyEntry], style: &str) 
 fn metadata_bool(metadata: &Value, keys: &[&str]) -> bool {
     keys.iter()
         .any(|key| metadata.get(*key).and_then(Value::as_bool).unwrap_or(false))
+}
+
+fn index_section_requested(metadata: &Value) -> bool {
+    metadata_bool(metadata, &["indexSection", "index_section"])
+        || metadata
+            .get("index")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        || metadata
+            .get("index")
+            .and_then(|index| {
+                index
+                    .get("enabled")
+                    .or_else(|| index.get("section"))
+                    .and_then(Value::as_bool)
+            })
+            .unwrap_or(false)
 }
 
 fn render_caption_list(kind: &str, entries: &[CaptionEntry]) -> String {
