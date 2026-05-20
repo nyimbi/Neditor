@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `bf60405`
+  `13b3086`
 
 Status vocabulary:
 
@@ -76,22 +76,22 @@ modules after behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `bf60405 Disambiguate tab workflow rename command`
+- `13b3086 Keep stale workspace roots out of recents`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26151184228` on commit `bf60405`
+- Run `26152255407` on commit `13b3086`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26151184228`:
+CI evidence from run `26152255407`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 22 Chromium workflow tests, including advanced table paste import,
+  includes 23 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, row/column structure editing, column format totals,
   cancel-without-applying behavior, AI paste insert/quote/appendix/replace
@@ -105,8 +105,9 @@ CI evidence from run `26151184228`:
   watcher-originated reload, watcher-originated dirty root-file conflicts,
   clean included-file recompile, dirty included-file conflicts, restart-style
   workspace restore, restored scroll positions, missing restored-file warnings,
-  tab activation, dirty close confirmation, renamed recent cleanup, and deleted
-  recently-closed pruning.
+  tab activation, dirty close confirmation, renamed recent cleanup, deleted
+  recently-closed pruning, recent folder reopen/prune behavior, and externally
+  moved recently-closed path pruning.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -223,6 +224,20 @@ Recent local verification evidence from this buildout:
   locator.
 - `gh run watch 26151184228 --exit-status`: passed on commit `bf60405` across
   22 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
+- `pnpm run test:unit`: passed after adding stale recent-folder cleanup and
+  moved recently-closed path coverage.
+- `pnpm run build`: passed after adding stale recent-folder cleanup and moved
+  recently-closed path coverage.
+- `pnpm exec playwright test --list`: listed 23 Chromium workflow tests after
+  adding recent folder reopen/prune behavior and moved recently-closed path
+  pruning.
+- `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "reopens recent
+  folders" --project chromium`: blocked locally because the Chromium
+  headless-shell executable is missing from the Playwright cache.
+- `git diff --check`: passed after adding recent-folder and moved-path
+  coverage.
+- `gh run watch 26152255407 --exit-status`: passed on commit `13b3086` across
+  23 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -428,6 +443,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   scroll positions, and clear warnings for missing restored files.
 - Tab/recent workflow: tab activation, dirty close confirmation, renamed recent
   cleanup, and deleted recently-closed pruning.
+- Recent folder and moved-path workflow: reopen a recent folder, prune a missing
+  workspace root from recent folders, prune an externally moved recently closed
+  path, and show the moved target through workspace refresh.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -436,9 +454,8 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 
 Required next coverage:
 
-- Remaining file/workspace flows: pushed tab/stale-recent CI proof,
-  externally moved recently-closed behavior, multi-tab watcher switching, and
-  native desktop dialog behavior.
+- Remaining file/workspace flows: multi-tab watcher switching and native
+  desktop dialog behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
 - Preview heading click-to-source and synchronized scrolling.
@@ -635,7 +652,9 @@ Finish:
 - Scroll position restore. Browser CI run `26148828614` covers this workflow.
 - Recently closed behavior for renamed and deleted files, plus dirty unsaved
   close confirmation. Browser CI run `26151184228` covers this workflow.
-- Externally moved recently-closed file behavior.
+- Recent folder reopening and stale recent-folder pruning, plus externally
+  moved recently-closed file pruning. Browser CI run `26152255407` covers this
+  workflow.
 - Clear UX for missing documents during restore. Browser CI run `26148828614`
   covers this workflow.
 - Matrix entry that split editor panes are deferred/later if not implemented.

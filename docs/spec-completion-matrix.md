@@ -65,7 +65,7 @@ is not "Complete".
 | 6.4 Preview | Scroll sync and heading click-to-source | Partial | Preview/editor scroll handlers; click handler | Browser tests. |
 | 6.4 Preview | Separate preview theme, inline warnings, transform blocks, export preview | Partial | Preview theme setting; diagnostics; transform rendering; modes | UI verification and visual tests. |
 | 6.5 File Operations | New, open file, open folder, save, save as, revert, rename, duplicate, reveal | Partial | Store actions and Rust file commands; file command tests; Playwright mocked workflows cover open/save/save-as/duplicate/rename/pin/reveal/revert in CI run `26137556147`; stale-save conflict copy/merge/keep-local/accept-external recovery in CI run `26139678118`; watcher-originated root reload/conflict proof in CI run `26140882880`; included-file watcher conflict proof in CI run `26145509141` | Native desktop dialog workflow tests. |
-| 6.5 File Operations | Recent docs/folders, workspace restore | Partial | Persisted workspace store; Playwright mocked workflows cover workspace listing after open and recently closed reopening in CI run `26137556147`; browser CI run `26147556750` covers restart-style restore for open tabs, active tab, pinned state, mode/sidebar, workspace root, and recent files; browser CI run `26148828614` covers scroll restore and missing-restored-file warning coverage; browser CI run `26151184228` covers tab activation, dirty close confirmation, renamed recent cleanup, and deleted recently-closed pruning coverage | Externally moved recently-closed behavior and fuller recent folder behavior. |
+| 6.5 File Operations | Recent docs/folders, workspace restore | Partial | Persisted workspace store; Playwright mocked workflows cover workspace listing after open and recently closed reopening in CI run `26137556147`; browser CI run `26147556750` covers restart-style restore for open tabs, active tab, pinned state, mode/sidebar, workspace root, and recent files; browser CI run `26148828614` covers scroll restore and missing-restored-file warning coverage; browser CI run `26151184228` covers tab activation, dirty close confirmation, renamed recent cleanup, and deleted recently-closed pruning coverage; browser CI run `26152255407` covers recent folder reopen/prune behavior and externally moved recently-closed path pruning | Native desktop dialog/recent-folder proof and deeper folder/document-set grouping behavior. |
 | 6.5 File Operations | External change detection/conflict handling | Partial | Watch/conflict code and tests; browser CI run `26139678118` covers stale-save conflict blocking, compare, save-copy preservation, merge-back recovery, keep-local, and accept-external; browser CI run `26140882880` covers clean root reload and watcher-originated dirty root conflict; browser CI run `26145509141` covers clean included-file recompile and dirty included-file conflict flows | Desktop workflow proof. |
 
 ## Compiler And Document Model
@@ -193,11 +193,11 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed code CI on commit `bf60405` is green across browser workflows and
+- Latest pushed code CI on commit `13b3086` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26151184228` with 22
+- Browser-level workflow harness passes in Linux CI run `26152255407` with 23
   Chromium tests, including advanced table editor coverage, mocked file
   lifecycle coverage, save-as, recently closed reopening, and stale-save
   conflict copy/merge/keep-local/accept-external recovery plus watcher-originated
@@ -207,7 +207,9 @@ Current major verification gaps:
   restart-style workspace restore coverage for open tabs, active tab, pinned
   state, mode/sidebar, workspace root, recent files, scroll-position restore,
   missing-restored-file warning coverage, tab activation, dirty close
-  confirmation, renamed recent cleanup, and deleted recently-closed pruning.
+  confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
+  folder reopen/prune behavior, and externally moved recently-closed path
+  pruning.
   Local focused execution is
   currently blocked because the workspace-local Chromium headless-shell
   executable is missing from the Playwright cache.

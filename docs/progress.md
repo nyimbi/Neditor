@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `bf60405
-  Disambiguate tab workflow rename command`
+- Latest inspected committed baseline before this update: `13b3086 Keep stale
+  workspace roots out of recents`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -105,6 +105,10 @@ Recent pushed checkpoints visible in current git history:
 - `44c49f5`, `3fe0c78`, `39a3286`, and `bf60405` added and stabilized browser
   workflow proof for tab activation, dirty-close confirmation, renamed recent
   cleanup, and deleted recently-closed pruning.
+- `13b3086` added browser workflow proof for reopening recent folders, pruning
+  missing workspace roots from recent folders, and pruning externally moved
+  recently closed document paths while the moved target remains visible through
+  workspace refresh.
 
 ## Current Capability Snapshot
 
@@ -142,7 +146,8 @@ Implemented or substantially present, pending the conservative caveats in
   clean included-file recompile, dirty included-file conflict handling, and
   export readiness, restart-style workspace restore, restored scroll position
   handling, missing restored-file warnings, tab activation, dirty-close
-  confirmation, renamed recent cleanup, and deleted recently-closed pruning.
+  confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
+  folder reopen/prune behavior, and moved recently-closed path pruning.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -153,13 +158,13 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed code CI for commit `bf60405` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26151184228`.
+- Latest pushed code CI for commit `13b3086` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26152255407`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 22 Chromium tests in
-  run `26151184228`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 23 Chromium tests in
+  run `26152255407`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
   root-file conflicts, advanced table structure/format/cancel coverage, and AI
@@ -171,7 +176,8 @@ P0 gaps:
   Local focused Playwright execution remains blocked by the missing
   workspace-local Chromium headless shell.
 - The same green browser run now also covers tab activation, dirty close
-  confirmation, renamed recent cleanup, and deleted recently-closed pruning.
+  confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
+  folder reopen/prune behavior, and moved recently-closed path pruning.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -308,6 +314,17 @@ Additional tab and stale-recent workflow verification:
 | `pnpm exec playwright test --list` | Pass | Listed the same 22 Chromium workflow tests after the exact rename locator fix. |
 | `git diff --check` | Pass | No whitespace errors after the exact rename locator fix. |
 | `gh run watch 26151184228 --exit-status` | Pass | Commit `bf60405` passed 22 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
+
+Additional recent-folder and moved-path workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding stale recent-folder cleanup and moved recently-closed path coverage. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the recent-folder and moved-path workflow update. |
+| `pnpm exec playwright test --list` | Pass | Listed 23 Chromium workflow tests, including recent folder reopen/prune behavior and moved recently-closed path pruning. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "reopens recent folders" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
+| `git diff --check` | Pass | No whitespace errors after adding recent-folder and moved-path coverage. |
+| `gh run watch 26152255407 --exit-status` | Pass | Commit `13b3086` passed 23 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
 
 Current CI evidence log:
 
