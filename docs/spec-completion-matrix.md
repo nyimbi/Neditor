@@ -193,19 +193,16 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed CI on commit `5c29914` is not green: Windows has passed the
-  formerly failing path-sensitive Rust tests, frontend tests, and frontend
-  build; Ubuntu now passes installed Pikchr conformance but fails
-  `external_transform_adapters_shape_engine_specific_invocations` because the
-  fake `d2` adapter fixture exited without consuming stdin. The local fixture
-  fix now drains fake `d2` stdin and passes focused/full Rust verification, but
-  follow-up CI has not confirmed it yet.
+- Latest pushed CI on commit `33ee6a9` is green across browser workflows and
+  Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
+  Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
+  fake-`d2` stdin fixture failure are resolved in current CI.
 - Initial browser-level workflow test harness passes in Linux CI, but local
   sandbox execution is blocked at Chromium launch before app assertions.
 - No desktop WebDriver/Tauri-driver workflow test harness.
-- Current committed browser workflow evidence exists, but full desktop CI is
-  blocked by the Ubuntu fake-`d2` fixture failure above until the follow-up CI
-  run verifies the fix.
+- Current committed browser workflow evidence exists, and the desktop CI matrix
+  is currently green, but desktop user journeys are still not covered by a
+  WebDriver/Tauri-driver harness.
 - Export tests rely heavily on package/text assertions; visual/rendered quality
   remains under-proven.
 - Optional external transform engines are proven most strongly on Linux; macOS

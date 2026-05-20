@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `5c29914 Keep CI
-  paths and Pikchr invocation portable`
+- Latest inspected committed baseline before this update: `33ee6a9 Keep
+  external adapter fixtures stdin-safe on Linux`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -50,6 +50,9 @@ Recent pushed checkpoints visible in current git history:
   `pikchr-cli` positional source compatibility path.
 - `5c29914` normalized serialized file/export paths to `/` separators and
   changed the `pikchr-cli` adapter to pass a temporary `.pikchr` source file.
+- `33ee6a9` made the fake `d2` adapter fixture drain stdin on Linux and
+  refreshed the backlog, progress log, and completion matrix from current CI
+  evidence.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -101,12 +104,11 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `5c29914` is not green: browser workflow and
-  macOS desktop jobs pass; Windows has passed the formerly failing Rust tests,
-  frontend tests, and frontend build; Ubuntu now passes installed Pikchr
-  conformance but fails the fake-`d2` adapter fixture with a Linux stdin
-  `Broken pipe (os error 32)`. A local fixture fix now drains fake `d2` stdin
-  before printing SVG output; CI has not yet verified that fix.
+- Latest pushed CI for commit `33ee6a9` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26133595556`.
+  The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
+  conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
+  in current CI.
 - Initial browser-level workflow tests pass in Linux CI, but coverage is still
   narrow and local sandbox execution still fails before app assertions because
   Chromium cannot register its Mach bootstrap port.
@@ -201,6 +203,8 @@ Current CI follow-up:
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Re-run after the fake `d2` stdin fixture fix; no warnings. |
 | `cargo test --locked` in `src-tauri` | Pass | 126 Rust tests passed plus main/doc test targets with 0 tests after the fake `d2` stdin fixture fix. |
 | `git diff --check` | Pass | No whitespace errors after the latest documentation and fake-`d2` fixture edits. |
+| `gh run watch 26133595556 --exit-status` | Pass | For `33ee6a9`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Ubuntu passed optional engine install, Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle build. |
+| `git diff --check` | Pass | No whitespace errors after refreshing docs with the green CI result. |
 
 Relevant CI fixes already landed:
 
@@ -253,17 +257,15 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Push the local fake-`d2` fixture fix and verify a green CI run across
-   browser workflows and the desktop matrix.
-2. Expand browser coverage for file operations, workspace restore, conflicts,
+1. Expand browser coverage for file operations, workspace restore, conflicts,
    preview navigation, scroll sync, transform settings, export progress, and
    the remaining AI/table modes.
-3. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
+2. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
-4. Use failures from workflow tests to drive implementation fixes.
-5. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
-6. Add macOS/Windows optional transform engine evidence.
-7. Only after behavior is locked, modularize oversized frontend/store/backend
+3. Use failures from workflow tests to drive implementation fixes.
+4. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
+5. Add macOS/Windows optional transform engine evidence.
+6. Only after behavior is locked, modularize oversized frontend/store/backend
    modules.
 
 ## Completion Gate

@@ -24,8 +24,8 @@ Current survey inputs:
   watcher modules under `src-tauri/src/`
 - Backend tests under `src-tauri/src/tests/`
 - CI workflow: `.github/workflows/ci.yml`
-- Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`, and
-  `5c29914`
+- Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
+  `5c29914`, and `33ee6a9`
 
 Status vocabulary:
 
@@ -73,44 +73,36 @@ modules after behavior is locked.
 
 ## Current Verification Snapshot
 
-Latest pushed commit inspected before this fix:
+Latest pushed commit inspected:
 
-- `5c29914 Keep CI paths and Pikchr invocation portable`
+- `33ee6a9 Keep external adapter fixtures stdin-safe on Linux`
 
 Latest GitHub Actions run inspected:
 
-- Run `26133136580` on commit `5c29914`
-- Overall result: failed while the Windows desktop job was still finishing
+- Run `26133595556` on commit `33ee6a9`
+- Overall result: passed
 - Browser workflow job: passed
+- Ubuntu desktop job: passed
 - macOS desktop job: passed
-- Windows desktop job: in progress at inspection time, but the formerly
-  failing Rust backend tests, frontend tests, and frontend build had passed
-- Ubuntu desktop job: failed at Rust backend tests
+- Windows desktop job: passed
 
-CI evidence from run `26133136580`:
+CI evidence from run `26133595556`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`.
+- Ubuntu desktop passed setup, Linux optional transform installation, Rust
+  formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
+  tests, frontend build, and Tauri `--no-bundle` desktop build. This proves the
+  fake `d2` stdin fixture fix cleared the Ubuntu Rust-test blocker from run
+  `26133136580`, while installed Pikchr conformance stayed passing.
 - macOS desktop passed Rust formatting, Rust check, native-watch check, clippy,
   Rust tests, frontend unit tests, frontend build, and Tauri `--no-bundle`
   desktop build.
 - Windows desktop passed setup, Rust formatting, Rust check, native-watch check,
-  clippy, Rust tests, frontend unit tests, and frontend build. That proves the
-  slash-normalized path serialization fixed the four earlier Windows Rust-test
-  failures from run `26132634911`.
-- Ubuntu desktop passed setup, Linux optional transform installation, Rust
-  formatting, Rust check, native-watch check, and clippy, then failed
-  `cargo test --locked` in
-  `external_transform_adapters_shape_engine_specific_invocations`.
-  `external_transform_conformance_runs_installed_engines` passed, proving the
-  `pikchr-cli` temporary source-file invocation fixed the prior installed
-  Pikchr conformance blocker.
-- The current Ubuntu failure is a test-fixture portability issue: the fake `d2`
-  adapter exited without reading stdin, which Linux surfaces as
-  `Broken pipe (os error 32)` from the writer thread. Local changes now make the
-  fake `d2` adapter consume stdin before printing its SVG. Focused and full
-  Rust verification pass locally; the follow-up GitHub Actions run is still
-  required before the desktop CI blocker can be closed.
+  clippy, Rust tests, frontend unit tests, frontend build, and Tauri
+  `--no-bundle` desktop build. This confirms the slash-normalized path
+  serialization fixed the four earlier Windows Rust-test failures from run
+  `26132634911`.
 
 Recent local verification evidence from this buildout:
 
@@ -147,13 +139,13 @@ Known local environment caveat:
 
 ### 1. Verify The Desktop CI Fix
 
-Status: third local fix implemented; remote CI verification pending.
+Status: complete for current CI.
 
-The latest desktop CI failures have local fixes. Push and verify the next
-GitHub Actions run before widening the feature surface. Keep the older runs
-`26131929125` and `26132634911` in mind because they explain why the Unix-only
-cache-helper, slash-normalized path serialization, and `pikchr-cli` temporary
-source-file fixes exist. The current blocker is from run `26133136580`.
+The latest desktop CI failures are fixed and verified in GitHub Actions run
+`26133595556`. Keep the older runs `26131929125`, `26132634911`, and
+`26133136580` in mind because they explain why the Unix-only cache-helper,
+slash-normalized path serialization, `pikchr-cli` temporary source-file, and
+fake-`d2` stdin-drain fixes exist.
 
 Resolved previous Windows clippy failure:
 
@@ -196,9 +188,8 @@ Local fix:
 
 Completion criteria:
 
-- Windows CI passes the four previously failing Rust tests. Run `26133136580`
-  reached and passed Windows Rust tests, frontend unit tests, and frontend
-  build; wait for the full Windows desktop job result in the follow-up run.
+- Windows CI passes the four previously failing Rust tests and the full desktop
+  job in run `26133595556`.
 - The path normalization does not break local file commands, Git commands,
   external engine execution, or export artifact references.
 
@@ -231,7 +222,7 @@ Completion criteria:
   into a mock-only pass.
 - Linux CI passes optional-engine installation, clippy, and Rust tests.
 
-Current Ubuntu fixture failure:
+Resolved Ubuntu fixture failure:
 
 - Command: `cargo test --locked`
 - Job: `Desktop build (ubuntu-22.04)`
@@ -251,6 +242,7 @@ Local fix:
 Completion criteria:
 
 - Ubuntu CI passes `external_transform_adapters_shape_engine_specific_invocations`.
+  Verified in run `26133595556`.
 - The real installed-engine conformance test remains enabled and passing.
 - Do not mask stdin write failures in production adapter code to compensate for
   a mock that ignores stdin.
@@ -406,14 +398,13 @@ Completion criteria:
 
 ### 7. External Transform Platform Evidence
 
-Status: Linux installed-engine evidence now reaches Pikchr conformance locally
-and in the latest CI run; the active Linux blocker is a fake-`d2` fixture stdin
-failure. macOS and Windows optional-engine evidence is incomplete.
+Status: Linux installed-engine evidence now passes in CI; macOS and Windows
+optional-engine evidence is incomplete.
 
 Finish:
 
-- Verify the Linux fake-`d2` stdin fixture fix in CI while keeping installed
-  Pikchr conformance passing.
+- Preserve Linux installed-engine conformance in CI while expanding optional
+  engine proof beyond Linux.
 - Keep Graphviz/DOT, D2, PlantUML, and Pikchr as real optional-engine CI proof
   where available.
 - Add macOS manual or CI evidence for all optional engines.
