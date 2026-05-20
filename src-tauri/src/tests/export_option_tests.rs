@@ -264,3 +264,68 @@ fn export_syntax_highlighting_can_be_included_or_omitted() {
         export::export_text(&response, &json!({ "includeSyntaxHighlighting": false }));
     assert!(exported_text.contains("Syntax highlighting: omitted"));
 }
+
+#[test]
+fn export_appendix_options_control_target_outputs() {
+    let response = compile(CompileRequest {
+        text: include_str!("../../fixtures/export/business_report.md").to_string(),
+        file_path: None,
+    });
+    let included = json!({
+        "includeGlossary": true,
+        "includeComments": true,
+        "includeProvenance": true
+    });
+    let omitted = json!({
+        "includeGlossary": false,
+        "includeComments": false,
+        "includeProvenance": false
+    });
+
+    let html = render_full_html(&response, &included);
+    assert!(html.contains("class=\"export-glossary\""));
+    assert!(html.contains("class=\"export-comments\""));
+    assert!(html.contains("class=\"export-provenance\""));
+    let html_without_appendix = render_full_html(&response, &omitted);
+    assert!(!html_without_appendix.contains("class=\"export-glossary\""));
+    assert!(!html_without_appendix.contains("class=\"export-comments\""));
+    assert!(!html_without_appendix.contains("class=\"export-provenance\""));
+
+    let pdf = String::from_utf8_lossy(&render_pdf_bytes(&response, &included)).into_owned();
+    assert!(pdf.contains("Glossary"));
+    assert!(pdf.contains("Review Comments"));
+    assert!(pdf.contains("AI Provenance"));
+    let pdf_without_appendix =
+        String::from_utf8_lossy(&render_pdf_bytes(&response, &omitted)).into_owned();
+    assert!(!pdf_without_appendix.contains("Review Comments"));
+    assert!(!pdf_without_appendix.contains("AI Provenance"));
+
+    let docx = render_docx_bytes(&response, &included).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Glossary"));
+    assert!(docx_document.contains("Review Comments"));
+    assert!(docx_document.contains("AI Provenance"));
+    let docx_without_appendix = render_docx_bytes(&response, &omitted).expect("docx bytes");
+    let docx_without_document = zip_entry_text(&docx_without_appendix, "word/document.xml");
+    assert!(!docx_without_document.contains("Review Comments"));
+    assert!(!docx_without_document.contains("AI Provenance"));
+
+    let pptx = render_pptx_bytes(&response, &included).expect("pptx bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Glossary"));
+    assert!(pptx_slides.contains("Review Comments"));
+    assert!(pptx_slides.contains("AI Provenance"));
+    let pptx_without_appendix = render_pptx_bytes(&response, &omitted).expect("pptx bytes");
+    let pptx_without_slides =
+        zip_entry_texts_with_prefix(&pptx_without_appendix, "ppt/slides/").join("\n");
+    assert!(!pptx_without_slides.contains("Review Comments"));
+    assert!(!pptx_without_slides.contains("AI Provenance"));
+
+    let text = export::export_text(&response, &included);
+    assert!(text.contains("Glossary"));
+    assert!(text.contains("Review Comments"));
+    assert!(text.contains("AI Provenance"));
+    let text_without_appendix = export::export_text(&response, &omitted);
+    assert!(!text_without_appendix.contains("Review Comments"));
+    assert!(!text_without_appendix.contains("AI Provenance"));
+}
