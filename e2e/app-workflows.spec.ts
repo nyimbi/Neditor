@@ -360,8 +360,8 @@ async function revealedPaths(page: Page) {
   return page.evaluate(() => window.__NEDITOR_E2E__.revealedPaths());
 }
 
-async function activeTabText(page: Page) {
-  return page.locator(".document-tabs .tab.active .tab-main").innerText();
+async function activeFileRowText(page: Page) {
+  return page.locator(".sidebar .file-row.active").innerText();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -419,11 +419,12 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await queueDialogSelection(page, "/workspace/market copy.md");
   await page.getByRole("button", { name: "Duplicate" }).click();
   await expect.poll(() => mockFileText(page, "/workspace/market copy.md")).toContain("status: in-review");
-  await expect.poll(() => activeTabText(page)).toContain("market copy.md");
+  await page.locator(".sidebar").getByRole("button", { name: /market copy\.md/ }).click();
+  await expect.poll(() => activeFileRowText(page)).toContain("market copy.md");
 
   await queueDialogSelection(page, "/workspace/renamed.md");
   await page.getByRole("button", { name: "Rename" }).click();
-  await expect.poll(() => activeTabText(page)).toContain("renamed.md");
+  await expect.poll(() => activeFileRowText(page)).toContain("renamed.md");
 
   await page.getByLabel("Pin document").click();
   await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /renamed\.md/ })).toBeVisible();
