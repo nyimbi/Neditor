@@ -1250,6 +1250,16 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await page.getByRole("button", { name: "Insert table Snippet" }).click();
   await expect.poll(() => editorText(page)).toContain("| Item | Value |");
 
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert list of figures");
+  await page.getByRole("button", { name: "Insert list of figures Snippet" }).click();
+  await expect.poll(() => editorText(page)).toContain("[LIST_OF_FIGURES]");
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert list of tables");
+  await page.getByRole("button", { name: "Insert list of tables Snippet" }).click();
+  await expect.poll(() => editorText(page)).toContain("[LIST_OF_TABLES]");
+
   await page.getByLabel("Sidebar panel").selectOption("tables");
   await page.getByRole("button", { name: "New table" }).click();
   await page.getByLabel("Caption").fill("Workflow budget");

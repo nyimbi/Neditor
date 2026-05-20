@@ -1204,6 +1204,8 @@ const figureCropPositionPoints: Record<FigureCropPosition, { x: number; y: numbe
 };
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
 const equationSnippet = "$$\nE = mc^2\n$$ {#eq:energy}\n";
+const listOfFiguresSnippet = "[LIST_OF_FIGURES]\n";
+const listOfTablesSnippet = "[LIST_OF_TABLES]\n";
 const glossarySnippet = "```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n";
 const layoutSnippet = "```layout\ncolumns: 2\nsection: market-analysis\n```\n";
 const commentSnippet = "<!-- comment: unresolved | author: local | at: 2026-05-18T00:00:00Z | Review note. -->\n";
@@ -1469,6 +1471,8 @@ const commands = computed(() => [
     })),
   { name: "Insert calculation", group: "Snippet", run: () => insertBlock(calcSnippet) },
   { name: "Insert equation", group: "Snippet", run: () => insertBlock(equationSnippet) },
+  { name: "Insert list of figures", group: "Snippet", run: () => insertBlock(listOfFiguresSnippet) },
+  { name: "Insert list of tables", group: "Snippet", run: () => insertBlock(listOfTablesSnippet) },
   { name: "Insert glossary", group: "Snippet", run: () => insertBlock(glossarySnippet) },
   { name: "Insert layout directive", group: "Snippet", run: () => insertBlock(layoutSnippet) },
   { name: "Insert review comment", group: "Snippet", run: () => insertBlock(commentSnippet) },
