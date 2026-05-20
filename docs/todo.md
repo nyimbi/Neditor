@@ -25,7 +25,8 @@ Current survey inputs:
 - Backend tests under `src-tauri/src/tests/`
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
-  `5c29914`, `33ee6a9`, and `443515b`
+  `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
+  `11dafc3`
 
 Status vocabulary:
 
@@ -75,9 +76,9 @@ modules after behavior is locked.
 
 Latest pushed commit inspected:
 
-- `443515b Prove advanced table editing in browser workflows`
+- `11dafc3 Stabilize file lifecycle browser proof`
 
-Latest GitHub Actions run inspected:
+Latest fully completed green GitHub Actions run inspected:
 
 - Run `26134248308` on commit `443515b`
 - Overall result: passed
@@ -85,6 +86,23 @@ Latest GitHub Actions run inspected:
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
+
+Current follow-up GitHub Actions run:
+
+- Run `26135510740` on commit `11dafc3`
+- Status at survey time: in progress
+- Browser workflow job: still in `Install Playwright Chromium`; it has not
+  reached `pnpm run test:e2e` yet, so the sixth browser workflow test is not
+  CI-proven on this commit.
+- macOS desktop job: passed, including Rust formatting/check/native-watch,
+  clippy, Rust tests, frontend unit tests, frontend build, and Tauri
+  `--no-bundle` desktop build.
+- Ubuntu desktop job: passed, including Linux optional transform installation,
+  Rust formatting/check/native-watch, clippy, Rust tests, frontend unit tests,
+  frontend build, and Tauri `--no-bundle` desktop build.
+- Windows desktop job: passed through Rust checks/tests, frontend unit tests,
+  and frontend build; it was still building the Tauri desktop shell at survey
+  time.
 
 CI evidence from run `26134248308`:
 
@@ -127,6 +145,13 @@ Recent local verification evidence from this buildout:
   fixture fixes with 126 Rust tests.
 - `git diff --check`: passed after the latest documentation and fake-`d2`
   fixture edits.
+- `pnpm exec playwright test --list`: passed after adding the mocked file
+  lifecycle workflow, listing six Chromium workflow tests.
+- `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "opens, saves,
+  duplicates" --project chromium`: blocked locally because the macOS
+  Playwright cache is missing the Chromium headless-shell executable.
+- `git diff --check`: passed after stabilizing the file lifecycle workflow
+  assertions.
 
 Known local environment caveat:
 
@@ -249,7 +274,7 @@ Completion criteria:
 
 ### 2. Keep The Browser Workflow Lane Passing While Expanding It
 
-Status: expanded CI pass exists; coverage remains incomplete.
+Status: expanded local list exists; latest CI execution is pending.
 
 Current browser coverage in `e2e/app-workflows.spec.ts`:
 
@@ -290,7 +315,9 @@ Required next coverage:
 
 Completion criteria:
 
-- Browser workflow tests continue passing in Linux CI.
+- Browser workflow tests continue passing in Linux CI; the sixth mocked file
+  lifecycle workflow still needs a completed CI run because run `26135510740`
+  has not reached test execution yet.
 - Local sandbox limitations remain documented but are not used as completion
   evidence.
 - Browser coverage failures drive implementation fixes rather than broad

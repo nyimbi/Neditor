@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `443515b Prove
-  advanced table editing in browser workflows`
+- Latest inspected committed baseline before this update: `11dafc3 Stabilize
+  file lifecycle browser proof`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -57,6 +57,13 @@ Recent pushed checkpoints visible in current git history:
   paste import, numeric sorting, formula rows, merged-cell metadata, and
   apply-back behavior, with local unit/build proof and green CI in run
   `26134248308`.
+- `e2f22d5` added a mocked Tauri file/dialog layer and browser workflow proof
+  for open, edit, save, duplicate, rename, pin, reveal, workspace listing, and
+  revert.
+- `f5d5e9a`, `5b7a756`, `85ad6db`, `613d880`, and `11dafc3` tightened that
+  workflow after CI exposed brittle selectors and edit-state assumptions; the
+  latest version asserts duplicate/rename state through mock file contents and
+  active-tab text.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -115,11 +122,13 @@ P0 gaps:
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with five Chromium tests, and
-  the local Playwright list now includes a sixth mocked file lifecycle test.
-  Linux CI still needs to prove the new sixth test after this slice is pushed.
-  Coverage remains incomplete and local sandbox execution still fails before
-  app assertions because Chromium cannot register its Mach bootstrap port.
+- Browser-level workflow tests pass in Linux CI with five Chromium tests in
+  run `26134248308`. The local Playwright list now includes a sixth mocked
+  file lifecycle test. Run `26135510740` for commit `11dafc3` is still in
+  progress at this survey point, with the browser job in `Install Playwright
+  Chromium`; that run has not yet proven the sixth test. Coverage remains
+  incomplete, and local execution is blocked by the missing macOS Playwright
+  Chromium headless-shell executable in the local cache.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -220,6 +229,9 @@ Current CI follow-up:
 | `pnpm exec playwright test --list` | Pass | Listed 6 Chromium browser workflow tests, including the new mocked file open/save/duplicate/rename/pin/reveal/revert flow. |
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding the mocked file lifecycle browser workflow. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding the mocked file lifecycle browser workflow. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "opens, saves, duplicates" --project chromium` | Blocked locally | Playwright could not launch because `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell` is missing. |
+| `git diff --check` | Pass | No whitespace errors after stabilizing the mocked file lifecycle workflow assertions. |
+| `gh run view 26135510740 --json status,conclusion,jobs` | In progress | For `11dafc3`, macOS and Ubuntu desktop passed. Windows passed Rust checks/tests plus frontend tests/build and was still building the Tauri shell. Browser workflow was still installing Playwright Chromium and had not reached `pnpm run test:e2e`. |
 
 Relevant CI fixes already landed:
 
