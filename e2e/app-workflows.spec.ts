@@ -828,6 +828,32 @@ test("runs command palette citation glossary and index navigation", async ({ pag
   await expect(page.locator(".cm-line").filter({ hasText: "Working capital" })).toBeVisible();
 });
 
+test("runs command palette open document and workspace file navigation", async ({ page }) => {
+  await setMockFileText(page, "/workspace/command-first.md", "# Command First\n\nFirst command document body.");
+  await setMockFileText(page, "/workspace/command-second.md", "# Command Second\n\nSecond command document body.");
+  await setMockFileText(page, "/workspace/reports/workspace-target.md", "# Workspace Target\n\nWorkspace command body.");
+
+  await queueDialogSelection(page, "/workspace/command-first.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueDialogSelection(page, "/workspace/command-second.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await expect.poll(() => editorText(page)).toContain("Second command document body.");
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Command First");
+  await page.getByRole("button", { name: "Command First Open document" }).click();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("Command First");
+  await expect.poll(() => editorText(page)).toContain("First command document body.");
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("workspace-target");
+  await page.getByRole("button", { name: "reports/workspace-target.md Workspace file" }).click();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("Workspace Target");
+  await expect.poll(() => editorText(page)).toContain("Workspace command body.");
+  await page.getByLabel("Sidebar panel").selectOption("files");
+  await expect.poll(() => activeFileRowText(page)).toContain("workspace-target.md");
+});
+
 test("runs command palette insertion and table editor workflows", async ({ page }) => {
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert table");
