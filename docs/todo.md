@@ -124,7 +124,7 @@ Most recent local verification evidence:
 - `pnpm run check:a11y`: passed and checked the Vue template for accessible
   button names, form-control labels, and dialog labeling.
 - `pnpm run check:docs`: passed and checked README plus all docs for missing
-  local links.
+  local links, including storage model and security threat model docs.
 - `npx playwright test e2e/app-workflows.spec.ts -g "keeps large document editing"`:
   not run to completion on this host because the Playwright Chromium binary is
   not installed; the large-document browser workflow is present in the harness.
@@ -1260,9 +1260,12 @@ Completion criteria:
 3. Use workflow failures to close real implementation gaps.
 4. Audit export artifacts and add conformance fixtures.
 5. Harden cross-platform external transform evidence.
-6. Modularize frontend/store/backend code after behavior is locked.
-7. Complete packaging evidence, user docs, and example projects.
-8. Run a final requirement-by-requirement audit and fresh verification baseline.
+6. Run an independent security review against `docs/security-threat-model.md`.
+7. Prove native settings/snapshot storage and sidecar workflows in a real
+   desktop run.
+8. Modularize frontend/store/backend code after behavior is locked.
+9. Complete packaging evidence, user docs, and example projects.
+10. Run a final requirement-by-requirement audit and fresh verification baseline.
 
 ## Completion Gate
 

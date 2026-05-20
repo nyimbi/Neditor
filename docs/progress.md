@@ -251,6 +251,11 @@ Recent pushed checkpoints visible in current git history:
   settings, legacy key aliases, clamped persisted values, and frontend unit
   coverage for preferences, recents, transform settings, AI cleanup defaults,
   and scroll positions.
+- This update adds `docs/storage-model.md` and
+  `docs/security-threat-model.md`, links them from the README, and folds them
+  into the markdown link checker so local-first storage, sidecar evidence,
+  trust boundaries, threat mitigations, and non-goals are auditable alongside
+  the specification matrix.
 
 ## Current Capability Snapshot
 
@@ -633,6 +638,7 @@ Additional review/provenance readiness metadata verification:
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed, including latest-document task cancellation/stale-result guard coverage, preview debounce timing/coalescing coverage, and workspace persistence migration/schema normalization. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |
 | `pnpm run check:a11y` | Pass | Static Vue template accessibility guard passed for button names, form-control labels, and dialog labeling. |
+| `pnpm run check:docs` | Pass | Markdown link guard covers README plus specification, external transforms, dependency admission, IPC coverage, storage model, security threat model, progress, matrix, and backlog docs. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
 | `git diff --check` | Pass | No whitespace errors after the readiness metadata, dirty-Git manifest, and documentation updates. |
 | `pnpm run check:docs` | Pass | Repo-wide markdown link guard checked README plus all docs and found no missing local links after adding `docs/architecture.svg`. |

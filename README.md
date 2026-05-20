@@ -224,6 +224,8 @@ tracked conservatively in:
 
 - [Specification](docs/specification.md)
 - [External transform setup](docs/external-transforms.md)
+- [Storage model](docs/storage-model.md)
+- [Security threat model](docs/security-threat-model.md)
 - [Completion matrix](docs/spec-completion-matrix.md)
 - [Current backlog](docs/todo.md)
 - [Progress log](docs/progress.md)

@@ -9,8 +9,10 @@ const markdownFiles = [
   "docs/external-transforms.md",
   "docs/ipc-command-coverage.md",
   "docs/progress.md",
+  "docs/security-threat-model.md",
   "docs/spec-completion-matrix.md",
   "docs/specification.md",
+  "docs/storage-model.md",
   "docs/todo.md",
 ];
 const linkPattern = /!?\[[^\]]*]\(([^)]+)\)/g;
