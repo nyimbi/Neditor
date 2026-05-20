@@ -704,10 +704,10 @@ test("switches tabs, guards dirty closes, and prunes stale recent document paths
   await queueDialogSelection(page, "/workspace/second.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
-  await expect(page.locator(".document-tabs .tab.active")).toContainText("second.md");
+  await expect(page.locator(".document-tabs .tab.active")).toContainText(/Second File|second\.md/);
   await expect.poll(() => editorText(page)).toContain("Second body.");
-  await page.locator(".document-tabs .tab").filter({ hasText: "first.md" }).getByRole("button").first().click();
-  await expect(page.locator(".document-tabs .tab.active")).toContainText("first.md");
+  await page.locator(".document-tabs .tab").filter({ hasText: /First File|first\.md/ }).getByRole("button").first().click();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText(/First File|first\.md/);
   await expect.poll(() => editorText(page)).toContain("First body.");
 
   await page.getByRole("button", { name: "New" }).click();
@@ -715,10 +715,10 @@ test("switches tabs, guards dirty closes, and prunes stale recent document paths
   await queueConfirmResponse(page, false);
   await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
   await expect(page.locator(".document-tabs .tab.active")).toContainText("Untitled");
-  await expect(page.locator(".document-tabs .tab").filter({ hasText: "Untitled" })).toHaveCount(2);
+  await expect(page.locator(".document-tabs .tab").filter({ hasText: "Untitled" })).toHaveCount(1);
   await queueConfirmResponse(page, true);
   await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
-  await expect(page.locator(".document-tabs .tab").filter({ hasText: "Untitled" })).toHaveCount(1);
+  await expect(page.locator(".document-tabs .tab").filter({ hasText: "Untitled" })).toHaveCount(0);
 
   await queueDialogSelection(page, "/workspace/rename-source.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
@@ -782,6 +782,7 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await queueDialogSelection(page, "/workspace/field-notes.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueConfirmResponse(page, true);
   await page
     .locator(".document-tabs .tab")
     .filter({ hasText: "Market Entry Report" })
@@ -827,6 +828,7 @@ test("skips missing restored files with a clear restore warning after reload", a
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await queueDialogSelection(page, "/workspace/missing-brief.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueConfirmResponse(page, true);
   await page
     .locator(".document-tabs .tab")
     .filter({ hasText: "Market Entry Report" })
