@@ -5,6 +5,10 @@ pub(crate) struct ReviewComment {
     pub(crate) line: usize,
     pub(crate) author: String,
     pub(crate) created_at: String,
+    #[serde(skip_serializing)]
+    pub(crate) has_author: bool,
+    #[serde(skip_serializing)]
+    pub(crate) has_created_at: bool,
     pub(crate) state: String,
     pub(crate) text: String,
 }
@@ -14,6 +18,10 @@ pub(crate) struct ChangeNote {
     pub(crate) line: usize,
     pub(crate) author: String,
     pub(crate) created_at: String,
+    #[serde(skip_serializing)]
+    pub(crate) has_author: bool,
+    #[serde(skip_serializing)]
+    pub(crate) has_created_at: bool,
     pub(crate) text: String,
 }
 
@@ -46,6 +54,8 @@ pub(crate) fn collect_change_notes(text: &str) -> Vec<ChangeNote> {
 pub(crate) fn parse_review_comment(line: usize, content: &str) -> ReviewComment {
     let mut author = "local".to_string();
     let mut created_at = String::new();
+    let mut has_author = false;
+    let mut has_created_at = false;
     let mut state = if content.contains("resolved") {
         "resolved"
     } else {
@@ -66,6 +76,7 @@ pub(crate) fn parse_review_comment(line: usize, content: &str) -> ReviewComment 
             .or_else(|| part.strip_prefix("author="))
         {
             author = value.trim().to_string();
+            has_author = true;
         } else if let Some(value) = part
             .strip_prefix("at:")
             .or_else(|| part.strip_prefix("at="))
@@ -73,6 +84,7 @@ pub(crate) fn parse_review_comment(line: usize, content: &str) -> ReviewComment 
             .or_else(|| part.strip_prefix("createdAt="))
         {
             created_at = value.trim().to_string();
+            has_created_at = true;
         } else {
             text_parts.push(part.to_string());
         }
@@ -82,6 +94,8 @@ pub(crate) fn parse_review_comment(line: usize, content: &str) -> ReviewComment 
         line,
         author,
         created_at,
+        has_author,
+        has_created_at,
         state,
         text: text_parts.join(" | "),
     }
@@ -90,6 +104,8 @@ pub(crate) fn parse_review_comment(line: usize, content: &str) -> ReviewComment 
 pub(crate) fn parse_change_note(line: usize, content: &str) -> ChangeNote {
     let mut author = "local".to_string();
     let mut created_at = String::new();
+    let mut has_author = false;
+    let mut has_created_at = false;
     let mut text_parts = Vec::new();
 
     for part in content
@@ -102,6 +118,7 @@ pub(crate) fn parse_change_note(line: usize, content: &str) -> ChangeNote {
             .or_else(|| part.strip_prefix("author="))
         {
             author = value.trim().to_string();
+            has_author = true;
         } else if let Some(value) = part
             .strip_prefix("at:")
             .or_else(|| part.strip_prefix("at="))
@@ -109,6 +126,7 @@ pub(crate) fn parse_change_note(line: usize, content: &str) -> ChangeNote {
             .or_else(|| part.strip_prefix("createdAt="))
         {
             created_at = value.trim().to_string();
+            has_created_at = true;
         } else {
             text_parts.push(part.to_string());
         }
@@ -118,6 +136,8 @@ pub(crate) fn parse_change_note(line: usize, content: &str) -> ChangeNote {
         line,
         author,
         created_at,
+        has_author,
+        has_created_at,
         text: text_parts.join(" | "),
     }
 }

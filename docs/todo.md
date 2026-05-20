@@ -738,6 +738,12 @@ Needed proof:
 
 Status: implemented in part; requirement coverage needs audit.
 
+Current evidence:
+
+- Readiness now reports malformed review comments and change notes when author,
+  timestamp, or body text is missing, and the diagnostics are copied into the
+  export manifest.
+
 Readiness should validate and report:
 
 - Required metadata.
@@ -752,7 +758,7 @@ Readiness should validate and report:
 - Transform engines, trust state, executable paths, adapter input mode,
   timeouts, stderr, missing output, output limits, and cache identity.
 - Export target options and target-specific blockers.
-- Unresolved comments and change notes.
+- Unresolved comments and malformed comment/change-note audit metadata.
 - AI provenance that is not human reviewed.
 - Dirty Git state and export manifest state.
 

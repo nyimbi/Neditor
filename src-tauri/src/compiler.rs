@@ -250,6 +250,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
             bibliography: &bibliography,
             duplicate_bibliography_keys: &duplicate_bibliography_keys,
             comments: &comments,
+            change_notes: &change_notes,
             ai_sources: &ai_sources,
             ai_assisted_sections: &ai_assisted_sections,
             has_bibliography_source: !bibliography.is_empty(),

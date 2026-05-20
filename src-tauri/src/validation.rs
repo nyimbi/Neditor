@@ -8,7 +8,7 @@ use crate::{
     },
     metadata_string,
     provenance::{AiAssistedSection, AiSource},
-    review::ReviewComment,
+    review::{ChangeNote, ReviewComment},
     source_mapping::diagnostic_location_for_generated_line,
     SourceMapEntry,
 };
@@ -21,6 +21,7 @@ pub(crate) struct DocumentValidationInput<'a> {
     pub(crate) bibliography: &'a [BibliographyEntry],
     pub(crate) duplicate_bibliography_keys: &'a [String],
     pub(crate) comments: &'a [ReviewComment],
+    pub(crate) change_notes: &'a [ChangeNote],
     pub(crate) ai_sources: &'a [AiSource],
     pub(crate) ai_assisted_sections: &'a [AiAssistedSection],
     pub(crate) has_bibliography_source: bool,
@@ -192,6 +193,62 @@ pub(crate) fn validate_document(
         diagnostic.related.push(format!(
             "First unresolved comment by {}: {}",
             comment.author, comment.text
+        ));
+        diagnostics.push(diagnostic);
+    }
+    if let Some(comment) = input.comments.iter().find(|comment| {
+        !comment.has_author || !comment.has_created_at || comment.text.trim().is_empty()
+    }) {
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, comment.line);
+        let mut diagnostic = diag(
+            "warning",
+            "Review comment is missing audit metadata.",
+            source_file,
+            line,
+            Some("Add author, at timestamp, and comment text before export."),
+        );
+        diagnostic.related.push(format!(
+            "Comment metadata: author={}, at={}",
+            if comment.has_author {
+                "present"
+            } else {
+                "missing"
+            },
+            if comment.has_created_at {
+                "present"
+            } else {
+                "missing"
+            }
+        ));
+        diagnostics.push(diagnostic);
+    }
+    if let Some(note) = input
+        .change_notes
+        .iter()
+        .find(|note| !note.has_author || !note.has_created_at || note.text.trim().is_empty())
+    {
+        let (source_file, line) =
+            diagnostic_location_for_generated_line(input.source_map, note.line);
+        let mut diagnostic = diag(
+            "warning",
+            "Change note is missing audit metadata.",
+            source_file,
+            line,
+            Some("Add author, at timestamp, and change note text before export."),
+        );
+        diagnostic.related.push(format!(
+            "Change note metadata: author={}, at={}",
+            if note.has_author {
+                "present"
+            } else {
+                "missing"
+            },
+            if note.has_created_at {
+                "present"
+            } else {
+                "missing"
+            }
         ));
         diagnostics.push(diagnostic);
     }

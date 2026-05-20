@@ -15,6 +15,53 @@ fn prepare_for_export_blocks_warning_cleanliness() {
 }
 
 #[test]
+fn prepare_for_export_reports_review_change_note_audit_metadata() {
+    let report = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: Review Audit\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Review Audit\n<!-- comment: resolved | author: Dana | Confirmed numbers. -->\n<!-- change: at: 2026-05-20T09:00:00Z | Updated forecast assumptions. -->\n"
+            .to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 0);
+    assert_eq!(report.warning_count, 2);
+    assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
+    assert!(
+        report.diagnostics.iter().any(|diagnostic| {
+            diagnostic.message == "Review comment is missing audit metadata."
+                && diagnostic.source_file.as_deref() == Some("untitled.md")
+                && diagnostic.line == Some(9)
+                && diagnostic
+                    .related
+                    .iter()
+                    .any(|related| related.contains("at=missing"))
+        }),
+        "{:#?}",
+        report.diagnostics
+    );
+    assert!(
+        report.diagnostics.iter().any(|diagnostic| {
+            diagnostic.message == "Change note is missing audit metadata."
+                && diagnostic.source_file.as_deref() == Some("untitled.md")
+                && diagnostic.line == Some(10)
+                && diagnostic
+                    .related
+                    .iter()
+                    .any(|related| related.contains("author=missing"))
+        }),
+        "{:#?}",
+        report.diagnostics
+    );
+    assert!(report
+        .manifest
+        .diagnostics
+        .iter()
+        .any(|diagnostic| { diagnostic.message == "Change note is missing audit metadata." }));
+}
+
+#[test]
 fn export_document_blocks_compiler_errors_before_writing() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
