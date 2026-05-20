@@ -312,6 +312,14 @@ Recent pushed checkpoints visible in current git history:
   Markdown bundle evidence. It covers block quotes, callouts, unordered,
   nested, ordered, and task lists, JavaScript code blocks, tables, figures,
   equations, generated lists of figures/tables, and cross references.
+- This update adds
+  `external_transform_cache_invalidates_when_trusted_executable_changes`, which
+  rewrites a trusted external executable at the same absolute path and proves
+  the cache key changes, the output hash changes, and the new engine output is
+  executed instead of serving stale memory or disk cache. The transform
+  metadata and setup docs now describe engine file size, modified time,
+  adapter arguments, input mode, renderer version, and source hash as part of
+  cache identity.
 
 ## Current Capability Snapshot
 
@@ -344,6 +352,10 @@ Implemented or substantially present, pending the conservative caveats in
   business-document blocks and generated cross-reference sections.
 - Transform registry with Rust-native renderers/fallbacks and trust-gated
   external adapters for Graphviz/DOT, D2, PlantUML, and Pikchr.
+- External transform cache identity includes executable file identity
+  (path/size/modified time), adapter arguments, input mode, renderer version,
+  and source hash, with a regression test proving same-path executable rewrites
+  do not serve stale cached output.
 - Rust-native structured-document transforms for JSON, YAML, OpenAPI, and JSON
   Schema, including nested schema/reference output for API and schema docs.
 - Business features including AI paste cleanup, table editor logic, formula
@@ -506,6 +518,21 @@ Additional rich Markdown block export verification:
 | `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after adding the rich-block conformance test. |
 | `cargo test --locked export_conformance_tests --lib` in `src-tauri` | Pass | 5 export conformance tests passed, including `rich_markdown_blocks_survive_cross_target_exports`. |
 | `cargo test --locked` in `src-tauri` | Pass | 145 Rust tests passed; 0 failed. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests passed. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed. |
+| `pnpm run check:docs` | Pass | Checked 12 Markdown files; local links resolve. |
+| `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
+| `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests; execution still depends on local Chromium availability and host permissions. |
+| `git diff --check` | Pass | No whitespace errors in the current diff. |
+
+Additional external transform cache identity verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after adding same-path executable cache invalidation coverage. |
+| `cargo test --locked external_transform_tests --lib` in `src-tauri` | Pass | 9 external transform tests passed, including `external_transform_cache_invalidates_when_trusted_executable_changes`. |
+| `cargo test --locked` in `src-tauri` | Pass | 146 Rust tests passed; 0 failed. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed. |

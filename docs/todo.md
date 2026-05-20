@@ -906,8 +906,10 @@ Finish:
 - Confirm Windows `.exe` paths and package-manager shims.
 - Confirm PlantUML file mode on all platforms.
 - Confirm Pikchr stdin/file/argument mode for each supported executable shape.
-- Confirm cache invalidation includes adapter identity, executable identity,
-  arguments, file size/mtime, and relevant version data.
+- Cache invalidation now includes adapter identity, executable path, executable
+  file size/mtime, adapter arguments, input mode, renderer version, and source
+  hash; `external_transform_cache_invalidates_when_trusted_executable_changes`
+  proves same-path executable rewrites do not serve stale cached output.
 - Preserve diagnostics for missing executable, non-executable path, timeout,
   bad syntax, sidecar not produced, output limit, and stderr warnings.
 

@@ -315,6 +315,91 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
     let _ = fs::remove_file(pikchr_cli);
 }
 
+#[cfg(unix)]
+#[test]
+fn external_transform_cache_invalidates_when_trusted_executable_changes() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let script = write_executable_script(
+        "graphviz-cache-identity",
+        "#!/bin/sh\ncat >/dev/null\nprintf '<svg>engine-v1</svg>'\n",
+    );
+    let script_path = path_to_string(&script);
+    let body = format!(
+        "digraph {{ cache_identity_{} }}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos()
+    );
+
+    let first = run_external_transform(ExternalTransformRequest {
+        name: "dot".to_string(),
+        body: body.clone(),
+        engine_path: Some(script_path.clone()),
+        trusted: true,
+        input_mode: Some("stdin".to_string()),
+        timeout_ms: Some(1000),
+        max_input_bytes: Some(1024),
+        max_output_bytes: Some(4096),
+    })
+    .expect("initial external transform");
+    assert!(first.html.contains("engine-v1"));
+    let first_version = first
+        .engine_version
+        .clone()
+        .expect("first engine version identity");
+
+    fs::write(
+        &script,
+        "#!/bin/sh\ncat >/dev/null\nprintf '<svg>engine-v2-with-new-size</svg>'\n# identity padding\n",
+    )
+    .expect("rewrite trusted executable");
+    let mut permissions = fs::metadata(&script)
+        .expect("rewritten script metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&script, permissions).expect("keep rewritten executable");
+
+    let second = run_external_transform(ExternalTransformRequest {
+        name: "dot".to_string(),
+        body,
+        engine_path: Some(script_path),
+        trusted: true,
+        input_mode: Some("stdin".to_string()),
+        timeout_ms: Some(1000),
+        max_input_bytes: Some(1024),
+        max_output_bytes: Some(4096),
+    })
+    .expect("external transform after executable rewrite");
+
+    assert!(second.html.contains("engine-v2-with-new-size"));
+    assert_ne!(second.cache_key, first.cache_key);
+    assert_ne!(second.output_hash, first.output_hash);
+    assert_ne!(
+        second.engine_version.as_deref(),
+        Some(first_version.as_str())
+    );
+    assert!(second
+        .engine_version
+        .as_deref()
+        .is_some_and(|version| version.contains("file-size:") && version.contains("mtime:")));
+    assert!(second.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message.contains("completed")
+            && diagnostic.related.iter().any(|related| {
+                related.starts_with("engine_version: ")
+                    && related.contains("file-size:")
+                    && related.contains("mtime:")
+            })
+    }));
+    assert!(!second
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("served from cache")));
+
+    let _ = fs::remove_file(script);
+}
+
 #[test]
 fn external_transform_conformance_runs_installed_engines() {
     struct EngineCase {

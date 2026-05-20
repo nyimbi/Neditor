@@ -112,8 +112,8 @@ explicit platform checks.
 
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
-| 10.1 Architecture | Registry, option validation, artifact cache, diagnostics | Partial | `transforms/renderer.rs`; `transforms/options.rs`; `transforms/external.rs` | More option validation coverage and structured artifact use in exports. |
-| 10.2 Safety | No network, no shell, trust, timeout, output limits, source hash cache | Partial | External transform runner and tests | Cross-platform process behavior and cache identity hardening. |
+| 10.1 Architecture | Registry, option validation, artifact cache, diagnostics | Partial | `transforms/renderer.rs`; `transforms/options.rs`; `transforms/external.rs`; external transform tests cover adapter invocation shape, cache diagnostics, persistent cache reuse, and same-path executable cache invalidation | More option validation coverage and structured artifact use in exports. |
+| 10.2 Safety | No network, no shell, trust, timeout, output limits, source hash cache | Partial | External transform runner and tests; `external_transform_cache_invalidates_when_trusted_executable_changes` proves cache identity changes when a trusted executable is rewritten at the same path, using engine file size/mtime plus adapter/input/source identity | Cross-platform process behavior proof and broader executable edge cases. |
 | 10.3 Core transforms | `calc`, `mermaid`, `pikchr` | Partial | Renderer and transform tests | Fidelity limitations documented; optional engine proof for Pikchr. |
 | 10.4.1 DOT/Graphviz | SVG diagrams and engines | Partial | Native fallback; external adapter; Linux installed-engine conformance | Engine variants and Windows/macOS proof. |
 | 10.4.2 PlantUML | SVG/PNG enterprise diagrams | Partial | External adapter and fallback | Real PlantUML cross-platform proof; PNG support decision. |
@@ -178,7 +178,7 @@ explicit platform checks.
 
 | Setup doc section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
-| Safety model | Real executable paths, per-engine trust, bounded execution, cache keys, fallback | Partial | `transforms/external.rs`; external transform tests; archived browser workflow run `26157446711` covers settings-level path change trust clearing, trust prompts, denied trust reset, input mode/timeout probe details, cache identity display, and missing-executable diagnostics | Cross-platform process proof and deeper executable edge cases. |
+| Safety model | Real executable paths, per-engine trust, bounded execution, cache keys, fallback | Partial | `transforms/external.rs`; external transform tests; `external_transform_cache_invalidates_when_trusted_executable_changes`; archived browser workflow run `26157446711` covers settings-level path change trust clearing, trust prompts, denied trust reset, input mode/timeout probe details, cache identity display, and missing-executable diagnostics | Cross-platform process proof and deeper executable edge cases. |
 | macOS setup | Graphviz, D2, Pikchr, Java/PlantUML paths | Unverified | Documentation exists | Add manual evidence on macOS. |
 | Linux setup | Packages and optional engines | Partial | Historical workflow installed Linux engines; current proof requires local installed-engine checks | Keep installed-engine conformance stable. |
 | Windows setup | Winget paths and shim guidance | Unverified | Documentation exists | Add manual evidence on Windows. |

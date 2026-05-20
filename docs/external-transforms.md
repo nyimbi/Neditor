@@ -15,7 +15,8 @@ External engines are never trusted by default. Configure the executable path in 
 - Each engine has an adapter profile for arguments, stdin/file mode, output handling, and diagnostics.
 - Trust is per engine.
 - Execution is bounded by timeout and output-size limits.
-- Cache keys include the source hash, engine path, input mode, and adapter behavior.
+- Cache keys include the transform name, source hash, engine path, engine file
+  size and modified time, adapter arguments, input mode, and renderer version.
 - Failed external execution falls back to native rendering when a native fallback exists.
 
 ## macOS
@@ -101,4 +102,6 @@ If an engine is installed through a package manager shim, verify that the shim w
 - If output is empty, increase diagnostics by running the same executable manually with a tiny sample.
 - If execution times out, reduce diagram complexity before increasing the timeout.
 - If trust is disabled, NEditor will not execute the engine and will use native fallback behavior where available.
-- If cache output appears stale, change the source or engine path; both are part of the cache identity.
+- If cache output appears stale, change the source or engine path. NEditor also
+  invalidates cached external output when the executable at the trusted path
+  changes size or modified time.

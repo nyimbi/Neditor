@@ -367,7 +367,9 @@ fn prepare_cached_external_transform(
         format!("{name} external transform served from cache ({cache_scope})."),
         None,
         None,
-        Some("Cache key includes transform name, engine path, input mode, and source hash."),
+        Some(
+            "Cache key includes transform name, engine path, engine file identity, adapter args, input mode, and source hash.",
+        ),
     );
     diagnostic
         .related
@@ -795,7 +797,7 @@ fn transform_engine(
             "maxInputBytes": MAX_TRANSFORM_INPUT_BYTES,
             "maxOutputBytes": MAX_TRANSFORM_OUTPUT_BYTES
         },
-        "cacheScope": "name+enginePath+inputMode+sourceHash",
+        "cacheScope": "name+enginePath+engineFileIdentity+adapterArgs+inputMode+sourceHash",
         "exportTargets": ["html", "pdf", "docx", "pptx"]
     })
 }
@@ -837,7 +839,7 @@ fn transform_diagnostic_profile(name: &str, requires_execution: bool) -> Value {
             "stderr",
             "output_limit"
         ],
-        "cacheKeyIncludes": ["transform", "engine_path", "engine_version", "adapter", "input_mode", "source_hash"]
+        "cacheKeyIncludes": ["transform", "engine_path", "engine_file_size", "engine_mtime", "adapter", "adapter_args", "input_mode", "source_hash"]
     })
 }
 
