@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `25c7d1e Stabilize
-  conflict merge workflow proof`
+- Latest inspected committed baseline before this update: `4eb1d2c Prove
+  conflict keep and accept actions`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -76,6 +76,10 @@ Recent pushed checkpoints visible in current git history:
   stale-save conflict recovery: save blocking when disk content changed, compare
   dialog visibility, local conflict-copy preservation, and merge-back recovery
   into the original file.
+- `4eb1d2c` added browser workflow proof for the remaining stale-save conflict
+  action buttons: keep-local preserves editor edits without overwriting the
+  changed disk file, and accept-external replaces the active document with the
+  external disk content.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -118,8 +122,8 @@ Implemented or substantially present, pending the conservative caveats in
   covering view mode switching, command palette table insertion, table editor
   insertion, mocked file lifecycle operations, advanced table
   paste/sort/formula/merge/apply behavior, save-as plus recently closed
-  reopening, stale-save conflict copy/merge recovery, AI paste cleanup
-  insertion, and export readiness.
+  reopening, stale-save conflict copy/merge/keep-local/accept-external
+  recovery, AI paste cleanup insertion, and export readiness.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -130,14 +134,15 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `25c7d1e` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26138672512`.
+- Latest pushed CI for commit `4eb1d2c` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26139678118`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with nine Chromium tests in
-  run `26138672512`, including mocked file lifecycle coverage, save-as plus
-  recently closed reopening, and stale-save conflict copy/merge recovery.
+- Browser-level workflow tests pass in Linux CI with 11 Chromium tests in
+  run `26139678118`, including mocked file lifecycle coverage, save-as plus
+  recently closed reopening, and stale-save conflict copy/merge/keep-local/
+  accept-external recovery.
   Coverage remains incomplete, and local focused Playwright execution is blocked
   by the missing/default macOS Playwright cache and the workspace-local Chromium
   Mach bootstrap permission failure.
@@ -267,6 +272,11 @@ Current CI evidence log:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after removing the transient status assertion. |
 | `git diff --check` | Pass | No whitespace errors after stabilizing the conflict merge workflow proof. |
 | `gh run watch 26138672512 --exit-status` | Pass | For `25c7d1e`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser CI installed Chromium and ran 9 tests through `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
+| `pnpm exec playwright test --list` | Pass | Listed 11 Chromium browser workflow tests after adding keep-local and accept-external stale-save conflict workflows. |
+| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test e2e/app-workflows.spec.ts --grep "keeps local\|accepts external" --project chromium` | Blocked locally | Workspace-local Chromium launched, then failed before assertions with `bootstrap_check_in ... Permission denied (1100)`. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding keep-local and accept-external conflict workflows. |
+| `git diff --check` | Pass | No whitespace errors after the keep-local and accept-external conflict workflow edits. |
+| `gh run watch 26139678118 --exit-status` | Pass | For `4eb1d2c`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser CI installed Chromium and ran 11 tests through `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
 
 Relevant CI fixes already landed:
 

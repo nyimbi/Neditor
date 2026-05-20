@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `25c7d1e`
+  `4eb1d2c`
 
 Status vocabulary:
 
@@ -76,28 +76,30 @@ modules after behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `25c7d1e Stabilize conflict merge workflow proof`
+- `4eb1d2c Prove conflict keep and accept actions`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26138672512` on commit `25c7d1e`
+- Run `26139678118` on commit `4eb1d2c`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26138672512`:
+CI evidence from run `26139678118`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes nine Chromium workflow tests, including advanced table paste import,
+  includes 11 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, the mocked file lifecycle flow, save-as to a new path, and reopening
   that saved document from the recently closed list. It also now covers
   stale-save conflict blocking, conflict compare visibility, saving unsaved
-  local edits to a copy without overwriting the disk edit, and merging external
-  conflict text back into the original file.
+  local edits to a copy without overwriting the disk edit, merging external
+  conflict text back into the original file, keeping local editor edits while
+  leaving the external disk edit untouched, and accepting external disk content
+  into the active document.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -154,6 +156,19 @@ Recent local verification evidence from this buildout:
   compile refresh could overwrite; eight browser tests passed before the fix.
 - `gh run watch 26138672512 --exit-status`: passed for commit `25c7d1e` across
   nine browser workflows and Ubuntu/macOS/Windows desktop builds.
+- `pnpm exec playwright test --list`: passed after adding keep-local and
+  accept-external stale-save conflict workflows, listing 11 Chromium workflow
+  tests.
+- `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test e2e/app-workflows.spec.ts
+  --grep "keeps local|accepts external" --project chromium`: blocked locally
+  by the existing macOS Chromium Mach bootstrap permission failure before app
+  assertions.
+- `pnpm run build`: passed after the keep-local and accept-external conflict
+  workflow tests.
+- `git diff --check`: passed after the keep-local and accept-external conflict
+  workflow tests.
+- `gh run watch 26139678118 --exit-status`: passed for commit `4eb1d2c` across
+  11 browser workflows and Ubuntu/macOS/Windows desktop builds.
 - `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "opens, saves,
   duplicates" --project chromium`: blocked locally because the macOS
   Playwright cache is missing the Chromium headless-shell executable.
@@ -299,8 +314,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Stale-save conflict workflow: block a save when disk content changed, expose
   Compare/Accept external/Keep local/Save copy actions, show local and external
   content in the compare dialog, preserve local edits as a separate copy without
-  overwriting the disk edit, and merge external conflict text back into the
-  original file.
+  overwriting the disk edit, merge external conflict text back into the original
+  file, keep local editor edits while leaving the external disk edit untouched,
+  and accept external disk content into the active document.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, and apply-back-to-editor behavior.
 - AI paste cleanup preview and insertion.
@@ -320,9 +336,8 @@ Required next coverage:
   glossary/index commands, and navigation commands.
 - Remaining table editor flows: add/remove rows and columns, column formats,
   cancel behavior, and export fixture proof for edited tables.
-- External conflict modal: keep-local and accept-external assertions,
-  watcher-originated dirty conflicts, included-file conflict behavior, and
-  more granular line-compose controls.
+- External conflict modal: watcher-originated dirty conflicts, included-file
+  conflict behavior, and more granular line-compose controls.
 - AI paste cleanup modes: quote, appendix, replace selection, merge into
   current section, replace document, provenance, citation TODOs, clipboard, and
   review-state flows.
@@ -335,7 +350,8 @@ Completion criteria:
 
 - Browser workflow tests continue passing in Linux CI; the mocked file
   lifecycle workflow, save-as/recently closed reopening, and stale-save
-  conflict copy/merge workflows are CI-proven in run `26138672512`.
+  conflict copy/merge/keep-local/accept-external workflows are CI-proven in run
+  `26139678118`.
 - Local sandbox limitations remain documented but are not used as completion
   evidence.
 - Browser coverage failures drive implementation fixes rather than broad
@@ -471,8 +487,9 @@ Finish:
 
 ### 8. File Watcher And Conflict Workflows
 
-Status: backend and UI exist; stale-save conflict copy/merge workflow proof is
-present in browser CI, but watcher-originated flows are still missing.
+Status: backend and UI exist; stale-save conflict copy/merge/keep-local/
+accept-external workflow proof is present in browser CI, but watcher-originated
+flows are still missing.
 
 Finish:
 
@@ -480,13 +497,12 @@ Finish:
 - Dirty root-file conflict through UI.
 - Dirty included-file conflict and master recompilation through UI.
 - Save-race conflict when a file changes after the last watcher event but
-  before save. Browser CI run `26138672512` covers the stale-save conflict path
-  through compare, save-copy preservation, and merge-back recovery.
+  before save. Browser CI run `26139678118` covers the stale-save conflict path
+  through compare, save-copy preservation, merge-back recovery, keep-local, and
+  accept-external.
 - Multi-tab watcher switching.
 - Stale watcher cleanup when tabs close or paths move.
 - Include graph changes after editing include directives.
-- Keep-local and accept-external conflict paths with expected editor/file
-  content.
 
 ### 9. Workspace, Tabs, And Document Sets
 
