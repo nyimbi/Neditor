@@ -4,6 +4,9 @@ async function installTauriMock(page: Page) {
   await page.addInitScript(() => {
     const callbacks = new Map<number, unknown>();
     const stores = new Map<number, Map<string, unknown>>();
+    const files = new Map<string, { text: string; hash: string; modified: string }>();
+    const dialogSelections: Array<string | null> = [];
+    const revealedPaths: string[] = [];
     let callbackId = 1;
     let storeId = 1;
 
@@ -14,6 +17,43 @@ async function installTauriMock(page: Page) {
       }
       return `mock-${value.toString(16)}`;
     }
+
+    function normalizePath(path: string) {
+      return path.replace(/\\/g, "/");
+    }
+
+    function titleFromPath(path: string) {
+      return normalizePath(path).split("/").pop() || path;
+    }
+
+    function setFile(path: string, text: string) {
+      files.set(normalizePath(path), {
+        text,
+        hash: hash(text),
+        modified: new Date(0).toISOString(),
+      });
+    }
+
+    function readMockFile(path: string) {
+      const normalized = normalizePath(path);
+      const file = files.get(normalized);
+      if (!file) throw new Error(`Mock file not found: ${normalized}`);
+      return { path: normalized, ...file };
+    }
+
+    setFile(
+      "/workspace/market.md",
+      [
+        "---",
+        "title: Market Entry Report",
+        "status: draft",
+        "---",
+        "",
+        "# Market Entry Report",
+        "",
+        "Original saved content.",
+      ].join("\n"),
+    );
 
     function escapeHtml(text: string) {
       return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -145,12 +185,89 @@ async function installTauriMock(page: Page) {
       if (cmd === "plugin:event|listen") return callbackId++;
       if (cmd === "plugin:event|unlisten") return null;
       if (cmd === "plugin:window|set_title") return null;
+      if (cmd === "plugin:dialog|open") {
+        return dialogSelections.length ? dialogSelections.shift() : "/workspace/market.md";
+      }
+      if (cmd === "plugin:dialog|save") {
+        return dialogSelections.length ? dialogSelections.shift() : "/workspace/market.md";
+      }
+      if (cmd === "plugin:dialog|confirm") return true;
+      if (cmd === "read_file") {
+        return readMockFile(args.path as string);
+      }
+      if (cmd === "save_file") {
+        const request = args.request as { path: string; text: string };
+        const path = normalizePath(request.path);
+        setFile(path, request.text);
+        return readMockFile(path);
+      }
+      if (cmd === "file_metadata") {
+        const path = normalizePath(args.path as string);
+        const file = files.get(path);
+        return {
+          path,
+          exists: Boolean(file),
+          hash: file?.hash || null,
+          modified: file?.modified || null,
+        };
+      }
+      if (cmd === "rename_file") {
+        const request = args.request as { from: string; to: string };
+        const from = normalizePath(request.from);
+        const to = normalizePath(request.to);
+        const file = readMockFile(from);
+        files.delete(from);
+        setFile(to, file.text);
+        return readMockFile(to);
+      }
+      if (cmd === "duplicate_file") {
+        const request = args.request as { from: string; to: string };
+        const source = readMockFile(request.from);
+        const to = normalizePath(request.to);
+        setFile(to, source.text);
+        return readMockFile(to);
+      }
+      if (cmd === "reveal_path") {
+        revealedPaths.push(normalizePath(args.path as string));
+        return null;
+      }
       if (cmd === "compile_document_with_options") {
         const request = args.request as { text: string };
         return compileMarkdown(request.text);
       }
       if (cmd === "list_transform_engines") return [];
-      if (cmd === "list_workspace_files") return [];
+      if (cmd === "list_workspace_files") {
+        const request = args.request as { root: string };
+        const root = normalizePath(request.root).replace(/\/$/, "");
+        const folders = new Set<string>();
+        const entries = Array.from(files.keys()).flatMap((path) => {
+          if (!path.startsWith(`${root}/`)) return [];
+          const relativePath = path.slice(root.length + 1);
+          const parts = relativePath.split("/");
+          if (parts.length > 1) {
+            folders.add(parts[0]);
+          }
+          return [
+            {
+              path,
+              name: titleFromPath(path),
+              relative_path: relativePath,
+              kind: titleFromPath(path).split(".").pop() || "file",
+              depth: parts.length - 1,
+            },
+          ];
+        });
+        return [
+          ...Array.from(folders).map((folder) => ({
+            path: `${root}/${folder}`,
+            name: folder,
+            relative_path: folder,
+            kind: "directory",
+            depth: 0,
+          })),
+          ...entries,
+        ].sort((left, right) => left.relative_path.localeCompare(right.relative_path));
+      }
       if (cmd === "list_snapshots") return [];
       if (cmd === "get_git_status") return { inside_repo: false, dirty: false, summary: [] };
       if (cmd === "start_file_watcher") return { paths: [], native_watcher: false, watcher_error: null };
@@ -182,6 +299,21 @@ async function installTauriMock(page: Page) {
       return null;
     }
 
+    window.__NEDITOR_E2E__ = {
+      queueDialogSelection(path: string | null) {
+        dialogSelections.push(path);
+      },
+      getFile(path: string) {
+        return readMockFile(path).text;
+      },
+      setFile(path: string, text: string) {
+        setFile(path, text);
+      },
+      revealedPaths() {
+        return [...revealedPaths];
+      },
+    };
+
     window.__TAURI_INTERNALS__ = {
       metadata: {
         currentWindow: { label: "main" },
@@ -210,6 +342,28 @@ async function installTauriMock(page: Page) {
 
 async function editorText(page: Page) {
   return page.locator(".cm-content").innerText();
+}
+
+async function replaceEditorText(page: Page, text: string) {
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.insertText(text);
+}
+
+async function queueDialogSelection(page: Page, path: string | null) {
+  await page.evaluate((selectedPath) => window.__NEDITOR_E2E__.queueDialogSelection(selectedPath), path);
+}
+
+async function mockFileText(page: Page, path: string) {
+  return page.evaluate((selectedPath) => window.__NEDITOR_E2E__.getFile(selectedPath), path);
+}
+
+async function setMockFileText(page: Page, path: string, text: string) {
+  await page.evaluate(({ selectedPath, content }) => window.__NEDITOR_E2E__.setFile(selectedPath, content), { selectedPath: path, content: text });
+}
+
+async function revealedPaths(page: Page) {
+  return page.evaluate(() => window.__NEDITOR_E2E__.revealedPaths());
 }
 
 test.beforeEach(async ({ page }) => {
@@ -248,6 +402,51 @@ test("runs command palette insertion and table editor workflows", async ({ page 
 
   await expect.poll(() => editorText(page)).toContain("Table: Workflow budget");
   await expect.poll(() => editorText(page)).toContain("Total");
+});
+
+test("opens, saves, duplicates, renames, reveals, and reverts mocked files", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open" }).click();
+
+  await expect.poll(() => editorText(page)).toContain("Original saved content.");
+  await expect(page.getByText("/workspace")).toBeVisible();
+  await expect(page.getByRole("button", { name: /market\.md/ }).first()).toBeVisible();
+
+  await replaceEditorText(
+    page,
+    [
+      "---",
+      "title: Market Entry Report",
+      "status: draft",
+      "---",
+      "",
+      "# Market Entry Report",
+      "",
+      "Saved from browser workflow.",
+    ].join("\n"),
+  );
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("Saved from browser workflow.");
+
+  await queueDialogSelection(page, "/workspace/market copy.md");
+  await page.getByRole("button", { name: "Duplicate" }).click();
+  await expect(page.getByRole("button", { name: /market copy\.md/ })).toBeVisible();
+  await expect.poll(() => mockFileText(page, "/workspace/market copy.md")).toContain("Saved from browser workflow.");
+
+  await queueDialogSelection(page, "/workspace/renamed.md");
+  await page.getByRole("button", { name: "Rename" }).click();
+  await expect(page.getByRole("button", { name: /renamed\.md/ })).toBeVisible();
+
+  await page.getByLabel("Pin document").click();
+  await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /renamed\.md/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "Reveal" }).click();
+  await expect.poll(() => revealedPaths(page)).toContain("/workspace/renamed.md");
+
+  await setMockFileText(page, "/workspace/renamed.md", "# Renamed\n\nDisk version after rename.");
+  await replaceEditorText(page, "# Renamed\n\nLocal unsaved edit.");
+  await page.getByRole("button", { name: "Revert" }).click();
+  await expect.poll(() => editorText(page)).toContain("Disk version after rename.");
 });
 
 test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {

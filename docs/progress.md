@@ -97,8 +97,9 @@ Implemented or substantially present, pending the conservative caveats in
 - Frontend unit coverage for table logic and conflict diff alignment.
 - Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering view mode switching, command palette table insertion, table editor
-  insertion, advanced table paste/sort/formula/merge/apply behavior, AI paste
-  cleanup insertion, and export readiness.
+  insertion, mocked file lifecycle operations, advanced table
+  paste/sort/formula/merge/apply behavior, AI paste cleanup insertion, and
+  export readiness.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -114,9 +115,10 @@ P0 gaps:
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with five Chromium tests,
-  including advanced table paste/sort/formula/merge/apply behavior, but
-  coverage remains incomplete and local sandbox execution still fails before
+- Browser-level workflow tests pass in Linux CI with five Chromium tests, and
+  the local Playwright list now includes a sixth mocked file lifecycle test.
+  Linux CI still needs to prove the new sixth test after this slice is pushed.
+  Coverage remains incomplete and local sandbox execution still fails before
   app assertions because Chromium cannot register its Mach bootstrap port.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
@@ -215,6 +217,9 @@ Current CI follow-up:
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding the advanced table browser workflow. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding the advanced table browser workflow. |
 | `gh run watch 26134248308 --exit-status` | Pass | For `443515b`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser workflow tests ran through Chromium installation and `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
+| `pnpm exec playwright test --list` | Pass | Listed 6 Chromium browser workflow tests, including the new mocked file open/save/duplicate/rename/pin/reveal/revert flow. |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding the mocked file lifecycle browser workflow. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding the mocked file lifecycle browser workflow. |
 
 Relevant CI fixes already landed:
 
@@ -267,9 +272,9 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Expand browser coverage for file operations, workspace restore, conflicts,
-   preview navigation, scroll sync, transform settings, export progress, and
-   the remaining AI/table modes.
+1. Expand browser coverage for workspace restore, conflicts, preview
+   navigation, scroll sync, transform settings, export progress, and the
+   remaining AI/table modes.
 2. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
 3. Use failures from workflow tests to drive implementation fixes.

@@ -64,8 +64,8 @@ is not "Complete".
 | 6.4 Preview | Live debounced preview | Partial | Store compile on editor update; debounce in `src/App.vue` | Large-document behavior and timing tests. |
 | 6.4 Preview | Scroll sync and heading click-to-source | Partial | Preview/editor scroll handlers; click handler | Browser tests. |
 | 6.4 Preview | Separate preview theme, inline warnings, transform blocks, export preview | Partial | Preview theme setting; diagnostics; transform rendering; modes | UI verification and visual tests. |
-| 6.5 File Operations | New, open file, open folder, save, save as, revert, rename, duplicate, reveal | Partial | Store actions and Rust file commands; file command tests | Dialog and desktop workflow tests. |
-| 6.5 File Operations | Recent docs/folders, workspace restore | Partial | Persisted workspace store | Restart workflow test. |
+| 6.5 File Operations | New, open file, open folder, save, save as, revert, rename, duplicate, reveal | Partial | Store actions and Rust file commands; file command tests; Playwright mocked file lifecycle covers open/save/duplicate/rename/pin/reveal/revert | Explicit save-as workflow and native desktop dialog workflow tests. |
+| 6.5 File Operations | Recent docs/folders, workspace restore | Partial | Persisted workspace store; Playwright mocked file lifecycle covers workspace listing after open | Recently closed and restart restore workflow tests. |
 | 6.5 File Operations | External change detection/conflict handling | Partial | Watch/conflict code and tests | Full UI workflow proof. |
 
 ## Compiler And Document Model
@@ -197,10 +197,10 @@ Current major verification gaps:
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26134248308` and now
-  lists 5 Chromium tests locally, including advanced table editor coverage.
-  Local sandbox execution is still blocked at Chromium launch before app
-  assertions.
+- Browser-level workflow harness passes in Linux CI run `26134248308`; the
+  local Playwright list now includes 6 Chromium tests, including advanced table
+  editor coverage and mocked file lifecycle coverage. Local sandbox execution
+  is still blocked at Chromium launch before app assertions.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, and the desktop CI matrix
   is currently green, but desktop user journeys are still not covered by a

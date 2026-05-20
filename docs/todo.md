@@ -257,6 +257,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Split, preview, and source view mode switching.
 - Command palette table snippet insertion.
 - Table editor insertion.
+- Mocked file lifecycle workflow: open, edit, save, duplicate, rename, pin,
+  reveal, workspace listing, and revert against an in-memory Tauri file/dialog
+  mock.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, and apply-back-to-editor behavior.
 - AI paste cleanup preview and insertion.
@@ -264,9 +267,11 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 
 Required next coverage:
 
-- Open, edit, save, save-as, revert, rename, duplicate, and reveal flows.
-- Workspace folder browsing, tab activation, pinning, recently closed reopen,
-  and workspace restore.
+- Remaining file/workspace flows: explicit save-as behavior, tab activation,
+  recently closed reopen, missing-file restore, moved/deleted-file restore,
+  restart workspace restore, unsaved-document close behavior, and stale-save
+  conflict races.
+- Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
 - Preview heading click-to-source and synchronized scrolling.
 - Command palette search, keybindings, heading commands, citation commands,
@@ -727,9 +732,9 @@ Completion criteria:
 
 ## Recommended Execution Order
 
-1. Expand browser workflow coverage for file operations, workspace restore,
-   conflicts, preview navigation/scroll sync, transform settings, export
-   progress, and remaining AI/table modes.
+1. Expand browser workflow coverage for workspace restore, conflicts, preview
+   navigation/scroll sync, transform settings, export progress, and remaining
+   AI/table modes.
 2. Add desktop WebDriver/Tauri smoke tests.
 3. Use workflow failures to close real implementation gaps.
 4. Audit export artifacts and add conformance fixtures.
