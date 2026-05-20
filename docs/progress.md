@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `1ac72c1 Preserve
-  reload status after watcher refresh`
+- Latest inspected committed baseline before this update: `bf60405
+  Disambiguate tab workflow rename command`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -100,6 +100,11 @@ Recent pushed checkpoints visible in current git history:
 - `1f7c576` let PDF text flow beside figure floats.
 - `d20cfde` shared fenced-code detection across compiler scanners.
 - `a712da9` kept headings and references out of fenced examples.
+- `3a3e009`, `5a13fe2`, and `7b549c0` restored workspace scroll positions,
+  warned clearly about missing restored files, and recorded the green CI proof.
+- `44c49f5`, `3fe0c78`, `39a3286`, and `bf60405` added and stabilized browser
+  workflow proof for tab activation, dirty-close confirmation, renamed recent
+  cleanup, and deleted recently-closed pruning.
 
 ## Current Capability Snapshot
 
@@ -135,7 +140,9 @@ Implemented or substantially present, pending the conservative caveats in
   recovery, watcher-originated root reload/conflict behavior, AI paste cleanup
   insertion plus quote/appendix/replace-document/section/selection modes,
   clean included-file recompile, dirty included-file conflict handling, and
-  export readiness.
+  export readiness, restart-style workspace restore, restored scroll position
+  handling, missing restored-file warnings, tab activation, dirty-close
+  confirmation, renamed recent cleanup, and deleted recently-closed pruning.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -146,13 +153,13 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed code CI for commit `655d65c` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26147556750`.
+- Latest pushed code CI for commit `bf60405` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26151184228`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 21 Chromium tests in
-  run `26148828614`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 22 Chromium tests in
+  run `26151184228`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
   root-file conflicts, advanced table structure/format/cancel coverage, and AI
@@ -163,10 +170,8 @@ P0 gaps:
   files, scroll-position restore, and missing-restored-file warning coverage.
   Local focused Playwright execution remains blocked by the missing
   workspace-local Chromium headless shell.
-- Local browser workflow discovery now lists 22 Chromium tests after adding
-  tab activation, dirty close confirmation, renamed recent cleanup, and deleted
-  recently-closed pruning coverage. Pushed CI evidence is pending for this
-  slice.
+- The same green browser run now also covers tab activation, dirty close
+  confirmation, renamed recent cleanup, and deleted recently-closed pruning.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -291,6 +296,18 @@ Additional tab and stale-recent workflow verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "switches tabs" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
 | `pnpm exec playwright install chromium` | Interrupted | The install attempt produced no output for several minutes, so the hung process tree was terminated and CI remains the browser execution source of truth. |
 | `git diff --check` | Pass | No whitespace errors after adding tab and stale-recent coverage. |
+| `gh run view 26150151349 --json status,conclusion,headSha,jobs` | Superseded failure | Commit `44c49f5` ran 20 passing browser workflows before the new tab/stale-recent test exposed title and dirty-close mock assumptions. |
+| `gh run view 26150581320 --job 76916713881 --log` | Superseded failure diagnosed | Commit `3fe0c78` still failed because the Tauri dialog mock handled `plugin:dialog\|confirm`, while installed `@tauri-apps/plugin-dialog` implements `confirm()` through `plugin:dialog\|message`. |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after correcting the dialog mock and new-document tab-count assertions. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after correcting the dialog mock and new-document tab-count assertions. |
+| `pnpm exec playwright test --list` | Pass | Still listed 22 Chromium workflow tests after the dialog mock correction. |
+| `git diff --check` | Pass | No whitespace errors after the dialog mock correction. |
+| `gh run view 26151007765 --job 76918155717 --log` | Superseded failure diagnosed | Commit `39a3286` ran 21 passing browser workflows; the remaining failure was a broad `Rename` locator matching the `Rename Source` tab and file row. |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after disambiguating the rename command locator. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after disambiguating the rename command locator. |
+| `pnpm exec playwright test --list` | Pass | Listed the same 22 Chromium workflow tests after the exact rename locator fix. |
+| `git diff --check` | Pass | No whitespace errors after the exact rename locator fix. |
+| `gh run watch 26151184228 --exit-status` | Pass | Commit `bf60405` passed 22 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
 
 Current CI evidence log:
 

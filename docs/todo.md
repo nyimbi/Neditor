@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `1ac72c1`
+  `bf60405`
 
 Status vocabulary:
 
@@ -76,22 +76,22 @@ modules after behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `c0cefd1 Stabilize included-file watcher proof`
+- `bf60405 Disambiguate tab workflow rename command`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26145509141` on commit `c0cefd1`
+- Run `26151184228` on commit `bf60405`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26145509141`:
+CI evidence from run `26151184228`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 19 Chromium workflow tests, including advanced table paste import,
+  includes 22 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, row/column structure editing, column format totals,
   cancel-without-applying behavior, AI paste insert/quote/appendix/replace
@@ -103,7 +103,10 @@ CI evidence from run `26145509141`:
   original file, keeping local editor edits while leaving the external disk edit
   untouched, accepting external disk content into the active document, clean
   watcher-originated reload, watcher-originated dirty root-file conflicts,
-  clean included-file recompile, and dirty included-file conflicts.
+  clean included-file recompile, dirty included-file conflicts, restart-style
+  workspace restore, restored scroll positions, missing restored-file warnings,
+  tab activation, dirty close confirmation, renamed recent cleanup, and deleted
+  recently-closed pruning.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -205,6 +208,21 @@ Recent local verification evidence from this buildout:
   executable is missing from the Playwright cache.
 - `pnpm exec playwright install chromium`: interrupted after producing no
   output for several minutes; the hung process tree was terminated.
+- `gh run view 26150581320 --job 76916713881 --log`: diagnosed the pushed
+  tab/stale-recent workflow failure; the Tauri dialog mock handled
+  `plugin:dialog|confirm`, while installed `@tauri-apps/plugin-dialog`
+  implements `confirm()` through `plugin:dialog|message`.
+- `pnpm run test:unit`, `pnpm run build`, `pnpm exec playwright test --list`,
+  and `git diff --check`: passed after correcting the dialog mock and
+  new-document dirty-close assertions.
+- `gh run view 26151007765 --job 76918155717 --log`: diagnosed the follow-up
+  browser failure; 21 workflow tests passed and the remaining issue was an
+  ambiguous `Rename` locator.
+- `pnpm run test:unit`, `pnpm run build`, `pnpm exec playwright test --list`,
+  and `git diff --check`: passed after disambiguating the rename command
+  locator.
+- `gh run watch 26151184228 --exit-status`: passed on commit `bf60405` across
+  22 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -405,6 +423,11 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - Included-file watcher workflow: clean master documents recompile when an
   included file changes, and dirty master documents open the non-destructive
   included-file compare flow before accepting the updated include.
+- Workspace restore workflow: restart-style restore of open tabs, active tab,
+  pinned state, mode/sidebar state, workspace root, recent files, restored
+  scroll positions, and clear warnings for missing restored files.
+- Tab/recent workflow: tab activation, dirty close confirmation, renamed recent
+  cleanup, and deleted recently-closed pruning.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -592,8 +615,9 @@ Finish:
   before save. Browser CI run `26139678118` covers the stale-save conflict path
   through compare, save-copy preservation, merge-back recovery, keep-local, and
   accept-external.
-- Multi-tab watcher switching.
-- Stale watcher cleanup when tabs close or paths move.
+- Multi-tab watcher switching beyond the current tab-activation proof.
+- Stale watcher cleanup when tabs close or paths move beyond current
+  recent-path cleanup coverage.
 - Include graph changes after editing include directives.
 
 ### 9. Workspace, Tabs, And Document Sets
@@ -610,8 +634,7 @@ Finish:
   pinned state. Browser CI run `26147556750` covers this workflow.
 - Scroll position restore. Browser CI run `26148828614` covers this workflow.
 - Recently closed behavior for renamed and deleted files, plus dirty unsaved
-  close confirmation. Local Playwright discovery covers this workflow; pushed
-  CI evidence is pending for this slice.
+  close confirmation. Browser CI run `26151184228` covers this workflow.
 - Externally moved recently-closed file behavior.
 - Clear UX for missing documents during restore. Browser CI run `26148828614`
   covers this workflow.
