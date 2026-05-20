@@ -427,7 +427,7 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await page.getByRole("button", { name: "Rename" }).click();
   await expect.poll(() => activeFileRowText(page)).toContain("renamed.md");
 
-  await page.getByLabel("Pin document").click();
+  await page.locator(".document-tabs .tab.active").getByLabel("Pin document").click();
   await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /renamed\.md/ })).toBeVisible();
 
   await page.getByRole("button", { name: "Reveal" }).click();
