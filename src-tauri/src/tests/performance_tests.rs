@@ -81,3 +81,110 @@ fn compiler_stress_handles_large_documents_with_many_artifacts() {
 
     fs::remove_dir_all(root).expect("clean stress test dir");
 }
+
+#[test]
+fn repeated_export_loop_keeps_large_artifacts_stable() {
+    let mut text = String::from(
+        "---\ntitle: Loop Export Stress\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\nclient: Example Holdings\ntoc: true\n---\n# Loop Export Stress\n\nPrepared for {{client}}.\n\n[TOC]\n\n",
+    );
+    text.push_str("```calc\n");
+    for index in 0..90 {
+        text.push_str(&format!("loop_metric_{index} = {index} + 10\n"));
+    }
+    text.push_str("loop_total = SUM(loop_metric_1, loop_metric_2, loop_metric_3)\n```\n\n");
+
+    for index in 0..50 {
+        text.push_str(&format!(
+            "## Export Section {index}\n\nParagraph {index} with enough body text to exercise layout and repeated export rendering across targets.\n\nTable: Export metrics {index} {{#tbl:export-{index}}}\n| Metric | Value |\n| --- | ---: |\n| Revenue | {} |\n| Cost | {} |\n| Margin | =SUM(B1:B2) |\n\n```csv caption=\"Loop data {index}\" audited\nRegion,Revenue\nNorth,{}\nSouth,{}\n```\n\n",
+            500 + index,
+            200 + index,
+            75 + index,
+            25 + index
+        ));
+    }
+
+    let response = compile_with_options(
+        CompileRequest {
+            text,
+            file_path: None,
+        },
+        &json!({ "includeSyntaxHighlighting": true }),
+    );
+    let options = json!({
+        "includeSyntaxHighlighting": true,
+        "includeManifest": true,
+        "includeCoverPage": true,
+        "includePageNumbers": true,
+        "includeToc": true,
+        "includeCommentsAppendix": true,
+        "includeAiProvenanceAppendix": true,
+        "includeGlossaryAppendix": true,
+        "includeAgenda": true,
+        "watermark": "CONFIDENTIAL"
+    });
+
+    assert!(response.semantic.headings.len() >= 50);
+    assert!(response.semantic.tables >= 50);
+    assert!(response.formula_graph.len() >= 90);
+    assert!(response.transform_artifacts.len() >= 50);
+
+    let mut previous_lengths: Option<[usize; 5]> = None;
+    let started_at = Instant::now();
+    for iteration in 0..3 {
+        let html = render_full_html(&response, &options);
+        let pdf = render_pdf_bytes(&response, &options);
+        let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+        let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+        let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+            .expect("markdown bundle bytes");
+
+        assert!(html.contains("Loop Export Stress"));
+        assert!(html.contains("Export Section 49"));
+        assert!(pdf.starts_with(b"%PDF-1.4"));
+        let pdf_text = String::from_utf8_lossy(&pdf).into_owned();
+        assert!(pdf_text.contains("Loop Export Stress"));
+        assert!(zip_has_entry(&docx, "word/document.xml"));
+        let docx_document = zip_entry_text(&docx, "word/document.xml");
+        assert!(docx_document.contains("Loop Export Stress"));
+        assert!(zip_has_entry(&pptx, "ppt/presentation.xml"));
+        let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+        assert!(pptx_slides.contains("Export Section 49"));
+        assert!(zip_has_entry(&bundle, "document.md"));
+        assert!(zip_has_entry(&bundle, "manifest.json"));
+        assert!(zip_has_entry(&bundle, "transform-artifacts.json"));
+        let bundled_document = zip_entry_text(&bundle, "document.md");
+        assert!(bundled_document.contains("Loop Export Stress"));
+        assert!(zip_entry_text(&bundle, "transform-artifacts.json").contains("Loop data 49"));
+
+        let lengths = [html.len(), pdf.len(), docx.len(), pptx.len(), bundle.len()];
+        for (target, length) in ["html", "pdf", "docx", "pptx", "bundle"]
+            .iter()
+            .zip(lengths)
+        {
+            assert!(
+                length > 1024,
+                "{target} artifact was unexpectedly small on iteration {iteration}: {length}"
+            );
+        }
+        if let Some(previous) = previous_lengths {
+            for ((target, length), previous_length) in ["html", "pdf", "docx", "pptx", "bundle"]
+                .iter()
+                .zip(lengths)
+                .zip(previous)
+            {
+                let delta = length.abs_diff(previous_length);
+                assert!(
+                    delta <= 512,
+                    "{target} artifact size changed by {delta} bytes on iteration {iteration}"
+                );
+            }
+        }
+        previous_lengths = Some(lengths);
+    }
+    let elapsed = started_at.elapsed();
+
+    assert!(
+        elapsed.as_secs() < 20,
+        "repeated export loop took {elapsed:?}"
+    );
+}

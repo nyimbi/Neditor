@@ -80,7 +80,7 @@ behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `1293320 Preserve Git export warnings in manifests`
+- `f6b3ea3 Stress large document compilation`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -95,11 +95,15 @@ Most recent local verification evidence:
 - `cargo check --locked --features native-watch`: passed in `src-tauri`.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed in
   `src-tauri`.
-- `cargo test --locked`: passed locally with 136 Rust tests.
+- `cargo test --locked`: passed locally with 137 Rust tests.
 - `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib`:
   passed and stress-compiles a large Markdown source with nested includes, 80
   tables, 80 CSV transform artifacts, 120 formula definitions, many source-map
   entries, and many broken link/media diagnostics.
+- `cargo test --locked repeated_export_loop_keeps_large_artifacts_stable --lib`:
+  passed and repeatedly renders a large compiled document through HTML, PDF,
+  DOCX, PPTX, and Markdown bundle outputs with structural and artifact-size
+  assertions.
 - `cargo test --locked export_command_tests --lib`: passed 12 export command
   tests, including direct-export dirty-Git warnings copied into response and
   sidecar manifests.
@@ -1017,8 +1021,8 @@ Finish:
 
 ### 17. Performance And Large Documents
 
-Status: initial compiler stress evidence exists; broader performance proof
-remains open.
+Status: compiler and repeated export-loop stress evidence exists; broader
+performance proof remains open.
 
 Current evidence:
 
@@ -1026,11 +1030,15 @@ Current evidence:
   stress-compiles a large Markdown document with nested includes, many tables,
   formulas, native transform artifacts, source-map entries, and broken
   link/media diagnostics.
+- `performance_tests::repeated_export_loop_keeps_large_artifacts_stable`
+  repeatedly renders a large compiled document through HTML, PDF, DOCX, PPTX,
+  and Markdown bundle outputs, asserting target structure, meaningful content,
+  non-trivial artifact sizes, and bounded size drift across three export loops.
 
 Finish:
 
-- Benchmarks or deeper stress tests for repeated editing sessions, export
-  loops, memory growth, and UI debounce timing.
+- Benchmarks or deeper stress tests for repeated editing sessions, memory
+  growth, transform-cache reuse, and UI debounce timing.
 - Debounce and cancellation behavior for compile/preview updates.
 - Progress reporting for expensive transforms and exports.
 - Cache behavior for repeated transform execution.
