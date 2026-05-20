@@ -732,6 +732,48 @@ test("edits pasted tables with sorting, formulas, and merged cells", async ({ pa
   await expect.poll(() => editorText(page)).toContain("=AVG(C1:C2)");
 });
 
+test("edits table structure with formats and cancels draft changes", async ({ page }) => {
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert table");
+  await page.getByRole("button", { name: "Insert table Snippet" }).click();
+  await expect.poll(() => editorText(page)).toContain("| Revenue | 125000 |");
+
+  await page.getByLabel("Sidebar panel").selectOption("tables");
+  const markdownPreview = page.getByLabel("Markdown preview");
+  await expect(page.getByLabel("Value, row 1, column B")).toHaveValue("125000");
+
+  await page.getByLabel("Column B format").selectOption("currency");
+  await expect(page.locator(".table-editor-grid output").nth(1)).toHaveText("$125000");
+
+  await page.getByRole("button", { name: "Add row" }).click();
+  await page.getByLabel("Item, row 2, column A").fill("Cost");
+  await page.getByLabel("Value, row 2, column B").fill("74000");
+  await expect(markdownPreview).toHaveValue(/Cost\s+\|\s+74000/);
+
+  await page.getByRole("button", { name: "Remove row 2" }).click();
+  await expect(markdownPreview).not.toHaveValue(/Cost/);
+
+  await page.getByRole("button", { name: "Add column" }).click();
+  await page.getByLabel("Column C header").fill("Margin");
+  await page.getByLabel("Margin, row 1, column C").fill("0.42");
+  await expect(markdownPreview).toHaveValue(/Margin/);
+  await expect(markdownPreview).toHaveValue(/0\.42/);
+
+  await page.getByRole("button", { name: "Remove column C" }).click();
+  await expect(markdownPreview).not.toHaveValue(/Margin/);
+
+  await page.getByLabel("Value, row 1, column B").fill("999");
+  await expect(markdownPreview).toHaveValue(/999/);
+  await page.getByRole("button", { name: "Cancel table edit" }).click();
+  await expect(page.getByLabel("Value, row 1, column B")).toHaveValue("125000");
+  await expect.poll(() => editorText(page)).not.toContain("999");
+
+  await page.getByLabel("Value, row 1, column B").fill("250000");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect.poll(() => editorText(page)).toContain("| Revenue | 250000 |");
+  await expect.poll(() => editorText(page)).not.toContain("| Revenue | 125000 |");
+});
+
 test("previews and inserts cleaned AI paste through the modal", async ({ page }) => {
   await page.getByRole("button", { name: "AI Paste" }).click();
   await page.getByRole("textbox", { name: "Original" }).fill("Assistant: Revenue grew 24%.");

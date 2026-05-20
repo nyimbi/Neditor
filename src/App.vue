@@ -186,6 +186,7 @@
           <template v-if="tableDraft">
             <div class="table-actions">
               <button type="button" :disabled="tableDraftHasErrors" @click="applyTableDraft">{{ isNewTableDraft ? "Insert table" : "Apply" }}</button>
+              <button type="button" @click="cancelTableDraft">Cancel table edit</button>
               <button type="button" @click="addTableRow">Add row</button>
               <button type="button" @click="addTableColumn">Add column</button>
               <button type="button" @click="addTableTotalsRow">Add totals row</button>
@@ -277,14 +278,24 @@
               />
               <span></span>
               <span>Align</span>
-              <select v-for="(_, columnIndex) in tableDraft.headers" :key="`align-${columnIndex}`" v-model="tableDraft.alignments[columnIndex]">
+              <select
+                v-for="(_, columnIndex) in tableDraft.headers"
+                :key="`align-${columnIndex}`"
+                v-model="tableDraft.alignments[columnIndex]"
+                :aria-label="`Column ${spreadsheetColumnName(columnIndex + 1)} alignment`"
+              >
                 <option value="left">Left</option>
                 <option value="center">Center</option>
                 <option value="right">Right</option>
               </select>
               <span></span>
               <span>Format</span>
-              <select v-for="(_, columnIndex) in tableDraft.headers" :key="`format-${columnIndex}`" v-model="tableDraft.formats[columnIndex]">
+              <select
+                v-for="(_, columnIndex) in tableDraft.headers"
+                :key="`format-${columnIndex}`"
+                v-model="tableDraft.formats[columnIndex]"
+                :aria-label="`Column ${spreadsheetColumnName(columnIndex + 1)} format`"
+              >
                 <option value="text">Text</option>
                 <option value="number">Number</option>
                 <option value="currency">Currency</option>
@@ -294,16 +305,16 @@
               <span></span>
               <span>Sort</span>
               <span v-for="(_, columnIndex) in tableDraft.headers" :key="`sort-${columnIndex}`" class="column-actions">
-                <button type="button" @click="sortTableRows(columnIndex, 'asc')">Asc</button>
-                <button type="button" @click="sortTableRows(columnIndex, 'desc')">Desc</button>
+                <button type="button" :aria-label="`Sort column ${spreadsheetColumnName(columnIndex + 1)} ascending`" @click="sortTableRows(columnIndex, 'asc')">Asc</button>
+                <button type="button" :aria-label="`Sort column ${spreadsheetColumnName(columnIndex + 1)} descending`" @click="sortTableRows(columnIndex, 'desc')">Desc</button>
               </span>
               <span></span>
               <template v-for="(row, rowIndex) in tableDraft.rows" :key="`row-${rowIndex}`">
                 <span class="row-actions">
-                  <button type="button" :disabled="rowIndex === 0" @click="moveTableRow(rowIndex, -1)">Up</button>
-                  <button type="button" :disabled="rowIndex === tableDraft.rows.length - 1" @click="moveTableRow(rowIndex, 1)">Down</button>
-                  <button type="button" @click="duplicateTableRow(rowIndex)">Copy</button>
-                  <button type="button" @click="removeTableRow(rowIndex)">Remove</button>
+                  <button type="button" :disabled="rowIndex === 0" :aria-label="`Move row ${rowIndex + 1} up`" @click="moveTableRow(rowIndex, -1)">Up</button>
+                  <button type="button" :disabled="rowIndex === tableDraft.rows.length - 1" :aria-label="`Move row ${rowIndex + 1} down`" @click="moveTableRow(rowIndex, 1)">Down</button>
+                  <button type="button" :aria-label="`Copy row ${rowIndex + 1}`" @click="duplicateTableRow(rowIndex)">Copy</button>
+                  <button type="button" :aria-label="`Remove row ${rowIndex + 1}`" @click="removeTableRow(rowIndex)">Remove</button>
                 </span>
                 <input
                   v-for="(_, columnIndex) in tableDraft.headers"
@@ -321,17 +332,29 @@
               <span></span>
               <span>Move column</span>
               <span v-for="(_, columnIndex) in tableDraft.headers" :key="`move-col-${columnIndex}`" class="column-actions">
-                <button type="button" :disabled="columnIndex === 0" @click="moveTableColumn(columnIndex, -1)">Left</button>
-                <button type="button" :disabled="columnIndex === tableDraft.headers.length - 1" @click="moveTableColumn(columnIndex, 1)">Right</button>
+                <button type="button" :disabled="columnIndex === 0" :aria-label="`Move column ${spreadsheetColumnName(columnIndex + 1)} left`" @click="moveTableColumn(columnIndex, -1)">Left</button>
+                <button type="button" :disabled="columnIndex === tableDraft.headers.length - 1" :aria-label="`Move column ${spreadsheetColumnName(columnIndex + 1)} right`" @click="moveTableColumn(columnIndex, 1)">Right</button>
               </span>
               <span></span>
               <span>Duplicate column</span>
-              <button v-for="(_, columnIndex) in tableDraft.headers" :key="`duplicate-col-${columnIndex}`" type="button" @click="duplicateTableColumn(columnIndex)">
+              <button
+                v-for="(_, columnIndex) in tableDraft.headers"
+                :key="`duplicate-col-${columnIndex}`"
+                type="button"
+                :aria-label="`Copy column ${spreadsheetColumnName(columnIndex + 1)}`"
+                @click="duplicateTableColumn(columnIndex)"
+              >
                 Copy
               </button>
               <span></span>
               <span>Remove column</span>
-              <button v-for="(_, columnIndex) in tableDraft.headers" :key="`remove-col-${columnIndex}`" type="button" @click="removeTableColumn(columnIndex)">
+              <button
+                v-for="(_, columnIndex) in tableDraft.headers"
+                :key="`remove-col-${columnIndex}`"
+                type="button"
+                :aria-label="`Remove column ${spreadsheetColumnName(columnIndex + 1)}`"
+                @click="removeTableColumn(columnIndex)"
+              >
                 Remove
               </button>
               <span></span>
@@ -2803,6 +2826,18 @@ function applyTableDraft() {
   }
   isNewTableDraft.value = false;
   tableDraft.value = normalizedDraft;
+}
+
+function cancelTableDraft() {
+  if (isNewTableDraft.value) {
+    tableDraft.value = null;
+    isNewTableDraft.value = false;
+    if (selectedTable.value) loadSelectedTable();
+    store.statusMessage = "Cancelled new table";
+    return;
+  }
+  loadSelectedTable();
+  store.statusMessage = "Discarded table draft changes";
 }
 
 function insertTableAtCursor(lines: string[]) {

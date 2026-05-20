@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `4eb1d2c`
+  `1ac72c1`
 
 Status vocabulary:
 
@@ -76,30 +76,31 @@ modules after behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `4eb1d2c Prove conflict keep and accept actions`
+- `1ac72c1 Preserve reload status after watcher refresh`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26139678118` on commit `4eb1d2c`
+- Run `26140882880` on commit `1ac72c1`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26139678118`:
+CI evidence from run `26140882880`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
-  includes 11 Chromium workflow tests, including advanced table paste import,
+  includes 13 Chromium workflow tests, including advanced table paste import,
   numeric sorting, formula rows, merged-cell metadata, apply-back-to-editor
   behavior, the mocked file lifecycle flow, save-as to a new path, and reopening
   that saved document from the recently closed list. It also now covers
   stale-save conflict blocking, conflict compare visibility, saving unsaved
   local edits to a copy without overwriting the disk edit, merging external
   conflict text back into the original file, keeping local editor edits while
-  leaving the external disk edit untouched, and accepting external disk content
-  into the active document.
+  leaving the external disk edit untouched, accepting external disk content
+  into the active document, clean watcher-originated reload, and
+  watcher-originated dirty root-file conflicts.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -122,6 +123,16 @@ Recent local verification evidence from this buildout:
 - `pnpm tauri build --no-bundle`: passed locally.
 - `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test --list`: listed the
   current browser tests.
+- `pnpm run test:unit`: passed after table-draft cancellation and accessible
+  row/column controls.
+- `pnpm run build`: passed after table-draft cancellation and accessible
+  row/column controls.
+- `pnpm exec playwright test --list`: listed 14 Chromium workflow tests after
+  adding table structure/format/cancel coverage.
+- `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test e2e/app-workflows.spec.ts
+  --grep "edits table structure" --project chromium`: blocked locally by the
+  macOS Chromium Mach bootstrap permission failure before app assertions;
+  escalated local browser execution was rejected by the approval reviewer.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
 - `cargo test --locked file_command_tests --lib`: passed after slash-normalized
@@ -317,8 +328,11 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   overwriting the disk edit, merge external conflict text back into the original
   file, keep local editor edits while leaving the external disk edit untouched,
   and accept external disk content into the active document.
+- Watcher-originated root-file workflow: clean documents reload external edits
+  automatically, while dirty documents open the non-destructive compare flow.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
-  merged-cell metadata, and apply-back-to-editor behavior.
+  merged-cell metadata, row and column add/remove behavior, column format
+  totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
 - AI paste cleanup preview and insertion.
 - Export readiness status.
 
@@ -326,18 +340,18 @@ Required next coverage:
 
 - Remaining file/workspace flows: tab activation, missing-file restore,
   moved/deleted-file restore, restart workspace restore, unsaved-document close
-  behavior, clean external reload, watcher-originated dirty conflicts, included
-  file conflicts, multi-tab watcher switching, and native desktop dialog
+  behavior, included file conflicts, multi-tab watcher switching, and native
+  desktop dialog
   behavior.
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation modes.
 - Preview heading click-to-source and synchronized scrolling.
 - Command palette search, keybindings, heading commands, citation commands,
   glossary/index commands, and navigation commands.
-- Remaining table editor flows: add/remove rows and columns, column formats,
-  cancel behavior, and export fixture proof for edited tables.
-- External conflict modal: watcher-originated dirty conflicts, included-file
-  conflict behavior, and more granular line-compose controls.
+- Remaining table editor flows: non-sandboxed browser execution and export
+  fixture proof for edited tables.
+- External conflict modal: included-file conflict behavior and more granular
+  line-compose controls.
 - AI paste cleanup modes: quote, appendix, replace selection, merge into
   current section, replace document, provenance, citation TODOs, clipboard, and
   review-state flows.
@@ -488,13 +502,16 @@ Finish:
 ### 8. File Watcher And Conflict Workflows
 
 Status: backend and UI exist; stale-save conflict copy/merge/keep-local/
-accept-external workflow proof is present in browser CI, but watcher-originated
-flows are still missing.
+accept-external workflow proof is present in browser CI. Clean watcher reload
+and watcher-originated dirty root-file conflict proof are also present in
+browser CI; included-file watcher flows are still missing.
 
 Finish:
 
-- Clean external reload for unchanged local documents.
-- Dirty root-file conflict through UI.
+- Clean external reload for unchanged local documents. Browser CI run
+  `26140882880` covers this for root-file changes.
+- Dirty root-file conflict through UI. Browser CI run `26140882880` covers this
+  for watcher-originated root-file changes.
 - Dirty included-file conflict and master recompilation through UI.
 - Save-race conflict when a file changes after the last watcher event but
   before save. Browser CI run `26139678118` covers the stale-save conflict path

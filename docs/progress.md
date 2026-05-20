@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `4eb1d2c Prove
-  conflict keep and accept actions`
+- Latest inspected committed baseline before this update: `1ac72c1 Preserve
+  reload status after watcher refresh`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -80,6 +80,14 @@ Recent pushed checkpoints visible in current git history:
   action buttons: keep-local preserves editor edits without overwriting the
   changed disk file, and accept-external replaces the active document with the
   external disk content.
+- `e0ac31c` added browser workflow proof for watcher-originated root-file
+  changes: clean documents reload external edits automatically and dirty
+  documents open the non-destructive compare flow.
+- `1ac72c1` preserved the clean reload status message after watcher-triggered
+  compilation, fixing the CI regression from the first watcher workflow proof.
+- This update adds table-draft cancellation, accessible table row/column
+  controls, and browser workflow coverage for column formats, add/remove row,
+  add/remove column, cancel-without-applying, and apply-back behavior.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -121,9 +129,11 @@ Implemented or substantially present, pending the conservative caveats in
 - Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering view mode switching, command palette table insertion, table editor
   insertion, mocked file lifecycle operations, advanced table
-  paste/sort/formula/merge/apply behavior, save-as plus recently closed
+  paste/sort/formula/merge/apply behavior, row/column structure editing,
+  column format totals, cancel behavior, save-as plus recently closed
   reopening, stale-save conflict copy/merge/keep-local/accept-external
-  recovery, AI paste cleanup insertion, and export readiness.
+  recovery, watcher-originated root reload/conflict behavior, AI paste cleanup
+  insertion, and export readiness.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -134,18 +144,19 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `4eb1d2c` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26139678118`.
+- Latest pushed CI for commit `1ac72c1` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26140882880`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Browser-level workflow tests pass in Linux CI with 11 Chromium tests in
-  run `26139678118`, including mocked file lifecycle coverage, save-as plus
+- Browser-level workflow tests pass in Linux CI with 13 Chromium tests in
+  run `26140882880`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, and stale-save conflict copy/merge/keep-local/
-  accept-external recovery.
-  Coverage remains incomplete, and local focused Playwright execution is blocked
-  by the missing/default macOS Playwright cache and the workspace-local Chromium
-  Mach bootstrap permission failure.
+  accept-external recovery, clean watcher reload, and watcher-originated dirty
+  root-file conflicts. This update raises local test discovery to 14 Chromium
+  tests by adding the table-structure workflow; local focused Playwright
+  execution is blocked by the workspace-local Chromium Mach bootstrap
+  permission failure.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -158,9 +169,9 @@ P1 gaps:
 - File watcher/conflict flows need UI workflow tests.
 - Workspace/tab-group behavior needs restart and document-set grouping proof.
 - Editor and preview ergonomics need browser interaction proof.
-- AI paste, citations, layout, accessibility, performance, and remaining table
-  editor/export fixture paths need workflow, artifact, or benchmark evidence
-  before they can be considered complete.
+- AI paste, citations, layout, accessibility, performance, table export
+  fixtures, and non-sandboxed table/browser execution need workflow, artifact,
+  or benchmark evidence before they can be considered complete.
 
 P2/P3 gaps:
 
@@ -201,6 +212,16 @@ Additional browser workflow harness verification:
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright install chromium` | Pass | Chromium, FFmpeg, and Chromium headless shell downloaded into Playwright's workspace-local browser cache. |
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test --list` | Pass | Listed 4 Chromium tests in `e2e/app-workflows.spec.ts`. |
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm run test:e2e` | Blocked by sandbox | Chromium launch failed before app assertions with `bootstrap_check_in ... Permission denied (1100)`. |
+
+Additional table editor workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding table-draft cancellation and accessible row/column controls. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
+| `pnpm exec playwright test --list` | Pass | Listed 14 Chromium workflow tests, including `edits table structure with formats and cancels draft changes`. |
+| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test e2e/app-workflows.spec.ts --grep "edits table structure" --project chromium` | Blocked by sandbox | Chromium launched, then failed before app assertions with `bootstrap_check_in ... Permission denied (1100)`. Escalated local browser execution was rejected by the approval reviewer. |
+| `git diff --check` | Pass | No whitespace errors in the current diff. |
 
 Current CI evidence log:
 
@@ -277,6 +298,8 @@ Current CI evidence log:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding keep-local and accept-external conflict workflows. |
 | `git diff --check` | Pass | No whitespace errors after the keep-local and accept-external conflict workflow edits. |
 | `gh run watch 26139678118 --exit-status` | Pass | For `4eb1d2c`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser CI installed Chromium and ran 11 tests through `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
+| `gh run list --branch main --limit 5 --json databaseId,headSha,status,conclusion,displayTitle,createdAt,url` | Pass | Latest pushed run for `1ac72c1` completed successfully as run `26140882880`. |
+| `gh run view 26140882880 --json jobs,conclusion,status,headSha,url` | Pass | Browser workflow tests and Ubuntu/macOS/Windows desktop builds all passed for `1ac72c1`. |
 
 Relevant CI fixes already landed:
 
