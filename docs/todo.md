@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `659426d Preserve equation captions through exports`
+- `3e0abb7 Render page-numbered TOCs in PDF exports`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -176,7 +176,10 @@ Most recent local verification evidence:
   passed and proves front matter-generated TOCs keep depth/numbering, PDF
   exports render page-numbered TOC entries, and DOCX exports emit a TOC field
   instead of leaking Markdown TOC links.
-- `cargo test --locked`: passed locally with 158 Rust tests on this Unix host.
+- `cargo test --locked compiler_reports_circular_and_too_deep_includes --lib -- --nocapture`:
+  passed and proves circular include diagnostics, include-chain graph depth, and
+  maximum include depth enforcement.
+- `cargo test --locked`: passed locally with 159 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -914,7 +917,9 @@ Readiness should validate and report:
   exists.
 - Draft/export warnings.
 - Includes and include graph. Export manifests and Markdown bundles now carry
-  include graph evidence; remaining work is UI navigation/editing proof.
+  include graph evidence, and focused compiler coverage proves missing include,
+  circular include, and maximum include depth diagnostics. Remaining work is UI
+  navigation/editing proof and unreadable-file platform coverage.
 - Broken local links and missing media. Broad readiness audit test coverage
   exists.
 - Citations, bibliography files, missing keys, duplicate keys, and style

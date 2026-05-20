@@ -596,6 +596,86 @@ fn compiler_reports_missing_include_without_panicking() {
 }
 
 #[test]
+fn compiler_reports_circular_and_too_deep_includes() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-include-guards-{unique}"));
+    let cycle_dir = root.join("cycle");
+    let depth_dir = root.join("depth");
+    fs::create_dir_all(&cycle_dir).expect("create cycle dir");
+    fs::create_dir_all(&depth_dir).expect("create depth dir");
+
+    fs::write(cycle_dir.join("a.md"), "# A\n!include b.md\n").expect("write cycle a");
+    fs::write(cycle_dir.join("b.md"), "# B\n!include a.md\n").expect("write cycle b");
+    let cycle_root = root.join("cycle-root.md");
+    fs::write(&cycle_root, "# Root\n!include cycle/a.md\n").expect("write cycle root");
+    let cycle_response = compile(CompileRequest {
+        text: fs::read_to_string(&cycle_root).expect("read cycle root"),
+        file_path: Some(path_to_string(&cycle_root)),
+    });
+
+    let cycle_diagnostic = cycle_response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message == "Circular include detected.")
+        .expect("circular include diagnostic");
+    assert_eq!(cycle_diagnostic.severity, "error");
+    assert_eq!(
+        cycle_diagnostic.source_file.as_deref(),
+        Some(path_to_string(&cycle_dir.join("b.md")).as_str())
+    );
+    assert!(cycle_diagnostic
+        .related
+        .iter()
+        .any(|related| related.contains("Include target:")));
+    assert!(cycle_response
+        .include_graph
+        .iter()
+        .any(|edge| edge.depth == 1 && edge.child.ends_with("cycle/a.md")));
+    assert!(cycle_response
+        .include_graph
+        .iter()
+        .any(|edge| edge.depth == 2 && edge.child.ends_with("cycle/b.md")));
+
+    for index in 0..18 {
+        let next = index + 1;
+        let body = if index < 17 {
+            format!("# Depth {index}\n!include include-{next:02}.md\n")
+        } else {
+            format!("# Depth {index}\n")
+        };
+        fs::write(depth_dir.join(format!("include-{index:02}.md")), body)
+            .expect("write depth include");
+    }
+    let depth_root = root.join("depth-root.md");
+    fs::write(&depth_root, "# Root\n!include depth/include-00.md\n").expect("write depth root");
+    let depth_response = compile(CompileRequest {
+        text: fs::read_to_string(&depth_root).expect("read depth root"),
+        file_path: Some(path_to_string(&depth_root)),
+    });
+
+    let depth_diagnostic = depth_response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message == "Maximum include depth exceeded.")
+        .expect("maximum include depth diagnostic");
+    assert_eq!(depth_diagnostic.severity, "error");
+    assert!(depth_diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("Reduce nested include directives")));
+    assert!(depth_response
+        .include_graph
+        .iter()
+        .any(|edge| edge.depth == 17));
+    assert!(!depth_response.compiled_markdown.contains("Depth 17"));
+
+    fs::remove_dir_all(root).expect("clean include guard test dir");
+}
+
+#[test]
 fn compiler_reports_broken_local_markdown_links() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

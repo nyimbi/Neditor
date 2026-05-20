@@ -1021,6 +1021,24 @@ Additional TOC export verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional include guard verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_reports_circular_and_too_deep_includes --lib -- --nocapture` in `src-tauri` | Pass | Focused compiler test proves circular include diagnostics, related include-target context, include graph depth entries for the resolved chain, maximum include depth enforcement, and suppression of content beyond the depth limit. |
+| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after adding include guard regression coverage. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the include guard coverage update. |
+| `cargo check --locked --features native-watch` in `src-tauri` | Pass | Native watcher feature still compiles after the include guard coverage update. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after adding circular/max-depth include guard coverage. |
+| `cargo test --locked` in `src-tauri` | Pass | 159 Rust tests passed; 0 failed. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests still passed after the backend/documentation update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the backend/documentation update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files had all local links resolve. |
+| `pnpm run check:a11y` | Pass | Vue template accessibility guardrails still passed. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
