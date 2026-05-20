@@ -803,6 +803,9 @@ Covered:
 - Basic bracket auto-pairing.
 - CodeMirror find and replace.
 - Command-palette heading navigation.
+- Explicit multi-cursor command palette actions for add-cursor-above,
+  add-cursor-below, and select-next-occurrence, with a browser harness workflow
+  that edits matching lines through multiple cursors.
 
 Finish:
 
@@ -813,8 +816,7 @@ Finish:
 - Spellcheck.
 - Word count, character count, and reading-time status.
 - Outline navigation beyond command-palette heading search.
-- Multi-cursor support classification: complete if CodeMirror default behavior
-  is acceptable and verified, otherwise deferred with rationale.
+- Multi-cursor support local browser/native execution proof.
 - Vim/emacs keybindings classification: deferred unless intentionally added.
 
 ### 11. Preview Ergonomics

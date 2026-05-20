@@ -1058,9 +1058,9 @@ import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorState, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, keymap, lineNumbers, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { addCursorAbove, addCursorBelow, defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap } from "@codemirror/search";
+import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap, selectNextOccurrence } from "@codemirror/search";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
@@ -1447,6 +1447,9 @@ const commands = computed(() => [
   { name: "Find previous", group: "Edit", run: () => runEditorCommand(findPrevious) },
   { name: "Replace next", group: "Edit", run: () => runEditorCommand(replaceNext) },
   { name: "Replace all", group: "Edit", run: () => runEditorCommand(replaceAll) },
+  { name: "Select next occurrence", group: "Edit", run: () => runEditorCommand(selectNextOccurrence) },
+  { name: "Add cursor above", group: "Edit", run: () => runEditorCommand(addCursorAbove) },
+  { name: "Add cursor below", group: "Edit", run: () => runEditorCommand(addCursorBelow) },
   { name: "Add review comment", group: "Review", run: () => (store.sidebar = "review") },
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },

@@ -895,6 +895,37 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await expect(page.locator(".cm-line").filter({ hasText: "## Command Target" })).toBeVisible();
 });
 
+test("edits with explicit multi-cursor commands", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/multi-cursor.md",
+    [
+      "---",
+      "title: Multi Cursor",
+      "status: draft",
+      "---",
+      "",
+      "# Multi Cursor",
+      "",
+      "Row A",
+      "Row B",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/multi-cursor.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const editorContent = page.locator(".cm-content");
+  await editorContent.click();
+  await page.keyboard.press("Control+End");
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Add cursor above");
+  await page.getByRole("button", { name: /Add cursor above Edit/ }).click();
+  await page.keyboard.type("!");
+
+  await expect.poll(() => editorText(page)).toContain("Row A!");
+  await expect.poll(() => editorText(page)).toContain("Row B!");
+});
+
 test("runs command palette citation glossary and index navigation", async ({ page }) => {
   await setMockFileText(
     page,
