@@ -584,6 +584,8 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 - View mode workflow: split, source, preview, focus, export preview, review,
   and presentation outline modes, including sidebar routing for export, review,
   and presentation.
+- Window title workflow: clean opened document title, dirty title marker, and
+  return to clean title after save.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.

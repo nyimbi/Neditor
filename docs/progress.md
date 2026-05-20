@@ -168,6 +168,8 @@ Recent pushed checkpoints visible in current git history:
   sidebars and hides the source pane for presentation outline mode, with
   workflow harness coverage for split, source, preview, focus, export, review,
   and presentation modes.
+- This update adds workflow harness coverage for browser window title updates
+  across clean opened files, dirty edits, and post-save clean state.
 
 ## Current Capability Snapshot
 
@@ -205,8 +207,8 @@ Implemented or substantially present, pending the conservative caveats in
 - Frontend unit coverage for table logic and conflict diff alignment.
 - Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering split/source/preview/focus/export/review/presentation view mode
-  switching, command palette table insertion, table editor insertion, mocked
-  file lifecycle operations, advanced table
+  switching, clean/dirty/saved window titles, command palette table insertion,
+  table editor insertion, mocked file lifecycle operations, advanced table
   paste/sort/formula/merge/apply behavior, row/column structure editing,
   column format totals, cancel behavior, save-as plus recently closed
   reopening, stale-save conflict copy/merge/keep-local/accept-external
