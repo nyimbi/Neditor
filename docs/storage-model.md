@@ -52,6 +52,12 @@ Snapshot metadata records:
 - Author when present.
 - Include graph hash.
 
+Snapshot restore is scoped to the active document and configured snapshot
+store. A restore request must point at a Markdown snapshot inside that store,
+must have matching JSON metadata, and the metadata `sourcePath` must match the
+active saved document when one exists. This keeps app-data and project-local
+snapshot histories from being mixed accidentally.
+
 ## Export Sidecars
 
 Export manifests are sidecar evidence files written next to exported artifacts

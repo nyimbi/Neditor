@@ -1,6 +1,6 @@
 # NEditor IPC Command Coverage
 
-Updated: 2026-05-20
+Updated: 2026-05-21
 
 This table tracks the initial Tauri IPC command surface required by
 `docs/specification.md` section 25.4. The Rust test
@@ -21,4 +21,4 @@ keeps this table synchronized with the specification and with
 | `get_git_status` | `src-tauri/src/git.rs` | `file_command_tests::git_history_diff_commit_tag_and_restore_workflow` |
 | `create_snapshot` | `src-tauri/src/snapshot.rs` | `snapshot_storage::tests::project_snapshot_gitignore_entry_is_idempotent` |
 | `list_snapshots` | `src-tauri/src/snapshot.rs` | `snapshot_storage::tests::project_snapshot_gitignore_entry_is_idempotent` |
-| `restore_snapshot` | `src-tauri/src/snapshot.rs` | `snapshot_storage::tests::project_snapshot_gitignore_entry_is_idempotent` |
+| `restore_snapshot` | `src-tauri/src/snapshot.rs` | `snapshot::tests::snapshot_restore_is_scoped_to_active_document_store`; `snapshot::tests::snapshot_restore_rejects_out_of_scope_and_mismatched_sources` |

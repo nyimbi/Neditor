@@ -21,6 +21,7 @@ workflows.
 | --- | --- | --- | --- |
 | Tauri command boundary | Rust commands | Vue UI events and persisted settings | Stable command names, validation, typed request structures. |
 | Filesystem boundary | User-selected paths | External disk edits and missing/moved files | Hash checks, stale-save blocking, conflict UI, snapshots before destructive recovery. |
+| Snapshot boundary | Active document snapshot store | Arbitrary paths, stale metadata, snapshots for another document | Store-root scoping, Markdown-only restore files, required metadata, active source-path matching. |
 | Include boundary | Root document | Included Markdown/media/data files | Include graph tracking, diagnostics, source hashes. |
 | Export boundary | Compiler/export modules | Target artifact consumers | Readiness checks, manifests, output hashes, sidecar evidence. |
 | Git boundary | Opened repository worktree | User-controlled tags, revisions, and worktree paths | Argument-array invocation, pathspec separators, ref validation, symlink restore blocking, repository-contained restore targets. |
@@ -84,6 +85,19 @@ Mitigations:
 - Transform trust/path/input-mode records are type-filtered.
 - Legacy keys are migrated deliberately.
 
+### Unsafe Snapshot Restore
+
+Threat: A malformed UI event or stale snapshot list restores content from a
+different document or from outside the configured snapshot store.
+
+Mitigations:
+
+- Snapshot restore takes a typed request with active file path and storage mode.
+- Restored files must be Markdown snapshots inside the configured snapshot root.
+- Matching JSON metadata is required before content is returned.
+- Snapshot metadata `sourcePath` must match the active saved document when one
+  exists; saved-document snapshots cannot be restored into an unsaved document.
+
 ### Export Without Evidence
 
 Threat: A business deliverable is produced without enough audit evidence to
@@ -128,5 +142,7 @@ Mitigations:
 - `export_document_manifest_records_dirty_git_warning`
 - `git_restore_and_tag_reject_option_shaped_refs`
 - `git_restore_refuses_symlink_targets`
+- `snapshot_restore_is_scoped_to_active_document_store`
+- `snapshot_restore_rejects_out_of_scope_and_mismatched_sources`
 - `workspace persistence migration versions and normalizes saved settings`
 - `save_file_rejects_stale_expected_hash`

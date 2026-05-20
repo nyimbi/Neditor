@@ -83,7 +83,7 @@ behavior is locked.
 
 Latest pushed code commit inspected before this update:
 
-- `ba9a916 Format document variables across exports`
+- `a57767b Surface malformed front matter with source ranges`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -98,7 +98,7 @@ Most recent local verification evidence:
 - `cargo check --locked --features native-watch`: passed in `src-tauri`.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed in
   `src-tauri`.
-- `cargo test --locked`: passed locally with 143 Rust tests on this Unix host.
+- `cargo test --locked`: passed locally with 169 Rust tests on this Unix host.
 - `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib`:
   passed and stress-compiles a large Markdown source with nested includes, 80
   tables, 80 CSV transform artifacts, 120 formula definitions, many source-map
@@ -122,6 +122,10 @@ Most recent local verification evidence:
 - `cargo test --locked git_restore_refuses_symlink_targets --lib`: passed and
   proves restore refuses symlinked worktree files without modifying the outside
   symlink target.
+- `cargo test --locked snapshot_restore --lib -- --nocapture`: passed and
+  proves snapshot restore is scoped to Markdown snapshot files inside the
+  configured active-document store, requires matching metadata, and rejects
+  snapshots for another source document.
 - `cargo test --locked git_history_diff_commit_tag_and_restore_workflow --lib`:
   passed after Git hardening and proves normal history, diff, commit, tag, and
   restore behavior still works.
@@ -210,6 +214,8 @@ Most recent local verification evidence:
   timing/coalescing coverage, and workspace persistence migration/schema
   normalization.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
+- `./node_modules/.bin/tauri build --no-bundle`: passed and built the release
+  desktop binary after the snapshot restore IPC request update.
 - `pnpm run check:a11y`: passed and checked the Vue template for accessible
   button names, form-control labels, and dialog labeling.
 - `pnpm run check:docs`: passed and checked README plus all docs for missing

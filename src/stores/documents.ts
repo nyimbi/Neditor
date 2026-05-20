@@ -1270,13 +1270,14 @@ export const useDocumentsStore = defineStore("documents", {
     async restoreSnapshot(snapshotPath: string) {
       await this.snapshotBeforeDestructiveAction("pre-snapshot-restore");
       const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("restore_snapshot", {
-        snapshotPath,
+        request: { snapshot_path: snapshotPath, file_path: this.activeDocument?.path, storage: this.snapshotStorage },
       });
       const doc = this.activeDocument;
       doc.text = response.text;
       doc.dirty = true;
-      this.statusMessage = `Restored snapshot ${response.path}`;
+      this.statusMessage = `Restored snapshot ${snapshotPath}`;
       await this.compileActive();
+      await this.listSnapshots();
     },
     async prepareForExport() {
       if (this.exportBusy) return;

@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-20
+Updated: 2026-05-21
 
 ## Active Goal
 
@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `6ef570e Expose
-  unresolved citation keys before export`
+- Latest inspected committed baseline before this update: `a57767b Surface
+  malformed front matter with source ranges`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -1113,6 +1113,26 @@ Additional malformed front matter verification:
 | `pnpm run check:a11y` | Pass | Vue template accessibility guardrails still passed. |
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
+Additional snapshot restore hardening verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked snapshot_restore --lib -- --nocapture` in `src-tauri` | Pass | Focused snapshot tests prove restore succeeds for matching active-document metadata and rejects out-of-store snapshots, non-Markdown restore targets, and snapshots whose source metadata belongs to another document. |
+| `cargo test --locked spec_25_4_ipc_commands_are_registered_and_documented --lib -- --nocapture` in `src-tauri` | Pass | IPC command coverage stayed synchronized after changing `restore_snapshot` to a typed restore request. |
+| `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after the snapshot restore hardening. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the snapshot restore hardening. |
+| `cargo check --locked --features native-watch` in `src-tauri` | Pass | Native watcher feature still compiles after the snapshot restore hardening. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after the snapshot restore hardening. |
+| `cargo test --locked` in `src-tauri` | Pass | 169 Rust tests passed; 0 failed. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests still passed after the store restore request update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the store restore request update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files had all local links resolve. |
+| `pnpm run check:a11y` | Pass | Vue template accessibility guardrails still passed. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 35 Chromium workflow tests. Full browser execution remains host-limited in this workspace. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`, proving the updated Tauri command shape compiles in the desktop app. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
 ## Next Execution Order

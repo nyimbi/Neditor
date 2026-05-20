@@ -212,6 +212,11 @@ Git-free snapshots remain available for non-Git users. Automatic snapshots
 default to app data. Project-local `.neditor/` snapshots are opt-in and are
 added to `.gitignore` when enabled.
 
+Snapshot restore is document-scoped. The app restores only Markdown snapshots
+from the active document's configured snapshot store, and it checks matching
+snapshot metadata before loading the older text back into the editor as an
+unsaved change.
+
 See [Storage model](storage-model.md) and
 [Security threat model](security-threat-model.md) for persistence and trust
 boundaries.
