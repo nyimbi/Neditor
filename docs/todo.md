@@ -26,7 +26,7 @@ Current survey inputs:
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
   `5c29914`, `33ee6a9`, `443515b`, and browser-follow-up commits through
-  `976016c`
+  `02e832a`
 
 Status vocabulary:
 
@@ -76,18 +76,18 @@ behavior is locked.
 
 Latest pushed code commit inspected:
 
-- `976016c Stabilize denied transform trust proof`
+- `02e832a Export current editor state before readiness`
 
 Latest fully completed green GitHub Actions run inspected:
 
-- Run `26157446711` on commit `976016c`
+- Run `26159396761` on commit `02e832a`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26157446711`:
+CI evidence from run `26159396761`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
   install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
@@ -114,7 +114,10 @@ CI evidence from run `26157446711`:
   bracket auto-pairing, command-palette heading navigation, command-palette
   citation navigation, command-palette glossary navigation, command-palette
   index navigation, command-palette open-document switching, command-palette
-  workspace-file opening, and transform engine settings trust/probe diagnostics.
+  workspace-file opening, transform engine settings trust/probe diagnostics,
+  target-specific export readiness status and manifest preview, export output
+  and manifest path reporting, success and writer-failure diagnostics, and
+  blocked-readiness diagnostics before file write.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
   tests, frontend build, and Tauri `--no-bundle` desktop build.
@@ -310,6 +313,25 @@ Recent local verification evidence from this buildout:
   denied-trust branch, where Playwright `check()` conflicted with the expected
   checkbox reset.
 - `gh run watch 26157446711 --exit-status`: passed on commit `976016c` across
+  28 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
+- `pnpm run test:unit`: passed after export result diagnostics and immediate
+  export editor-state flushing.
+- `pnpm run build`: passed after the export readiness/result workflow update.
+- `pnpm exec playwright test --list`: listed 28 Chromium workflow tests after
+  adding export readiness/result success, failure, and blocked-readiness
+  workflow coverage.
+- `pnpm exec playwright install chromium`: blocked locally by `EPERM` while
+  creating `/Users/nyimbiodero/Library/Caches/ms-playwright/__dirlock`.
+- `git diff --check`: passed after the export workflow fixes.
+- `gh run watch 26158664142 --exit-status`: failed on commit `03bda13` because
+  the UI preview still showed the active compile manifest instead of the
+  target-specific readiness manifest.
+- `gh run watch 26158831828 --exit-status`: failed on commit `18ff4a4` because
+  immediate export after typing could still read stale debounced store text.
+- `gh run watch 26159218728 --exit-status`: failed on commit `e1e1b2a` with
+  the same stale-store export readiness issue after the test insertion path was
+  stabilized.
+- `gh run watch 26159396761 --exit-status`: passed on commit `02e832a` across
   28 browser workflow tests and Ubuntu/macOS/Windows desktop builds.
 - `cargo test --locked external_transform_tests --lib`: passed after the
   `pikchr-cli` temporary source path fix.
@@ -536,11 +558,15 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   appear for used external transform fences, denied trust resets the checkbox,
   input mode and timeout feed probe requests, successful probes show diagnostics
   and cache identity, and missing executables surface failure diagnostics.
+- Export readiness/result workflow: target-specific readiness status and
+  manifest preview, export output and manifest path reporting, success
+  diagnostics, writer-failure diagnostics, blocked-readiness diagnostics before
+  file write, and immediate editor edits flushed before readiness checks.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
-- AI paste cleanup preview and insertion.
-- Export readiness status.
+- AI paste cleanup workflow: preview, insertion, quote, appendix,
+  replace-selection, merge-into-section, and replace-document modes.
 
 Required next coverage:
 
@@ -552,11 +578,10 @@ Required next coverage:
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
 - External conflict modal: more granular line-compose controls.
-- AI paste cleanup modes: quote, appendix, replace selection, merge into
-  current section, replace document, provenance, citation TODOs, clipboard, and
+- AI paste cleanup remaining proof: provenance, citation TODOs, clipboard, and
   review-state flows.
-- Export flow progress, target-specific readiness checks, manifest path
-  reporting, and error diagnostics.
+- Export artifact fidelity, target-specific option matrices,
+  progress/cancellation behavior if needed, and rendered/manual proof.
 - Remaining transform engine settings: disabled-engine and cross-platform
   executable edge cases beyond the mocked browser workflow.
 
@@ -1032,9 +1057,10 @@ Completion criteria:
 
 ## Recommended Execution Order
 
-1. Expand browser workflow coverage for export progress, broader keyboard
-   shortcuts, deeper workspace grouping, remaining preview modes, and remaining
-   AI/table modes.
+1. Expand browser workflow coverage for export artifact fidelity,
+   target-specific option matrices, progress/cancellation behavior if needed,
+   broader keyboard shortcuts, deeper workspace grouping, remaining preview
+   modes, and remaining AI provenance/table export modes.
 2. Add desktop WebDriver/Tauri smoke tests.
 3. Use workflow failures to close real implementation gaps.
 4. Audit export artifacts and add conformance fixtures.

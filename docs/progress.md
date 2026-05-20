@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `976016c Stabilize
-  denied transform trust proof`
+- Latest inspected committed baseline before this update: `02e832a Export
+  current editor state before readiness`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -126,6 +126,11 @@ Recent pushed checkpoints visible in current git history:
   external transform engine settings: path-change trust clearing, trust
   prompts, denied trust reset, input mode and timeout persistence, successful
   probe details, cache identity, and missing-executable diagnostics.
+- `03bda13`, `18ff4a4`, `e1e1b2a`, and `02e832a` added and stabilized export
+  readiness/result workflow proof: target-specific readiness manifest preview,
+  output and manifest path reporting, success and writer-failure diagnostics,
+  blocked export diagnostics before file write, and an immediate editor-state
+  flush before export readiness runs.
 
 ## Current Capability Snapshot
 
@@ -170,7 +175,10 @@ Implemented or substantially present, pending the conservative caveats in
   smart list continuation, bracket auto-pairing, command-palette heading
   navigation, command-palette citation, glossary, and index navigation,
   command-palette open-document switching and workspace-file opening, plus
-  transform engine settings trust/probe diagnostics.
+  transform engine settings trust/probe diagnostics, target-specific export
+  readiness manifest preview, export output/manifest path reporting, export
+  success/failure diagnostics, and blocked-readiness diagnostics before file
+  write.
 - CI matrix for macOS, Ubuntu, and Windows with Rust formatting/check/test,
   native-watch check, clippy, frontend unit tests, frontend build, and Tauri
   no-bundle compile.
@@ -181,13 +189,13 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed code CI for commit `976016c` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26157446711`.
+- Latest pushed code CI for commit `02e832a` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26159396761`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
 - Browser-level workflow tests pass in Linux CI with 28 Chromium tests in
-  run `26157446711`, including mocked file lifecycle coverage, save-as plus
+  run `26159396761`, including mocked file lifecycle coverage, save-as plus
   recently closed reopening, stale-save conflict copy/merge/keep-local/
   accept-external recovery, clean watcher reload, watcher-originated dirty
   root-file conflicts, advanced table structure/format/cancel coverage, and AI
@@ -196,8 +204,10 @@ P0 gaps:
   conflict handling, plus restart-style workspace restore for open tabs, active
   tab, pinned state, mode/sidebar persistence, workspace root, and recent
   files, scroll-position restore, and missing-restored-file warning coverage.
-  Local focused Playwright execution remains blocked by the missing
-  workspace-local Chromium headless shell.
+  Local focused Playwright execution remains blocked by sandboxed Playwright
+  browser cache installation: `pnpm exec playwright install chromium` failed
+  with `EPERM` while creating
+  `/Users/nyimbiodero/Library/Caches/ms-playwright/__dirlock`.
 - The same green browser run now also covers tab activation, dirty close
   confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
   folder reopen/prune behavior, moved recently-closed path pruning,
@@ -205,15 +215,18 @@ P0 gaps:
   editor word-wrap and line-number persistence, CodeMirror find/replace, smart
   list continuation, bracket auto-pairing, command-palette heading navigation,
   citation navigation, glossary navigation, index navigation, open-document
-  switching, workspace-file opening, and transform engine settings trust/probe
-  diagnostics.
+  switching, workspace-file opening, transform engine settings trust/probe
+  diagnostics, target-specific export readiness manifest preview, export
+  output/manifest path reporting, export success/failure diagnostics, and
+  blocked export diagnostics before file write.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
 P1 gaps:
 
 - Export fidelity requires stricter artifact-level and visual/manual proof.
-- Export readiness coverage needs a requirement-by-requirement audit.
+- Export readiness has browser workflow coverage for the target-specific
+  status/diagnostic path, but still needs a requirement-by-requirement audit.
 - Optional external transform evidence is strongest on Linux; macOS and Windows
   optional-engine evidence remains incomplete.
 - File watcher/conflict flows need UI workflow tests.
@@ -411,6 +424,17 @@ Additional transform settings workflow verification:
 | `git diff --check` | Pass | No whitespace errors after adding and stabilizing transform settings workflow coverage. |
 | `gh run watch 26157446711 --exit-status` | Pass | Commit `976016c` passed 28 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
 
+Additional export readiness/result workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after export result diagnostics and immediate-export editor-state flush. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the export readiness/result workflow update. |
+| `pnpm exec playwright test --list` | Pass | Listed 28 Chromium workflow tests, including export readiness, success, failure, and blocked-readiness workflow coverage. |
+| `pnpm exec playwright install chromium` | Blocked locally | Browser install is sandbox-blocked by `EPERM` while creating `/Users/nyimbiodero/Library/Caches/ms-playwright/__dirlock`. |
+| `git diff --check` | Pass | No whitespace errors after the export workflow fixes. |
+| `gh run watch 26159396761 --exit-status` | Pass | Commit `02e832a` passed 28 browser workflow tests plus Ubuntu, macOS, and Windows desktop builds. |
+
 Current CI evidence log:
 
 | Command | Result | Evidence |
@@ -540,9 +564,10 @@ Known packaging note from `README.md`:
 
 ## Next Execution Order
 
-1. Expand browser coverage for export progress, remaining preview modes,
-   broader keyboard shortcuts, deeper workspace grouping, and the remaining
-   AI/table modes.
+1. Expand browser coverage for export artifact fidelity, target-specific export
+   option matrices, progress/cancellation behavior if needed, remaining preview
+   modes, broader keyboard shortcuts, deeper workspace grouping, and the
+   remaining AI provenance/table export modes.
 2. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
    stable.
 3. Use failures from workflow tests to drive implementation fixes.

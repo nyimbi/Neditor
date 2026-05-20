@@ -40,7 +40,7 @@ is not "Complete".
 | 5.1 External File Refresh | Watch included files and recompile master docs | Partial | Watch setup includes manifest included files; include tests; browser CI run `26145509141` covers clean included-file recompile and dirty included-file conflict workflows | Deeper include graph navigation edits. |
 | 5.2 Build Toolchain Lessons | Pinned local JS/Rust dependencies | Partial | `pnpm-lock.yaml`; `src-tauri/Cargo.lock`; README commands | Confirm no hidden global dependency remains in packaging and optional engines. |
 | 5.2 Build Toolchain Lessons | Diagnostics for missing external engines | Partial | `transforms/external.rs`; external transform tests | Cross-platform diagnostic proof and UI workflow coverage. |
-| 5.3 Business Export Customization | HTML/PDF/DOCX/PPTX exports | Partial | `src-tauri/src/export/*`; export tests | Artifact-level conformance and rendered/manual checks for each target. |
+| 5.3 Business Export Customization | HTML/PDF/DOCX/PPTX exports | Partial | `src-tauri/src/export/*`; export tests; browser CI run `26159396761` covers export invocation success/failure, output and manifest path UI reporting, and readiness-blocked export before write | Artifact-level conformance, target-specific option matrices, and rendered/manual checks for each target. |
 | 5.3 Business Export Customization | Page numbering, headers/footers, logo, brand color, cover, watermark, presets, metadata | Partial | Export option tests; export shared helpers; frontend settings | Completion matrix rows for each option and visual artifact proof. |
 | 5.4 Master Documents And Includes | Include syntaxes, relative resolution, strip child front matter, circular diagnostics | Partial | Compiler/document structure tests | Add completion evidence for max depth, invalid include files, navigation, and UI include graph. |
 | 5.5 Table Of Contents | `[TOC]`, front matter TOC, depth, numbering, export formatting | Partial | Generated sections and export tests | Page-numbered TOC proof for PDF/DOCX where supported; browser preview tests. |
@@ -83,7 +83,7 @@ is not "Complete".
 | --- | --- | --- | --- | --- |
 | 9.1 Git versioning | Detect repo, branch/dirty, commit, history, diff, restore, tag | Partial | `git.rs`; `git_support.rs`; versioning UI; git workflow test | Browser/desktop workflow tests and Git-free UX validation. |
 | 9.1 Git-free snapshots | Local snapshots for non-Git users | Partial | `snapshot.rs`; snapshot UI/tests | Restore workflow through UI and storage-mode docs. |
-| 9.2 Export snapshots | Manifest with hashes/options/app/version/status/timestamp | Partial | `manifest.rs`; `export_commands.rs`; export command tests | Confirm all export targets write/consume manifests consistently. |
+| 9.2 Export snapshots | Manifest with hashes/options/app/version/status/timestamp | Partial | `manifest.rs`; `export_commands.rs`; export command tests; browser CI run `26159396761` covers manifest path reporting and target-specific readiness manifest preview | Confirm all export targets write/consume manifests consistently. |
 | 9.3 Release workflow | Status values, badge, draft export warning, approval metadata, release tagging | Partial | Review UI; validation; Git tag command | Visual badge proof and workflow tests. |
 | 9.4 AI paste cleanup | Normalize chat output, code fences, bullets, tables, links, citations, insert modes | Partial | `ai_cleanup.rs`; AI modal; AI cleanup tests; shared insertion helper tests; Playwright coverage for insert, quote, appendix, replace document, merge into section, and replace selection modes | Clipboard behavior, provenance workflows, citation TODOs, and non-sandboxed execution. |
 | 9.5 AI provenance | `ai-source`, AI-assisted sections, export appendix | Partial | `provenance.rs`; review/provenance tests; UI toggles | Workflow and export readiness proof for unreviewed content. |
@@ -101,7 +101,7 @@ is not "Complete".
 | 9.17 Review comments/change notes | Comments, unresolved validation, exports | Partial | `review.rs`; review UI; export conformance tests | UI workflow tests and native target fidelity. |
 | 9.18 Document variables | Front matter/project/data variables | Partial | `variables.rs`; project variable tests | Filter coverage and docs. |
 | 9.19 Pikchr diagrams | Native fallback/external setup and diagnostics | Partial | `transforms/diagram.rs`; `external.rs`; transform tests | Cross-platform optional engine proof. |
-| 9.20 Validation | One-click prepare report across metadata/includes/citations/formulas/figures/transforms/settings/links/comments | Partial | `validation.rs`; `export_commands.rs`; readiness UI; initial Playwright readiness test | Completeness audit, target-specific readiness cases, and non-sandboxed browser execution. |
+| 9.20 Validation | One-click prepare report across metadata/includes/citations/formulas/figures/transforms/settings/links/comments | Partial | `validation.rs`; `export_commands.rs`; readiness UI; browser CI run `26159396761` covers target-specific readiness diagnostics and blocked export behavior | Full readiness completeness audit and non-sandboxed/native execution. |
 
 ## Fenced-Code Transform System
 
@@ -193,11 +193,11 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed code CI on commit `976016c` is green across browser workflows and
+- Latest pushed code CI on commit `02e832a` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI run `26157446711` with 28
+- Browser-level workflow harness passes in Linux CI run `26159396761` with 28
   Chromium tests, including advanced table editor coverage, mocked file
   lifecycle coverage, save-as, recently closed reopening, and stale-save
   conflict copy/merge/keep-local/accept-external recovery plus watcher-originated
@@ -214,10 +214,12 @@ Current major verification gaps:
   CodeMirror find/replace, smart list continuation, bracket auto-pairing, and
   command-palette heading, citation, glossary, index, open-document, and
   workspace-file navigation, plus transform engine settings trust/probe
-  diagnostics.
-  Local focused execution is
-  currently blocked because the workspace-local Chromium headless-shell
-  executable is missing from the Playwright cache.
+  diagnostics, target-specific export readiness manifest preview, export
+  output/manifest path reporting, export success/failure diagnostics, and
+  blocked export diagnostics before file write.
+  Local focused execution is currently blocked because Playwright browser
+  installation in the sandbox fails with `EPERM` while creating
+  `/Users/nyimbiodero/Library/Caches/ms-playwright/__dirlock`.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, and the desktop CI matrix
   is currently green, but desktop user journeys are still not covered by a
