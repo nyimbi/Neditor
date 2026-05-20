@@ -807,7 +807,7 @@ test("recompiles clean master documents after included files change", async ({ p
 
   const preview = page.getByRole("region", { name: "Live preview" });
   await expect(preview).toContainText("Original included risk note.");
-  await page.getByLabel("Sidebar panel").selectOption("files");
+  await page.getByLabel("Sidebar panel").selectOption("references");
   await expect(page.getByRole("button", { name: "/workspace/chapters/risk.md" })).toBeVisible();
 
   await setMockFileText(page, "/workspace/chapters/risk.md", "## Risk Notes\n\nUpdated included risk note.");
@@ -853,7 +853,7 @@ test("opens included-file conflicts without overwriting dirty master drafts", as
   await expect(conflictDialog).toContainText("/workspace/chapters/risk.md");
   await expect(conflictDialog).toContainText("Dirty included risk note.");
 
-  await conflictActions.getByRole("button", { name: "Accept external" }).click();
+  await conflictDialog.getByRole("button", { name: "Accept external" }).click();
   await expect(conflictDialog).toBeHidden();
   await expect.poll(() => editorText(page)).toContain("status: in-review");
   await expect.poll(() => editorText(page)).toContain("!include chapters/risk.md");
