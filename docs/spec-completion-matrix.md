@@ -24,7 +24,7 @@ explicit platform checks.
 
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
-| 1 Purpose | Local-first business Markdown workbench | Partial | `README.md`; Tauri/Vue/Rust project layout; compiler/export modules | Full buildout still needs requirement-by-requirement verification and workflow tests. |
+| 1 Purpose | Local-first business Markdown workbench | Partial | `README.md`; `docs/user-guide.md`; Tauri/Vue/Rust project layout; compiler/export modules | Full buildout still needs requirement-by-requirement verification and workflow tests. |
 | 2 Source Prompt Extension | Tauri 2, Vue 3, Pinia, Vite, vanilla CSS | Complete | `package.json`; `src/main.ts`; `src/App.vue`; `src-tauri/Cargo.toml` | Keep dependency admission docs current as test dependencies are added. |
 | 2 Source Prompt Extension | Side-by-side Markdown editor and live preview | Partial | `src/App.vue` editor/preview panes; CodeMirror setup; Playwright harness covers source edit to live preview update and now includes a large-document edit/preview responsiveness workflow; archived browser workflow run `26153224371` covers synchronized editor/preview scrolling and preview heading click-to-source; `tests/frontend-unit.test.ts` proves preview debounce timing stays within the small-document target budget and coalesces rapid edits | Run the new large-document browser workflow on a host with Playwright Chromium installed, plus native desktop interaction proof. |
 | 2 Source Prompt Extension | Split, preview-only, focus/source modes | Partial | `src/App.vue` mode controls; `e2e/app-workflows.spec.ts` covers split/source/preview/focus/export/review/presentation modes with sidebar routing for export/review/presentation; archived browser workflow evidence passed on commit `420af08` | Desktop execution still needs proof. |
@@ -33,7 +33,7 @@ explicit platform checks.
 | 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler; archived browser workflow run `26154535588` covers CodeMirror search keybinding and command-palette heading search/navigation; archived browser workflow run `26155535210` covers command-palette citation, glossary, and index navigation; archived browser workflow run `26156393184` covers open-document switching and workspace-file command navigation | Broader shortcut coverage and native desktop command execution proof. |
 | 2 Source Prompt Extension | Light/dark/system theme and typography | Partial | Settings in `src/App.vue`; persisted preferences in store; Playwright harness asserts theme, preview theme, high contrast, reduced motion, and editor/preview typography application plus reload persistence | Visual/accessibility verification across themes in a real browser/native runtime. |
 | 2 Source Prompt Extension | Cross-platform packaging | Partial | `README.md` packaging note; local Tauri build commands | Full local/manual bundle evidence for Windows/Linux and refreshed macOS bundle/DMG status. |
-| 3 Product Positioning | Local-first document workbench, not cloud suite | Partial | Local file/snapshot/Git/export design | User documentation and fixture workflows need to prove positioning. |
+| 3 Product Positioning | Local-first document workbench, not cloud suite | Partial | `README.md`; `docs/user-guide.md`; local file/snapshot/Git/export design | Fixture workflows and platform proof still need to reinforce positioning. |
 | 4 Target Users | Business, technical, research, product users | Complete | Example project front matter declares consultants, technical writers, researchers and analysts, product and engineering teams, executives and managers, students and academics, developers, and teams using AI chat output; `example_fixture_tests::example_project_fixtures_compile_and_export` verifies each persona compiles and exports across supported targets | Keep new personas represented by executable example fixtures. |
 
 ## Carry-Forward MacDown Improvements
@@ -198,8 +198,9 @@ Current direct evidence:
   alignment under `tests/frontend-unit.test.ts`.
 - Local verification covers Rust checks/tests, frontend unit tests, frontend
   build, and Tauri no-bundle compile when run on the current host.
-- `pnpm run check:docs` now checks README plus the docs set for missing local
-  links, including the `docs/specification.md` architecture figure target.
+- `pnpm run check:docs` now discovers README plus all top-level docs Markdown
+  files and checks local links, including the user guide, Markdown extensions
+  reference, and `docs/specification.md` architecture figure target.
 - `pnpm run check:a11y` now checks static Vue template accessibility guardrails
   for accessible control names and dialog labeling.
 

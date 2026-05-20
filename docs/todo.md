@@ -1217,20 +1217,25 @@ Current evidence:
 
 - `docs/specification.md` now has a checked-in `docs/architecture.svg` target
   for the figure/caption example.
-- `pnpm run check:docs` checks README and the docs set for missing local links.
+- `README.md` links the user-facing documentation set.
+- `docs/user-guide.md` now covers first-run setup, workbench modes, local file
+  safety, includes, Markdown extensions, tables/calculations, citations,
+  review and AI governance, transform trust, export manifests, versioning, and
+  troubleshooting.
+- `docs/markdown-extensions.md` now provides a readable syntax reference for
+  front matter, includes, generated sections, variables, formulas, tables,
+  figures, equations, citations, glossary/index, comments, AI provenance,
+  transforms, and export readiness markers.
+- `pnpm run check:docs` discovers README plus all top-level docs Markdown files
+  and checks missing local links.
 
 Needed docs:
 
-- Getting started.
-- Markdown extensions supported by NEditor.
-- Includes and master documents.
-- Export options and manifests.
-- Review and release workflow.
-- AI paste cleanup and governance.
-- Tables, formulas, and data sources.
-- Bibliography, citations, glossary, index, and cross references.
-- Transform engine setup and trust model.
-- Troubleshooting build, packaging, and engine issues.
+- Expand target-specific export option examples and rendered artifact
+  screenshots as export fidelity proof grows.
+- Add desktop/native workflow screenshots after the native smoke harness exists.
+- Keep user docs synchronized with matrix rows as features move from partial to
+  complete.
 
 ### 25. Example Project Fixtures
 

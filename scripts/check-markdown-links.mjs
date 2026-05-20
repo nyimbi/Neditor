@@ -1,20 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { extname, relative, resolve } from "node:path";
 import process from "node:process";
 
 const root = process.cwd();
 const markdownFiles = [
   "README.md",
-  "docs/dependency-admission.md",
-  "docs/external-transforms.md",
-  "docs/ipc-command-coverage.md",
-  "docs/progress.md",
-  "docs/security-threat-model.md",
-  "docs/spec-completion-matrix.md",
-  "docs/specification.md",
-  "docs/storage-model.md",
-  "docs/todo.md",
-];
+  ...markdownFilesUnder("docs"),
+].sort();
 const linkPattern = /!?\[[^\]]*]\(([^)]+)\)/g;
 const absoluteUrlPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
 const allowedExtensions = new Set([
@@ -73,4 +65,11 @@ function normalizeTarget(rawTarget) {
     return null;
   }
   return decodeURIComponent(target.split("#", 1)[0]);
+}
+
+function markdownFilesUnder(directory) {
+  const absoluteDirectory = resolve(root, directory);
+  return readdirSync(absoluteDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => `${directory}/${entry.name}`);
 }

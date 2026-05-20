@@ -223,6 +223,8 @@ fixtures, and local verification coverage. The remaining hardening work is
 tracked conservatively in:
 
 - [Specification](docs/specification.md)
+- [User guide](docs/user-guide.md)
+- [Markdown extensions](docs/markdown-extensions.md)
 - [External transform setup](docs/external-transforms.md)
 - [Storage model](docs/storage-model.md)
 - [Security threat model](docs/security-threat-model.md)

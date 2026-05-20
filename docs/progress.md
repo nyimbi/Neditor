@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `3c10a2c Document
-  storage and security boundaries`
+- Latest inspected committed baseline before this update: `1c532ee Constrain
+  Git restore to explicit safe refs`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -31,6 +31,8 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- `1c532ee` constrained Git restore/tag inputs to explicit safe refs, blocked
+  symlink restore targets, and recorded the security evidence.
 - `3c10a2c` documented storage and security boundaries, linked them from the
   README, and added markdown link checking for the new docs.
 - `2b252c5` versioned workspace persistence migrations and covered legacy
@@ -267,6 +269,10 @@ Recent pushed checkpoints visible in current git history:
   restore revisions now reject option-shaped or unsupported ref syntax before
   invoking Git, restore refuses symlink targets, and restore paths must resolve
   inside the repository root before the document is overwritten.
+- This update adds first-user documentation in `docs/user-guide.md`, a
+  readable syntax reference in `docs/markdown-extensions.md`, README links to
+  both, and a docs link checker that automatically discovers top-level docs
+  Markdown files.
 
 ## Current Capability Snapshot
 
@@ -302,6 +308,9 @@ Implemented or substantially present, pending the conservative caveats in
   managers, students and academics, developers, and teams using AI chat output,
   with local Rust coverage across HTML, PDF, DOCX, PPTX, and Markdown bundle
   outputs.
+- User-facing docs now include the README feature tour, a first-user guide, a
+  Markdown extensions syntax reference, transform setup, storage model,
+  security threat model, completion matrix, backlog, and progress log.
 - Frontend unit coverage for table logic and conflict diff alignment.
 - Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering split/source/preview/focus/export/review/presentation view mode
@@ -652,7 +661,7 @@ Additional review/provenance readiness metadata verification:
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed, including latest-document task cancellation/stale-result guard coverage, preview debounce timing/coalescing coverage, and workspace persistence migration/schema normalization. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |
 | `pnpm run check:a11y` | Pass | Static Vue template accessibility guard passed for button names, form-control labels, and dialog labeling. |
-| `pnpm run check:docs` | Pass | Markdown link guard covers README plus specification, external transforms, dependency admission, IPC coverage, storage model, security threat model, progress, matrix, and backlog docs. |
+| `pnpm run check:docs` | Pass | Markdown link guard now discovers README plus all top-level docs Markdown files, including the user guide and Markdown extensions reference. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
 | `git diff --check` | Pass | No whitespace errors after the readiness metadata, dirty-Git manifest, and documentation updates. |
 | `pnpm run check:docs` | Pass | Repo-wide markdown link guard checked README plus all docs and found no missing local links after adding `docs/architecture.svg`. |
