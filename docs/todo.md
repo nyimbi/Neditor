@@ -1137,9 +1137,15 @@ Finish:
   browser harness locally.
 - Rich clipboard paste behavior where the runtime supports it.
 - Provenance block aliases.
-- AI-assisted section review-state toggles.
-- Readiness/export warnings for unreviewed AI content.
-- Export appendix behavior for AI provenance.
+- AI-assisted section review-state toggles. The Review sidebar toggles
+  `ai-source` blocks and AI-assisted section markers between needs-review and
+  human-reviewed states.
+- Readiness/export warnings for unreviewed AI content. The browser harness now
+  covers an unreviewed AI provenance warning and verifies it clears after
+  review-state toggles.
+- Export appendix behavior for AI provenance. Backend export option tests
+  prove appendix inclusion/exclusion across targets; remaining work is richer
+  rendered/native QA.
 
 ### 13. Tables, Calculations, And Data Sources
 

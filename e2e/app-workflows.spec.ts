@@ -344,6 +344,67 @@ async function installTauriMock(page: Page) {
       return Array.from(terms);
     }
 
+    function aiFields(text: string) {
+      const fields: Record<string, string> = {};
+      for (const part of text.split("|")) {
+        const [rawKey, ...rawValue] = part.split("=");
+        const key = rawKey?.trim();
+        if (!key) continue;
+        fields[key] = rawValue.join("=").trim();
+      }
+      return fields;
+    }
+
+    function aiSourcesFromMarkdown(text: string) {
+      const sources: Array<{
+        line: number;
+        provider: string;
+        model: string;
+        date: string;
+        prompt_summary: string;
+        reviewed_by: string;
+        reviewed_at: string;
+        status: string;
+      }> = [];
+      for (const fence of text.matchAll(/```ai-source\s*\n([\s\S]*?)```/g)) {
+        const body = fence[1] || "";
+        const line = sourcePositionAtOffset(text, fence.index || 0).line;
+        const field = (name: string) => body.match(new RegExp(`^${name}:\\s*(.*?)\\s*$`, "m"))?.[1]?.trim() || "";
+        sources.push({
+          line,
+          provider: field("provider"),
+          model: field("model"),
+          date: field("date"),
+          prompt_summary: field("promptSummary") || field("prompt_summary") || field("prompt"),
+          reviewed_by: field("reviewedBy") || field("reviewed_by") || field("reviewer"),
+          reviewed_at: field("reviewedAt") || field("reviewed_at") || field("reviewDate"),
+          status: field("status") || "unreviewed",
+        });
+      }
+      return sources;
+    }
+
+    function aiAssistedSectionsFromMarkdown(text: string) {
+      const lines = text.split(/\r?\n/);
+      return lines.flatMap((line, index) => {
+        const marker = line.match(/<!--\s*ai-assisted:(.*?)-->/);
+        if (!marker) return [];
+        const fields = aiFields(marker[1]);
+        const heading = lines.slice(index + 1).find((candidate) => /^#{1,6}\s+/.test(candidate))?.replace(/^#{1,6}\s+/, "").trim() || "";
+        return [
+          {
+            line: index + 1,
+            heading,
+            status: fields.status || "unreviewed",
+            reviewed_by: fields.reviewedBy || fields.reviewed_by || "",
+            reviewed_at: fields.reviewedAt || fields.reviewed_at || "",
+            source: fields.source || "",
+            prompt_summary: fields.promptSummary || fields.prompt_summary || "",
+          },
+        ];
+      });
+    }
+
     function transformArtifactsFromMarkdown(text: string, sourceFile: string) {
       const artifacts: Array<{
         id: string;
@@ -489,6 +550,8 @@ async function installTauriMock(page: Page) {
       const duplicateBibliographyKeys = duplicateBibliographyKeys(bibliography);
       const glossary = glossaryFromMarkdown(expanded.compiled);
       const indexTerms = indexTermsFromMarkdown(expanded.compiled);
+      const aiSources = aiSourcesFromMarkdown(expanded.compiled);
+      const aiAssistedSections = aiAssistedSectionsFromMarkdown(expanded.compiled);
       const transformArtifacts = transformArtifactsFromMarkdown(expanded.compiled, filePath);
       const sourceHash = hash(text);
       const metadata = {
@@ -561,8 +624,8 @@ async function installTauriMock(page: Page) {
           layout_directives: [],
           comments: [],
           change_notes: [],
-          ai_sources: [],
-          ai_assisted_sections: [],
+          ai_sources: aiSources,
+          ai_assisted_sections: aiAssistedSections,
           labels: [],
           cross_references: [],
         },
@@ -810,21 +873,46 @@ async function installTauriMock(page: Page) {
       if (cmd === "prepare_for_export") {
         const request = args.request as { text: string; target?: string; options?: { includeManifest?: boolean } };
         const response = compileMarkdown(request.text);
-        const diagnostics = request.text.includes("EXPORT_BLOCKER")
-          ? [
-              {
-                severity: "error",
-                message: `${(request.target || "html").toUpperCase()} export requires approved metadata before writing.`,
-                source_file: "/workspace/market.md",
-                line: 3,
-                column: 1,
-                end_line: 3,
-                end_column: 16,
-                suggestion: "Set status: approved before exporting this target.",
-                related: [`target:${request.target || "html"}`],
-              },
-            ]
-          : [];
+        const diagnostics: Array<{
+          severity: "error" | "warning";
+          message: string;
+          source_file: string;
+          line: number;
+          column: number;
+          end_line: number;
+          end_column: number;
+          suggestion: string;
+          related: string[];
+        }> = [];
+        if (request.text.includes("EXPORT_BLOCKER")) {
+          diagnostics.push({
+            severity: "error",
+            message: `${(request.target || "html").toUpperCase()} export requires approved metadata before writing.`,
+            source_file: "/workspace/market.md",
+            line: 3,
+            column: 1,
+            end_line: 3,
+            end_column: 16,
+            suggestion: "Set status: approved before exporting this target.",
+            related: [`target:${request.target || "html"}`],
+          });
+        }
+        const pendingAiLine =
+          response.semantic.ai_sources.find((source) => source.status !== "human-reviewed")?.line ||
+          response.semantic.ai_assisted_sections.find((section) => section.status !== "human-reviewed")?.line;
+        if (request.options?.includeProvenance !== false && pendingAiLine) {
+          diagnostics.push({
+            severity: "warning",
+            message: "Document has AI-assisted sections that are not human-reviewed.",
+            source_file: "/workspace/market.md",
+            line: pendingAiLine,
+            column: 1,
+            end_line: pendingAiLine,
+            end_column: 2,
+            suggestion: "Mark AI source blocks and AI-assisted section markers as human-reviewed after review.",
+            related: ["ai-provenance"],
+          });
+        }
         const progressSteps = [
           ...response.export_manifest.progress_steps,
           {
@@ -838,7 +926,7 @@ async function installTauriMock(page: Page) {
         return {
           ready: diagnostics.length === 0,
           error_count: diagnostics.filter((diagnostic) => diagnostic.severity === "error").length,
-          warning_count: 0,
+          warning_count: diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length,
           info_count: request.target === "pptx" ? 1 : 0,
           source_map: [],
           paged_document: response.paged_document,
@@ -2454,6 +2542,64 @@ test("applies AI paste provenance citation TODO and draft governance toggles", a
   await expect.poll(() => editorText(page)).toContain("ai-assisted: status=needs-review");
   await expect.poll(() => editorText(page)).toContain("```ai-source");
   await expect(page.getByRole("dialog", { name: "AI paste cleanup" })).toBeHidden();
+});
+
+test("toggles AI review state and clears provenance readiness warnings", async ({ page }) => {
+  await page.locator(".cm-content").click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.keyboard.insertText(
+    [
+      "---",
+      "title: AI Review Workflow",
+      "status: approved",
+      "approvedBy: QA",
+      "approvedAt: 2026-05-20T10:00:00Z",
+      "---",
+      "",
+      "# AI Review Workflow",
+      "",
+      "<!-- ai-assisted: status=needs-review | source=OpenAI | promptSummary=Drafted risk language -->",
+      "## AI Draft",
+      "Drafted AI content.",
+      "",
+      "```ai-source",
+      "provider: OpenAI",
+      "model: ChatGPT",
+      "date: 2026-05-20",
+      "promptSummary: Drafted risk language",
+      "reviewedBy: ",
+      "reviewedAt: ",
+      "status: needs-review",
+      "```",
+    ].join("\n"),
+  );
+  await expect.poll(() => editorText(page)).toContain("status: needs-review");
+
+  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await page.getByRole("button", { name: "Prepare for export" }).click();
+  await expect(page.locator("article.readiness").getByText("Needs attention", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Export readiness diagnostics" })).toContainText(
+    "Document has AI-assisted sections that are not human-reviewed.",
+  );
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await expect(page.locator(".sidebar")).toContainText("2 AI review pending");
+  const sourceReview = page.locator(".sidebar article").filter({ hasText: "OpenAI / ChatGPT" });
+  await sourceReview.getByLabel("Human reviewed").check();
+  const sectionReview = page.locator(".sidebar article").filter({ hasText: "AI Draft" });
+  await sectionReview.getByLabel("Human reviewed").check();
+
+  await expect.poll(() => editorText(page)).toContain("status=human-reviewed");
+  await expect.poll(() => editorText(page)).toContain("status: human-reviewed");
+  await expect.poll(() => editorText(page)).toContain("reviewedBy: local");
+  await expect(page.locator(".sidebar")).toContainText("0 AI review pending");
+  await expect(page.locator(".sidebar")).toContainText("2 AI reviewed");
+
+  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await page.getByRole("button", { name: "Prepare for export" }).click();
+  await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
+  await expect(page.getByText("0 errors, 0 warnings, 0 info")).toBeVisible();
+  await expect(page.locator(".sidebar").getByText('"includeProvenance": true')).toBeVisible();
 });
 
 test("applies AI paste quote appendix and section merge modes", async ({ page }) => {
