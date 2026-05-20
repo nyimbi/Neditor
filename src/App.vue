@@ -805,7 +805,7 @@
           </section>
           <section aria-label="Recent folders">
             <h3>Recent folders</h3>
-            <button v-for="path in store.recentFolders" :key="path" class="outline-row" type="button" @click="store.openFolder(path)">
+            <button v-for="path in store.recentFolders" :key="path" class="outline-row" type="button" @click="store.openRecentFolder(path)">
               {{ path }}
             </button>
           </section>

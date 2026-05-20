@@ -408,6 +408,7 @@ async function installTauriMock(page: Page) {
             },
           ];
         });
+        if (!entries.length) throw new Error(`Mock workspace not found: ${root}`);
         return [
           ...Array.from(folders).map((folder) => ({
             path: `${root}/${folder}`,
@@ -743,6 +744,45 @@ test("switches tabs, guards dirty closes, and prunes stale recent document paths
   await page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/delete-after-close.md" }).click();
   await expect(page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/delete-after-close.md" })).toHaveCount(0);
   await expect(page.getByText("Removed missing recent file delete-after-close.md")).toBeVisible();
+});
+
+test("reopens recent folders and prunes moved workspace paths", async ({ page }) => {
+  await setMockFileText(page, "/client/project-a.md", "# Project A\n\nClient workspace body.");
+  await setMockFileText(page, "/workspace/move-source.md", "# Move Source\n\nMove source body.");
+
+  await queueDialogSelection(page, "/client");
+  await page.getByRole("button", { name: "Open Folder", exact: true }).click();
+  await page.getByLabel("Sidebar panel").selectOption("files");
+  await expect(page.getByText("/client")).toBeVisible();
+  await expect(page.getByRole("button", { name: /project-a\.md/ })).toBeVisible();
+
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  const recentFolders = page.getByLabel("Recent folders");
+  await expect(recentFolders.getByRole("button", { name: "/client" })).toBeVisible();
+  await deleteMockFile(page, "/client/project-a.md");
+  await recentFolders.getByRole("button", { name: "/client" }).click();
+  await expect(recentFolders.getByRole("button", { name: "/client" })).toHaveCount(0);
+  await expect(page.getByText("Removed missing recent folder client")).toBeVisible();
+
+  await queueDialogSelection(page, "/workspace/move-source.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect.poll(() => editorText(page)).toContain("Move source body.");
+  await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
+
+  await setMockFileText(page, "/workspace/move-target.md", "# Move Target\n\nMoved body.");
+  await deleteMockFile(page, "/workspace/move-source.md");
+
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  const recentlyClosed = page.getByLabel("Recently closed documents");
+  await expect(recentlyClosed.getByRole("button", { name: "/workspace/move-source.md" })).toBeVisible();
+  await recentlyClosed.getByRole("button", { name: "/workspace/move-source.md" }).click();
+  await expect(recentlyClosed.getByRole("button", { name: "/workspace/move-source.md" })).toHaveCount(0);
+  await expect(page.getByText("Removed missing recent file move-source.md")).toBeVisible();
+
+  await page.getByLabel("Sidebar panel").selectOption("files");
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.getByRole("button", { name: /move-target\.md/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /move-source\.md/ })).toHaveCount(0);
 });
 
 test("restores workspace tabs, active document, pins, mode, and sidebar after reload", async ({ page }) => {

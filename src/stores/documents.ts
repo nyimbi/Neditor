@@ -805,26 +805,46 @@ export const useDocumentsStore = defineStore("documents", {
       if (persist) void this.persistWorkspace();
     },
     async openFolder(path: string) {
+      const previousRoot = this.workspaceRoot;
+      const previousFiles = this.workspaceFiles;
       this.workspaceRoot = path;
+      const opened = await this.refreshWorkspace();
+      if (!opened) {
+        this.workspaceRoot = previousRoot;
+        this.workspaceFiles = previousFiles;
+        this.statusMessage = `Could not open workspace ${titleFromPath(path)}`;
+        await this.persistWorkspace();
+        return false;
+      }
       this.rememberFolder(path);
-      await this.refreshWorkspace();
       this.sidebar = "files";
       this.statusMessage = `Opened workspace ${titleFromPath(path)}`;
       await this.persistWorkspace();
+      return true;
+    },
+    async openRecentFolder(path: string) {
+      const opened = await this.openFolder(path);
+      if (opened) return true;
+      this.forgetFolderPath(path);
+      this.statusMessage = `Removed missing recent folder ${titleFromPath(path)}`;
+      await this.persistWorkspace();
+      return false;
     },
     async refreshWorkspace() {
       if (!this.workspaceRoot) {
         this.workspaceFiles = [];
-        return;
+        return true;
       }
       try {
         this.workspaceFiles = await invoke<WorkspaceFileEntry[]>("list_workspace_files", {
           request: { root: this.workspaceRoot },
         });
         this.lastError = "";
+        return true;
       } catch (error) {
         this.workspaceFiles = [];
         this.lastError = error instanceof Error ? error.message : String(error);
+        return false;
       }
     },
     async saveActive(path?: string) {
@@ -1633,6 +1653,14 @@ export const useDocumentsStore = defineStore("documents", {
     rememberFolder(path: string | null) {
       if (!path) return;
       this.recentFolders = [path, ...this.recentFolders.filter((recent) => recent !== path)].slice(0, 12);
+    },
+    forgetFolderPath(path: string | null) {
+      if (!path) return;
+      this.recentFolders = this.recentFolders.filter((recent) => recent !== path);
+      if (this.workspaceRoot === path) {
+        this.workspaceRoot = null;
+        this.workspaceFiles = [];
+      }
     },
   },
 });
