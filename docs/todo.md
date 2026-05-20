@@ -586,6 +586,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   and presentation.
 - Window title workflow: clean opened document title, dirty title marker, and
   return to clean title after save.
+- Theme and typography workflow: app theme, preview theme, high contrast,
+  reduced motion, editor typography, preview typography, and reload
+  persistence.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.
@@ -600,6 +603,7 @@ Required next coverage:
 - Deeper workspace folder browsing and document-set grouping behavior.
 - Focus, export, review, and presentation mode local browser/native execution proof.
 - Broader keyboard shortcut coverage.
+- Theme/typography visual accessibility proof in a real browser/native runtime.
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
 - External conflict modal: more granular line-compose controls.

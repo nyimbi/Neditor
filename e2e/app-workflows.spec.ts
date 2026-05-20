@@ -893,6 +893,27 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await expect(editorContent).toHaveAttribute("spellcheck", "true");
   await expect(editorContent).toHaveAttribute("autocapitalize", "sentences");
   await page.getByLabel("Sidebar panel").selectOption("settings");
+
+  const appShell = page.locator(".app-shell");
+  const previewPane = page.locator(".preview-pane");
+  const previewDocument = page.locator(".preview-document");
+  await page.getByLabel("Theme", { exact: true }).selectOption("dark");
+  await page.getByLabel("Preview theme").selectOption("dark");
+  await page.getByLabel("High contrast").check();
+  await page.getByLabel("Reduced motion").check();
+  await page.getByLabel("Editor font").fill("Courier New, monospace");
+  await page.getByLabel("Editor font size").fill("18");
+  await page.getByLabel("Editor line height").fill("1.8");
+  await page.getByLabel("Preview font").fill("Georgia, serif");
+  await page.getByLabel("Preview font size").fill("19");
+  await page.getByLabel("Preview line height").fill("1.9");
+  await expect(appShell).toHaveAttribute("data-theme", "dark");
+  await expect(appShell).toHaveAttribute("data-high-contrast", "true");
+  await expect(appShell).toHaveAttribute("data-reduced-motion", "true");
+  await expect(previewPane).toHaveAttribute("data-preview-theme", "dark");
+  await expect(previewDocument).toHaveAttribute("style", /font-family: Georgia, serif; font-size: 19px; line-height: 1\.9/);
+  await expect.poll(() => editorContent.evaluate((element) => getComputedStyle(element).fontSize)).toBe("18px");
+
   await expect(page.getByLabel("Word wrap")).toBeChecked();
   await expect(page.getByLabel("Line numbers")).toBeChecked();
   await expect.poll(() => editorContent.evaluate((element) => element.classList.contains("cm-lineWrapping"))).toBe(true);
@@ -906,6 +927,11 @@ test("persists editor settings and runs search plus heading commands", async ({ 
 
   await page.reload();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("settings");
+  await expect(appShell).toHaveAttribute("data-theme", "dark");
+  await expect(appShell).toHaveAttribute("data-high-contrast", "true");
+  await expect(appShell).toHaveAttribute("data-reduced-motion", "true");
+  await expect(previewPane).toHaveAttribute("data-preview-theme", "dark");
+  await expect.poll(() => editorContent.evaluate((element) => getComputedStyle(element).fontSize)).toBe("18px");
   await expect(page.getByLabel("Word wrap")).not.toBeChecked();
   await expect(page.getByLabel("Line numbers")).not.toBeChecked();
   await expect.poll(() => editorContent.evaluate((element) => element.classList.contains("cm-lineWrapping"))).toBe(false);
