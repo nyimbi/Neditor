@@ -189,6 +189,9 @@ fn render_cross_reference_line(
 }
 
 fn reference_display_text(reference: &CrossReference) -> String {
+    if !reference.key.contains(':') {
+        return unprefixed_reference_display_text(&reference.key);
+    }
     let (label, suffix) = reference
         .key
         .split_once(':')
@@ -199,6 +202,30 @@ fn reference_display_text(reference: &CrossReference) -> String {
     } else {
         format!("{label} {}", suffix.replace(['-', '_'], " "))
     }
+}
+
+fn unprefixed_reference_display_text(key: &str) -> String {
+    let normalized = key.replace(['-', '_'], " ");
+    for (prefix, label) in [("appendix ", "Appendix"), ("decision ", "Decision")] {
+        if let Some(suffix) = normalized.strip_prefix(prefix) {
+            return format!("{label} {}", title_case_reference_suffix(suffix));
+        }
+    }
+    format!("Section {normalized}")
+}
+
+fn title_case_reference_suffix(suffix: &str) -> String {
+    suffix
+        .split_whitespace()
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn reference_kind_label(kind: &str) -> &'static str {

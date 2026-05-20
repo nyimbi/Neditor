@@ -201,6 +201,53 @@ fn rich_markdown_blocks_survive_cross_target_exports() {
 }
 
 #[test]
+fn heading_appendix_and_decision_references_survive_cross_target_exports() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Reference Export\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}, {@appendix-a}, and {@decision-record}.\n\n## Appendix A\nSupporting detail.\n\n## Decision Record\nUse local-first exports.\n".to_string(),
+        file_path: None,
+    });
+    let options = json!({});
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    assert!(response.compiled_markdown.contains(
+        "See [Section strategy](#sec:strategy), [Appendix A](#appendix-a), and [Decision Record](#decision-record)."
+    ));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains(r##"<a href="#sec:strategy">Section strategy</a>"##));
+    assert!(html.contains(r##"<a href="#appendix-a">Appendix A</a>"##));
+    assert!(html.contains(r##"<a href="#decision-record">Decision Record</a>"##));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Section strategy"));
+    assert!(pdf_text.contains("Appendix A"));
+    assert!(pdf_text.contains("Decision Record"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx reference bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Section strategy"));
+    assert!(docx_document.contains("Appendix A"));
+    assert!(docx_document.contains("Decision Record"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx reference bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Section strategy"));
+    assert!(pptx_slides.contains("Appendix A"));
+    assert!(pptx_slides.contains("Decision Record"));
+
+    let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+        .expect("reference bundle bytes");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    assert!(bundled_text.contains("Section strategy"));
+    assert!(bundled_text.contains("Appendix A"));
+    assert!(bundled_text.contains("Decision Record"));
+}
+
+#[test]
 fn export_conformance_fixture_maps_business_features() {
     let response = compile(CompileRequest {
         text: include_str!("../../fixtures/export/business_report.md").to_string(),

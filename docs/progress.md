@@ -600,11 +600,13 @@ Additional citation and generated-section verification:
 | `cargo test --locked compiler_reports_duplicate_keys_across_external_bibliography_files --lib -- --nocapture` in `src-tauri` | Pass | Proved multiple bibliography front matter paths can load separate BibTeX and CSL JSON files, and duplicate-key diagnostics point at the duplicate key in the second external file with first-file context. |
 | `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 14 citation tests passed, including BibTeX, CSL JSON, Hayagriva, external-file duplicate-key source ranges, numeric citation rendering, unsupported CSL-style fallback diagnostics, and citation export conformance. |
 | `cargo test --locked compiler_generates_glossary_sections_from_marker_and_metadata --lib -- --nocapture` in `src-tauri` | Pass | Proved `[GLOSSARY]` marker replacement, front matter-driven generated glossary insertion, preview hover preservation, and DOCX glossary artifact text. |
+| `cargo test --locked cross_references_resolve_heading_appendix_and_decision_anchors --lib -- --nocapture` in `src-tauri` | Pass | Proved unprefixed appendix and decision anchors render as Appendix and Decision labels rather than generic section labels. |
+| `cargo test --locked heading_appendix_and_decision_references_survive_cross_target_exports --lib -- --nocapture` in `src-tauri` | Pass | Proved section, appendix, and decision cross-reference labels survive HTML, PDF, DOCX, PPTX, and Markdown bundle artifacts. |
 | `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after carrying bibliography source metadata. |
 | `cargo check --locked` in `src-tauri` | Pass | Finished dev profile successfully. |
 | `cargo check --locked --features native-watch` in `src-tauri` | Pass | Finished dev profile successfully. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
-| `cargo test --locked` in `src-tauri` | Pass | 153 Rust tests passed; 0 failed. |
+| `cargo test --locked` in `src-tauri` | Pass | 154 Rust tests passed; 0 failed. |
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed after extending bibliography entry shape and numeric citation-style preference normalization. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed with duplicate source locations and numeric citation style controls in the References panel. |
 | `pnpm run check:docs` | Pass | Checked 13 Markdown files; local links resolve. |

@@ -129,7 +129,7 @@ fn cross_references_resolve_heading_appendix_and_decision_anchors() {
         .iter()
         .any(|reference| reference.key == "missing-code"));
     assert!(response.compiled_markdown.contains(
-            "See [Section strategy](#sec:strategy), [Section appendix a](#appendix-a), and [Section decision record](#decision-record)."
+            "See [Section strategy](#sec:strategy), [Appendix A](#appendix-a), and [Decision Record](#decision-record)."
         ));
     assert!(response
         .compiled_markdown

@@ -153,7 +153,13 @@ Most recent local verification evidence:
   passed and proves `[GLOSSARY]` marker replacement, front matter-driven
   generated glossary insertion, preview hover preservation, and DOCX glossary
   artifact text.
-- `cargo test --locked`: passed locally with 153 Rust tests on this Unix host.
+- `cargo test --locked heading_appendix_and_decision_references_survive_cross_target_exports --lib -- --nocapture`:
+  passed and proves section, appendix, and decision cross-reference labels
+  survive HTML, PDF, DOCX, PPTX, and Markdown bundle artifacts.
+- `cargo test --locked cross_references_resolve_heading_appendix_and_decision_anchors --lib -- --nocapture`:
+  passed and proves unprefixed appendix/decision anchors render as Appendix
+  and Decision labels instead of generic section labels.
+- `cargo test --locked`: passed locally with 154 Rust tests on this Unix host.
 - `pnpm run test:unit`: passed with 11 frontend unit tests, including latest
   document task cancellation/stale-result guard coverage, preview debounce
   timing/coalescing coverage, and workspace persistence migration/schema
@@ -1104,7 +1110,9 @@ Finish:
   Rust-native CSL/Hayagriva adapter for named CSL styles beyond the built-in
   options.
 - Cross-reference links across preview, HTML, PDF, DOCX, PPTX, and bundle
-  outputs.
+  outputs. Current focused coverage proves table, figure, equation, section,
+  appendix, and decision references across target artifacts, with appendix and
+  decision anchors rendered as semantic labels instead of generic sections.
 - Automatic index inclusion/exclusion.
 - Glossary definition preview, hover behavior, generated-section marker,
   front matter insertion, export appendix behavior, and command-palette
