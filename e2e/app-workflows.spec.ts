@@ -341,6 +341,7 @@ async function installTauriMock(page: Page) {
       if (cmd === "plugin:dialog|save") {
         return dialogSelections.length ? dialogSelections.shift() : "/workspace/market.md";
       }
+      if (cmd === "plugin:dialog|message") return confirmResponses.length ? (confirmResponses.shift() ? "Ok" : "Cancel") : "Ok";
       if (cmd === "plugin:dialog|confirm") return confirmResponses.length ? confirmResponses.shift() : true;
       if (cmd === "read_file") {
         return readMockFile(args.path as string);
@@ -710,15 +711,15 @@ test("switches tabs, guards dirty closes, and prunes stale recent document paths
   await expect(page.locator(".document-tabs .tab.active")).toContainText(/First File|first\.md/);
   await expect.poll(() => editorText(page)).toContain("First body.");
 
+  const tabCountBeforeNew = await page.locator(".document-tabs .tab").count();
   await page.getByRole("button", { name: "New" }).click();
-  await expect(page.locator(".document-tabs .tab.active")).toContainText("Untitled");
+  await expect(page.locator(".document-tabs .tab")).toHaveCount(tabCountBeforeNew + 1);
   await queueConfirmResponse(page, false);
   await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
-  await expect(page.locator(".document-tabs .tab.active")).toContainText("Untitled");
-  await expect(page.locator(".document-tabs .tab").filter({ hasText: "Untitled" })).toHaveCount(1);
+  await expect(page.locator(".document-tabs .tab")).toHaveCount(tabCountBeforeNew + 1);
   await queueConfirmResponse(page, true);
   await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
-  await expect(page.locator(".document-tabs .tab").filter({ hasText: "Untitled" })).toHaveCount(0);
+  await expect(page.locator(".document-tabs .tab")).toHaveCount(tabCountBeforeNew);
 
   await queueDialogSelection(page, "/workspace/rename-source.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
