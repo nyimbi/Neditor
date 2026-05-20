@@ -93,6 +93,9 @@ Most recent local verification evidence:
 - `pnpm exec playwright test --list`: listed the browser workflow harness with
   command-palette insertion proof for `[TOC]`, `[INDEX]`, `[BIBLIOGRAPHY]`,
   `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
+- `pnpm exec playwright test --list`: listed the browser workflow harness with
+  references-panel proof for resolved bibliography entries, missing citation
+  keys, and duplicate bibliography keys.
 - `pnpm run test:unit`: passed with 8 frontend unit tests.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
 - `cargo test --locked compiler_generates_lists_of_figures_and_tables --lib`:
@@ -612,6 +615,8 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   groups.
 - Generated-section insertion workflow: command-palette insertion for `[TOC]`,
   `[INDEX]`, `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
+- References workflow: citation command navigation plus resolved bibliography
+  entries, missing citation keys, and duplicate bibliography-key reporting.
 - Table editor Markdown paste import, numeric sorting, custom formula rows,
   merged-cell metadata, row and column add/remove behavior, column format
   totals, cancel-without-applying behavior, and apply-back-to-editor behavior.

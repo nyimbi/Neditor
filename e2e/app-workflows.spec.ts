@@ -201,6 +201,33 @@ async function installTauriMock(page: Page) {
       });
     }
 
+    function bibliographyFromMarkdown(text: string) {
+      const entries: Array<{ key: string; title: string; author: string | null; issued: string | null }> = [];
+      for (const fence of text.matchAll(/```(?:bibtex|bibliography)\s*\n([\s\S]*?)```/g)) {
+        for (const entry of fence[1].matchAll(/@\w+\s*\{\s*([^,\s]+)\s*,([\s\S]*?)(?=\n@\w+\s*\{|$)/g)) {
+          const body = entry[2] || "";
+          entries.push({
+            key: entry[1].trim(),
+            title: bibtexField(body, "title") || entry[1].trim(),
+            author: bibtexField(body, "author"),
+            issued: bibtexField(body, "year"),
+          });
+        }
+      }
+      return entries;
+    }
+
+    function bibtexField(body: string, field: string) {
+      const match = body.match(new RegExp(`${field}\\s*=\\s*[{\"]([^}\"]+)`, "i"));
+      return match?.[1].trim() || null;
+    }
+
+    function duplicateBibliographyKeys(entries: Array<{ key: string }>) {
+      const counts = new Map<string, number>();
+      for (const entry of entries) counts.set(entry.key, (counts.get(entry.key) || 0) + 1);
+      return Array.from(counts.entries()).filter(([, count]) => count > 1).map(([key]) => key);
+    }
+
     function glossaryFromMarkdown(text: string) {
       const glossary: Record<string, string> = {};
       const glossaryBlockPattern = /```glossary\s*\n([\s\S]*?)```/g;
@@ -300,6 +327,8 @@ async function installTauriMock(page: Page) {
       const documentSet = frontMatterValue(text, "documentSet") || frontMatterValue(text, "document_set") || frontMatterValue(text, "set");
       const headings = headingsFromMarkdown(expanded.compiled);
       const citationReferences = citationReferencesFromMarkdown(expanded.compiled);
+      const bibliography = bibliographyFromMarkdown(expanded.compiled);
+      const duplicateBibliographyKeys = duplicateBibliographyKeys(bibliography);
       const glossary = glossaryFromMarkdown(expanded.compiled);
       const indexTerms = indexTermsFromMarkdown(expanded.compiled);
       const sourceHash = hash(text);
@@ -357,7 +386,7 @@ async function installTauriMock(page: Page) {
           equations: 0,
           citations: citationReferences,
           citation_references: citationReferences,
-          duplicate_bibliography_keys: [],
+          duplicate_bibliography_keys: duplicateBibliographyKeys,
           glossary,
           layout_directives: [],
           comments: [],
@@ -384,7 +413,7 @@ async function installTauriMock(page: Page) {
         include_graph: expanded.includeGraph,
         source_map: [],
         metadata,
-        bibliography: [],
+        bibliography,
         index_terms: indexTerms,
         formula_graph: [],
         formula_dependency_edges: [],
@@ -1122,6 +1151,25 @@ test("runs command palette citation glossary and index navigation", async ({ pag
       "# Reference Navigation",
       "",
       "Citation target cites [@risk2026, p. 4] for the operating model.",
+      "Missing source cites [@missing2026] while duplicates cite [@dup2026].",
+      "",
+      "```bibtex",
+      "@article{risk2026,",
+      "  title={Risk Operating Model},",
+      "  author={Risk Team},",
+      "  year={2026}",
+      "}",
+      "@book{dup2026,",
+      "  title={Duplicate Reference A},",
+      "  author={One},",
+      "  year={2026}",
+      "}",
+      "@book{dup2026,",
+      "  title={Duplicate Reference B},",
+      "  author={Two},",
+      "  year={2026}",
+      "}",
+      "```",
       "",
       "```glossary",
       "ARR: Annual recurring revenue.",
@@ -1138,6 +1186,12 @@ test("runs command palette citation glossary and index navigation", async ({ pag
   await page.getByRole("button", { name: "[@risk2026] Citation" }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("references");
   await expect(page.locator(".cm-line").filter({ hasText: "Citation target cites" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Resolved references" })).toBeVisible();
+  await expect(page.getByText("Risk Operating Model")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Missing keys" })).toBeVisible();
+  await expect(page.getByText("@missing2026")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Duplicate keys" })).toBeVisible();
+  await expect(page.getByText("dup2026")).toBeVisible();
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("ARR");

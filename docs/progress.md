@@ -187,6 +187,9 @@ Recent pushed checkpoints visible in current git history:
   markers: `[TOC]`, `[INDEX]`, `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and
   `[LIST_OF_TABLES]`, with workflow harness coverage in the snippet insertion
   flow.
+- This update strengthens the references workflow harness with mock BibTeX
+  parsing so the References panel proves resolved bibliography entries,
+  missing citation keys, and duplicate bibliography-key reporting.
 
 ## Current Capability Snapshot
 
@@ -538,6 +541,14 @@ Additional generated-list insertion workflow verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness lists the command-palette insertion workflow that now asserts `[TOC]`, `[INDEX]`, `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]` insertion. |
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding generated-section insertion commands. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding generated-section insertion commands. |
+
+Additional references-panel bibliography verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm exec playwright test --list` | Pass | Browser harness lists the citation/glossary/index workflow that now asserts resolved bibliography entries, missing citation keys, and duplicate bibliography keys. |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding bibliography-aware browser mock compilation. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding bibliography-aware browser mock compilation. |
 
 Archived remote workflow evidence log:
 
