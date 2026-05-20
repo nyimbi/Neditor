@@ -680,6 +680,20 @@ test("saves a document as a new file and reopens it from recently closed", async
 test("restores workspace tabs, active document, pins, mode, and sidebar after reload", async ({ page }) => {
   await setMockFileText(
     page,
+    "/workspace/pinned-brief.md",
+    [
+      "---",
+      "title: Pinned Brief",
+      "status: draft",
+      "---",
+      "",
+      "# Pinned Brief",
+      "",
+      "Pinned workspace note.",
+    ].join("\n"),
+  );
+  await setMockFileText(
+    page,
     "/workspace/field-notes.md",
     [
       "---",
@@ -693,12 +707,19 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
     ].join("\n"),
   );
 
+  await queueDialogSelection(page, "/workspace/pinned-brief.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
   await queueDialogSelection(page, "/workspace/field-notes.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page
+    .locator(".document-tabs .tab")
+    .filter({ hasText: "Market Entry Report" })
+    .getByLabel("Close document")
+    .click();
 
-  const marketTab = page.locator(".document-tabs .tab").filter({ hasText: "Market Entry Report" });
-  await marketTab.getByLabel("Pin document").click();
-  await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /Market Entry Report/ })).toBeVisible();
+  const pinnedTab = page.locator(".document-tabs .tab").filter({ hasText: "Pinned Brief" });
+  await pinnedTab.getByLabel("Pin document").click();
+  await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /Pinned Brief/ })).toBeVisible();
   await expect(page.locator(".document-tabs .tab.active")).toContainText("Field Notes");
 
   await page.getByLabel("View mode").selectOption("review");
@@ -710,7 +731,7 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
   await expect(page.getByLabel("View mode")).toHaveValue("review");
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("settings");
   await expect(page.locator(".document-tabs .tab")).toHaveCount(2);
-  await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /Market Entry Report/ })).toBeVisible();
+  await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /Pinned Brief/ })).toBeVisible();
   await expect(page.locator(".document-tabs .tab.active")).toContainText("Field Notes");
   await expect.poll(() => editorText(page)).toContain("Reloaded workspace note.");
   await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/field-notes.md" })).toBeVisible();
