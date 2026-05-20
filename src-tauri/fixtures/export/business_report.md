@@ -6,6 +6,7 @@ status: approved
 approvedBy: QA
 approvedAt: 2026-05-18T12:00:00Z
 classification: restricted
+legalDisclaimer: "For board review only. Do not distribute externally without approval."
 toc: true
 brand:
   name: Acme Strategy

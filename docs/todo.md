@@ -759,6 +759,16 @@ Completion criteria:
 
 Status: broad implementation exists; artifact-level proof is incomplete.
 
+Current evidence:
+
+- `export_conformance_fixture_maps_business_features` now asserts release
+  approval metadata and legal disclaimer fidelity across HTML, PDF, DOCX
+  package properties/body text, PPTX package properties/slides, plain text, and
+  Markdown bundle metadata.
+- DOCX/PPTX custom package properties now include approval metadata and legal
+  disclaimer fields alongside status, version, classification, client, source
+  hash, and app version.
+
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
 
 - Headings, paragraphs, lists, nested lists, block quotes, callouts, code blocks.
@@ -776,7 +786,8 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   decision records.
 - Glossary, index, TOC, generated sections, and appendices.
 - Review comments, change notes, release metadata, AI provenance, legal
-  disclaimers, draft warnings, and approval metadata.
+  disclaimers, draft warnings, and approval metadata. The legal-disclaimer and
+  approval-metadata path is now covered by the export conformance fixture.
 - Page size, orientation, margins, columns, breaks, keep-with-next,
   keep-together, headers, footers, watermarks, cover pages, page numbers,
   brand profile, logo, colors, and fonts.

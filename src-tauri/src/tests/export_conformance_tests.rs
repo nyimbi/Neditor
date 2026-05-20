@@ -87,6 +87,13 @@ fn export_conformance_fixture_maps_business_features() {
     assert_eq!(response.semantic.title, "Export Conformance Report");
     assert_eq!(response.semantic.status, "approved");
     assert_eq!(response.export_manifest.document_version, "2.0.0");
+    assert_eq!(
+        response
+            .metadata
+            .get("legalDisclaimer")
+            .and_then(Value::as_str),
+        Some("For board review only. Do not distribute externally without approval.")
+    );
     assert!(response
         .semantic
         .citations
@@ -170,15 +177,17 @@ fn export_conformance_fixture_maps_business_features() {
     assert!(html.contains("Added export conformance evidence."));
     assert!(html.contains("class=\"export-provenance\""));
     assert!(html.contains("gpt-5.4"));
+    assert!(html.contains("class=\"export-legal\""));
+    assert!(html.contains("For board review only. Do not distribute externally without approval."));
 
     let pdf = render_pdf_bytes(&response, &options);
     let pdf_text = String::from_utf8_lossy(&pdf);
     assert!(pdf.starts_with(b"%PDF-1.4"));
-    assert!(pdf_text.contains("/Count 6"));
+    assert!(pdf_text.contains("/Count 7"));
     assert!(pdf_text.contains("/Title (Export Conformance Report)"));
     assert!(pdf_text.contains("/Keywords (approved; 2.0.0; restricted)"));
     assert!(pdf_text.contains("Export Conformance Report | restricted"));
-    assert!(pdf_text.contains("Page 6 of 6"));
+    assert!(pdf_text.contains("Page 7 of 7"));
     assert!(pdf_text.contains("Export Conformance Report"));
     assert!(pdf_text.contains("Competitive Advantage"));
     assert!(pdf_text.contains("Competitive Advantage, p."));
@@ -192,6 +201,10 @@ fn export_conformance_fixture_maps_business_features() {
     assert!(pdf_text.contains("Review Comments"));
     assert!(pdf_text.contains("Change Notes"));
     assert!(pdf_text.contains("AI Provenance"));
+    assert!(pdf_text.contains("Legal Disclaimer"));
+    assert!(
+        pdf_text.contains("For board review only. Do not distribute externally without approval.")
+    );
 
     let docx = render_docx_bytes(&response, &options).expect("docx bytes");
     let docx_content_types = zip_entry_text(&docx, "[Content_Types].xml");
@@ -201,6 +214,8 @@ fn export_conformance_fixture_maps_business_features() {
     let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
     let docx_comments = zip_entry_text(&docx, "word/comments.xml");
     let docx_app = zip_entry_text(&docx, "docProps/app.xml");
+    let docx_core = zip_entry_text(&docx, "docProps/core.xml");
+    let docx_custom = zip_entry_text(&docx, "docProps/custom.xml");
     let docx_svg = zip_entry_text(&docx, "word/media/image1.svg");
     assert!(docx_content_types.contains(r#"ContentType="image/svg+xml""#));
     assert!(docx_content_types.contains(
@@ -227,8 +242,20 @@ fn export_conformance_fixture_maps_business_features() {
     assert!(docx_comments.contains("Verify board-pack export fidelity."));
     assert!(docx_comments.contains(r#"<w:comment w:id="1" w:author="QA""#));
     assert!(docx_comments.contains("Change note: Added export conformance evidence."));
+    assert!(docx_core.contains("<dc:creator>QA</dc:creator>"));
     assert!(docx_app.contains("<Application>NEditor</Application>"));
     assert!(docx_app.contains("<Company>Acme Strategy</Company>"));
+    assert!(docx_custom.contains(r#"name="NEditorStatus""#));
+    assert!(docx_custom.contains("<vt:lpwstr>approved</vt:lpwstr>"));
+    assert!(docx_custom.contains(r#"name="NEditorVersion""#));
+    assert!(docx_custom.contains("<vt:lpwstr>2.0.0</vt:lpwstr>"));
+    assert!(docx_custom.contains(r#"name="NEditorApprovedBy""#));
+    assert!(docx_custom.contains("<vt:lpwstr>QA</vt:lpwstr>"));
+    assert!(docx_custom.contains(r#"name="NEditorApprovedAt""#));
+    assert!(docx_custom.contains("<vt:lpwstr>2026-05-18T12:00:00Z</vt:lpwstr>"));
+    assert!(docx_custom.contains(r#"name="NEditorLegalDisclaimer""#));
+    assert!(docx_custom
+        .contains("For board review only. Do not distribute externally without approval."));
     let docx_without_comments = render_docx_bytes(
         &response,
         &json!({
@@ -265,11 +292,16 @@ fn export_conformance_fixture_maps_business_features() {
     assert!(docx_document.contains("Added export conformance evidence."));
     assert!(docx_document.contains("AI Provenance"));
     assert!(docx_document.contains("gpt-5.4"));
+    assert!(docx_document.contains("Legal Disclaimer"));
+    assert!(docx_document
+        .contains("For board review only. Do not distribute externally without approval."));
 
     let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
     let pptx_content_types = zip_entry_text(&pptx, "[Content_Types].xml");
     let pptx_presentation = zip_entry_text(&pptx, "ppt/presentation.xml");
     let pptx_app = zip_entry_text(&pptx, "docProps/app.xml");
+    let pptx_core = zip_entry_text(&pptx, "docProps/core.xml");
+    let pptx_custom = zip_entry_text(&pptx, "docProps/custom.xml");
     let pptx_agenda_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
     let pptx_slide_three = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
     let pptx_slide_three_relationships = zip_entry_text(&pptx, "ppt/slides/_rels/slide3.xml.rels");
@@ -281,6 +313,12 @@ fn export_conformance_fixture_maps_business_features() {
         r#"ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml""#
     ));
     assert!(pptx_presentation.contains(r#"r:id="rId2""#));
+    assert!(pptx_core.contains("<dc:creator>QA</dc:creator>"));
+    assert!(pptx_custom.contains(r#"name="NEditorApprovedBy""#));
+    assert!(pptx_custom.contains(r#"name="NEditorApprovedAt""#));
+    assert!(pptx_custom.contains(r#"name="NEditorLegalDisclaimer""#));
+    assert!(pptx_custom
+        .contains("For board review only. Do not distribute externally without approval."));
     assert!(pptx_app.contains("<Application>NEditor</Application>"));
     assert!(pptx_app.contains(&format!("<Slides>{pptx_slide_part_count}</Slides>")));
     assert_eq!(pptx_media_part_count, 2);
@@ -297,7 +335,7 @@ fn export_conformance_fixture_maps_business_features() {
     assert!(pptx_slide_three.contains("Reference architecture"));
     assert!(pptx_slide_three.contains(r#"name="Header""#));
     assert!(pptx_slide_three.contains(r#"name="Footer""#));
-    assert!(pptx_slide_three.contains("Page 3 of 9"));
+    assert!(pptx_slide_three.contains("Page 3 of 10"));
     assert!(pptx_slide_three.contains(r#"r:embed="rIdImage1""#));
     assert!(pptx_slide_three_relationships.contains(r#"Target="../media/image1.svg""#));
     assert_eq!(pptx_svg, "<svg/>");
@@ -318,6 +356,12 @@ fn export_conformance_fixture_maps_business_features() {
         .find(|slide| slide.contains("AI Provenance"))
         .expect("provenance slide");
     assert!(pptx_provenance_slide.contains("gpt-5.4"));
+    let pptx_legal_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
+        .into_iter()
+        .find(|slide| slide.contains("Legal Disclaimer"))
+        .expect("legal disclaimer slide");
+    assert!(pptx_legal_slide
+        .contains("For board review only. Do not distribute externally without approval."));
 
     let exported_text = export::export_text(&response, &options);
     assert!(exported_text.contains("Glossary"));
@@ -325,6 +369,9 @@ fn export_conformance_fixture_maps_business_features() {
     assert!(exported_text.contains("Review Comments"));
     assert!(exported_text.contains("Change Notes"));
     assert!(exported_text.contains("AI Provenance"));
+    assert!(exported_text.contains("Legal Disclaimer"));
+    assert!(exported_text
+        .contains("For board review only. Do not distribute externally without approval."));
 
     let mut bundle_manifest = response.export_manifest.clone();
     bundle_manifest.export_options = options.clone();
@@ -350,6 +397,11 @@ fn export_conformance_fixture_maps_business_features() {
     assert!(bundled_semantic.contains("\"title\": \"Export Conformance Report\""));
     assert!(bundled_semantic.contains("\"comments\""));
     assert!(bundled_metadata.contains("\"classification\": \"restricted\""));
+    assert!(bundled_metadata.contains("\"approvedBy\": \"QA\""));
+    assert!(bundled_metadata.contains("\"approvedAt\": \"2026-05-18T12:00:00Z\""));
+    assert!(bundled_metadata.contains(
+        "\"legalDisclaimer\": \"For board review only. Do not distribute externally without approval.\""
+    ));
     assert!(bundled_ast.contains("\"kind\": \"figure\""));
     assert!(bundled_ast.contains("\"source_file\""));
     assert!(bundled_source_map.contains("\"generated_line\""));

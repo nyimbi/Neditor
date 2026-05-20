@@ -103,6 +103,21 @@ pub(super) fn render_custom_properties(response: &CompileResponse) -> String {
     );
     push_custom_property(
         &mut properties,
+        "NEditorApprovedBy",
+        &metadata_string(&response.metadata, "approvedBy").unwrap_or_default(),
+    );
+    push_custom_property(
+        &mut properties,
+        "NEditorApprovedAt",
+        &metadata_string(&response.metadata, "approvedAt").unwrap_or_default(),
+    );
+    push_custom_property(
+        &mut properties,
+        "NEditorLegalDisclaimer",
+        &metadata_string(&response.metadata, "legalDisclaimer").unwrap_or_default(),
+    );
+    push_custom_property(
+        &mut properties,
         "NEditorSourceHash",
         &response.export_manifest.source_hash,
     );
