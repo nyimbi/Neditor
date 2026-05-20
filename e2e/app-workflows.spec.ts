@@ -674,6 +674,75 @@ test("syncs editor and preview scrolling and jumps preview headings to source", 
   await expect.poll(() => editorScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
 });
 
+test("persists editor settings and runs search plus heading commands", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/editor-ergonomics.md",
+    [
+      "---",
+      "title: Editor Ergonomics",
+      "status: draft",
+      "---",
+      "",
+      "# Editor Ergonomics",
+      "",
+      "Find target Acme should be replaceable.",
+      "",
+      "## Command Target",
+      "",
+      "Heading command should focus this source line.",
+      "",
+      "- First item",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/editor-ergonomics.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const editorContent = page.locator(".cm-content");
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await expect(page.getByLabel("Word wrap")).toBeChecked();
+  await expect(page.getByLabel("Line numbers")).toBeChecked();
+  await expect.poll(() => editorContent.evaluate((element) => element.classList.contains("cm-lineWrapping"))).toBe(true);
+  await expect(page.locator(".cm-lineNumbers")).toHaveCount(1);
+
+  await page.getByLabel("Word wrap").uncheck();
+  await page.getByLabel("Line numbers").uncheck();
+  await expect.poll(() => editorContent.evaluate((element) => element.classList.contains("cm-lineWrapping"))).toBe(false);
+  await expect(page.locator(".cm-lineNumbers")).toHaveCount(0);
+  await page.getByRole("button", { name: "Save Workspace" }).click();
+
+  await page.reload();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("settings");
+  await expect(page.getByLabel("Word wrap")).not.toBeChecked();
+  await expect(page.getByLabel("Line numbers")).not.toBeChecked();
+  await expect.poll(() => editorContent.evaluate((element) => element.classList.contains("cm-lineWrapping"))).toBe(false);
+  await expect(page.locator(".cm-lineNumbers")).toHaveCount(0);
+
+  await editorContent.click();
+  await page.keyboard.press("Control+f");
+  await page.getByRole("textbox", { name: "Find" }).fill("Acme");
+  await page.getByRole("textbox", { name: "Replace" }).fill("Globex");
+  await page.locator(".cm-search").getByRole("button", { name: "replace all" }).click();
+  await expect.poll(() => editorText(page)).toContain("Find target Globex should be replaceable.");
+  await expect.poll(() => editorText(page)).not.toContain("Acme");
+
+  await editorContent.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Second item");
+  await expect.poll(() => editorText(page)).toContain("- Second item");
+
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("(");
+  await expect.poll(() => editorText(page)).toContain("()");
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Command Target");
+  await page.getByRole("button", { name: /Command Target Heading line/ }).click();
+  await expect(page.locator(".cm-line").filter({ hasText: "## Command Target" })).toBeVisible();
+});
+
 test("runs command palette insertion and table editor workflows", async ({ page }) => {
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert table");
