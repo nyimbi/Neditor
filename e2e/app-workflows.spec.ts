@@ -964,7 +964,7 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await enginePath.dispatchEvent("change");
   await expect(trusted).not.toBeChecked();
   await queueConfirmResponse(page, false);
-  await trusted.check();
+  await trusted.click();
   await expect(trusted).not.toBeChecked();
   await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/opt/bin/d2");
 });
