@@ -72,6 +72,135 @@ fn pptx_export_splits_large_tables_across_slides() {
 }
 
 #[test]
+fn rich_markdown_blocks_survive_cross_target_exports() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Rich Artifact Blocks\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20T12:00:00Z\n---\n# Rich Artifact Blocks\n\n> Quoted evidence\n> across lines\n\n> [!WARNING] Launch Gate\n> Confirm fallback before release.\n\n- First decision\n  - Nested control\n- Second decision\n\n1. First ordered step\n2. Second ordered step\n\n- [x] Reviewed by finance\n- [ ] Attach signed approval\n\n```js\nconst total = 42;\n```\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Fallback | Platform |\n\n![Architecture](data:image/svg+xml;base64,PHN2Zy8+){#fig:architecture caption=\"Reference architecture\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n[LIST_OF_FIGURES]\n\n[LIST_OF_TABLES]\n\nSee {@tbl:controls}, {@fig:architecture}, and {@eq:roi}.\n".to_string(),
+        file_path: None,
+    });
+    let options = json!({ "includeGlossary": false });
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    assert!(response
+        .document_ast
+        .blocks
+        .iter()
+        .any(|block| matches!(block, DocumentBlock::BlockQuote { text, .. } if text.contains("Quoted evidence"))));
+    assert!(response
+        .document_ast
+        .blocks
+        .iter()
+        .any(|block| matches!(block, DocumentBlock::Callout { callout_type, title, text, .. } if callout_type == "warning" && title == "Launch Gate" && text.contains("Confirm fallback"))));
+    assert!(response
+        .document_ast
+        .blocks
+        .iter()
+        .any(|block| matches!(block, DocumentBlock::CodeBlock { language, code, .. } if language.as_deref() == Some("js") && code.contains("const total = 42"))));
+    assert!(response.compiled_markdown.contains("List of Figures"));
+    assert!(response
+        .compiled_markdown
+        .contains("[Figure 1: Reference architecture](#fig:architecture)"));
+    assert!(response.compiled_markdown.contains("List of Tables"));
+    assert!(response
+        .compiled_markdown
+        .contains("[Table 1: Controls](#tbl:controls)"));
+    assert!(response
+        .compiled_markdown
+        .contains("[Table controls](#tbl:controls)"));
+    assert!(response
+        .compiled_markdown
+        .contains("[Figure architecture](#fig:architecture)"));
+    assert!(response
+        .compiled_markdown
+        .contains("[Equation roi](#eq:roi)"));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("<blockquote>"));
+    assert!(html.contains("Quoted evidence"));
+    assert!(html.contains("class=\"callout callout-warning\""));
+    assert!(html.contains("Launch Gate"));
+    assert!(html.contains("Nested control"));
+    assert!(html.contains("total"));
+    assert!(html.contains("42"));
+    assert!(html.contains("List of Figures"));
+    assert!(html.contains("List of Tables"));
+    assert!(html.contains(r##"<a href="#tbl:controls">Table controls</a>"##));
+    assert!(html.contains(r##"<a href="#fig:architecture">Figure architecture</a>"##));
+    assert!(html.contains(r##"<a href="#eq:roi">Equation roi</a>"##));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("> Quoted evidence"));
+    assert!(pdf_text.contains("> across lines"));
+    assert!(pdf_text.contains("Callout: warning: Launch Gate"));
+    assert!(pdf_text.contains("- First decision"));
+    assert!(pdf_text.contains("Nested control"));
+    assert!(pdf_text.contains("1. First ordered step"));
+    assert!(pdf_text.contains("- [x] Reviewed by finance"));
+    assert!(pdf_text.contains("```js"));
+    assert!(pdf_text.contains("const total = 42;"));
+    assert!(pdf_text.contains("Controls"));
+    assert!(pdf_text.contains("Fallback"));
+    assert!(pdf_text.contains("Reference architecture"));
+    assert!(pdf_text.contains("Equation roi"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Quote: Quoted evidence"));
+    assert!(docx_document.contains("across lines"));
+    assert!(docx_document.contains("Callout: warning: Launch Gate"));
+    assert!(docx_document.contains("Confirm fallback before release."));
+    assert!(docx_document.contains("First decision"));
+    assert!(docx_document.contains("Nested control"));
+    assert!(docx_document.contains("First ordered step"));
+    assert!(docx_document.contains("[x] Reviewed by finance"));
+    assert!(docx_document.contains("Code (js)"));
+    assert!(docx_document.contains("const total = 42;"));
+    assert!(docx_document.contains("List of Figures"));
+    assert!(docx_document.contains("List of Tables"));
+    assert!(docx_document.contains("Table controls"));
+    assert!(docx_document.contains("Figure architecture"));
+    assert!(docx_document.contains("Equation roi"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("&gt; Quoted evidence"));
+    assert!(pptx_slides.contains("Callout: warning: Launch Gate"));
+    assert!(pptx_slides.contains("- First decision"));
+    assert!(pptx_slides.contains("Nested control"));
+    assert!(pptx_slides.contains("1. First ordered step"));
+    assert!(pptx_slides.contains("- [x] Reviewed by finance"));
+    assert!(pptx_slides.contains("```js"));
+    assert!(pptx_slides.contains("const total = 42;"));
+    assert!(pptx_slides.contains("Controls"));
+    assert!(pptx_slides.contains("Fallback"));
+    assert!(pptx_slides.contains("Reference architecture"));
+    assert!(pptx_slides.contains("List of Figures"));
+    assert!(pptx_slides.contains("List of Tables"));
+    assert!(pptx_slides.contains("Equation roi"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_options = options.clone();
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
+    assert!(bundled_text.contains("> Quoted evidence"));
+    assert!(bundled_text.contains("Callout: warning: Launch Gate"));
+    assert!(bundled_text.contains("```js"));
+    assert!(bundled_text.contains("const total = 42;"));
+    assert!(bundled_text.contains("Controls"));
+    assert!(bundled_text.contains("Fallback"));
+    assert!(bundled_text.contains("Figure: fig:architecture: Reference architecture"));
+    assert!(bundled_ast.contains("\"kind\": \"block_quote\""));
+    assert!(bundled_ast.contains("\"kind\": \"callout\""));
+    assert!(bundled_ast.contains("\"kind\": \"code_block\""));
+    assert!(bundled_ast.contains("\"kind\": \"list\""));
+    assert!(bundled_ast.contains("\"kind\": \"task_list\""));
+}
+
+#[test]
 fn export_conformance_fixture_maps_business_features() {
     let response = compile(CompileRequest {
         text: include_str!("../../fixtures/export/business_report.md").to_string(),

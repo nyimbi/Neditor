@@ -777,10 +777,18 @@ Current evidence:
   highlighting, cover page, page numbers, glossary/comment/provenance
   appendices, PPTX agenda, compact layout preset, watermark, legal disclaimer
   carry-through, and exact Markdown bundle `export_options` evidence.
+- `rich_markdown_blocks_survive_cross_target_exports` now proves common
+  Markdown/business blocks across HTML, PDF, DOCX, PPTX, plain text, and
+  Markdown bundle evidence: block quotes, callouts, unordered/nested/ordered
+  lists, task lists, code blocks, tables, figures, equations, generated lists
+  of figures/tables, and table/figure/equation cross references.
 
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
 
 - Headings, paragraphs, lists, nested lists, block quotes, callouts, code blocks.
+  Common block evidence now exists in
+  `rich_markdown_blocks_survive_cross_target_exports`; remaining work is
+  rendered/manual QA and more edge-case permutations.
 - Tables, merged cells, alignment, formulas, totals, captions, and large table
   pagination/splitting.
 - Figures, captions, cover crop/fit, relative media packaging, duplicate media
@@ -789,6 +797,9 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   focused compiler/export artifact test for numbering, anchors, fenced-example
   exclusion, preview HTML, and DOCX text.
 - Equations, numbering, references, and cross-target rendering.
+  A focused rich-block export test now proves equation text and equation
+  references across the artifact family; remaining work is rendered visual QA
+  and more math syntax permutations.
 - Citations, bibliography, locators, missing keys, duplicate keys, and CSL
   behavior.
 - Cross references to headings, figures, tables, equations, appendices, and

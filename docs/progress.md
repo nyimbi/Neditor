@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `5c1caee Render
-  richer API schema transform references`
+- Latest inspected committed baseline before this update: `18500c1 Prove
+  export option intent across artifacts`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -306,6 +306,12 @@ Recent pushed checkpoints visible in current git history:
   appendices, PPTX agenda generation, layout preset, watermark, legal
   disclaimer output, and Markdown bundle `export_options` are honored from the
   same compiled document.
+- This update adds
+  `rich_markdown_blocks_survive_cross_target_exports`, which pushes a richer
+  Markdown business fixture through HTML, PDF, DOCX, PPTX, plain text, and
+  Markdown bundle evidence. It covers block quotes, callouts, unordered,
+  nested, ordered, and task lists, JavaScript code blocks, tables, figures,
+  equations, generated lists of figures/tables, and cross references.
 
 ## Current Capability Snapshot
 
@@ -333,6 +339,9 @@ Implemented or substantially present, pending the conservative caveats in
 - Export option fidelity now has backend package/text proof across HTML, PDF,
   DOCX, PPTX, plain text, and Markdown bundle manifests for one target-specific
   option matrix.
+- Rich Markdown block fidelity now has backend package/text proof across HTML,
+  PDF, DOCX, PPTX, plain text, and Markdown bundle AST/text evidence for common
+  business-document blocks and generated cross-reference sections.
 - Transform registry with Rust-native renderers/fallbacks and trust-gated
   external adapters for Graphviz/DOT, D2, PlantUML, and Pikchr.
 - Rust-native structured-document transforms for JSON, YAML, OpenAPI, and JSON
@@ -434,8 +443,8 @@ P0 gaps:
 
 P1 gaps:
 
-- Export fidelity still requires broader artifact-level and visual/manual
-  proof, but target-specific option matrix preservation now has backend
+- Export fidelity still requires rendered/manual proof, but target-specific
+  option matrix preservation and rich Markdown block fidelity now have backend
   package/text evidence across every export target.
 - Export readiness has browser workflow coverage for the target-specific
   status/diagnostic path, but still needs a requirement-by-requirement audit.
@@ -482,6 +491,21 @@ Additional export option matrix verification:
 | `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after adding the option-matrix conformance test. |
 | `cargo test --locked export_option_tests --lib` in `src-tauri` | Pass | 9 export option tests passed, including `export_option_matrix_is_preserved_across_targets_and_bundle_evidence`. |
 | `cargo test --locked` in `src-tauri` | Pass | 144 Rust tests passed; 0 failed. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
+| `pnpm run test:unit` | Pass | 11 frontend unit tests passed. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed. |
+| `pnpm run check:docs` | Pass | Checked 12 Markdown files; local links resolve. |
+| `pnpm run check:a11y` | Pass | Checked `App.vue` template accessibility guardrails. |
+| `pnpm exec playwright test --list` | Pass | Listed 35 Chromium workflow tests; execution still depends on local Chromium availability and host permissions. |
+| `git diff --check` | Pass | No whitespace errors in the current diff. |
+
+Additional rich Markdown block export verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo fmt --check` in `src-tauri` | Pass | Completed with no formatting diff after adding the rich-block conformance test. |
+| `cargo test --locked export_conformance_tests --lib` in `src-tauri` | Pass | 5 export conformance tests passed, including `rich_markdown_blocks_survive_cross_target_exports`. |
+| `cargo test --locked` in `src-tauri` | Pass | 145 Rust tests passed; 0 failed. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Finished with no warnings. |
 | `pnpm run test:unit` | Pass | 11 frontend unit tests passed. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 57 modules transformed. |
