@@ -786,6 +786,17 @@ export const useDocumentsStore = defineStore("documents", {
       await this.refreshGitStatus();
       await this.persistWorkspace();
     },
+    async openRecentPath(path: string) {
+      try {
+        await this.openPath(path);
+        return true;
+      } catch {
+        this.forgetFilePath(path);
+        this.statusMessage = `Removed missing recent file ${titleFromPath(path)}`;
+        await this.persistWorkspace();
+        return false;
+      }
+    },
     setDocumentScroll(id: string, scroll: { editor?: number; preview?: number }, persist = false) {
       const document = this.documents.find((item) => item.id === id);
       if (!document) return;
@@ -886,6 +897,7 @@ export const useDocumentsStore = defineStore("documents", {
     async renameActive(path: string) {
       const doc = this.activeDocument;
       if (!doc.path) throw new Error("Save the document before renaming it.");
+      const oldPath = doc.path;
       const metadata = await invoke<{ path: string; exists: boolean; hash?: string; modified?: string }>("rename_file", {
         request: { from: doc.path, to: path },
       });
@@ -894,6 +906,7 @@ export const useDocumentsStore = defineStore("documents", {
       doc.savedHash = metadata.hash || doc.savedHash;
       doc.modified = metadata.modified;
       this.statusMessage = `Renamed ${doc.title}`;
+      this.forgetFilePath(oldPath);
       this.rememberFile(doc.path);
       if (this.workspaceRoot) await this.refreshWorkspace();
       await this.refreshGitStatus();
@@ -1610,6 +1623,12 @@ export const useDocumentsStore = defineStore("documents", {
     rememberFile(path: string | null) {
       if (!path) return;
       this.recentFiles = [path, ...this.recentFiles.filter((recent) => recent !== path)].slice(0, 20);
+    },
+    forgetFilePath(path: string | null) {
+      if (!path) return;
+      this.recentFiles = this.recentFiles.filter((recent) => recent !== path);
+      this.recentlyClosed = this.recentlyClosed.filter((recent) => recent !== path);
+      this.missingWorkspaceFiles = this.missingWorkspaceFiles.filter((missing) => missing !== path);
     },
     rememberFolder(path: string | null) {
       if (!path) return;

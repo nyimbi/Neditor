@@ -41,7 +41,7 @@
             >
               {{ document.pinned ? "!" : "^" }}
             </button>
-            <button class="tab-close" type="button" aria-label="Close document" @click="store.closeDocument(document.id)">x</button>
+            <button class="tab-close" type="button" aria-label="Close document" @click="closeDocument(document.id)">x</button>
           </div>
         </section>
       </section>
@@ -799,7 +799,7 @@
           </label>
           <section aria-label="Recent files">
             <h3>Recent files</h3>
-            <button v-for="path in store.recentFiles" :key="path" class="outline-row" type="button" @click="store.openPath(path)">
+            <button v-for="path in store.recentFiles" :key="path" class="outline-row" type="button" @click="store.openRecentPath(path)">
               {{ path }}
             </button>
           </section>
@@ -811,7 +811,7 @@
           </section>
           <section aria-label="Recently closed documents">
             <h3>Recently closed</h3>
-            <button v-for="path in store.recentlyClosed" :key="path" class="outline-row" type="button" @click="store.openPath(path)">
+            <button v-for="path in store.recentlyClosed" :key="path" class="outline-row" type="button" @click="store.openRecentPath(path)">
               {{ path }}
             </button>
           </section>
@@ -2146,8 +2146,24 @@ function activate(id: string) {
 
 function closeTabGroup(group: DocumentTabGroup) {
   for (const document of [...group.documents]) {
-    store.closeDocument(document.id);
+    void closeDocument(document.id);
   }
+}
+
+async function closeDocument(id: string) {
+  const document = store.documents.find((item) => item.id === id);
+  if (!document) return;
+  if (document.dirty) {
+    const discard = await confirm(`Close ${document.title} and discard unsaved changes?`, {
+      title: "Discard unsaved changes",
+      kind: "warning",
+    });
+    if (!discard) {
+      store.statusMessage = `Kept ${document.title} open`;
+      return;
+    }
+  }
+  store.closeDocument(id);
 }
 
 function dropTabOnGroup(group: DocumentTabGroup) {

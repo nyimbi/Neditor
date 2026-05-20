@@ -20,6 +20,7 @@ async function installTauriMock(page: Page) {
     const storeResources = new Map<number, Map<string, unknown>>();
     const files = new Map<string, { text: string; hash: string; modified: string }>(persistentState.files || []);
     const dialogSelections: Array<string | null> = [];
+    const confirmResponses: boolean[] = [];
     const revealedPaths: string[] = [];
     let callbackId = 1;
     let storeId = 1;
@@ -340,7 +341,7 @@ async function installTauriMock(page: Page) {
       if (cmd === "plugin:dialog|save") {
         return dialogSelections.length ? dialogSelections.shift() : "/workspace/market.md";
       }
-      if (cmd === "plugin:dialog|confirm") return true;
+      if (cmd === "plugin:dialog|confirm") return confirmResponses.length ? confirmResponses.shift() : true;
       if (cmd === "read_file") {
         return readMockFile(args.path as string);
       }
@@ -481,6 +482,9 @@ async function installTauriMock(page: Page) {
       queueDialogSelection(path: string | null) {
         dialogSelections.push(path);
       },
+      queueConfirmResponse(value: boolean) {
+        confirmResponses.push(value);
+      },
       getFile(path: string) {
         return readMockFile(path).text;
       },
@@ -538,6 +542,10 @@ async function editorText(page: Page) {
 
 async function queueDialogSelection(page: Page, path: string | null) {
   await page.evaluate((selectedPath) => window.__NEDITOR_E2E__.queueDialogSelection(selectedPath), path);
+}
+
+async function queueConfirmResponse(page: Page, value: boolean) {
+  await page.evaluate((response) => window.__NEDITOR_E2E__.queueConfirmResponse(response), value);
 }
 
 async function mockFileText(page: Page, path: string) {
@@ -683,6 +691,57 @@ test("saves a document as a new file and reopens it from recently closed", async
   await expect(recentlyClosed.getByRole("button", { name: "/workspace/market-approved.md" })).toHaveCount(0);
   await page.getByLabel("Sidebar panel").selectOption("files");
   await expect.poll(() => activeFileRowText(page)).toContain("market-approved.md");
+});
+
+test("switches tabs, guards dirty closes, and prunes stale recent document paths", async ({ page }) => {
+  await setMockFileText(page, "/workspace/first.md", "# First File\n\nFirst body.");
+  await setMockFileText(page, "/workspace/second.md", "# Second File\n\nSecond body.");
+  await setMockFileText(page, "/workspace/rename-source.md", "# Rename Source\n\nRename source body.");
+  await setMockFileText(page, "/workspace/delete-after-close.md", "# Delete After Close\n\nDelete body.");
+
+  await queueDialogSelection(page, "/workspace/first.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueDialogSelection(page, "/workspace/second.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("second.md");
+  await expect.poll(() => editorText(page)).toContain("Second body.");
+  await page.locator(".document-tabs .tab").filter({ hasText: "first.md" }).getByRole("button").first().click();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("first.md");
+  await expect.poll(() => editorText(page)).toContain("First body.");
+
+  await page.getByRole("button", { name: "New" }).click();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("Untitled");
+  await queueConfirmResponse(page, false);
+  await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("Untitled");
+  await expect(page.locator(".document-tabs .tab").filter({ hasText: "Untitled" })).toHaveCount(2);
+  await queueConfirmResponse(page, true);
+  await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
+  await expect(page.locator(".document-tabs .tab").filter({ hasText: "Untitled" })).toHaveCount(1);
+
+  await queueDialogSelection(page, "/workspace/rename-source.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueDialogSelection(page, "/workspace/rename-target.md");
+  await page.getByRole("button", { name: "Rename" }).click();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("rename-target.md");
+
+  await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/rename-source.md" })).toHaveCount(0);
+  await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/rename-target.md" })).toBeVisible();
+  await expect(page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/rename-source.md" })).toHaveCount(0);
+  await expect(page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/rename-target.md" })).toBeVisible();
+
+  await queueDialogSelection(page, "/workspace/delete-after-close.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
+  await deleteMockFile(page, "/workspace/delete-after-close.md");
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await expect(page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/delete-after-close.md" })).toBeVisible();
+  await page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/delete-after-close.md" }).click();
+  await expect(page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/delete-after-close.md" })).toHaveCount(0);
+  await expect(page.getByText("Removed missing recent file delete-after-close.md")).toBeVisible();
 });
 
 test("restores workspace tabs, active document, pins, mode, and sidebar after reload", async ({ page }) => {

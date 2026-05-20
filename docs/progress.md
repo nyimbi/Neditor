@@ -163,6 +163,10 @@ P0 gaps:
   files, scroll-position restore, and missing-restored-file warning coverage.
   Local focused Playwright execution remains blocked by the missing
   workspace-local Chromium headless shell.
+- Local browser workflow discovery now lists 22 Chromium tests after adding
+  tab activation, dirty close confirmation, renamed recent cleanup, and deleted
+  recently-closed pruning coverage. Pushed CI evidence is pending for this
+  slice.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -276,6 +280,17 @@ Additional missing-file and scroll restore workflow verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "restores workspace\|skips missing" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
 | `gh run view 26148828614 --json status,conclusion,headSha,jobs,url` | Pass | Commit `5a13fe2` passed the 21-test browser workflow job plus Ubuntu, macOS, and Windows desktop builds. |
 | `git diff --check` | Pass | No whitespace errors after adding scroll and missing-file restore coverage. |
+
+Additional tab and stale-recent workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding dirty-close confirmation and stale recent cleanup paths. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed; 54 modules transformed. |
+| `pnpm exec playwright test --list` | Pass | Listed 22 Chromium workflow tests, including tab activation, dirty close confirmation, renamed recent cleanup, and deleted recently-closed pruning coverage. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "switches tabs" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache. |
+| `pnpm exec playwright install chromium` | Interrupted | The install attempt produced no output for several minutes, so the hung process tree was terminated and CI remains the browser execution source of truth. |
+| `git diff --check` | Pass | No whitespace errors after adding tab and stale-recent coverage. |
 
 Current CI evidence log:
 
