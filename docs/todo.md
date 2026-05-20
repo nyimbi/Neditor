@@ -25,7 +25,7 @@ Current survey inputs:
 - Backend tests under `src-tauri/src/tests/`
 - CI workflow: `.github/workflows/ci.yml`
 - Current GitHub Actions evidence for commits `9a6d52e`, `25f7b04`,
-  `5c29914`, and `33ee6a9`
+  `5c29914`, `33ee6a9`, and `443515b`
 
 Status vocabulary:
 
@@ -75,34 +75,33 @@ modules after behavior is locked.
 
 Latest pushed commit inspected:
 
-- `33ee6a9 Keep external adapter fixtures stdin-safe on Linux`
+- `443515b Prove advanced table editing in browser workflows`
 
 Latest GitHub Actions run inspected:
 
-- Run `26133595556` on commit `33ee6a9`
+- Run `26134248308` on commit `443515b`
 - Overall result: passed
 - Browser workflow job: passed
 - Ubuntu desktop job: passed
 - macOS desktop job: passed
 - Windows desktop job: passed
 
-CI evidence from run `26133595556`:
+CI evidence from run `26134248308`:
 
 - Browser workflow tests passed after pnpm setup, Node setup, dependency
-  install, Playwright Chromium install, and `pnpm run test:e2e`.
+  install, Playwright Chromium install, and `pnpm run test:e2e`. The suite now
+  includes five Chromium workflow tests, including advanced table paste import,
+  numeric sorting, formula rows, merged-cell metadata, and apply-back-to-editor
+  behavior.
 - Ubuntu desktop passed setup, Linux optional transform installation, Rust
   formatting, Rust check, native-watch check, clippy, Rust tests, frontend unit
-  tests, frontend build, and Tauri `--no-bundle` desktop build. This proves the
-  fake `d2` stdin fixture fix cleared the Ubuntu Rust-test blocker from run
-  `26133136580`, while installed Pikchr conformance stayed passing.
+  tests, frontend build, and Tauri `--no-bundle` desktop build.
 - macOS desktop passed Rust formatting, Rust check, native-watch check, clippy,
   Rust tests, frontend unit tests, frontend build, and Tauri `--no-bundle`
   desktop build.
 - Windows desktop passed setup, Rust formatting, Rust check, native-watch check,
   clippy, Rust tests, frontend unit tests, frontend build, and Tauri
-  `--no-bundle` desktop build. This confirms the slash-normalized path
-  serialization fixed the four earlier Windows Rust-test failures from run
-  `26132634911`.
+  `--no-bundle` desktop build.
 
 Recent local verification evidence from this buildout:
 
@@ -142,10 +141,11 @@ Known local environment caveat:
 Status: complete for current CI.
 
 The latest desktop CI failures are fixed and verified in GitHub Actions run
-`26133595556`. Keep the older runs `26131929125`, `26132634911`, and
-`26133136580` in mind because they explain why the Unix-only cache-helper,
-slash-normalized path serialization, `pikchr-cli` temporary source-file, and
-fake-`d2` stdin-drain fixes exist.
+`26134248308`. Earlier green run `26133595556` first proved the desktop matrix
+fixes; keep older runs `26131929125`, `26132634911`, and `26133136580` in mind
+because they explain why the Unix-only cache-helper, slash-normalized path
+serialization, `pikchr-cli` temporary source-file, and fake-`d2` stdin-drain
+fixes exist.
 
 Resolved previous Windows clippy failure:
 
@@ -189,7 +189,7 @@ Local fix:
 Completion criteria:
 
 - Windows CI passes the four previously failing Rust tests and the full desktop
-  job in run `26133595556`.
+  job in runs `26133595556` and `26134248308`.
 - The path normalization does not break local file commands, Git commands,
   external engine execution, or export artifact references.
 
@@ -242,14 +242,14 @@ Local fix:
 Completion criteria:
 
 - Ubuntu CI passes `external_transform_adapters_shape_engine_specific_invocations`.
-  Verified in run `26133595556`.
+  Verified in runs `26133595556` and `26134248308`.
 - The real installed-engine conformance test remains enabled and passing.
 - Do not mask stdin write failures in production adapter code to compensate for
   a mock that ignores stdin.
 
 ### 2. Keep The Browser Workflow Lane Passing While Expanding It
 
-Status: initial CI pass exists; coverage remains narrow.
+Status: expanded CI pass exists; coverage remains incomplete.
 
 Current browser coverage in `e2e/app-workflows.spec.ts`:
 
@@ -727,20 +727,16 @@ Completion criteria:
 
 ## Recommended Execution Order
 
-1. Push and verify a green CI run for browser workflow, macOS desktop, Ubuntu
-   desktop, and Windows desktop.
-2. Update `docs/progress.md` and `docs/spec-completion-matrix.md` with the new
-   CI evidence.
-3. Expand browser workflow coverage for file operations, workspace restore,
+1. Expand browser workflow coverage for file operations, workspace restore,
    conflicts, preview navigation/scroll sync, transform settings, export
    progress, and remaining AI/table modes.
-4. Add desktop WebDriver/Tauri smoke tests.
-5. Use workflow failures to close real implementation gaps.
-6. Audit export artifacts and add conformance fixtures.
-7. Harden cross-platform external transform evidence.
-8. Modularize frontend/store/backend code after behavior is locked.
-9. Complete packaging evidence, user docs, and example projects.
-10. Run a final requirement-by-requirement audit and fresh verification baseline.
+2. Add desktop WebDriver/Tauri smoke tests.
+3. Use workflow failures to close real implementation gaps.
+4. Audit export artifacts and add conformance fixtures.
+5. Harden cross-platform external transform evidence.
+6. Modularize frontend/store/backend code after behavior is locked.
+7. Complete packaging evidence, user docs, and example projects.
+8. Run a final requirement-by-requirement audit and fresh verification baseline.
 
 ## Completion Gate
 

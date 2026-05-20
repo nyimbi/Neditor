@@ -193,13 +193,14 @@ Current direct evidence:
 
 Current major verification gaps:
 
-- Latest pushed CI on commit `33ee6a9` is green across browser workflows and
+- Latest pushed CI on commit `443515b` is green across browser workflows and
   Ubuntu/macOS/Windows desktop builds. The earlier Windows path-sensitive
   Rust-test failures, Ubuntu installed Pikchr conformance failure, and Ubuntu
   fake-`d2` stdin fixture failure are resolved in current CI.
-- Browser-level workflow harness passes in Linux CI and now lists 5 Chromium
-  tests locally, including advanced table editor coverage. Local sandbox
-  execution is still blocked at Chromium launch before app assertions.
+- Browser-level workflow harness passes in Linux CI run `26134248308` and now
+  lists 5 Chromium tests locally, including advanced table editor coverage.
+  Local sandbox execution is still blocked at Chromium launch before app
+  assertions.
 - No desktop WebDriver/Tauri-driver workflow test harness.
 - Current committed browser workflow evidence exists, and the desktop CI matrix
   is currently green, but desktop user journeys are still not covered by a

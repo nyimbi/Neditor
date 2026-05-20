@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `33ee6a9 Keep
-  external adapter fixtures stdin-safe on Linux`
+- Latest inspected committed baseline before this update: `443515b Prove
+  advanced table editing in browser workflows`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -53,6 +53,10 @@ Recent pushed checkpoints visible in current git history:
 - `33ee6a9` made the fake `d2` adapter fixture drain stdin on Linux and
   refreshed the backlog, progress log, and completion matrix from current CI
   evidence.
+- `443515b` added advanced table editor browser workflow coverage for Markdown
+  paste import, numeric sorting, formula rows, merged-cell metadata, and
+  apply-back behavior, with local unit/build proof and green CI in run
+  `26134248308`.
 - `15b7df6` kept fenced citation examples literal.
 - `58ae0fd` shared table cell span normalization.
 - `f157fbf` let the table editor author merged cells.
@@ -91,7 +95,7 @@ Implemented or substantially present, pending the conservative caveats in
 - Backend test coverage across many compiler, export, transform, table,
   validation, media, file, Git, snapshot, review, and provenance paths.
 - Frontend unit coverage for table logic and conflict diff alignment.
-- Initial Playwright browser workflow harness for Vite with mocked Tauri IPC,
+- Playwright browser workflow harness for Vite with mocked Tauri IPC,
   covering view mode switching, command palette table insertion, table editor
   insertion, advanced table paste/sort/formula/merge/apply behavior, AI paste
   cleanup insertion, and export readiness.
@@ -105,14 +109,15 @@ Implemented or substantially present, pending the conservative caveats in
 
 P0 gaps:
 
-- Latest pushed CI for commit `33ee6a9` is green: browser workflow, Ubuntu
-  desktop, macOS desktop, and Windows desktop all passed in run `26133595556`.
+- Latest pushed CI for commit `443515b` is green: browser workflow, Ubuntu
+  desktop, macOS desktop, and Windows desktop all passed in run `26134248308`.
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in current CI.
-- Initial browser-level workflow tests pass in Linux CI, but coverage is still
-  narrow and local sandbox execution still fails before app assertions because
-  Chromium cannot register its Mach bootstrap port.
+- Browser-level workflow tests pass in Linux CI with five Chromium tests,
+  including advanced table paste/sort/formula/merge/apply behavior, but
+  coverage remains incomplete and local sandbox execution still fails before
+  app assertions because Chromium cannot register its Mach bootstrap port.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -209,6 +214,7 @@ Current CI follow-up:
 | `pnpm exec playwright test --list` | Pass | Listed 5 Chromium browser workflow tests, including the new advanced table paste/sort/formula/merge/apply flow. |
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed after adding the advanced table browser workflow. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed after adding the advanced table browser workflow. |
+| `gh run watch 26134248308 --exit-status` | Pass | For `443515b`, browser workflows and Ubuntu/macOS/Windows desktop builds all passed. Browser workflow tests ran through Chromium installation and `pnpm run test:e2e`; desktop jobs passed Rust formatting/check/native-watch/clippy/tests, frontend tests/build, and Tauri no-bundle builds. |
 
 Relevant CI fixes already landed:
 
