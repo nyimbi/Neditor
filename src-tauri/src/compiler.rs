@@ -7,8 +7,8 @@ use crate::{
     compile_options::apply_compile_options,
     compiler_support::{citation_style, collect_fence_bodies, collect_glossary, extract_headings},
     compiler_types::{
-        export_readiness_summary, CompileRequest, CompileResponse, CompileWithOptionsRequest,
-        ExportManifest, SemanticDocument, SourceMapEntry,
+        export_progress_steps, export_readiness_summary, CompileRequest, CompileResponse,
+        CompileWithOptionsRequest, ExportManifest, SemanticDocument, SourceMapEntry,
     },
     diagnostics::DocumentDiagnostic,
     document_ast::{
@@ -305,6 +305,13 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
                 })
             })
             .collect(),
+        progress_steps: export_progress_steps(
+            "preview",
+            transform_artifacts.len(),
+            false,
+            None,
+            true,
+        ),
         readiness: export_readiness_summary(&diagnostics),
         diagnostics: diagnostics.clone(),
         source_map: source_map.clone(),

@@ -1,6 +1,8 @@
 use crate::{
     compile_with_options,
-    compiler_types::{export_readiness_summary, ExportReadinessSummary},
+    compiler_types::{
+        export_progress_steps, export_readiness_summary, ExportProgressStep, ExportReadinessSummary,
+    },
     diagnostics::{diag, DocumentDiagnostic},
     export::{
         render_docx_bytes, render_full_html, render_markdown_bundle_bytes, render_pdf_bytes,
@@ -42,6 +44,7 @@ pub(crate) struct ExportResponse {
     pub(crate) manifest_path: Option<String>,
     pub(crate) manifest: ExportManifest,
     pub(crate) diagnostics: Vec<DocumentDiagnostic>,
+    pub(crate) progress_steps: Vec<ExportProgressStep>,
 }
 
 #[derive(Debug, Serialize)]
@@ -55,6 +58,7 @@ pub(crate) struct ExportReadinessReport {
     pub(crate) paged_document: PagedDocument,
     pub(crate) diagnostics: Vec<DocumentDiagnostic>,
     pub(crate) manifest: ExportManifest,
+    pub(crate) progress_steps: Vec<ExportProgressStep>,
 }
 
 #[tauri::command]
@@ -138,6 +142,17 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
     let output_bytes = fs::read(&output_path).map_err(|err| err.to_string())?;
     manifest.output_path = Some(path_to_string(&output_path));
     manifest.output_hash = Some(sha256_uri(&output_bytes));
+    manifest.progress_steps = export_progress_steps(
+        &request.target,
+        compile_response.transform_artifacts.len(),
+        request
+            .options
+            .get("includeManifest")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
+        manifest.output_path.as_deref(),
+        true,
+    );
 
     let manifest_path = if request
         .options
@@ -157,6 +172,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
     Ok(ExportResponse {
         output_path: path_to_string(&output_path),
         manifest_path,
+        progress_steps: manifest.progress_steps.clone(),
         manifest,
         diagnostics,
     })
@@ -181,7 +197,19 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
     }
     response.export_manifest.readiness = export_readiness_summary(&response.diagnostics);
     response.export_manifest.diagnostics = response.diagnostics.clone();
+    response.export_manifest.progress_steps = export_progress_steps(
+        &request.target,
+        response.transform_artifacts.len(),
+        request
+            .options
+            .get("includeManifest")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
+        None,
+        false,
+    );
     let readiness = response.export_manifest.readiness.clone();
+    let progress_steps = response.export_manifest.progress_steps.clone();
     ExportReadinessReport {
         ready: readiness.ready,
         error_count: readiness.error_count,
@@ -192,6 +220,7 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
         paged_document: response.paged_document,
         diagnostics: response.diagnostics,
         manifest: response.export_manifest,
+        progress_steps,
     }
 }
 

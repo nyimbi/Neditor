@@ -95,7 +95,7 @@ Most recent local verification evidence:
 - `cargo check --locked --features native-watch`: passed in `src-tauri`.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed in
   `src-tauri`.
-- `cargo test --locked`: passed locally with 138 Rust tests on Unix hosts.
+- `cargo test --locked`: passed locally with 139 Rust tests on Unix hosts.
 - `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib`:
   passed and stress-compiles a large Markdown source with nested includes, 80
   tables, 80 CSV transform artifacts, 120 formula definitions, many source-map
@@ -107,9 +107,12 @@ Most recent local verification evidence:
 - `cargo test --locked repeated_editing_sessions_reuse_external_transform_cache --lib`:
   passed and repeatedly recompiles edited document text while proving a stable
   trusted external DOT transform is served from cache after the first run.
-- `cargo test --locked export_command_tests --lib`: passed 12 export command
+- `cargo test --locked export_readiness_and_manifest_report_progress_steps --lib`:
+  passed and proves readiness/export manifests carry compile, transform,
+  readiness, render, and manifest progress steps.
+- `cargo test --locked export_command_tests --lib`: passed 13 export command
   tests, including direct-export dirty-Git warnings copied into response and
-  sidecar manifests.
+  sidecar manifests plus structured export progress-step reporting.
 - `pnpm run test:unit`: passed with 8 frontend unit tests.
 - `pnpm run build`: passed with `vue-tsc --noEmit` and Vite production build.
 - `pnpm run check:a11y`: passed and checked the Vue template for accessible
@@ -1024,8 +1027,8 @@ Finish:
 
 ### 17. Performance And Large Documents
 
-Status: compiler, repeated export-loop, and repeated edit/cache stress evidence
-exists; broader performance proof remains open.
+Status: compiler, repeated export-loop, repeated edit/cache, and export
+progress evidence exists; broader performance proof remains open.
 
 Current evidence:
 
@@ -1041,12 +1044,15 @@ Current evidence:
   repeatedly recompiles edited document text while keeping a trusted external
   DOT transform stable, proving memory and persistent cache reuse without
   re-running the external engine after the first compile.
+- `export_command_tests::export_readiness_and_manifest_report_progress_steps`
+  proves readiness/export manifests carry compile, transform, readiness,
+  render, and manifest progress steps, and the export UI displays readiness and
+  last-export progress steps.
 
 Finish:
 
 - Benchmarks or deeper stress tests for memory growth and UI debounce timing.
 - Debounce and cancellation behavior for compile/preview updates.
-- Progress reporting for expensive transforms and exports.
 - Memory growth checks for long editing sessions and repeated exports.
 
 ## P2 - Architecture And Maintainability

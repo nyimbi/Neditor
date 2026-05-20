@@ -368,6 +368,15 @@ async function installTauriMock(page: Page) {
         export_target: "html",
         export_options: {},
         transform_artifacts: [],
+        progress_steps: [
+          {
+            id: "compile",
+            label: "Compile document model",
+            state: "complete",
+            detail: "Browser mock compile completed.",
+            work_units: 1,
+          },
+        ],
         diagnostics,
         source_map: [],
         app_version: "e2e-mock",
@@ -620,6 +629,16 @@ async function installTauriMock(page: Page) {
               },
             ]
           : [];
+        const progressSteps = [
+          ...response.export_manifest.progress_steps,
+          {
+            id: "render",
+            label: `Render ${request.target || "html"} artifact`,
+            state: "pending",
+            detail: "Browser mock export readiness completed before writing.",
+            work_units: 1,
+          },
+        ];
         return {
           ready: diagnostics.length === 0,
           error_count: diagnostics.filter((diagnostic) => diagnostic.severity === "error").length,
@@ -632,7 +651,9 @@ async function installTauriMock(page: Page) {
             ...response.export_manifest,
             export_target: request.target || "html",
             export_options: request.options || {},
+            progress_steps: progressSteps,
           },
+          progress_steps: progressSteps,
         };
       }
       if (cmd === "cleanup_ai_paste") {
@@ -669,9 +690,26 @@ async function installTauriMock(page: Page) {
         const request = args.request as { output_path: string; target?: string; options?: { includeManifest?: boolean } };
         if (request.output_path.includes("fail")) throw new Error(`Mock export writer failed for ${request.output_path}`);
         const manifestPath = request.options?.includeManifest === false ? null : `${request.output_path}.manifest.json`;
+        const progressSteps = [
+          {
+            id: "compile",
+            label: "Compile document model",
+            state: "complete",
+            detail: "Browser mock compile completed.",
+            work_units: 1,
+          },
+          {
+            id: "render",
+            label: `Render ${request.target || "html"} artifact`,
+            state: "complete",
+            detail: `Target artifact path: ${request.output_path}`,
+            work_units: 1,
+          },
+        ];
         return {
           output_path: request.output_path,
           manifest_path: manifestPath,
+          progress_steps: progressSteps,
           diagnostics: [
             {
               severity: "info",

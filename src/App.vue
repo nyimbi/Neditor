@@ -527,6 +527,13 @@
             <strong>{{ store.exportReadiness.ready ? "Ready" : "Needs attention" }}</strong>
             <p>{{ store.exportReadiness.error_count }} errors, {{ store.exportReadiness.warning_count }} warnings, {{ store.exportReadiness.info_count }} info</p>
             <p>{{ readinessLayoutSummary }}</p>
+            <ol v-if="store.exportReadiness.progress_steps.length" class="progress-steps" aria-label="Export readiness progress">
+              <li v-for="step in store.exportReadiness.progress_steps" :key="`readiness-${step.id}`">
+                <strong>{{ step.label }}</strong>
+                <span>{{ step.state }}</span>
+                <small>{{ step.detail }}</small>
+              </li>
+            </ol>
           </article>
           <section v-if="store.exportReadiness?.diagnostics.length" class="export-diagnostic-report" aria-label="Export readiness diagnostics">
             <article
@@ -549,6 +556,13 @@
             <h3>Last export</h3>
             <p v-if="store.lastExportOutputPath">Output: {{ store.lastExportOutputPath }}</p>
             <p v-if="store.lastExportManifestPath">Manifest: {{ store.lastExportManifestPath }}</p>
+            <ol v-if="store.lastExportProgressSteps.length" class="progress-steps" aria-label="Last export progress">
+              <li v-for="step in store.lastExportProgressSteps" :key="`export-${step.id}`">
+                <strong>{{ step.label }}</strong>
+                <span>{{ step.state }}</span>
+                <small>{{ step.detail }}</small>
+              </li>
+            </ol>
             <article
               v-for="diagnostic in store.lastExportDiagnostics"
               :key="`export-${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.message}`"
@@ -3745,6 +3759,24 @@ select:hover {
 .diagnostic-related {
   margin: 6px 0 0;
   padding-left: 18px;
+  color: #526171;
+  font-size: 12px;
+}
+
+.progress-steps {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.progress-steps li {
+  display: grid;
+  gap: 2px;
+}
+
+.progress-steps span,
+.progress-steps small {
   color: #526171;
   font-size: 12px;
 }

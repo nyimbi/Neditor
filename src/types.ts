@@ -311,10 +311,19 @@ export interface ExportManifest {
   export_target: string;
   export_options: Record<string, unknown>;
   transform_artifacts: Array<Record<string, unknown>>;
+  progress_steps: ExportProgressStep[];
   readiness: ExportReadinessSummary;
   diagnostics: DocumentDiagnostic[];
   source_map: Array<{ generated_line: number; source_file: string; source_line: number }>;
   app_version: string;
+}
+
+export interface ExportProgressStep {
+  id: string;
+  label: string;
+  state: string;
+  detail: string;
+  work_units: number;
 }
 
 export interface TransformEngineMetadata {
@@ -433,4 +442,5 @@ export interface ExportReadinessReport {
   paged_document: PagedDocument;
   diagnostics: DocumentDiagnostic[];
   manifest: ExportManifest;
+  progress_steps: ExportProgressStep[];
 }

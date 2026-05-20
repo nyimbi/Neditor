@@ -9,6 +9,7 @@ import type {
   AiCleanupOptions,
   CompileResponse,
   DocumentDiagnostic,
+  ExportProgressStep,
   ExportReadinessReport,
   GitHistoryEntry,
   GitStatus,
@@ -537,6 +538,7 @@ export const useDocumentsStore = defineStore("documents", {
     lastExportOutputPath: "",
     lastExportManifestPath: "",
     lastExportDiagnostics: [] as DocumentDiagnostic[],
+    lastExportProgressSteps: [] as ExportProgressStep[],
     aiCleanupIssues: [] as string[],
     aiCleanupPreview: null as AiCleanupResponse | null,
     recentFiles: [] as string[],
@@ -1302,12 +1304,18 @@ export const useDocumentsStore = defineStore("documents", {
       this.lastExportOutputPath = "";
       this.lastExportManifestPath = "";
       this.lastExportDiagnostics = [];
+      this.lastExportProgressSteps = [];
       this.lastError = "";
       try {
         this.exportProgress = "Creating pre-export snapshot";
         await this.createSnapshot("pre-export");
         this.exportProgress = `Writing ${this.exportTarget.toUpperCase()} export`;
-        const response = await invoke<{ output_path: string; manifest_path?: string | null; diagnostics?: DocumentDiagnostic[] }>("export_document", {
+        const response = await invoke<{
+          output_path: string;
+          manifest_path?: string | null;
+          diagnostics?: DocumentDiagnostic[];
+          progress_steps?: ExportProgressStep[];
+        }>("export_document", {
           request: {
             text: doc.text,
             file_path: doc.path,
@@ -1319,6 +1327,7 @@ export const useDocumentsStore = defineStore("documents", {
         this.lastExportOutputPath = response.output_path;
         this.lastExportManifestPath = response.manifest_path || "";
         this.lastExportDiagnostics = response.diagnostics || [];
+        this.lastExportProgressSteps = response.progress_steps || [];
         this.statusMessage = `Exported ${response.output_path}${response.manifest_path ? ` with manifest ${response.manifest_path}` : ""}`;
         this.exportProgress = "Refreshing export snapshots";
         await this.listSnapshots();

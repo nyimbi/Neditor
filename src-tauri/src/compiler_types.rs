@@ -104,10 +104,20 @@ pub(crate) struct ExportManifest {
     pub(crate) export_target: String,
     pub(crate) export_options: Value,
     pub(crate) transform_artifacts: Vec<Value>,
+    pub(crate) progress_steps: Vec<ExportProgressStep>,
     pub(crate) readiness: ExportReadinessSummary,
     pub(crate) diagnostics: Vec<DocumentDiagnostic>,
     pub(crate) source_map: Vec<SourceMapEntry>,
     pub(crate) app_version: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct ExportProgressStep {
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) state: String,
+    pub(crate) detail: String,
+    pub(crate) work_units: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -139,6 +149,68 @@ pub(crate) fn export_readiness_summary(
         warning_count,
         info_count,
     }
+}
+
+pub(crate) fn export_progress_steps(
+    target: &str,
+    transform_count: usize,
+    include_manifest: bool,
+    output_path: Option<&str>,
+    output_written: bool,
+) -> Vec<ExportProgressStep> {
+    let render_state = if output_written {
+        "complete"
+    } else {
+        "pending"
+    };
+    let render_detail = output_path
+        .map(|path| format!("Target artifact path: {path}"))
+        .unwrap_or_else(|| "Target artifact has not been written yet.".to_string());
+    let mut steps = vec![
+        ExportProgressStep {
+            id: "compile".to_string(),
+            label: "Compile document model".to_string(),
+            state: "complete".to_string(),
+            detail: "Source, includes, semantic model, diagnostics, and preview HTML are available."
+                .to_string(),
+            work_units: 1,
+        },
+        ExportProgressStep {
+            id: "transforms".to_string(),
+            label: "Render transform artifacts".to_string(),
+            state: "complete".to_string(),
+            detail: format!("{transform_count} transform artifact(s) rendered or cache-resolved."),
+            work_units: transform_count,
+        },
+        ExportProgressStep {
+            id: "readiness".to_string(),
+            label: "Validate export readiness".to_string(),
+            state: "complete".to_string(),
+            detail: "Metadata, diagnostics, target settings, captions, provenance, and Git cleanliness checks completed.".to_string(),
+            work_units: 1,
+        },
+        ExportProgressStep {
+            id: "render".to_string(),
+            label: format!("Render {target} artifact"),
+            state: render_state.to_string(),
+            detail: render_detail,
+            work_units: 1,
+        },
+    ];
+    if include_manifest {
+        steps.push(ExportProgressStep {
+            id: "manifest".to_string(),
+            label: "Write export manifest".to_string(),
+            state: render_state.to_string(),
+            detail: if output_written {
+                "Sidecar manifest includes source, output, readiness, diagnostics, and progress evidence.".to_string()
+            } else {
+                "Sidecar manifest will be written after the target artifact succeeds.".to_string()
+            },
+            work_units: 1,
+        });
+    }
+    steps
 }
 
 #[derive(Clone, Debug, Serialize)]

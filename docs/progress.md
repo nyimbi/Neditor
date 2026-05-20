@@ -227,6 +227,11 @@ Recent pushed checkpoints visible in current git history:
   `performance_tests::repeated_editing_sessions_reuse_external_transform_cache`,
   which repeatedly recompiles edited document text while proving a stable
   trusted external DOT transform is served from cache after the first run.
+- This update adds structured export progress steps to readiness/export
+  manifests and the export UI. The new
+  `export_command_tests::export_readiness_and_manifest_report_progress_steps`
+  test proves compile, transform, readiness, render, and manifest progress
+  stages are carried in backend evidence.
 
 ## Current Capability Snapshot
 
@@ -594,14 +599,15 @@ Additional review/provenance readiness metadata verification:
 | `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after adding review/change-note, AI provenance, caption/label readiness diagnostics, and direct-export dirty-Git manifest warnings. |
 | `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the direct-export readiness update. |
 | `cargo check --locked --features native-watch` in `src-tauri` | Pass | Native file watcher feature still compiles after the direct-export readiness update. |
-| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 12 export command tests passed, including readiness and manifest diagnostics for malformed review comments, change notes, incomplete AI provenance metadata, invalid AI review statuses, missing figure/table/equation labels or captions, explicit manifest readiness summaries, and direct-export dirty-Git manifest warnings. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 13 export command tests passed, including readiness and manifest diagnostics for malformed review comments, change notes, incomplete AI provenance metadata, invalid AI review statuses, missing figure/table/equation labels or captions, explicit manifest readiness summaries, direct-export dirty-Git manifest warnings, and structured export progress-step reporting. |
 | `cargo test --locked review_provenance_tests --lib` in `src-tauri` | Pass | 4 review/provenance tests passed after the stricter AI provenance validation. |
 | `cargo test --locked validation_tests --lib` in `src-tauri` | Pass | 4 validation tests passed after the readiness validation extension. |
 | `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | No clippy warnings after the shared parser and export-readiness validation changes. |
 | `cargo test --locked compiler_stress_handles_large_documents_with_many_artifacts --lib` in `src-tauri` | Pass | Large-document compiler stress test passed with nested includes, 80 tables, 80 CSV transform artifacts, 120 formula definitions, many source-map entries, and many broken link/media diagnostics. |
 | `cargo test --locked repeated_export_loop_keeps_large_artifacts_stable --lib` in `src-tauri` | Pass | Repeated export-loop stress test passed across HTML, PDF, DOCX, PPTX, and Markdown bundle rendering for a large compiled document. |
 | `cargo test --locked repeated_editing_sessions_reuse_external_transform_cache --lib` in `src-tauri` | Pass | Repeated editing/cache stress test passed with a trusted external DOT transform executed once and served from cache during subsequent edits. |
-| `cargo test --locked` in `src-tauri` | Pass | 138 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
+| `cargo test --locked export_readiness_and_manifest_report_progress_steps --lib` in `src-tauri` | Pass | Export progress-step test passed, proving readiness/export manifests expose compile, transform, readiness, render, and manifest stages. |
+| `cargo test --locked` in `src-tauri` | Pass | 139 Rust tests passed plus main/doc test targets with 0 tests on this Unix host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness still lists 34 Chromium workflow tests after the direct-export readiness change. |
 | `pnpm run test:unit` | Pass | 8 frontend unit tests passed. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed. |

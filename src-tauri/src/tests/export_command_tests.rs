@@ -199,6 +199,35 @@ fn prepare_for_export_reports_missing_caption_labels() {
 }
 
 #[test]
+fn export_readiness_and_manifest_report_progress_steps() {
+    let source = "---\ntitle: Progress Ready\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\nversion: 1.0.0\n---\n# Progress Ready\n\n```chart\ntype: bar\ntitle: Progress data\ndata:\n  - region: East\n    revenue: 42\n  - region: West\n    revenue: 27\nx: region\ny: revenue\n```\n";
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source.to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+    });
+
+    assert!(report.ready, "{:#?}", report.diagnostics);
+    assert_eq!(
+        report.progress_steps.len(),
+        report.manifest.progress_steps.len()
+    );
+    assert!(report.progress_steps.iter().any(|step| {
+        step.id == "transforms"
+            && step.state == "complete"
+            && step.work_units == 1
+            && step.detail.contains("1 transform artifact")
+    }));
+    assert!(report.progress_steps.iter().any(|step| {
+        step.id == "render" && step.state == "pending" && step.label == "Render pdf artifact"
+    }));
+    assert!(report.progress_steps.iter().any(|step| {
+        step.id == "manifest" && step.state == "pending" && step.detail.contains("will be written")
+    }));
+}
+
+#[test]
 fn export_document_blocks_compiler_errors_before_writing() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -283,6 +312,9 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(manifest_text.contains("\"output_path\": "));
     assert!(manifest_text.contains("\"output_hash\": \"sha256:"));
     assert!(manifest_text.contains("\"readiness\": {"));
+    assert!(manifest_text.contains("\"progress_steps\": ["));
+    assert!(manifest_text.contains("\"id\": \"render\""));
+    assert!(manifest_text.contains("\"state\": \"complete\""));
     assert!(manifest_text.contains("\"ready\": true"));
     assert!(manifest_text.contains("\"error_count\": 0"));
     assert!(manifest_text.contains("\"diagnostics\": []"));
@@ -305,6 +337,19 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(response.manifest.readiness.ready);
     assert_eq!(response.manifest.readiness.error_count, 0);
     assert_eq!(response.manifest.readiness.warning_count, 0);
+    assert_eq!(
+        response.progress_steps.len(),
+        response.manifest.progress_steps.len()
+    );
+    assert!(response.progress_steps.iter().any(|step| {
+        step.id == "render"
+            && step.state == "complete"
+            && step.detail.contains(output_string.as_str())
+    }));
+    assert!(response
+        .progress_steps
+        .iter()
+        .any(|step| step.id == "manifest" && step.state == "complete"));
     assert!(!response.manifest.source_map.is_empty());
 
     let docx_output = root.join("ready.docx");
