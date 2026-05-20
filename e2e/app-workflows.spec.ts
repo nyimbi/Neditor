@@ -438,6 +438,30 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await expect.poll(() => editorText(page)).toContain("Disk version after rename.");
 });
 
+test("saves a document as a new file and reopens it from recently closed", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await page.locator(".sidebar").getByLabel("Status").selectOption("approved");
+  await expect.poll(() => editorText(page)).toContain("status: approved");
+
+  await queueDialogSelection(page, "/workspace/market-approved.md");
+  await page.getByRole("button", { name: "Save As" }).click();
+  await expect.poll(() => mockFileText(page, "/workspace/market-approved.md")).toContain("status: approved");
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("market-approved.md");
+
+  await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
+  await expect(page.locator(".document-tabs .tab.active")).not.toContainText("market-approved.md");
+
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await page.getByRole("button", { name: "/workspace/market-approved.md" }).click();
+
+  await expect(page.locator(".document-tabs .tab.active")).toContainText("market-approved.md");
+  await expect.poll(() => editorText(page)).toContain("status: approved");
+  await expect(page.getByRole("button", { name: "/workspace/market-approved.md" })).toHaveCount(0);
+});
+
 test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {
   await page.getByLabel("Sidebar panel").selectOption("tables");
   await page.getByRole("button", { name: "New table" }).click();
