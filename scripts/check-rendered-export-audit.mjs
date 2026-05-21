@@ -82,6 +82,10 @@ if (issues.length === 0) {
 }
 
 if (issues.length === 0) {
+  collectMacTextutilProof(issues, viewerProof);
+}
+
+if (issues.length === 0) {
   collectMacQuickLookProof(issues, viewerProof);
 }
 
@@ -377,6 +381,35 @@ function collectMacQuickLookProof(issues, assertions) {
   if (!passed) {
     issues.push(`macOS Quick Look did not render a meaningful PDF thumbnail${output ? `:\n${output}` : ""}`);
   }
+}
+
+function collectMacTextutilProof(issues, assertions) {
+  if (process.platform !== "darwin") return;
+  const result = spawnSync(
+    "textutil",
+    ["-convert", "txt", "-stdout", join(auditDir, "rendered-export-audit.docx")],
+    {
+      encoding: "utf8",
+      timeout: 15_000,
+    },
+  );
+  if (result.status !== 0) {
+    assertions.push({
+      scope: "macos-textutil-docx",
+      assertion: "extracts DOCX text through macOS textutil",
+      passed: false,
+      stderr: result.stderr?.trim() || "",
+    });
+    issues.push("macOS textutil failed to extract rendered-export-audit.docx");
+    return;
+  }
+  assertContains(assertions, issues, "macos-textutil-docx", result.stdout ?? "", [
+    "Rendered Export Audit",
+    "Control summary",
+    "Review Comments",
+    "AI Provenance",
+    "Legal Disclaimer",
+  ]);
 }
 
 function readTextArtifact(file) {

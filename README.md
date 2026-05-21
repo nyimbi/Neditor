@@ -230,11 +230,11 @@ DOCX, PPTX, Markdown bundle, blog package, Substack package, LaTeX, Google Docs
 package, hashes, a manual visual-review checklist, and `viewer-proof.json` with
 executable HTML/PDF/DOCX/PPTX/package assertions, publishing handoff workflow
 metadata checks, LaTeX source checks, Google Docs import workflow checks, and
-nested Google Docs DOCX checks. On macOS it
-also attempts a bounded Quick Look PDF thumbnail proof and records either the
-thumbnail assertion or the host sandbox limitation in `viewer-proof.json`. When
-`pdflatex` is installed, it also compiles the generated `.tex` file into
-`.tmp/rendered-export-audit/latex-compile/`.
+nested Google Docs DOCX checks. On macOS it also extracts DOCX text through
+`textutil` and attempts a bounded Quick Look PDF thumbnail proof, recording
+either the thumbnail assertion or the host sandbox limitation in
+`viewer-proof.json`. When `pdflatex` is installed, it also compiles the
+generated `.tex` file into `.tmp/rendered-export-audit/latex-compile/`.
 
 `pnpm run test:performance-audit` writes `.tmp/performance-audit/report.json`
 after running the Rust performance stress tests and the focused browser

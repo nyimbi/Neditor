@@ -2176,7 +2176,7 @@ Publishing and Google Docs handoff workflow verification:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed after adding machine-readable publish/import workflow metadata to blog, Substack, and Google Docs packages. |
-| `pnpm run test:rendered-exports` | Pass | Rendered export audit passed with package assertions for blog/Substack publish workflow metadata, Google Docs import workflow metadata, LaTeX source checks, nested Google Docs DOCX package checks, and `pdflatex` compile proof. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit passed with package assertions for blog/Substack publish workflow metadata, Google Docs import workflow metadata, LaTeX source checks, nested Google Docs DOCX package checks, macOS `textutil` DOCX text extraction, and `pdflatex` compile proof. |
 
 Performance audit report verification:
 

@@ -968,7 +968,7 @@ Current evidence:
   executable HTML/PDF/DOCX/PPTX/package assertions, blog/Substack publish
   workflow metadata and copy artifact assertions, LaTeX source assertions,
   Google Docs import workflow metadata assertions, and nested Google Docs DOCX
-  package assertions. On macOS it also
+  package assertions. On macOS it also extracts DOCX text through `textutil`,
   attempts a Quick Look PDF thumbnail and records either thumbnail evidence or
   the current host's `qlmanage` sandbox limitation in `viewer-proof.json`. When
   `pdflatex` is installed, it also compiles the generated LaTeX artifact into
@@ -1021,8 +1021,9 @@ Needed proof:
 
 - Package/text assertions where appropriate.
 - More target-specific option combinations beyond the current focused matrix.
-- Additional rendered/manual visual inspection of more representative
-  PDF/DOCX/PPTX artifacts across native viewers and platforms.
+- Additional rendered/manual visual inspection of more representative PDF/PPTX
+  artifacts across native viewers and platforms, plus DOCX visual QA beyond the
+  current macOS `textutil` extraction proof.
 - Fixture exports tied back to matrix rows.
 
 ### 6. Export Readiness Completeness
