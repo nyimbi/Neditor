@@ -386,3 +386,15 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["test:unit"], "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js");
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
 });
+
+test("desktop WebDriver harness covers native restart and export workflows", () => {
+  const script = readFileSync("scripts/run-tauri-webdriver.mjs", "utf8");
+
+  ok(script.includes("assertDirtyTitleWorkflow(session)"));
+  ok(script.includes("assertExportReadinessWorkflow(session)"));
+  ok(script.includes("assertPreferenceRestartWorkflow(session, originalPreferences)"));
+  ok(script.includes("document.querySelector('.sidebar pre')"));
+  ok(script.includes('"export_target": "html"'));
+  ok(script.includes("persisted desktop preferences after restart"));
+  ok(script.includes("Official Tauri WebDriver currently supports desktop automation on Windows and Linux only"));
+});

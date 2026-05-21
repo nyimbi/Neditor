@@ -65,6 +65,11 @@ Recent pushed checkpoints visible in current git history:
   launch smoke now writes `.tmp/desktop-smoke/launch-report.json` with the
   binary path, PID, observed launch window, captured output, and
   `processAlive: true` evidence when NEditor remains running until timeout.
+- This update deepens the supported Windows/Linux Tauri WebDriver harness. In
+  addition to native launch/title/shell checks, it now creates a dirty document
+  and checks the native dirty-title marker, runs export readiness through the
+  desktop UI/command path, and verifies selected preferences persist across a
+  desktop session restart before restoring them.
 - This update makes browser workflow execution current-host evidence instead
   of stale archived evidence. `pnpm run test:e2e` now uses the project-local
   Playwright browser cache and passes all 42 Chromium workbench workflows
@@ -579,7 +584,9 @@ P0 gaps:
 - Desktop proof now includes the native command workflow smoke plus a bounded
   macOS GUI launch smoke. A Tauri-driver/WebDriver harness also exists and is
   wired into full local verification; on this host it records the official
-  macOS skip, so supported Windows/Linux WebDriver execution is still needed.
+  macOS skip. The supported-platform harness covers dirty native titles, export
+  readiness, and preference persistence across restart, but supported
+  Windows/Linux execution is still needed.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
 P1 gaps:
@@ -630,7 +637,7 @@ Current verification recorded on 2026-05-21:
 | `pnpm run test:e2e` | Pass | 42 Chromium browser workbench workflows passed locally on this host, including blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, and `processAlive: true` evidence. |
-| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; this macOS host records the official unsupported WKWebView-driver platform skip. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, export readiness, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip. |
 
 Fresh baseline recorded on 2026-05-20:
 

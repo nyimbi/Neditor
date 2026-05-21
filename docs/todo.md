@@ -879,13 +879,20 @@ Needed desktop smoke coverage:
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
   script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native
-  title/shell commands, switches view mode, and opens the command palette. On
-  macOS it records an explicit official-platform skip.
+  title/shell commands, switches view mode, opens the command palette, checks a
+  dirty native title, runs export readiness, and verifies selected preferences
+  persist across a desktop session restart before restoring them. On macOS it
+  records an explicit official-platform skip.
 - New/open/save/save-as with real local files.
-- Dirty title/status behavior.
+- Dirty title/status behavior. Covered in the supported-platform WebDriver
+  harness; still needs execution on Windows/Linux.
 - External file watcher and conflict flow with real file changes.
-- Export readiness and one real export invocation.
-- Preferences persistence across restart.
+- Export readiness and one real export invocation. Export readiness is covered
+  in the supported-platform WebDriver harness; real export invocation is covered
+  by the native command smoke and still needs supported-platform WebDriver
+  execution if the harness grows a dialog-free native export path.
+- Preferences persistence across restart. Covered in the supported-platform
+  WebDriver harness; still needs execution on Windows/Linux.
 
 Completion criteria:
 

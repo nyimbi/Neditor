@@ -11,6 +11,26 @@ const timeoutMs = Number(process.env.NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS || 30_00
 const application = desktopBinaryPath();
 let tauriDriver = null;
 
+const controlByLabelScript = `function controlByLabel(labelText, selector) {
+  const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
+  const label = [...document.querySelectorAll('label')].find((item) => normalized(item.textContent || '').includes(labelText));
+  const control = label?.querySelector(selector);
+  if (!control) throw new Error('Missing control for ' + labelText);
+  return control;
+}`;
+
+const readPreferenceScript = `function readPreferences() {
+  const controlByLabel = ${controlByLabelScript};
+  return {
+    theme: controlByLabel('Theme', 'select').value,
+    previewTheme: controlByLabel('Preview theme', 'select').value,
+    wordWrap: controlByLabel('Word wrap', 'input').checked,
+    lineNumbers: controlByLabel('Line numbers', 'input').checked,
+    highContrast: controlByLabel('High contrast', 'input').checked,
+    reducedMotion: controlByLabel('Reduced motion', 'input').checked,
+  };
+}`;
+
 if (!existsSync(application) || !statSync(application).isFile()) {
   fail(`desktop binary is missing: ${relative(application)}. Run ./node_modules/.bin/tauri build --no-bundle first.`);
 }
@@ -68,41 +88,22 @@ async function runWebDriverSmoke() {
   });
 
   await waitForDriver();
-  const session = await createSession();
+  let session = await createSession();
+  let originalPreferences = null;
   try {
-    const title = await webdriver("GET", `/session/${session}/title`);
-    if (!String(title.value || "").includes("NEditor")) {
-      throw new Error(`expected native window title to include NEditor, found ${JSON.stringify(title.value)}`);
-    }
-
-    const shell = await findElement(session, ".app-shell");
-    const shellText = await elementText(session, shell);
-    for (const expected of ["New", "Open", "Save", "Commands"]) {
-      if (!shellText.includes(expected)) {
-        throw new Error(`desktop shell did not render expected command ${expected}`);
-      }
-    }
-
-    const mode = await execute(session, `
-      const select = document.querySelector('[aria-label="View mode"]');
-      select.value = 'preview';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-      return document.querySelector('.workspace')?.className || '';
-    `);
-    if (!String(mode.value || "").includes("mode-preview")) {
-      throw new Error(`expected WebDriver mode switch to reach preview mode, found ${JSON.stringify(mode.value)}`);
-    }
-
-    const palette = await execute(session, `
-      const button = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'Commands');
-      button.click();
-      return document.querySelector('[role="dialog"][aria-label="Command palette"] input')?.getAttribute('aria-label') || '';
-    `);
-    if (!String(palette.value || "").includes("Search commands")) {
-      throw new Error("command palette did not open through the native WebDriver session");
-    }
+    await assertInitialShell(session);
+    await assertModeSwitchAndCommandPalette(session);
+    await assertDirtyTitleWorkflow(session);
+    await assertExportReadinessWorkflow(session);
+    originalPreferences = await readDesktopPreferences(session);
+    session = await assertPreferenceRestartWorkflow(session, originalPreferences);
   } finally {
-    await webdriver("DELETE", `/session/${session}`).catch(() => undefined);
+    if (session && originalPreferences) {
+      await restoreDesktopPreferences(session, originalPreferences).catch(() => undefined);
+    }
+    if (session) {
+      await webdriver("DELETE", `/session/${session}`).catch(() => undefined);
+    }
   }
 
   function driverFailureDetail() {
@@ -124,6 +125,223 @@ async function runWebDriverSmoke() {
     }
     throw new Error(`timed out waiting for tauri-driver at ${serverUrl}.${driverFailureDetail()}`);
   }
+}
+
+async function assertInitialShell(session) {
+  const title = await webdriver("GET", `/session/${session}/title`);
+  if (!String(title.value || "").includes("NEditor")) {
+    throw new Error(`expected native window title to include NEditor, found ${JSON.stringify(title.value)}`);
+  }
+
+  const shell = await findElement(session, ".app-shell");
+  const shellText = await elementText(session, shell);
+  for (const expected of ["New", "Open", "Save", "Commands"]) {
+    if (!shellText.includes(expected)) {
+      throw new Error(`desktop shell did not render expected command ${expected}`);
+    }
+  }
+}
+
+async function assertModeSwitchAndCommandPalette(session) {
+  const mode = await execute(session, `
+    const select = document.querySelector('[aria-label="View mode"]');
+    select.value = 'preview';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return document.querySelector('.workspace')?.className || '';
+  `);
+  if (!String(mode.value || "").includes("mode-preview")) {
+    throw new Error(`expected WebDriver mode switch to reach preview mode, found ${JSON.stringify(mode.value)}`);
+  }
+
+  const palette = await execute(session, `
+    const button = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'Commands');
+    button.click();
+    return document.querySelector('[role="dialog"][aria-label="Command palette"] input')?.getAttribute('aria-label') || '';
+  `);
+  if (!String(palette.value || "").includes("Search commands")) {
+    throw new Error("command palette did not open through the native WebDriver session");
+  }
+}
+
+async function assertDirtyTitleWorkflow(session) {
+  const dirtyTitle = await waitForValue(
+    session,
+    `
+      const newButton = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'New');
+      newButton.click();
+      return {
+        title: document.title,
+        tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+      };
+    `,
+    (value) => String(value?.title || "").startsWith("* ") && String(value?.tab || "").includes("*Untitled"),
+    "dirty document title marker",
+  );
+  if (!String(dirtyTitle.title || "").includes("NEditor")) {
+    throw new Error(`dirty title did not include the application name: ${JSON.stringify(dirtyTitle)}`);
+  }
+
+  const nativeTitle = await webdriver("GET", `/session/${session}/title`);
+  if (!String(nativeTitle.value || "").startsWith("* ")) {
+    throw new Error(`native title did not expose dirty state: ${JSON.stringify(nativeTitle.value)}`);
+  }
+}
+
+async function assertExportReadinessWorkflow(session) {
+  await showSidebar(session, "exports", "Target");
+  await execute(session, `
+    const controlByLabel = ${controlByLabelScript};
+    const target = controlByLabel('Target', 'select');
+    target.value = 'html';
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+    const prepare = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'Prepare for export');
+    prepare.click();
+    return true;
+  `);
+  const readiness = await waitForValue(
+    session,
+    `
+      return {
+        status: document.querySelector('article.readiness strong')?.textContent || '',
+        manifest: document.querySelector('.sidebar pre')?.textContent || '',
+        progress: [...document.querySelectorAll('[aria-label="Export readiness progress"] li')].map((item) => item.textContent.trim()),
+      };
+    `,
+    (value) =>
+      ["Ready", "Needs attention"].includes(String(value?.status || "")) &&
+      String(value?.manifest || "").includes('"export_target": "html"') &&
+      Array.isArray(value?.progress) &&
+      value.progress.length > 0,
+    "export readiness result",
+  );
+  if (!String(readiness.manifest || "").includes('"progress_steps"')) {
+    throw new Error(`export readiness manifest did not include progress evidence: ${JSON.stringify(readiness)}`);
+  }
+}
+
+async function assertPreferenceRestartWorkflow(session, originalPreferences) {
+  const targetPreferences = {
+    theme: originalPreferences.theme === "dark" ? "light" : "dark",
+    previewTheme: "dark",
+    wordWrap: !originalPreferences.wordWrap,
+    lineNumbers: !originalPreferences.lineNumbers,
+    highContrast: !originalPreferences.highContrast,
+    reducedMotion: !originalPreferences.reducedMotion,
+  };
+  await applyDesktopPreferences(session, targetPreferences);
+  await saveWorkspace(session);
+  await delay(500);
+  await webdriver("DELETE", `/session/${session}`).catch(() => undefined);
+
+  const restartedSession = await createSession();
+  try {
+    await showSidebar(restartedSession, "settings", "Word wrap");
+    await waitForValue(
+      restartedSession,
+      `
+        const read = ${readPreferenceScript};
+        return read();
+      `,
+      (value) => preferencesMatch(value, targetPreferences),
+      "persisted desktop preferences after restart",
+    );
+    return restartedSession;
+  } catch (error) {
+    await webdriver("DELETE", `/session/${restartedSession}`).catch(() => undefined);
+    throw error;
+  }
+}
+
+async function readDesktopPreferences(session) {
+  await showSidebar(session, "settings", "Word wrap");
+  const response = await execute(session, `
+    const read = ${readPreferenceScript};
+    return read();
+  `);
+  return response.value;
+}
+
+async function restoreDesktopPreferences(session, preferences) {
+  await applyDesktopPreferences(session, preferences);
+  await saveWorkspace(session);
+  await delay(250);
+}
+
+async function applyDesktopPreferences(session, preferences) {
+  await showSidebar(session, "settings", "Word wrap");
+  await execute(session, `
+    const prefs = ${JSON.stringify(preferences)};
+    const controlByLabel = ${controlByLabelScript};
+    const setSelect = (labelText, value) => {
+      const select = controlByLabel(labelText, 'select');
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const setCheckbox = (labelText, checked) => {
+      const input = controlByLabel(labelText, 'input');
+      if (input.checked !== checked) {
+        input.checked = checked;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
+    setSelect('Theme', prefs.theme);
+    setSelect('Preview theme', prefs.previewTheme);
+    setCheckbox('Word wrap', prefs.wordWrap);
+    setCheckbox('Line numbers', prefs.lineNumbers);
+    setCheckbox('High contrast', prefs.highContrast);
+    setCheckbox('Reduced motion', prefs.reducedMotion);
+    return true;
+  `);
+}
+
+async function showSidebar(session, value, labelText) {
+  await execute(session, `
+    const sidebar = document.querySelector('[aria-label="Sidebar panel"]');
+    sidebar.value = ${JSON.stringify(value)};
+    sidebar.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  `);
+  await waitForValue(
+    session,
+    `
+      const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
+      return [...document.querySelectorAll('label')].some((label) => normalized(label.textContent || '').includes(${JSON.stringify(labelText)}));
+    `,
+    Boolean,
+    `${value} sidebar controls`,
+  );
+}
+
+async function saveWorkspace(session) {
+  await execute(session, `
+    const button = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'Save Workspace');
+    button.click();
+    return true;
+  `);
+}
+
+async function waitForValue(session, script, predicate, description) {
+  const started = Date.now();
+  let lastValue = null;
+  while (Date.now() - started < timeoutMs) {
+    const response = await execute(session, script);
+    lastValue = response.value;
+    if (predicate(lastValue)) return lastValue;
+    await delay(250);
+  }
+  throw new Error(`timed out waiting for ${description}; last value: ${JSON.stringify(lastValue)}`);
+}
+
+function preferencesMatch(actual, expected) {
+  return (
+    actual?.theme === expected.theme &&
+    actual?.previewTheme === expected.previewTheme &&
+    actual?.wordWrap === expected.wordWrap &&
+    actual?.lineNumbers === expected.lineNumbers &&
+    actual?.highContrast === expected.highContrast &&
+    actual?.reducedMotion === expected.reducedMotion
+  );
 }
 
 async function createSession() {
