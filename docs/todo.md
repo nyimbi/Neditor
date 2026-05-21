@@ -804,7 +804,8 @@ Completion criteria:
 
 ### 3. Add Desktop WebDriver/Tauri Workflow Smoke Tests
 
-Status: missing.
+Status: partial local artifact smoke exists; interactive desktop workflow
+coverage remains open.
 
 Browser tests prove the Vue workbench under mocked Tauri IPC. They do not prove
 native dialogs, real file permissions, window title behavior, real Tauri
@@ -812,7 +813,12 @@ command wiring, or desktop shell lifecycle.
 
 Needed desktop smoke coverage:
 
-- App boots as a Tauri desktop shell.
+- Release desktop binary and bundled frontend artifact existence. Covered by
+  `pnpm run test:desktop-smoke` after `./node_modules/.bin/tauri build
+  --no-bundle`.
+- App boots as a Tauri desktop shell. The smoke harness supports a bounded GUI
+  launch with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`, but
+  GUI launch requires host permission.
 - New/open/save/save-as with real local files.
 - Dirty title/status behavior.
 - External file watcher and conflict flow with real file changes.
@@ -821,7 +827,8 @@ Needed desktop smoke coverage:
 
 Completion criteria:
 
-- Use Tauri-driver/WebDriver or another project-appropriate desktop smoke
+- Use the local desktop smoke harness for release artifact checks and extend it
+  with Tauri-driver/WebDriver or another project-appropriate desktop workflow
   harness without weakening the browser harness.
 - Do not add GitHub Actions for this smoke harness; keep it local/manual unless
   the project policy changes.

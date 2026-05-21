@@ -316,6 +316,7 @@ test("local verification scripts expose frontend and browser checks", () => {
   equal(scripts["check:docs"], "node scripts/check-markdown-links.mjs");
   equal(scripts["check:engines"], "node scripts/check-external-engines.mjs");
   equal(scripts.build, "vue-tsc --noEmit && vite build");
+  equal(scripts["test:desktop-smoke"], "node scripts/check-desktop-smoke.mjs");
   equal(scripts["test:unit"], "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js");
   equal(scripts["test:e2e"], "playwright test");
 });

@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `7aff68f Announce
-  workbench status changes accessibly`
+- Latest inspected committed baseline before this update: `4c6f306 Label the
+  table editor for screen readers`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -41,6 +41,11 @@ Recent pushed checkpoints visible in current git history:
 - This update also names the table editor grid, row/column control groups, and
   totals so screen-reader users can navigate the dense table editing surface by
   structure rather than visual position alone.
+- This update adds `pnpm run test:desktop-smoke`, a local desktop artifact smoke
+  check for the Vite build, Tauri config, package/license metadata, and release
+  desktop binary produced by `./node_modules/.bin/tauri build --no-bundle`. The
+  same harness has an opt-in bounded GUI launch mode for hosts that permit
+  desktop app startup.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.
@@ -1594,14 +1599,28 @@ Table-editor screen-reader accessibility verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "pasted tables\|table structure" --project chromium` | Blocked locally | The Vite server started and selected the two table workflows, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence was used. |
 | `git diff --check` | Pass | No whitespace errors after the diagnostic/conflict/table accessibility updates. |
 
+Desktop artifact smoke verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build created the frontend artifact consumed by the Tauri build. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary built at `src-tauri/target/release/neditor`. |
+| `pnpm run test:desktop-smoke` | Pass | Checked `dist/index.html`, bundled JS assets, Tauri product/config/license metadata, npm/Cargo MIT metadata, and the executable release binary. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed, including the package-script guard for `test:desktop-smoke`. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the desktop smoke harness; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after adding the desktop smoke script and docs. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Blocked locally | Bounded GUI launch smoke requires elevated desktop app launch permission; the escalation request was rejected by the auto-review layer, so no workaround was attempted. |
+| `git diff --check` | Pass | No whitespace errors after the desktop smoke harness update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
    option matrices, progress/cancellation behavior if needed, remaining preview
    modes, broader keyboard shortcuts, deeper workspace grouping, AI review-state
    workflows, and table export modes.
-2. Add desktop WebDriver/Tauri-driver smoke tests after the browser harness is
-   stable.
+2. Extend the new desktop smoke harness with WebDriver/Tauri-driver workflows
+   for real local file, watcher, export, title, and restart behavior.
 3. Use failures from workflow tests to drive implementation fixes.
 4. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
 5. Add macOS/Windows optional transform engine evidence.

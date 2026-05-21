@@ -184,6 +184,7 @@ pnpm run build
 pnpm run check:docs
 pnpm run check:a11y
 pnpm run check:engines
+pnpm run test:desktop-smoke
 cd src-tauri && cargo fmt --check
 cd src-tauri && cargo check --locked
 cd src-tauri && cargo check --locked --features native-watch
@@ -200,6 +201,13 @@ and the host allows Chromium to launch.
 `pnpm run check:engines` probes optional external transform engines and reports
 installed/missing Graphviz/DOT, D2, PlantUML, Java-backed PlantUML, and Pikchr
 paths without failing just because an optional engine is absent.
+
+`pnpm run test:desktop-smoke` verifies the local Vite build, Tauri
+configuration, package metadata, MIT license metadata, and release desktop
+binary produced by `./node_modules/.bin/tauri build --no-bundle`. On machines
+that allow GUI app startup, run
+`NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` for a bounded
+native launch smoke.
 
 `cargo check` and `cargo test` require crates.io access the first time Rust
 dependencies are resolved. After dependencies are present, the project is

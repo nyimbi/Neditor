@@ -235,7 +235,10 @@ Current major verification gaps:
   Local focused execution is currently blocked because Playwright browser
   installation in the sandbox fails with `EPERM` while creating
   `/Users/nyimbiodero/Library/Caches/ms-playwright/__dirlock`.
-- No desktop WebDriver/Tauri-driver workflow test harness.
+- `pnpm run test:desktop-smoke` now checks the built Vite artifact, Tauri
+  configuration, package/license metadata, and the release desktop binary after
+  `./node_modules/.bin/tauri build --no-bundle`; a WebDriver/Tauri-driver
+  workflow harness is still missing.
 - Current committed browser workflow tests exist, but local browser execution
   depends on Playwright browser installation and host permissions; desktop user
   journeys are still not covered by a WebDriver/Tauri-driver harness.
