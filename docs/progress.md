@@ -103,11 +103,11 @@ Recent pushed checkpoints visible in current git history:
   limitation in `.tmp/rendered-export-audit/viewer-proof.json`.
 - This update makes browser workflow execution current-host evidence instead
   of stale archived evidence. `pnpm run test:e2e` now uses the project-local
-  Playwright browser cache and passes all 42 Chromium workbench workflows
+  Playwright browser cache and passes all 43 Chromium workbench workflows
   locally, including editor/preview typing, settings persistence, command
   palette navigation, file/save/rename/reveal flows, snapshots, workspace
   restore, stale-save conflicts, include watchers, AI governance, and export
-  readiness/success/failure, plus browser UI handoff coverage for blog,
+  readiness/success/failure, transform template management, plus browser UI handoff coverage for blog,
   Substack, LaTeX, and Google Docs package targets.
 - This update fixes workflow bugs found by that browser run: command-palette
   editor commands now regain editor focus after the modal closes, CodeMirror
@@ -600,7 +600,7 @@ P0 gaps:
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in that retired workflow.
-- Browser-level workflow tests now pass locally with 42 Chromium tests through
+- Browser-level workflow tests now pass locally with 43 Chromium tests through
   `pnpm run test:e2e` using the project-local Playwright browser cache. This
   closes the prior local browser-cache/launch blocker and covers mocked file
   lifecycle, save-as/recently-closed flows, stale-save conflict copy/merge/
@@ -609,7 +609,7 @@ P0 gaps:
   workspace restore, tab activation, recent cleanup, synchronized editor/
   preview scrolling, preview heading click-to-source, settings persistence,
   CodeMirror find/replace and editing helpers, command-palette navigation,
-  transform engine diagnostics, table workflows, AI governance, export
+  transform engine diagnostics, transform template management, table workflows, AI governance, export
   readiness/success/failure diagnostics, and blog/Substack/LaTeX/Google Docs
   export-target UI handoffs.
 - Desktop proof now includes the native command workflow smoke plus a bounded
@@ -652,7 +652,7 @@ P2/P3 gaps:
 
 ## Verification Status
 
-Current verification recorded on 2026-05-21:
+Current verification recorded on 2026-05-21 and 2026-05-22:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
@@ -663,9 +663,9 @@ Current verification recorded on 2026-05-21:
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
-| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 42 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 43 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed through the focused workbench boot workflow on this host. |
-| `pnpm run test:e2e` | Pass | 42 Chromium browser workbench workflows passed locally on this host, including blog/Substack/LaTeX/Google Docs target handoffs. |
+| `pnpm run test:e2e` | Pass | 43 Chromium browser workbench workflows passed locally on this host, including transform template management and blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
@@ -2237,6 +2237,13 @@ Native desktop window smoke verification:
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Rebuilt the release desktop binary consumed by the launch smoke after adding the app-authored native window report. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS launch smoke verified the release binary, native command workflow, process survival, and app-authored native window report. `.tmp/desktop-smoke/native-window-report.json` records package `NEditor`, identifier `com.neditor.desktop`, main-window title `NEditor`, visible `true`, size `2880x1840`, and scale factor `2`. |
 | `node --check scripts/check-desktop-smoke.mjs`, `cargo fmt --check` in `src-tauri`, `pnpm run build`, `pnpm run check` | Pass | Script syntax, Rust formatting, production frontend build, and Vue typecheck passed after the desktop smoke hardening. |
+
+Transform template browser workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages transform templates" --project chromium` | Pass | Focused Chromium workflow passed on this host with the system-Chrome fallback, proving the Templates panel filters the Science `calc` library, previews and inserts the built-in "Dose by weight" template, creates and persists a custom `calc` template, and inserts the custom template from the command palette. |
+| `node scripts/run-e2e.mjs` | Pass | Full Chromium browser workflow suite passed all 43 tests after adding transform template management coverage. |
 
 ## Next Execution Order
 

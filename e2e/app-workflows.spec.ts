@@ -1800,6 +1800,63 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/opt/bin/d2");
 });
 
+test("manages transform templates and inserts reusable calc workflows", async ({ page }) => {
+  await page.getByRole("button", { name: "Templates" }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("templates");
+
+  const sidebar = page.locator(".sidebar");
+  const templateFilters = page.getByRole("region", { name: "Transform template filters" });
+  await expect(sidebar.getByRole("heading", { name: /Templates/ })).toBeVisible();
+  await templateFilters.getByLabel("Category").selectOption("Science");
+  await templateFilters.getByLabel("Transform").selectOption("calc");
+  await templateFilters.getByLabel("Search").fill("dose");
+
+  const doseTemplate = sidebar.getByRole("listitem").filter({ hasText: "Dose by weight" });
+  await expect(doseTemplate).toContainText("Science | calc | builtin");
+  await expect(doseTemplate).toContainText("clinical");
+  await doseTemplate.getByText("Preview").click();
+  await expect(doseTemplate.locator("pre")).toContainText("total_dose_mg");
+  await doseTemplate.getByRole("button", { name: "Insert" }).click();
+
+  await expect.poll(() => editorText(page)).toContain("weight_kg = 72");
+  await expect.poll(() => editorText(page)).toContain("Total dose: {{=total_dose_mg}} mg");
+  await expect(page.locator(".status-bar")).toContainText("Inserted Dose by weight template");
+
+  const customEditor = page.getByRole("region", { name: "Custom transform template editor" });
+  await customEditor.getByLabel("Name").fill("Custom Safety Margin");
+  await customEditor.getByLabel("Category").fill("Business");
+  await customEditor.getByLabel("Transform").selectOption("calc");
+  await customEditor.getByLabel("Summary").fill("Reusable safety stock margin calculation.");
+  await customEditor.getByLabel("Tags").fill("operations, margin");
+  await customEditor.getByLabel("Body").fill(
+    [
+      "```calc",
+      "required_units = 100",
+      "available_units = 135",
+      "margin_units = available_units - required_units",
+      "```",
+      "Margin: {{=margin_units}} units",
+    ].join("\n"),
+  );
+  await customEditor.getByRole("button", { name: "Create custom" }).click();
+  await expect(page.locator(".status-bar")).toContainText("Saved Custom Safety Margin template");
+
+  await templateFilters.getByLabel("Category").selectOption("all");
+  await templateFilters.getByLabel("Transform").selectOption("all");
+  await templateFilters.getByLabel("Search").fill("safety margin");
+  const customTemplate = sidebar.getByRole("listitem").filter({ hasText: "Custom Safety Margin" });
+  await expect(customTemplate).toContainText("Business | calc | custom");
+  await customTemplate.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => editorText(page)).toContain("margin_units = available_units - required_units");
+
+  await page.getByRole("button", { name: "Save Workspace" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Custom Safety Margin");
+  await page.getByRole("button", { name: "Insert Custom Safety Margin template Template Business" }).click();
+  await expect.poll(() => editorText(page)).toContain("Margin: {{=margin_units}} units");
+});
+
 test("runs command palette insertion and table editor workflows", async ({ page }) => {
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert table");
