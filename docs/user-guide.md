@@ -221,6 +221,9 @@ Supported targets:
 - PPTX for presentation-style summaries and executive decks.
 - Markdown bundle for portable source handoff.
 - Blog and Substack packages for local-first publishing handoff.
+- LaTeX source for academic and technical handoff.
+- Google Docs package for local-first import through DOCX, HTML, Markdown, or
+  text fallbacks.
 
 Export options cover manifests, styles, syntax highlighting, cover pages, page
 numbers, layout presets, comments appendix, AI provenance appendix, glossary
@@ -249,6 +252,11 @@ Blog and Substack package exports are ZIP files with copy-ready Markdown,
 standalone HTML, plain text, metadata, an RSS item seed, packaged media assets,
 and an embedded NEditor manifest. Substack packages also include a minimal
 `substack-copy.html` fragment intended for paste/import workflows.
+Google Docs package exports are ZIP files with `document.docx` as the primary
+Google Docs upload/import file, plus HTML, Markdown, plain text, metadata,
+assets, and an embedded manifest for auditability. LaTeX exports write a direct
+`.tex` file and use the regular sidecar manifest when `includeManifest` is
+enabled.
 
 ## Versioning And Snapshots
 

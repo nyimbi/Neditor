@@ -285,7 +285,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     previewLineHeight: 0.2,
     autosaveDelayMs: 10,
     snapshotIntervalMs: 9_999_999,
-    exportTarget: "pdf",
+    exportTarget: "google-docs",
     exportDefaults: {
       includeManifest: false,
       includeCoverPage: false,
@@ -322,7 +322,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.previewLineHeight, 1);
   equal(migrated.autosaveDelayMs, 500);
   equal(migrated.snapshotIntervalMs, 3_600_000);
-  equal(migrated.exportTarget, "pdf");
+  equal(migrated.exportTarget, "google-docs");
   deepEqual(migrated.exportDefaults, {
     includeManifest: false,
     includeStyles: true,
@@ -382,6 +382,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts.build, "vue-tsc --noEmit && vite build");
   equal(scripts["test:desktop-smoke"], "node scripts/check-desktop-smoke.mjs");
   equal(scripts["test:tauri-webdriver"], "node scripts/run-tauri-webdriver.mjs");
+  equal(scripts["test:rendered-exports"], "node scripts/check-rendered-export-audit.mjs");
   equal(scripts["test:unit"], "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js");
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
 });

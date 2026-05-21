@@ -198,8 +198,10 @@ pub(crate) fn export_progress_steps(
             work_units: 1,
         },
     ];
-    let bundle_embeds_manifest =
-        matches!(target, "markdown-bundle" | "markdown" | "blog" | "substack");
+    let bundle_embeds_manifest = matches!(
+        target,
+        "markdown-bundle" | "markdown" | "blog" | "substack" | "google-docs"
+    );
     if include_manifest || bundle_embeds_manifest {
         let (label, detail) = if bundle_embeds_manifest && !include_manifest {
             (

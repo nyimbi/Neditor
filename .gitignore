@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 .pnpm-store
 .cache/
+.tmp/
 .omx/
 dist
 dist-ssr

@@ -36,6 +36,7 @@ const fullCommands = [
     "src-tauri",
   ),
   command("Rust tests", "cargo", ["test", "--locked"], "src-tauri"),
+  command("Rendered export audit", "pnpm", ["run", "test:rendered-exports"]),
   command(
     "Desktop release compile",
     "./node_modules/.bin/tauri",

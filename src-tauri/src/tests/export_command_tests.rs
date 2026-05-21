@@ -101,6 +101,8 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
         ("markdown-bundle", "zip"),
         ("blog", "zip"),
         ("substack", "zip"),
+        ("latex", "tex"),
+        ("google-docs", "zip"),
     ] {
         let output_path = exports.join(format!("native-smoke.{extension}"));
         let response = export_document(ExportRequest {
@@ -185,6 +187,68 @@ fn export_document_writes_blog_and_substack_publish_packages() {
 
         fs::remove_file(output).expect("clean publish package");
     }
+}
+
+#[test]
+fn export_document_writes_latex_and_google_docs_outputs() {
+    let source = "---\ntitle: Research Brief\nsubtitle: Import-ready evidence pack\nauthor: NEditor QA\ndate: 2026-05-21\nversion: 2.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Research Brief\n\nA **business** brief with a [source link](https://example.com/evidence).\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Review | Operations |\n\n$$\nROI = \\frac{Gain}{Cost}\n$$ {#eq:roi caption=\"Return on investment\"}\n".to_string();
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+
+    let latex_output = std::env::temp_dir().join(format!("neditor-latex-{unique}.tex"));
+    let latex_response = export_document(ExportRequest {
+        text: source.clone(),
+        file_path: None,
+        target: "latex".to_string(),
+        output_path: path_to_string(&latex_output),
+        options: json!({ "warnOnDirtyGit": false, "includeManifest": false }),
+    })
+    .expect("latex export should pass");
+    let latex = fs::read_to_string(&latex_output).expect("latex output");
+    assert_eq!(latex_response.manifest.export_target, "latex");
+    assert!(latex_response.manifest_path.is_none());
+    assert!(latex.contains("\\documentclass"));
+    assert!(latex.contains("\\title{Research Brief}"));
+    assert!(latex.contains("\\section{Research Brief}"));
+    assert!(latex.contains("\\textbf{business}"));
+    assert!(latex.contains("\\href{https://example.com/evidence}{source link}"));
+    assert!(latex.contains("\\begin{longtable}"));
+    assert!(latex.contains("\\label{tbl:controls}"));
+    assert!(latex.contains("ROI = \\frac{Gain}{Cost}"));
+    assert!(latex.contains("\\label{eq:roi}"));
+
+    let google_docs_output = std::env::temp_dir().join(format!("neditor-google-docs-{unique}.zip"));
+    let google_docs_response = export_document(ExportRequest {
+        text: source,
+        file_path: None,
+        target: "google-docs".to_string(),
+        output_path: path_to_string(&google_docs_output),
+        options: json!({ "warnOnDirtyGit": false, "includeManifest": false }),
+    })
+    .expect("google docs package export should pass");
+    let bytes = fs::read(&google_docs_output).expect("google docs package");
+    assert_eq!(google_docs_response.manifest.export_target, "google-docs");
+    assert!(google_docs_response.manifest_path.is_none());
+    assert!(zip_has_entry(&bytes, "document.docx"));
+    assert!(zip_has_entry(&bytes, "document.html"));
+    assert!(zip_has_entry(&bytes, "document.md"));
+    assert!(zip_has_entry(&bytes, "document.txt"));
+    assert!(zip_has_entry(&bytes, "metadata.json"));
+    assert!(zip_has_entry(&bytes, "manifest.json"));
+    assert!(zip_has_entry(&bytes, "README.md"));
+    assert!(zip_entry_text(&bytes, "metadata.json").contains("\"exportTarget\": \"google-docs\""));
+    assert!(zip_entry_text(&bytes, "metadata.json").contains("Upload document.docx to Google Docs"));
+    assert!(zip_entry_text(&bytes, "manifest.json").contains("\"export_target\": \"google-docs\""));
+    assert!(google_docs_response.progress_steps.iter().any(|step| {
+        step.id == "manifest"
+            && step.label == "Embed package manifest"
+            && step.detail.contains("sidecar manifest output is disabled")
+    }));
+
+    fs::remove_file(latex_output).expect("clean latex export");
+    fs::remove_file(google_docs_output).expect("clean google docs package");
 }
 
 #[test]

@@ -33,6 +33,9 @@ pub(crate) use pdf::render_pdf_bytes;
 mod docx;
 pub(crate) use docx::render_docx_bytes;
 
+mod latex;
+pub(crate) use latex::render_latex_bytes;
+
 mod pptx;
 pub(crate) use pptx::render_pptx_bytes;
 
@@ -41,3 +44,6 @@ pub(crate) use bundle::render_markdown_bundle_bytes;
 
 mod blog;
 pub(crate) use blog::render_blog_publish_package_bytes;
+
+mod google_docs;
+pub(crate) use google_docs::render_google_docs_package_bytes;

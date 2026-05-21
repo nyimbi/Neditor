@@ -29,7 +29,16 @@ export type CitationStyle = (typeof SUPPORTED_CITATION_STYLES)[number];
 export type LayoutPreset = "business" | "compact" | "presentation";
 export type PreviewTheme = "match" | "light" | "dark";
 export type SnapshotStorage = "app-data" | "project-local";
-export type ExportTarget = "html" | "pdf" | "docx" | "pptx" | "markdown-bundle" | "blog" | "substack";
+export type ExportTarget =
+  | "html"
+  | "pdf"
+  | "docx"
+  | "pptx"
+  | "markdown-bundle"
+  | "blog"
+  | "substack"
+  | "latex"
+  | "google-docs";
 export type WorkbenchMode = "split" | "source" | "preview" | "focus" | "export" | "review" | "presentation";
 export type SidebarPanel = "files" | "outline" | "diagnostics" | "tables" | "references" | "exports" | "versioning" | "review" | "settings";
 export type ThemePreference = "system" | "light" | "dark";
@@ -321,7 +330,17 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (editorLineHeight !== undefined) migrated.editorLineHeight = clampLineHeight(editorLineHeight);
   const previewLineHeight = numberValue(raw.previewLineHeight);
   if (previewLineHeight !== undefined) migrated.previewLineHeight = clampLineHeight(previewLineHeight);
-  const exportTarget = enumValue(raw.exportTarget, ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack"] as const);
+  const exportTarget = enumValue(raw.exportTarget, [
+    "html",
+    "pdf",
+    "docx",
+    "pptx",
+    "markdown-bundle",
+    "blog",
+    "substack",
+    "latex",
+    "google-docs",
+  ] as const);
   if (exportTarget) migrated.exportTarget = exportTarget;
   if (isRecord(raw.exportDefaults)) migrated.exportDefaults = normalizeExportDefaults(raw.exportDefaults);
   if (isRecord(raw.bibliographyDefaults)) migrated.bibliographyDefaults = normalizeBibliographyDefaults(raw.bibliographyDefaults);

@@ -10,7 +10,7 @@ documents usually force into office suites: structured metadata, includes,
 tables, calculations, citations, diagrams, review comments, release status,
 brand-aware exports, and reproducible export manifests. Your source stays local
 and inspectable. The app helps turn it into polished HTML, PDF, DOCX, PPTX,
-Markdown bundle, blog, or Substack package outputs.
+Markdown bundle, blog, Substack, LaTeX, or Google Docs package outputs.
 
 ![NEditor workbench showing Markdown source, live preview, outline, diagnostics, and status](docs/screenshots/workbench.svg)
 
@@ -154,6 +154,8 @@ preview HTML as the only source of truth.
 | Markdown bundle | Portable source handoff | Source document plus manifest and packaged evidence |
 | Blog package | Blog publishing handoff | Copy-ready Markdown, HTML, text, metadata, RSS seed, assets, and manifest |
 | Substack package | Substack publishing handoff | Substack copy HTML, Markdown, text, metadata, RSS seed, assets, and manifest |
+| LaTeX | Academic or technical handoff | `.tex` source with metadata, headings, tables, figures, equations, links, and labels |
+| Google Docs package | Google Docs import handoff | DOCX, HTML, Markdown, text, metadata, assets, and manifest |
 
 Export defaults include manifests, styles, syntax highlighting, cover page, page
 numbers, layout preset, comments appendix, AI provenance appendix, glossary
@@ -220,6 +222,11 @@ paths without failing just because an optional engine is absent.
 `pnpm run check:deps` verifies that every JavaScript and Rust dependency in the
 project manifests has an entry in the dependency admission record and that
 NEditor package metadata still declares MIT licensing.
+
+`pnpm run test:rendered-exports` runs the representative rendered export audit
+and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
+DOCX, PPTX, Markdown bundle, blog package, Substack package, LaTeX, Google Docs
+package, hashes, and a manual visual-review checklist.
 
 `pnpm run test:desktop-smoke` verifies the local Vite build, Tauri
 configuration, package metadata, MIT license metadata, release desktop binary

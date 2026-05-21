@@ -336,7 +336,16 @@ export const useDocumentsStore = defineStore("documents", {
     previewFontSize: 14,
     editorLineHeight: 1.55,
     previewLineHeight: 1.65,
-    exportTarget: "html" as "html" | "pdf" | "docx" | "pptx" | "markdown-bundle" | "blog" | "substack",
+    exportTarget: "html" as
+      | "html"
+      | "pdf"
+      | "docx"
+      | "pptx"
+      | "markdown-bundle"
+      | "blog"
+      | "substack"
+      | "latex"
+      | "google-docs",
     exportDefaults: {
       includeManifest: true,
       includeStyles: true,

@@ -596,6 +596,8 @@
               <option value="markdown-bundle">Markdown bundle</option>
               <option value="blog">Blog package</option>
               <option value="substack">Substack package</option>
+              <option value="latex">LaTeX</option>
+              <option value="google-docs">Google Docs package</option>
             </select>
           </label>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
@@ -3263,6 +3265,8 @@ async function exportDocument() {
     "markdown-bundle": "zip",
     blog: "zip",
     substack: "zip",
+    latex: "tex",
+    "google-docs": "zip",
   };
   const extension = extensions[store.exportTarget];
   const path = await save({

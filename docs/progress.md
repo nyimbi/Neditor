@@ -44,11 +44,21 @@ Recent pushed checkpoints visible in current git history:
   fixture, checking inspectable HTML, PDF object structure, DOCX/PPTX package
   anatomy, core/custom properties, comments and AI provenance appendices,
   transform artifacts, and Markdown bundle manifest evidence.
+- This update makes the rendered export audit directly executable through
+  `pnpm run test:rendered-exports`. The command generates local HTML, PDF,
+  DOCX, PPTX, Markdown bundle, blog package, Substack package, LaTeX, and
+  Google Docs package artifacts under `.tmp/rendered-export-audit`, plus a JSON
+  report with sizes, hashes, and a manual visual-review checklist.
 - This update adds local-first blog and Substack publishing packages as export
   targets. `blog` and `substack` exports write ZIP packages containing
   compiled Markdown, standalone blog HTML, a minimal Substack copy/paste HTML
   fragment, plain text, metadata, RSS item seed, README, and the embedded
   NEditor manifest.
+- This update adds LaTeX and Google Docs exports. `latex` writes a `.tex`
+  document with metadata, headings, tables, figures, equations, links, and
+  labels. `google-docs` writes a local ZIP handoff with `document.docx`,
+  standalone HTML, Markdown, plain text, metadata, assets, README, and embedded
+  manifest evidence for Google Docs import workflows.
 - This update makes browser workflow execution current-host evidence instead
   of stale archived evidence. `pnpm run test:e2e` now uses the project-local
   Playwright browser cache and passes all 41 Chromium workbench workflows
@@ -566,9 +576,9 @@ P0 gaps:
 
 P1 gaps:
 
-- Export fidelity still requires rendered/manual proof, but target-specific
-  option matrix preservation and rich Markdown block fidelity now have backend
-  package/text evidence across every export target.
+- Export fidelity now has a local rendered-export audit artifact bundle and
+  manual checklist. Broader manual review across more fixtures, viewers, and
+  platforms is still needed before the entire export surface can be complete.
 - Export readiness has browser workflow coverage for the target-specific
   status/diagnostic path, but still needs a requirement-by-requirement audit.
 - Optional external transform evidence now includes current macOS Graphviz/DOT,
@@ -602,10 +612,11 @@ Current verification recorded on 2026-05-21:
 | --- | --- | --- |
 | `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | 8 file command tests passed, including `reveal_command_for_existing_path_is_platform_specific_and_argument_safe`. |
 | `cargo test --locked desktop_native_command_workflow_smoke --lib` in `src-tauri` | Pass | Native command workflow smoke passed against real local files and direct export outputs. |
-| `cargo test --locked representative_rendered_export_artifacts_are_package_inspectable --lib` in `src-tauri` | Pass | Representative rendered/package export audit passed across HTML, PDF, DOCX, PPTX, and Markdown bundle evidence. |
-| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 27 export command tests passed, including blog/Substack publish packages, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
+| `cargo test --locked representative_rendered_export_artifacts_are_package_inspectable --lib` in `src-tauri` | Pass | Representative rendered/package export audit passed across HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package evidence. |
+| `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes and a manual checklist report. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
-| `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 212 Rust tests, Tauri no-bundle release compile, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe still reports Pikchr missing on this host. |
+| `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe still reports Pikchr missing on this host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 41 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed on this host. |
 | `pnpm run test:e2e` | Pass | 41 Chromium browser workbench workflows passed locally on this host. |

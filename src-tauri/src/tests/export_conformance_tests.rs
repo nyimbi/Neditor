@@ -260,6 +260,145 @@ status: human-reviewed
         .is_some_and(|artifacts| artifacts
             .iter()
             .any(|artifact| artifact.get("name").and_then(Value::as_str) == Some("chart"))));
+
+    let mut blog_manifest = response.export_manifest.clone();
+    blog_manifest.export_target = "blog".to_string();
+    blog_manifest.export_options = options.clone();
+    let blog =
+        render_blog_publish_package_bytes(&response, &blog_manifest).expect("blog audit package");
+    assert!(zip_has_entry(&blog, "post.md"));
+    assert!(zip_has_entry(&blog, "post.html"));
+    assert!(zip_has_entry(&blog, "substack-copy.html"));
+    assert!(zip_has_entry(&blog, "metadata.json"));
+    assert!(zip_has_entry(&blog, "manifest.json"));
+    assert!(zip_entry_text(&blog, "post.html").contains("Rendered Export Audit"));
+    assert!(zip_entry_text(&blog, "metadata.json").contains("\"exportTarget\": \"blog\""));
+
+    let mut substack_manifest = response.export_manifest.clone();
+    substack_manifest.export_target = "substack".to_string();
+    substack_manifest.export_options = options.clone();
+    let substack = render_blog_publish_package_bytes(&response, &substack_manifest)
+        .expect("substack audit package");
+    assert!(zip_has_entry(&substack, "post.md"));
+    assert!(zip_has_entry(&substack, "post.html"));
+    assert!(zip_has_entry(&substack, "substack-copy.html"));
+    assert!(zip_has_entry(&substack, "metadata.json"));
+    assert!(zip_has_entry(&substack, "manifest.json"));
+    assert!(zip_entry_text(&substack, "substack-copy.html").contains("Rendered Export Audit"));
+    assert!(zip_entry_text(&substack, "metadata.json").contains("\"exportTarget\": \"substack\""));
+
+    let mut latex_manifest = response.export_manifest.clone();
+    latex_manifest.export_target = "latex".to_string();
+    latex_manifest.export_options = options.clone();
+    let latex = render_latex_bytes(&response, &latex_manifest).expect("latex audit artifact");
+    let latex_text = String::from_utf8(latex.clone()).expect("latex utf8");
+    assert!(latex_text.contains("\\documentclass"));
+    assert!(latex_text.contains("\\title{Rendered Export Audit}"));
+    assert!(latex_text.contains("\\begin{longtable}"));
+    assert!(latex_text.contains("Source hash"));
+
+    let mut google_docs_manifest = response.export_manifest.clone();
+    google_docs_manifest.export_target = "google-docs".to_string();
+    google_docs_manifest.export_options = options.clone();
+    let google_docs = render_google_docs_package_bytes(&response, &google_docs_manifest)
+        .expect("google docs audit package");
+    assert!(zip_has_entry(&google_docs, "document.docx"));
+    assert!(zip_has_entry(&google_docs, "document.html"));
+    assert!(zip_has_entry(&google_docs, "document.md"));
+    assert!(zip_has_entry(&google_docs, "metadata.json"));
+    assert!(zip_has_entry(&google_docs, "manifest.json"));
+    assert!(
+        zip_entry_text(&google_docs, "metadata.json").contains("\"exportTarget\": \"google-docs\"")
+    );
+
+    write_rendered_export_audit_artifacts(RenderedExportAuditArtifacts {
+        response: &response,
+        html: &html,
+        pdf: &pdf,
+        docx: &docx,
+        pptx: &pptx,
+        bundle: &bundle,
+        blog: &blog,
+        substack: &substack,
+        latex: &latex,
+        google_docs: &google_docs,
+    });
+}
+
+struct RenderedExportAuditArtifacts<'a> {
+    response: &'a CompileResponse,
+    html: &'a str,
+    pdf: &'a [u8],
+    docx: &'a [u8],
+    pptx: &'a [u8],
+    bundle: &'a [u8],
+    blog: &'a [u8],
+    substack: &'a [u8],
+    latex: &'a [u8],
+    google_docs: &'a [u8],
+}
+
+fn write_rendered_export_audit_artifacts(artifacts: RenderedExportAuditArtifacts<'_>) {
+    let Some(root) = std::env::var_os("NEDITOR_RENDERED_EXPORT_AUDIT_DIR").map(PathBuf::from)
+    else {
+        return;
+    };
+    fs::create_dir_all(&root).expect("create rendered export audit dir");
+    fs::write(root.join("rendered-export-audit.html"), artifacts.html).expect("write audit html");
+    fs::write(root.join("rendered-export-audit.pdf"), artifacts.pdf).expect("write audit pdf");
+    fs::write(root.join("rendered-export-audit.docx"), artifacts.docx).expect("write audit docx");
+    fs::write(root.join("rendered-export-audit.pptx"), artifacts.pptx).expect("write audit pptx");
+    fs::write(
+        root.join("rendered-export-audit.markdown-bundle.zip"),
+        artifacts.bundle,
+    )
+    .expect("write audit markdown bundle");
+    fs::write(root.join("rendered-export-audit.blog.zip"), artifacts.blog)
+        .expect("write audit blog package");
+    fs::write(
+        root.join("rendered-export-audit.substack.zip"),
+        artifacts.substack,
+    )
+    .expect("write audit substack package");
+    fs::write(root.join("rendered-export-audit.tex"), artifacts.latex).expect("write audit latex");
+    fs::write(
+        root.join("rendered-export-audit.google-docs.zip"),
+        artifacts.google_docs,
+    )
+    .expect("write audit google docs package");
+    let report = json!({
+        "title": artifacts.response.semantic.title,
+        "version": artifacts.response.export_manifest.document_version,
+        "targets": [
+            { "target": "html", "path": "rendered-export-audit.html", "bytes": artifacts.html.len(), "sha256": sha256_hex(artifacts.html.as_bytes()) },
+            { "target": "pdf", "path": "rendered-export-audit.pdf", "bytes": artifacts.pdf.len(), "sha256": sha256_hex(artifacts.pdf) },
+            { "target": "docx", "path": "rendered-export-audit.docx", "bytes": artifacts.docx.len(), "sha256": sha256_hex(artifacts.docx) },
+            { "target": "pptx", "path": "rendered-export-audit.pptx", "bytes": artifacts.pptx.len(), "sha256": sha256_hex(artifacts.pptx) },
+            { "target": "markdown-bundle", "path": "rendered-export-audit.markdown-bundle.zip", "bytes": artifacts.bundle.len(), "sha256": sha256_hex(artifacts.bundle) },
+            { "target": "blog", "path": "rendered-export-audit.blog.zip", "bytes": artifacts.blog.len(), "sha256": sha256_hex(artifacts.blog) },
+            { "target": "substack", "path": "rendered-export-audit.substack.zip", "bytes": artifacts.substack.len(), "sha256": sha256_hex(artifacts.substack) },
+            { "target": "latex", "path": "rendered-export-audit.tex", "bytes": artifacts.latex.len(), "sha256": sha256_hex(artifacts.latex) },
+            { "target": "google-docs", "path": "rendered-export-audit.google-docs.zip", "bytes": artifacts.google_docs.len(), "sha256": sha256_hex(artifacts.google_docs) }
+        ],
+        "manualChecklist": [
+            "Open rendered-export-audit.html and confirm cover, watermark, comments, provenance, table, figure, and chart are visible.",
+            "Open rendered-export-audit.pdf and confirm cover, watermark, pagination, comments, provenance, and decision section are readable.",
+            "Open rendered-export-audit.docx and confirm document properties, table, figure caption, comments appendix, and AI provenance appendix are present.",
+            "Open rendered-export-audit.pptx and confirm slides contain title, control summary, comments, and AI provenance.",
+            "Open rendered-export-audit.tex in a LaTeX editor and confirm headings, tables, equations, and metadata are present.",
+            "Inspect ZIP packages and confirm manifests plus publishing and Google Docs handoff files are present."
+        ]
+    });
+    fs::write(
+        root.join("rendered-export-audit-report.json"),
+        serde_json::to_string_pretty(&report).expect("audit report json"),
+    )
+    .expect("write audit report");
+    fs::write(
+        root.join("README.md"),
+        "# Rendered Export Audit\n\nThis directory is generated by `pnpm run test:rendered-exports`.\n\nOpen the HTML/PDF/DOCX/PPTX files in native viewers for manual visual review, inspect the LaTeX source, and inspect the ZIP packages for manifest-backed publishing and Google Docs handoff evidence. The JSON report records target paths, sizes, hashes, and the manual checklist.\n",
+    )
+    .expect("write audit readme");
 }
 
 #[test]

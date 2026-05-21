@@ -8,7 +8,8 @@ use crate::{
     diagnostics::{diag, DocumentDiagnostic},
     export::{
         render_blog_publish_package_bytes, render_docx_bytes, render_full_html,
-        render_markdown_bundle_bytes, render_pdf_bytes, render_pptx_bytes,
+        render_google_docs_package_bytes, render_latex_bytes, render_markdown_bundle_bytes,
+        render_pdf_bytes, render_pptx_bytes,
     },
     git::get_git_status,
     metadata_string,
@@ -153,9 +154,19 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
             render_blog_publish_package_bytes(&compile_response, &manifest)?,
         )
         .map_err(|err| err.to_string())?,
+        "latex" => fs::write(
+            &output_path,
+            render_latex_bytes(&compile_response, &manifest)?,
+        )
+        .map_err(|err| err.to_string())?,
+        "google-docs" => fs::write(
+            &output_path,
+            render_google_docs_package_bytes(&compile_response, &manifest)?,
+        )
+        .map_err(|err| err.to_string())?,
         other => {
             return Err(format!(
-                "Unsupported export target '{other}'. Use html, pdf, docx, pptx, markdown-bundle, blog, or substack."
+                "Unsupported export target '{other}'. Use html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, or google-docs."
             ));
         }
     }
@@ -298,14 +309,23 @@ fn validate_export_settings(
 ) {
     if !matches!(
         target,
-        "html" | "pdf" | "docx" | "pptx" | "markdown-bundle" | "markdown" | "blog" | "substack"
+        "html"
+            | "pdf"
+            | "docx"
+            | "pptx"
+            | "markdown-bundle"
+            | "markdown"
+            | "blog"
+            | "substack"
+            | "latex"
+            | "google-docs"
     ) {
         diagnostics.push(diag(
             "error",
             format!("Unsupported export target: {target}"),
             None,
             None,
-            Some("Use html, pdf, docx, pptx, markdown-bundle, blog, or substack."),
+            Some("Use html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, or google-docs."),
         ));
     }
     validate_optional_string(options, "watermark", "Export watermark", diagnostics);
@@ -502,7 +522,10 @@ fn validate_target_specific_export_options(
         );
     }
 
-    if matches!(target, "markdown-bundle" | "markdown" | "blog" | "substack") {
+    if matches!(
+        target,
+        "markdown-bundle" | "markdown" | "blog" | "substack" | "google-docs"
+    ) {
         if sidecar_manifest_disabled {
             push_option_info(
                 target,
@@ -639,7 +662,8 @@ fn expected_export_extension(target: &str) -> Option<&'static str> {
         "pdf" => Some("pdf"),
         "docx" => Some("docx"),
         "pptx" => Some("pptx"),
-        "markdown-bundle" | "markdown" | "blog" | "substack" => Some("zip"),
+        "latex" => Some("tex"),
+        "markdown-bundle" | "markdown" | "blog" | "substack" | "google-docs" => Some("zip"),
         _ => None,
     }
 }

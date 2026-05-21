@@ -62,8 +62,9 @@ pub(crate) use diagnostics::{diag, DocumentDiagnostic};
 use document_ast::DocumentBlock;
 #[cfg(test)]
 use export::{
-    render_docx_bytes, render_full_html, render_markdown_bundle_bytes, render_pdf_bytes,
-    render_pptx_bytes,
+    render_blog_publish_package_bytes, render_docx_bytes, render_full_html,
+    render_google_docs_package_bytes, render_latex_bytes, render_markdown_bundle_bytes,
+    render_pdf_bytes, render_pptx_bytes,
 };
 use export_commands::{export_document, prepare_for_export};
 #[cfg(test)]

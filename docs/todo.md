@@ -57,8 +57,8 @@ NEditor is no longer a basic scaffold. The repository currently contains:
 - Richer Rust-native OpenAPI and JSON Schema transform rendering for API
   operations, parameters, request/response bodies, component schemas, nested
   schema fields, array items, refs, enums, formats, defaults, and constraints.
-- Export modules for HTML, PDF, DOCX, PPTX, Markdown bundles, and local-first
-  blog/Substack publishing packages.
+- Export modules for HTML, PDF, DOCX, PPTX, Markdown bundles, LaTeX, and
+  local-first blog/Substack/Google Docs handoff packages.
 - Backend tests across compiler, exports, transforms, tables, media packaging,
   validation, file commands, Git workflows, snapshots, review/provenance, and
   external engines.
@@ -132,10 +132,11 @@ Most recent local verification evidence:
 - `cargo test --locked git_history_diff_commit_tag_and_restore_workflow --lib`:
   passed after Git hardening and proves normal history, diff, commit, tag, and
   restore behavior still works.
-- `cargo test --locked export_command_tests --lib`: passed 27 export command
+- `cargo test --locked export_command_tests --lib`: passed 28 export command
   tests, including direct-export dirty-Git warnings copied into response,
   sidecar manifests, structured export progress-step reporting, blog/Substack
-  publishing packages, and precise no-bibliography citation readiness ranges.
+  publishing packages, LaTeX and Google Docs handoff exports, and precise
+  no-bibliography citation readiness ranges.
 - `pnpm run test:e2e`: passed all 41 Chromium browser workbench workflows
   locally on 2026-05-21 using the project-local Playwright browser cache.
 - `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture`:
@@ -597,14 +598,17 @@ current completion evidence.
 
 Current local verification evidence:
 
-- 2026-05-21: `pnpm run verify:local` passed after adding blog/Substack
-  publish packages and stabilizing the browser workflow suite. The run covered
+- 2026-05-21: `pnpm run verify:local:full` passed after adding rendered export
+  audit artifacts plus LaTeX and Google Docs handoff exports. The run covered
   frontend typecheck, frontend unit tests, project structure, accessibility,
-  dependency admission, Markdown links, Rust formatting, Rust
-  `cargo check --locked`, and `git diff --check`.
-- 2026-05-21: `cargo test --locked export_command_tests --lib` passed 27 export
-  command tests, including blog/Substack package exports and native command
-  workflow smoke.
+  dependency admission, Markdown links, Rust formatting, Rust `cargo check
+  --locked`, `git diff --check`, production build, optional engine probe,
+  native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri
+  no-bundle release compile, desktop artifact/native-command smoke, and the
+  desktop WebDriver harness step.
+- 2026-05-21: `cargo test --locked export_command_tests --lib` passed 28 export
+  command tests, including blog/Substack package exports, LaTeX export, Google
+  Docs package export, and native command workflow smoke.
 - 2026-05-21: `pnpm run check:e2e-env` and `pnpm run test:e2e` passed locally;
   the browser run covered all 41 Chromium workbench workflows.
 - 2026-05-21: `pnpm run verify:local` passed after hardening the `reveal_path`
@@ -826,8 +830,8 @@ Required next coverage:
 - External conflict modal: native desktop proof and deeper manual UX QA for
   the new line-composition tray.
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
-- Export artifact fidelity, target-specific option matrices,
-  progress/cancellation behavior if needed, and rendered/manual proof.
+- Export artifact fidelity, target-specific option matrices, and rendered audit
+  proof now have executable coverage; broader manual viewer/platform QA remains.
 - Run the large-document browser performance workflow on a host that permits
   Playwright Chromium launch, plus native desktop performance proof.
 - Remaining transform engine settings: cross-platform executable edge cases
@@ -939,6 +943,10 @@ Current evidence:
   a board-style fixture through inspectable HTML, PDF object structure, DOCX
   and PPTX package anatomy, core/custom properties, comments/provenance
   appendices, transform artifacts, and Markdown bundle manifest entries.
+- `pnpm run test:rendered-exports` generates reviewable HTML, PDF, DOCX, PPTX,
+  Markdown bundle, blog package, Substack package, LaTeX, and Google Docs
+  package artifacts under `.tmp/rendered-export-audit`, plus a JSON report with
+  hashes and a manual visual-review checklist.
 
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
 
@@ -986,8 +994,8 @@ Needed proof:
 
 - Package/text assertions where appropriate.
 - More target-specific option combinations beyond the current focused matrix.
-- Additional rendered/manual visual inspection of representative PDF/DOCX/PPTX
-  artifacts beyond package-level rendered artifact audits.
+- Additional rendered/manual visual inspection of more representative
+  PDF/DOCX/PPTX artifacts across native viewers and platforms.
 - Fixture exports tied back to matrix rows.
 
 ### 6. Export Readiness Completeness
