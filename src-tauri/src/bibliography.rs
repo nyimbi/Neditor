@@ -160,38 +160,24 @@ fn parse_bibliography_source_with_origin(
         return entries;
     }
     let mut entries = Vec::new();
-    let mut search_from = 0usize;
-    while let Some(relative_at) = body[search_from..].find('@') {
-        let at = search_from + relative_at;
-        let next_at = body[at + 1..]
-            .find('@')
-            .map(|relative| at + 1 + relative)
-            .unwrap_or(body.len());
-        let entry = &body[at + 1..next_at];
-        if let Some((kind_and_key, rest)) = entry.split_once('{') {
-            if let Some((raw_key, raw)) = rest.split_once(',') {
-                let key = raw_key.trim();
-                if !key.is_empty() {
-                    let key_offset =
-                        at + 1 + kind_and_key.len() + 1 + leading_whitespace_len(raw_key);
-                    let (line, column) = source_position_for_offset(body, start_line, key_offset);
-                    let title = bibtex_field(raw, "title")
-                        .unwrap_or_else(|| kind_and_key.trim().to_string());
-                    entries.push(BibliographyEntry {
-                        key: key.to_string(),
-                        title,
-                        author: bibtex_field(raw, "author"),
-                        issued: bibtex_issued_year(raw),
-                        raw: raw.to_string(),
-                        source_file: source_file.map(ToString::to_string),
-                        line: Some(line),
-                        column: Some(column),
-                        end_column: Some(column + key.len()),
-                    });
-                }
-            }
+    for entry in bibtex_entry_slices(body) {
+        let key = entry.raw_key.trim();
+        if !key.is_empty() {
+            let key_offset = entry.key_offset + leading_whitespace_len(entry.raw_key);
+            let (line, column) = source_position_for_offset(body, start_line, key_offset);
+            let title = bibtex_field(entry.raw, "title").unwrap_or_else(|| entry.kind.to_string());
+            entries.push(BibliographyEntry {
+                key: key.to_string(),
+                title,
+                author: bibtex_field(entry.raw, "author"),
+                issued: bibtex_issued_year(entry.raw),
+                raw: entry.raw.to_string(),
+                source_file: source_file.map(ToString::to_string),
+                line: Some(line),
+                column: Some(column),
+                end_column: Some(column + key.len()),
+            });
         }
-        search_from = next_at;
     }
     entries
 }
@@ -205,6 +191,149 @@ pub(crate) fn duplicate_bibliography_keys(bibliography: &[BibliographyEntry]) ->
         }
     }
     duplicates.into_iter().collect()
+}
+
+struct BibtexEntrySlice<'a> {
+    kind: &'a str,
+    raw_key: &'a str,
+    raw: &'a str,
+    key_offset: usize,
+}
+
+fn bibtex_entry_slices(body: &str) -> Vec<BibtexEntrySlice<'_>> {
+    let mut entries = Vec::new();
+    let mut search_from = 0usize;
+    while let Some(relative_at) = body[search_from..].find('@') {
+        let at = search_from + relative_at;
+        let mut kind_start = at + 1;
+        while let Some(ch) = body[kind_start..].chars().next() {
+            if !ch.is_whitespace() {
+                break;
+            }
+            kind_start += ch.len_utf8();
+        }
+        let kind_end = body[kind_start..]
+            .char_indices()
+            .find_map(|(index, ch)| (!is_bibtex_identifier_char(ch)).then_some(kind_start + index))
+            .unwrap_or(body.len());
+        let kind = body[kind_start..kind_end].trim();
+        if kind.is_empty() {
+            search_from = at + 1;
+            continue;
+        }
+        let mut open_index = kind_end;
+        while let Some(ch) = body[open_index..].chars().next() {
+            if !ch.is_whitespace() {
+                break;
+            }
+            open_index += ch.len_utf8();
+        }
+        let Some(open) = body[open_index..].chars().next() else {
+            break;
+        };
+        if !matches!(open, '{' | '(') {
+            search_from = open_index + open.len_utf8();
+            continue;
+        }
+        let content_start = open_index + open.len_utf8();
+        let Some(close_index) = find_bibtex_entry_close(body, open_index, open) else {
+            break;
+        };
+        let content = &body[content_start..close_index];
+        if !matches!(
+            kind.to_ascii_lowercase().as_str(),
+            "comment" | "preamble" | "string"
+        ) {
+            if let Some(comma_index) = find_top_level_bibtex_comma(content) {
+                entries.push(BibtexEntrySlice {
+                    kind,
+                    raw_key: &content[..comma_index],
+                    raw: &content[comma_index + 1..],
+                    key_offset: content_start,
+                });
+            }
+        }
+        search_from = close_index + 1;
+    }
+    entries
+}
+
+fn find_bibtex_entry_close(body: &str, open_index: usize, open: char) -> Option<usize> {
+    let mut delimiter_depth = 0usize;
+    let mut brace_depth = 0usize;
+    let mut in_quote = false;
+    let mut escaped = false;
+    for (index, ch) in body[open_index..].char_indices() {
+        let absolute_index = open_index + index;
+        if in_quote {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_quote = false;
+            }
+            continue;
+        }
+        if ch == '"' {
+            in_quote = true;
+            continue;
+        }
+        if ch == '{' {
+            brace_depth += 1;
+            if open == '{' {
+                delimiter_depth += 1;
+            }
+            continue;
+        }
+        if ch == '}' {
+            brace_depth = brace_depth.saturating_sub(1);
+            if open == '{' {
+                delimiter_depth = delimiter_depth.saturating_sub(1);
+                if delimiter_depth == 0 {
+                    return Some(absolute_index);
+                }
+            }
+            continue;
+        }
+        if open == '(' && ch == '(' {
+            delimiter_depth += 1;
+            continue;
+        }
+        if open == '(' && ch == ')' && brace_depth == 0 {
+            delimiter_depth = delimiter_depth.saturating_sub(1);
+            if delimiter_depth == 0 {
+                return Some(absolute_index);
+            }
+        }
+    }
+    None
+}
+
+fn find_top_level_bibtex_comma(content: &str) -> Option<usize> {
+    let mut brace_depth = 0usize;
+    let mut in_quote = false;
+    let mut escaped = false;
+    for (index, ch) in content.char_indices() {
+        if in_quote {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_quote = false;
+            }
+            continue;
+        }
+        match ch {
+            '"' => in_quote = true,
+            '{' => brace_depth += 1,
+            '}' => brace_depth = brace_depth.saturating_sub(1),
+            ',' if brace_depth == 0 => return Some(index),
+            _ => {}
+        }
+    }
+    None
 }
 
 fn parse_hayagriva_yaml_bibliography(
@@ -272,10 +401,8 @@ fn parse_csl_json_bibliography(
 ) -> Result<Vec<BibliographyEntry>, serde_json::Error> {
     let value = serde_json::from_str::<Value>(body)?;
     let mut occurrence_counts = BTreeMap::<String, usize>::new();
-    let entries = value
-        .as_array()
+    let entries = csl_json_entries(&value)
         .into_iter()
-        .flatten()
         .filter_map(|entry| {
             let key = entry
                 .get("id")
@@ -304,6 +431,23 @@ fn parse_csl_json_bibliography(
         })
         .collect();
     Ok(entries)
+}
+
+fn csl_json_entries(value: &Value) -> Vec<&Value> {
+    if let Some(entries) = value.as_array() {
+        return entries.iter().collect();
+    }
+    if let Some(object) = value.as_object() {
+        for key in ["items", "references", "bibliography", "data"] {
+            if let Some(entries) = object.get(key).and_then(Value::as_array) {
+                return entries.iter().collect();
+            }
+        }
+        if object.contains_key("id") || object.contains_key("citation-key") {
+            return vec![value];
+        }
+    }
+    Vec::new()
 }
 
 struct HayagrivaEntrySpan {
@@ -408,14 +552,10 @@ fn bibliography_key_location_for_occurrence(
 fn yaml_author(entry: &Value) -> Option<String> {
     entry.get("author").and_then(|author| match author {
         Value::String(value) => Some(value.clone()),
+        Value::Object(author) => author_name_from_object(author),
         Value::Array(values) => values.first().and_then(|value| match value {
             Value::String(value) => Some(value.clone()),
-            Value::Object(author) => author
-                .get("name")
-                .or_else(|| author.get("family"))
-                .or_else(|| author.get("literal"))
-                .and_then(Value::as_str)
-                .map(ToString::to_string),
+            Value::Object(author) => author_name_from_object(author),
             _ => None,
         }),
         _ => None,
@@ -426,12 +566,7 @@ fn yaml_issued_year(entry: &Value) -> Option<String> {
     ["date", "year", "issued"]
         .into_iter()
         .find_map(|field| entry.get(field))
-        .and_then(|value| match value {
-            Value::String(value) => Some(value.chars().take(4).collect::<String>()),
-            Value::Number(value) => Some(value.to_string()),
-            _ => None,
-        })
-        .filter(|year| year.len() == 4 && year.chars().all(|ch| ch.is_ascii_digit()))
+        .and_then(year_from_value)
 }
 
 fn bibtex_field(raw: &str, field: &str) -> Option<String> {
@@ -521,11 +656,17 @@ fn is_bibtex_identifier_char(ch: char) -> bool {
 }
 
 fn clean_bibliography_value(value: &str) -> String {
-    value
+    let trimmed = value
         .trim()
         .trim_matches(&['{', '}', ',', '"'][..])
         .trim()
-        .to_string()
+        .to_string();
+    trimmed
+        .replace("\\&", "&")
+        .replace(['{', '}'], "")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn bibtex_issued_year(raw: &str) -> Option<String> {
@@ -544,24 +685,78 @@ fn csl_author(entry: &Value) -> Option<String> {
         .and_then(|authors| authors.first())
         .and_then(|author| {
             author
-                .get("literal")
-                .and_then(Value::as_str)
-                .or_else(|| author.get("family").and_then(Value::as_str))
-                .or_else(|| author.get("name").and_then(Value::as_str))
+                .as_object()
+                .and_then(author_name_from_object)
+                .or_else(|| {
+                    author
+                        .get("literal")
+                        .and_then(Value::as_str)
+                        .or_else(|| author.get("family").and_then(Value::as_str))
+                        .or_else(|| author.get("name").and_then(Value::as_str))
+                        .map(ToString::to_string)
+                })
         })
-        .map(ToString::to_string)
 }
 
 fn csl_issued_year(entry: &Value) -> Option<String> {
-    entry
-        .get("issued")
-        .and_then(|issued| issued.get("date-parts"))
-        .and_then(Value::as_array)
-        .and_then(|date_parts| date_parts.first())
-        .and_then(Value::as_array)
-        .and_then(|first_date| first_date.first())
-        .and_then(Value::as_i64)
-        .map(|year| year.to_string())
+    entry.get("issued").and_then(year_from_value)
+}
+
+fn author_name_from_object(author: &serde_json::Map<String, Value>) -> Option<String> {
+    if let Some(literal) = author.get("literal").and_then(Value::as_str) {
+        return Some(literal.to_string());
+    }
+    if let Some(name) = author.get("name").and_then(Value::as_str) {
+        return Some(name.to_string());
+    }
+    let given = author
+        .get("given")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    let family = author
+        .get("family")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    match (given.is_empty(), family.is_empty()) {
+        (false, false) => Some(format!("{given} {family}")),
+        (false, true) => Some(given.to_string()),
+        (true, false) => Some(family.to_string()),
+        (true, true) => None,
+    }
+}
+
+fn year_from_value(value: &Value) -> Option<String> {
+    match value {
+        Value::String(value) => first_year(value),
+        Value::Number(value) => Some(value.to_string()).filter(|year| is_year(year)),
+        Value::Object(object) => object
+            .get("date-parts")
+            .and_then(Value::as_array)
+            .and_then(|date_parts| date_parts.first())
+            .and_then(Value::as_array)
+            .and_then(|first_date| first_date.first())
+            .and_then(year_from_value)
+            .or_else(|| {
+                ["raw", "literal", "date", "year"]
+                    .into_iter()
+                    .filter_map(|key| object.get(key))
+                    .find_map(year_from_value)
+            }),
+        _ => None,
+    }
+}
+
+fn first_year(value: &str) -> Option<String> {
+    value
+        .split(|ch: char| !ch.is_ascii_digit())
+        .find(|part| is_year(part))
+        .map(ToString::to_string)
+}
+
+fn is_year(value: &str) -> bool {
+    value.len() == 4 && value.chars().all(|ch| ch.is_ascii_digit())
 }
 
 pub(crate) fn collect_citation_references(text: &str) -> Vec<CitationReference> {
@@ -619,7 +814,7 @@ fn citation_references_from_bracket(
         let after_at = &rest[index + 1..];
         let key = after_at
             .chars()
-            .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | ':'))
+            .take_while(|ch| is_citation_key_char(*ch))
             .collect::<String>();
         let key_len = key.len();
         if !key.is_empty() {
@@ -646,6 +841,10 @@ fn citation_references_from_bracket(
         rest = &rest[advance..];
     }
     references
+}
+
+fn is_citation_key_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | ':' | '.' | '/')
 }
 
 pub(crate) fn render_citations(

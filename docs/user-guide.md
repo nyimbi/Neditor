@@ -138,6 +138,10 @@ Research and business documents can keep reference metadata near the source.
 
 - Use citation syntax such as `[@porter1985]` or `[@porter1985, p. 42]`.
 - Add `[BIBLIOGRAPHY]` where the rendered references should appear.
+- Import BibTeX with brace or parenthesis entries, Zotero/Better BibTeX-style
+  metadata records, dotted keys, and `@` characters inside field values.
+- Import CSL JSON as a root array, a single item, or an object with `items`,
+  `references`, `bibliography`, or `data`.
 - Choose `title`, `author-year`, `key`, or `numeric` citation style from front
   matter, preferences, or the references panel.
 - Use `glossary` fenced blocks for terms and definitions.

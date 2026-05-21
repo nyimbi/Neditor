@@ -218,6 +218,81 @@ fn compiler_loads_csl_json_bibliography() {
 }
 
 #[test]
+fn compiler_parses_better_bibtex_edge_cases_without_splitting_at_symbols() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Better BibTeX\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# Better BibTeX\nClaim [@doe.2026, sec. 2].\n\n```bibtex\n@string{JOURNAL = \"Journal of Evidence\"}\n@comment{Exported by Zotero Better BibTeX}\n@article( doe.2026,\n  title = {Evidence {@} Scale, with {Protected} Terms},\n  author = {Doe, Jane and Smith, John},\n  year = {2026},\n  url = {https://example.test/@artifact}\n)\n```\n[BIBLIOGRAPHY]\n".to_string(),
+            file_path: None,
+        });
+
+    assert_eq!(response.bibliography.len(), 1);
+    let entry = response
+        .bibliography
+        .iter()
+        .find(|entry| entry.key == "doe.2026")
+        .expect("dotted BibTeX key");
+    assert_eq!(entry.title, "Evidence @ Scale, with Protected Terms");
+    assert_eq!(entry.author.as_deref(), Some("Doe, Jane and Smith, John"));
+    assert_eq!(entry.issued.as_deref(), Some("2026"));
+    assert_eq!(entry.line, Some(7));
+    assert!(response
+        .semantic
+        .citation_references
+        .iter()
+        .any(
+            |citation| citation.key == "doe.2026" && citation.locator.as_deref() == Some("sec. 2")
+        ));
+    assert!(response
+        .html
+        .contains("Doe, Jane and Smith, John 2026, sec. 2"));
+    assert!(response
+        .html
+        .contains("Evidence @ Scale, with Protected Terms"));
+    assert!(!response
+        .bibliography
+        .iter()
+        .any(|entry| entry.key == "JOURNAL"));
+}
+
+#[test]
+fn compiler_loads_csl_json_object_variants_with_full_author_dates() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: CSL Object\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# CSL Object\nClaim [@smith.2026].\nSecond [@10.5555/example].\n\n```bibliography\n{\n  \"items\": [\n    {\n      \"citation-key\": \"smith.2026\",\n      \"title\": \"Object Wrapped Evidence\",\n      \"author\": [{\"given\": \"Jane\", \"family\": \"Smith\"}],\n      \"issued\": {\"raw\": \"2026-04-01\"}\n    },\n    {\n      \"id\": \"10.5555/example\",\n      \"title\": \"DOI Style Key\",\n      \"author\": [{\"literal\": \"Standards Board\"}],\n      \"issued\": {\"date-parts\": [[\"2025\", 5, 1]]}\n    }\n  ]\n}\n```\n[BIBLIOGRAPHY]\n".to_string(),
+            file_path: None,
+        });
+
+    assert_eq!(response.bibliography.len(), 2);
+    assert!(response.bibliography.iter().any(|entry| {
+        entry.key == "smith.2026"
+            && entry.author.as_deref() == Some("Jane Smith")
+            && entry.issued.as_deref() == Some("2026")
+    }));
+    assert!(response.bibliography.iter().any(|entry| {
+        entry.key == "10.5555/example"
+            && entry.author.as_deref() == Some("Standards Board")
+            && entry.issued.as_deref() == Some("2025")
+    }));
+    assert!(response.html.contains("Jane Smith 2026"));
+    assert!(response.html.contains("Standards Board 2025"));
+    assert!(response.html.contains("Object Wrapped Evidence"));
+    assert!(response.html.contains("DOI Style Key"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("Broken citation")));
+
+    let single = compile(CompileRequest {
+        text: "---\ntitle: CSL Single\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# CSL Single\nClaim [@single.2026].\n\n```bibliography\n{\"id\":\"single.2026\",\"title\":\"Single Object Entry\",\"author\":[{\"name\":\"One Author\"}],\"issued\":\"2026-02-03\"}\n```\n[BIBLIOGRAPHY]\n"
+            .to_string(),
+        file_path: None,
+    });
+    assert_eq!(single.bibliography.len(), 1);
+    assert_eq!(single.bibliography[0].key, "single.2026");
+    assert_eq!(single.bibliography[0].author.as_deref(), Some("One Author"));
+    assert_eq!(single.bibliography[0].issued.as_deref(), Some("2026"));
+    assert!(single.html.contains("One Author 2026"));
+}
+
+#[test]
 fn compiler_loads_hayagriva_yaml_bibliography() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Hayagriva\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# Hayagriva\nClaim [@porter1985].\n\n```hayagriva\nporter1985:\n  type: book\n  title: Competitive Advantage\n  author: Porter\n  date: 1985\n```\n[BIBLIOGRAPHY]".to_string(),

@@ -1675,6 +1675,23 @@ Malformed reference marker validation verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
 | `git diff --check` | Pass | No whitespace errors after the reference validation update. |
 
+Bibliography import compatibility verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_parses_better_bibtex_edge_cases_without_splitting_at_symbols --lib -- --nocapture` in `src-tauri` | Pass | Focused BibTeX proof skips `@string`/`@comment` metadata records, handles parenthesis-delimited entries, dotted keys, protected title braces, locators, and `@` characters inside field values without splitting the entry. |
+| `cargo test --locked compiler_loads_csl_json_object_variants_with_full_author_dates --lib -- --nocapture` in `src-tauri` | Pass | Focused CSL JSON proof accepts wrapper objects with `items`, full given/family authors, literal authors, raw date strings, string `date-parts`, and DOI-style slash keys. |
+| `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 16 citation tests passed after extending BibTeX/CSL import compatibility and citation key parsing. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 192 Rust library tests passed after the bibliography parser update. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the bibliography parser update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the bibliography parser update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the bibliography/parser docs update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the bibliography/parser update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting expanded BibTeX/CSL compatibility; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after the bibliography/parser update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
+| `git diff --check` | Pass | No whitespace errors after the bibliography/parser update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

@@ -1233,6 +1233,12 @@ external bibliography files, and the References panel displays duplicate entry
 locations. Citation style handling now supports title, author-year, key, and
 numeric styles, and unsupported CSL/style names produce a warning before
 falling back to title rendering.
+BibTeX import now handles brace and parenthesis entries, skips Better
+BibTeX-style `@string`/`@comment`/`@preamble` metadata records, preserves `@`
+characters inside field values, normalizes protected title braces, and accepts
+dotted citation keys. CSL JSON import now accepts root arrays, single-item
+objects, and wrapper objects with `items`, `references`, `bibliography`, or
+`data`, including full given/family author names and raw/string date forms.
 Duplicate cross-reference labels now produce source-ranged compiler/readiness
 errors and are copied into export manifests so repeated section, figure, table,
 equation, appendix, or decision anchors cannot make references ambiguous.
@@ -1242,7 +1248,11 @@ compiler/readiness errors that are copied into export manifests.
 
 Finish:
 
-- BibTeX and CSL JSON import edge cases.
+- BibTeX and CSL JSON import edge cases. Current coverage proves Better
+  BibTeX-style metadata skipping, `@` characters inside values, parenthesis
+  entries, dotted and DOI-style keys, CSL JSON wrapper objects, full author
+  names, and non-`date-parts` dates; remaining work is deeper CSL style
+  rendering fidelity.
 - Duplicate bibliography key UI and readiness reporting. Current coverage shows
   duplicate entry locations and source-range readiness diagnostics for BibTeX,
   CSL JSON, Hayagriva YAML, and separate external bibliography files; remaining
