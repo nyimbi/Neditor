@@ -236,8 +236,9 @@ it also compiles the generated `.tex` file into
 configuration, package metadata, MIT license metadata, release desktop binary
 produced by `./node_modules/.bin/tauri build --no-bundle`, and a native
 command workflow smoke that opens, watches, compiles, checks readiness, exports,
-and reveals real local files through the Rust command surface. On machines that
-allow GUI app startup, run
+and reveals real local files through the Rust command surface. The command writes
+`.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and
+native command workflow duration. On machines that allow GUI app startup, run
 `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` for a bounded
 native launch smoke. The launch smoke writes
 `.tmp/desktop-smoke/launch-report.json` with the binary path, PID, elapsed

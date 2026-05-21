@@ -14,6 +14,17 @@ const tauriConfig = readJson("src-tauri/tauri.conf.json");
 const packageJson = readJson("package.json");
 const cargoToml = readText("src-tauri/Cargo.toml");
 const binaryPath = desktopBinaryPath();
+const smokeReport = {
+  generatedAt: new Date().toISOString(),
+  platform: process.platform,
+  arch: process.arch,
+  binary: relative(binaryPath),
+  binarySize: null,
+  frontendAssets: {
+    jsBundles: 0,
+  },
+  nativeCommandWorkflow: null,
+};
 
 requireEqual(packageJson.license, "MIT", "package.json must declare MIT license");
 requireEqual(tauriConfig.productName, "NEditor", "Tauri productName must remain NEditor");
@@ -26,10 +37,15 @@ requireIncludes(cargoToml, 'license = "MIT"', "Cargo package must declare MIT li
 
 requireFile("dist/index.html", "frontend build output is missing; run pnpm run build first");
 const assetDir = join(root, "dist", "assets");
-if (!existsSync(assetDir) || !readdirSync(assetDir).some((name) => name.endsWith(".js"))) {
+const assetNames = existsSync(assetDir) ? readdirSync(assetDir) : [];
+smokeReport.frontendAssets.jsBundles = assetNames.filter((name) => name.endsWith(".js")).length;
+if (!existsSync(assetDir) || smokeReport.frontendAssets.jsBundles === 0) {
   issues.push("frontend asset bundle is missing from dist/assets");
 }
 requireExecutable(binaryPath, "desktop release binary is missing; run ./node_modules/.bin/tauri build --no-bundle first");
+if (existsSync(binaryPath)) {
+  smokeReport.binarySize = statSync(binaryPath).size;
+}
 
 if (issues.length === 0) {
   runNativeCommandWorkflowSmoke();
@@ -40,6 +56,7 @@ if (issues.length === 0 && launchRequested) {
 }
 
 if (issues.length > 0) {
+  writeSmokeReport();
   console.error("Desktop smoke check failed:");
   for (const issue of issues) {
     console.error(`- ${issue}`);
@@ -47,6 +64,7 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
+writeSmokeReport();
 console.log(
   launchRequested
     ? "Checked NEditor desktop build artifacts, native command workflow smoke, and bounded launch smoke."
@@ -100,6 +118,7 @@ function relative(path) {
 }
 
 function runNativeCommandWorkflowSmoke() {
+  const startedAt = Date.now();
   const result = spawnSync(
     "cargo",
     ["test", "--locked", "desktop_native_command_workflow_smoke", "--lib"],
@@ -109,6 +128,13 @@ function runNativeCommandWorkflowSmoke() {
       shell: process.platform === "win32",
     },
   );
+  smokeReport.nativeCommandWorkflow = {
+    command: "cargo test --locked desktop_native_command_workflow_smoke --lib",
+    status: result.status ?? 1,
+    durationMs: Date.now() - startedAt,
+    stdoutTail: tail(result.stdout),
+    stderrTail: tail(result.stderr),
+  };
   if (result.status !== 0) {
     const detail = [result.stdout?.trim(), result.stderr?.trim()].filter(Boolean).join("\n");
     issues.push(
@@ -117,6 +143,12 @@ function runNativeCommandWorkflowSmoke() {
       }`,
     );
   }
+}
+
+function writeSmokeReport() {
+  const directory = join(root, ".tmp", "desktop-smoke");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "native-command-report.json"), `${JSON.stringify(smokeReport, null, 2)}\n`);
 }
 
 async function launchDesktop(path) {
@@ -213,4 +245,9 @@ function writeLaunchReport(report) {
   const directory = join(root, ".tmp", "desktop-smoke");
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, "launch-report.json"), `${JSON.stringify(report, null, 2)}\n`);
+}
+
+function tail(value) {
+  const lines = value.trim().split(/\r?\n/).filter(Boolean);
+  return lines.slice(-12);
 }

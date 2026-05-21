@@ -838,7 +838,8 @@ Required next coverage:
 - Export artifact fidelity, target-specific option matrices, and rendered audit
   proof now have executable coverage; broader manual viewer/platform QA remains.
 - Run the large-document browser performance workflow on a host that permits
-  Playwright Chromium launch, plus native desktop performance proof.
+  Playwright Chromium launch; native command workflow timing is now recorded by
+  `pnpm run test:desktop-smoke`.
 - Remaining transform engine settings: cross-platform executable edge cases
   beyond the mocked browser workflow.
 
@@ -1507,9 +1508,9 @@ Finish:
 ### 17. Performance And Large Documents
 
 Status: compiler, repeated export-loop, repeated edit/cache, export progress,
-compile-result cancellation, preview debounce timing, and repeated
-compile/export memory-growth evidence exists; broader performance proof remains
-open.
+compile-result cancellation, preview debounce timing, repeated compile/export
+memory-growth evidence, and native command workflow timing evidence exist;
+broader performance proof remains open.
 
 Current evidence:
 
@@ -1541,6 +1542,10 @@ Current evidence:
   repeatedly compiles and renders large documents through HTML, PDF, DOCX,
   PPTX, and Markdown bundle paths while retaining only summaries and asserting
   process RSS growth remains bounded on macOS/Linux hosts.
+- `pnpm run test:desktop-smoke` writes
+  `.tmp/desktop-smoke/native-command-report.json` with release binary metadata,
+  frontend bundle counts, native command workflow status, and duration for the
+  real-file desktop command smoke.
 - `e2e/app-workflows.spec.ts` includes a large-document editing workflow that
   appends source text, waits for preview update, checks elapsed browser time,
   and verifies editor-to-preview scroll sync. Local execution still requires
@@ -1550,7 +1555,7 @@ Finish:
 
 - Deeper long-running memory profiling beyond bounded test loops.
 - Run the large-document browser workflow where Playwright Chromium is
-  installed, and add native desktop performance proof.
+  installed.
 
 ## P2 - Architecture And Maintainability
 

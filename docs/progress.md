@@ -85,6 +85,10 @@ Recent pushed checkpoints visible in current git history:
   `pnpm run check:engines` now writes
   `.tmp/external-engines/probe-report.json` with platform, architecture,
   installed Graphviz/DOT variants, D2, PlantUML, and missing optional engines.
+- This update adds native command workflow timing evidence to the desktop
+  smoke. `pnpm run test:desktop-smoke` now writes
+  `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata,
+  native command workflow status, and duration.
 - This update makes browser workflow execution current-host evidence instead
   of stale archived evidence. `pnpm run test:e2e` now uses the project-local
   Playwright browser cache and passes all 42 Chromium workbench workflows
@@ -650,7 +654,7 @@ Current verification recorded on 2026-05-21:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 42 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed through the focused workbench boot workflow on this host. |
 | `pnpm run test:e2e` | Pass | 42 Chromium browser workbench workflows passed locally on this host, including blog/Substack/LaTeX/Google Docs target handoffs. |
-| `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke. |
+| `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |

@@ -275,12 +275,13 @@ Current major verification gaps:
   optional-engine evidence remain open.
 - Accessibility has an initial static guard, but full keyboard/manual audit
   evidence is still missing. Performance now has compiler, repeated export
-  loop, repeated edit/cache, export progress reporting, and compile-result
-  cancellation coverage, preview debounce timing/coalescing coverage, and a
-  bounded repeated compile/export memory-growth stress test. Browser
-  performance workflow execution still needs a host that permits Playwright
-  Chromium launch, deeper long-running memory profiling remains open, and
-  native desktop performance proof remains under-proven.
+  loop, repeated edit/cache, export progress reporting, compile-result
+  cancellation coverage, preview debounce timing/coalescing coverage, a bounded
+  repeated compile/export memory-growth stress test, and native command
+  workflow timing evidence in `.tmp/desktop-smoke/native-command-report.json`.
+  Browser performance workflow execution still needs a host that permits
+  Playwright Chromium launch, and deeper long-running memory profiling remains
+  open.
 
 ## Next Matrix Work
 
