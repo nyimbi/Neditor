@@ -89,6 +89,7 @@ use git_support::run_git;
 #[cfg(test)]
 use git_types::{GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRequest};
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
+use tauri::Manager;
 #[cfg(test)]
 use transforms::external::ExternalTransformRequest;
 use transforms::external::{list_transform_engines, run_external_transform};
@@ -113,6 +114,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .setup(|app| {
+            write_desktop_smoke_report(app);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             open_file,
             read_file,
@@ -146,6 +151,36 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");
+}
+
+fn write_desktop_smoke_report(app: &tauri::App) {
+    let Ok(report_path) = std::env::var("NEDITOR_DESKTOP_SMOKE_REPORT") else {
+        return;
+    };
+    let window = app.get_webview_window("main");
+    let package_info = app.package_info();
+    let payload = serde_json::json!({
+        "generatedAt": chrono::Utc::now().to_rfc3339(),
+        "packageName": package_info.name,
+        "version": package_info.version.to_string(),
+        "identifier": app.config().identifier,
+        "window": window.as_ref().map(|item| serde_json::json!({
+            "label": item.label(),
+            "title": item.title().ok(),
+            "visible": item.is_visible().ok(),
+            "innerSize": item.inner_size().ok().map(|size| serde_json::json!({
+                "width": size.width,
+                "height": size.height,
+            })),
+            "scaleFactor": item.scale_factor().ok(),
+        })),
+    });
+    if let Some(parent) = std::path::Path::new(&report_path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(serialized) = serde_json::to_string_pretty(&payload) {
+        let _ = std::fs::write(report_path, format!("{serialized}\n"));
+    }
 }
 
 #[cfg(test)]

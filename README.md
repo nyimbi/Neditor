@@ -253,7 +253,9 @@ native command workflow duration. On machines that allow GUI app startup, run
 native launch smoke. The launch smoke writes
 `.tmp/desktop-smoke/launch-report.json` with the binary path, PID, elapsed
 window, captured output, and `processAlive: true` evidence when the app remains
-running until the timeout.
+running until the timeout, plus `.tmp/desktop-smoke/native-window-report.json`
+with app-authored package, identifier, main-window title, visibility, size, and
+scale-factor evidence.
 
 `pnpm run test:desktop-bundle` verifies the current host's packaged desktop
 bundle evidence. On macOS it checks `NEditor.app` Info.plist metadata, bundle

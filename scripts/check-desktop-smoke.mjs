@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const launchRequested =
   process.argv.includes("--launch") || process.env.NEDITOR_DESKTOP_SMOKE_LAUNCH === "1";
 const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 3000);
+const nativeWindowReportPath = join(root, ".tmp", "desktop-smoke", "native-window-report.json");
 const issues = [];
 
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
@@ -24,6 +25,7 @@ const smokeReport = {
     jsBundles: 0,
   },
   nativeCommandWorkflow: null,
+  nativeWindow: null,
 };
 
 requireEqual(packageJson.license, "MIT", "package.json must declare MIT license");
@@ -154,11 +156,13 @@ function writeSmokeReport() {
 async function launchDesktop(path) {
   await new Promise((resolveLaunch) => {
     const startedAt = Date.now();
+    rmSync(nativeWindowReportPath, { force: true });
     const child = spawn(path, [], {
       cwd: root,
       env: {
         ...process.env,
         RUST_BACKTRACE: "1",
+        NEDITOR_DESKTOP_SMOKE_REPORT: nativeWindowReportPath,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -188,6 +192,7 @@ async function launchDesktop(path) {
         issues.push(`desktop launch process was not alive after ${report.observedMs}ms`);
       } else {
         report.status = "survived-until-timeout";
+        validateNativeWindowReport(report);
       }
       writeLaunchReport(report);
       child.kill("SIGTERM");
@@ -238,6 +243,44 @@ function isProcessAlive(pid) {
     return true;
   } catch {
     return false;
+  }
+}
+
+function validateNativeWindowReport(launchReport) {
+  if (!existsSync(nativeWindowReportPath)) {
+    issues.push(`native launch report was not written: ${relative(nativeWindowReportPath)}`);
+    return;
+  }
+  let report;
+  try {
+    report = JSON.parse(readFileSync(nativeWindowReportPath, "utf8"));
+  } catch (error) {
+    issues.push(`native launch report is not valid JSON: ${error.message}`);
+    return;
+  }
+  smokeReport.nativeWindow = report;
+  launchReport.nativeWindow = report;
+  if (report.packageName !== "NEditor") {
+    issues.push(`native launch package name changed: expected "NEditor", found ${JSON.stringify(report.packageName)}`);
+  }
+  if (report.identifier !== "com.neditor.desktop") {
+    issues.push(
+      `native launch bundle identifier changed: expected "com.neditor.desktop", found ${JSON.stringify(
+        report.identifier,
+      )}`,
+    );
+  }
+  if (report.window?.label !== "main") {
+    issues.push(`native launch did not report the main window label: ${JSON.stringify(report.window?.label)}`);
+  }
+  if (report.window?.title !== "NEditor") {
+    issues.push(`native launch title changed: expected "NEditor", found ${JSON.stringify(report.window?.title)}`);
+  }
+  if (report.window?.visible !== true) {
+    issues.push(`native launch did not report a visible window: ${JSON.stringify(report.window?.visible)}`);
+  }
+  if (!Number.isFinite(report.window?.innerSize?.width) || !Number.isFinite(report.window?.innerSize?.height)) {
+    issues.push(`native launch did not report a usable window size: ${JSON.stringify(report.window?.innerSize)}`);
   }
 }
 

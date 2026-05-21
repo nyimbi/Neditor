@@ -2229,14 +2229,24 @@ Browser workflow fallback verification:
 | `node scripts/run-e2e.mjs` | Pass | Escalated macOS run passed all 42 Chromium browser workflows with the default system-Chrome fallback; `.tmp/e2e-browser/report.json` records `source: system-chromium`, the Chrome executable path, and exit status 0. |
 | `pnpm run check`, `pnpm run test:unit`, `pnpm run check:a11y` | Pass | Typecheck, 18 frontend unit tests, and static accessibility guardrails passed after restoring explicit Find, Open Folder, and Save Workspace command labels. |
 
+Native desktop window smoke verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo check --locked` in `src-tauri` | Pass | Tauri setup hook for the desktop smoke report compiled cleanly. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Rebuilt the release desktop binary consumed by the launch smoke after adding the app-authored native window report. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS launch smoke verified the release binary, native command workflow, process survival, and app-authored native window report. `.tmp/desktop-smoke/native-window-report.json` records package `NEditor`, identifier `com.neditor.desktop`, main-window title `NEditor`, visible `true`, size `2880x1840`, and scale factor `2`. |
+| `node --check scripts/check-desktop-smoke.mjs`, `cargo fmt --check` in `src-tauri`, `pnpm run build`, `pnpm run check` | Pass | Script syntax, Rust formatting, production frontend build, and Vue typecheck passed after the desktop smoke hardening. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
    option matrices, progress/cancellation behavior if needed, remaining preview
    modes, broader keyboard shortcuts, deeper workspace grouping, AI review-state
    workflows, and table export modes.
-2. Extend the new desktop smoke harness with WebDriver/Tauri-driver workflows
-   for real local file, watcher, export, title, and restart behavior.
+2. Execute the Windows/Linux Tauri-driver workflow harness on supported hosts
+   and keep using the macOS app-authored launch report where WebDriver is
+   officially unavailable.
 3. Use failures from workflow tests to drive implementation fixes.
 4. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
 5. Add macOS/Windows optional transform engine evidence.
