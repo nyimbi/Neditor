@@ -234,6 +234,10 @@ When `includeManifest` is enabled, NEditor writes sidecar evidence beside the
 artifact. The manifest records source hashes, include hashes, export options,
 include graph edges, diagnostics, readiness summary, layout sections, progress
 steps, output path, and output hash.
+Markdown bundle exports always include an embedded `manifest.json` for portable
+handoff. If `includeManifest` is disabled for a Markdown bundle, NEditor still
+embeds that internal manifest and records an informational readiness diagnostic;
+only the sidecar manifest with final output path/hash evidence is suppressed.
 
 ## Versioning And Snapshots
 

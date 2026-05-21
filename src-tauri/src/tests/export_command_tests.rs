@@ -633,6 +633,51 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(no_manifest.manifest_path.is_none());
     assert!(!PathBuf::from(format!("{}.manifest.json", no_manifest_output.display())).exists());
 
+    let bundle_without_sidecar_output = root.join("ready-no-sidecar-bundle.zip");
+    let bundle_without_sidecar = export_document(ExportRequest {
+        text: source.to_string(),
+        file_path: Some(path_to_string(&root.join("root.md"))),
+        target: "markdown-bundle".to_string(),
+        output_path: path_to_string(&bundle_without_sidecar_output),
+        options: json!({ "includeManifest": false, "warnOnDirtyGit": false }),
+    })
+    .expect("successful markdown bundle export without sidecar manifest");
+    let bundle_without_sidecar_bytes =
+        fs::read(&bundle_without_sidecar_output).expect("markdown bundle output bytes");
+    let embedded_manifest = zip_entry_text(&bundle_without_sidecar_bytes, "manifest.json");
+    assert!(bundle_without_sidecar_output.exists());
+    assert!(bundle_without_sidecar.manifest_path.is_none());
+    assert!(!PathBuf::from(format!(
+        "{}.manifest.json",
+        bundle_without_sidecar_output.display()
+    ))
+    .exists());
+    assert!(zip_has_entry(&bundle_without_sidecar_bytes, "document.md"));
+    assert!(embedded_manifest.contains("\"export_target\": \"markdown-bundle\""));
+    assert!(embedded_manifest.contains("\"includeManifest\": false"));
+    assert!(embedded_manifest.contains("\"output_hash\": null"));
+    assert_eq!(
+        bundle_without_sidecar.manifest.output_path.as_deref(),
+        Some(path_to_string(&bundle_without_sidecar_output).as_str())
+    );
+    assert!(bundle_without_sidecar
+        .manifest
+        .output_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("sha256:")));
+    assert_eq!(bundle_without_sidecar.manifest.readiness.info_count, 1);
+    assert!(bundle_without_sidecar.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .message
+            .contains("Markdown bundles still embed manifest.json")
+    }));
+    assert!(bundle_without_sidecar.progress_steps.iter().any(|step| {
+        step.id == "manifest"
+            && step.label == "Embed bundle manifest"
+            && step.state == "complete"
+            && step.detail.contains("sidecar manifest output is disabled")
+    }));
+
     fs::remove_dir_all(root).expect("clean export manifest dir");
 }
 
@@ -1017,6 +1062,42 @@ fn prepare_for_export_reports_target_specific_option_info() {
             bundle_report.diagnostics
         );
     }
+}
+
+#[test]
+fn prepare_for_export_reports_markdown_bundle_manifest_sidecar_info() {
+    let source = "---\ntitle: Bundle Manifest Audit\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Bundle Manifest Audit\n".to_string();
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source,
+        file_path: None,
+        target: "markdown-bundle".to_string(),
+        options: json!({ "warnOnDirtyGit": false, "includeManifest": false }),
+    });
+
+    assert!(report.ready, "{:#?}", report.diagnostics);
+    assert_eq!(report.error_count, 0);
+    assert_eq!(report.warning_count, 0);
+    assert_eq!(report.info_count, 1);
+    assert_eq!(report.manifest.readiness.info_count, 1);
+    let diagnostic = report
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("sidecar manifest"))
+        .expect("markdown bundle sidecar diagnostic");
+    assert_eq!(diagnostic.severity, "info");
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|item| item == "target:markdown-bundle"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|item| item == "option:includeManifest"));
+    assert!(report.progress_steps.iter().any(|step| {
+        step.id == "manifest"
+            && step.label == "Embed bundle manifest"
+            && step.detail.contains("sidecar manifest output is disabled")
+    }));
 }
 
 #[test]

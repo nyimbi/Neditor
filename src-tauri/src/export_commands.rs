@@ -495,6 +495,15 @@ fn validate_target_specific_export_options(
     }
 
     if matches!(target, "markdown-bundle" | "markdown") {
+        if options.get("includeManifest").and_then(Value::as_bool) == Some(false) {
+            push_option_info(
+                target,
+                "includeManifest",
+                "includeManifest=false disables the sidecar manifest, but Markdown bundles still embed manifest.json.",
+                "Enable includeManifest when you also need a sidecar manifest with final output path and hash evidence.",
+                diagnostics,
+            );
+        }
         for option in [
             "includeStyles",
             "includeSyntaxHighlighting",

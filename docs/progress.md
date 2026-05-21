@@ -1775,6 +1775,19 @@ Non-goal documentation verification:
 | --- | --- | --- |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after adding first-release non-goals to the README and user guide; all local links resolved. |
 
+Markdown bundle manifest sidecar verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked prepare_for_export_reports_markdown_bundle_manifest_sidecar_info --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust readiness proof reports `includeManifest=false` on Markdown bundles as a non-blocking info diagnostic, keeps readiness true, and shows progress as embedded bundle-manifest work instead of sidecar output. |
+| `cargo test --locked export_document_writes_optional_sidecar_manifest --lib -- --nocapture` in `src-tauri` | Pass | Direct export proof now verifies Markdown bundles with sidecar manifests disabled still write a ZIP containing `manifest.json`, suppress the sidecar path, keep final output path/hash evidence in the response manifest, and record embedded-manifest progress. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 24 export command tests passed after adding Markdown bundle sidecar/embedded manifest distinction coverage. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the Markdown bundle manifest update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the Markdown bundle manifest update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the user guide, matrix, TODO, and progress log; all local links resolved. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
+| `git diff --check` | Pass | No whitespace errors after the Markdown bundle manifest update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

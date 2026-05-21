@@ -1020,7 +1020,9 @@ Readiness should validate and report:
   option shapes; more target-specific option combinations remain.
 - Target-specific option no-op visibility. Focused Rust coverage now proves
   valid-but-ignored options and empty appendix export options are surfaced as
-  info diagnostics without blocking readiness.
+  info diagnostics without blocking readiness. Markdown bundle exports now also
+  report when `includeManifest=false` suppresses only the sidecar manifest while
+  the bundle still embeds `manifest.json`.
 - Target/output extension consistency. Focused Rust coverage now proves direct
   exports refuse mismatched target extensions before writing artifacts.
 - Unresolved comments and malformed comment/change-note audit metadata. Broad

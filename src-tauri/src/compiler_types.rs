@@ -198,16 +198,44 @@ pub(crate) fn export_progress_steps(
             work_units: 1,
         },
     ];
-    if include_manifest {
+    let bundle_embeds_manifest = matches!(target, "markdown-bundle" | "markdown");
+    if include_manifest || bundle_embeds_manifest {
+        let (label, detail) = if bundle_embeds_manifest && !include_manifest {
+            (
+                "Embed bundle manifest".to_string(),
+                if output_written {
+                    "Markdown bundle embeds manifest.json; sidecar manifest output is disabled."
+                        .to_string()
+                } else {
+                    "Markdown bundle will embed manifest.json; sidecar manifest output is disabled."
+                        .to_string()
+                },
+            )
+        } else if bundle_embeds_manifest {
+            (
+                "Write export manifests".to_string(),
+                if output_written {
+                    "Markdown bundle embeds manifest.json and the sidecar manifest includes source, output, readiness, diagnostics, and progress evidence.".to_string()
+                } else {
+                    "Markdown bundle manifest.json and sidecar manifest will be written after the target artifact succeeds.".to_string()
+                },
+            )
+        } else {
+            (
+                "Write export manifest".to_string(),
+                if output_written {
+                    "Sidecar manifest includes source, output, readiness, diagnostics, and progress evidence.".to_string()
+                } else {
+                    "Sidecar manifest will be written after the target artifact succeeds."
+                        .to_string()
+                },
+            )
+        };
         steps.push(ExportProgressStep {
             id: "manifest".to_string(),
-            label: "Write export manifest".to_string(),
+            label,
             state: render_state.to_string(),
-            detail: if output_written {
-                "Sidecar manifest includes source, output, readiness, diagnostics, and progress evidence.".to_string()
-            } else {
-                "Sidecar manifest will be written after the target artifact succeeds.".to_string()
-            },
+            detail,
             work_units: 1,
         });
     }
