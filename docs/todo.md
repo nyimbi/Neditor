@@ -1475,6 +1475,9 @@ Current evidence:
   `diff`, and `qr` are documented native transforms with cross-target artifact
   proof, while execution-heavy second-wave transforms remain deferred until
   each has a safe sandbox or static renderer.
+- Visual/data transform export proof now covers `chart`, `vega-lite`,
+  `geojson`, `topojson`, `stl`, and `timeline` static SVG artifacts, output
+  hashes, source ranges, HTML, PDF, DOCX, PPTX, and Markdown bundle evidence.
 - Front matter documentation now calls out that metadata must be a YAML mapping
   and that invalid YAML/list/scalar metadata produces source-ranged diagnostics.
 - `pnpm run check:docs` discovers README plus all top-level docs Markdown files

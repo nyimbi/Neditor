@@ -275,6 +275,167 @@ fn safe_business_transforms_survive_cross_target_exports() {
 }
 
 #[test]
+fn visual_data_transforms_survive_cross_target_exports() {
+    let response = compile(CompileRequest {
+        text: r#"---
+title: Visual Transform Pack
+status: approved
+approvedBy: QA
+approvedAt: 2026-05-21T09:00:00Z
+---
+# Visual Transform Pack
+
+```chart
+type: area
+title: Revenue Plan
+data:
+  - month: Jan
+    revenue: 4
+  - month: Feb
+    revenue: 7
+x: month
+y: revenue
+```
+
+```vega-lite
+{"title":"Pipeline Trend","mark":"line","data":{"values":[{"month":"Jan","value":3},{"month":"Feb","value":8}]},"encoding":{"x":{"field":"month"},"y":{"field":"value"}}}
+```
+
+```geojson
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[36.80,-1.30],[36.86,-1.30],[36.86,-1.24],[36.80,-1.30]]]}},{"type":"Feature","geometry":{"type":"Point","coordinates":[36.83,-1.27]}}]}
+```
+
+```topojson
+{"type":"Topology","transform":{"scale":[0.01,0.01],"translate":[36.80,-1.30]},"arcs":[[[0,0],[6,0],[0,6],[-6,-6]]],"objects":{"zone":{"type":"Polygon","arcs":[[0]]}}}
+```
+
+```stl
+solid sample
+ facet normal 0 0 1
+  outer loop
+   vertex 0 0 0
+   vertex 1 0 0
+   vertex 0 1 0
+  endloop
+ endfacet
+endsolid sample
+```
+
+```timeline
+2026-05-21: Export proof
+2026-06-01: Visual QA
+```
+"#
+        .to_string(),
+        file_path: None,
+    });
+    let options = json!({});
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    for (name, output_kind) in [
+        ("chart", "svg"),
+        ("vega-lite", "svg"),
+        ("geojson", "svg"),
+        ("topojson", "svg"),
+        ("stl", "svg"),
+        ("timeline", "svg"),
+    ] {
+        let artifact = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == name)
+            .unwrap_or_else(|| panic!("missing {name} artifact"));
+        assert_eq!(artifact.output_kind, output_kind);
+        assert_eq!(artifact.execution_kind, "embedded");
+        assert_eq!(artifact.source_hash.len(), 64);
+        assert_eq!(artifact.output_hash.len(), 64);
+        assert!(artifact.html.contains(&format!("transform-{name}")));
+        assert!(artifact.source_line.is_some());
+        assert!(artifact.end_source_line.is_some());
+    }
+    assert!(response
+        .export_manifest
+        .transform_artifacts
+        .iter()
+        .any(
+            |artifact| artifact.get("name").and_then(Value::as_str) == Some("vega-lite")
+                && artifact.get("outputKind").and_then(Value::as_str) == Some("svg")
+        ));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("transform-chart"));
+    assert!(html.contains("Revenue Plan"));
+    assert!(html.contains("transform-vega-lite"));
+    assert!(html.contains("Pipeline Trend"));
+    assert!(html.contains("transform-geojson"));
+    assert!(html.contains("1 polygons / 1 points"));
+    assert!(html.contains("transform-topojson"));
+    assert!(html.contains("1 polygons"));
+    assert!(html.contains("transform-stl"));
+    assert!(html.contains("1 triangles / 3 vertices"));
+    assert!(html.contains("transform-timeline"));
+    assert!(html.contains("Export proof"));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Transform: chart"));
+    assert!(pdf_text.contains("Revenue Plan"));
+    assert!(pdf_text.contains("Transform: vega-lite"));
+    assert!(pdf_text.contains("Pipeline Trend"));
+    assert!(pdf_text.contains("Transform: geojson"));
+    assert!(pdf_text.contains("1 polygons / 1 points"));
+    assert!(pdf_text.contains("Transform: topojson"));
+    assert!(pdf_text.contains("1 polygons"));
+    assert!(pdf_text.contains("Transform: stl"));
+    assert!(pdf_text.contains("1 triangles / 3 vertices"));
+    assert!(pdf_text.contains("Transform: timeline"));
+    assert!(pdf_text.contains("Export proof"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx visual transform pack");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Transform: chart"));
+    assert!(docx_document.contains("Revenue Plan"));
+    assert!(docx_document.contains("Pipeline Trend"));
+    assert!(docx_document.contains("1 polygons / 1 points"));
+    assert!(docx_document.contains("1 triangles / 3 vertices"));
+    assert!(docx_document.contains("Export proof"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx visual transform pack");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Visual Transform Pack"));
+    assert!(pptx_slides.contains("Transform: chart"));
+    assert!(pptx_slides.contains("Pipeline Trend"));
+    assert!(pptx_slides.contains("1 polygons / 1 points"));
+    assert!(pptx_slides.contains("1 triangles / 3 vertices"));
+    assert!(pptx_slides.contains("Export proof"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_options = options.clone();
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_artifacts = zip_entry_text(&bundle, "transform-artifacts.json");
+    assert!(bundled_text.contains("Transform: chart"));
+    assert!(bundled_text.contains("Pipeline Trend"));
+    assert!(bundled_text.contains("1 triangles / 3 vertices"));
+    for name in [
+        "chart",
+        "vega-lite",
+        "geojson",
+        "topojson",
+        "stl",
+        "timeline",
+    ] {
+        assert!(bundled_artifacts.contains(&format!("\"name\": \"{name}\"")));
+    }
+    assert!(bundled_artifacts.contains("\"output_kind\": \"svg\""));
+    assert!(bundled_artifacts.contains("\"source_line\""));
+    assert!(bundled_artifacts.contains("\"output_hash\""));
+}
+
+#[test]
 fn captioned_equations_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Captioned Equation\nstatus: approved\napprovedBy: QA\n---\n# Captioned Equation\n\n$$\nconfidence = signal / noise\n$$ {#eq:confidence caption=\"Confidence score\"}\n\nSee {@eq:confidence}.\n".to_string(),
