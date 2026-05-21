@@ -87,6 +87,10 @@ fn publish_metadata(response: &CompileResponse, manifest: &ExportManifest, slug:
         "appVersion": manifest.app_version.clone(),
         "exportTarget": manifest.export_target.clone(),
         "readiness": manifest.readiness.clone(),
+        "packageType": "publishing-handoff",
+        "primaryPublishFile": primary_publish_file(&manifest.export_target),
+        "fallbackFiles": ["post.md", "post.txt"],
+        "publishingSteps": publishing_steps(&manifest.export_target),
     })
 }
 
@@ -150,11 +154,38 @@ fn render_rss_item(response: &CompileResponse, slug: &str) -> String {
 
 fn render_publish_readme(response: &CompileResponse, manifest: &ExportManifest) -> String {
     format!(
-        "# {}\n\nThis NEditor publish package contains copy-ready blog artifacts.\n\n- `post.md`: compiled Markdown source.\n- `post.html`: standalone blog HTML preview.\n- `substack-copy.html`: minimal HTML fragment for browser copy/paste into Substack's editor.\n- `post.txt`: plain-text fallback.\n- `metadata.json`: title, slug, author, tags, status, and readiness metadata.\n- `rss-item.xml`: feed item seed for static blog generators.\n- `manifest.json`: NEditor export audit manifest.\n\nExport target: `{}`\nSource hash: `{}`\n",
+        "# {}\n\nThis NEditor publish package contains copy-ready blog artifacts.\n\n- `post.md`: compiled Markdown source.\n- `post.html`: standalone blog HTML preview and static-site publishing source.\n- `substack-copy.html`: minimal HTML fragment for browser copy/paste into Substack's editor.\n- `post.txt`: plain-text fallback.\n- `metadata.json`: title, slug, author, tags, status, readiness, and publish workflow metadata.\n- `rss-item.xml`: feed item seed for static blog generators.\n- `manifest.json`: NEditor export audit manifest.\n\n## Publish Workflow\n\n1. Review `metadata.json` and confirm readiness is true.\n2. Use `{}` as the primary publish file for this target.\n3. Keep `manifest.json` with the published record for auditability.\n\nExport target: `{}`\nSource hash: `{}`\n",
         response.semantic.title,
+        primary_publish_file(&manifest.export_target),
         manifest.export_target,
         manifest.source_hash
     )
+}
+
+fn primary_publish_file(target: &str) -> &'static str {
+    if target == "substack" {
+        "substack-copy.html"
+    } else {
+        "post.html"
+    }
+}
+
+fn publishing_steps(target: &str) -> Vec<&'static str> {
+    if target == "substack" {
+        vec![
+            "Open substack-copy.html in a browser or editor.",
+            "Copy the article fragment into Substack's editor.",
+            "Use metadata.json for title, slug, tags, and audit status.",
+            "Retain manifest.json with the published record.",
+        ]
+    } else {
+        vec![
+            "Use post.html for static-site or CMS publishing.",
+            "Use post.md when the destination accepts Markdown.",
+            "Use rss-item.xml as a feed item seed when publishing through a static blog generator.",
+            "Retain manifest.json with the published record.",
+        ]
+    }
 }
 
 fn publish_tags(response: &CompileResponse) -> Vec<String> {

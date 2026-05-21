@@ -172,8 +172,14 @@ fn export_document_writes_blog_and_substack_publish_packages() {
         let metadata = zip_entry_text(&bytes, "metadata.json");
         assert!(metadata.contains("\"slug\": \"board-notes-weekly\""));
         assert!(metadata.contains("\"exportTarget\": "));
+        assert!(metadata.contains("\"packageType\": \"publishing-handoff\""));
+        assert!(metadata.contains("\"primaryPublishFile\": "));
+        assert!(metadata.contains("\"publishingSteps\": "));
         assert!(metadata.contains("\"strategy\""));
         assert!(metadata.contains("https://example.com/board-notes"));
+        let readme = zip_entry_text(&bytes, "README.md");
+        assert!(readme.contains("## Publish Workflow"));
+        assert!(readme.contains("Keep `manifest.json` with the published record"));
         let copy_html = zip_entry_text(&bytes, "substack-copy.html");
         assert!(copy_html.contains("<h1>Board Notes</h1>"));
         assert!(copy_html.contains("<strong>business</strong>"));
@@ -240,8 +246,15 @@ fn export_document_writes_latex_and_google_docs_outputs() {
     assert!(zip_has_entry(&bytes, "manifest.json"));
     assert!(zip_has_entry(&bytes, "README.md"));
     assert!(zip_entry_text(&bytes, "metadata.json").contains("\"exportTarget\": \"google-docs\""));
+    assert!(zip_entry_text(&bytes, "metadata.json")
+        .contains("\"packageType\": \"google-docs-import-handoff\""));
+    assert!(zip_entry_text(&bytes, "metadata.json")
+        .contains("\"primaryImportFile\": \"document.docx\""));
+    assert!(zip_entry_text(&bytes, "metadata.json").contains("\"importSteps\": "));
     assert!(zip_entry_text(&bytes, "metadata.json").contains("Upload document.docx to Google Docs"));
     assert!(zip_entry_text(&bytes, "manifest.json").contains("\"export_target\": \"google-docs\""));
+    assert!(zip_entry_text(&bytes, "README.md").contains("## Import Workflow"));
+    assert!(zip_entry_text(&bytes, "README.md").contains("Open it with Google Docs"));
     assert!(google_docs_response.progress_steps.iter().any(|step| {
         step.id == "manifest"
             && step.label == "Embed package manifest"

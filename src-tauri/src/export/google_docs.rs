@@ -75,13 +75,22 @@ fn google_docs_metadata(response: &CompileResponse, manifest: &ExportManifest) -
         "appVersion": manifest.app_version.clone(),
         "exportTarget": manifest.export_target.clone(),
         "readiness": manifest.readiness.clone(),
-        "importHint": "Upload document.docx to Google Docs, or unzip and use document.html/document.md as fallback sources."
+        "packageType": "google-docs-import-handoff",
+        "primaryImportFile": "document.docx",
+        "fallbackImportFiles": ["document.html", "document.md", "document.txt"],
+        "importHint": "Upload document.docx to Google Docs, or unzip and use document.html/document.md as fallback sources.",
+        "importSteps": [
+            "Upload document.docx to Google Drive.",
+            "Open with Google Docs to convert the DOCX into an editable cloud document.",
+            "Use document.html or document.md if the DOCX conversion needs a fallback source.",
+            "Retain manifest.json and metadata.json with the source record for auditability."
+        ]
     })
 }
 
 fn render_google_docs_readme(response: &CompileResponse, manifest: &ExportManifest) -> String {
     format!(
-        "# {}\n\nThis NEditor Google Docs package is a local-first import handoff.\n\n- `document.docx`: primary file to upload or convert in Google Docs.\n- `document.html`: standalone HTML fallback for copy/import workflows.\n- `document.md`: compiled Markdown source.\n- `document.txt`: plain-text fallback.\n- `metadata.json`: title, author, status, version, readiness, and source hash metadata.\n- `manifest.json`: NEditor export audit manifest.\n- `assets/`: embedded media extracted for audit when present.\n\nExport target: `{}`\nSource hash: `{}`\n",
+        "# {}\n\nThis NEditor Google Docs package is a local-first import handoff.\n\n- `document.docx`: primary file to upload or convert in Google Docs.\n- `document.html`: standalone HTML fallback for copy/import workflows.\n- `document.md`: compiled Markdown source.\n- `document.txt`: plain-text fallback.\n- `metadata.json`: title, author, status, version, readiness, import workflow, and source hash metadata.\n- `manifest.json`: NEditor export audit manifest.\n- `assets/`: embedded media extracted for audit when present.\n\n## Import Workflow\n\n1. Upload `document.docx` to Google Drive.\n2. Open it with Google Docs to convert it into an editable cloud document.\n3. If conversion needs a fallback source, use `document.html` or `document.md`.\n4. Keep `manifest.json` and `metadata.json` with the source record for auditability.\n\nExport target: `{}`\nSource hash: `{}`\n",
         response.semantic.title,
         manifest.export_target,
         manifest.source_hash

@@ -152,10 +152,10 @@ preview HTML as the only source of truth.
 | DOCX | Word-compatible client deliverables | Document structure, paragraphs, tables, comments/provenance appendices, manifests |
 | PPTX | Presentation-style summaries and executive decks | Slide packaging, agenda option, table splitting, manifest sidecars |
 | Markdown bundle | Portable source handoff | Source document plus manifest and packaged evidence |
-| Blog package | Blog publishing handoff | Copy-ready Markdown, HTML, text, metadata, RSS seed, assets, and manifest |
-| Substack package | Substack publishing handoff | Substack copy HTML, Markdown, text, metadata, RSS seed, assets, and manifest |
+| Blog package | Blog publishing handoff | Copy-ready Markdown, HTML, text, publish workflow metadata, RSS seed, assets, and manifest |
+| Substack package | Substack publishing handoff | Substack copy HTML, Markdown, text, publish workflow metadata, RSS seed, assets, and manifest |
 | LaTeX | Academic or technical handoff | `.tex` source with metadata, headings, tables, figures, equations, links, and labels |
-| Google Docs package | Google Docs import handoff | DOCX, HTML, Markdown, text, metadata, assets, and manifest |
+| Google Docs package | Google Docs import handoff | DOCX, HTML, Markdown, text, import workflow metadata, assets, and manifest |
 
 Export defaults include manifests, styles, syntax highlighting, cover page, page
 numbers, layout preset, comments appendix, AI provenance appendix, glossary
@@ -228,8 +228,9 @@ NEditor package metadata still declares MIT licensing.
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
 DOCX, PPTX, Markdown bundle, blog package, Substack package, LaTeX, Google Docs
 package, hashes, a manual visual-review checklist, and `viewer-proof.json` with
-executable HTML/PDF/DOCX/PPTX/package assertions, publishing handoff metadata
-checks, LaTeX source checks, and nested Google Docs DOCX checks. On macOS it
+executable HTML/PDF/DOCX/PPTX/package assertions, publishing handoff workflow
+metadata checks, LaTeX source checks, Google Docs import workflow checks, and
+nested Google Docs DOCX checks. On macOS it
 also attempts a bounded Quick Look PDF thumbnail proof and records either the
 thumbnail assertion or the host sandbox limitation in `viewer-proof.json`. When
 `pdflatex` is installed, it also compiles the generated `.tex` file into

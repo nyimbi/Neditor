@@ -223,6 +223,9 @@ function collectViewerProof(issues, assertions) {
   ]);
   assertContains(assertions, issues, "blog-metadata", readZipEntryText(blog, "metadata.json"), [
     "\"exportTarget\": \"blog\"",
+    "\"packageType\": \"publishing-handoff\"",
+    "\"primaryPublishFile\": \"post.html\"",
+    "\"publishingSteps\":",
     "\"ready\": true",
     "\"slug\": \"rendered-export-audit\"",
     "\"status\": \"approved\"",
@@ -254,6 +257,8 @@ function collectViewerProof(issues, assertions) {
   ]);
   assertContains(assertions, issues, "substack-metadata", readZipEntryText(substack, "metadata.json"), [
     "\"exportTarget\": \"substack\"",
+    "\"primaryPublishFile\": \"substack-copy.html\"",
+    "\"publishingSteps\":",
     "\"ready\": true",
     "\"slug\": \"rendered-export-audit\"",
   ]);
@@ -297,12 +302,16 @@ function collectViewerProof(issues, assertions) {
   ]);
   assertContains(assertions, issues, "google-docs-metadata", readZipEntryText(googleDocs, "metadata.json"), [
     "\"exportTarget\": \"google-docs\"",
+    "\"packageType\": \"google-docs-import-handoff\"",
+    "\"primaryImportFile\": \"document.docx\"",
+    "\"importSteps\":",
     "\"ready\": true",
     "\"importHint\": \"Upload document.docx to Google Docs",
     "\"version\": \"3.1.4\"",
   ]);
   assertContains(assertions, issues, "google-docs-readme", readZipEntryText(googleDocs, "README.md"), [
     "primary file to upload or convert in Google Docs",
+    "## Import Workflow",
     "document.docx",
     "manifest.json",
   ]);

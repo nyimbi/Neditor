@@ -965,9 +965,10 @@ Current evidence:
   Markdown bundle, blog package, Substack package, LaTeX, and Google Docs
   package artifacts under `.tmp/rendered-export-audit`, plus a JSON report with
   hashes, a manual visual-review checklist, and `viewer-proof.json` with
-  executable HTML/PDF/DOCX/PPTX/package assertions, blog/Substack metadata and
-  copy artifact assertions, LaTeX source assertions, Google Docs import metadata
-  assertions, and nested Google Docs DOCX package assertions. On macOS it also
+  executable HTML/PDF/DOCX/PPTX/package assertions, blog/Substack publish
+  workflow metadata and copy artifact assertions, LaTeX source assertions,
+  Google Docs import workflow metadata assertions, and nested Google Docs DOCX
+  package assertions. On macOS it also
   attempts a Quick Look PDF thumbnail and records either thumbnail evidence or
   the current host's `qlmanage` sandbox limitation in `viewer-proof.json`. When
   `pdflatex` is installed, it also compiles the generated LaTeX artifact into

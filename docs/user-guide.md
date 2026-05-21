@@ -251,12 +251,17 @@ only the sidecar manifest with final output path/hash evidence is suppressed.
 Blog and Substack package exports are ZIP files with copy-ready Markdown,
 standalone HTML, plain text, metadata, an RSS item seed, packaged media assets,
 and an embedded NEditor manifest. Substack packages also include a minimal
-`substack-copy.html` fragment intended for paste/import workflows.
+`substack-copy.html` fragment intended for paste/import workflows. Their
+`metadata.json` files name the primary publish file, fallback files, and
+target-specific publishing steps so the package remains self-describing outside
+NEditor.
 Google Docs package exports are ZIP files with `document.docx` as the primary
 Google Docs upload/import file, plus HTML, Markdown, plain text, metadata,
-assets, and an embedded manifest for auditability. LaTeX exports write a direct
-`.tex` file and use the regular sidecar manifest when `includeManifest` is
-enabled.
+assets, and an embedded manifest for auditability. Their metadata names
+`document.docx` as the primary import file, records HTML/Markdown/plain-text
+fallbacks, and includes the Google Docs import workflow. LaTeX exports write a
+direct `.tex` file and use the regular sidecar manifest when `includeManifest`
+is enabled.
 
 ## Versioning And Snapshots
 

@@ -2171,6 +2171,13 @@ Accessibility report and browser-performance evidence verification:
 | `pnpm run verify:local` | Pass | Quick local verification passed after making `pnpm run check:a11y` emit `.tmp/accessibility/report.json`; the report recorded 10 named checks, 10 passed, 0 failed, and 0 issues. |
 | `pnpm run test:e2e` | Pass | 42 Chromium browser workflows passed locally, including skip links, modal focus, status/progress live regions, accessible diagnostics/conflict/table/source/preview semantics, large-document edit/preview responsiveness, and blog/Substack/LaTeX/Google Docs export handoffs. |
 
+Publishing and Google Docs handoff workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed after adding machine-readable publish/import workflow metadata to blog, Substack, and Google Docs packages. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit passed with package assertions for blog/Substack publish workflow metadata, Google Docs import workflow metadata, LaTeX source checks, nested Google Docs DOCX package checks, and `pdflatex` compile proof. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
