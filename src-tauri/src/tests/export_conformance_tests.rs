@@ -423,6 +423,35 @@ paths:
             accountById:
               operationId: getAccount
               description: Fetch a single account
+      callbacks:
+        paymentStatus:
+          '{$request.body#/callbackUrl}':
+            post:
+              summary: Payment status callback
+              operationId: paymentStatusCallback
+              responses:
+                "204":
+                  description: Accepted
+webhooks:
+  accountChanged:
+    post:
+      summary: Account changed webhook
+      operationId: accountChangedWebhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/Account"
+                - $ref: "#/components/schemas/AccountClosed"
+              discriminator:
+                propertyName: eventType
+                mapping:
+                  account: "#/components/schemas/Account"
+                  closed: "#/components/schemas/AccountClosed"
+      responses:
+        "202":
+          description: Queued
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -442,6 +471,14 @@ components:
         status:
           type: string
           enum: [active, suspended]
+    AccountClosed:
+      type: object
+      required:
+        - eventType
+      properties:
+        eventType:
+          type: string
+          const: closed
 ```
 
 ```json-schema
@@ -462,6 +499,20 @@ components:
       "properties": {
         "b": { "type": "string", "minLength": 3 }
       }
+    }
+  },
+  "if": {
+    "properties": {
+      "status": { "const": "closed" }
+    }
+  },
+  "then": {
+    "required": ["closedAt"]
+  },
+  "$defs": {
+    "Money": {
+      "type": "number",
+      "multipleOf": 0.01
     }
   },
   "properties": {
@@ -546,6 +597,12 @@ components:
     assert!(html.contains("examples: success"));
     assert!(html.contains("X-RateLimit-Remaining"));
     assert!(html.contains("getAccount"));
+    assert!(html.contains("callbacks: paymentStatus"));
+    assert!(html.contains("paymentStatusCallback"));
+    assert!(html.contains("WEBHOOK POST"));
+    assert!(html.contains("accountChangedWebhook"));
+    assert!(html.contains("discriminator eventType"));
+    assert!(html.contains("mapping account, closed"));
     assert!(html.contains("Component schemas"));
     assert!(html.contains("transform-json-schema"));
     assert!(html.contains("Account Payload"));
@@ -553,6 +610,9 @@ components:
     assert!(html.contains("dependentRequired: b -&gt; cc"));
     assert!(html.contains("patternProperties[^x-]"));
     assert!(html.contains("dependentSchemas[cc].b"));
+    assert!(html.contains("if.status"));
+    assert!(html.contains("then"));
+    assert!(html.contains("$defs[Money]"));
     assert!(html.contains("tuple.prefixItems[1]"));
     assert!(html.contains("multipleOf: 0.01"));
     assert!(html.contains("payment.oneOf[2]"));
@@ -567,6 +627,11 @@ components:
     assert!(pdf_text.contains("ApiKeyAuth"));
     assert!(pdf_text.contains("X-RateLimit-Remaining"));
     assert!(pdf_text.contains("getAccount"));
+    assert!(pdf_text.contains("callbacks:"));
+    assert!(pdf_text.contains("paymentStatusCallback"));
+    assert!(pdf_text.contains("WEBHOOK POST"));
+    assert!(pdf_text.contains("accountChangedWebhook"));
+    assert!(pdf_text.contains("discriminator eventType"));
     assert!(pdf_text.contains("tenant"));
     assert!(pdf_text.contains("Account id"));
     assert!(pdf_text.contains("Account Payload"));
@@ -574,6 +639,9 @@ components:
     assert!(pdf_text.contains("false;"));
     assert!(pdf_text.contains("patternProperties[^x-]"));
     assert!(pdf_text.contains("dependentSchemas[cc].b"));
+    assert!(pdf_text.contains("if.status"));
+    assert!(pdf_text.contains("then"));
+    assert!(pdf_text.contains("$defs[Money]"));
     assert!(pdf_text.contains("tuple.prefixItems[1]"));
     assert!(pdf_text.contains("payment.oneOf[2]"));
     assert!(pdf_text.contains("transactions[]"));
@@ -585,9 +653,14 @@ components:
     assert!(docx_document.contains("listAccounts"));
     assert!(docx_document.contains("ApiKeyAuth"));
     assert!(docx_document.contains("X-RateLimit-Remaining"));
+    assert!(docx_document.contains("paymentStatusCallback"));
+    assert!(docx_document.contains("WEBHOOK POST"));
+    assert!(docx_document.contains("accountChangedWebhook"));
+    assert!(docx_document.contains("discriminator eventType"));
     assert!(docx_document.contains("Account id"));
     assert!(docx_document.contains("Account Payload"));
     assert!(docx_document.contains("patternProperties[^x-]"));
+    assert!(docx_document.contains("$defs[Money]"));
     assert!(docx_document.contains("tuple.prefixItems[1]"));
     assert!(docx_document.contains("payment.oneOf[2]"));
     assert!(docx_document.contains("transactions[]"));
@@ -598,8 +671,12 @@ components:
     assert!(pptx_slides.contains("Ledger API"));
     assert!(pptx_slides.contains("ApiKeyAuth"));
     assert!(pptx_slides.contains("X-RateLimit-Remaining"));
+    assert!(pptx_slides.contains("paymentStatusCallback"));
+    assert!(pptx_slides.contains("WEBHOOK POST"));
+    assert!(pptx_slides.contains("accountChangedWebhook"));
     assert!(pptx_slides.contains("Account Payload"));
     assert!(pptx_slides.contains("patternProperties[^x-]"));
+    assert!(pptx_slides.contains("$defs[Money]"));
     assert!(pptx_slides.contains("tuple.prefixItems[1]"));
 
     let mut bundle_manifest = response.export_manifest.clone();
@@ -610,8 +687,12 @@ components:
     assert!(bundled_text.contains("Ledger API"));
     assert!(bundled_text.contains("ApiKeyAuth"));
     assert!(bundled_text.contains("X-RateLimit-Remaining"));
+    assert!(bundled_text.contains("paymentStatusCallback"));
+    assert!(bundled_text.contains("WEBHOOK POST"));
+    assert!(bundled_text.contains("accountChangedWebhook"));
     assert!(bundled_text.contains("Account Payload"));
     assert!(bundled_text.contains("patternProperties[^x-]"));
+    assert!(bundled_text.contains("$defs[Money]"));
     assert!(bundled_text.contains("payment.oneOf[2]"));
     for name in ["openapi", "json-schema"] {
         assert!(bundled_artifacts.contains(&format!("\"name\": \"{name}\"")));

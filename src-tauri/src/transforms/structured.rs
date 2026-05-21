@@ -133,6 +133,7 @@ pub(crate) fn render_openapi_html(
             }
         }
     }
+    html.push_str(&render_openapi_webhook_rows(&value));
     html.push_str("</tbody></table>");
     html.push_str(&render_openapi_security_schemes(&value));
     html.push_str(&render_openapi_components(&value));
@@ -295,11 +296,108 @@ fn operation_label(summary: &str, operation_id: &str, operation: &Value) -> Stri
             ));
         }
     }
+    let callbacks = render_openapi_callbacks(operation.get("callbacks"));
+    if !callbacks.is_empty() {
+        parts.push(callbacks);
+    }
     if parts.is_empty() {
         "&nbsp;".to_string()
     } else {
         parts.join("<br>")
     }
+}
+
+fn render_openapi_callbacks(callbacks: Option<&Value>) -> String {
+    let Some(callbacks) = callbacks.and_then(Value::as_object) else {
+        return String::new();
+    };
+    let items = callbacks
+        .iter()
+        .flat_map(|(name, callback)| {
+            callback
+                .as_object()
+                .into_iter()
+                .flat_map(move |expressions| {
+                    expressions.iter().flat_map(move |(expression, path_item)| {
+                        path_item.as_object().into_iter().flat_map(move |methods| {
+                            methods
+                                .iter()
+                                .filter(|(method, _)| is_openapi_method(method.as_str()))
+                                .map(move |(method, operation)| {
+                                    let label = operation
+                                        .get("operationId")
+                                        .or_else(|| operation.get("summary"))
+                                        .and_then(Value::as_str)
+                                        .unwrap_or("");
+                                    [
+                                        escape_html(name),
+                                        escape_html(&method.to_ascii_uppercase()),
+                                        escape_html(expression),
+                                        escape_html(label),
+                                    ]
+                                    .into_iter()
+                                    .filter(|part| !part.is_empty())
+                                    .collect::<Vec<_>>()
+                                    .join(" ")
+                                })
+                        })
+                    })
+                })
+        })
+        .filter(|item| !item.is_empty())
+        .collect::<Vec<_>>()
+        .join("; ");
+    if items.is_empty() {
+        String::new()
+    } else {
+        format!("<small>callbacks: {items}</small>")
+    }
+}
+
+fn render_openapi_webhook_rows(value: &Value) -> String {
+    let Some(webhooks) = value.get("webhooks").and_then(Value::as_object) else {
+        return String::new();
+    };
+    webhooks
+        .iter()
+        .flat_map(|(name, path_item)| {
+            path_item.as_object().into_iter().flat_map(move |methods| {
+                methods
+                    .iter()
+                    .filter(|(method, _)| is_openapi_method(method.as_str()))
+                    .map(move |(method, operation)| {
+                        let summary = operation
+                            .get("summary")
+                            .or_else(|| operation.get("description"))
+                            .and_then(Value::as_str)
+                            .unwrap_or("");
+                        let operation_id = operation
+                            .get("operationId")
+                            .and_then(Value::as_str)
+                            .unwrap_or("");
+                        let operation_label = operation_label(summary, operation_id, operation);
+                        let parameters = operation
+                            .get("parameters")
+                            .and_then(Value::as_array)
+                            .map(|parameters| parameters.iter().collect::<Vec<_>>())
+                            .unwrap_or_default();
+                        format!(
+                            "<tr><td><code>WEBHOOK {}</code></td><td><code>{}</code></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                            escape_html(&method.to_ascii_uppercase()),
+                            escape_html(name),
+                            operation_label,
+                            render_openapi_security(
+                                operation.get("security").or_else(|| value.get("security"))
+                            ),
+                            render_openapi_parameters(&parameters),
+                            render_openapi_request_body(operation.get("requestBody")),
+                            render_openapi_responses(operation.get("responses"))
+                        )
+                    })
+            })
+        })
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn render_openapi_security(security: Option<&Value>) -> String {
@@ -751,7 +849,17 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
             );
         }
     }
-    for keyword in ["additionalProperties", "contains", "propertyNames"] {
+    for keyword in [
+        "additionalProperties",
+        "contains",
+        "propertyNames",
+        "unevaluatedItems",
+        "unevaluatedProperties",
+        "not",
+        "if",
+        "then",
+        "else",
+    ] {
         if let Some(child_schema) = schema.get(keyword).filter(|value| value.is_object()) {
             collect_schema_rows(
                 &schema_child_path(field, keyword),
@@ -759,6 +867,18 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
                 false,
                 rows,
             );
+        }
+    }
+    for keyword in ["$defs", "definitions"] {
+        if let Some(definitions) = schema.get(keyword).and_then(Value::as_object) {
+            for (name, child_schema) in definitions {
+                collect_schema_rows(
+                    &schema_child_path(field, &format!("{keyword}[{name}]")),
+                    child_schema,
+                    false,
+                    rows,
+                );
+            }
         }
     }
     if let Some(dependent_schemas) = schema.get("dependentSchemas").and_then(Value::as_object) {
@@ -806,7 +926,7 @@ fn schema_type_summary(schema: &Value) -> String {
             .collect::<Vec<_>>()
             .join(" | ");
     }
-    match schema.get("type").and_then(Value::as_str) {
+    let kind = match schema.get("type").and_then(Value::as_str) {
         Some("array") => schema
             .get("items")
             .map(|items| format!("array<{}>", schema_type_summary(items)))
@@ -818,7 +938,8 @@ fn schema_type_summary(schema: &Value) -> String {
         None if schema.get("anyOf").is_some() => "anyOf".to_string(),
         None if schema.get("allOf").is_some() => "allOf".to_string(),
         None => String::new(),
-    }
+    };
+    append_schema_discriminator(kind, schema)
 }
 
 fn schema_constraints(schema: &Value) -> String {
@@ -854,6 +975,9 @@ fn schema_constraints(schema: &Value) -> String {
     if let Some(reference) = schema.get("$ref").and_then(Value::as_str) {
         constraints.push(format!("ref: {}", reference_tail(reference)));
     }
+    if let Some(discriminator) = schema_discriminator_summary(schema) {
+        constraints.push(discriminator);
+    }
     if let Some(additional_properties) = schema.get("additionalProperties") {
         if additional_properties.is_boolean() {
             constraints.push(format!(
@@ -888,6 +1012,49 @@ fn schema_constraints(schema: &Value) -> String {
         constraints.push(format!("examples: {}", value_list_summary(examples)));
     }
     constraints.join("; ")
+}
+
+fn append_schema_discriminator(kind: String, schema: &Value) -> String {
+    let Some(discriminator) = schema_discriminator_property(schema) else {
+        return kind;
+    };
+    let mapping = schema_discriminator_mapping(schema)
+        .map(|mapping| format!(" mapping {mapping}"))
+        .unwrap_or_default();
+    if kind.is_empty() {
+        format!("discriminator {discriminator}{mapping}")
+    } else {
+        format!("{kind} discriminator {discriminator}{mapping}")
+    }
+}
+
+fn schema_discriminator_summary(schema: &Value) -> Option<String> {
+    let property = schema_discriminator_property(schema)?;
+    if let Some(mapping) = schema_discriminator_mapping(schema) {
+        Some(format!("discriminator: {property}; mapping: {mapping}"))
+    } else {
+        Some(format!("discriminator: {property}"))
+    }
+}
+
+fn schema_discriminator_property(schema: &Value) -> Option<String> {
+    schema
+        .get("discriminator")
+        .and_then(Value::as_object)
+        .and_then(|discriminator| discriminator.get("propertyName"))
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+}
+
+fn schema_discriminator_mapping(schema: &Value) -> Option<String> {
+    let mapping = schema
+        .get("discriminator")
+        .and_then(Value::as_object)
+        .and_then(|discriminator| discriminator.get("mapping"))
+        .and_then(Value::as_object)
+        .map(|mapping| mapping.keys().cloned().collect::<Vec<_>>().join(", "))
+        .unwrap_or_default();
+    (!mapping.is_empty()).then_some(mapping)
 }
 
 fn reference_tail(reference: &str) -> String {

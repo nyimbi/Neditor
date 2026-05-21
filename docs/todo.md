@@ -1489,6 +1489,9 @@ Current evidence:
   security schemes; JSON Schema rendering now covers pattern properties, tuple
   `prefixItems`, dependent required/dependent schemas, `additionalProperties`,
   and `oneOf` composition across the export artifact family.
+- OpenAPI callback, webhook, and discriminator details now flow through the
+  native renderer and export artifacts; JSON Schema conditional branches and
+  `$defs` rows now flow through the same semantic-table export path.
 - Front matter documentation now calls out that metadata must be a YAML mapping
   and that invalid YAML/list/scalar metadata produces source-ranged diagnostics.
 - `pnpm run check:docs` discovers README plus all top-level docs Markdown files

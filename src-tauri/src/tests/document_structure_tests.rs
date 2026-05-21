@@ -721,6 +721,15 @@ paths:
             accountById:
               operationId: getAccount
               description: Fetch a single account
+      callbacks:
+        paymentStatus:
+          '{$request.body#/callbackUrl}':
+            post:
+              summary: Payment status callback
+              operationId: paymentStatusCallback
+              responses:
+                "204":
+                  description: Accepted
     post:
       summary: Create account
       requestBody:
@@ -734,6 +743,26 @@ paths:
       responses:
         "201":
           description: Created account
+webhooks:
+  accountChanged:
+    post:
+      summary: Account changed webhook
+      operationId: accountChangedWebhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/Account"
+                - $ref: "#/components/schemas/AccountClosed"
+              discriminator:
+                propertyName: eventType
+                mapping:
+                  account: "#/components/schemas/Account"
+                  closed: "#/components/schemas/AccountClosed"
+      responses:
+        "202":
+          description: Queued
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -759,6 +788,14 @@ components:
             email:
               type: string
               format: email
+    AccountClosed:
+      type: object
+      required:
+        - eventType
+      properties:
+        eventType:
+          type: string
+          const: closed
 ```
 
 ```json-schema
@@ -779,6 +816,20 @@ components:
       "properties": {
         "b": { "type": "string", "minLength": 3 }
       }
+    }
+  },
+  "if": {
+    "properties": {
+      "status": { "const": "closed" }
+    }
+  },
+  "then": {
+    "required": ["closedAt"]
+  },
+  "$defs": {
+    "Money": {
+      "type": "number",
+      "multipleOf": 0.01
     }
   },
   "properties": {
@@ -835,6 +886,12 @@ components:
     assert!(response.html.contains("examples: success"));
     assert!(response.html.contains("X-RateLimit-Remaining"));
     assert!(response.html.contains("getAccount"));
+    assert!(response.html.contains("callbacks: paymentStatus"));
+    assert!(response.html.contains("paymentStatusCallback"));
+    assert!(response.html.contains("WEBHOOK POST"));
+    assert!(response.html.contains("accountChangedWebhook"));
+    assert!(response.html.contains("discriminator eventType"));
+    assert!(response.html.contains("mapping account, closed"));
     assert!(response.html.contains("array&lt;ref Account&gt;"));
     assert!(response.html.contains("Component schemas"));
     assert!(response.html.contains("owner.email"));
@@ -847,6 +904,9 @@ components:
     assert!(response.html.contains("dependentRequired: b -&gt; cc"));
     assert!(response.html.contains("patternProperties[^x-]"));
     assert!(response.html.contains("dependentSchemas[cc].b"));
+    assert!(response.html.contains("if.status"));
+    assert!(response.html.contains("then"));
+    assert!(response.html.contains("$defs[Money]"));
     assert!(response.html.contains("tuple.prefixItems[1]"));
     assert!(response.html.contains("multipleOf: 0.01"));
     assert!(response.html.contains("payment.oneOf[2]"));
