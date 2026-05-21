@@ -230,6 +230,13 @@ allow GUI app startup, run
 `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` for a bounded
 native launch smoke.
 
+`pnpm run test:tauri-webdriver` runs the Tauri WebDriver desktop smoke on
+Windows and Linux hosts with `tauri-driver` plus the platform WebDriver
+installed. The harness starts the built desktop binary, checks the native title,
+switches view mode, and opens the command palette through WebDriver. On macOS,
+official Tauri WebDriver is skipped because the supported stack does not provide
+a WKWebView driver; use the bounded desktop launch smoke there.
+
 `cargo check` and `cargo test` require crates.io access the first time Rust
 dependencies are resolved. After dependencies are present, the project is
 designed to verify without global tools beyond the checked-in package managers

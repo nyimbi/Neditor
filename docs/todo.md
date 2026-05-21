@@ -612,10 +612,11 @@ Current local verification evidence:
   project structure, accessibility, dependency admission, Markdown links, Rust
   formatting, Rust `cargo check --locked`, and `git diff --check`.
 - 2026-05-21: `pnpm run verify:local:full` passed after adding native command
-  desktop smoke and rendered export audit coverage. The run covered the quick
-  baseline, production build, optional engine probe, native-watch check,
-  clippy, 211 Rust tests, Tauri no-bundle release compile, and strengthened
-  desktop smoke. Pikchr remains the only missing optional engine on this host.
+  desktop smoke, rendered export audit coverage, and the WebDriver harness
+  step. The run covered the quick baseline, production build, optional engine
+  probe, native-watch check, clippy, 212 Rust tests, Tauri no-bundle release
+  compile, desktop artifact/native-command smoke, and the macOS WebDriver
+  platform skip. Pikchr remains the only missing optional engine on this host.
 
 Resolved previous Windows clippy failure:
 
@@ -846,8 +847,9 @@ Completion criteria:
 
 ### 3. Add Desktop WebDriver/Tauri Workflow Smoke Tests
 
-Status: partial local artifact smoke exists; interactive desktop workflow
-coverage remains open.
+Status: WebDriver harness exists; bounded macOS GUI launch and native command
+smoke are locally verified; supported Windows/Linux WebDriver execution remains
+open.
 
 Browser tests prove the Vue workbench under mocked Tauri IPC. They do not prove
 native dialogs, real file permissions, window title behavior, real Tauri
@@ -863,9 +865,13 @@ Needed desktop smoke coverage:
   by `pnpm run test:desktop-smoke`; it exercises save-as, open, watch, compile,
   readiness, HTML/PDF/DOCX/PPTX/Markdown bundle export, sidecar manifests, and
   reveal command construction without requiring a GUI session.
-- App boots as a Tauri desktop shell. The smoke harness supports a bounded GUI
-  launch with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`, but
-  GUI launch requires host permission.
+- App boots as a Tauri desktop shell. Covered on this macOS host by
+  `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`.
+- Tauri-driver/WebDriver harness for supported platforms. Covered as a project
+  script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
+  `tauri-driver`, opens the built NEditor desktop binary, asserts the native
+  title/shell commands, switches view mode, and opens the command palette. On
+  macOS it records an explicit official-platform skip.
 - New/open/save/save-as with real local files.
 - Dirty title/status behavior.
 - External file watcher and conflict flow with real file changes.
@@ -874,9 +880,9 @@ Needed desktop smoke coverage:
 
 Completion criteria:
 
-- Use the local desktop smoke harness for release artifact checks and extend it
-  with Tauri-driver/WebDriver or another project-appropriate desktop workflow
-  harness without weakening the browser harness.
+- Use the local desktop smoke harness for release artifact checks and run the
+  Tauri-driver/WebDriver harness on a supported Windows/Linux desktop host
+  without weakening the browser harness.
 - Do not add GitHub Actions for this smoke harness; keep it local/manual unless
   the project policy changes.
 

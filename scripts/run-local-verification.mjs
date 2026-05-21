@@ -42,6 +42,7 @@ const fullCommands = [
     ["build", "--no-bundle"],
   ),
   command("Desktop artifact smoke", "pnpm", ["run", "test:desktop-smoke"]),
+  command("Desktop WebDriver smoke", "pnpm", ["run", "test:tauri-webdriver"]),
 ];
 
 const commands = mode === "full" ? fullCommands : quickCommands;

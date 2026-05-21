@@ -49,7 +49,7 @@ if (issues.length > 0) {
 
 console.log(
   launchRequested
-    ? "Checked NEditor desktop build artifacts and bounded launch smoke."
+    ? "Checked NEditor desktop build artifacts, native command workflow smoke, and bounded launch smoke."
     : "Checked NEditor desktop build artifacts and native command workflow smoke. Set NEDITOR_DESKTOP_SMOKE_LAUNCH=1 for bounded GUI launch smoke.",
 );
 

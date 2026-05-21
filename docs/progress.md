@@ -558,7 +558,10 @@ P0 gaps:
   CodeMirror find/replace and editing helpers, command-palette navigation,
   transform engine diagnostics, table workflows, AI governance, and export
   readiness/success/failure diagnostics.
-- Desktop WebDriver/Tauri-driver workflow tests are missing.
+- Desktop proof now includes the native command workflow smoke plus a bounded
+  macOS GUI launch smoke. A Tauri-driver/WebDriver harness also exists and is
+  wired into full local verification; on this host it records the official
+  macOS skip, so supported Windows/Linux WebDriver execution is still needed.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
 P1 gaps:
@@ -602,11 +605,13 @@ Current verification recorded on 2026-05-21:
 | `cargo test --locked representative_rendered_export_artifacts_are_package_inspectable --lib` in `src-tauri` | Pass | Representative rendered/package export audit passed across HTML, PDF, DOCX, PPTX, and Markdown bundle evidence. |
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 27 export command tests passed, including blog/Substack publish packages, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
-| `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 211 Rust tests, Tauri no-bundle release compile, and strengthened desktop smoke. Optional engine probe still reports Pikchr missing on this host. |
+| `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 212 Rust tests, Tauri no-bundle release compile, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe still reports Pikchr missing on this host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 41 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed on this host. |
 | `pnpm run test:e2e` | Pass | 41 Chromium browser workbench workflows passed locally on this host. |
-| `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; bounded GUI launch remains opt-in via `NEDITOR_DESKTOP_SMOKE_LAUNCH=1`. |
+| `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; this macOS host records the official unsupported WKWebView-driver platform skip. |
 
 Fresh baseline recorded on 2026-05-20:
 
@@ -2042,7 +2047,7 @@ Local verification runner verification:
 | --- | --- | --- |
 | `pnpm run verify:local` | Pass | New quick local baseline passed all 9 steps: frontend typecheck, frontend unit tests, project structure, accessibility, dependency/license admission, Markdown links, Rust formatting, Rust dev check, and whitespace checks. |
 | `pnpm run verify:local -- --list` | Pass | Printed the quick local baseline command plan without running it. |
-| `pnpm run verify:local:full -- --list` | Pass | Printed the release-grade local baseline command plan, including build, optional engine probe, native-watch, clippy, full Rust tests, Tauri no-bundle compile, and desktop artifact smoke. |
+| `pnpm run verify:local:full -- --list` | Pass | Printed the release-grade local baseline command plan, including build, optional engine probe, native-watch, clippy, full Rust tests, Tauri no-bundle compile, desktop artifact smoke, and desktop WebDriver smoke. |
 | `pnpm run test:unit` | Pass | 15 frontend unit tests passed after adding package-script coverage for `verify:local` and `verify:local:full`. |
 | `git diff --check` | Pass | No whitespace errors after adding the local verification runner. |
 
