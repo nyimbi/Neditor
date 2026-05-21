@@ -17,6 +17,124 @@ fn prepare_for_export_blocks_warning_cleanliness() {
 }
 
 #[test]
+fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-desktop-command-smoke-{unique}"));
+    let chapters = root.join("chapters");
+    let exports = root.join("exports");
+    fs::create_dir_all(&chapters).expect("create smoke chapters");
+    fs::create_dir_all(&exports).expect("create smoke exports");
+    let root_doc = root.join("board-pack.md");
+    let summary = chapters.join("summary.md");
+    let source = "---\ntitle: Native Workflow Smoke\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21T08:00:00Z\ntoc: true\n---\n# Native Workflow Smoke\n\n!include chapters/summary.md\n\n[TOC]\n\n```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\nmargin = profit / revenue\n```\n\nExpected margin: {{=margin | percent}}\n\nTable: Budget controls {#tbl:budget}\n| Metric | Value |\n| --- | ---: |\n| Revenue | {{=revenue | currency}} |\n| Cost | {{=cost | currency}} |\n| Profit | {{=profit | currency}} |\n\n```chart\ntype: bar\ntitle: Quarterly Revenue\ndata:\n  - quarter: Q1\n    revenue: 120\n  - quarter: Q2\n    revenue: 148\nx: quarter\ny: revenue\n```\n\n![Architecture](data:image/svg+xml;base64,PHN2Zy8+){#fig:architecture caption=\"Architecture diagram\"}\n\nSee {@tbl:budget} and {@fig:architecture}.\n".to_string();
+    fs::write(
+        &summary,
+        "## Executive Summary\n\nThe native workflow smoke uses real file operations and export commands.\n",
+    )
+    .expect("write smoke include");
+
+    let saved = save_file_as(SaveFileRequest {
+        path: path_to_string(&root_doc),
+        text: source.clone(),
+        expected_hash: Some("ignored-for-save-as".to_string()),
+    })
+    .expect("save desktop smoke source");
+    assert_eq!(saved.path, path_to_string(&root_doc));
+    assert!(saved.text.contains("Native Workflow Smoke"));
+
+    let opened = open_file(path_to_string(&root_doc)).expect("open desktop smoke source");
+    assert_eq!(opened.hash, saved.hash);
+    assert!(opened.text.contains("!include chapters/summary.md"));
+
+    let watched = watch_file(WatchFileRequest {
+        root: path_to_string(&root_doc),
+        included: vec![],
+    })
+    .expect("watch desktop smoke source");
+    assert!(watched
+        .paths
+        .iter()
+        .any(|path| path.role == "root" && path.path.ends_with("board-pack.md") && path.exists));
+    assert!(watched.paths.iter().any(|path| path.role == "include"
+        && path.path.ends_with("chapters/summary.md")
+        && path.exists));
+
+    let compile_response = compile_document(CompileRequest {
+        text: opened.text.clone(),
+        file_path: Some(path_to_string(&root_doc)),
+    })
+    .expect("compile desktop smoke source");
+    assert!(!compile_response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    assert!(compile_response
+        .compiled_markdown
+        .contains("Executive Summary"));
+    assert!(compile_response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "chart"));
+
+    let readiness = prepare_for_export(PrepareExportRequest {
+        text: opened.text.clone(),
+        file_path: Some(path_to_string(&root_doc)),
+        target: "pdf".to_string(),
+        options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+    });
+    assert!(readiness.ready, "{:#?}", readiness.diagnostics);
+    assert_eq!(readiness.manifest.document_title, "Native Workflow Smoke");
+    assert!(readiness
+        .manifest
+        .include_graph
+        .iter()
+        .any(|edge| edge.child.ends_with("chapters/summary.md")));
+
+    for (target, extension) in [
+        ("html", "html"),
+        ("pdf", "pdf"),
+        ("docx", "docx"),
+        ("pptx", "pptx"),
+        ("markdown-bundle", "zip"),
+    ] {
+        let output_path = exports.join(format!("native-smoke.{extension}"));
+        let response = export_document(ExportRequest {
+            text: opened.text.clone(),
+            file_path: Some(path_to_string(&root_doc)),
+            target: target.to_string(),
+            output_path: path_to_string(&output_path),
+            options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+        })
+        .unwrap_or_else(|error| panic!("{target} export should pass: {error}"));
+        assert_eq!(response.output_path, path_to_string(&output_path));
+        assert_eq!(response.manifest.export_target, target);
+        assert!(response.manifest.output_hash.is_some());
+        assert!(output_path.exists(), "{target} output should exist");
+        assert!(
+            response
+                .manifest_path
+                .as_deref()
+                .is_some_and(|path| Path::new(path).exists()),
+            "{target} sidecar manifest should exist"
+        );
+        assert!(response
+            .progress_steps
+            .iter()
+            .any(|step| step.id == "render" && step.state == "complete"));
+    }
+
+    let reveal = crate::filesystem::reveal_command_for_path(path_to_string(&root_doc).as_str())
+        .expect("desktop smoke reveal command");
+    assert!(!reveal.program.is_empty());
+    assert!(!reveal.args.is_empty());
+
+    fs::remove_dir_all(root).expect("clean desktop command smoke");
+}
+
+#[test]
 fn prepare_for_export_reports_review_change_note_audit_metadata() {
     let report = prepare_for_export(PrepareExportRequest {
         text: "---\ntitle: Review Audit\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Review Audit\n<!-- comment: resolved | author: Dana | Confirmed numbers. -->\n<!-- change: at: 2026-05-20T09:00:00Z | Updated forecast assumptions. -->\n"

@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
@@ -31,6 +31,10 @@ if (!existsSync(assetDir) || !readdirSync(assetDir).some((name) => name.endsWith
 }
 requireExecutable(binaryPath, "desktop release binary is missing; run ./node_modules/.bin/tauri build --no-bundle first");
 
+if (issues.length === 0) {
+  runNativeCommandWorkflowSmoke();
+}
+
 if (issues.length === 0 && launchRequested) {
   await launchDesktop(binaryPath);
 }
@@ -46,7 +50,7 @@ if (issues.length > 0) {
 console.log(
   launchRequested
     ? "Checked NEditor desktop build artifacts and bounded launch smoke."
-    : "Checked NEditor desktop build artifacts. Set NEDITOR_DESKTOP_SMOKE_LAUNCH=1 for bounded GUI launch smoke.",
+    : "Checked NEditor desktop build artifacts and native command workflow smoke. Set NEDITOR_DESKTOP_SMOKE_LAUNCH=1 for bounded GUI launch smoke.",
 );
 
 function readJson(relativePath) {
@@ -93,6 +97,26 @@ function desktopBinaryPath() {
 
 function relative(path) {
   return path.startsWith(root) ? path.slice(root.length + 1) : path;
+}
+
+function runNativeCommandWorkflowSmoke() {
+  const result = spawnSync(
+    "cargo",
+    ["test", "--locked", "desktop_native_command_workflow_smoke", "--lib"],
+    {
+      cwd: join(root, "src-tauri"),
+      encoding: "utf8",
+      shell: process.platform === "win32",
+    },
+  );
+  if (result.status !== 0) {
+    const detail = [result.stdout?.trim(), result.stderr?.trim()].filter(Boolean).join("\n");
+    issues.push(
+      `native command workflow smoke failed with exit code ${result.status ?? 1}${
+        detail ? `:\n${detail}` : ""
+      }`,
+    );
+  }
 }
 
 async function launchDesktop(path) {

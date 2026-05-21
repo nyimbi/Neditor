@@ -592,12 +592,17 @@ green before claiming a slice is complete:
 Older remote run notes in this file explain past fixes only; do not use them as
 current completion evidence.
 
-Current local quick-verification evidence:
+Current local verification evidence:
 
 - 2026-05-21: `pnpm run verify:local` passed after hardening the `reveal_path`
   command builder. The run covered frontend typecheck, frontend unit tests,
   project structure, accessibility, dependency admission, Markdown links, Rust
   formatting, Rust `cargo check --locked`, and `git diff --check`.
+- 2026-05-21: `pnpm run verify:local:full` passed after adding native command
+  desktop smoke and rendered export audit coverage. The run covered the quick
+  baseline, production build, optional engine probe, native-watch check,
+  clippy, 211 Rust tests, Tauri no-bundle release compile, and strengthened
+  desktop smoke. Pikchr remains the only missing optional engine on this host.
 
 Resolved previous Windows clippy failure:
 
@@ -840,6 +845,11 @@ Needed desktop smoke coverage:
 - Release desktop binary and bundled frontend artifact existence. Covered by
   `pnpm run test:desktop-smoke` after `./node_modules/.bin/tauri build
   --no-bundle`.
+- Native command workflow against real files. Covered by
+  `desktop_native_command_workflow_smoke_uses_real_files_and_exports` and run
+  by `pnpm run test:desktop-smoke`; it exercises save-as, open, watch, compile,
+  readiness, HTML/PDF/DOCX/PPTX/Markdown bundle export, sidecar manifests, and
+  reveal command construction without requiring a GUI session.
 - App boots as a Tauri desktop shell. The smoke harness supports a bounded GUI
   launch with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`, but
   GUI launch requires host permission.
@@ -906,6 +916,10 @@ Current evidence:
   Markdown bundle evidence: block quotes, callouts, unordered/nested/ordered
   lists, task lists, code blocks, tables, figures, equations, generated lists
   of figures/tables, and table/figure/equation cross references.
+- `representative_rendered_export_artifacts_are_package_inspectable` now proves
+  a board-style fixture through inspectable HTML, PDF object structure, DOCX
+  and PPTX package anatomy, core/custom properties, comments/provenance
+  appendices, transform artifacts, and Markdown bundle manifest entries.
 
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
 
@@ -953,7 +967,8 @@ Needed proof:
 
 - Package/text assertions where appropriate.
 - More target-specific option combinations beyond the current focused matrix.
-- Rendered or manually inspected representative PDF/DOCX/PPTX artifacts.
+- Additional rendered/manual visual inspection of representative PDF/DOCX/PPTX
+  artifacts beyond package-level rendered artifact audits.
 - Fixture exports tied back to matrix rows.
 
 ### 6. Export Readiness Completeness

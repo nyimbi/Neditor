@@ -220,9 +220,11 @@ project manifests has an entry in the dependency admission record and that
 NEditor package metadata still declares MIT licensing.
 
 `pnpm run test:desktop-smoke` verifies the local Vite build, Tauri
-configuration, package metadata, MIT license metadata, and release desktop
-binary produced by `./node_modules/.bin/tauri build --no-bundle`. On machines
-that allow GUI app startup, run
+configuration, package metadata, MIT license metadata, release desktop binary
+produced by `./node_modules/.bin/tauri build --no-bundle`, and a native
+command workflow smoke that opens, watches, compiles, checks readiness, exports,
+and reveals real local files through the Rust command surface. On machines that
+allow GUI app startup, run
 `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` for a bounded
 native launch smoke.
 

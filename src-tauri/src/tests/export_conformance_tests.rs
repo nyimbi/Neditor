@@ -72,6 +72,197 @@ fn pptx_export_splits_large_tables_across_slides() {
 }
 
 #[test]
+fn representative_rendered_export_artifacts_are_package_inspectable() {
+    let response = compile(CompileRequest {
+        text: r##"---
+title: Rendered Export Audit
+subtitle: Board package
+version: 3.1.4
+status: approved
+approvedBy: Release QA
+approvedAt: 2026-05-21T09:00:00Z
+classification: Confidential
+toc: true
+legalDisclaimer: "For rendered export audit only."
+brand:
+  name: NEditor Audit
+  color: "#2563EB"
+layout:
+  header: "{{title}} | {{status}}"
+  footer: "{{classification}} | Page {{page}} of {{pages}}"
+---
+
+# Rendered Export Audit
+
+[TOC]
+
+> [!INFO] Readiness
+> This package is ready for rendered artifact inspection.
+
+Table: Control summary {#tbl:controls}
+| Control | Owner | Status |
+| --- | --- | --- |
+| Export manifest | Release QA | Complete |
+| Native package check | Desktop QA | Complete |
+
+```chart
+type: line
+title: Export Confidence
+data:
+  - month: Apr
+    score: 86
+  - month: May
+    score: 94
+x: month
+y: score
+```
+
+![Architecture](data:image/svg+xml;base64,PHN2Zy8+){#fig:architecture caption="Architecture diagram" fit="cover"}
+
+{{page-break}}
+
+## Decision
+
+See {@tbl:controls} and {@fig:architecture}.
+
+<!-- comment: author: QA | at: 2026-05-21T09:10:00Z | resolved | Rendered artifact audit passed. -->
+
+```ai-source
+provider: OpenAI
+model: gpt-5.4
+date: 2026-05-21
+promptSummary: rendered export audit fixture
+reviewedBy: Release QA
+reviewedAt: 2026-05-21T09:15:00Z
+status: human-reviewed
+```
+"##
+        .to_string(),
+        file_path: None,
+    });
+    let options = json!({
+        "includeStyles": true,
+        "includeSyntaxHighlighting": true,
+        "coverPage": true,
+        "pageNumbers": true,
+        "includeComments": true,
+        "includeProvenance": true,
+        "includeManifest": true,
+        "watermark": "APPROVED",
+        "layoutPreset": "board"
+    });
+
+    assert!(
+        !response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == "error"),
+        "{:#?}",
+        response.diagnostics
+    );
+    assert_eq!(
+        response.export_manifest.document_title,
+        "Rendered Export Audit"
+    );
+    assert_eq!(response.export_manifest.document_version, "3.1.4");
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "chart" && artifact.output_kind == "svg"));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("<!doctype html>"));
+    assert!(html.contains("class=\"cover\""));
+    assert!(html.contains("Rendered Export Audit | approved"));
+    assert!(html.contains("APPROVED"));
+    assert!(html.contains("class=\"export-comments\""));
+    assert!(html.contains("class=\"export-provenance\""));
+    assert!(html.contains("For rendered export audit only."));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf.starts_with(b"%PDF-1.4\n"));
+    assert!(pdf_text.contains("/Type /Catalog"));
+    assert!(pdf_text.contains("/Type /Pages"));
+    assert!(pdf_text.contains("/MediaBox [0 0 "));
+    assert!(pdf_text.contains("Cover: Rendered Export Audit"));
+    assert!(pdf_text.contains("Watermark: APPROVED"));
+    assert!(pdf_text.contains("Review Comments"));
+    assert!(pdf_text.contains("AI Provenance"));
+    assert!(pdf_text.contains("For rendered export audit only."));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx audit bytes");
+    assert!(zip_has_entry(&docx, "[Content_Types].xml"));
+    assert!(zip_has_entry(&docx, "_rels/.rels"));
+    assert!(zip_has_entry(&docx, "word/document.xml"));
+    assert!(zip_has_entry(&docx, "docProps/core.xml"));
+    assert!(zip_has_entry(&docx, "docProps/custom.xml"));
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    let docx_core = zip_entry_text(&docx, "docProps/core.xml");
+    let docx_custom = zip_entry_text(&docx, "docProps/custom.xml");
+    assert!(docx_document.contains("Cover: Rendered Export Audit"));
+    assert!(docx_document.contains("Table controls"));
+    assert!(docx_document.contains("Figure architecture"));
+    assert!(docx_document.contains("Review Comments"));
+    assert!(docx_document.contains("AI Provenance"));
+    assert!(docx_core.contains("<dc:title>Rendered Export Audit</dc:title>"));
+    assert!(docx_custom.contains("3.1.4"));
+    assert!(docx_custom.contains(r#"name="NEditorApprovedBy""#));
+    assert!(docx_custom.contains("Release QA"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx audit bytes");
+    assert!(zip_has_entry(&pptx, "[Content_Types].xml"));
+    assert!(zip_has_entry(&pptx, "_rels/.rels"));
+    assert!(zip_has_entry(&pptx, "ppt/presentation.xml"));
+    assert!(zip_has_entry(&pptx, "ppt/_rels/presentation.xml.rels"));
+    assert!(zip_entry_count_with_prefix(&pptx, "ppt/slides/", ".xml") >= 2);
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    let pptx_core = zip_entry_text(&pptx, "docProps/core.xml");
+    let pptx_custom = zip_entry_text(&pptx, "docProps/custom.xml");
+    assert!(pptx_slides.contains("Rendered Export Audit"));
+    assert!(pptx_slides.contains("Control summary"));
+    assert!(pptx_slides.contains("Review Comments"));
+    assert!(pptx_slides.contains("AI Provenance"));
+    assert!(pptx_core.contains("<dc:title>Rendered Export Audit</dc:title>"));
+    assert!(pptx_custom.contains("3.1.4"));
+    assert!(pptx_custom.contains(r#"name="NEditorApprovedBy""#));
+    assert!(pptx_custom.contains("Release QA"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_target = "markdown-bundle".to_string();
+    bundle_manifest.export_options = options.clone();
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("audit bundle");
+    assert!(zip_has_entry(&bundle, "document.md"));
+    assert!(zip_has_entry(&bundle, "document.txt"));
+    assert!(zip_has_entry(&bundle, "document-ast.json"));
+    assert!(zip_has_entry(&bundle, "manifest.json"));
+    assert!(zip_has_entry(&bundle, "transform-artifacts.json"));
+    assert!(zip_has_entry(&bundle, "media-uses.json"));
+    let manifest: Value =
+        serde_json::from_str(&zip_entry_text(&bundle, "manifest.json")).expect("manifest json");
+    assert_eq!(
+        manifest.get("document_title").and_then(Value::as_str),
+        Some("Rendered Export Audit")
+    );
+    assert_eq!(
+        manifest.get("document_version").and_then(Value::as_str),
+        Some("3.1.4")
+    );
+    assert_eq!(
+        manifest
+            .pointer("/export_options/watermark")
+            .and_then(Value::as_str),
+        Some("APPROVED")
+    );
+    assert!(manifest
+        .get("transform_artifacts")
+        .and_then(Value::as_array)
+        .is_some_and(|artifacts| artifacts
+            .iter()
+            .any(|artifact| artifact.get("name").and_then(Value::as_str) == Some("chart"))));
+}
+
+#[test]
 fn rich_markdown_blocks_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Rich Artifact Blocks\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20T12:00:00Z\n---\n# Rich Artifact Blocks\n\n> Quoted evidence\n> across lines\n\n> [!WARNING] Launch Gate\n> Confirm fallback before release.\n\n- First decision\n  - Nested control\n- Second decision\n\n1. First ordered step\n2. Second ordered step\n\n- [x] Reviewed by finance\n- [ ] Attach signed approval\n\n```js\nconst total = 42;\n```\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Fallback | Platform |\n\n![Architecture](data:image/svg+xml;base64,PHN2Zy8+){#fig:architecture caption=\"Reference architecture\"}\n\n$$\nROI = Gain / Cost\n$$ {#eq:roi}\n\n[LIST_OF_FIGURES]\n\n[LIST_OF_TABLES]\n\nSee {@tbl:controls}, {@fig:architecture}, and {@eq:roi}.\n".to_string(),
