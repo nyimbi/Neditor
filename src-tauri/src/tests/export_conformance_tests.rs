@@ -359,6 +359,177 @@ fn bibtex_transform_survives_cross_target_exports_with_metadata() {
 }
 
 #[test]
+fn api_schema_transforms_survive_cross_target_exports() {
+    let response = compile(CompileRequest {
+        text: r##"---
+title: API Schema Transform Pack
+status: approved
+approvedBy: QA
+approvedAt: 2026-05-21T11:00:00Z
+---
+# API Schema Transform Pack
+
+```openapi
+openapi: 3.1.0
+info:
+  title: Ledger API
+  version: 1.0.0
+servers:
+  - url: https://api.example.test
+    description: Production
+paths:
+  /accounts:
+    parameters:
+      - name: tenant
+        in: header
+        required: true
+        schema:
+          type: string
+    get:
+      summary: List accounts
+      operationId: listAccounts
+      tags:
+        - Accounts
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        "200":
+          description: Account list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Account"
+components:
+  schemas:
+    Account:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Account id
+        status:
+          type: string
+          enum: [active, suspended]
+```
+
+```json-schema
+{
+  "title": "Account Payload",
+  "description": "Account payload contract",
+  "type": "object",
+  "required": ["id", "transactions"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid", "description": "Account id" },
+    "balance": { "type": "number", "minimum": 0, "default": 0 },
+    "transactions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["amount"],
+        "properties": {
+          "amount": { "type": "number" },
+          "kind": { "type": "string", "enum": ["credit", "debit"] }
+        }
+      }
+    }
+  }
+}
+```
+"##
+        .to_string(),
+        file_path: None,
+    });
+    let options = json!({});
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    for name in ["openapi", "json-schema"] {
+        let artifact = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == name)
+            .unwrap_or_else(|| panic!("missing {name} artifact"));
+        assert_eq!(artifact.output_kind, "html");
+        assert_eq!(artifact.execution_kind, "embedded");
+        assert_eq!(artifact.source_hash.len(), 64);
+        assert_eq!(artifact.output_hash.len(), 64);
+        assert!(artifact.html.contains(&format!("transform-{name}")));
+        assert!(artifact.source_line.is_some());
+        assert!(artifact.end_source_line.is_some());
+    }
+    assert!(response
+        .export_manifest
+        .transform_artifacts
+        .iter()
+        .any(
+            |artifact| artifact.get("name").and_then(Value::as_str) == Some("openapi")
+                && artifact.get("outputKind").and_then(Value::as_str) == Some("html")
+        ));
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("transform-openapi"));
+    assert!(html.contains("Ledger API"));
+    assert!(html.contains("https://api.example.test"));
+    assert!(html.contains("listAccounts"));
+    assert!(html.contains("tenant"));
+    assert!(html.contains("array&lt;ref Account&gt;"));
+    assert!(html.contains("Component schemas"));
+    assert!(html.contains("transform-json-schema"));
+    assert!(html.contains("Account Payload"));
+    assert!(html.contains("transactions[]"));
+    assert!(html.contains("enum: credit, debit"));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Ledger API"));
+    assert!(pdf_text.contains("listAccounts"));
+    assert!(pdf_text.contains("tenant"));
+    assert!(pdf_text.contains("Account id"));
+    assert!(pdf_text.contains("Account Payload"));
+    assert!(pdf_text.contains("transactions[]"));
+    assert!(pdf_text.contains("enum: credit, debit"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx api schema transform pack");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Ledger API"));
+    assert!(docx_document.contains("listAccounts"));
+    assert!(docx_document.contains("Account id"));
+    assert!(docx_document.contains("Account Payload"));
+    assert!(docx_document.contains("transactions[]"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx api schema transform pack");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("API Schema Transform Pack"));
+    assert!(pptx_slides.contains("Ledger API"));
+    assert!(pptx_slides.contains("Account Payload"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_options = options.clone();
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_artifacts = zip_entry_text(&bundle, "transform-artifacts.json");
+    assert!(bundled_text.contains("Ledger API"));
+    assert!(bundled_text.contains("Account Payload"));
+    for name in ["openapi", "json-schema"] {
+        assert!(bundled_artifacts.contains(&format!("\"name\": \"{name}\"")));
+    }
+    assert!(bundled_artifacts.contains("\"output_kind\": \"html\""));
+    assert!(bundled_artifacts.contains("\"source_line\""));
+    assert!(bundled_artifacts.contains("\"output_hash\""));
+}
+
+#[test]
 fn visual_data_transforms_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: r#"---

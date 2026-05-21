@@ -1525,7 +1525,7 @@ fn parse_ast_transform_table(
         line: line_number,
         end_line,
         id: None,
-        caption: None,
+        caption: transform_table_caption(html),
         headers: headers.clone(),
         alignments: headers.iter().map(|_| "left".to_string()).collect(),
         header_cells,
@@ -1533,6 +1533,14 @@ fn parse_ast_transform_table(
         row_cells,
         source: None,
     })
+}
+
+fn transform_table_caption(html: &str) -> Option<String> {
+    ["h3", "h4", "h5"]
+        .into_iter()
+        .find_map(|tag| extract_between(html, &format!("<{tag}>"), &format!("</{tag}>")))
+        .map(|caption| clean_inline_text(&caption))
+        .filter(|caption| !caption.is_empty())
 }
 
 fn html_between<'a>(html: &'a str, open_prefix: &str, close_tag: &str) -> Option<&'a str> {
