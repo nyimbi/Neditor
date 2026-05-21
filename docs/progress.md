@@ -89,6 +89,10 @@ Recent pushed checkpoints visible in current git history:
   smoke. `pnpm run test:desktop-smoke` now writes
   `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata,
   native command workflow status, and duration.
+- This update makes desktop WebDriver evidence durable. `pnpm run
+  test:tauri-webdriver` now writes `.tmp/desktop-webdriver/report.json` with
+  dependency and assertion evidence on Windows/Linux, or the official macOS
+  unsupported-platform reason plus the launch-smoke fallback.
 - This update makes browser workflow execution current-host evidence instead
   of stale archived evidence. `pnpm run test:e2e` now uses the project-local
   Playwright browser cache and passes all 42 Chromium workbench workflows
@@ -659,7 +663,7 @@ Current verification recorded on 2026-05-21:
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, and `processAlive: true` evidence. |
-| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, export readiness, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, export readiness, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip in `.tmp/desktop-webdriver/report.json`. |
 
 Fresh baseline recorded on 2026-05-20:
 

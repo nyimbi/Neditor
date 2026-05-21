@@ -261,9 +261,10 @@ installed. The harness starts the built desktop binary, checks the native title,
 switches view mode, opens the command palette, creates a dirty document and
 checks the native dirty-title marker, runs export readiness through the desktop
 command path, and verifies selected preferences survive a desktop session
-restart before restoring them. On macOS, official Tauri WebDriver is skipped
-because the supported stack does not provide a WKWebView driver; use the
-bounded desktop launch smoke there.
+restart before restoring them. It writes `.tmp/desktop-webdriver/report.json`
+with dependency, assertion, pass, or skip evidence. On macOS, official Tauri
+WebDriver is skipped because the supported stack does not provide a WKWebView
+driver; use the bounded desktop launch smoke there.
 
 `cargo check` and `cargo test` require crates.io access the first time Rust
 dependencies are resolved. After dependencies are present, the project is

@@ -885,8 +885,10 @@ Needed desktop smoke coverage:
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native
   title/shell commands, switches view mode, opens the command palette, checks a
   dirty native title, runs export readiness, and verifies selected preferences
-  persist across a desktop session restart before restoring them. On macOS it
-  records an explicit official-platform skip.
+  persist across a desktop session restart before restoring them. It writes
+  `.tmp/desktop-webdriver/report.json` with dependency/assertion evidence. On
+  macOS it records an explicit official-platform skip plus the bounded launch
+  smoke fallback.
 - New/open/save/save-as with real local files.
 - Dirty title/status behavior. Covered in the supported-platform WebDriver
   harness; still needs execution on Windows/Linux.

@@ -259,7 +259,8 @@ Current major verification gaps:
   the official unsupported skip because the Tauri WebDriver stack has no
   WKWebView driver there. The supported-platform harness now reaches beyond
   shell smoke by checking dirty native titles, export readiness, and preference
-  persistence across a desktop restart.
+  persistence across a desktop restart, and `pnpm run test:tauri-webdriver`
+  writes `.tmp/desktop-webdriver/report.json` with pass/skip evidence.
 - Export tests now include package/text assertions plus a representative
   rendered export audit that inspects HTML, PDF object structure, DOCX/PPTX
   package anatomy, custom/core properties, comments/provenance appendices,

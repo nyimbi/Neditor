@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,24 @@ const serverUrl = process.env.NEDITOR_TAURI_WEBDRIVER_URL || "http://127.0.0.1:4
 const required = process.argv.includes("--strict") || process.env.NEDITOR_TAURI_WEBDRIVER_REQUIRED === "1";
 const timeoutMs = Number(process.env.NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS || 30_000);
 const application = desktopBinaryPath();
+const reportPath = join(root, ".tmp", "desktop-webdriver", "report.json");
+const macosUnsupportedMessage =
+  "Official Tauri WebDriver currently supports desktop automation on Windows and Linux only; macOS has no WKWebView driver in that stack.";
+const report = {
+  generatedAt: new Date().toISOString(),
+  platform: process.platform,
+  arch: process.arch,
+  application: relative(application),
+  serverUrl,
+  timeoutMs,
+  required,
+  status: "pending",
+  supportedDesktopPlatforms: ["linux", "win32"],
+  dependencies: [],
+  assertions: [],
+  skippedReason: null,
+  fallback: null,
+};
 let tauriDriver = null;
 
 const controlByLabelScript = `function controlByLabel(labelText, selector) {
@@ -36,8 +54,11 @@ if (!existsSync(application) || !statSync(application).isFile()) {
 }
 
 if (process.platform === "darwin") {
-  const message =
-    "Official Tauri WebDriver currently supports desktop automation on Windows and Linux only; macOS has no WKWebView driver in that stack. Use NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke for the bounded macOS GUI launch smoke.";
+  const message = `${macosUnsupportedMessage} Use NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke for the bounded macOS GUI launch smoke.`;
+  report.status = required ? "failed" : "skipped";
+  report.skippedReason = macosUnsupportedMessage;
+  report.fallback = "NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke";
+  writeReport();
   if (required) fail(message);
   console.log(`Skipped Tauri WebDriver smoke on macOS. ${message}`);
   process.exit(0);
@@ -45,6 +66,9 @@ if (process.platform === "darwin") {
 
 if (!["linux", "win32"].includes(process.platform)) {
   const message = `Tauri WebDriver smoke is not configured for ${process.platform}.`;
+  report.status = required ? "failed" : "skipped";
+  report.skippedReason = message;
+  writeReport();
   if (required) fail(message);
   console.log(`Skipped Tauri WebDriver smoke. ${message}`);
   process.exit(0);
@@ -60,6 +84,8 @@ if (process.platform === "win32") {
 
 try {
   await runWebDriverSmoke();
+  report.status = "passed";
+  writeReport();
   console.log("Tauri WebDriver smoke passed against the built NEditor desktop binary.");
 } finally {
   tauriDriver?.kill();
@@ -132,6 +158,7 @@ async function assertInitialShell(session) {
   if (!String(title.value || "").includes("NEditor")) {
     throw new Error(`expected native window title to include NEditor, found ${JSON.stringify(title.value)}`);
   }
+  recordAssertion("initial native title includes NEditor");
 
   const shell = await findElement(session, ".app-shell");
   const shellText = await elementText(session, shell);
@@ -140,6 +167,7 @@ async function assertInitialShell(session) {
       throw new Error(`desktop shell did not render expected command ${expected}`);
     }
   }
+  recordAssertion("desktop shell renders primary commands");
 }
 
 async function assertModeSwitchAndCommandPalette(session) {
@@ -161,6 +189,7 @@ async function assertModeSwitchAndCommandPalette(session) {
   if (!String(palette.value || "").includes("Search commands")) {
     throw new Error("command palette did not open through the native WebDriver session");
   }
+  recordAssertion("native WebDriver switches modes and opens command palette");
 }
 
 async function assertDirtyTitleWorkflow(session) {
@@ -185,6 +214,7 @@ async function assertDirtyTitleWorkflow(session) {
   if (!String(nativeTitle.value || "").startsWith("* ")) {
     throw new Error(`native title did not expose dirty state: ${JSON.stringify(nativeTitle.value)}`);
   }
+  recordAssertion("native title exposes dirty document state");
 }
 
 async function assertExportReadinessWorkflow(session) {
@@ -217,6 +247,7 @@ async function assertExportReadinessWorkflow(session) {
   if (!String(readiness.manifest || "").includes('"progress_steps"')) {
     throw new Error(`export readiness manifest did not include progress evidence: ${JSON.stringify(readiness)}`);
   }
+  recordAssertion("desktop export readiness returns manifest progress evidence");
 }
 
 async function assertPreferenceRestartWorkflow(session, originalPreferences) {
@@ -245,6 +276,7 @@ async function assertPreferenceRestartWorkflow(session, originalPreferences) {
       (value) => preferencesMatch(value, targetPreferences),
       "persisted desktop preferences after restart",
     );
+    recordAssertion("desktop preferences persist across WebDriver restart");
     return restartedSession;
   } catch (error) {
     await webdriver("DELETE", `/session/${restartedSession}`).catch(() => undefined);
@@ -415,8 +447,12 @@ function requireCommand(cmd, installHint) {
       ? spawnSync("where", [cmd], { encoding: "utf8", shell: true })
       : spawnSync("sh", ["-c", `command -v ${shellQuote(cmd)}`], { encoding: "utf8" });
   if (lookup.status !== 0) {
+    report.dependencies.push({ command: cmd, status: "missing", installHint });
+    report.status = "failed";
+    writeReport();
     fail(`${cmd} is required for Tauri WebDriver smoke on ${process.platform}. ${installHint}`);
   }
+  report.dependencies.push({ command: cmd, status: "found", path: firstLine(`${lookup.stdout}${lookup.stderr}`) || cmd });
 }
 
 function shellQuote(value) {
@@ -437,6 +473,31 @@ function delay(ms) {
 }
 
 function fail(message) {
+  if (report.status === "pending") {
+    report.status = "failed";
+    report.error = message;
+    writeReport();
+  }
   console.error(message);
   process.exit(1);
+}
+
+function recordAssertion(name) {
+  report.assertions.push({
+    name,
+    status: "passed",
+    elapsedMs: Date.now() - Date.parse(report.generatedAt),
+  });
+}
+
+function writeReport() {
+  mkdirSync(dirname(reportPath), { recursive: true });
+  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+}
+
+function firstLine(text) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
 }
