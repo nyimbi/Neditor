@@ -25,6 +25,7 @@ import {
   type PersistedWorkspace,
   type PreviewTheme,
   type SnapshotStorage,
+  type ToolbarDisplay,
 } from "../lib/workspacePersistence";
 import type {
   AiCleanupResponse,
@@ -320,6 +321,7 @@ export const useDocumentsStore = defineStore("documents", {
       | "settings",
     theme: "system" as "system" | "light" | "dark",
     previewTheme: "match" as PreviewTheme,
+    toolbarDisplay: "both" as ToolbarDisplay,
     editorPaneRatio: 0.5,
     wordWrap: true,
     lineNumbers: true,
@@ -449,6 +451,9 @@ export const useDocumentsStore = defineStore("documents", {
         const persisted = migratePersistedWorkspace(await preferencesStore.get<unknown>("workspace"));
         if (persisted.theme) this.theme = persisted.theme;
         if (persisted.previewTheme === "match" || persisted.previewTheme === "light" || persisted.previewTheme === "dark") this.previewTheme = persisted.previewTheme;
+        if (persisted.toolbarDisplay === "both" || persisted.toolbarDisplay === "icons" || persisted.toolbarDisplay === "text") {
+          this.toolbarDisplay = persisted.toolbarDisplay;
+        }
         if (typeof persisted.editorPaneRatio === "number") this.editorPaneRatio = clampPaneRatio(persisted.editorPaneRatio);
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
@@ -503,6 +508,7 @@ export const useDocumentsStore = defineStore("documents", {
       const workspace: PersistedWorkspace = {
         theme: this.theme,
         previewTheme: this.previewTheme,
+        toolbarDisplay: this.toolbarDisplay,
         editorPaneRatio: this.editorPaneRatio,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,

@@ -280,6 +280,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     schemaVersion: 1,
     theme: "solarized",
     previewTheme: "dark",
+    toolbarDisplay: "icons",
     editorPaneRatio: 0.95,
     editorFontSize: 99,
     previewLineHeight: 0.2,
@@ -317,6 +318,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.schemaVersion, WORKSPACE_SCHEMA_VERSION);
   equal(migrated.theme, undefined);
   equal(migrated.previewTheme, "dark");
+  equal(migrated.toolbarDisplay, "icons");
   equal(migrated.editorPaneRatio, 0.75);
   equal(migrated.editorFontSize, 22);
   equal(migrated.previewLineHeight, 1);
@@ -362,6 +364,20 @@ test("workspace persistence migration versions and normalizes saved settings", (
   deepEqual(migrated.disabledTransformEngines, { d2: true, dot: false });
   deepEqual(migrated.transformInputModes, { dot: "stdin" });
   equal(migrated.transformTimeoutMs, 30_000);
+});
+
+test("workbench command bar exposes icon display controls and workflow groups", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+
+  ok(app.includes(':data-toolbar-display="store.toolbarDisplay"'));
+  ok(app.includes('aria-label="Toolbar button display"'));
+  ok(app.includes('class="icon-command"'));
+  for (const label of ["Document", "Manage", "Write", "Insert", "Review"]) {
+    ok(app.includes(`label: "${label}"`), `missing ${label} command group`);
+  }
+  for (const icon of ["saveAs", "snapshot", "equation", "comment"]) {
+    ok(app.includes(`${icon}: [`), `missing ${icon} icon path`);
+  }
 });
 
 test("local verification scripts expose local baseline checks", () => {

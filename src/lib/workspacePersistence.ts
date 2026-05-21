@@ -42,6 +42,7 @@ export type ExportTarget =
 export type WorkbenchMode = "split" | "source" | "preview" | "focus" | "export" | "review" | "presentation";
 export type SidebarPanel = "files" | "outline" | "diagnostics" | "tables" | "references" | "exports" | "versioning" | "review" | "settings";
 export type ThemePreference = "system" | "light" | "dark";
+export type ToolbarDisplay = "both" | "icons" | "text";
 export type TransformInputMode = "stdin" | "file";
 
 export interface ExportDefaults {
@@ -86,6 +87,7 @@ export interface PersistedWorkspace {
   schemaVersion?: number;
   theme?: ThemePreference;
   previewTheme?: PreviewTheme;
+  toolbarDisplay?: ToolbarDisplay;
   editorPaneRatio?: number;
   wordWrap?: boolean;
   lineNumbers?: boolean;
@@ -306,6 +308,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (theme) migrated.theme = theme;
   const previewTheme = enumValue(raw.previewTheme, ["match", "light", "dark"] as const);
   if (previewTheme) migrated.previewTheme = previewTheme;
+  const toolbarDisplay = enumValue(raw.toolbarDisplay, ["both", "icons", "text"] as const);
+  if (toolbarDisplay) migrated.toolbarDisplay = toolbarDisplay;
   const editorPaneRatio = numberValue(raw.editorPaneRatio);
   if (editorPaneRatio !== undefined) migrated.editorPaneRatio = clampPaneRatio(editorPaneRatio);
   for (const key of ["wordWrap", "lineNumbers", "highContrast", "reducedMotion", "autosave", "autoSnapshot"] as const) {

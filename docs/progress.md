@@ -2184,6 +2184,18 @@ Performance audit report verification:
 | --- | --- | --- |
 | `pnpm run test:performance-audit` | Pass | Wrote `.tmp/performance-audit/report.json` with 2 passing checks: 4 Rust performance stress tests and the focused Chromium large-document edit/preview workflow. The first sandboxed browser attempt failed on macOS Mach port permissions, then the approved run passed outside the sandbox. |
 
+Command bar UI polish verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after restructuring the command bar and adding the persisted toolbar display setting. |
+| `pnpm run test:unit` | Pass | 17 frontend unit tests passed, including workspace migration for `toolbarDisplay` and a static guard proving the command bar exposes workflow groups, icon paths, and display controls. |
+| `pnpm run check:a11y` | Pass | Static accessibility guardrails passed and rewrote `.tmp/accessibility/report.json`; command bar buttons keep accessible names through icon-only mode. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the grouped icon command bar and toolbar display preference; all local links resolved. |
+| `pnpm run build` | Pass | Vue typecheck and Vite production build passed after the command-bar UI polish. |
+| `pnpm run verify:local` | Pass | Quick local verification passed all 9 steps after the command-bar UI polish. |
+| `git diff --check` | Pass | No whitespace errors after the command-bar UI polish. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

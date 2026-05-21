@@ -49,6 +49,10 @@ character count, reading-time status, and source navigation from diagnostics.
 The command palette searches app actions, headings, citations, glossary terms,
 index terms, open documents, and workspace files.
 
+The top command bar is grouped around document, management, writing, insertion,
+review, and view workflows. In Settings or the command bar's Buttons selector,
+choose icons and text, icons only, or text only to match the density you want.
+
 ## Product Boundaries
 
 NEditor is a local-first desktop workbench for document files. It does not

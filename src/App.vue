@@ -3,6 +3,7 @@
     class="app-shell"
     :class="{ 'has-trust-prompt': externalTransformTrustPrompts.length }"
     :data-theme="store.theme"
+    :data-toolbar-display="store.toolbarDisplay"
     :data-high-contrast="store.highContrast ? 'true' : 'false'"
     :data-reduced-motion="store.reducedMotion ? 'true' : 'false'"
   >
@@ -62,55 +63,66 @@
     </header>
 
     <nav id="main-commands" class="command-bar" aria-label="Main commands" tabindex="-1">
-      <button type="button" @click="store.newDocument">New</button>
-      <button type="button" @click="openDocument">Open</button>
-      <button type="button" @click="openFolder">Open Folder</button>
-      <button type="button" @click="saveWorkspace">Save Workspace</button>
-      <button type="button" @click="saveDocument">Save</button>
-      <button type="button" @click="saveDocumentAs">Save As</button>
-      <button type="button" @click="store.revertActive">Revert</button>
-      <button type="button" @click="renameDocument">Rename</button>
-      <button type="button" @click="duplicateDocument">Duplicate</button>
-      <button type="button" @click="store.revealActive">Reveal</button>
-      <button type="button" @click="snapshotActive">Snapshot</button>
-      <button type="button" :disabled="store.exportBusy" @click="exportDocument">Export</button>
-      <button type="button" @click="openAiPaste">AI Paste</button>
-      <button type="button" @click="commandPaletteOpen = true">Commands</button>
-      <span class="divider"></span>
-      <button type="button" title="Bold" @click="wrapSelection('**')"><strong>B</strong></button>
-      <button type="button" title="Italic" @click="wrapSelection('*')"><em>I</em></button>
-      <button type="button" title="Code" @click="wrapSelection('`')">Code</button>
-      <button type="button" title="Code fence" @click="insertBlock(codeFenceSnippet)">Fence</button>
-      <button type="button" title="Heading" @click="insertAtLineStart('## ')">H2</button>
-      <button type="button" title="Link" @click="wrapSelection('[', '](https://)')">Link</button>
-      <button type="button" title="Table" @click="insertBlock(tableSnippet)">Table</button>
-      <button type="button" title="Figure" @click="insertFigureSnippet()">Figure</button>
-      <button type="button" title="Calculation" @click="insertBlock(calcSnippet)">Calc</button>
-      <button type="button" title="Equation" @click="insertBlock(equationSnippet)">Equation</button>
-      <button type="button" title="AI source" @click="insertBlock(aiSnippet)">AI</button>
-      <button type="button" title="Find and replace" @click="runEditorCommand(openSearchPanel)">Find</button>
-      <button type="button" title="Find next" @click="runEditorCommand(findNext)">Next</button>
-      <span class="divider"></span>
-      <select v-model="store.mode" aria-label="View mode">
-        <option value="split">Split</option>
-        <option value="source">Source</option>
-        <option value="preview">Preview</option>
-        <option value="focus">Focus</option>
-        <option value="export">Export</option>
-        <option value="review">Review</option>
-        <option value="presentation">Presentation</option>
-      </select>
-      <select v-model="store.sidebar" aria-label="Sidebar panel">
-        <option value="files">Files</option>
-        <option value="outline">Outline</option>
-        <option value="diagnostics">Diagnostics</option>
-        <option value="tables">Tables</option>
-        <option value="references">References</option>
-        <option value="exports">Exports</option>
-        <option value="versioning">Versioning</option>
-        <option value="review">Review</option>
-        <option value="settings">Settings</option>
-      </select>
+      <section v-for="group in commandBarGroups" :key="group.id" class="command-group" :aria-label="`${group.label} commands`">
+        <span class="command-group-label">{{ group.label }}</span>
+        <div class="command-group-actions">
+          <button
+            v-for="action in group.actions"
+            :key="action.id"
+            type="button"
+            class="icon-command"
+            :class="{ primary: action.primary }"
+            :disabled="action.disabled"
+            :aria-label="action.title || action.label"
+            :title="action.title || action.label"
+            @click="runCommandBarAction(action)"
+          >
+            <span class="command-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path v-for="path in toolbarIconPaths(action.icon)" :key="path" :d="path"></path>
+              </svg>
+            </span>
+            <span class="command-label">{{ action.label }}</span>
+          </button>
+        </div>
+      </section>
+      <section class="command-group command-group-view" aria-label="View commands">
+        <span class="command-group-label">View</span>
+        <label class="compact-field">
+          <span>Mode</span>
+          <select v-model="store.mode" aria-label="View mode">
+            <option value="split">Split</option>
+            <option value="source">Source</option>
+            <option value="preview">Preview</option>
+            <option value="focus">Focus</option>
+            <option value="export">Export</option>
+            <option value="review">Review</option>
+            <option value="presentation">Presentation</option>
+          </select>
+        </label>
+        <label class="compact-field">
+          <span>Panel</span>
+          <select v-model="store.sidebar" aria-label="Sidebar panel">
+            <option value="files">Files</option>
+            <option value="outline">Outline</option>
+            <option value="diagnostics">Diagnostics</option>
+            <option value="tables">Tables</option>
+            <option value="references">References</option>
+            <option value="exports">Exports</option>
+            <option value="versioning">Versioning</option>
+            <option value="review">Review</option>
+            <option value="settings">Settings</option>
+          </select>
+        </label>
+        <label class="compact-field">
+          <span>Buttons</span>
+          <select v-model="store.toolbarDisplay" aria-label="Toolbar button display">
+            <option value="both">Icons and text</option>
+            <option value="icons">Icons only</option>
+            <option value="text">Text only</option>
+          </select>
+        </label>
+      </section>
     </nav>
 
     <section v-if="externalTransformTrustPrompts.length" class="trust-prompt" aria-label="External transform trust prompts">
@@ -826,6 +838,14 @@
               <option value="dark">Dark</option>
             </select>
           </label>
+          <label>
+            Toolbar buttons
+            <select v-model="store.toolbarDisplay">
+              <option value="both">Icons and text</option>
+              <option value="icons">Icons only</option>
+              <option value="text">Text only</option>
+            </select>
+          </label>
           <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
           <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
           <label><input v-model="store.highContrast" type="checkbox" /> High contrast</label>
@@ -1499,6 +1519,81 @@ interface TransformPreviewItem {
   locationLabel: string;
 }
 
+type ToolbarIconName =
+  | "new"
+  | "open"
+  | "folder"
+  | "workspace"
+  | "save"
+  | "saveAs"
+  | "revert"
+  | "rename"
+  | "duplicate"
+  | "reveal"
+  | "snapshot"
+  | "export"
+  | "ai"
+  | "commands"
+  | "bold"
+  | "italic"
+  | "code"
+  | "fence"
+  | "heading"
+  | "link"
+  | "table"
+  | "figure"
+  | "calc"
+  | "equation"
+  | "toc"
+  | "comment"
+  | "find";
+
+interface CommandBarAction {
+  id: string;
+  label: string;
+  title?: string;
+  icon: ToolbarIconName;
+  primary?: boolean;
+  disabled?: boolean;
+  run: () => unknown;
+}
+
+interface CommandBarGroup {
+  id: string;
+  label: string;
+  actions: CommandBarAction[];
+}
+
+const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
+  new: ["M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z", "M14 3v6h6", "M12 12v6", "M9 15h6"],
+  open: ["M4 6h6l2 2h8v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z", "M8 14h8", "M12 10v8"],
+  folder: ["M3 7h7l2 2h9l-2 10H5z", "M3 7v10a2 2 0 0 0 2 2"],
+  workspace: ["M4 5h7v7H4z", "M13 5h7v7h-7z", "M4 14h7v5H4z", "M13 14h7v5h-7z"],
+  save: ["M5 4h12l2 2v14H5z", "M8 4v6h8V4", "M8 16h8"],
+  saveAs: ["M5 4h11l3 3v13H5z", "M8 4v6h7V4", "M8 16h5", "M15 17l3 3", "M18 14l-3 3"],
+  revert: ["M9 7H4v5", "M4 12a8 8 0 1 0 2.3-5.7L4 8.5"],
+  rename: ["M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16z", "M13 6l4 4"],
+  duplicate: ["M8 8h11v11H8z", "M5 16H4a1 1 0 0 1-1-1V5h10v1"],
+  reveal: ["M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z", "M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"],
+  snapshot: ["M4 7h3l2-2h6l2 2h3v12H4z", "M12 10a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"],
+  export: ["M12 3v12", "M7 8l5-5 5 5", "M5 15v4h14v-4"],
+  ai: ["M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z", "M5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8z"],
+  commands: ["M4 7h16", "M4 12h16", "M4 17h10", "M17 15l3 2-3 2"],
+  bold: ["M8 5h5a3 3 0 0 1 0 6H8z", "M8 11h6a3 3 0 0 1 0 6H8z", "M8 5v12"],
+  italic: ["M10 5h8", "M6 19h8", "M14 5l-4 14"],
+  code: ["M9 18l-6-6 6-6", "M15 6l6 6-6 6"],
+  fence: ["M5 6h14", "M5 12h14", "M5 18h14"],
+  heading: ["M5 5v14", "M19 5v14", "M5 12h14", "M14 19h5"],
+  link: ["M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1", "M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"],
+  table: ["M4 5h16v14H4z", "M4 10h16", "M4 15h16", "M10 5v14", "M15 5v14"],
+  figure: ["M4 5h16v14H4z", "M8 13l3-3 3 4 2-2 4 5", "M8 8h.01"],
+  calc: ["M7 4h10v16H7z", "M10 8h4", "M10 12h1", "M14 12h1", "M10 16h1", "M14 16h1"],
+  equation: ["M4 8h16", "M4 16h16", "M8 12h8"],
+  toc: ["M5 7h2", "M10 7h9", "M5 12h2", "M10 12h9", "M5 17h2", "M10 17h9"],
+  comment: ["M5 5h14v10H9l-4 4z"],
+  find: ["M11 5a6 6 0 1 1 0 12 6 6 0 0 1 0-12z", "M16 16l4 4"],
+};
+
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const codeFenceSnippet = "```markdown\n\n```\n";
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
@@ -1848,6 +1943,66 @@ const diagnosticSignature = computed(() =>
     )
     .join("\n"),
 );
+const commandBarGroups = computed<CommandBarGroup[]>(() => [
+  {
+    id: "document",
+    label: "Document",
+    actions: [
+      { id: "new", label: "New", title: "New document", icon: "new", primary: true, run: () => store.newDocument() },
+      { id: "open", label: "Open", title: "Open document", icon: "open", run: () => openDocument() },
+      { id: "save", label: "Save", title: "Save document", icon: "save", primary: true, run: () => saveDocument() },
+      { id: "save-as", label: "Save As", title: "Save document as", icon: "saveAs", run: () => saveDocumentAs() },
+      { id: "export", label: "Export", title: "Export document", icon: "export", disabled: store.exportBusy, run: () => exportDocument() },
+    ],
+  },
+  {
+    id: "manage",
+    label: "Manage",
+    actions: [
+      { id: "open-folder", label: "Folder", title: "Open folder", icon: "folder", run: () => openFolder() },
+      { id: "save-workspace", label: "Workspace", title: "Save workspace", icon: "workspace", run: () => saveWorkspace() },
+      { id: "revert", label: "Revert", title: "Revert to saved", icon: "revert", run: () => store.revertActive() },
+      { id: "rename", label: "Rename", title: "Rename document", icon: "rename", run: () => renameDocument() },
+      { id: "duplicate", label: "Duplicate", title: "Duplicate document", icon: "duplicate", run: () => duplicateDocument() },
+      { id: "reveal", label: "Reveal", title: "Reveal in file manager", icon: "reveal", run: () => store.revealActive() },
+      { id: "snapshot", label: "Snapshot", title: "Create snapshot", icon: "snapshot", run: () => snapshotActive() },
+    ],
+  },
+  {
+    id: "write",
+    label: "Write",
+    actions: [
+      { id: "bold", label: "Bold", title: "Bold selection", icon: "bold", run: () => wrapSelection("**") },
+      { id: "italic", label: "Italic", title: "Italic selection", icon: "italic", run: () => wrapSelection("*") },
+      { id: "code", label: "Code", title: "Inline code selection", icon: "code", run: () => wrapSelection("`") },
+      { id: "link", label: "Link", title: "Insert link", icon: "link", run: () => wrapSelection("[", "](https://)") },
+      { id: "heading", label: "Heading", title: "Insert second-level heading", icon: "heading", run: () => insertAtLineStart("## ") },
+      { id: "fence", label: "Fence", title: "Insert code fence", icon: "fence", run: () => insertBlock(codeFenceSnippet) },
+      { id: "find", label: "Find", title: "Find and replace", icon: "find", run: () => runEditorCommand(openSearchPanel) },
+    ],
+  },
+  {
+    id: "insert",
+    label: "Insert",
+    actions: [
+      { id: "table", label: "Table", title: "Insert table", icon: "table", run: () => insertBlock(tableSnippet) },
+      { id: "figure", label: "Figure", title: "Insert figure", icon: "figure", run: () => insertFigureSnippet() },
+      { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
+      { id: "equation", label: "Equation", title: "Insert equation", icon: "equation", run: () => insertBlock(equationSnippet) },
+      { id: "toc", label: "TOC", title: "Insert table of contents", icon: "toc", run: () => insertBlock(tocSnippet) },
+      { id: "ai-source", label: "AI Source", title: "Insert AI source block", icon: "ai", run: () => insertBlock(aiSnippet) },
+    ],
+  },
+  {
+    id: "review",
+    label: "Review",
+    actions: [
+      { id: "ai-paste", label: "AI Paste", title: "Paste from AI chat", icon: "ai", run: () => openAiPaste() },
+      { id: "comment", label: "Comment", title: "Insert review comment", icon: "comment", run: () => insertBlock(commentSnippet) },
+      { id: "commands", label: "Commands", title: "Open command palette", icon: "commands", run: () => (commandPaletteOpen.value = true) },
+    ],
+  },
+]);
 const commands = computed(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
@@ -1874,6 +2029,9 @@ const commands = computed(() => [
   { name: "Select next occurrence", group: "Edit", run: () => runEditorCommand(selectNextOccurrence) },
   { name: "Add cursor above", group: "Edit", run: () => runEditorCommand(addCursorAbove) },
   { name: "Add cursor below", group: "Edit", run: () => runEditorCommand(addCursorBelow) },
+  { name: "Show toolbar icons and text", group: "View", run: () => (store.toolbarDisplay = "both") },
+  { name: "Show toolbar icons only", group: "View", run: () => (store.toolbarDisplay = "icons") },
+  { name: "Show toolbar text only", group: "View", run: () => (store.toolbarDisplay = "text") },
   { name: "Bold selection", group: "Markdown", run: () => wrapSelection("**") },
   { name: "Italic selection", group: "Markdown", run: () => wrapSelection("*") },
   { name: "Inline code selection", group: "Markdown", run: () => wrapSelection("`") },
@@ -2062,6 +2220,7 @@ watch(
     store.lineNumbers,
     store.theme,
     store.previewTheme,
+    store.toolbarDisplay,
     store.highContrast,
     store.reducedMotion,
     store.editorFont,
@@ -3466,6 +3625,20 @@ async function runCommand(run: () => unknown) {
   run();
 }
 
+function toolbarIconPaths(icon: ToolbarIconName) {
+  return toolbarIconPathMap[icon] || toolbarIconPathMap.commands;
+}
+
+async function runCommandBarAction(action: CommandBarAction) {
+  if (action.disabled) return;
+  try {
+    await action.run();
+  } catch (error) {
+    store.lastError = error instanceof Error ? error.message : String(error);
+    store.statusMessage = `${action.label} failed`;
+  }
+}
+
 function insertReviewComment() {
   store.insertReviewComment(reviewCommentText.value);
   reviewCommentText.value = "";
@@ -4124,7 +4297,7 @@ select:hover {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 38px 42px minmax(0, 1fr) 28px;
+  grid-template-rows: 38px auto minmax(0, 1fr) 28px;
   width: 100vw;
   height: 100vh;
   color: #18212f;
@@ -4132,7 +4305,7 @@ select:hover {
 }
 
 .app-shell.has-trust-prompt {
-  grid-template-rows: 38px 42px auto minmax(0, 1fr) 28px;
+  grid-template-rows: 38px auto auto minmax(0, 1fr) 28px;
 }
 
 .app-shell[data-theme="dark"] {
@@ -4140,10 +4313,52 @@ select:hover {
   background: #111821;
 }
 
+.app-shell[data-theme="dark"] .titlebar,
+.app-shell[data-theme="dark"] .command-bar,
+.app-shell[data-theme="dark"] .status-bar {
+  border-color: #29384a;
+  background: #172231;
+}
+
+.app-shell[data-theme="dark"] button,
+.app-shell[data-theme="dark"] select,
+.app-shell[data-theme="dark"] input,
+.app-shell[data-theme="dark"] textarea {
+  border-color: #405267;
+  background: #202c3b;
+  color: #e6edf5;
+}
+
+.app-shell[data-theme="dark"] .icon-command.primary {
+  border-color: #587ea9;
+  background: #203b58;
+}
+
 @media (prefers-color-scheme: dark) {
   .app-shell[data-theme="system"] {
     color: #e6edf5;
     background: #111821;
+  }
+
+  .app-shell[data-theme="system"] .titlebar,
+  .app-shell[data-theme="system"] .command-bar,
+  .app-shell[data-theme="system"] .status-bar {
+    border-color: #29384a;
+    background: #172231;
+  }
+
+  .app-shell[data-theme="system"] button,
+  .app-shell[data-theme="system"] select,
+  .app-shell[data-theme="system"] input,
+  .app-shell[data-theme="system"] textarea {
+    border-color: #405267;
+    background: #202c3b;
+    color: #e6edf5;
+  }
+
+  .app-shell[data-theme="system"] .icon-command.primary {
+    border-color: #587ea9;
+    background: #203b58;
   }
 }
 
@@ -4395,7 +4610,135 @@ select:hover {
 }
 
 .command-bar {
+  align-items: stretch;
+  gap: 0;
+  min-height: 58px;
   overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 8px;
+  border-bottom-color: #b9c6d4;
+  background: #ffffff;
+}
+
+.command-group {
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content);
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  padding: 0 10px;
+  border-right: 1px solid #d9e1ea;
+}
+
+.command-group:first-child {
+  padding-left: 2px;
+}
+
+.command-group:last-child {
+  border-right: 0;
+  padding-right: 2px;
+}
+
+.command-group-label {
+  min-width: 48px;
+  color: #607083;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.command-group-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 34px;
+  height: 36px;
+  padding: 0 8px;
+  border-color: #c5d0dc;
+  background: #f8fafc;
+  color: #203044;
+  white-space: nowrap;
+}
+
+.icon-command.primary {
+  border-color: #9fb6d3;
+  background: #eef5ff;
+}
+
+.icon-command:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.command-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.command-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.command-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-shell[data-toolbar-display="icons"] .icon-command {
+  width: 36px;
+  padding: 0;
+}
+
+.app-shell[data-toolbar-display="icons"] .command-label,
+.app-shell[data-toolbar-display="text"] .command-icon {
+  display: none;
+}
+
+.app-shell[data-toolbar-display="text"] .icon-command {
+  min-width: auto;
+}
+
+.command-group-view {
+  grid-template-columns: auto repeat(3, max-content);
+}
+
+.compact-field {
+  display: inline-grid;
+  grid-template-columns: auto minmax(84px, max-content);
+  align-items: center;
+  gap: 5px;
+  color: #526171;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.compact-field span {
+  text-transform: uppercase;
+}
+
+.compact-field select {
+  height: 36px;
+  min-width: 96px;
 }
 
 .trust-prompt {
