@@ -38,6 +38,12 @@ pub(crate) struct FileMetadata {
     pub(crate) modified: Option<String>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct RevealCommand {
+    pub(crate) program: String,
+    pub(crate) args: Vec<String>,
+}
+
 #[tauri::command]
 pub(crate) fn read_file(path: String) -> Result<FileResponse, String> {
     let path_buf = PathBuf::from(path);
@@ -116,38 +122,65 @@ pub(crate) fn duplicate_file(request: DuplicateFileRequest) -> Result<FileRespon
 
 #[tauri::command]
 pub(crate) fn reveal_path(path: String) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    let mut command = {
-        let mut command = Command::new("open");
-        command.arg("-R").arg(&path);
-        command
-    };
-
-    #[cfg(target_os = "windows")]
-    let mut command = {
-        let mut command = Command::new("explorer");
-        command.arg(format!("/select,{path}"));
-        command
-    };
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let mut command = {
-        let target = PathBuf::from(&path)
-            .parent()
-            .map(path_to_string)
-            .unwrap_or(path);
-        let mut command = Command::new("xdg-open");
-        command.arg(target);
-        command
-    };
-
-    let status = command.status().map_err(|err| err.to_string())?;
+    let command_spec = reveal_command_for_path(&path)?;
+    let status = Command::new(&command_spec.program)
+        .args(&command_spec.args)
+        .status()
+        .map_err(|err| err.to_string())?;
     if status.success() {
         Ok(())
     } else {
         Err(format!(
             "Unable to reveal path; command exited with {status}"
         ))
+    }
+}
+
+pub(crate) fn reveal_command_for_path(path: &str) -> Result<RevealCommand, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("Cannot reveal an empty path.".to_string());
+    }
+
+    let path_buf = PathBuf::from(trimmed);
+    if !path_buf.exists() {
+        return Err(format!(
+            "Cannot reveal missing path: {}",
+            path_to_string(&path_buf)
+        ));
+    }
+
+    let canonical = path_buf
+        .canonicalize()
+        .map_err(|err| format!("Cannot reveal path: {err}"))?;
+    let canonical_path = path_to_string(&canonical);
+
+    #[cfg(target_os = "macos")]
+    {
+        Ok(RevealCommand {
+            program: "open".to_string(),
+            args: vec!["-R".to_string(), canonical_path],
+        })
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Ok(RevealCommand {
+            program: "explorer".to_string(),
+            args: vec![format!("/select,{canonical_path}")],
+        })
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let target = canonical
+            .parent()
+            .map(path_to_string)
+            .unwrap_or(canonical_path);
+        Ok(RevealCommand {
+            program: "xdg-open".to_string(),
+            args: vec![target],
+        })
     }
 }
 

@@ -592,6 +592,13 @@ green before claiming a slice is complete:
 Older remote run notes in this file explain past fixes only; do not use them as
 current completion evidence.
 
+Current local quick-verification evidence:
+
+- 2026-05-21: `pnpm run verify:local` passed after hardening the `reveal_path`
+  command builder. The run covered frontend typecheck, frontend unit tests,
+  project structure, accessibility, dependency admission, Markdown links, Rust
+  formatting, Rust `cargo check --locked`, and `git diff --check`.
+
 Resolved previous Windows clippy failure:
 
 - Command: `cargo clippy --locked --all-targets -- -D warnings`

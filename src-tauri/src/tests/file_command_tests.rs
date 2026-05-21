@@ -31,6 +31,55 @@ fn file_duplicate_and_rename_commands_move_content() {
 }
 
 #[test]
+fn reveal_command_for_existing_path_is_platform_specific_and_argument_safe() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor reveal test {unique}"));
+    fs::create_dir_all(&root).expect("create reveal test dir");
+    let doc = root.join("document with spaces.md");
+    fs::write(&doc, "# Reveal").expect("write reveal target");
+
+    let command = crate::filesystem::reveal_command_for_path(path_to_string(&doc).as_str())
+        .expect("existing path should map to reveal command");
+    let canonical = path_to_string(&doc.canonicalize().expect("canonical reveal path"));
+
+    #[cfg(target_os = "macos")]
+    {
+        assert_eq!(command.program, "open");
+        assert_eq!(command.args, vec!["-R".to_string(), canonical]);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        assert_eq!(command.program, "explorer");
+        assert_eq!(command.args, vec![format!("/select,{canonical}")]);
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        assert_eq!(command.program, "xdg-open");
+        assert_eq!(
+            command.args,
+            vec![path_to_string(
+                &doc.canonicalize()
+                    .expect("canonical reveal path")
+                    .parent()
+                    .expect("canonical path should have parent")
+            )]
+        );
+    }
+
+    let missing = root.join("missing.md");
+    let error = crate::filesystem::reveal_command_for_path(path_to_string(&missing).as_str())
+        .expect_err("missing path should not launch file manager");
+    assert!(error.contains("Cannot reveal missing path"));
+
+    fs::remove_dir_all(root).expect("clean reveal test dir");
+}
+
+#[test]
 fn save_file_rejects_stale_expected_hash() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

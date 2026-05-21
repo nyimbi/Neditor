@@ -19,7 +19,8 @@ progress records prove the requested end state.
 - Latest inspected committed baseline before this update: `71f35fc Preserve
   table structure in text exports`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: clean
+- Worktree before this log update: `src-tauri/src/filesystem.rs` contained
+  in-progress reveal-path hardening.
 
 ## Durable Planning Artifacts
 
@@ -31,6 +32,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- This update repairs the reveal-path file operation slice after the
+  in-progress `filesystem.rs` change left the Rust crate uncompilable. The
+  command builder now has focused regression coverage for existing paths,
+  missing paths, platform-specific file-manager arguments, and path arguments
+  containing spaces.
 - `7aff68f` announced workbench status changes accessibly.
 - `8d73d69` managed focus across workbench modals.
 - `4ce66b5` improved keyboard access to workbench regions.
@@ -574,6 +580,13 @@ P2/P3 gaps:
   packaging evidence remain incomplete.
 
 ## Verification Status
+
+Current verification recorded on 2026-05-21:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | 8 file command tests passed, including `reveal_command_for_existing_path_is_platform_specific_and_argument_safe`. |
+| `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 
 Fresh baseline recorded on 2026-05-20:
 
