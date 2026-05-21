@@ -142,8 +142,9 @@ Research and business documents can keep reference metadata near the source.
   metadata records, dotted keys, and `@` characters inside field values.
 - Import CSL JSON as a root array, a single item, or an object with `items`,
   `references`, `bibliography`, or `data`.
-- Choose `title`, `author-year`, `key`, or `numeric` citation style from front
-  matter, preferences, or the references panel.
+- Choose `title`, `author-year`, `key`, `numeric`, or a common CSL alias such
+  as `apa`, `chicago-author-date`, `ieee`, or `vancouver` from front matter,
+  preferences, or the references panel.
 - Use `glossary` fenced blocks for terms and definitions.
 - Add `[GLOSSARY]` where the generated glossary should appear, or set
   `glossarySection: true` in front matter.

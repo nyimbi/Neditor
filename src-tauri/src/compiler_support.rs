@@ -51,13 +51,9 @@ pub(crate) fn collect_glossary(text: &str) -> BTreeMap<String, String> {
     glossary
 }
 
-pub(crate) fn citation_style(metadata: &Value) -> &str {
+pub(crate) fn citation_style(metadata: &Value) -> &'static str {
     let style = citation_style_value(metadata).unwrap_or("title");
-    if supported_citation_style(style) {
-        style
-    } else {
-        "title"
-    }
+    canonical_citation_style(style).unwrap_or("title")
 }
 
 pub(crate) fn citation_style_value(metadata: &Value) -> Option<&str> {
@@ -69,7 +65,31 @@ pub(crate) fn citation_style_value(metadata: &Value) -> Option<&str> {
 }
 
 pub(crate) fn supported_citation_style(style: &str) -> bool {
-    matches!(style, "title" | "author-year" | "key" | "numeric")
+    canonical_citation_style(style).is_some()
+}
+
+pub(crate) fn canonical_citation_style(style: &str) -> Option<&'static str> {
+    let normalized = style.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "title" | "neditor-title" => Some("title"),
+        "author-year"
+        | "author_year"
+        | "apa"
+        | "american-psychological-association"
+        | "chicago-author-date"
+        | "chicago"
+        | "harvard"
+        | "council-of-science-editors-author-date" => Some("author-year"),
+        "key" | "citation-key" | "citation_key" => Some("key"),
+        "numeric"
+        | "ieee"
+        | "vancouver"
+        | "nature"
+        | "american-medical-association"
+        | "ama"
+        | "elsevier-vancouver" => Some("numeric"),
+        _ => None,
+    }
 }
 
 pub(crate) fn collect_fence_bodies(text: &str, target: &str) -> Vec<String> {

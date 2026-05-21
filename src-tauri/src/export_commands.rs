@@ -398,17 +398,17 @@ fn validate_default_citation_style_option(
             "defaultCitationStyle must be a string.",
             None,
             None,
-            Some("Use title, author-year, key, or numeric."),
+            Some("Use title, author-year, key, numeric, or a supported CSL alias."),
         ));
         return;
     };
     if !supported_citation_style(style) {
         diagnostics.push(diag(
             "error",
-            "defaultCitationStyle must be title, author-year, key, or numeric.",
+            "defaultCitationStyle must be a supported citation style.",
             None,
             None,
-            Some("Choose one of the built-in citation styles or remove the default."),
+            Some("Choose title, author-year, key, numeric, apa, chicago-author-date, ieee, vancouver, or remove the default."),
         ));
     }
 }

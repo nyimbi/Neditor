@@ -1239,6 +1239,10 @@ characters inside field values, normalizes protected title braces, and accepts
 dotted citation keys. CSL JSON import now accepts root arrays, single-item
 objects, and wrapper objects with `items`, `references`, `bibliography`, or
 `data`, including full given/family author names and raw/string date forms.
+Common CSL style aliases now map deterministically onto native renderers:
+APA/Chicago/Harvard/CSE author-date aliases render as author-year, and
+IEEE/Vancouver/Nature/AMA aliases render as numeric. Unknown CSL style names
+still warn and fall back to title rendering.
 Duplicate cross-reference labels now produce source-ranged compiler/readiness
 errors and are copied into export manifests so repeated section, figure, table,
 equation, appendix, or decision anchors cannot make references ambiguous.
@@ -1258,6 +1262,10 @@ Finish:
   CSL JSON, Hayagriva YAML, and separate external bibliography files; remaining
   work is richer citation manager UX.
 - Citation styles: title, author-year, key, numeric, and CSL-driven choices.
+  Current coverage proves common CSL aliases for APA-style author-year output
+  and IEEE-style numeric output, plus export option validation for alias
+  defaults; remaining work is full CSL processor fidelity beyond deterministic
+  native aliases.
 - Remaining citation diagnostics: richer CSL style validation and a future
   Rust-native CSL/Hayagriva adapter for named CSL styles beyond the built-in
   options.

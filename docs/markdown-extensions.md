@@ -255,8 +255,14 @@ a single item object, or an object wrapping an `items`, `references`,
 ```
 
 Set `citationStyle` to `title`, `author-year`, `key`, or `numeric` in front
-matter. Unsupported `citationStyle` or `cslStyle` names produce a warning and
-fall back to title rendering until a native CSL adapter is added.
+matter. Common CSL aliases are accepted for deterministic native rendering:
+`apa`, `american-psychological-association`, `chicago-author-date`,
+`chicago`, `harvard`, and `council-of-science-editors-author-date` map to the
+author-year renderer; `ieee`, `vancouver`, `nature`,
+`american-medical-association`, `ama`, and `elsevier-vancouver` map to the
+numeric renderer. Unsupported `citationStyle` or `cslStyle` names produce a
+warning and fall back to title rendering until a full native CSL adapter is
+added.
 
 Diagnostics cover missing keys, duplicate bibliography keys, missing
 bibliography sources, and unsupported citation styles. The references panel

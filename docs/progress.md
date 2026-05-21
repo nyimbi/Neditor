@@ -1692,6 +1692,26 @@ Bibliography import compatibility verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
 | `git diff --check` | Pass | No whitespace errors after the bibliography/parser update. |
 
+CSL alias rendering verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_maps_common_csl_style_aliases_to_native_renderers --lib -- --nocapture` in `src-tauri` | Pass | Focused citation proof maps `apa` to author-year output and `ieee` to numeric output without unsupported-style warnings. |
+| `cargo test --locked compile_options_supply_csl_alias_default_citation_style --lib -- --nocapture` in `src-tauri` | Pass | Compile-option defaults now accept supported CSL aliases such as `apa` and render through the native author-year path. |
+| `cargo test --locked compiler_warns_and_falls_back_for_unsupported_csl_style --lib -- --nocapture` in `src-tauri` | Pass | Unknown CSL style names still warn and fall back to title rendering. |
+| `cargo test --locked prepare_for_export_validates_brand_and_default_style_options --lib -- --nocapture` in `src-tauri` | Pass | Export readiness accepts supported CSL aliases as default citation styles and still blocks unknown default styles before writing. |
+| `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 18 citation tests passed after adding deterministic CSL alias rendering. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 23 export command tests passed after updating default citation-style validation for CSL aliases. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 194 Rust library tests passed after adding deterministic CSL alias support. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the CSL alias update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the CSL alias update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the CSL alias docs/update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the CSL alias update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting CSL aliases; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after the CSL alias update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
+| `git diff --check` | Pass | No whitespace errors after the CSL alias update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

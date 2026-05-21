@@ -847,7 +847,7 @@ fn prepare_for_export_validates_brand_and_default_style_options() {
         options: json!({
             "warnOnDirtyGit": false,
             "brandColor": "#123ABC",
-            "defaultCitationStyle": "numeric",
+            "defaultCitationStyle": "apa",
             "includeCoverPage": true,
             "includePageNumbers": true,
             "defaultBrandProfile": {
@@ -871,7 +871,7 @@ fn prepare_for_export_validates_brand_and_default_style_options() {
         options: json!({
             "warnOnDirtyGit": "no",
             "brandColor": "blue",
-            "defaultCitationStyle": "apa",
+            "defaultCitationStyle": "experimental-csl-style",
             "includeCoverPage": "yes",
             "includePageNumbers": "yes",
             "defaultBrandProfile": {
@@ -886,7 +886,7 @@ fn prepare_for_export_validates_brand_and_default_style_options() {
     assert_eq!(report.error_count, 8, "{:#?}", report.diagnostics);
     for expected in [
         "brandColor must be a hex color",
-        "defaultCitationStyle must be title, author-year, key, or numeric",
+        "defaultCitationStyle must be a supported citation style",
         "defaultBrandProfile.logo must be a string",
         "defaultBrandProfile.header must be a string",
         "defaultBrandProfile.color must be a hex color",
