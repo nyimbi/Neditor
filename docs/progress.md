@@ -2177,7 +2177,7 @@ Accessibility report and browser-performance evidence verification:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm run verify:local` | Pass | Quick local verification passed after making `pnpm run check:a11y` emit `.tmp/accessibility/report.json`; the report recorded 10 named checks, 10 passed, 0 failed, and 0 issues. |
-| `pnpm run test:e2e` | Pass | 42 Chromium browser workflows passed locally, including skip links, modal focus, status/progress live regions, accessible diagnostics/conflict/table/source/preview semantics, large-document edit/preview responsiveness, and blog/Substack/LaTeX/Google Docs export handoffs. |
+| `pnpm run test:e2e` | Pass | 43 Chromium browser workflows passed locally through the system-Chrome fallback, including skip links, modal focus, status/progress live regions, accessible diagnostics/conflict/table/source/preview semantics, large-document edit/preview responsiveness, transform template management, and blog/Substack/LaTeX/Google Docs export handoffs. |
 
 Publishing and Google Docs handoff workflow verification:
 
@@ -2234,7 +2234,7 @@ Browser workflow fallback verification:
 | --- | --- | --- |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host by falling back from the missing Playwright bundled Chromium path to `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; `.tmp/e2e-environment/report.json` records the browser source and command tail. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "modal focus\|syncs editor\|persists editor settings" --project chromium` | Pass | Escalated macOS run proved the default system-Chrome fallback can run the editor/modal/search workflow subset after restoring explicit command labels. |
-| `node scripts/run-e2e.mjs` | Pass | Escalated macOS run passed all 42 Chromium browser workflows with the default system-Chrome fallback; `.tmp/e2e-browser/report.json` records `source: system-chromium`, the Chrome executable path, and exit status 0. |
+| `node scripts/run-e2e.mjs` | Pass | Current macOS run passed all 43 Chromium browser workflows with the default system-Chrome fallback; `.tmp/e2e-browser/report.json` records `source: system-chromium`, the Chrome executable path, and exit status 0. |
 | `pnpm run check`, `pnpm run test:unit`, `pnpm run check:a11y` | Pass | Typecheck, 18 frontend unit tests, and static accessibility guardrails passed after restoring explicit Find, Open Folder, and Save Workspace command labels. |
 
 Native desktop window smoke verification:
