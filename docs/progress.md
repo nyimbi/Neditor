@@ -62,6 +62,10 @@ Recent pushed checkpoints visible in current git history:
   styles, non-hex brand colors, malformed default brand profile fields,
   dirty-Git warning flags, and legacy cover/page-number aliases now fail
   readiness with manifest-backed diagnostics instead of being ignored.
+- This update also makes appendix export options content-aware: enabled
+  glossary, review-comment, or AI-provenance appendices now produce
+  manifest-backed info diagnostics when the document has no matching content,
+  while populated appendices remain clean.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.

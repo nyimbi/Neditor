@@ -383,6 +383,8 @@ Before export, NEditor validates the compiled document for issues such as:
 - Transform engine trust, path, timeout, stderr, output, and cache details.
 - Export option shape, including citation-style defaults, brand colors, brand
   profile fields, and boolean toggles.
+- Enabled appendix options that have no matching glossary, review, or AI
+  provenance content.
 - Unresolved comments and malformed change notes.
 - Incomplete AI provenance or missing human review metadata.
 

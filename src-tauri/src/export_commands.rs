@@ -2,7 +2,8 @@ use crate::{
     compile_with_options,
     compiler_support::supported_citation_style,
     compiler_types::{
-        export_progress_steps, export_readiness_summary, ExportProgressStep, ExportReadinessSummary,
+        export_progress_steps, export_readiness_summary, ExportProgressStep,
+        ExportReadinessSummary, SemanticDocument,
     },
     diagnostics::{diag, DocumentDiagnostic},
     export::{
@@ -95,6 +96,12 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
         &mut diagnostics,
     );
     validate_captioned_business_objects(&compile_response.document_ast.blocks, &mut diagnostics);
+    validate_content_sensitive_export_options(
+        &request.target,
+        &request.options,
+        &compile_response.semantic,
+        &mut diagnostics,
+    );
     if git_export_warnings_enabled(&request.options) {
         validate_git_export_cleanliness(file_path.as_deref(), &mut diagnostics);
     }
@@ -205,6 +212,12 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
         &mut response.diagnostics,
     );
     validate_captioned_business_objects(&response.document_ast.blocks, &mut response.diagnostics);
+    validate_content_sensitive_export_options(
+        &request.target,
+        &request.options,
+        &response.semantic,
+        &mut response.diagnostics,
+    );
     if git_export_warnings_enabled(&request.options) {
         validate_git_export_cleanliness(request.file_path.as_deref(), &mut response.diagnostics);
     }
@@ -472,16 +485,13 @@ fn validate_target_specific_export_options(
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
     if target != "pptx" && bool_option_enabled(options, "includeAgenda") {
-        let mut diagnostic = diag(
-            "info",
+        push_option_info(
+            target,
+            "includeAgenda",
             "includeAgenda is only used for PPTX exports.",
-            None,
-            None,
-            Some("Disable includeAgenda for this target or switch the export target to pptx."),
+            "Disable includeAgenda for this target or switch the export target to pptx.",
+            diagnostics,
         );
-        diagnostic.related.push(format!("target:{target}"));
-        diagnostic.related.push("option:includeAgenda".to_string());
-        diagnostics.push(diagnostic);
     }
 
     if matches!(target, "markdown-bundle" | "markdown") {
@@ -492,19 +502,70 @@ fn validate_target_specific_export_options(
             "pageNumbers",
         ] {
             if bool_option_enabled(options, option) {
-                let mut diagnostic = diag(
-                    "info",
-                    format!("{option} is recorded in the Markdown bundle manifest but does not render bundle content."),
-                    None,
-                    None,
-                    Some("Keep the option for manifest parity or disable it to reduce bundle export noise."),
+                push_option_info(
+                    target,
+                    option,
+                    &format!("{option} is recorded in the Markdown bundle manifest but does not render bundle content."),
+                    "Keep the option for manifest parity or disable it to reduce bundle export noise.",
+                    diagnostics,
                 );
-                diagnostic.related.push(format!("target:{target}"));
-                diagnostic.related.push(format!("option:{option}"));
-                diagnostics.push(diagnostic);
             }
         }
     }
+}
+
+fn validate_content_sensitive_export_options(
+    target: &str,
+    options: &Value,
+    semantic: &SemanticDocument,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if bool_option_enabled(options, "includeGlossary") && semantic.glossary.is_empty() {
+        push_option_info(
+            target,
+            "includeGlossary",
+            "includeGlossary is enabled but the document has no glossary entries.",
+            "Add glossary entries or disable includeGlossary for this export.",
+            diagnostics,
+        );
+    }
+    if bool_option_enabled(options, "includeComments")
+        && semantic.comments.is_empty()
+        && semantic.change_notes.is_empty()
+    {
+        push_option_info(
+            target,
+            "includeComments",
+            "includeComments is enabled but the document has no review comments or change notes.",
+            "Add review comments/change notes or disable includeComments for this export.",
+            diagnostics,
+        );
+    }
+    if bool_option_enabled(options, "includeProvenance")
+        && semantic.ai_sources.is_empty()
+        && semantic.ai_assisted_sections.is_empty()
+    {
+        push_option_info(
+            target,
+            "includeProvenance",
+            "includeProvenance is enabled but the document has no AI provenance entries.",
+            "Add ai-source or ai-assisted metadata, or disable includeProvenance for this export.",
+            diagnostics,
+        );
+    }
+}
+
+fn push_option_info(
+    target: &str,
+    option: &str,
+    message: &str,
+    suggestion: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let mut diagnostic = diag("info", message, None, None, Some(suggestion));
+    diagnostic.related.push(format!("target:{target}"));
+    diagnostic.related.push(format!("option:{option}"));
+    diagnostics.push(diagnostic);
 }
 
 fn bool_option_enabled(options: &Value, option: &str) -> bool {

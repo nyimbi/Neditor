@@ -966,6 +966,10 @@ Current evidence:
 - Target-specific option audits now report non-blocking info diagnostics when
   valid options are ignored by the selected target, including non-PPTX agenda
   options and Markdown bundle render-only options.
+- Appendix export option audits now report non-blocking info diagnostics when
+  `includeGlossary`, `includeComments`, or `includeProvenance` is enabled but
+  the compiled document has no matching glossary, review, or AI provenance
+  entries.
 - Export option audits now reject malformed readiness settings before writing:
   invalid default citation styles, non-hex brand colors, malformed default
   brand profile fields, dirty-Git warning flags, and legacy cover/page-number
@@ -1012,8 +1016,8 @@ Readiness should validate and report:
   proves the PPTX approved-metadata blocker and malformed brand/citation
   option shapes; more target-specific option combinations remain.
 - Target-specific option no-op visibility. Focused Rust coverage now proves
-  valid-but-ignored options are surfaced as info diagnostics without blocking
-  readiness.
+  valid-but-ignored options and empty appendix export options are surfaced as
+  info diagnostics without blocking readiness.
 - Target/output extension consistency. Focused Rust coverage now proves direct
   exports refuse mismatched target extensions before writing artifacts.
 - Unresolved comments and malformed comment/change-note audit metadata. Broad

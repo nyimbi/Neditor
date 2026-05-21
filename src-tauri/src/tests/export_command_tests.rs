@@ -982,6 +982,57 @@ fn prepare_for_export_reports_target_specific_option_info() {
 }
 
 #[test]
+fn prepare_for_export_reports_empty_appendix_options_as_info() {
+    let source = "---\ntitle: Empty Appendix Options\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Empty Appendix Options\nNo appendices are available.\n".to_string();
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source.clone(),
+        file_path: None,
+        target: "docx".to_string(),
+        options: json!({
+            "warnOnDirtyGit": false,
+            "includeGlossary": true,
+            "includeComments": true,
+            "includeProvenance": true
+        }),
+    });
+
+    assert!(report.ready, "{:#?}", report.diagnostics);
+    assert_eq!(report.error_count, 0);
+    assert_eq!(report.warning_count, 0);
+    assert_eq!(report.info_count, 3);
+    assert_eq!(report.manifest.readiness.info_count, 3);
+    for option in ["includeGlossary", "includeComments", "includeProvenance"] {
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.severity == "info"
+                    && diagnostic
+                        .related
+                        .iter()
+                        .any(|related| related == &format!("option:{option}"))),
+            "missing content-sensitive info diagnostic for {option}: {:#?}",
+            report.diagnostics
+        );
+    }
+
+    let populated = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: Populated Appendix Options\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Populated Appendix Options\n```glossary\nSLA: Service-level agreement.\n```\n<!-- comment: resolved | author: QA | at: 2026-05-21T10:00:00Z | Looks good. -->\n```ai-source\nprovider: OpenAI\nmodel: gpt-5.4\ndate: 2026-05-21\npromptSummary: Drafted appendix notes\nreviewedBy: QA\nreviewedAt: 2026-05-21T10:30:00Z\nstatus: human-reviewed\n```\n"
+            .to_string(),
+        file_path: None,
+        target: "docx".to_string(),
+        options: json!({
+            "warnOnDirtyGit": false,
+            "includeGlossary": true,
+            "includeComments": true,
+            "includeProvenance": true
+        }),
+    });
+    assert!(populated.ready, "{:#?}", populated.diagnostics);
+    assert_eq!(populated.info_count, 0, "{:#?}", populated.diagnostics);
+}
+
+#[test]
 fn prepare_for_export_validates_transform_engine_options() {
     let report = prepare_for_export(PrepareExportRequest {
         text: "---\ntitle: Ready\nstatus: approved\napprovedBy: QA\n---\n# Ready".to_string(),

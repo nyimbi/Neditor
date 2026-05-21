@@ -206,7 +206,10 @@ transform engine settings, and draft watermark behavior.
 Readiness also audits those options before writing: invalid citation-style
 defaults, non-hex brand colors, malformed brand profile fields, and non-boolean
 export toggles are reported in the same manifest-backed diagnostics as document
-content problems.
+content problems. When optional appendix exports are enabled but the document
+has no matching glossary, review, or AI provenance content, readiness keeps the
+export allowed and records an informational diagnostic so the manifest explains
+the no-op.
 
 When `includeManifest` is enabled, NEditor writes sidecar evidence beside the
 artifact. The manifest records source hashes, include hashes, export options,
