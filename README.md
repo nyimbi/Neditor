@@ -208,12 +208,14 @@ artifact smoke.
 Use `pnpm run verify:local -- --list` or
 `pnpm run verify:local:full -- --list` to print the exact command sequence
 without running it. Browser workflow tests are available through
-`pnpm run test:e2e` directly when Playwright's local browser dependencies are
-installed and the host allows Chromium to launch.
+`pnpm run test:e2e` directly when the host allows Chromium to launch. The runner
+prefers Playwright's project-local browser cache and falls back to an installed
+Chrome-compatible browser when that cache is missing.
 
 Use `pnpm run check:e2e-env` before browser workflow runs. It defaults to the
-project-local Playwright browser cache and runs the focused workbench boot
-workflow through the same Playwright CLI path as the full browser suite.
+project-local Playwright browser cache, records the browser source under
+`.tmp/e2e-environment/report.json`, and runs the focused workbench boot workflow
+through the same Playwright CLI path as the full browser suite.
 
 `pnpm run check:engines` probes optional external transform engines and reports
 installed/missing Graphviz/DOT, D2, PlantUML, Java-backed PlantUML, and Pikchr

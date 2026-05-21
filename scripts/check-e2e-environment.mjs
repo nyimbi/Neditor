@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { resolvePlaywrightBrowserEnv, writePlaywrightBrowserReport } from "./playwright-browser-env.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const binary = join(
@@ -10,17 +11,29 @@ const binary = join(
   ".bin",
   process.platform === "win32" ? "playwright.cmd" : "playwright",
 );
-const env = {
-  ...process.env,
-  PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH ?? "0",
-};
+const reportPath = join(root, ".tmp", "e2e-environment", "report.json");
+const browserResolution = resolvePlaywrightBrowserEnv(process.env);
+
+if (!browserResolution.ok) {
+  writePlaywrightBrowserReport(reportPath, browserResolution, "blocked");
+  console.error(browserResolution.message);
+  process.exit(1);
+}
 
 const result = spawnSync(binary, ["test", "--grep", "boots the workbench"], {
   cwd: root,
-  env,
+  env: browserResolution.env,
   shell: process.platform === "win32",
   stdio: "pipe",
   encoding: "utf8",
+});
+
+writePlaywrightBrowserReport(reportPath, browserResolution, result.status === 0 ? "passed" : "failed", {
+  command: [binary, "test", "--grep", "boots the workbench"],
+  exitStatus: result.status,
+  signal: result.signal,
+  stdoutTail: tail(result.stdout),
+  stderrTail: tail(result.stderr),
 });
 
 if (result.status !== 0) {
@@ -30,4 +43,11 @@ if (result.status !== 0) {
   process.exit(result.status ?? 1);
 }
 
-console.log("Playwright Chromium launch preflight passed through the focused workbench boot workflow.");
+console.log(`${browserResolution.message} Playwright Chromium launch preflight passed through the focused workbench boot workflow.`);
+
+function tail(output) {
+  return output
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .slice(-80);
+}

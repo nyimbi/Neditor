@@ -2220,6 +2220,15 @@ Transform template library verification:
 | `pnpm run verify:local` | Pass | Quick local verification passed all 9 steps after the transform template update. |
 | `git diff --check` | Pass | No whitespace errors after the transform template update. |
 
+Browser workflow fallback verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host by falling back from the missing Playwright bundled Chromium path to `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; `.tmp/e2e-environment/report.json` records the browser source and command tail. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "modal focus\|syncs editor\|persists editor settings" --project chromium` | Pass | Escalated macOS run proved the default system-Chrome fallback can run the editor/modal/search workflow subset after restoring explicit command labels. |
+| `node scripts/run-e2e.mjs` | Pass | Escalated macOS run passed all 42 Chromium browser workflows with the default system-Chrome fallback; `.tmp/e2e-browser/report.json` records `source: system-chromium`, the Chrome executable path, and exit status 0. |
+| `pnpm run check`, `pnpm run test:unit`, `pnpm run check:a11y` | Pass | Typecheck, 18 frontend unit tests, and static accessibility guardrails passed after restoring explicit Find, Open Folder, and Save Workspace command labels. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

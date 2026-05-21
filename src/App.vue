@@ -2109,8 +2109,8 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     id: "manage",
     label: "Manage",
     actions: [
-      { id: "open-folder", label: "Folder", title: "Open folder", icon: "folder", run: () => openFolder() },
-      { id: "save-workspace", label: "Workspace", title: "Save workspace", icon: "workspace", run: () => saveWorkspace() },
+      { id: "open-folder", label: "Open Folder", title: "Open folder", icon: "folder", run: () => openFolder() },
+      { id: "save-workspace", label: "Save Workspace", title: "Save workspace", icon: "workspace", run: () => saveWorkspace() },
       { id: "revert", label: "Revert", title: "Revert to saved", icon: "revert", run: () => store.revertActive() },
       { id: "rename", label: "Rename", title: "Rename document", icon: "rename", run: () => renameDocument() },
       { id: "duplicate", label: "Duplicate", title: "Duplicate document", icon: "duplicate", run: () => duplicateDocument() },
@@ -2134,7 +2134,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     id: "navigate",
     label: "Navigate",
     actions: [
-      { id: "search", label: "Search", title: "Find and replace", icon: "find", run: () => runEditorCommand(openSearchPanel) },
+      { id: "search", label: "Find", title: "Find and replace", icon: "find", run: () => runEditorCommand(openSearchPanel) },
       { id: "find-previous", label: "Prev", title: "Find previous match", icon: "previous", run: () => runEditorCommand(findPrevious) },
       { id: "find-next", label: "Next", title: "Find next match", icon: "next", run: () => runEditorCommand(findNext) },
       { id: "outline", label: "Outline", title: "Show document outline", icon: "outline", run: () => showOutline() },
