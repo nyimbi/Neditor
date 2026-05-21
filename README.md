@@ -236,6 +236,10 @@ thumbnail assertion or the host sandbox limitation in `viewer-proof.json`. When
 `pdflatex` is installed, it also compiles the generated `.tex` file into
 `.tmp/rendered-export-audit/latex-compile/`.
 
+`pnpm run test:performance-audit` writes `.tmp/performance-audit/report.json`
+after running the Rust performance stress tests and the focused browser
+large-document workflow through the project-local Playwright browser cache.
+
 `pnpm run test:desktop-smoke` verifies the local Vite build, Tauri
 configuration, package metadata, MIT license metadata, release desktop binary
 produced by `./node_modules/.bin/tauri build --no-bundle`, and a native

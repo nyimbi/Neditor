@@ -1561,12 +1561,14 @@ Current evidence:
 - `pnpm run test:e2e` passes the large-document editing workflow locally; it
   appends source text, waits for preview update, checks elapsed browser time,
   and verifies editor-to-preview scroll sync.
+- `pnpm run test:performance-audit` writes
+  `.tmp/performance-audit/report.json` after running the Rust performance stress
+  suite and the focused browser large-document workflow.
 
 Finish:
 
-- Deeper long-running memory profiling beyond bounded test loops.
-- Add deeper long-running memory/native profiling beyond bounded test loops and
-  command-smoke timing.
+- Longer soak profiling and release-device native profiling beyond bounded test
+  loops and command-smoke timing.
 
 ## P2 - Architecture And Maintainability
 

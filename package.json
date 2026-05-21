@@ -20,6 +20,7 @@
     "test:desktop-bundle": "node scripts/check-desktop-bundle.mjs",
     "test:desktop-dmg": "node scripts/check-desktop-dmg.mjs",
     "test:desktop-smoke": "node scripts/check-desktop-smoke.mjs",
+    "test:performance-audit": "node scripts/check-performance-audit.mjs",
     "test:tauri-webdriver": "node scripts/run-tauri-webdriver.mjs",
     "test:rendered-exports": "node scripts/check-rendered-export-audit.mjs",
     "test:unit": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js",
