@@ -26,6 +26,7 @@ const smokeReport = {
   },
   nativeCommandWorkflow: null,
   nativeWindow: null,
+  nativeAutomation: null,
 };
 
 requireEqual(packageJson.license, "MIT", "package.json must declare MIT license");
@@ -193,6 +194,7 @@ async function launchDesktop(path) {
       } else {
         report.status = "survived-until-timeout";
         validateNativeWindowReport(report);
+        collectNativeAutomationReport(report, child.pid);
       }
       writeLaunchReport(report);
       child.kill("SIGTERM");
@@ -288,6 +290,73 @@ function writeLaunchReport(report) {
   const directory = join(root, ".tmp", "desktop-smoke");
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, "launch-report.json"), `${JSON.stringify(report, null, 2)}\n`);
+}
+
+function collectNativeAutomationReport(launchReport, pid) {
+  if (process.platform !== "darwin") return;
+  const script = `
+set targetPid to ${Number(pid) || 0}
+tell application "System Events"
+  set matches to every process whose unix id is targetPid
+  if (count of matches) is 0 then error "process not found for pid " & targetPid
+  set targetProcess to item 1 of matches
+  set processName to name of targetProcess
+  set processFrontmost to frontmost of targetProcess
+  set windowCount to count of windows of targetProcess
+  set windowName to ""
+  set windowWidth to 0
+  set windowHeight to 0
+  if windowCount > 0 then
+    set firstWindow to window 1 of targetProcess
+    set windowName to name of firstWindow
+    set windowSize to size of firstWindow
+    set windowWidth to item 1 of windowSize
+    set windowHeight to item 2 of windowSize
+  end if
+  return processName & linefeed & processFrontmost & linefeed & windowCount & linefeed & windowName & linefeed & windowWidth & linefeed & windowHeight
+end tell
+`;
+  const result = spawnSync("osascript", ["-e", script], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  const output = result.stdout.trim();
+  const stderr = result.stderr.trim();
+  if (result.status !== 0) {
+    const detail = stderr || output || `osascript exited with code ${result.status ?? "unknown"}`;
+    const automation = {
+      tool: "osascript:System Events",
+      status: "skipped",
+      reason: detail,
+    };
+    launchReport.nativeAutomation = automation;
+    smokeReport.nativeAutomation = automation;
+    return;
+  }
+  const [processName, frontmost, windowCount, windowName, windowWidth, windowHeight] = output.split(/\r?\n/);
+  const automation = {
+    tool: "osascript:System Events",
+    status: "passed",
+    processName,
+    frontmost: frontmost === "true",
+    windowCount: Number(windowCount),
+    window: {
+      name: windowName,
+      width: Number(windowWidth),
+      height: Number(windowHeight),
+    },
+  };
+  launchReport.nativeAutomation = automation;
+  smokeReport.nativeAutomation = automation;
+  if (!processName || !processName.toLowerCase().includes("neditor")) {
+    issues.push(`macOS native automation found an unexpected process name: ${JSON.stringify(processName)}`);
+  }
+  if (!Number.isFinite(automation.windowCount) || automation.windowCount < 1) {
+    issues.push(`macOS native automation did not find a NEditor window: ${JSON.stringify(automation)}`);
+  }
+  if (!Number.isFinite(automation.window.width) || !Number.isFinite(automation.window.height)) {
+    issues.push(`macOS native automation did not report a usable window size: ${JSON.stringify(automation.window)}`);
+  }
 }
 
 function tail(value) {
