@@ -174,8 +174,11 @@ csvFiles:
 ```
 
 CSV/TSV sources render as tables, JSON arrays can render as structured tables,
-and nested JSON/YAML values render as structured trees. Missing paths,
-unsupported source types, and unreadable files are reported as diagnostics.
+and nested JSON/YAML values render as structured trees. Data source paths must
+stay inside the document folder by using relative child paths; absolute paths
+and `..` parent-directory escapes are blocked before any file is read, and
+resolved symlinks are checked before import. Missing paths, unsupported source
+types, and unreadable files are reported as diagnostics.
 
 The table editor can write clean Markdown after paste import, sorting, row and
 column edits, alignment, totals, formula rows, and merged-cell metadata edits.

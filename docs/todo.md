@@ -198,6 +198,13 @@ Most recent local verification evidence:
 - `cargo test --locked compiler_reports_malformed_front_matter_data_sources --lib -- --nocapture`:
   passed and proves data source entries with missing paths, unsupported types,
   and unreadable local files produce actionable diagnostics.
+- `cargo test --locked compiler_blocks_data_sources_outside_document_folder --lib -- --nocapture`:
+  passed and proves front matter data source imports reject absolute paths and
+  `..` parent-directory escapes before reading files outside the document
+  folder.
+- `cargo test --locked compiler_blocks_symlinked_data_sources_outside_document_folder --lib -- --nocapture`:
+  passed on Unix and proves canonicalized symlink targets outside the document
+  folder are rejected before import.
 - `cargo test --locked front_matter_data_sources_survive_cross_target_exports --lib -- --nocapture`:
   passed and proves front matter CSV/TSV/JSON/YAML data sources survive HTML,
   PDF, DOCX, PPTX, Markdown bundle text, and Markdown bundle manifest outputs.
@@ -1256,10 +1263,13 @@ Finish:
 - Inline formulas and table-cell formulas in preview/export/readiness.
 - Data sources from front matter and external CSV/TSV/JSON/YAML paths. Backend
   coverage now proves CSV, TSV, JSON, and YAML local file sources through
-  compile, transform artifacts, manifests, and cross-target export outputs.
+  compile, transform artifacts, manifests, and cross-target export outputs, with
+  absolute paths, parent-directory escapes, and resolved symlink escapes blocked
+  before file reads.
 - Validation for malformed data source paths, broken formulas, circular or
   unsupported dependencies, and mixed span/formula tables. Data source coverage
-  now proves missing path, unsupported type, and unreadable file diagnostics.
+  now proves missing path, unsupported type, unreadable file, outside-folder
+  path, and symlink escape diagnostics.
 - Export parity for large, merged, formatted, summarized, sorted, and
   formula-driven tables. Text and Markdown bundle exports now preserve readable
   Markdown-style table rows with alignment and span metadata for edited,

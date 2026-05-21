@@ -5,7 +5,7 @@ use crate::{
 use serde_json::{json, Value};
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 pub(crate) fn parse_front_matter(
@@ -198,6 +198,10 @@ pub(crate) fn render_front_matter_data_sources(
             ));
             continue;
         }
+        if !data_source_path_is_document_relative(&spec.path) {
+            diagnostics.push(data_source_path_diagnostic(root_file, &spec.path));
+            continue;
+        }
         let kind = spec
             .kind
             .as_deref()
@@ -215,6 +219,10 @@ pub(crate) fn render_front_matter_data_sources(
             continue;
         }
         let path = base.join(&spec.path);
+        if data_source_resolves_outside_base(&base, &path) {
+            diagnostics.push(data_source_path_diagnostic(root_file, &spec.path));
+            continue;
+        }
         let contents = match fs::read_to_string(&path) {
             Ok(contents) => contents,
             Err(err) => {
@@ -316,6 +324,37 @@ fn data_source_kind_from_path(path: &str) -> Option<&'static str> {
     } else {
         None
     }
+}
+
+fn data_source_path_is_document_relative(path: &str) -> bool {
+    let path = Path::new(path);
+    !path.is_absolute()
+        && path.components().all(|component| {
+            !matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+}
+
+fn data_source_resolves_outside_base(base: &Path, path: &Path) -> bool {
+    let Ok(base) = fs::canonicalize(base) else {
+        return false;
+    };
+    let Ok(path) = fs::canonicalize(path) else {
+        return false;
+    };
+    !path.starts_with(base)
+}
+
+fn data_source_path_diagnostic(root_file: &str, path: &str) -> DocumentDiagnostic {
+    diag(
+        "error",
+        format!("Data source path must stay relative to the document folder: {path}"),
+        Some(root_file.to_string()),
+        None,
+        Some("Use a relative child path such as data/accounts.csv."),
+    )
 }
 
 pub(crate) fn strip_front_matter(text: &str) -> String {

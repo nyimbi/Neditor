@@ -2013,6 +2013,17 @@ Local verification runner verification:
 | `pnpm run test:unit` | Pass | 15 frontend unit tests passed after adding package-script coverage for `verify:local` and `verify:local:full`. |
 | `git diff --check` | Pass | No whitespace errors after adding the local verification runner. |
 
+Front matter data-source boundary verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_core_tests --lib` in `src-tauri` | Pass | 24 compiler core tests passed after blocking unsafe front matter data-source imports. New coverage proves absolute paths, `..` parent-directory escapes, and Unix symlink escapes are rejected before reading files outside the document folder, while safe sibling data sources still render. |
+| `cargo test --locked front_matter_data_sources_survive_cross_target_exports --lib` in `src-tauri` | Pass | Existing cross-target data-source export proof still passes for CSV, TSV, JSON, and YAML front matter data sources after the path-boundary guard. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the front matter data-source boundary update. |
+| `pnpm run verify:local` | Pass | The quick local verification baseline passed after the data-source boundary update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the Markdown extension docs, matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the data-source boundary update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

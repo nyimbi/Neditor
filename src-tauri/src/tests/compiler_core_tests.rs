@@ -504,6 +504,93 @@ fn compiler_reports_malformed_front_matter_data_sources() {
 }
 
 #[test]
+fn compiler_blocks_data_sources_outside_document_folder() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-unsafe-data-source-{unique}"));
+    fs::create_dir_all(root.join("docs")).expect("create unsafe data source dir");
+    fs::write(root.join("secrets.csv"), "Key,Value\nToken,secret\n")
+        .expect("write outside data source");
+    fs::write(root.join("docs").join("safe.csv"), "Key,Value\nPublic,ok\n")
+        .expect("write safe data source");
+
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Unsafe Data Sources\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Parent escape\n    path: ../secrets.csv\n    type: csv\n  - name: Absolute escape\n    path: /tmp/neditor-secret.csv\n    type: csv\n  - name: Safe data\n    path: safe.csv\n    type: csv\n---\n# Unsafe Data Sources\n".to_string(),
+        file_path: Some(path_to_string(&root.join("docs").join("report.md"))),
+    });
+
+    let path_errors = response
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic.severity == "error"
+                && diagnostic
+                    .message
+                    .contains("Data source path must stay relative")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(path_errors.len(), 2, "{:#?}", response.diagnostics);
+    assert!(path_errors
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("../secrets.csv")));
+    assert!(path_errors
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("/tmp/neditor-secret.csv")));
+    assert!(response.html.contains("Data Source: Safe data"));
+    assert!(response.html.contains("<td>Public</td>"));
+    assert!(!response.html.contains("Token"));
+    assert!(response
+        .include_graph
+        .iter()
+        .any(|edge| edge.child.ends_with("docs/safe.csv")));
+    assert!(!response
+        .include_graph
+        .iter()
+        .any(|edge| edge.child.ends_with("secrets.csv")));
+
+    fs::remove_dir_all(root).expect("clean unsafe data source test dir");
+}
+
+#[cfg(unix)]
+#[test]
+fn compiler_blocks_symlinked_data_sources_outside_document_folder() {
+    use std::os::unix::fs::symlink;
+
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-symlink-data-source-{unique}"));
+    fs::create_dir_all(root.join("docs").join("data")).expect("create symlink data source dir");
+    fs::write(root.join("secrets.csv"), "Key,Value\nToken,secret\n")
+        .expect("write symlink target data source");
+    symlink(
+        root.join("secrets.csv"),
+        root.join("docs").join("data").join("outside.csv"),
+    )
+    .expect("create data source symlink");
+
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Symlink Data Source\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Linked outside\n    path: data/outside.csv\n    type: csv\n---\n# Symlink Data Source\n".to_string(),
+        file_path: Some(path_to_string(&root.join("docs").join("report.md"))),
+    });
+
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.severity == "error"
+            && diagnostic
+                .message
+                .contains("Data source path must stay relative")
+            && diagnostic.message.contains("data/outside.csv")
+    }));
+    assert!(!response.html.contains("Token"));
+    assert!(response.include_graph.is_empty());
+
+    fs::remove_dir_all(root).expect("clean symlink data source test dir");
+}
+
+#[test]
 fn compiler_honors_toc_depth_and_numbering() {
     let response = compile(CompileRequest {
             text: "---\ntitle: TOC\nstatus: approved\napprovedBy: QA\ntoc: true\ntocDepth: 2\ntocNumbered: true\n---\n# Alpha\n## Beta\n### Gamma\n## Delta\n".to_string(),
