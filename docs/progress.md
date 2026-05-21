@@ -235,6 +235,11 @@ Recent pushed checkpoints visible in current git history:
   command bar, workspace, sidebar, Markdown source, live preview, and status
   bar programmatically focusable skip targets, extends `pnpm run check:a11y` to
   guard those targets, and adds a Playwright workflow for skip-link focus.
+- This update adds modal focus management for the AI paste, command palette,
+  and external-conflict dialogs: initial focus, edge Tab trapping, Escape close,
+  and focus return to the invoking control. The static accessibility guard now
+  requires dialog focusability and keyboard handling, and the browser harness
+  lists a modal focus/Escape workflow.
 - This update adds
   `performance_tests::compiler_stress_handles_large_documents_with_many_artifacts`,
   which stress-compiles a large Markdown source with nested includes, many
@@ -1532,6 +1537,16 @@ Keyboard skip-link accessibility verification:
 | `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the accessibility update. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery now lists 39 Chromium workflow tests, including `exposes keyboard skip links to primary workbench regions`. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "skip links" --project chromium` | Blocked locally | The Vite server started, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence used. |
+
+Modal focus accessibility verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails now verify accessible controls, dialog labels/modal state, dialog focusability/keyboard handling, and required skip-link targets. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding modal focus/Tab/Escape handling. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the modal focus update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery now lists 40 Chromium workflow tests, including `manages modal focus and Escape return paths`. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "modal focus" --project chromium` | Blocked locally | The Vite server started, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence used. |
 
 ## Next Execution Order
 

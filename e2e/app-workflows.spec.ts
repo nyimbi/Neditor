@@ -1228,6 +1228,26 @@ test("exposes keyboard skip links to primary workbench regions", async ({ page }
   }
 });
 
+test("manages modal focus and Escape return paths", async ({ page }) => {
+  const aiPasteButton = page.getByRole("button", { name: "AI Paste" });
+  await aiPasteButton.click();
+  const aiDialog = page.getByRole("dialog", { name: "AI paste cleanup" });
+  await expect(aiDialog).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Original" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(aiDialog).toBeHidden();
+  await expect(aiPasteButton).toBeFocused();
+
+  const commandsButton = page.getByRole("button", { name: "Commands" });
+  await commandsButton.click();
+  const commandDialog = page.getByRole("dialog", { name: "Command palette" });
+  await expect(commandDialog).toBeVisible();
+  await expect(page.getByLabel("Search commands, headings, citations, glossary, and index terms")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(commandDialog).toBeHidden();
+  await expect(commandsButton).toBeFocused();
+});
+
 test("syncs editor and preview scrolling and jumps preview headings to source", async ({ page }) => {
   const longPreviewDocument = [
     "---",

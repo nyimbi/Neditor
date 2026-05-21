@@ -1030,7 +1030,16 @@
       <span v-if="store.lastError" class="error">{{ store.lastError }}</span>
     </footer>
 
-    <section v-if="aiPasteOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="AI paste cleanup">
+    <section
+      v-if="aiPasteOpen"
+      ref="aiPasteDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="AI paste cleanup"
+      tabindex="-1"
+      @keydown="handleModalKeydown('ai-paste', $event)"
+    >
       <form class="modal" @submit.prevent="cleanAiPaste">
         <header>
           <h2>Paste from AI Chat</h2>
@@ -1039,7 +1048,7 @@
         <section class="compare-grid ai-paste-grid">
           <label>
             Original
-            <textarea v-model="aiPasteText" rows="12" placeholder="Paste AI chat output here"></textarea>
+            <textarea v-model="aiPasteText" rows="12" placeholder="Paste AI chat output here" data-initial-focus></textarea>
           </label>
           <label>
             Cleaned preview
@@ -1076,13 +1085,22 @@
       </form>
     </section>
 
-    <section v-if="commandPaletteOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Command palette">
+    <section
+      v-if="commandPaletteOpen"
+      ref="commandPaletteDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
+      tabindex="-1"
+      @keydown="handleModalKeydown('command-palette', $event)"
+    >
       <div class="modal command-modal">
         <header>
           <h2>Command Palette</h2>
-          <button type="button" aria-label="Close command palette" @click="commandPaletteOpen = false">x</button>
+          <button type="button" aria-label="Close command palette" @click="closeCommandPalette">x</button>
         </header>
-        <input v-model="commandQuery" autofocus aria-label="Search commands, headings, citations, glossary, and index terms" placeholder="Search commands, headings, citations, glossary, index terms" />
+        <input v-model="commandQuery" autofocus data-initial-focus aria-label="Search commands, headings, citations, glossary, and index terms" placeholder="Search commands, headings, citations, glossary, index terms" />
         <button
           v-for="command in filteredCommands"
           :key="command.name"
@@ -1096,11 +1114,20 @@
       </div>
     </section>
 
-    <section v-if="conflictOpen && store.externalConflict" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="External file conflict">
+    <section
+      v-if="conflictOpen && store.externalConflict"
+      ref="conflictDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="External file conflict"
+      tabindex="-1"
+      @keydown="handleModalKeydown('conflict', $event)"
+    >
       <div class="modal conflict-modal">
         <header>
           <h2>External Changes</h2>
-          <button type="button" aria-label="Close external file conflict" @click="conflictOpen = false">x</button>
+          <button type="button" aria-label="Close external file conflict" @click="closeConflictDialog">x</button>
         </header>
         <p>{{ store.externalConflict.message }}</p>
         <p class="conflict-path">{{ store.externalConflict.path }}</p>
@@ -1171,9 +1198,9 @@
           </article>
         </section>
         <footer>
-          <button type="button" @click="store.keepLocalChanges(); conflictOpen = false">Keep local</button>
+          <button type="button" @click="store.keepLocalChanges(); closeConflictDialog()">Keep local</button>
           <button type="button" @click="saveConflictCopy">Save copy</button>
-          <button type="button" @click="store.acceptExternalChanges(); conflictOpen = false">Accept external</button>
+          <button type="button" @click="store.acceptExternalChanges(); closeConflictDialog()">Accept external</button>
         </footer>
       </div>
     </section>
@@ -1230,6 +1257,9 @@ const appWindow = getCurrentWindow();
 const editorHost = ref<HTMLElement | null>(null);
 const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
+const aiPasteDialog = ref<HTMLElement | null>(null);
+const commandPaletteDialog = ref<HTMLElement | null>(null);
+const conflictDialog = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
 const previewTextCommit = createDebouncedTextCommit((text) => store.updateText(text), {
   setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
@@ -1241,6 +1271,7 @@ let scrollPersistHandle = 0;
 let lastAutoSnapshotSignature = "";
 let syncingScroll = false;
 let restoringScroll = false;
+let modalReturnFocus: HTMLElement | null = null;
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
 const aiInsertMode = ref<"insert" | "quote" | "replace" | "appendix" | "selection" | "section">("insert");
@@ -1834,6 +1865,10 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleShortcut);
   stopPaneResize();
 });
+
+watch(aiPasteOpen, (open) => handleModalStateChange(open, aiPasteDialog));
+watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteDialog));
+watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
 
 watch(
   () => active.value.id,
@@ -2528,6 +2563,93 @@ function focusSkipTarget(event: Event) {
   target.focus({ preventScroll: true });
 }
 
+async function handleModalStateChange(open: boolean, dialogRef: { value: HTMLElement | null }) {
+  if (open) {
+    modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    await nextTick();
+    focusFirstModalControl(dialogRef.value);
+  } else {
+    restoreModalFocus();
+  }
+}
+
+function focusFirstModalControl(dialog: HTMLElement | null) {
+  if (!dialog) return;
+  const initial = dialog.querySelector<HTMLElement>("[data-initial-focus]");
+  const target = initial || modalFocusableElements(dialog)[0] || dialog;
+  target.focus({ preventScroll: true });
+}
+
+function modalFocusableElements(dialog: HTMLElement) {
+  return Array.from(
+    dialog.querySelectorAll<HTMLElement>(
+      [
+        "a[href]",
+        "button:not([disabled])",
+        "input:not([disabled])",
+        "select:not([disabled])",
+        "textarea:not([disabled])",
+        "[tabindex]:not([tabindex='-1'])",
+      ].join(","),
+    ),
+  ).filter((element) => !element.hasAttribute("disabled") && element.offsetParent !== null);
+}
+
+function restoreModalFocus() {
+  const target = modalReturnFocus;
+  modalReturnFocus = null;
+  if (target?.isConnected) {
+    target.focus({ preventScroll: true });
+  } else {
+    editorView?.focus();
+  }
+}
+
+function handleModalKeydown(kind: "ai-paste" | "command-palette" | "conflict", event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeModal(kind);
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const dialog = event.currentTarget as HTMLElement;
+  const focusable = modalFocusableElements(dialog);
+  if (!focusable.length) {
+    event.preventDefault();
+    dialog.focus({ preventScroll: true });
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const activeElement = document.activeElement;
+  if (event.shiftKey && activeElement === first) {
+    event.preventDefault();
+    last.focus({ preventScroll: true });
+  } else if (!event.shiftKey && activeElement === last) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+  }
+}
+
+function closeModal(kind: "ai-paste" | "command-palette" | "conflict") {
+  if (kind === "ai-paste") {
+    closeAiPaste();
+  } else if (kind === "command-palette") {
+    closeCommandPalette();
+  } else {
+    closeConflictDialog();
+  }
+}
+
+function closeCommandPalette() {
+  commandPaletteOpen.value = false;
+  commandQuery.value = "";
+}
+
+function closeConflictDialog() {
+  conflictOpen.value = false;
+}
+
 function runEditorCommand(command: (view: EditorView) => boolean) {
   if (!editorView) return;
   command(editorView);
@@ -2915,7 +3037,7 @@ async function saveConflictCopy() {
   });
   if (path) {
     await store.saveLocalConflictCopy(path);
-    conflictOpen.value = false;
+    closeConflictDialog();
   }
 }
 
@@ -2953,7 +3075,7 @@ function moveConflictLine(id: string, direction: -1 | 1) {
 async function applyConflictMerge() {
   await store.applyConflictMerge(mergedConflictText.value);
   conflictMergeParts.value = [];
-  conflictOpen.value = false;
+  closeConflictDialog();
 }
 
 function flushEditorTextToStore() {
@@ -3158,8 +3280,7 @@ function aiCleanupSignature() {
 
 function runCommand(run: () => unknown) {
   run();
-  commandPaletteOpen.value = false;
-  commandQuery.value = "";
+  closeCommandPalette();
 }
 
 function insertReviewComment() {

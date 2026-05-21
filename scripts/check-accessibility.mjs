@@ -67,6 +67,12 @@ function checkDialogs() {
     if (!hasAccessibleName(attrs)) {
       issues.push(`${sourcePath}:${lineFor(match.index)} dialog needs aria-label or aria-labelledby`);
     }
+    if (!/\btabindex\s*=\s*["']-1["']/.test(attrs)) {
+      issues.push(`${sourcePath}:${lineFor(match.index)} dialog must be programmatically focusable`);
+    }
+    if (!/@keydown\s*=/.test(attrs)) {
+      issues.push(`${sourcePath}:${lineFor(match.index)} dialog must handle keyboard focus trapping and Escape`);
+    }
   }
 }
 

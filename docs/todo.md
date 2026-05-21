@@ -1271,20 +1271,25 @@ Status: partial automated guard exists; full accessibility audit remains open.
 Current evidence:
 
 - `pnpm run check:a11y` checks `src/App.vue` for accessible button names,
-  form-control labels, dialog labels/modal state, and required skip-link
-  targets.
+  form-control labels, dialog labels/modal state, dialog focusability/keyboard
+  handling, and required skip-link targets.
 - Modal close buttons, command-palette search, and conflict merge-line controls
   now have explicit labels exposed to assistive technology.
 - The workbench now exposes visible-on-focus skip links to the command bar,
   workspace, sidebar, Markdown source, live preview, and status bar. Each
   target is programmatically focusable, and the browser workflow harness now
   lists a skip-link focus test for those primary regions.
+- AI paste, command palette, and external-conflict dialogs now receive initial
+  focus, trap Tab at the dialog edge, close on Escape, and restore focus to the
+  invoking control. Browser harness discovery now lists a modal focus/Escape
+  return workflow.
 
 Finish:
 
 - Complete keyboard-only navigation through tabs, modals, command palette,
   table editor, conflict UI, and deeper editor/preview interactions.
-- Focus management in all modals.
+- Run modal focus workflows on a host with Playwright Chromium installed, then
+  broaden coverage for nested conflict/table-editor controls.
 - ARIA labels and roles for custom controls.
 - High contrast and reduced motion behavior.
 - Screen-reader labels for diagnostics, status messages, table cells, conflict
