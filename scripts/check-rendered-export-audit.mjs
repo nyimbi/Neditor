@@ -217,6 +217,27 @@ function collectViewerProof(issues, assertions) {
     "rss-item.xml",
     "manifest.json",
   ]);
+  assertContains(assertions, issues, "blog-metadata", readZipEntryText(blog, "metadata.json"), [
+    "\"exportTarget\": \"blog\"",
+    "\"ready\": true",
+    "\"slug\": \"rendered-export-audit\"",
+    "\"status\": \"approved\"",
+  ]);
+  assertContains(assertions, issues, "blog-post", readZipEntryText(blog, "post.html"), [
+    "Rendered Export Audit",
+    "Control summary",
+    "Architecture diagram",
+    "Rendered artifact audit passed",
+  ]);
+  assertContains(assertions, issues, "blog-text-fallback", readZipEntryText(blog, "post.txt"), [
+    "Review Comments",
+    "AI Provenance",
+    "Legal Disclaimer",
+  ]);
+  assertContains(assertions, issues, "blog-rss", readZipEntryText(blog, "rss-item.xml"), [
+    "<title>Rendered Export Audit</title>",
+    "<description>Board package</description>",
+  ]);
 
   const substack = join(auditDir, "rendered-export-audit.substack.zip");
   assertEntries(assertions, issues, "substack-package", listZipEntries(substack), [
@@ -227,9 +248,36 @@ function collectViewerProof(issues, assertions) {
     "metadata.json",
     "manifest.json",
   ]);
+  assertContains(assertions, issues, "substack-metadata", readZipEntryText(substack, "metadata.json"), [
+    "\"exportTarget\": \"substack\"",
+    "\"ready\": true",
+    "\"slug\": \"rendered-export-audit\"",
+  ]);
+  assertContains(assertions, issues, "substack-copy", readZipEntryText(substack, "substack-copy.html"), [
+    "<article>",
+    "Rendered Export Audit",
+    "Control summary",
+    "Architecture diagram",
+    "Rendered artifact audit passed",
+  ]);
+  assertContains(assertions, issues, "substack-text-fallback", readZipEntryText(substack, "post.txt"), [
+    "Review Comments",
+    "AI Provenance",
+    "Legal Disclaimer",
+  ]);
+
+  assertContains(assertions, issues, "latex-source", readTextArtifact("rendered-export-audit.tex"), [
+    "\\documentclass[11pt]{article}",
+    "\\title{Rendered Export Audit}",
+    "\\author{Release QA}",
+    "\\caption{Control summary}\\label{tbl:controls}",
+    "\\label{fig:architecture}",
+    "\\subsection*{AI Provenance}",
+  ]);
 
   const googleDocs = join(auditDir, "rendered-export-audit.google-docs.zip");
-  assertEntries(assertions, issues, "google-docs-package", listZipEntries(googleDocs), [
+  const googleDocsEntries = readZipEntries(googleDocs);
+  assertEntries(assertions, issues, "google-docs-package", Array.from(googleDocsEntries.keys()), [
     "document.docx",
     "document.html",
     "document.md",
@@ -241,6 +289,31 @@ function collectViewerProof(issues, assertions) {
   assertContains(assertions, issues, "google-docs-html", readZipEntryText(googleDocs, "document.html"), [
     "Rendered Export Audit",
     "Control summary",
+    "AI Provenance",
+  ]);
+  assertContains(assertions, issues, "google-docs-metadata", readZipEntryText(googleDocs, "metadata.json"), [
+    "\"exportTarget\": \"google-docs\"",
+    "\"ready\": true",
+    "\"importHint\": \"Upload document.docx to Google Docs",
+    "\"version\": \"3.1.4\"",
+  ]);
+  assertContains(assertions, issues, "google-docs-readme", readZipEntryText(googleDocs, "README.md"), [
+    "primary file to upload or convert in Google Docs",
+    "document.docx",
+    "manifest.json",
+  ]);
+  const googleDocsDocx = googleDocsEntries.get("document.docx");
+  assertEntries(assertions, issues, "google-docs-docx-package", listZipBufferEntries(googleDocsDocx), [
+    "word/document.xml",
+    "word/header1.xml",
+    "word/footer1.xml",
+    "docProps/core.xml",
+    "docProps/custom.xml",
+  ]);
+  assertContains(assertions, issues, "google-docs-docx-document", readZipBufferEntryText(googleDocsDocx, "word/document.xml"), [
+    "Rendered Export Audit",
+    "Control summary",
+    "Architecture diagram",
     "AI Provenance",
   ]);
 }
@@ -270,6 +343,10 @@ function listZipEntries(path) {
   return Array.from(readZipEntries(path).keys());
 }
 
+function listZipBufferEntries(buffer) {
+  return Array.from(readZipEntries(buffer).keys());
+}
+
 function readZipEntryText(path, entryName) {
   const entries = readZipEntries(path);
   const entry = entries.get(entryName);
@@ -277,8 +354,15 @@ function readZipEntryText(path, entryName) {
   return entry.toString("utf8");
 }
 
-function readZipEntries(path) {
-  const buffer = readFileSync(path);
+function readZipBufferEntryText(buffer, entryName) {
+  const entries = readZipEntries(buffer);
+  const entry = entries.get(entryName);
+  if (!entry) throw new Error(`missing ZIP entry ${entryName} in nested ZIP`);
+  return entry.toString("utf8");
+}
+
+function readZipEntries(pathOrBuffer) {
+  const buffer = Buffer.isBuffer(pathOrBuffer) ? pathOrBuffer : readFileSync(pathOrBuffer);
   const entries = new Map();
   let offset = 0;
   while (offset + 30 <= buffer.length) {

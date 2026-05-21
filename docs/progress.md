@@ -93,6 +93,10 @@ Recent pushed checkpoints visible in current git history:
   test:tauri-webdriver` now writes `.tmp/desktop-webdriver/report.json` with
   dependency and assertion evidence on Windows/Linux, or the official macOS
   unsupported-platform reason plus the launch-smoke fallback.
+- This update deepens rendered export handoff proof. `pnpm run
+  test:rendered-exports` now asserts blog/Substack metadata and copy artifacts,
+  LaTeX source structure, Google Docs import metadata, and the nested DOCX
+  package inside the Google Docs handoff ZIP.
 - This update makes browser workflow execution current-host evidence instead
   of stale archived evidence. `pnpm run test:e2e` now uses the project-local
   Playwright browser cache and passes all 42 Chromium workbench workflows
@@ -651,7 +655,7 @@ Current verification recorded on 2026-05-21:
 | `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | 8 file command tests passed, including `reveal_command_for_existing_path_is_platform_specific_and_argument_safe`. |
 | `cargo test --locked desktop_native_command_workflow_smoke --lib` in `src-tauri` | Pass | Native command workflow smoke passed against real local files and direct export outputs. |
 | `cargo test --locked representative_rendered_export_artifacts_are_package_inspectable --lib` in `src-tauri` | Pass | Representative rendered/package export audit passed across HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package evidence. |
-| `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes, a manual checklist report, `viewer-proof.json` executable viewer/package assertions, and a `pdflatex` compile proof on this host. |
+| `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes, a manual checklist report, `viewer-proof.json` executable viewer/package assertions, publishing handoff metadata checks, LaTeX source checks, nested Google Docs DOCX checks, and a `pdflatex` compile proof on this host. |
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |

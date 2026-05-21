@@ -965,7 +965,9 @@ Current evidence:
   Markdown bundle, blog package, Substack package, LaTeX, and Google Docs
   package artifacts under `.tmp/rendered-export-audit`, plus a JSON report with
   hashes, a manual visual-review checklist, and `viewer-proof.json` with
-  executable HTML/PDF/DOCX/PPTX/package assertions. When `pdflatex` is
+  executable HTML/PDF/DOCX/PPTX/package assertions, blog/Substack metadata and
+  copy artifact assertions, LaTeX source assertions, Google Docs import metadata
+  assertions, and nested Google Docs DOCX package assertions. When `pdflatex` is
   installed, it also compiles the generated LaTeX artifact into
   `.tmp/rendered-export-audit/latex-compile/rendered-export-audit.pdf`.
 

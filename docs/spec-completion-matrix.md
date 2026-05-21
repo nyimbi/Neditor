@@ -268,8 +268,10 @@ Current major verification gaps:
   LaTeX source, and Google Docs packages.
   `pnpm run test:rendered-exports` also writes reviewable artifacts, a manual
   checklist, and executable viewer/package proof under
-  `.tmp/rendered-export-audit`; broader native viewer/platform manual QA remains
-  under-proven.
+  `.tmp/rendered-export-audit`; that proof now includes publishing handoff
+  metadata checks, LaTeX source checks, Google Docs import metadata, and nested
+  Google Docs DOCX package checks. Broader native viewer/platform manual QA
+  remains under-proven.
 - Optional external transform engine evidence now includes current macOS
   Graphviz/DOT variants, D2, and PlantUML proof via `pnpm run check:engines`
   and `.tmp/external-engines/probe-report.json`; macOS Pikchr and Windows
