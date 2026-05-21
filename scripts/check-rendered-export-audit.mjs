@@ -158,6 +158,13 @@ writeFileSync(
   join(auditDir, "viewer-proof.json"),
   `${JSON.stringify({ generatedAt: new Date().toISOString(), assertions: viewerProof }, null, 2)}\n`,
 );
+writeManualReviewDashboard(auditReport, viewerProof);
+verifyManualReviewDashboard(issues);
+if (issues.length > 0) {
+  console.error("Rendered export audit failed:");
+  for (const issue of issues) console.error(`- ${issue}`);
+  process.exit(1);
+}
 console.log(`Rendered export audit artifacts verified in ${auditDir}`);
 
 function collectViewerProof(issues, assertions) {
@@ -491,6 +498,123 @@ function collectMacTextutilProof(issues, assertions) {
   ]);
 }
 
+function writeManualReviewDashboard(report, assertions) {
+  const generatedAt = new Date().toISOString();
+  const primaryTargets = (report.targets || [])
+    .map((target) => targetRow(target))
+    .join("\n");
+  const reviewCases = (report.reviewCases || [])
+    .map((reviewCase) => {
+      const targets = (reviewCase.targets || [])
+        .map((target) => targetRow(target))
+        .join("\n");
+      const evidence = (reviewCase.requiredEvidence || [])
+        .map((item) => `<li><code>${escapeHtml(item)}</code></li>`)
+        .join("\n");
+      return `<section class="review-case">
+  <h3>${escapeHtml(reviewCase.title || reviewCase.slug)}</h3>
+  <p><code>${escapeHtml(reviewCase.slug || "")}</code></p>
+  <h4>Required Evidence</h4>
+  <ul>${evidence}</ul>
+  <table>
+    <thead><tr><th>Target</th><th>Artifact</th><th>Bytes</th><th>SHA-256</th></tr></thead>
+    <tbody>${targets}</tbody>
+  </table>
+</section>`;
+    })
+    .join("\n");
+  const checklist = (report.manualChecklist || [])
+    .map((item, index) => `<li><label><input type="checkbox"> <strong>${index + 1}.</strong> ${escapeHtml(item)}</label></li>`)
+    .join("\n");
+  const proofRows = assertions
+    .map((assertion) => {
+      const state = assertion.skipped ? "skipped" : assertion.passed ? "passed" : "failed";
+      const detail = assertion.reason || assertion.thumbnail || assertion.stderr || "";
+      return `<tr class="${state}"><td>${escapeHtml(assertion.scope || "")}</td><td>${escapeHtml(assertion.assertion || "")}</td><td>${state}</td><td>${escapeHtml(String(detail || ""))}</td></tr>`;
+    })
+    .join("\n");
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rendered Export Manual Review</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.5; margin: 2rem; color: #1f2933; }
+    h1, h2, h3 { line-height: 1.2; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0 2rem; }
+    th, td { border: 1px solid #cbd5df; padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+    th { background: #edf2f7; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
+    .passed td { background: #eef8ef; }
+    .failed td { background: #fff1f1; }
+    .skipped td { background: #fff8e5; }
+    .review-case { border-top: 2px solid #d9e2ec; padding-top: 1rem; }
+    .hash { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>Rendered Export Manual Review</h1>
+  <p>Generated ${escapeHtml(generatedAt)} by <code>pnpm run test:rendered-exports</code>.</p>
+  <p>This dashboard is a human-review entry point for the generated export package. Open each linked artifact in the relevant native viewer, then use the checklist and proof table below to record manual QA results outside this file if needed.</p>
+
+  <h2>Primary Artifacts</h2>
+  <table>
+    <thead><tr><th>Target</th><th>Artifact</th><th>Bytes</th><th>SHA-256</th></tr></thead>
+    <tbody>${primaryTargets}</tbody>
+  </table>
+
+  <h2>Manual Checklist</h2>
+  <ol>${checklist}</ol>
+
+  <h2>Review Cases</h2>
+  ${reviewCases}
+
+  <h2>Executable Viewer And Package Proof</h2>
+  <table>
+    <thead><tr><th>Scope</th><th>Assertion</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>${proofRows}</tbody>
+  </table>
+</body>
+</html>
+`;
+  writeFileSync(join(auditDir, "manual-review.html"), html);
+}
+
+function verifyManualReviewDashboard(issues) {
+  const path = join(auditDir, "manual-review.html");
+  if (!existsSync(path)) {
+    issues.push("manual-review.html was not generated");
+    return;
+  }
+  if (statSync(path).size < 5000) {
+    issues.push(`manual-review.html is unexpectedly small: ${statSync(path).size} bytes`);
+    return;
+  }
+  const html = readFileSync(path, "utf8");
+  for (const expected of [
+    "Rendered Export Manual Review",
+    "rendered-export-audit.pdf",
+    "rendered-export-audit.google-docs.zip",
+    "review-cases/rich-blocks/rich-blocks.html",
+    "review-cases/option-heavy/option-heavy.html",
+    "Executable Viewer And Package Proof",
+    "macos-quicklook-pdf",
+  ]) {
+    if (!html.includes(expected)) {
+      issues.push(`manual-review.html is missing expected content: ${expected}`);
+    }
+  }
+}
+
+function targetRow(target) {
+  const path = escapeHtml(target.path || "");
+  const targetName = escapeHtml(target.target || "");
+  const bytes = Number(target.bytes || 0).toLocaleString("en-US");
+  const hash = escapeHtml(target.sha256 || "");
+  return `<tr><td>${targetName}</td><td><a href="${path}">${path}</a></td><td>${bytes}</td><td class="hash"><code>${hash}</code></td></tr>`;
+}
+
 function readTextArtifact(file) {
   return readFileSync(join(auditDir, file), "utf8");
 }
@@ -561,6 +685,14 @@ function readZipEntries(pathOrBuffer) {
 
 function relativeToAudit(path) {
   return path.startsWith(auditDir) ? path.slice(auditDir.length + 1) : path;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function unzipEntryData(method, data, name) {
