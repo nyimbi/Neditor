@@ -9,8 +9,8 @@ It keeps the speed and readability of Markdown, then adds the things business
 documents usually force into office suites: structured metadata, includes,
 tables, calculations, citations, diagrams, review comments, release status,
 brand-aware exports, and reproducible export manifests. Your source stays local
-and inspectable. The app helps turn it into polished HTML, PDF, DOCX, PPTX, or
-Markdown bundle outputs.
+and inspectable. The app helps turn it into polished HTML, PDF, DOCX, PPTX,
+Markdown bundle, blog, or Substack package outputs.
 
 ![NEditor workbench showing Markdown source, live preview, outline, diagnostics, and status](docs/screenshots/workbench.svg)
 
@@ -152,6 +152,8 @@ preview HTML as the only source of truth.
 | DOCX | Word-compatible client deliverables | Document structure, paragraphs, tables, comments/provenance appendices, manifests |
 | PPTX | Presentation-style summaries and executive decks | Slide packaging, agenda option, table splitting, manifest sidecars |
 | Markdown bundle | Portable source handoff | Source document plus manifest and packaged evidence |
+| Blog package | Blog publishing handoff | Copy-ready Markdown, HTML, text, metadata, RSS seed, assets, and manifest |
+| Substack package | Substack publishing handoff | Substack copy HTML, Markdown, text, metadata, RSS seed, assets, and manifest |
 
 Export defaults include manifests, styles, syntax highlighting, cover page, page
 numbers, layout preset, comments appendix, AI provenance appendix, glossary

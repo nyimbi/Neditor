@@ -38,3 +38,6 @@ pub(crate) use pptx::render_pptx_bytes;
 
 mod bundle;
 pub(crate) use bundle::render_markdown_bundle_bytes;
+
+mod blog;
+pub(crate) use blog::render_blog_publish_package_bytes;

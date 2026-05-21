@@ -72,7 +72,7 @@
       <button type="button" @click="renameDocument">Rename</button>
       <button type="button" @click="duplicateDocument">Duplicate</button>
       <button type="button" @click="store.revealActive">Reveal</button>
-      <button type="button" @click="store.snapshotActive()">Snapshot</button>
+      <button type="button" @click="snapshotActive">Snapshot</button>
       <button type="button" :disabled="store.exportBusy" @click="exportDocument">Export</button>
       <button type="button" @click="openAiPaste">AI Paste</button>
       <button type="button" @click="commandPaletteOpen = true">Commands</button>
@@ -594,6 +594,8 @@
               <option value="docx">DOCX</option>
               <option value="pptx">PPTX</option>
               <option value="markdown-bundle">Markdown bundle</option>
+              <option value="blog">Blog package</option>
+              <option value="substack">Substack package</option>
             </select>
           </label>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
@@ -613,7 +615,7 @@
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
           <label><input v-model="store.exportDefaults.includeAgenda" type="checkbox" /> PPTX agenda</label>
-          <button type="button" :disabled="store.exportBusy" @click="store.prepareForExport">Prepare for export</button>
+          <button type="button" :disabled="store.exportBusy" @click="prepareForExport">Prepare for export</button>
           <button type="button" :disabled="store.exportBusy" @click="exportDocument">Export document</button>
           <article v-if="store.exportReadiness" class="readiness" :class="{ ready: store.exportReadiness.ready }">
             <strong>{{ store.exportReadiness.ready ? "Ready" : "Needs attention" }}</strong>
@@ -684,7 +686,7 @@
             <p>{{ snapshot.label || "snapshot" }}</p>
             <small>{{ snapshot.created_at || snapshot.snapshot_path }}</small>
             <small>{{ snapshot.document_version || "unversioned" }} | {{ snapshot.status || "unknown" }} | {{ snapshot.author || "unknown author" }}</small>
-            <button type="button" @click="store.restoreSnapshot(snapshot.snapshot_path)">Restore</button>
+            <button type="button" @click="restoreSnapshot(snapshot.snapshot_path)">Restore</button>
           </article>
         </template>
 
@@ -715,13 +717,13 @@
             <button type="button" @click="store.restoreGitRevision(entry.revision)">Restore</button>
           </article>
           <h3>Snapshots</h3>
-          <button type="button" @click="store.snapshotActive()">Create snapshot</button>
+          <button type="button" @click="snapshotActive">Create snapshot</button>
           <button type="button" @click="store.listSnapshots">Refresh snapshots</button>
           <article v-for="snapshot in store.snapshots" :key="`version-${snapshot.snapshot_path}`" class="snapshot-row">
             <p>{{ snapshot.label || "snapshot" }}</p>
             <small>{{ snapshot.created_at || snapshot.snapshot_path }}</small>
             <small>{{ snapshot.document_version || "unversioned" }} | {{ snapshot.status || "unknown" }} | {{ snapshot.author || "unknown author" }}</small>
-            <button type="button" @click="store.restoreSnapshot(snapshot.snapshot_path)">Restore snapshot</button>
+            <button type="button" @click="restoreSnapshot(snapshot.snapshot_path)">Restore snapshot</button>
           </article>
         </template>
 
@@ -1854,9 +1856,9 @@ const commands = computed(() => [
   { name: "Revert to saved", group: "File", run: () => void store.revertActive() },
   { name: "Rename document", group: "File", run: () => void renameDocument() },
   { name: "Duplicate document", group: "File", run: () => void duplicateDocument() },
-  { name: "Prepare for export", group: "Export", run: () => void store.prepareForExport() },
+  { name: "Prepare for export", group: "Export", run: () => void prepareForExport() },
   { name: "Export document", group: "Export", run: () => void exportDocument() },
-  { name: "Create snapshot", group: "Versioning", run: () => void store.snapshotActive() },
+  { name: "Create snapshot", group: "Versioning", run: () => void snapshotActive() },
   { name: "Refresh Git diff", group: "Versioning", run: () => void store.refreshGitDiff() },
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
@@ -2212,6 +2214,7 @@ function editorExtensions() {
     ...(store.lineNumbers ? [lineNumbers()] : []),
     lintGutter(),
     history(),
+    EditorState.allowMultipleSelections.of(true),
     markdown(),
     linter(editorDiagnostics, { delay: 150 }),
     semanticEditorDecorations,
@@ -3246,8 +3249,7 @@ function flushEditorTextToStore() {
 
 async function exportDocument() {
   if (store.exportBusy) return;
-  flushEditorTextToStore();
-  await store.prepareForExport();
+  await prepareForExport();
   if (store.exportReadiness && store.exportReadiness.error_count > 0) {
     store.sidebar = "exports";
     store.statusMessage = `${store.exportReadiness.error_count} errors block export`;
@@ -3259,6 +3261,8 @@ async function exportDocument() {
     docx: "docx",
     pptx: "pptx",
     "markdown-bundle": "zip",
+    blog: "zip",
+    substack: "zip",
   };
   const extension = extensions[store.exportTarget];
   const path = await save({
@@ -3266,6 +3270,21 @@ async function exportDocument() {
     defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")}.${extension}`,
   });
   if (path) await store.exportActive(path);
+}
+
+async function prepareForExport() {
+  flushEditorTextToStore();
+  await store.prepareForExport();
+}
+
+async function snapshotActive() {
+  flushEditorTextToStore();
+  await store.snapshotActive();
+}
+
+async function restoreSnapshot(path: string) {
+  flushEditorTextToStore();
+  await store.restoreSnapshot(path);
 }
 
 async function cleanAiPaste() {
@@ -3437,9 +3456,10 @@ function aiCleanupSignature() {
   });
 }
 
-function runCommand(run: () => unknown) {
-  run();
+async function runCommand(run: () => unknown) {
   closeCommandPalette();
+  await nextTick();
+  run();
 }
 
 function insertReviewComment() {
@@ -3923,6 +3943,10 @@ async function goToSourceTarget(target: {
 }) {
   if (target.source_file && active.value.path && target.source_file !== active.value.path) {
     await store.openPath(target.source_file);
+    await nextTick();
+  }
+  if (["preview", "export", "presentation"].includes(store.mode)) {
+    store.mode = "split";
     await nextTick();
   }
   if (!editorView || !target.line) return;

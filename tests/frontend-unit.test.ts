@@ -382,5 +382,5 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts.build, "vue-tsc --noEmit && vite build");
   equal(scripts["test:desktop-smoke"], "node scripts/check-desktop-smoke.mjs");
   equal(scripts["test:unit"], "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js");
-  equal(scripts["test:e2e"], "playwright test");
+  equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
 });

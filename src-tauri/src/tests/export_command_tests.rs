@@ -99,6 +99,8 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
         ("docx", "docx"),
         ("pptx", "pptx"),
         ("markdown-bundle", "zip"),
+        ("blog", "zip"),
+        ("substack", "zip"),
     ] {
         let output_path = exports.join(format!("native-smoke.{extension}"));
         let response = export_document(ExportRequest {
@@ -132,6 +134,57 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
     assert!(!reveal.args.is_empty());
 
     fs::remove_dir_all(root).expect("clean desktop command smoke");
+}
+
+#[test]
+fn export_document_writes_blog_and_substack_publish_packages() {
+    let source = "---\ntitle: Board Notes\nsubtitle: Weekly operating summary\nslug: board-notes-weekly\nauthor: NEditor QA\ndate: 2026-05-21\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\ntags:\n  - strategy\n  - operations\ncanonicalUrl: https://example.com/board-notes\n---\n# Board Notes\n\nA copy-ready post with **business** context.\n".to_string();
+
+    for target in ["blog", "substack"] {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let output = std::env::temp_dir().join(format!("neditor-{target}-{unique}.zip"));
+        let response = export_document(ExportRequest {
+            text: source.clone(),
+            file_path: None,
+            target: target.to_string(),
+            output_path: path_to_string(&output),
+            options: json!({ "warnOnDirtyGit": false, "includeManifest": false }),
+        })
+        .unwrap_or_else(|error| panic!("{target} publish package export should pass: {error}"));
+        let bytes = fs::read(&output).expect("publish package bytes");
+
+        assert_eq!(response.manifest.export_target, target);
+        assert!(response.manifest_path.is_none());
+        assert!(zip_has_entry(&bytes, "post.md"));
+        assert!(zip_has_entry(&bytes, "post.html"));
+        assert!(zip_has_entry(&bytes, "substack-copy.html"));
+        assert!(zip_has_entry(&bytes, "post.txt"));
+        assert!(zip_has_entry(&bytes, "metadata.json"));
+        assert!(zip_has_entry(&bytes, "manifest.json"));
+        assert!(zip_has_entry(&bytes, "rss-item.xml"));
+        assert!(zip_has_entry(&bytes, "README.md"));
+
+        let metadata = zip_entry_text(&bytes, "metadata.json");
+        assert!(metadata.contains("\"slug\": \"board-notes-weekly\""));
+        assert!(metadata.contains("\"exportTarget\": "));
+        assert!(metadata.contains("\"strategy\""));
+        assert!(metadata.contains("https://example.com/board-notes"));
+        let copy_html = zip_entry_text(&bytes, "substack-copy.html");
+        assert!(copy_html.contains("<h1>Board Notes</h1>"));
+        assert!(copy_html.contains("<strong>business</strong>"));
+        let manifest = zip_entry_text(&bytes, "manifest.json");
+        assert!(manifest.contains(&format!("\"export_target\": \"{target}\"")));
+        assert!(response.progress_steps.iter().any(|step| {
+            step.id == "manifest"
+                && step.label == "Embed package manifest"
+                && step.detail.contains("sidecar manifest output is disabled")
+        }));
+
+        fs::remove_file(output).expect("clean publish package");
+    }
 }
 
 #[test]
@@ -793,11 +846,11 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(bundle_without_sidecar.diagnostics.iter().any(|diagnostic| {
         diagnostic
             .message
-            .contains("Markdown bundles still embed manifest.json")
+            .contains("package exports still embed manifest.json")
     }));
     assert!(bundle_without_sidecar.progress_steps.iter().any(|step| {
         step.id == "manifest"
-            && step.label == "Embed bundle manifest"
+            && step.label == "Embed package manifest"
             && step.state == "complete"
             && step.detail.contains("sidecar manifest output is disabled")
     }));
@@ -1246,7 +1299,7 @@ fn prepare_for_export_reports_markdown_bundle_manifest_sidecar_info() {
         .any(|item| item == "option:includeManifest"));
     assert!(report.progress_steps.iter().any(|step| {
         step.id == "manifest"
-            && step.label == "Embed bundle manifest"
+            && step.label == "Embed package manifest"
             && step.detail.contains("sidecar manifest output is disabled")
     }));
 }

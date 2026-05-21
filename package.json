@@ -19,7 +19,7 @@
     "verify:local:full": "node scripts/run-local-verification.mjs --full",
     "test:desktop-smoke": "node scripts/check-desktop-smoke.mjs",
     "test:unit": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-e2e.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

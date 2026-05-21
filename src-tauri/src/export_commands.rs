@@ -7,8 +7,8 @@ use crate::{
     },
     diagnostics::{diag, DocumentDiagnostic},
     export::{
-        render_docx_bytes, render_full_html, render_markdown_bundle_bytes, render_pdf_bytes,
-        render_pptx_bytes,
+        render_blog_publish_package_bytes, render_docx_bytes, render_full_html,
+        render_markdown_bundle_bytes, render_pdf_bytes, render_pptx_bytes,
     },
     git::get_git_status,
     metadata_string,
@@ -148,9 +148,14 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
             render_markdown_bundle_bytes(&compile_response, &manifest)?,
         )
         .map_err(|err| err.to_string())?,
+        "blog" | "substack" => fs::write(
+            &output_path,
+            render_blog_publish_package_bytes(&compile_response, &manifest)?,
+        )
+        .map_err(|err| err.to_string())?,
         other => {
             return Err(format!(
-                "Unsupported export target '{other}'. Use html, pdf, docx, pptx, or markdown-bundle."
+                "Unsupported export target '{other}'. Use html, pdf, docx, pptx, markdown-bundle, blog, or substack."
             ));
         }
     }
@@ -293,14 +298,14 @@ fn validate_export_settings(
 ) {
     if !matches!(
         target,
-        "html" | "pdf" | "docx" | "pptx" | "markdown-bundle" | "markdown"
+        "html" | "pdf" | "docx" | "pptx" | "markdown-bundle" | "markdown" | "blog" | "substack"
     ) {
         diagnostics.push(diag(
             "error",
             format!("Unsupported export target: {target}"),
             None,
             None,
-            Some("Use html, pdf, docx, pptx, or markdown-bundle."),
+            Some("Use html, pdf, docx, pptx, markdown-bundle, blog, or substack."),
         ));
     }
     validate_optional_string(options, "watermark", "Export watermark", diagnostics);
@@ -497,12 +502,12 @@ fn validate_target_specific_export_options(
         );
     }
 
-    if matches!(target, "markdown-bundle" | "markdown") {
+    if matches!(target, "markdown-bundle" | "markdown" | "blog" | "substack") {
         if sidecar_manifest_disabled {
             push_option_info(
                 target,
                 "includeManifest",
-                "includeManifest=false disables the sidecar manifest, but Markdown bundles still embed manifest.json.",
+                "includeManifest=false disables the sidecar manifest, but package exports still embed manifest.json.",
                 "Enable includeManifest when you also need a sidecar manifest with final output path and hash evidence.",
                 diagnostics,
             );
@@ -517,8 +522,8 @@ fn validate_target_specific_export_options(
                 push_option_info(
                     target,
                     option,
-                    &format!("{option} is recorded in the Markdown bundle manifest but does not render bundle content."),
-                    "Keep the option for manifest parity or disable it to reduce bundle export noise.",
+                    &format!("{option} is recorded in the package manifest but does not render package content."),
+                    "Keep the option for manifest parity or disable it to reduce package export noise.",
                     diagnostics,
                 );
             }
@@ -634,7 +639,7 @@ fn expected_export_extension(target: &str) -> Option<&'static str> {
         "pdf" => Some("pdf"),
         "docx" => Some("docx"),
         "pptx" => Some("pptx"),
-        "markdown-bundle" | "markdown" => Some("zip"),
+        "markdown-bundle" | "markdown" | "blog" | "substack" => Some("zip"),
         _ => None,
     }
 }

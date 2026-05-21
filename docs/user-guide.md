@@ -220,6 +220,7 @@ Supported targets:
 - DOCX for Word-compatible client deliverables.
 - PPTX for presentation-style summaries and executive decks.
 - Markdown bundle for portable source handoff.
+- Blog and Substack packages for local-first publishing handoff.
 
 Export options cover manifests, styles, syntax highlighting, cover pages, page
 numbers, layout presets, comments appendix, AI provenance appendix, glossary
@@ -244,6 +245,10 @@ Markdown bundle exports always include an embedded `manifest.json` for portable
 handoff. If `includeManifest` is disabled for a Markdown bundle, NEditor still
 embeds that internal manifest and records an informational readiness diagnostic;
 only the sidecar manifest with final output path/hash evidence is suppressed.
+Blog and Substack package exports are ZIP files with copy-ready Markdown,
+standalone HTML, plain text, metadata, an RSS item seed, packaged media assets,
+and an embedded NEditor manifest. Substack packages also include a minimal
+`substack-copy.html` fragment intended for paste/import workflows.
 
 ## Versioning And Snapshots
 

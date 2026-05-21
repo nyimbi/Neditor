@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `58ab0fb Keep
-  verification gaps tied to current host evidence`
+- Latest inspected committed baseline before this update: `6e4564a Strengthen
+  native desktop and rendered export proof`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -44,6 +44,24 @@ Recent pushed checkpoints visible in current git history:
   fixture, checking inspectable HTML, PDF object structure, DOCX/PPTX package
   anatomy, core/custom properties, comments and AI provenance appendices,
   transform artifacts, and Markdown bundle manifest evidence.
+- This update adds local-first blog and Substack publishing packages as export
+  targets. `blog` and `substack` exports write ZIP packages containing
+  compiled Markdown, standalone blog HTML, a minimal Substack copy/paste HTML
+  fragment, plain text, metadata, RSS item seed, README, and the embedded
+  NEditor manifest.
+- This update makes browser workflow execution current-host evidence instead
+  of stale archived evidence. `pnpm run test:e2e` now uses the project-local
+  Playwright browser cache and passes all 41 Chromium workbench workflows
+  locally, including editor/preview typing, settings persistence, command
+  palette navigation, file/save/rename/reveal flows, snapshots, workspace
+  restore, stale-save conflicts, include watchers, AI governance, and export
+  readiness/success/failure.
+- This update fixes workflow bugs found by that browser run: command-palette
+  editor commands now regain editor focus after the modal closes, CodeMirror
+  enables multiple selections for multi-cursor commands, prepare-for-export and
+  snapshot/restore actions flush pending editor text first, and source
+  navigation from export/preview/presentation modes returns the workbench to a
+  source-visible split view.
 - `7aff68f` announced workbench status changes accessibly.
 - `8d73d69` managed focus across workbench modals.
 - `4ce66b5` improved keyboard access to workbench regions.
@@ -529,31 +547,17 @@ P0 gaps:
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in that retired workflow.
-- Browser-level workflow tests previously passed in Linux Actions with 28 Chromium tests in
-  run `26159396761`, including mocked file lifecycle coverage, save-as plus
-  recently closed reopening, stale-save conflict copy/merge/keep-local/
-  accept-external recovery, clean watcher reload, watcher-originated dirty
-  root-file conflicts, advanced table structure/format/cancel coverage, and AI
-  paste insert/quote/appendix/replace-document/section-merge/replace-selection
-  workflows, clean included-file recompilation, and dirty included-file
-  conflict handling, plus restart-style workspace restore for open tabs, active
-  tab, pinned state, mode/sidebar persistence, workspace root, and recent
-  files, scroll-position restore, and missing-restored-file warning coverage.
-  Local focused Playwright execution remains blocked by sandboxed Playwright
-  browser cache installation: `pnpm exec playwright install chromium` failed
-  with `EPERM` while creating
-  `/Users/nyimbiodero/Library/Caches/ms-playwright/__dirlock`.
-- The same green browser run now also covers tab activation, dirty close
-  confirmation, renamed recent cleanup, deleted recently-closed pruning, recent
-  folder reopen/prune behavior, moved recently-closed path pruning,
-  synchronized editor/preview scrolling, preview heading click-to-source,
-  editor word-wrap and line-number persistence, CodeMirror find/replace, smart
-  list continuation, bracket auto-pairing, command-palette heading navigation,
-  citation navigation, glossary navigation, index navigation, open-document
-  switching, workspace-file opening, transform engine settings trust/probe
-  diagnostics, target-specific export readiness manifest preview, export
-  output/manifest path reporting, export success/failure diagnostics, and
-  blocked export diagnostics before file write.
+- Browser-level workflow tests now pass locally with 41 Chromium tests through
+  `pnpm run test:e2e` using the project-local Playwright browser cache. This
+  closes the prior local browser-cache/launch blocker and covers mocked file
+  lifecycle, save-as/recently-closed flows, stale-save conflict copy/merge/
+  keep-local/accept-external recovery, clean watcher reload, watcher-originated
+  dirty root-file conflicts, included-file recompilation/conflicts, restart
+  workspace restore, tab activation, recent cleanup, synchronized editor/
+  preview scrolling, preview heading click-to-source, settings persistence,
+  CodeMirror find/replace and editing helpers, command-palette navigation,
+  transform engine diagnostics, table workflows, AI governance, and export
+  readiness/success/failure diagnostics.
 - Desktop WebDriver/Tauri-driver workflow tests are missing.
 - Current progress/matrix/docs need to be kept updated as evidence changes.
 
@@ -567,12 +571,13 @@ P1 gaps:
 - Optional external transform evidence now includes current macOS Graphviz/DOT,
   D2, and PlantUML proof. macOS Pikchr and all Windows optional-engine evidence
   remain incomplete.
-- File watcher/conflict flows need UI workflow tests.
+- File watcher/conflict flows now have browser workflow proof; native desktop
+  execution proof remains missing.
 - Workspace/tab-group behavior now has browser harness proof for restart
   restore and document-set grouping; native desktop proof and deeper drag/reorder
   edge cases remain.
-- Remaining editor and preview ergonomics need browser interaction proof beyond
-  covered scroll sync and heading click-to-source.
+- Remaining editor and preview ergonomics need native desktop proof and broader
+  visual QA beyond the current browser interaction coverage.
 - AI paste, citations, layout, accessibility, performance, table export
   fixtures, and non-sandboxed table/browser execution need workflow, artifact,
   or benchmark evidence before they can be considered complete.
@@ -595,10 +600,12 @@ Current verification recorded on 2026-05-21:
 | `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | 8 file command tests passed, including `reveal_command_for_existing_path_is_platform_specific_and_argument_safe`. |
 | `cargo test --locked desktop_native_command_workflow_smoke --lib` in `src-tauri` | Pass | Native command workflow smoke passed against real local files and direct export outputs. |
 | `cargo test --locked representative_rendered_export_artifacts_are_package_inspectable --lib` in `src-tauri` | Pass | Representative rendered/package export audit passed across HTML, PDF, DOCX, PPTX, and Markdown bundle evidence. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 27 export command tests passed, including blog/Substack publish packages, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 211 Rust tests, Tauri no-bundle release compile, and strengthened desktop smoke. Optional engine probe still reports Pikchr missing on this host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 41 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
-| `pnpm run check:e2e-env` | Blocked locally | Project-local Playwright Chromium is installed, but this macOS session blocks Chromium launch with a Mach bootstrap permission denial. |
+| `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed on this host. |
+| `pnpm run test:e2e` | Pass | 41 Chromium browser workbench workflows passed locally on this host. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; bounded GUI launch remains opt-in via `NEDITOR_DESKTOP_SMOKE_LAUNCH=1`. |
 
 Fresh baseline recorded on 2026-05-20:
@@ -1718,7 +1725,7 @@ Malformed reference marker validation verification:
 | `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the reference validation slice. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting strict reference key rules; all local links resolved. |
 | `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after the reference validation slice. |
-| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors after the reference validation update. |
 
 Bibliography import compatibility verification:
@@ -1836,8 +1843,8 @@ Browser workflow environment preflight verification:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright install chromium` | Pass | Installed/confirmed project-local Playwright Chromium without touching tracked files. |
-| `pnpm run check:e2e-env` | Blocked locally | The new preflight found project-local Playwright Chromium, then classified the remaining failure as a macOS Mach bootstrap permission denial rather than a missing browser. |
-| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test e2e/app-workflows.spec.ts --grep "boots the workbench" --project chromium` | Blocked locally | The focused workflow reached the installed browser executable and failed before app assertions with `bootstrap_check_in ... Permission denied (1100)`. |
+| `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed on this host. |
+| `pnpm run test:e2e` | Pass | Full browser workflow execution passed all 41 Chromium tests locally. |
 | `node --check scripts/check-e2e-environment.mjs` | Pass | The E2E environment preflight script parses successfully. |
 | `pnpm run test:unit` | Pass | 12 frontend unit tests passed, including the package-script guard for `check:e2e-env`. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the preflight script. |

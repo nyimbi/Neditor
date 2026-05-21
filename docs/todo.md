@@ -57,7 +57,8 @@ NEditor is no longer a basic scaffold. The repository currently contains:
 - Richer Rust-native OpenAPI and JSON Schema transform rendering for API
   operations, parameters, request/response bodies, component schemas, nested
   schema fields, array items, refs, enums, formats, defaults, and constraints.
-- Export modules for HTML, PDF, DOCX, PPTX, and Markdown bundles.
+- Export modules for HTML, PDF, DOCX, PPTX, Markdown bundles, and local-first
+  blog/Substack publishing packages.
 - Backend tests across compiler, exports, transforms, tables, media packaging,
   validation, file commands, Git workflows, snapshots, review/provenance, and
   external engines.
@@ -131,10 +132,12 @@ Most recent local verification evidence:
 - `cargo test --locked git_history_diff_commit_tag_and_restore_workflow --lib`:
   passed after Git hardening and proves normal history, diff, commit, tag, and
   restore behavior still works.
-- `cargo test --locked export_command_tests --lib`: passed 15 export command
+- `cargo test --locked export_command_tests --lib`: passed 27 export command
   tests, including direct-export dirty-Git warnings copied into response,
-  sidecar manifests, structured export progress-step reporting, and precise
-  no-bibliography citation readiness ranges.
+  sidecar manifests, structured export progress-step reporting, blog/Substack
+  publishing packages, and precise no-bibliography citation readiness ranges.
+- `pnpm run test:e2e`: passed all 41 Chromium browser workbench workflows
+  locally on 2026-05-21 using the project-local Playwright browser cache.
 - `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture`:
   passed and proves no-bibliography citation readiness emits a broad source
   warning plus precise per-key missing citation diagnostics that are copied
@@ -567,12 +570,12 @@ Recent local verification evidence from this buildout:
 - `git diff --check`: passed after stabilizing the file lifecycle workflow
   assertions.
 
-Known local environment caveat:
+Resolved local environment caveat:
 
-- Full Playwright execution in this macOS sandbox reaches Chromium launch, then
-  fails before app assertions because Chromium cannot register its Mach
-  bootstrap port. This remains a local host limitation, not a reason to use
-  GitHub Actions as a source of truth.
+- Earlier local Playwright runs were blocked by browser-cache and macOS launch
+  permissions. As of 2026-05-21, `pnpm run check:e2e-env` passes the
+  project-local Chromium launch preflight and `pnpm run test:e2e` passes all
+  41 Chromium workbench workflows locally.
 
 ## P0 - Immediate Blockers
 
@@ -594,6 +597,16 @@ current completion evidence.
 
 Current local verification evidence:
 
+- 2026-05-21: `pnpm run verify:local` passed after adding blog/Substack
+  publish packages and stabilizing the browser workflow suite. The run covered
+  frontend typecheck, frontend unit tests, project structure, accessibility,
+  dependency admission, Markdown links, Rust formatting, Rust
+  `cargo check --locked`, and `git diff --check`.
+- 2026-05-21: `cargo test --locked export_command_tests --lib` passed 27 export
+  command tests, including blog/Substack package exports and native command
+  workflow smoke.
+- 2026-05-21: `pnpm run check:e2e-env` and `pnpm run test:e2e` passed locally;
+  the browser run covered all 41 Chromium workbench workflows.
 - 2026-05-21: `pnpm run verify:local` passed after hardening the `reveal_path`
   command builder. The run covered frontend typecheck, frontend unit tests,
   project structure, accessibility, dependency admission, Markdown links, Rust

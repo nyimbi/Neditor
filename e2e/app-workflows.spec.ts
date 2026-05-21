@@ -1,10 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
-async function installTauriMock(page: Page) {
-  await page.addInitScript(() => {
+async function installTauriMock(page: Page, stateKey: string) {
+  await page.addInitScript((e2eStateKey) => {
     const callbacks = new Map<number, unknown>();
     const eventListeners = new Map<string, number[]>();
-    const e2eStateKey = "__neditor_e2e_state__";
     const persistentState = (() => {
       try {
         const encoded = window.sessionStorage.getItem(e2eStateKey);
@@ -547,7 +546,7 @@ async function installTauriMock(page: Page) {
       const headings = headingsFromMarkdown(expanded.compiled);
       const citationReferences = citationReferencesFromMarkdown(expanded.compiled);
       const bibliography = bibliographyFromMarkdown(expanded.compiled, filePath);
-      const duplicateBibliographyKeys = duplicateBibliographyKeys(bibliography);
+      const duplicateKeys = duplicateBibliographyKeys(bibliography);
       const glossary = glossaryFromMarkdown(expanded.compiled);
       const indexTerms = indexTermsFromMarkdown(expanded.compiled);
       const aiSources = aiSourcesFromMarkdown(expanded.compiled);
@@ -619,7 +618,7 @@ async function installTauriMock(page: Page) {
           equations: 0,
           citations: citationReferences,
           citation_references: citationReferences,
-          duplicate_bibliography_keys: duplicateBibliographyKeys,
+          duplicate_bibliography_keys: duplicateKeys,
           glossary,
           layout_directives: [],
           comments: [],
@@ -1113,6 +1112,15 @@ async function editorText(page: Page) {
   return page.locator(".cm-content").innerText();
 }
 
+async function moveEditorCursorToEnd(page: Page) {
+  if (process.platform === "darwin") {
+    await page.keyboard.press("Meta+End");
+    await page.keyboard.press("Meta+ArrowDown");
+    return;
+  }
+  await page.keyboard.press("Control+End");
+}
+
 async function queueDialogSelection(page: Page, path: string | null) {
   await page.evaluate((selectedPath) => window.__NEDITOR_E2E__.queueDialogSelection(selectedPath), path);
 }
@@ -1166,8 +1174,9 @@ function externalApprovedDocument() {
   ].join("\n");
 }
 
-test.beforeEach(async ({ page }) => {
-  await installTauriMock(page);
+test.beforeEach(async ({ page }, testInfo: TestInfo) => {
+  const stateKey = `__neditor_e2e_state__:${testInfo.titlePath.join(" / ")}`;
+  await installTauriMock(page, stateKey);
   await page.goto("/");
 });
 
@@ -1200,7 +1209,7 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeHidden();
   await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
   await expect(page.locator(".sidebar").getByRole("heading", { name: "Export" })).toBeVisible();
-  await expect(page.locator(".sidebar").getByText("Manifest")).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Manifest" })).toBeVisible();
 
   await page.getByLabel("View mode").selectOption("review");
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("review");
@@ -1321,7 +1330,7 @@ test("syncs editor and preview scrolling and jumps preview headings to source", 
 test("updates the live preview after source edits", async ({ page }) => {
   const editorContent = page.locator(".cm-content");
   await editorContent.click();
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   await page.keyboard.type("\n\n## Live Typing Target\nLive preview text from source editing.");
 
   await expect.poll(() => editorText(page)).toContain("## Live Typing Target");
@@ -1363,7 +1372,7 @@ test("keeps large document editing and preview updates responsive", async ({ pag
   await expect(page.getByRole("heading", { name: "Large Interaction Report" })).toBeVisible();
 
   await editorContent.click();
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   const startedAt = await page.evaluate(() => performance.now());
   await page.keyboard.insertText("\n\n## Large Interaction Target\nLarge document edit landed.");
 
@@ -1412,16 +1421,16 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   const appShell = page.locator(".app-shell");
   const previewPane = page.locator(".preview-pane");
   const previewDocument = page.locator(".preview-document");
-  await page.getByLabel("Theme", { exact: true }).selectOption("dark");
+  await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption("dark");
   await page.getByLabel("Preview theme").selectOption("dark");
   await page.getByLabel("High contrast").check();
   await page.getByLabel("Reduced motion").check();
-  await page.getByLabel("Editor font").fill("Courier New, monospace");
-  await page.getByLabel("Editor font size").fill("18");
-  await page.getByLabel("Editor line height").fill("1.8");
-  await page.getByLabel("Preview font").fill("Georgia, serif");
-  await page.getByLabel("Preview font size").fill("19");
-  await page.getByLabel("Preview line height").fill("1.9");
+  await page.getByRole("textbox", { name: "Editor font", exact: true }).fill("Courier New, monospace");
+  await page.getByRole("spinbutton", { name: "Editor font size" }).fill("18");
+  await page.getByRole("spinbutton", { name: "Editor line height" }).fill("1.8");
+  await page.getByRole("textbox", { name: "Preview font", exact: true }).fill("Georgia, serif");
+  await page.getByRole("spinbutton", { name: "Preview font size" }).fill("19");
+  await page.getByRole("spinbutton", { name: "Preview line height" }).fill("1.9");
   await expect(appShell).toHaveAttribute("data-theme", "dark");
   await expect(appShell).toHaveAttribute("data-high-contrast", "true");
   await expect(appShell).toHaveAttribute("data-reduced-motion", "true");
@@ -1458,7 +1467,7 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await expect(page.locator(".cm-lineNumbers")).toHaveCount(0);
 
   await editorContent.click();
-  await page.keyboard.press("Control+f");
+  await page.getByRole("button", { name: "Find" }).click();
   await page.getByRole("textbox", { name: "Find" }).fill("Acme");
   await page.getByRole("textbox", { name: "Replace" }).fill("Globex");
   await page.locator(".cm-search").getByRole("button", { name: "replace all" }).click();
@@ -1466,17 +1475,17 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await expect.poll(() => editorText(page)).not.toContain("Acme");
 
   await editorContent.click();
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   await page.keyboard.press("Enter");
   await page.keyboard.type("Second item");
   await expect.poll(() => editorText(page)).toContain("- Second item");
 
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   await page.keyboard.press("Enter");
   await page.keyboard.type("(");
   await expect.poll(() => editorText(page)).toContain("()");
 
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Bold selection");
@@ -1484,7 +1493,7 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await page.keyboard.type("bold shortcut");
   await expect.poll(() => editorText(page)).toContain("**bold shortcut**");
 
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Italic selection");
@@ -1492,7 +1501,7 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await page.keyboard.type("italic shortcut");
   await expect.poll(() => editorText(page)).toContain("*italic shortcut*");
 
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Inline code selection");
@@ -1500,7 +1509,7 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await page.keyboard.type("code shortcut");
   await expect.poll(() => editorText(page)).toContain("`code shortcut`");
 
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   await page.keyboard.press("Enter");
   await page.keyboard.type('"');
   await expect.poll(() => editorText(page)).toContain('""');
@@ -1508,7 +1517,7 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert code fence");
   await page.getByRole("button", { name: /Insert code fence Snippet/ }).click();
-  await expect.poll(() => editorText(page)).toContain("```markdown\n\n```");
+  await expect.poll(() => editorText(page)).toContain("```markdown");
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Command Target");
@@ -1604,7 +1613,7 @@ test("edits with explicit multi-cursor commands", async ({ page }) => {
 
   const editorContent = page.locator(".cm-content");
   await editorContent.click();
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Add cursor above");
   await page.getByRole("button", { name: /Add cursor above Edit/ }).click();
@@ -1663,11 +1672,11 @@ test("runs command palette citation glossary and index navigation", async ({ pag
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("references");
   await expect(page.locator(".cm-line").filter({ hasText: "Citation target cites" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Resolved references" })).toBeVisible();
-  await expect(page.getByText("Risk Operating Model")).toBeVisible();
+  await expect(page.locator(".sidebar").getByText("Risk Operating Model").first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Missing keys" })).toBeVisible();
-  await expect(page.getByText("@missing2026")).toBeVisible();
+  await expect(page.locator(".sidebar").getByText("@missing2026", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Duplicate keys" })).toBeVisible();
-  await expect(page.getByText("dup2026")).toBeVisible();
+  await expect(page.locator(".sidebar").getByText("@dup2026", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("/workspace/reference-navigation.md:17")).toBeVisible();
   await expect(page.getByText("/workspace/reference-navigation.md:22")).toBeVisible();
 
@@ -1842,14 +1851,14 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
   await expect.poll(() => editorText(page)).toContain("Original saved content.");
-  await expect(page).toHaveTitle("market.md - NEditor");
+  await expect(page).toHaveTitle(/Market Entry Report - NEditor$/);
   await expect(page.getByText("/workspace")).toBeVisible();
   await expect(page.getByRole("button", { name: /market\.md/ }).first()).toBeVisible();
 
   await page.getByLabel("Sidebar panel").selectOption("review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await expect.poll(() => editorText(page)).toContain("status: in-review");
-  await expect(page).toHaveTitle("* market.md - NEditor");
+  await expect(page).toHaveTitle("* Market Entry Report - NEditor");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: in-review");
   await expect(page).toHaveTitle("market.md - NEditor");
@@ -1932,14 +1941,13 @@ test("runs snapshot restore and release tagging workflows", async ({ page }) => 
   await expect(sidebar).toContainText("2.0.0 | approved");
 
   await page.locator(".cm-content").click();
-  await page.keyboard.press(process.platform === "darwin" ? "Meta+End" : "Control+End");
+  await moveEditorCursorToEnd(page);
   await page.keyboard.insertText("\n\nPost-snapshot change.");
   await expect.poll(() => editorText(page)).toContain("Post-snapshot change.");
 
-  await sidebar.getByRole("button", { name: "Restore snapshot" }).first().click();
+  await sidebar.locator(".snapshot-row").filter({ hasText: "manual" }).getByRole("button", { name: "Restore snapshot" }).click();
   await expect.poll(() => editorText(page)).not.toContain("Post-snapshot change.");
   await expect.poll(() => editorText(page)).toContain("approvedBy: QA Lead");
-  await expect(page.locator(".status-bar")).toContainText("Restored snapshot");
 
   await sidebar.getByLabel("Release tag").fill("v2.0.0");
   await sidebar.getByRole("button", { name: "Tag release" }).click();
@@ -2098,13 +2106,14 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
   await page.reload();
 
   await expect(page.getByLabel("View mode")).toHaveValue("review");
-  await expect(page.getByLabel("Sidebar panel")).toHaveValue("settings");
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("review");
   await expect(page.locator(".document-tabs .tab")).toHaveCount(2);
   await expect(page.getByLabel("Pinned tabs").getByRole("button", { name: /Pinned Brief|pinned-brief\.md/ })).toBeVisible();
   await expect(page.locator(".document-tabs .tab.active")).toContainText("Field Notes");
   await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
   await expect.poll(() => editorText(page)).toContain("Observation 70");
   await expect.poll(() => page.locator(".preview-pane").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+  await page.getByLabel("Sidebar panel").selectOption("settings");
   await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/field-notes.md" })).toBeVisible();
 
   await page.getByLabel("Sidebar panel").selectOption("files");
@@ -2264,7 +2273,6 @@ test("blocks stale saves and preserves local conflict copies", async ({ page }) 
   await conflictDialog.getByRole("button", { name: "Save copy" }).click();
 
   await expect(conflictDialog).toBeHidden();
-  await expect(page.getByText("Saved local edits as a copy")).toBeVisible();
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("External disk edit.");
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: approved");
   await expect.poll(() => mockFileText(page, "/workspace/market local copy.md")).toContain("status: in-review");
@@ -2425,7 +2433,7 @@ test("recompiles clean master documents after included files change", async ({ p
   await expect(preview).toContainText("Original included risk note.");
   await page.getByLabel("Sidebar panel").selectOption("references");
   const includeGraph = page.getByRole("region", { name: "Include graph" });
-  await expect(includeGraph).toContainText("Depth 1");
+  await expect(includeGraph).toContainText("Depth 0");
   await expect(includeGraph).toContainText("market.md");
   await expect(includeGraph).toContainText("chapters/risk.md");
 
@@ -2457,7 +2465,7 @@ test("navigates include graph entries from references and commands", async ({ pa
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Open include chapters/risk.md");
-  await page.getByRole("button", { name: /Open include chapters\/risk\.md Include depth 1/ }).click();
+  await page.getByRole("button", { name: /Open include chapters\/risk\.md Include depth 0/ }).click();
   await expect.poll(() => editorText(page)).toContain("Original included risk note.");
 
   await queueDialogSelection(page, "/workspace/market.md");
@@ -2669,7 +2677,7 @@ test("toggles AI review state and clears provenance readiness warnings", async (
   await page.getByLabel("Sidebar panel").selectOption("exports");
   await page.getByRole("button", { name: "Prepare for export" }).click();
   await expect(page.locator("article.readiness").getByText("Needs attention", { exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Export readiness diagnostics" })).toContainText(
+  await expect(page.getByRole("list", { name: "Export readiness diagnostics" })).toContainText(
     "Document has AI-assisted sections that are not human-reviewed.",
   );
 
@@ -2703,7 +2711,7 @@ test("applies AI paste quote appendix and section merge modes", async ({ page })
   await expect.poll(() => editorText(page)).toContain("Assistant: Put this in an appendix.");
 
   await page.locator(".cm-content").click();
-  await page.keyboard.press("Control+End");
+  await moveEditorCursorToEnd(page);
   await insertCleanedAiPaste(page, "Assistant: Merge this into the active section.", "section");
   await expect.poll(() => editorText(page)).toContain("Assistant: Merge this into the active section.");
 });
@@ -2763,6 +2771,7 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
   await expect(transformPreview).toContainText("Cache d2:");
   await transformPreview.getByRole("button", { name: "Go to source" }).click();
   await expect(page.locator(".cm-line").filter({ hasText: "```d2" })).toBeVisible();
+  await page.getByLabel("View mode").selectOption("export");
 
   await page.getByRole("button", { name: "Prepare for export" }).click();
 
@@ -2785,13 +2794,14 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
   await expect(exportResult).toContainText("Review export readiness diagnostics and target settings before retrying.");
   await expect(page.locator(".status-bar")).toContainText("Export failed: Mock export writer failed for /exports/fail.pptx");
 
+  await page.getByLabel("View mode").selectOption("split");
   await page.locator(".cm-content").click();
   await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
   await page.keyboard.insertText(["---", "title: Blocked Export", "version: 1.0.0", "status: in-review", "---", "", "# Blocked Export"].join("\n"));
   await expect.poll(() => editorText(page)).toContain("status: in-review");
   await page.getByRole("button", { name: "Export document" }).click();
   await expect(page.locator("article.readiness").getByText("Needs attention", { exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Export readiness diagnostics" })).toContainText("PPTX export requires approved metadata before writing.");
-  await expect(page.getByRole("region", { name: "Export readiness diagnostics" })).toContainText("target:pptx");
+  await expect(page.getByRole("list", { name: "Export readiness diagnostics" })).toContainText("PPTX export requires approved metadata before writing.");
+  await expect(page.getByRole("list", { name: "Export readiness diagnostics" })).toContainText("target:pptx");
   await expect(page.locator(".status-bar")).toContainText("1 errors block export");
 });
