@@ -1323,6 +1323,7 @@ import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
+import { markdownListContinuation } from "./lib/markdownEditing";
 import { SUPPORTED_CITATION_STYLES } from "./lib/workspacePersistence";
 import {
   appendConflictMergePart,
@@ -2400,26 +2401,25 @@ function continueMarkdownList(view: EditorView) {
   if (!selection.empty) return false;
   const line = view.state.doc.lineAt(selection.head);
   const beforeCursor = line.text.slice(0, selection.head - line.from);
-  const bullet = beforeCursor.match(/^(\s*)([-+*])\s+(.*)$/);
-  const numbered = beforeCursor.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
-  if (!bullet && !numbered) return false;
+  const continuation = markdownListContinuation(beforeCursor);
+  if (!continuation) return false;
 
-  const indent = (bullet?.[1] || numbered?.[1] || "");
-  const marker = bullet ? bullet[2] : `${Number(numbered?.[2] || "0") + 1}${numbered?.[3] || "."}`;
-  const content = (bullet?.[3] || numbered?.[4] || "").trim();
-  if (!content) {
+  if (continuation.kind === "exit") {
     view.dispatch({
-      changes: { from: line.from, to: selection.head, insert: indent },
-      selection: { anchor: line.from + indent.length },
+      changes: {
+        from: line.from + continuation.fromColumn,
+        to: selection.head,
+        insert: continuation.replacement,
+      },
+      selection: { anchor: line.from + continuation.fromColumn + continuation.replacement.length },
       scrollIntoView: true,
     });
     return true;
   }
 
-  const insert = `\n${indent}${marker} `;
   view.dispatch({
-    changes: { from: selection.head, insert },
-    selection: { anchor: selection.head + insert.length },
+    changes: { from: selection.head, insert: continuation.insert },
+    selection: { anchor: selection.head + continuation.insert.length },
     scrollIntoView: true,
   });
   return true;

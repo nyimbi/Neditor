@@ -10,6 +10,7 @@ import {
 } from "../src/lib/asyncGuards.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
+import { markdownListContinuation } from "../src/lib/markdownEditing.js";
 import { migratePersistedWorkspace, normalizeCitationStyle, WORKSPACE_SCHEMA_VERSION } from "../src/lib/workspacePersistence.js";
 import {
   appendConflictMergeLine,
@@ -177,6 +178,17 @@ test("latest document task guard rejects stale and cancelled compile results", (
 
   cancelLatestDocumentTask(gate);
   ok(!isLatestDocumentTaskCurrent(gate, second, { id: "doc-1", text: "second draft" }));
+});
+
+test("markdown list continuation handles tasks numbers and blockquotes", () => {
+  deepEqual(markdownListContinuation("- First item"), { kind: "continue", insert: "\n- " });
+  deepEqual(markdownListContinuation("  3) Third item"), { kind: "continue", insert: "\n  4) " });
+  deepEqual(markdownListContinuation("- [x] Completed task"), { kind: "continue", insert: "\n- [ ] " });
+  deepEqual(markdownListContinuation("> - Quoted item"), { kind: "continue", insert: "\n> - " });
+  deepEqual(markdownListContinuation("> 2. Quoted numbered item"), { kind: "continue", insert: "\n> 3. " });
+  deepEqual(markdownListContinuation("  - "), { kind: "exit", fromColumn: 0, replacement: "  " });
+  deepEqual(markdownListContinuation("> - [ ] "), { kind: "exit", fromColumn: 2, replacement: "" });
+  equal(markdownListContinuation("plain paragraph"), null);
 });
 
 test("preview debounce coalesces edits inside the spec timing budget", () => {

@@ -1849,6 +1849,19 @@ AI paste code fence cleanup verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests, including the existing AI paste workflows. |
 | `git diff --check` | Pass | No whitespace errors after the AI cleanup code-fence update. |
 
+Smart Markdown list continuation verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 13 frontend unit tests passed after extracting Markdown list continuation logic and covering bullets, numbered lists, task lists, blockquoted lists, quoted numbered lists, empty-marker exit behavior, and plain-paragraph no-op behavior. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after wiring the extracted Markdown list continuation helper into the CodeMirror Enter key handler. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue accessibility guardrails still pass after the editor continuation helper extraction. |
+| `pnpm run check:structure` | Pass | The project structure guard still passes after adding `src/lib/markdownEditing.ts`. |
+| `cargo check --locked` in `src-tauri` | Pass | Backend dev-profile check remains clean after the frontend editor ergonomics update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests, including the existing editor ergonomics workflow. |
+| `git diff --check` | Pass | No whitespace errors after the smart Markdown list continuation update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

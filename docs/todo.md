@@ -1146,7 +1146,8 @@ Covered:
 
 - Line numbers toggle and persistence.
 - Word wrap toggle and persistence.
-- Basic Markdown list continuation.
+- Markdown list continuation for bullets, numbered lists, task lists,
+  blockquoted lists, quoted numbered lists, and empty-marker exit behavior.
 - Basic bracket auto-pairing.
 - Quote, bold, italic, inline-code pairing, and code-fence insertion through
   explicit Markdown commands.
