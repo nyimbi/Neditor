@@ -967,8 +967,10 @@ Current evidence:
   hashes, a manual visual-review checklist, and `viewer-proof.json` with
   executable HTML/PDF/DOCX/PPTX/package assertions, blog/Substack metadata and
   copy artifact assertions, LaTeX source assertions, Google Docs import metadata
-  assertions, and nested Google Docs DOCX package assertions. When `pdflatex` is
-  installed, it also compiles the generated LaTeX artifact into
+  assertions, and nested Google Docs DOCX package assertions. On macOS it also
+  attempts a Quick Look PDF thumbnail and records either thumbnail evidence or
+  the current host's `qlmanage` sandbox limitation in `viewer-proof.json`. When
+  `pdflatex` is installed, it also compiles the generated LaTeX artifact into
   `.tmp/rendered-export-audit/latex-compile/rendered-export-audit.pdf`.
 
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
@@ -1454,7 +1456,9 @@ Finish:
   slide directives.
 - Paged-document model evidence for each directive.
 - Export mapping evidence for HTML, PDF, DOCX, PPTX, and Markdown bundle.
-- Visual/manual review of representative PDF/DOCX/PPTX outputs.
+- Visual/manual review of representative PDF/DOCX/PPTX outputs; the rendered
+  export audit now classifies whether macOS Quick Look PDF thumbnailing can run
+  from the verifier on the current host.
 - Overflow handling for large figures, equations, tables, code blocks, and long
   unbroken words.
 

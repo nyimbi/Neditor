@@ -82,6 +82,10 @@ if (issues.length === 0) {
 }
 
 if (issues.length === 0) {
+  collectMacQuickLookProof(issues, viewerProof);
+}
+
+if (issues.length === 0) {
   const pdflatex = spawnSync("pdflatex", ["--version"], { stdio: "ignore" });
   if (pdflatex.status === 0) {
     const latexBuildDir = join(auditDir, "latex-compile");
@@ -318,6 +322,54 @@ function collectViewerProof(issues, assertions) {
   ]);
 }
 
+function collectMacQuickLookProof(issues, assertions) {
+  if (process.platform !== "darwin") return;
+  const qlmanage = spawnSync("qlmanage", ["-h"], { stdio: "ignore" });
+  if (qlmanage.status !== 0) {
+    assertions.push({ scope: "macos-quicklook-pdf", assertion: "qlmanage available", passed: false });
+    issues.push("qlmanage is unavailable for macOS Quick Look PDF proof");
+    return;
+  }
+  const quicklookDir = join(auditDir, "quicklook");
+  rmSync(quicklookDir, { recursive: true, force: true });
+  mkdirSync(quicklookDir, { recursive: true });
+  const result = spawnSync(
+    "qlmanage",
+    ["-t", "-s", "900", "-o", quicklookDir, join(auditDir, "rendered-export-audit.pdf")],
+    {
+      encoding: "utf8",
+      timeout: 15_000,
+    },
+  );
+  const output = [result.stdout?.trim(), result.stderr?.trim()].filter(Boolean).join("\n");
+  const thumbnail = join(quicklookDir, "rendered-export-audit.pdf.png");
+  if (output.includes("sandbox initialization failed: Operation not permitted")) {
+    assertions.push({
+      scope: "macos-quicklook-pdf",
+      assertion: "renders PDF thumbnail through Quick Look",
+      passed: false,
+      skipped: true,
+      reason: "qlmanage cannot initialize its sandbox when launched from this Node verifier on the current host",
+    });
+    return;
+  }
+  const passed =
+    result.status === 0 &&
+    existsSync(thumbnail) &&
+    statSync(thumbnail).isFile() &&
+    statSync(thumbnail).size > 10_000;
+  assertions.push({
+    scope: "macos-quicklook-pdf",
+    assertion: "renders PDF thumbnail through Quick Look",
+    passed,
+    thumbnail: relativeToAudit(thumbnail),
+    bytes: existsSync(thumbnail) ? statSync(thumbnail).size : 0,
+  });
+  if (!passed) {
+    issues.push(`macOS Quick Look did not render a meaningful PDF thumbnail${output ? `:\n${output}` : ""}`);
+  }
+}
+
 function readTextArtifact(file) {
   return readFileSync(join(auditDir, file), "utf8");
 }
@@ -384,6 +436,10 @@ function readZipEntries(pathOrBuffer) {
     offset = dataEnd;
   }
   return entries;
+}
+
+function relativeToAudit(path) {
+  return path.startsWith(auditDir) ? path.slice(auditDir.length + 1) : path;
 }
 
 function unzipEntryData(method, data, name) {

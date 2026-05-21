@@ -229,7 +229,9 @@ and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
 DOCX, PPTX, Markdown bundle, blog package, Substack package, LaTeX, Google Docs
 package, hashes, a manual visual-review checklist, and `viewer-proof.json` with
 executable HTML/PDF/DOCX/PPTX/package assertions, publishing handoff metadata
-checks, LaTeX source checks, and nested Google Docs DOCX checks. When
+checks, LaTeX source checks, and nested Google Docs DOCX checks. On macOS it
+also attempts a bounded Quick Look PDF thumbnail proof and records either the
+thumbnail assertion or the host sandbox limitation in `viewer-proof.json`. When
 `pdflatex` is installed, it also compiles the generated `.tex` file into
 `.tmp/rendered-export-audit/latex-compile/`.
 

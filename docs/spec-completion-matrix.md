@@ -270,8 +270,10 @@ Current major verification gaps:
   checklist, and executable viewer/package proof under
   `.tmp/rendered-export-audit`; that proof now includes publishing handoff
   metadata checks, LaTeX source checks, Google Docs import metadata, and nested
-  Google Docs DOCX package checks. Broader native viewer/platform manual QA
-  remains under-proven.
+  Google Docs DOCX package checks. On macOS it also attempts a Quick Look PDF
+  thumbnail and records either thumbnail evidence or the current host's
+  `qlmanage` sandbox limitation. Broader PDF/DOCX/PPTX native viewer/platform
+  manual QA remains under-proven.
 - Optional external transform engine evidence now includes current macOS
   Graphviz/DOT variants, D2, and PlantUML proof via `pnpm run check:engines`
   and `.tmp/external-engines/probe-report.json`; macOS Pikchr and Windows
