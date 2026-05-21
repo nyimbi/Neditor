@@ -853,6 +853,7 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
         "additionalProperties",
         "contains",
         "propertyNames",
+        "contentSchema",
         "unevaluatedItems",
         "unevaluatedProperties",
         "not",
@@ -955,9 +956,13 @@ fn schema_constraints(schema: &Value) -> String {
         "maxLength",
         "minItems",
         "maxItems",
+        "minContains",
+        "maxContains",
         "minProperties",
         "maxProperties",
         "multipleOf",
+        "contentEncoding",
+        "contentMediaType",
         "default",
         "example",
         "readOnly",
@@ -985,6 +990,17 @@ fn schema_constraints(schema: &Value) -> String {
                 structured_value_summary(additional_properties)
             ));
         }
+    }
+    for key in ["unevaluatedItems", "unevaluatedProperties"] {
+        if let Some(value) = schema.get(key).filter(|value| value.is_boolean()) {
+            constraints.push(format!("{key}: {}", structured_value_summary(value)));
+        }
+    }
+    if let Some(content_schema) = schema.get("contentSchema") {
+        constraints.push(format!(
+            "contentSchema: {}",
+            structured_value_summary(content_schema)
+        ));
     }
     if let Some(dependent_required) = schema.get("dependentRequired").and_then(Value::as_object) {
         let summary = dependent_required

@@ -2024,6 +2024,18 @@ Front matter data-source boundary verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the Markdown extension docs, matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the data-source boundary update. |
 
+JSON Schema dialect transform verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_renders_openapi_and_json_schema_tables --lib` in `src-tauri` | Pass | Focused compiler proof now covers JSON Schema `propertyNames`, `contains` with `minContains`/`maxContains`, `unevaluatedItems`/`unevaluatedProperties`, content annotations, and nested `contentSchema` rows. |
+| `cargo test --locked api_schema_transforms_survive_cross_target_exports --lib` in `src-tauri` | Pass | Focused cross-target proof carries the richer JSON Schema dialect rows and constraint summaries through HTML, PDF summary text, DOCX, PPTX, and Markdown bundle artifacts. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the schema dialect update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the schema dialect update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating transform docs, matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run verify:local` | Pass | The quick local verification baseline passed after the schema dialect update. |
+| `git diff --check` | Pass | No whitespace errors after the schema dialect update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

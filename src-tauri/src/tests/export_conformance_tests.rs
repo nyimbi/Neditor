@@ -522,6 +522,35 @@ components:
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
+    "labels": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z-]+$" },
+      "unevaluatedProperties": false
+    },
+    "attachments": {
+      "type": "array",
+      "minContains": 1,
+      "maxContains": 3,
+      "contains": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": { "type": "string", "const": "invoice" }
+        }
+      },
+      "unevaluatedItems": false
+    },
+    "payload": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "contentMediaType": "application/json",
+      "contentSchema": {
+        "type": "object",
+        "properties": {
+          "traceId": { "type": "string", "pattern": "^[A-Z0-9]+$" }
+        }
+      }
+    },
     "tuple": {
       "type": "array",
       "prefixItems": [
@@ -607,8 +636,18 @@ components:
     assert!(html.contains("transform-json-schema"));
     assert!(html.contains("Account Payload"));
     assert!(html.contains("additionalProperties: false"));
+    assert!(html.contains("unevaluatedProperties: false"));
+    assert!(html.contains("unevaluatedItems: false"));
+    assert!(html.contains("minContains: 1"));
+    assert!(html.contains("maxContains: 3"));
+    assert!(html.contains("contentEncoding: base64"));
+    assert!(html.contains("contentMediaType: application/json"));
+    assert!(html.contains("contentSchema: {2 fields}"));
     assert!(html.contains("dependentRequired: b -&gt; cc"));
     assert!(html.contains("patternProperties[^x-]"));
+    assert!(html.contains("labels.propertyNames"));
+    assert!(html.contains("attachments.contains.kind"));
+    assert!(html.contains("payload.contentSchema.traceId"));
     assert!(html.contains("dependentSchemas[cc].b"));
     assert!(html.contains("if.status"));
     assert!(html.contains("then"));
@@ -636,8 +675,12 @@ components:
     assert!(pdf_text.contains("Account id"));
     assert!(pdf_text.contains("Account Payload"));
     assert!(pdf_text.contains("additionalProperties:"));
+    assert!(pdf_text.contains("unevaluatedProperties:"));
+    assert!(pdf_text.contains("minContains:"));
+    assert!(pdf_text.contains("contentEncoding:"));
     assert!(pdf_text.contains("false;"));
     assert!(pdf_text.contains("patternProperties[^x-]"));
+    assert!(pdf_text.contains("labels.propertyNames"));
     assert!(pdf_text.contains("dependentSchemas[cc].b"));
     assert!(pdf_text.contains("if.status"));
     assert!(pdf_text.contains("then"));
@@ -660,6 +703,9 @@ components:
     assert!(docx_document.contains("Account id"));
     assert!(docx_document.contains("Account Payload"));
     assert!(docx_document.contains("patternProperties[^x-]"));
+    assert!(docx_document.contains("labels.propertyNames"));
+    assert!(docx_document.contains("attachments.contains.kind"));
+    assert!(docx_document.contains("payload.contentSchema.traceId"));
     assert!(docx_document.contains("$defs[Money]"));
     assert!(docx_document.contains("tuple.prefixItems[1]"));
     assert!(docx_document.contains("payment.oneOf[2]"));
@@ -676,6 +722,9 @@ components:
     assert!(pptx_slides.contains("accountChangedWebhook"));
     assert!(pptx_slides.contains("Account Payload"));
     assert!(pptx_slides.contains("patternProperties[^x-]"));
+    assert!(pptx_slides.contains("labels.propertyNames"));
+    assert!(pptx_slides.contains("attachments.contains.kind"));
+    assert!(pptx_slides.contains("payload.contentSchema.traceId"));
     assert!(pptx_slides.contains("$defs[Money]"));
     assert!(pptx_slides.contains("tuple.prefixItems[1]"));
 
@@ -692,6 +741,9 @@ components:
     assert!(bundled_text.contains("accountChangedWebhook"));
     assert!(bundled_text.contains("Account Payload"));
     assert!(bundled_text.contains("patternProperties[^x-]"));
+    assert!(bundled_text.contains("labels.propertyNames"));
+    assert!(bundled_text.contains("attachments.contains.kind"));
+    assert!(bundled_text.contains("payload.contentSchema.traceId"));
     assert!(bundled_text.contains("$defs[Money]"));
     assert!(bundled_text.contains("payment.oneOf[2]"));
     for name in ["openapi", "json-schema"] {

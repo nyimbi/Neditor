@@ -340,7 +340,7 @@ Common transform names:
 | `chart` | Bar, line, pie, area, and KPI charts. |
 | `mermaid`, `pikchr`, `dot`, `graphviz`, `circo`, `neato`, `fdp`, `osage`, `twopi`, `d2`, `plantuml` | Diagrams with native fallback or trusted external engine support. |
 | `csv`, `tsv`, `json`, `yaml` | Structured data rendering. |
-| `openapi`, `json-schema` | API operations, security requirements, request/response contracts, response headers/links/examples, callbacks, webhooks, discriminators, component schemas, nested fields, composition, object/conditional keywords, definitions, and schema constraints. |
+| `openapi`, `json-schema` | API operations, security requirements, request/response contracts, response headers/links/examples, callbacks, webhooks, discriminators, component schemas, nested fields, composition, object/conditional/content keywords, definitions, and schema constraints. |
 | `bibtex`, `glossary`, `timeline`, `roadmap`, `adr`, `diff`, `qr` | Business-document artifacts and generated sections. |
 | `vega-lite`, `geojson`, `topojson`, `stl` | Visual data previews with static export fallbacks. |
 

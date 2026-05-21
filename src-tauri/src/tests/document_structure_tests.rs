@@ -1032,6 +1032,35 @@ components:
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
+    "labels": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z-]+$" },
+      "unevaluatedProperties": false
+    },
+    "attachments": {
+      "type": "array",
+      "minContains": 1,
+      "maxContains": 3,
+      "contains": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": { "type": "string", "const": "invoice" }
+        }
+      },
+      "unevaluatedItems": false
+    },
+    "payload": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "contentMediaType": "application/json",
+      "contentSchema": {
+        "type": "object",
+        "properties": {
+          "traceId": { "type": "string", "pattern": "^[A-Z0-9]+$" }
+        }
+      }
+    },
     "tuple": {
       "type": "array",
       "prefixItems": [
@@ -1094,8 +1123,18 @@ components:
     assert!(response.html.contains("format: uuid"));
     assert!(response.html.contains("minimum: 0"));
     assert!(response.html.contains("additionalProperties: false"));
+    assert!(response.html.contains("unevaluatedProperties: false"));
+    assert!(response.html.contains("unevaluatedItems: false"));
+    assert!(response.html.contains("minContains: 1"));
+    assert!(response.html.contains("maxContains: 3"));
+    assert!(response.html.contains("contentEncoding: base64"));
+    assert!(response.html.contains("contentMediaType: application/json"));
+    assert!(response.html.contains("contentSchema: {2 fields}"));
     assert!(response.html.contains("dependentRequired: b -&gt; cc"));
     assert!(response.html.contains("patternProperties[^x-]"));
+    assert!(response.html.contains("labels.propertyNames"));
+    assert!(response.html.contains("attachments.contains.kind"));
+    assert!(response.html.contains("payload.contentSchema.traceId"));
     assert!(response.html.contains("dependentSchemas[cc].b"));
     assert!(response.html.contains("if.status"));
     assert!(response.html.contains("then"));

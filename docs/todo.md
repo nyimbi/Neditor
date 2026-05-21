@@ -1638,6 +1638,9 @@ Current evidence:
 - OpenAPI callback, webhook, and discriminator details now flow through the
   native renderer and export artifacts; JSON Schema conditional branches and
   `$defs` rows now flow through the same semantic-table export path.
+- JSON Schema dialect proof now also covers `propertyNames`, `contains`
+  summaries with `minContains`/`maxContains`, unevaluated item/property
+  booleans, and content annotations including nested `contentSchema` rows.
 - Transform registry metadata now declares aliases and output kinds, and
   executable coverage proves `vegalite`, `jsonschema`, `schema`, `yml`, and
   `graph` aliases render through the canonical transform artifacts.
