@@ -143,7 +143,18 @@ fn render_external_transform(
         ));
         return None;
     }
-    let engine_path = options.engine_path(name)?;
+    let Some(engine_path) = options.engine_path(name) else {
+        diagnostics.push(diag(
+            "info",
+            format!("{name} external transform path is not configured; using embedded renderer."),
+            None,
+            None,
+            Some(
+                "Configure and trust an external engine path in settings when higher-fidelity rendering is needed.",
+            ),
+        ));
+        return None;
+    };
     let request = ExternalTransformRequest {
         name: name.to_string(),
         body: body.to_string(),

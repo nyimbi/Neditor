@@ -1082,6 +1082,9 @@ Finish:
 - External engines now have an explicit per-engine disabled setting. Disabled
   engines are skipped before trust/path execution checks, fall back to embedded
   rendering when available, and avoid trust-failure noise.
+- Missing optional engine paths now emit non-blocking setup diagnostics before
+  embedded fallback so users can see why high-fidelity external rendering was
+  not attempted.
 - Prepare-for-export readiness now rejects configured missing, directory, and
   non-executable external engine paths before export, while still ignoring
   disabled engine paths.

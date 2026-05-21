@@ -1897,6 +1897,17 @@ Graphviz alias external transform settings verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the Graphviz alias settings update. |
 
+Missing external transform engine path diagnostics verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_reports_missing_external_engine_path_before_embedded_fallback --lib` in `src-tauri` | Pass | Focused compiler proof confirms an external-capable `dot` fence with no configured engine path emits a non-blocking setup diagnostic before using the embedded renderer. |
+| `cargo test --locked external_transform_tests --lib` in `src-tauri` | Pass | 14 external transform tests passed after adding the missing-path diagnostic proof. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the missing external engine path diagnostic update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the missing external engine path diagnostic update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the missing external engine path diagnostic update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
