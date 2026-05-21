@@ -632,6 +632,12 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(no_manifest_output.exists());
     assert!(no_manifest.manifest_path.is_none());
     assert!(!PathBuf::from(format!("{}.manifest.json", no_manifest_output.display())).exists());
+    assert_eq!(no_manifest.manifest.readiness.info_count, 1);
+    assert!(no_manifest.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .message
+            .contains("sidecar audit manifest for this export target")
+    }));
 
     let bundle_without_sidecar_output = root.join("ready-no-sidecar-bundle.zip");
     let bundle_without_sidecar = export_document(ExportRequest {
@@ -1026,6 +1032,33 @@ fn prepare_for_export_reports_target_specific_option_info() {
         .related
         .iter()
         .any(|item| item == "option:includeAgenda"));
+
+    let html_report = prepare_for_export(PrepareExportRequest {
+        text: source.clone(),
+        file_path: None,
+        target: "html".to_string(),
+        options: json!({ "warnOnDirtyGit": false, "includeManifest": false }),
+    });
+
+    assert!(html_report.ready, "{:#?}", html_report.diagnostics);
+    assert_eq!(html_report.error_count, 0);
+    assert_eq!(html_report.warning_count, 0);
+    assert_eq!(html_report.info_count, 1);
+    assert_eq!(html_report.manifest.readiness.info_count, 1);
+    let manifest_diagnostic = html_report
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("sidecar audit manifest"))
+        .expect("sidecar manifest target option diagnostic");
+    assert_eq!(manifest_diagnostic.severity, "info");
+    assert!(manifest_diagnostic
+        .related
+        .iter()
+        .any(|item| item == "target:html"));
+    assert!(manifest_diagnostic
+        .related
+        .iter()
+        .any(|item| item == "option:includeManifest"));
 
     let bundle_report = prepare_for_export(PrepareExportRequest {
         text: source,

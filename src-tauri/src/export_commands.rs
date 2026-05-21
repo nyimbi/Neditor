@@ -484,6 +484,9 @@ fn validate_target_specific_export_options(
     options: &Value,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
+    let sidecar_manifest_disabled =
+        options.get("includeManifest").and_then(Value::as_bool) == Some(false);
+
     if target != "pptx" && bool_option_enabled(options, "includeAgenda") {
         push_option_info(
             target,
@@ -495,7 +498,7 @@ fn validate_target_specific_export_options(
     }
 
     if matches!(target, "markdown-bundle" | "markdown") {
-        if options.get("includeManifest").and_then(Value::as_bool) == Some(false) {
+        if sidecar_manifest_disabled {
             push_option_info(
                 target,
                 "includeManifest",
@@ -520,6 +523,14 @@ fn validate_target_specific_export_options(
                 );
             }
         }
+    } else if sidecar_manifest_disabled {
+        push_option_info(
+            target,
+            "includeManifest",
+            "includeManifest=false disables the sidecar audit manifest for this export target.",
+            "Enable includeManifest when the exported artifact needs separate source hash, option, diagnostic, output path, and output hash evidence.",
+            diagnostics,
+        );
     }
 }
 

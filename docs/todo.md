@@ -1038,7 +1038,9 @@ Readiness should validate and report:
   valid-but-ignored options and empty appendix export options are surfaced as
   info diagnostics without blocking readiness. Markdown bundle exports now also
   report when `includeManifest=false` suppresses only the sidecar manifest while
-  the bundle still embeds `manifest.json`.
+  the bundle still embeds `manifest.json`, and HTML/PDF/DOCX/PPTX-style direct
+  targets now report when `includeManifest=false` removes the sidecar audit
+  manifest entirely.
 - Target/output extension consistency. Focused Rust coverage now proves direct
   exports refuse mismatched target extensions before writing artifacts.
 - Unresolved comments and malformed comment/change-note audit metadata. Broad

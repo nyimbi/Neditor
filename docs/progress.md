@@ -1993,6 +1993,16 @@ Markdown bundle figure/media audit verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the bundle media-use update. |
 
+Direct export sidecar-manifest readiness verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 25 export command tests passed after making `includeManifest=false` visible for non-bundle targets; the focused readiness test now proves HTML exports report a non-blocking sidecar audit manifest diagnostic, and the direct export manifest test proves the sidecar file is suppressed while the diagnostic is retained. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the sidecar-manifest readiness update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the sidecar-manifest readiness update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the sidecar-manifest readiness update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
