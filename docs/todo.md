@@ -1601,6 +1601,9 @@ Current evidence:
 - OpenAPI callback, webhook, and discriminator details now flow through the
   native renderer and export artifacts; JSON Schema conditional branches and
   `$defs` rows now flow through the same semantic-table export path.
+- Transform registry metadata now declares aliases and output kinds, and
+  executable coverage proves `vegalite`, `jsonschema`, `schema`, `yml`, and
+  `graph` aliases render through the canonical transform artifacts.
 - Direct export sidecar manifest proof now covers HTML, PDF, DOCX, PPTX, and
   Markdown bundle targets with structured JSON equality between the written
   sidecar and returned manifest, exact output paths, actual output SHA-256

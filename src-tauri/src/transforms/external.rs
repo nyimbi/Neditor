@@ -859,6 +859,8 @@ fn transform_engine(
     };
     json!({
         "name": name,
+        "aliases": transform_aliases(name),
+        "output": transform_output(name),
         "execution": execution,
         "safeByDefault": safe_by_default,
         "bundled": !requires_execution,
@@ -886,6 +888,31 @@ fn transform_engine(
 
 fn for_graphviz_engine(name: &str) -> Value {
     transform_engine(name, "external-sidecar", false, true)
+}
+
+fn transform_aliases(name: &str) -> Vec<&'static str> {
+    match name {
+        "dot" => vec!["graph"],
+        "graphviz" => vec!["dot"],
+        "vega-lite" => vec!["vegalite"],
+        "json-schema" => vec!["jsonschema", "schema"],
+        "yaml" => vec!["yml"],
+        _ => Vec::new(),
+    }
+}
+
+fn transform_output(name: &str) -> &'static str {
+    match name {
+        "calc" => "variables",
+        "csv" | "tsv" => "table",
+        "json" | "yaml" | "glossary" | "layout" | "roadmap" | "adr" | "diff" | "openapi"
+        | "json-schema" | "bibtex" => "html",
+        "plantuml" => "svg-or-png",
+        "timeline" | "qr" | "chart" | "mermaid" | "pikchr" | "dot" | "graphviz" | "circo"
+        | "neato" | "fdp" | "osage" | "twopi" | "d2" | "vega-lite" | "geojson" | "topojson"
+        | "stl" => "svg",
+        _ => "html",
+    }
 }
 
 fn transform_diagnostic_profile(name: &str, requires_execution: bool) -> Value {

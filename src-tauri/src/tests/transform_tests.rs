@@ -11,6 +11,18 @@ fn transform_registry_covers_required_first_release_transforms() {
         .iter()
         .find(|engine| engine.get("name").and_then(Value::as_str) == Some("pikchr"))
         .expect("pikchr engine metadata");
+    let vega_lite = engines
+        .iter()
+        .find(|engine| engine.get("name").and_then(Value::as_str) == Some("vega-lite"))
+        .expect("vega-lite engine metadata");
+    let json_schema = engines
+        .iter()
+        .find(|engine| engine.get("name").and_then(Value::as_str) == Some("json-schema"))
+        .expect("json-schema engine metadata");
+    let plantuml = engines
+        .iter()
+        .find(|engine| engine.get("name").and_then(Value::as_str) == Some("plantuml"))
+        .expect("plantuml engine metadata");
     assert_eq!(
         pikchr.get("trustRequired").and_then(Value::as_bool),
         Some(true)
@@ -48,6 +60,21 @@ fn transform_registry_covers_required_first_release_transforms() {
         .pointer("/diagnosticProfile/stderrHint")
         .and_then(Value::as_str)
         .is_some_and(|hint| hint.contains("Pikchr stderr")));
+    assert_eq!(pikchr.get("output").and_then(Value::as_str), Some("svg"));
+    assert_eq!(
+        plantuml.get("output").and_then(Value::as_str),
+        Some("svg-or-png")
+    );
+    assert!(vega_lite
+        .get("aliases")
+        .and_then(Value::as_array)
+        .is_some_and(|aliases| aliases.iter().any(|alias| alias == "vegalite")));
+    assert_eq!(vega_lite.get("output").and_then(Value::as_str), Some("svg"));
+    assert!(json_schema
+        .get("aliases")
+        .and_then(Value::as_array)
+        .is_some_and(|aliases| aliases.iter().any(|alias| alias == "jsonschema")
+            && aliases.iter().any(|alias| alias == "schema")));
 
     for name in [
         "calc",
@@ -88,6 +115,12 @@ fn transform_registry_covers_required_first_release_transforms() {
         );
         assert!(supported_transform(name), "unsupported transform: {name}");
     }
+    for alias in ["vegalite", "jsonschema", "schema", "yml", "graph"] {
+        assert!(
+            supported_transform(alias),
+            "unsupported transform alias: {alias}"
+        );
+    }
 
     let response = compile(CompileRequest {
         text: "---\ntitle: Diagram\n---\n# Diagram\n```pikchr\nbox \"A\"\narrow\nbox \"B\"\n```\n"
@@ -100,6 +133,50 @@ fn transform_registry_covers_required_first_release_transforms() {
         .diagnostics
         .iter()
         .any(|diagnostic| diagnostic.message.contains("Pikchr native preview")));
+}
+
+#[test]
+fn transform_aliases_render_through_canonical_artifacts() {
+    let vega_lite = run_transform(
+            "vegalite".to_string(),
+            r#"{"mark":"bar","title":"Alias Revenue","data":{"values":[{"region":"East","revenue":120}]},"encoding":{"x":{"field":"region","type":"nominal"},"y":{"field":"revenue","type":"quantitative"}}}"#.to_string(),
+        )
+        .expect("vegalite alias transform");
+    assert_eq!(vega_lite.name, "vega-lite");
+    assert_eq!(vega_lite.output_kind, "svg");
+    assert!(vega_lite.html.contains("transform-vega-lite"));
+
+    let schema = run_transform(
+        "jsonschema".to_string(),
+        r#"{"title":"Alias Schema","type":"object","properties":{"id":{"type":"string"}}}"#
+            .to_string(),
+    )
+    .expect("jsonschema alias transform");
+    assert_eq!(schema.name, "json-schema");
+    assert_eq!(schema.output_kind, "html");
+    assert!(schema.html.contains("Alias Schema"));
+
+    let yaml =
+        run_transform("yml".to_string(), "name: Alias\n".to_string()).expect("yml alias transform");
+    assert_eq!(yaml.name, "yaml");
+    assert!(yaml.html.contains("Alias"));
+
+    let dot = run_transform("graph".to_string(), "digraph { a -> b }".to_string())
+        .expect("graph alias transform");
+    assert_eq!(dot.name, "dot");
+    assert_eq!(dot.output_kind, "svg");
+    assert!(dot.html.contains("transform-dot"));
+
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Alias Fences\n---\n# Alias Fences\n```vegalite\n{\"mark\":\"bar\",\"title\":\"Fence Alias\",\"data\":{\"values\":[{\"region\":\"East\",\"revenue\":120}]},\"encoding\":{\"x\":{\"field\":\"region\"},\"y\":{\"field\":\"revenue\"}}}\n```\n"
+                .to_string(),
+            file_path: None,
+        });
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "vega-lite"));
+    assert!(response.html.contains("transform-vega-lite"));
 }
 
 #[test]

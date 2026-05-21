@@ -24,6 +24,7 @@ pub(crate) fn render_transform(
     options: &TransformExecutionOptions,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> TransformArtifact {
+    let name = canonical_transform_name(name);
     if external_transform_supported(name) {
         if let Some(artifact) =
             render_external_transform(name, body, fence_options, options, diagnostics)
@@ -88,6 +89,7 @@ pub(crate) fn render_transform(
 }
 
 pub(crate) fn supported_transform(name: &str) -> bool {
+    let name = canonical_transform_name(name);
     matches!(
         name,
         "calc"
@@ -122,6 +124,16 @@ pub(crate) fn supported_transform(name: &str) -> bool {
             | "json-schema"
             | "bibtex"
     )
+}
+
+pub(crate) fn canonical_transform_name(name: &str) -> &str {
+    match name {
+        "vegalite" => "vega-lite",
+        "jsonschema" | "schema" => "json-schema",
+        "yml" => "yaml",
+        "graph" => "dot",
+        other => other,
+    }
 }
 
 fn render_external_transform(

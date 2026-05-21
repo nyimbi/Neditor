@@ -1908,6 +1908,16 @@ Missing external transform engine path diagnostics verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the missing external engine path diagnostic update. |
 
+Transform registry alias metadata verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked transform_tests --lib` in `src-tauri` | Pass | 37 transform tests passed after adding registry alias/output metadata plus canonical command and fenced-rendering support for `vegalite`, `jsonschema`, `schema`, `yml`, and `graph`. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the transform registry alias metadata update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the transform registry alias metadata update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating transform docs, matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the transform registry alias metadata update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

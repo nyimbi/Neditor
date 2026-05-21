@@ -337,6 +337,15 @@ Common transform names:
 | `bibtex`, `glossary`, `timeline`, `roadmap`, `adr`, `diff`, `qr` | Business-document artifacts and generated sections. |
 | `vega-lite`, `geojson`, `topojson`, `stl` | Visual data previews with static export fallbacks. |
 
+Accepted aliases:
+
+| Alias | Canonical transform |
+| --- | --- |
+| `vegalite` | `vega-lite` |
+| `jsonschema`, `schema` | `json-schema` |
+| `yml` | `yaml` |
+| `graph` | `dot` |
+
 First-release native business transforms:
 
 | Transform | Supported syntax |
