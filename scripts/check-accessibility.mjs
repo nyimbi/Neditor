@@ -21,6 +21,7 @@ checkDiagnosticLabels();
 checkConflictDiffLabels();
 checkTableEditorLabels();
 checkContrastMotionCss();
+checkEditorPreviewSurfaceLabels();
 
 if (issues.length > 0) {
   console.error("Accessibility guard failed:");
@@ -221,6 +222,43 @@ function checkContrastMotionCss() {
   const mediaReducedMotionBlock = cssBlock("@media (prefers-reduced-motion: reduce)");
   if (!mediaReducedMotionBlock.includes(".app-shell *") || !mediaReducedMotionBlock.includes("transition-duration: 0s")) {
     issues.push(`${sourcePath}:1 prefers-reduced-motion media query must disable app shell transitions`);
+  }
+}
+
+function checkEditorPreviewSurfaceLabels() {
+  const markdownSource = template.match(/<section\b[^>]*id\s*=\s*["']markdown-source["'][^>]*>/);
+  if (!markdownSource || !/\baria-label\s*=\s*["']Markdown source["']/.test(markdownSource[0])) {
+    issues.push(`${sourcePath}:1 Markdown source region must be labeled`);
+  }
+  const livePreview = template.match(/<section\b[^>]*id\s*=\s*["']live-preview["'][^>]*>/);
+  if (!livePreview || !/\baria-label\s*=\s*["']Live preview["']/.test(livePreview[0])) {
+    issues.push(`${sourcePath}:1 Live preview region must be labeled`);
+  }
+  const previewDocument = template.match(/<article\b[^>]*class\s*=\s*["']preview-document["'][^>]*>/);
+  if (!previewDocument) {
+    issues.push(`${sourcePath}:1 preview document article is missing`);
+  } else {
+    const attrs = previewDocument[0];
+    if (!/\brole\s*=\s*["']document["']/.test(attrs)) {
+      issues.push(`${sourcePath}:1 preview document must use role=document`);
+    }
+    if (!/:aria-label\s*=\s*["']previewDocumentLabel["']/.test(attrs)) {
+      issues.push(`${sourcePath}:1 preview document must use previewDocumentLabel`);
+    }
+    if (!/\btabindex\s*=\s*["']0["']/.test(attrs)) {
+      issues.push(`${sourcePath}:1 preview document must be keyboard focusable`);
+    }
+  }
+  const contentAttributes = source.match(/EditorView\.contentAttributes\.of\(\{[\s\S]*?\}\)/);
+  if (!contentAttributes) {
+    issues.push(`${sourcePath}:1 CodeMirror content attributes are missing`);
+    return;
+  }
+  const attrs = contentAttributes[0];
+  for (const required of ['role: "textbox"', '"aria-label": "Markdown editor"', '"aria-multiline": "true"', 'spellcheck: "true"', 'autocapitalize: "sentences"']) {
+    if (!attrs.includes(required)) {
+      issues.push(`${sourcePath}:1 CodeMirror content attributes must include ${required}`);
+    }
   }
 }
 

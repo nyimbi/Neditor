@@ -1174,10 +1174,14 @@ test.beforeEach(async ({ page }) => {
 test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Market Entry Report" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Markdown editor" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Markdown editor" })).toHaveAttribute("aria-multiline", "true");
+  await expect(page.getByRole("document", { name: /Rendered preview for Market Entry Report, draft/ })).toBeVisible();
 
   await page.getByLabel("View mode").selectOption("preview");
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeHidden();
   await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
+  await expect(page.getByRole("document", { name: /Rendered preview for Market Entry Report, draft/ })).toBeVisible();
 
   await page.getByLabel("View mode").selectOption("source");
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeVisible();

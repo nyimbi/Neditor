@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `770cd11 Add local
-  desktop build smoke proof`
+- Latest inspected committed baseline before this update: `e1596c2 Guard
+  contrast and motion accessibility modes`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -50,6 +50,9 @@ Recent pushed checkpoints visible in current git history:
   static CSS guardrails for black-on-white high-contrast colors, focus outlines,
   and zero-duration motion, plus browser harness assertions for the computed
   settings state.
+- This update gives the primary source and preview surfaces deeper
+  screen-reader semantics: CodeMirror content is now a named multiline textbox,
+  and the rendered preview article is a focusable named document.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.
@@ -1628,6 +1631,18 @@ High-contrast/reduced-motion accessibility verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; the settings workflow now asserts high-contrast computed colors and reduced-motion zero-duration transitions. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "persists editor settings" --project chromium` | Blocked locally | The Vite server started and selected the settings workflow, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence was used. |
 | `git diff --check` | Pass | No whitespace errors after the high-contrast/reduced-motion accessibility update. |
+
+Editor/preview screen-reader surface verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:a11y` | Pass | Static Vue accessibility guardrails now verify the Markdown source and live preview region labels, the focusable `role=document` preview article, and CodeMirror `role=textbox`/`aria-label`/`aria-multiline` content attributes. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding editor and preview document accessibility semantics. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the editor/preview accessibility update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating matrix, TODO, and progress logs; all local links resolved. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; the boot workflow now asserts the named Markdown editor textbox and rendered preview document. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "boots the workbench" --project chromium` | Blocked locally | The Vite server started and selected the boot workflow, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence was used. |
+| `git diff --check` | Pass | No whitespace errors after the editor/preview accessibility update. |
 
 ## Next Execution Order
 

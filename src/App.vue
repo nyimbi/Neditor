@@ -1039,7 +1039,15 @@
             </ul>
           </article>
         </section>
-        <article class="preview-document" :style="previewDocumentStyle" @click="handlePreviewClick" v-html="previewHtmlWithDiagnostics"></article>
+        <article
+          class="preview-document"
+          role="document"
+          :aria-label="previewDocumentLabel"
+          tabindex="0"
+          :style="previewDocumentStyle"
+          @click="handlePreviewClick"
+          v-html="previewHtmlWithDiagnostics"
+        ></article>
       </section>
     </main>
 
@@ -1499,6 +1507,11 @@ const previewDocumentStyle = computed(() => ({
   fontSize: `${clampUiFontSize(store.previewFontSize)}px`,
   lineHeight: String(clampUiLineHeight(store.previewLineHeight)),
 }));
+const previewDocumentLabel = computed(() => {
+  const title = active.value.compile?.semantic.title || active.value.title || "Untitled document";
+  const status = active.value.compile?.semantic.status || "draft";
+  return `Rendered preview for ${title}, ${status}`;
+});
 const previewDiagnostics = computed<PreviewDiagnosticItem[]>(() => {
   const diagnostics = active.value.compile?.diagnostics || [];
   return diagnostics
@@ -2168,7 +2181,13 @@ function editorExtensions() {
     linter(editorDiagnostics, { delay: 150 }),
     semanticEditorDecorations,
     closeBrackets(),
-    EditorView.contentAttributes.of({ spellcheck: "true", autocapitalize: "sentences" }),
+    EditorView.contentAttributes.of({
+      role: "textbox",
+      "aria-label": "Markdown editor",
+      "aria-multiline": "true",
+      spellcheck: "true",
+      autocapitalize: "sentences",
+    }),
     keymap.of([{ key: "Enter", run: continueMarkdownList }, ...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
     EditorView.domEventHandlers({
       scroll: () => {

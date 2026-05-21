@@ -1306,6 +1306,10 @@ Current evidence:
   settings workflow harness asserts black-on-white high-contrast computed
   colors and zero-duration motion when the preferences are enabled and after
   reload.
+- The primary source and preview surfaces now expose deeper screen-reader
+  semantics: CodeMirror content is a named multiline textbox, and the rendered
+  preview article is a focusable named document. The static accessibility guard
+  checks those contracts, and the boot workflow harness asserts them.
 
 Finish:
 
@@ -1314,7 +1318,8 @@ Finish:
 - Run modal focus workflows on a host with Playwright Chromium installed, then
   broaden coverage for nested conflict/table-editor controls.
 - ARIA labels and roles for custom controls.
-- Broader screen-reader labels for deeper editor/preview interactions.
+- Broader keyboard and screen-reader testing for deeper editor/preview
+  interactions.
 - Broader automated checks where practical plus manual checklist evidence.
 
 ### 17. Performance And Large Documents
