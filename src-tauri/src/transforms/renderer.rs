@@ -5,7 +5,7 @@ use super::{
     },
     chart::render_chart_svg,
     diagram,
-    external::{run_external_transform, ExternalTransformRequest},
+    external::{graphviz_command, run_external_transform, ExternalTransformRequest},
     options::TransformExecutionOptions,
     qr, structured, transform_cache_key,
     visual_data::{render_geojson_svg, render_stl_svg, render_topojson_svg, render_vega_lite_svg},
@@ -57,7 +57,9 @@ pub(crate) fn render_transform(
         "vega-lite" => render_vega_lite_svg(body, &mut artifact_diags, diagnostics),
         "mermaid" => diagram::render_mermaid_svg(body, &mut artifact_diags, diagnostics),
         "pikchr" => diagram::render_pikchr_svg(body, &mut artifact_diags, diagnostics),
-        "dot" | "graphviz" => diagram::render_dot_svg(name, body, &mut artifact_diags, diagnostics),
+        name if graphviz_command(name).is_some() => {
+            diagram::render_dot_svg(name, body, &mut artifact_diags, diagnostics)
+        }
         "plantuml" => diagram::render_plantuml_svg(body, &mut artifact_diags, diagnostics),
         "d2" => diagram::render_d2_svg(body, &mut artifact_diags, diagnostics),
         _ => format!("<pre>{}</pre>", escape_html(body)),
@@ -105,6 +107,11 @@ pub(crate) fn supported_transform(name: &str) -> bool {
             | "pikchr"
             | "dot"
             | "graphviz"
+            | "circo"
+            | "neato"
+            | "fdp"
+            | "osage"
+            | "twopi"
             | "plantuml"
             | "d2"
             | "vega-lite"
@@ -168,5 +175,5 @@ fn render_external_transform(
 }
 
 fn external_transform_supported(name: &str) -> bool {
-    matches!(name, "pikchr" | "dot" | "graphviz" | "plantuml" | "d2")
+    graphviz_command(name).is_some() || matches!(name, "pikchr" | "plantuml" | "d2")
 }

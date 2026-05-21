@@ -2,7 +2,7 @@
 
 NEditor can render several fenced-code transforms with native Rust fallbacks. For higher fidelity, these engines can be configured as external executables:
 
-- Graphviz / DOT
+- Graphviz / DOT (`dot`, `graphviz`, `circo`, `neato`, `fdp`, `osage`, `twopi`)
 - D2
 - PlantUML
 - Pikchr
@@ -40,6 +40,11 @@ Typical paths:
 
 ```text
 /opt/homebrew/bin/dot
+/opt/homebrew/bin/circo
+/opt/homebrew/bin/neato
+/opt/homebrew/bin/fdp
+/opt/homebrew/bin/osage
+/opt/homebrew/bin/twopi
 /opt/homebrew/bin/d2
 /opt/homebrew/bin/pikchr
 /opt/homebrew/bin/plantuml
@@ -88,6 +93,11 @@ Typical paths vary by installer. Prefer explicit executable paths such as:
 
 ```text
 C:\Program Files\Graphviz\bin\dot.exe
+C:\Program Files\Graphviz\bin\circo.exe
+C:\Program Files\Graphviz\bin\neato.exe
+C:\Program Files\Graphviz\bin\fdp.exe
+C:\Program Files\Graphviz\bin\osage.exe
+C:\Program Files\Graphviz\bin\twopi.exe
 C:\Users\<you>\AppData\Local\Microsoft\WinGet\Packages\...\d2.exe
 C:\Program Files\PlantUML\plantuml.exe
 ```
@@ -98,7 +108,7 @@ If an engine is installed through a package manager shim, verify that the shim w
 
 | Engine | Input Mode | Expected Output | Notes |
 | --- | --- | --- | --- |
-| Graphviz / DOT | stdin | SVG stdout | Uses `dot -Tsvg` semantics. |
+| Graphviz / DOT | stdin | SVG stdout | `dot` and `graphviz` fences use `dot -Tsvg` semantics. `circo`, `neato`, `fdp`, `osage`, and `twopi` are separate Graphviz engine entries with their own executable paths and the same no-shell `-Tsvg` adapter. |
 | D2 | stdin | SVG stdout | Uses SVG export profile. |
 | Pikchr | stdin | SVG stdout | Native fallback covers simple diagrams. `pikchr-cli` executables receive a temporary `.pikchr` source file path as their positional argument. |
 | PlantUML | file | SVG sidecar | File mode avoids version-specific stdin behavior. |

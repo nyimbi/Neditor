@@ -1320,6 +1320,27 @@ Additional Vega-Lite native subset verification:
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional Graphviz variant external-engine verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked transform_registry_covers_required_first_release_transforms --lib -- --nocapture` in `src-tauri` | Pass | Focused registry proof includes `dot`, `graphviz`, `circo`, `neato`, `fdp`, `osage`, and `twopi` as supported first-release transforms. |
+| `cargo test --locked external_diagram_fallbacks_render_simple_native_svgs --lib -- --nocapture` in `src-tauri` | Pass | Native fallback proof renders a Graphviz variant fence as static SVG when no trusted executable is configured. |
+| `cargo test --locked external_transform_adapters_shape_engine_specific_invocations --lib -- --nocapture` in `src-tauri` | Pass | Adapter metadata proof exposes Graphviz variant default commands, version probes, setup hints, and no-shell `-Tsvg` adapter profiles. |
+| `cargo test --locked compiler_uses_trusted_graphviz_variant_transform_preferences --lib -- --nocapture` in `src-tauri` | Pass | Focused compiler proof routes a trusted `neato` transform through external execution with the configured executable path and transform artifact metadata. |
+| `cargo test --locked external_transform_tests --lib -- --nocapture` in `src-tauri` | Pass | 11 external transform tests passed; installed-engine conformance verified `dot`, `circo`, `neato`, `fdp`, `osage`, `twopi`, D2, and PlantUML, with Pikchr skipped because it is not installed. |
+| `cargo test --locked transform_tests --lib` in `src-tauri` | Pass | 31 transform tests passed after adding Graphviz variants to the registry and native fallback surface. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 177 Rust library tests passed after widening Graphviz transform support. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the Graphviz variant update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after widening external transform support. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding Graphviz variant probe settings. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the transform settings and docs update. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails passed after the Settings transform list expansion. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating external transform docs, matrix, TODO, platform evidence, and progress log; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 reports Graphviz `dot`, `circo`, `neato`, `fdp`, `osage`, `twopi`, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests, including the external transform settings workflow. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

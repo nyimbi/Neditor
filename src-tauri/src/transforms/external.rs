@@ -53,8 +53,13 @@ pub(crate) fn list_transform_engines() -> Vec<Value> {
         transform_engine("chart", "rust-native-svg", true, false),
         transform_engine("mermaid", "rust-native-svg", true, false),
         transform_engine("pikchr", "external-sidecar", false, true),
-        transform_engine("dot", "external-sidecar", false, true),
-        transform_engine("graphviz", "external-sidecar", false, true),
+        for_graphviz_engine("dot"),
+        for_graphviz_engine("graphviz"),
+        for_graphviz_engine("circo"),
+        for_graphviz_engine("neato"),
+        for_graphviz_engine("fdp"),
+        for_graphviz_engine("osage"),
+        for_graphviz_engine("twopi"),
         transform_engine("plantuml", "external-sidecar", false, true),
         transform_engine("d2", "external-sidecar", false, true),
         transform_engine("vega-lite", "rust-native-svg", true, false),
@@ -156,7 +161,7 @@ pub(crate) fn run_external_transform(
 }
 
 fn external_transform_supported(name: &str) -> bool {
-    matches!(name, "pikchr" | "dot" | "graphviz" | "plantuml" | "d2")
+    graphviz_command(name).is_some() || matches!(name, "pikchr" | "plantuml" | "d2")
 }
 
 #[derive(Debug)]
@@ -214,12 +219,12 @@ fn external_engine_adapter(
         .map(path_to_string)
         .unwrap_or_else(|| "-".to_string());
     match (name, input_mode) {
-        ("dot" | "graphviz", "stdin") => Ok(ExternalEngineAdapter::stdout(
+        (name, "stdin") if graphviz_command(name).is_some() => Ok(ExternalEngineAdapter::stdout(
             "graphviz",
             "stdin",
             vec!["-Tsvg".to_string()],
         )),
-        ("dot" | "graphviz", "file") => Ok(ExternalEngineAdapter::stdout(
+        (name, "file") if graphviz_command(name).is_some() => Ok(ExternalEngineAdapter::stdout(
             "graphviz",
             "file",
             vec!["-Tsvg".to_string(), temp],
@@ -278,7 +283,7 @@ fn external_transform_requires_temp_input(
 
 fn external_engine_temp_suffix(name: &str) -> &'static str {
     match name {
-        "dot" | "graphviz" => "dot",
+        name if graphviz_command(name).is_some() => "dot",
         "d2" => "d2",
         "plantuml" => "puml",
         "pikchr" => "pikchr",
@@ -802,6 +807,10 @@ fn transform_engine(
     })
 }
 
+fn for_graphviz_engine(name: &str) -> Value {
+    transform_engine(name, "external-sidecar", false, true)
+}
+
 fn transform_diagnostic_profile(name: &str, requires_execution: bool) -> Value {
     if !requires_execution {
         return json!({
@@ -846,6 +855,11 @@ fn transform_diagnostic_profile(name: &str, requires_execution: bool) -> Value {
 fn transform_version_probe(name: &str) -> Option<&'static str> {
     match name {
         "dot" | "graphviz" => Some("dot -V"),
+        "circo" => Some("circo -V"),
+        "neato" => Some("neato -V"),
+        "fdp" => Some("fdp -V"),
+        "osage" => Some("osage -V"),
+        "twopi" => Some("twopi -V"),
         "d2" => Some("d2 --version"),
         "plantuml" => Some("plantuml -version"),
         "pikchr" => Some("pikchr --version"),
@@ -859,9 +873,12 @@ fn transform_setup_hint(name: &str, requires_execution: bool) -> &'static str {
     }
     match name {
         "pikchr" => "Choose a local Pikchr executable. NEditor does not bundle Pikchr by default.",
-        "dot" | "graphviz" => {
-            "Choose a local Graphviz executable such as dot. NEditor invokes it directly, not through a shell."
-        }
+        "dot" | "graphviz" => "Choose a local Graphviz executable such as dot. NEditor invokes it directly, not through a shell.",
+        "circo" => "Choose a local Graphviz circo executable. NEditor invokes it directly, not through a shell.",
+        "neato" => "Choose a local Graphviz neato executable. NEditor invokes it directly, not through a shell.",
+        "fdp" => "Choose a local Graphviz fdp executable. NEditor invokes it directly, not through a shell.",
+        "osage" => "Choose a local Graphviz osage executable. NEditor invokes it directly, not through a shell.",
+        "twopi" => "Choose a local Graphviz twopi executable. NEditor invokes it directly, not through a shell.",
         "plantuml" => {
             "Choose a local PlantUML launcher or wrapper script. Java and PlantUML remain user-installed."
         }
@@ -874,6 +891,7 @@ fn transform_setup_hint(name: &str, requires_execution: bool) -> &'static str {
 fn transform_default_command(name: &str) -> String {
     match name {
         "dot" | "graphviz" => "dot".to_string(),
+        "circo" | "neato" | "fdp" | "osage" | "twopi" => name.to_string(),
         "plantuml" => "plantuml".to_string(),
         "d2" => "d2".to_string(),
         "pikchr" => "pikchr".to_string(),
@@ -884,6 +902,11 @@ fn transform_default_command(name: &str) -> String {
 fn transform_adapter_profile(name: &str) -> &'static str {
     match name {
         "dot" | "graphviz" => "Graphviz DOT adapter: invokes -Tsvg and captures SVG from stdout.",
+        "circo" => "Graphviz circo adapter: invokes -Tsvg and captures SVG from stdout.",
+        "neato" => "Graphviz neato adapter: invokes -Tsvg and captures SVG from stdout.",
+        "fdp" => "Graphviz fdp adapter: invokes -Tsvg and captures SVG from stdout.",
+        "osage" => "Graphviz osage adapter: invokes -Tsvg and captures SVG from stdout.",
+        "twopi" => "Graphviz twopi adapter: invokes -Tsvg and captures SVG from stdout.",
         "d2" => "D2 adapter: invokes input-to-stdout mode with '-' as the output target.",
         "plantuml" => "PlantUML adapter: uses -tsvg -pipe for stdin, or reads PlantUML's SVG sidecar for file mode.",
         "pikchr" => "Pikchr adapter: passes stdin directly, a temporary Pikchr source file, or a temporary source file path for pikchr-cli.",
@@ -893,9 +916,12 @@ fn transform_adapter_profile(name: &str) -> &'static str {
 
 fn transform_failure_suggestion(name: &str) -> &'static str {
     match name {
-        "dot" | "graphviz" => {
-            "Check DOT syntax and verify the selected executable is Graphviz dot; NEditor invokes -Tsvg without a shell."
-        }
+        "dot" | "graphviz" => "Check DOT syntax and verify the selected executable is Graphviz dot; NEditor invokes -Tsvg without a shell.",
+        "circo" => "Check DOT syntax and verify the selected executable is Graphviz circo; NEditor invokes -Tsvg without a shell.",
+        "neato" => "Check DOT syntax and verify the selected executable is Graphviz neato; NEditor invokes -Tsvg without a shell.",
+        "fdp" => "Check DOT syntax and verify the selected executable is Graphviz fdp; NEditor invokes -Tsvg without a shell.",
+        "osage" => "Check DOT syntax and verify the selected executable is Graphviz osage; NEditor invokes -Tsvg without a shell.",
+        "twopi" => "Check DOT syntax and verify the selected executable is Graphviz twopi; NEditor invokes -Tsvg without a shell.",
         "d2" => {
             "Check D2 syntax and verify the selected executable supports '-' input with '-' output."
         }
@@ -911,11 +937,23 @@ fn transform_failure_suggestion(name: &str) -> &'static str {
 
 fn transform_stderr_suggestion(name: &str) -> &'static str {
     match name {
-        "dot" | "graphviz" => "Graphviz stderr is captured verbatim; DOT parse errors usually include the source line.",
+        name if graphviz_command(name).is_some() => "Graphviz stderr is captured verbatim; DOT parse errors usually include the source line.",
         "d2" => "D2 stderr is captured verbatim; syntax and layout errors usually identify the failed shape or edge.",
         "plantuml" => "PlantUML stderr is captured verbatim; launcher, Java, and syntax errors are reported by the selected wrapper.",
         "pikchr" => "Pikchr stderr is captured verbatim; parser errors usually reference the malformed statement.",
         _ => "Renderer stderr is captured verbatim when available.",
+    }
+}
+
+pub(crate) fn graphviz_command(name: &str) -> Option<&'static str> {
+    match name {
+        "dot" | "graphviz" => Some("dot"),
+        "circo" => Some("circo"),
+        "neato" => Some("neato"),
+        "fdp" => Some("fdp"),
+        "osage" => Some("osage"),
+        "twopi" => Some("twopi"),
+        _ => None,
     }
 }
 

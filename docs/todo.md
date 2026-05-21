@@ -1016,18 +1016,20 @@ Completion criteria:
 
 ### 7. External Transform Platform Evidence
 
-Status: Linux installed-engine evidence passed historically, and this macOS
-host now has current local Graphviz/DOT, D2, and PlantUML evidence. Pikchr on
-macOS and all Windows optional-engine evidence remain incomplete.
+Status: Linux installed-engine evidence passed historically, this macOS host
+has current local Graphviz/DOT, D2, and PlantUML evidence, and the Graphviz
+adapter now exposes the requested `dot`, `graphviz`, `circo`, `neato`, `fdp`,
+`osage`, and `twopi` transform names. Pikchr on macOS and all Windows
+optional-engine evidence remain incomplete.
 
 Finish:
 
 - Preserve installed-engine conformance locally where engines are available
   while expanding optional engine proof beyond Linux.
-- Keep Graphviz/DOT, D2, PlantUML, and Pikchr as real optional-engine proof
-  where available.
-- macOS evidence now verifies Graphviz/DOT, D2, and PlantUML through
-  `pnpm run check:engines` and
+- Keep Graphviz/DOT variants, D2, PlantUML, and Pikchr as real optional-engine
+  proof where available.
+- macOS evidence now verifies Graphviz `dot`, `circo`, `neato`, `fdp`,
+  `osage`, `twopi`, D2, and PlantUML through `pnpm run check:engines` and
   `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture`;
   Pikchr remains missing on this host.
 - Add Windows manual evidence for all optional engines.

@@ -10,6 +10,36 @@ const engines = [
     versionArgs: ["-V"],
   },
   {
+    name: "Graphviz / circo",
+    command: "circo",
+    env: "NEDITOR_TEST_CIRCO",
+    versionArgs: ["-V"],
+  },
+  {
+    name: "Graphviz / neato",
+    command: "neato",
+    env: "NEDITOR_TEST_NEATO",
+    versionArgs: ["-V"],
+  },
+  {
+    name: "Graphviz / fdp",
+    command: "fdp",
+    env: "NEDITOR_TEST_FDP",
+    versionArgs: ["-V"],
+  },
+  {
+    name: "Graphviz / osage",
+    command: "osage",
+    env: "NEDITOR_TEST_OSAGE",
+    versionArgs: ["-V"],
+  },
+  {
+    name: "Graphviz / twopi",
+    command: "twopi",
+    env: "NEDITOR_TEST_TWOPI",
+    versionArgs: ["-V"],
+  },
+  {
     name: "D2",
     command: "d2",
     env: "NEDITOR_TEST_D2",

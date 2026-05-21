@@ -55,6 +55,11 @@ fn transform_registry_covers_required_first_release_transforms() {
         "pikchr",
         "dot",
         "graphviz",
+        "circo",
+        "neato",
+        "fdp",
+        "osage",
+        "twopi",
         "plantuml",
         "d2",
         "vega-lite",
@@ -109,6 +114,11 @@ fn external_diagram_fallbacks_render_simple_native_svgs() {
             "graphviz",
             "digraph { a [label=\"Alpha\"]; a -> b; }",
             "Alpha",
+        ),
+        (
+            "neato",
+            "graph { Start -- Review; Review -- Done; }",
+            "transform-neato",
         ),
         ("d2", "source -> target: request", "transform-d2"),
         (

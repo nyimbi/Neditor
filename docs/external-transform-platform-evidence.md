@@ -1,6 +1,6 @@
 # External Transform Platform Evidence
 
-Updated: 2026-05-20
+Updated: 2026-05-21
 
 NEditor keeps external transform engines optional. This page records current
 platform evidence for configured local engines and the repeatable command used
@@ -36,6 +36,26 @@ Graphviz / DOT: installed
   command: dot
   path: /opt/homebrew/bin/dot
   version: dot - graphviz version 14.1.5 (20260411.2331)
+Graphviz / circo: installed
+  command: circo
+  path: /opt/homebrew/bin/circo
+  version: circo - graphviz version 14.1.5 (20260411.2331)
+Graphviz / neato: installed
+  command: neato
+  path: /opt/homebrew/bin/neato
+  version: neato - graphviz version 14.1.5 (20260411.2331)
+Graphviz / fdp: installed
+  command: fdp
+  path: /opt/homebrew/bin/fdp
+  version: fdp - graphviz version 14.1.5 (20260411.2331)
+Graphviz / osage: installed
+  command: osage
+  path: /opt/homebrew/bin/osage
+  version: osage - graphviz version 14.1.5 (20260411.2331)
+Graphviz / twopi: installed
+  command: twopi
+  path: /opt/homebrew/bin/twopi
+  version: twopi - graphviz version 14.1.5 (20260411.2331)
 D2: installed
   command: d2
   path: /opt/homebrew/bin/d2
@@ -53,13 +73,14 @@ Rust conformance evidence:
 
 ```text
 cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture
-external transform conformance verified: dot, d2, plantuml; skipped: pikchr
+external transform conformance verified: dot, circo, neato, fdp, osage, twopi, d2, plantuml; skipped: pikchr
 ```
 
 Interpretation:
 
-- Graphviz/DOT, D2, and PlantUML are verified on this macOS host through the
-  same external transform execution path used by NEditor.
+- Graphviz/DOT, Graphviz layout engines (`circo`, `neato`, `fdp`, `osage`,
+  `twopi`), D2, and PlantUML are verified on this macOS host through the same
+  external transform execution path used by NEditor.
 - PlantUML file-mode execution is verified locally and Java is available.
 - Pikchr remains a macOS evidence gap on this host because neither `pikchr` nor
   `pikchr-cli` is installed.

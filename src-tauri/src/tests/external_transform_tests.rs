@@ -310,6 +310,29 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
         .and_then(Value::as_str)
         .is_some_and(|hint| hint.contains("Graphviz dot")));
 
+    let neato = engines
+        .iter()
+        .find(|engine| engine.get("name").and_then(Value::as_str) == Some("neato"))
+        .expect("neato metadata");
+    assert_eq!(
+        neato.get("defaultCommand").and_then(Value::as_str),
+        Some("neato")
+    );
+    assert!(neato
+        .get("adapterProfile")
+        .and_then(Value::as_str)
+        .is_some_and(|profile| profile.contains("Graphviz neato adapter")));
+    assert_eq!(
+        neato
+            .pointer("/diagnosticProfile/versionProbe")
+            .and_then(Value::as_str),
+        Some("neato -V")
+    );
+    assert!(neato
+        .pointer("/diagnosticProfile/failureHint")
+        .and_then(Value::as_str)
+        .is_some_and(|hint| hint.contains("Graphviz neato")));
+
     let _ = fs::remove_file(d2);
     let _ = fs::remove_file(plantuml);
     let _ = fs::remove_file(pikchr_cli);
@@ -423,6 +446,41 @@ fn external_transform_conformance_runs_installed_engines() {
             body: format!("digraph G {{ start -> done [label=\"{unique}\"]; }}"),
         },
         EngineCase {
+            name: "circo",
+            command: "circo",
+            env_var: "NEDITOR_TEST_CIRCO",
+            input_mode: "stdin",
+            body: format!("graph G {{ start -- done [label=\"{unique}\"]; }}"),
+        },
+        EngineCase {
+            name: "neato",
+            command: "neato",
+            env_var: "NEDITOR_TEST_NEATO",
+            input_mode: "stdin",
+            body: format!("graph G {{ start -- done [label=\"{unique}\"]; }}"),
+        },
+        EngineCase {
+            name: "fdp",
+            command: "fdp",
+            env_var: "NEDITOR_TEST_FDP",
+            input_mode: "stdin",
+            body: format!("graph G {{ start -- done [label=\"{unique}\"]; }}"),
+        },
+        EngineCase {
+            name: "osage",
+            command: "osage",
+            env_var: "NEDITOR_TEST_OSAGE",
+            input_mode: "stdin",
+            body: format!("graph G {{ start -- done [label=\"{unique}\"]; }}"),
+        },
+        EngineCase {
+            name: "twopi",
+            command: "twopi",
+            env_var: "NEDITOR_TEST_TWOPI",
+            input_mode: "stdin",
+            body: format!("graph G {{ start -- done [label=\"{unique}\"]; }}"),
+        },
+        EngineCase {
             name: "d2",
             command: "d2",
             env_var: "NEDITOR_TEST_D2",
@@ -496,13 +554,13 @@ fn external_transform_conformance_runs_installed_engines() {
         skipped.join(", ")
     );
     if verified.is_empty() {
-        eprintln!("No optional external transform engines were installed; set NEDITOR_TEST_DOT, NEDITOR_TEST_D2, NEDITOR_TEST_PLANTUML, or NEDITOR_TEST_PIKCHR to force a conformance run.");
+        eprintln!("No optional external transform engines were installed; set NEDITOR_TEST_DOT, NEDITOR_TEST_CIRCO, NEDITOR_TEST_NEATO, NEDITOR_TEST_FDP, NEDITOR_TEST_OSAGE, NEDITOR_TEST_TWOPI, NEDITOR_TEST_D2, NEDITOR_TEST_PLANTUML, or NEDITOR_TEST_PIKCHR to force a conformance run.");
     }
 }
 
 fn external_conformance_adapter(name: &str) -> &'static str {
     match name {
-        "dot" => "graphviz",
+        "dot" | "circo" | "neato" | "fdp" | "osage" | "twopi" => "graphviz",
         "d2" => "d2",
         "plantuml" => "plantuml",
         "pikchr" => "pikchr",
@@ -565,6 +623,49 @@ fn compiler_uses_trusted_external_transform_preferences() {
         .message
         .contains("dot external transform completed")));
     let _ = fs::remove_file(graphviz);
+}
+
+#[cfg(unix)]
+#[test]
+fn compiler_uses_trusted_graphviz_variant_transform_preferences() {
+    let neato = write_executable_script(
+        "compiler-neato-adapter",
+        "#!/bin/sh\nprintf '<svg data-args=\"%s\">' \"$*\"\ncat\nprintf '</svg>'\n",
+    );
+    let response = compile_with_options(
+        CompileRequest {
+            text:
+                "---\ntitle: External Neato\n---\n# External Neato\n```neato\ngraph { a -- b }\n```\n"
+                    .to_string(),
+            file_path: None,
+        },
+        &json!({
+            "transformEnginePaths": { "neato": path_to_string(&neato) },
+            "trustedTransformEngines": { "neato": true },
+            "transformInputModes": { "neato": "stdin" },
+            "transformTimeoutMs": 1000
+        }),
+    );
+
+    let artifact = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "neato")
+        .expect("neato artifact");
+    assert_eq!(artifact.execution_kind, "external");
+    assert_eq!(artifact.input_mode, "stdin");
+    assert!(artifact
+        .engine_path
+        .as_deref()
+        .is_some_and(|path| path == path_to_string(&neato)));
+    assert!(artifact.html.contains("graph { a -- b }"));
+    assert!(artifact.html.contains("-Tsvg"));
+    assert!(response.html.contains("transform-external"));
+    assert!(response.html.contains("transform-neato"));
+    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("neato external transform completed")));
+    let _ = fs::remove_file(neato);
 }
 
 #[test]

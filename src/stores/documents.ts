@@ -277,6 +277,11 @@ function externalTransformProbeBody(name: string) {
   switch (name) {
     case "dot":
     case "graphviz":
+    case "circo":
+    case "neato":
+    case "fdp":
+    case "osage":
+    case "twopi":
       return "digraph G { a -> b }\n";
     case "plantuml":
       return "@startuml\nAlice -> Bob: probe\n@enduml\n";
