@@ -5175,6 +5175,39 @@ select:hover {
   content: "√";
 }
 
+.preview-document .math-root-index {
+  font-size: 0.65em;
+  vertical-align: super;
+}
+
+.preview-document .math-text {
+  font-family: inherit;
+}
+
+.preview-document .math-hat::before,
+.preview-document .math-vec::before {
+  display: block;
+  height: 0;
+  line-height: 0;
+  text-align: center;
+}
+
+.preview-document .math-hat::before {
+  content: "^";
+}
+
+.preview-document .math-vec::before {
+  content: "→";
+}
+
+.preview-document .math-overline {
+  border-top: 1px solid currentColor;
+}
+
+.preview-document .math-underline {
+  border-bottom: 1px solid currentColor;
+}
+
 .preview-document .math-align-separator {
   display: inline-block;
   min-width: 1ch;

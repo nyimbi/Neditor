@@ -905,9 +905,11 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   export test now proves equation captions survive HTML, PDF, DOCX, PPTX, and
   Markdown bundle outputs. Additional focused coverage now proves sums,
   superscripts, subscripts, arrows, approximation/infinity symbols, Omega,
-  simple matrix environments, preview/export CSS, AST capture, and DOCX/PPTX
-  text evidence. Remaining work is rendered visual QA and deeper LaTeX
-  permutations beyond the native subset.
+  simple matrix environments, optional-index roots, text spans, overline,
+  underline, hat/vector wrappers, left/right delimiters, set/logic symbols,
+  ellipses, preview/export CSS, AST capture, and DOCX/PPTX text evidence.
+  Remaining work is rendered visual QA and additional LaTeX permutations beyond
+  the native subset.
 - Citations, bibliography, locators, missing keys, duplicate keys, and CSL
   behavior.
 - Cross references to headings, figures, tables, equations, appendices, and

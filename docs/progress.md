@@ -1816,6 +1816,23 @@ Enabled export option matrix verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors after the enabled option matrix fixture. |
 
+Extended LaTeX equation notation verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_renders_extended_latex_equation_notation --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust proof covers optional-index roots, `\text{}` labels, overline/underline/hat/vector wrappers, left/right delimiters, set/logic symbols, ellipses, preview/export CSS, AST capture, and DOCX/PPTX text evidence. |
+| `cargo test --locked document_structure_tests --lib` in `src-tauri` | Pass | 22 document structure tests passed after extending native LaTeX notation rendering. |
+| `cargo test --locked captioned_equations_survive_cross_target_exports --lib -- --nocapture` in `src-tauri` | Pass | Captioned equation export conformance still passes across target artifacts. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the extended LaTeX renderer update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the extended LaTeX renderer update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding preview CSS for the new math notation wrappers. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue accessibility guardrails still pass after the preview CSS update. |
+| `pnpm run check:structure` | Pass | The Vue single-file component structure guard still passes after the preview CSS update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests still pass after the preview CSS update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
+| `git diff --check` | Pass | No whitespace errors after the extended LaTeX renderer update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

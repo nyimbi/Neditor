@@ -94,6 +94,62 @@ fn compiler_renders_broader_latex_equation_syntax() {
 }
 
 #[test]
+fn compiler_renders_extended_latex_equation_notation() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Extended Math\nstatus: approved\napprovedBy: QA\n---\n# Extended Math\nInline \\(\\sqrt[3]{x} + \\overline{AB} + \\hat{\\theta} + \\vec{v}\\) and \\(\\forall x \\in A \\subseteq B \\Rightarrow x \\notin C\\).\n\n$$\n\\left( \\frac{\\text{Revenue}}{\\sqrt[3]{Cost}} \\right) + \\underline{risk} + \\cdots\n$$ {#eq:extended caption=\"Extended notation\"}\n\nSee {@eq:extended}.\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.html.contains("class=\"math-root-index\""));
+    assert!(response.html.contains("class=\"math-overline\""));
+    assert!(response.html.contains("class=\"math-hat\""));
+    assert!(response.html.contains("class=\"math-vec\""));
+    assert!(response.html.contains("class=\"math-text\">Revenue</span>"));
+    assert!(response.html.contains("class=\"math-underline\""));
+    assert!(response.html.contains("∀"));
+    assert!(response.html.contains("∈"));
+    assert!(response.html.contains("⊆"));
+    assert!(response.html.contains("∉"));
+    assert!(response.html.contains("⋯"));
+    assert!(response.html.contains("( <span class=\"math-frac\""));
+    assert!(response.html.contains("Equation 1: Extended notation"));
+    assert!(response
+        .compiled_markdown
+        .contains("See [Equation extended](#eq:extended)."));
+    assert!(response.document_ast.blocks.iter().any(|block| {
+        matches!(
+            block,
+            DocumentBlock::Equation { id, caption, text, .. }
+                if id.as_deref() == Some("eq:extended")
+                    && caption.as_deref() == Some("Extended notation")
+                    && text.contains("\\sqrt[3]")
+                    && text.contains("\\text{Revenue}")
+        )
+    }));
+
+    let options = json!({});
+    let html = render_full_html(&response, &options);
+    assert!(html.contains(".math-root-index"));
+    assert!(html.contains(".math-overline"));
+    assert!(html.contains(".math-underline"));
+    assert!(html.contains("class=\"math-text\">Revenue</span>"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx extended math");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Equation: eq:extended"));
+    assert!(docx_document.contains("Extended notation"));
+    assert!(docx_document.contains("\\sqrt[3]{Cost}"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx extended math");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/");
+    assert!(pptx_slides.iter().any(|slide| {
+        slide.contains("Equation: eq:extended")
+            && slide.contains("Extended notation")
+            && slide.contains("\\sqrt[3]{Cost}")
+    }));
+}
+
+#[test]
 fn compiler_renders_markdown_footnotes() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Footnotes\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\n---\n# Footnotes\nA governed claim.[^risk]\n\n[^risk]: Reviewed by compliance.\n    Includes second-line evidence.\n".to_string(),

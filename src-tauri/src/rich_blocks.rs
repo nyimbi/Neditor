@@ -244,14 +244,36 @@ fn render_latex_expr(input: &str) -> String {
                 index = after_matrix;
                 continue;
             }
+        } else if let Some((class_name, command_len)) = latex_wrapper_command(rest) {
+            if let Some((content, after_content)) = parse_latex_braced(input, index + command_len) {
+                output.push_str(&format!("<span class=\"{class_name}\">"));
+                output.push_str(&render_latex_expr(&content));
+                output.push_str("</span>");
+                index = after_content;
+                continue;
+            }
         } else if rest.starts_with("\\sqrt") {
-            if let Some((radicand, after_radicand)) =
-                parse_latex_braced(input, index + "\\sqrt".len())
-            {
+            let after_command = index + "\\sqrt".len();
+            let (root_index, after_index) = parse_latex_bracketed(input, after_command)
+                .unwrap_or((String::new(), after_command));
+            if let Some((radicand, after_radicand)) = parse_latex_braced(input, after_index) {
                 output.push_str("<span class=\"math-sqrt\">");
+                if !root_index.trim().is_empty() {
+                    output.push_str("<sup class=\"math-root-index\">");
+                    output.push_str(&render_latex_expr(&root_index));
+                    output.push_str("</sup>");
+                }
                 output.push_str(&render_latex_expr(&radicand));
                 output.push_str("</span>");
                 index = after_radicand;
+                continue;
+            }
+        } else if rest.starts_with("\\text") {
+            if let Some((text, after_text)) = parse_latex_braced(input, index + "\\text".len()) {
+                output.push_str("<span class=\"math-text\">");
+                output.push_str(&escape_html(&text));
+                output.push_str("</span>");
+                index = after_text;
                 continue;
             }
         } else if let Some(command) = rest.strip_prefix('\\').and_then(latex_command) {
@@ -281,6 +303,22 @@ fn render_latex_expr(input: &str) -> String {
         index += ch.len_utf8();
     }
     output
+}
+
+fn latex_wrapper_command(input: &str) -> Option<(&'static str, usize)> {
+    let name = input
+        .strip_prefix('\\')?
+        .chars()
+        .take_while(|ch| ch.is_ascii_alphabetic())
+        .collect::<String>();
+    let class_name = match name.as_str() {
+        "hat" => "math-hat",
+        "vec" => "math-vec",
+        "bar" | "overline" => "math-overline",
+        "underline" => "math-underline",
+        _ => return None,
+    };
+    Some((class_name, name.len() + 1))
 }
 
 fn render_latex_matrix(input: &str) -> Option<String> {
@@ -381,6 +419,9 @@ fn latex_command(input: &str) -> Option<LatexCommand<'_>> {
         "Omega" => "Ω",
         "Delta" => "Δ",
         "Sigma" => "Σ",
+        "Gamma" => "Γ",
+        "Lambda" => "Λ",
+        "Pi" => "Π",
         "sum" => "∑",
         "prod" => "∏",
         "int" => "∫",
@@ -388,6 +429,7 @@ fn latex_command(input: &str) -> Option<LatexCommand<'_>> {
         "partial" => "∂",
         "nabla" => "∇",
         "times" => "×",
+        "div" => "÷",
         "cdot" => "·",
         "pm" => "±",
         "to" => "→",
@@ -397,6 +439,25 @@ fn latex_command(input: &str) -> Option<LatexCommand<'_>> {
         "Leftarrow" => "⇐",
         "approx" => "≈",
         "equiv" => "≡",
+        "forall" => "∀",
+        "exists" => "∃",
+        "in" => "∈",
+        "notin" => "∉",
+        "subset" => "⊂",
+        "subseteq" => "⊆",
+        "cup" => "∪",
+        "cap" => "∩",
+        "land" => "∧",
+        "lor" => "∨",
+        "neg" => "¬",
+        "cdots" => "⋯",
+        "ldots" => "…",
+        "sin" => "sin",
+        "cos" => "cos",
+        "tan" => "tan",
+        "log" => "log",
+        "ln" => "ln",
+        "left" | "right" => "",
         "lt" => "&lt;",
         "gt" => "&gt;",
         "le" => "≤",
@@ -410,6 +471,32 @@ fn latex_command(input: &str) -> Option<LatexCommand<'_>> {
         symbol,
         consumed: name.len(),
     })
+}
+
+fn parse_latex_bracketed(input: &str, start: usize) -> Option<(String, usize)> {
+    let mut index = skip_latex_whitespace(input, start);
+    if input[index..].chars().next()? != '[' {
+        return None;
+    }
+    index += 1;
+    let content_start = index;
+    let mut depth = 1usize;
+    while index < input.len() {
+        let ch = input[index..].chars().next()?;
+        if ch == '[' {
+            depth += 1;
+        } else if ch == ']' {
+            depth = depth.saturating_sub(1);
+            if depth == 0 {
+                return Some((
+                    input[content_start..index].to_string(),
+                    index + ch.len_utf8(),
+                ));
+            }
+        }
+        index += ch.len_utf8();
+    }
+    None
 }
 
 fn parse_latex_braced(input: &str, start: usize) -> Option<(String, usize)> {
