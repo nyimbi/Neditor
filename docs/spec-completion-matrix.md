@@ -253,14 +253,14 @@ Current major verification gaps:
   now classifies this host's sandboxed `hdiutil create`/`hdiejectd` failure and
   writes `.tmp/desktop-bundle/macos-dmg-report.json`, so DMG failure is tracked
   as host-specific instead of an unclassified packaging note.
-- Current committed browser workflow tests exist, but local browser execution
-  depends on host permissions that allow Chromium launch. A Tauri-driver
-  WebDriver harness now exists for supported Windows/Linux hosts; macOS records
-  the official unsupported skip because the Tauri WebDriver stack has no
-  WKWebView driver there. The supported-platform harness now reaches beyond
-  shell smoke by checking dirty native titles, export readiness, and preference
-  persistence across a desktop restart, and `pnpm run test:tauri-webdriver`
-  writes `.tmp/desktop-webdriver/report.json` with pass/skip evidence.
+- Current committed browser workflow tests now execute locally on this host
+  through the project-local Playwright browser cache. A Tauri-driver WebDriver
+  harness exists for supported Windows/Linux hosts; macOS records the official
+  unsupported skip because the Tauri WebDriver stack has no WKWebView driver
+  there. The supported-platform harness now reaches beyond shell smoke by
+  checking dirty native titles, export readiness, and preference persistence
+  across a desktop restart, and `pnpm run test:tauri-webdriver` writes
+  `.tmp/desktop-webdriver/report.json` with pass/skip evidence.
 - Export tests now include package/text assertions plus a representative
   rendered export audit that inspects HTML, PDF object structure, DOCX/PPTX
   package anatomy, custom/core properties, comments/provenance appendices,
