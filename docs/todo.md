@@ -1468,6 +1468,9 @@ Current evidence:
   formulas, tables, figures, equations, citations, glossary/index, comments,
   AI provenance, transforms, native visual-data transform subsets, and export
   readiness markers.
+- Native visual-data subset documentation now reflects typed GeoJSON geometry
+  previews and TopoJSON object arc-reference resolution, including reversed
+  arcs.
 - Front matter documentation now calls out that metadata must be a YAML mapping
   and that invalid YAML/list/scalar metadata produces source-ranged diagnostics.
 - `pnpm run check:docs` discovers README plus all top-level docs Markdown files

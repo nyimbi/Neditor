@@ -80,8 +80,9 @@ pub(crate) fn render_geojson_svg(
             return "<section class=\"transform transform-geojson transform-error\">Invalid GeoJSON document</section>".to_string();
         }
     };
-    let mut positions = Vec::new();
-    collect_geojson_positions(&value, &mut positions);
+    let mut shapes = Vec::new();
+    collect_geojson_shapes(&value, &mut shapes);
+    let positions = geo_shapes_positions(&shapes);
     if positions.is_empty() {
         let diagnostic = diag(
             "warning",
@@ -94,28 +95,7 @@ pub(crate) fn render_geojson_svg(
         diagnostics.push(diagnostic);
         return "<section class=\"transform transform-geojson transform-error\">No GeoJSON coordinates found</section>".to_string();
     }
-    let positions = positions.into_iter().take(2000).collect::<Vec<_>>();
-    let (min_x, max_x, min_y, max_y) = geojson_bounds(&positions);
-    let points = positions
-        .iter()
-        .map(|position| {
-            let (x, y) = project_geojson_position(*position, min_x, max_x, min_y, max_y);
-            format!("{x:.2},{y:.2}")
-        })
-        .collect::<Vec<_>>();
-    let markers = points
-        .iter()
-        .map(|point| {
-            let (x, y) = point.split_once(',').unwrap_or(("0", "0"));
-            format!("<circle cx=\"{x}\" cy=\"{y}\" r=\"3\" fill=\"#0f766e\"/>")
-        })
-        .collect::<Vec<_>>()
-        .join("");
-    format!(
-        "<svg class=\"transform transform-geojson\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#ecfeff\" stroke=\"#67e8f9\"/><polyline points=\"{}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"3\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>{markers}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#134e4a\">{} coordinates</text></svg>",
-        points.join(" "),
-        positions.len()
-    )
+    render_geo_shapes_svg("geojson", "#ecfeff", "#67e8f9", "#134e4a", &shapes)
 }
 
 pub(crate) fn render_topojson_svg(
@@ -138,8 +118,8 @@ pub(crate) fn render_topojson_svg(
             return "<section class=\"transform transform-topojson transform-error\">Invalid TopoJSON document</section>".to_string();
         }
     };
-    let arcs = decode_topojson_arcs(&value);
-    if arcs.is_empty() {
+    let shapes = decode_topojson_shapes(&value);
+    if shapes.is_empty() {
         let diagnostic = diag(
             "warning",
             "TopoJSON transform did not contain drawable arcs.",
@@ -151,34 +131,7 @@ pub(crate) fn render_topojson_svg(
         diagnostics.push(diagnostic);
         return "<section class=\"transform transform-topojson transform-error\">No TopoJSON arcs found</section>".to_string();
     }
-    let positions = arcs
-        .iter()
-        .flatten()
-        .copied()
-        .take(4000)
-        .collect::<Vec<_>>();
-    let (min_x, max_x, min_y, max_y) = geojson_bounds(&positions);
-    let polylines = arcs
-        .iter()
-        .map(|arc| {
-            let points = arc
-                .iter()
-                .map(|position| {
-                    let (x, y) = project_geojson_position(*position, min_x, max_x, min_y, max_y);
-                    format!("{x:.2},{y:.2}")
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
-            format!(
-                "<polyline points=\"{points}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"3\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>"
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("");
-    format!(
-        "<svg class=\"transform transform-topojson\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#94a3b8\"/>{polylines}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#334155\">{} arcs</text></svg>",
-        arcs.len()
-    )
+    render_geo_shapes_svg("topojson", "#f8fafc", "#94a3b8", "#334155", &shapes)
 }
 
 pub(crate) fn render_stl_svg(
@@ -362,6 +315,218 @@ fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[(String, f64)])
     svg
 }
 
+#[derive(Clone, Debug)]
+enum GeoShape {
+    Point((f64, f64)),
+    Line(Vec<(f64, f64)>),
+    Polygon(Vec<Vec<(f64, f64)>>),
+}
+
+fn render_geo_shapes_svg(
+    class_name: &str,
+    fill: &str,
+    stroke: &str,
+    text_color: &str,
+    shapes: &[GeoShape],
+) -> String {
+    let positions = geo_shapes_positions(shapes);
+    let (min_x, max_x, min_y, max_y) = geojson_bounds(&positions);
+    let mut point_count = 0usize;
+    let mut line_count = 0usize;
+    let mut polygon_count = 0usize;
+    let mut coordinate_count = 0usize;
+    let mut body = String::new();
+
+    for shape in shapes.iter().take(500) {
+        match shape {
+            GeoShape::Point(position) => {
+                point_count += 1;
+                coordinate_count += 1;
+                let (x, y) = project_geojson_position(*position, min_x, max_x, min_y, max_y);
+                body.push_str(&format!(
+                    "<circle cx=\"{x:.2}\" cy=\"{y:.2}\" r=\"4\" fill=\"#0f766e\"/>"
+                ));
+            }
+            GeoShape::Line(line) => {
+                if line.len() < 2 {
+                    continue;
+                }
+                line_count += 1;
+                coordinate_count += line.len();
+                let points = projected_points(line, min_x, max_x, min_y, max_y);
+                body.push_str(&format!(
+                    "<polyline points=\"{points}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"3\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>"
+                ));
+            }
+            GeoShape::Polygon(rings) => {
+                for ring in rings {
+                    if ring.len() < 3 {
+                        continue;
+                    }
+                    polygon_count += 1;
+                    coordinate_count += ring.len();
+                    let points = projected_points(ring, min_x, max_x, min_y, max_y);
+                    body.push_str(&format!(
+                        "<polygon points=\"{points}\" fill=\"rgba(39,93,168,.18)\" stroke=\"#275DA8\" stroke-width=\"2\" stroke-linejoin=\"round\"/>"
+                    ));
+                }
+            }
+        }
+    }
+
+    let mut summary_parts = Vec::new();
+    if polygon_count > 0 {
+        summary_parts.push(format!("{polygon_count} polygons"));
+    }
+    if line_count > 0 {
+        summary_parts.push(format!("{line_count} lines"));
+    }
+    if point_count > 0 {
+        summary_parts.push(format!("{point_count} points"));
+    }
+    summary_parts.push(format!("{coordinate_count} coordinates"));
+    let summary = summary_parts.join(" / ");
+
+    format!(
+        "<svg class=\"transform transform-{class_name}\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"{fill}\" stroke=\"{stroke}\"/>{body}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"{text_color}\">{summary}</text></svg>"
+    )
+}
+
+fn projected_points(
+    positions: &[(f64, f64)],
+    min_x: f64,
+    max_x: f64,
+    min_y: f64,
+    max_y: f64,
+) -> String {
+    positions
+        .iter()
+        .map(|position| {
+            let (x, y) = project_geojson_position(*position, min_x, max_x, min_y, max_y);
+            format!("{x:.2},{y:.2}")
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn geo_shapes_positions(shapes: &[GeoShape]) -> Vec<(f64, f64)> {
+    shapes
+        .iter()
+        .flat_map(|shape| match shape {
+            GeoShape::Point(position) => vec![*position],
+            GeoShape::Line(line) => line.clone(),
+            GeoShape::Polygon(rings) => rings.iter().flatten().copied().collect(),
+        })
+        .take(4000)
+        .collect()
+}
+
+fn collect_geojson_shapes(value: &Value, shapes: &mut Vec<GeoShape>) {
+    let Some(kind) = value.get("type").and_then(Value::as_str) else {
+        return;
+    };
+    match kind {
+        "FeatureCollection" => {
+            if let Some(features) = value.get("features").and_then(Value::as_array) {
+                for feature in features {
+                    collect_geojson_shapes(feature, shapes);
+                }
+            }
+        }
+        "Feature" => {
+            if let Some(geometry) = value.get("geometry") {
+                collect_geojson_shapes(geometry, shapes);
+            }
+        }
+        "GeometryCollection" => {
+            if let Some(geometries) = value.get("geometries").and_then(Value::as_array) {
+                for geometry in geometries {
+                    collect_geojson_shapes(geometry, shapes);
+                }
+            }
+        }
+        "Point" => {
+            if let Some(point) = value.get("coordinates").and_then(position_from_value) {
+                shapes.push(GeoShape::Point(point));
+            }
+        }
+        "MultiPoint" => {
+            if let Some(points) = value.get("coordinates").and_then(line_from_value) {
+                shapes.extend(points.into_iter().map(GeoShape::Point));
+            }
+        }
+        "LineString" => {
+            if let Some(line) = value.get("coordinates").and_then(line_from_value) {
+                shapes.push(GeoShape::Line(line));
+            }
+        }
+        "MultiLineString" => {
+            if let Some(lines) = value
+                .get("coordinates")
+                .and_then(Value::as_array)
+                .map(|items| items.iter().filter_map(line_from_value))
+            {
+                shapes.extend(lines.map(GeoShape::Line));
+            }
+        }
+        "Polygon" => {
+            if let Some(rings) = value.get("coordinates").and_then(rings_from_value) {
+                shapes.push(GeoShape::Polygon(rings));
+            }
+        }
+        "MultiPolygon" => {
+            if let Some(polygons) = value
+                .get("coordinates")
+                .and_then(Value::as_array)
+                .map(|items| items.iter().filter_map(rings_from_value))
+            {
+                shapes.extend(polygons.map(GeoShape::Polygon));
+            }
+        }
+        _ => {}
+    }
+}
+
+fn position_from_value(value: &Value) -> Option<(f64, f64)> {
+    let coordinates = value.as_array()?;
+    Some((
+        coordinates.first()?.as_f64()?,
+        coordinates.get(1)?.as_f64()?,
+    ))
+}
+
+fn line_from_value(value: &Value) -> Option<Vec<(f64, f64)>> {
+    let positions = value
+        .as_array()?
+        .iter()
+        .filter_map(position_from_value)
+        .collect::<Vec<_>>();
+    (!positions.is_empty()).then_some(positions)
+}
+
+fn rings_from_value(value: &Value) -> Option<Vec<Vec<(f64, f64)>>> {
+    let rings = value
+        .as_array()?
+        .iter()
+        .filter_map(line_from_value)
+        .collect::<Vec<_>>();
+    (!rings.is_empty()).then_some(rings)
+}
+
+fn decode_topojson_shapes(value: &Value) -> Vec<GeoShape> {
+    let decoded_arcs = decode_topojson_arcs(value);
+    let mut shapes = Vec::new();
+    if let Some(objects) = value.get("objects").and_then(Value::as_object) {
+        for object in objects.values() {
+            collect_topojson_object_shapes(object, &decoded_arcs, &mut shapes);
+        }
+    }
+    if shapes.is_empty() {
+        shapes.extend(decoded_arcs.into_iter().map(GeoShape::Line));
+    }
+    shapes
+}
+
 fn decode_topojson_arcs(value: &Value) -> Vec<Vec<(f64, f64)>> {
     let scale = value
         .pointer("/transform/scale")
@@ -380,6 +545,107 @@ fn decode_topojson_arcs(value: &Value) -> Vec<Vec<(f64, f64)>> {
         .flatten()
         .filter_map(|arc| decode_topojson_arc(arc, scale, translate))
         .collect()
+}
+
+fn collect_topojson_object_shapes(
+    object: &Value,
+    decoded_arcs: &[Vec<(f64, f64)>],
+    shapes: &mut Vec<GeoShape>,
+) {
+    let Some(kind) = object.get("type").and_then(Value::as_str) else {
+        return;
+    };
+    match kind {
+        "GeometryCollection" => {
+            if let Some(geometries) = object.get("geometries").and_then(Value::as_array) {
+                for geometry in geometries {
+                    collect_topojson_object_shapes(geometry, decoded_arcs, shapes);
+                }
+            }
+        }
+        "LineString" => {
+            if let Some(line) = object
+                .get("arcs")
+                .and_then(|arcs| topojson_line_from_arc_refs(arcs, decoded_arcs))
+            {
+                shapes.push(GeoShape::Line(line));
+            }
+        }
+        "MultiLineString" => {
+            if let Some(lines) = object.get("arcs").and_then(Value::as_array).map(|items| {
+                items
+                    .iter()
+                    .filter_map(|line| topojson_line_from_arc_refs(line, decoded_arcs))
+            }) {
+                shapes.extend(lines.map(GeoShape::Line));
+            }
+        }
+        "Polygon" => {
+            if let Some(rings) = object.get("arcs").and_then(Value::as_array).map(|items| {
+                items
+                    .iter()
+                    .filter_map(|ring| topojson_line_from_arc_refs(ring, decoded_arcs))
+                    .collect::<Vec<_>>()
+            }) {
+                if !rings.is_empty() {
+                    shapes.push(GeoShape::Polygon(rings));
+                }
+            }
+        }
+        "MultiPolygon" => {
+            if let Some(polygons) = object.get("arcs").and_then(Value::as_array) {
+                for polygon in polygons {
+                    if let Some(rings) = polygon.as_array().map(|items| {
+                        items
+                            .iter()
+                            .filter_map(|ring| topojson_line_from_arc_refs(ring, decoded_arcs))
+                            .collect::<Vec<_>>()
+                    }) {
+                        if !rings.is_empty() {
+                            shapes.push(GeoShape::Polygon(rings));
+                        }
+                    }
+                }
+            }
+        }
+        "Point" => {
+            if let Some(point) = object.get("coordinates").and_then(position_from_value) {
+                shapes.push(GeoShape::Point(point));
+            }
+        }
+        "MultiPoint" => {
+            if let Some(points) = object.get("coordinates").and_then(line_from_value) {
+                shapes.extend(points.into_iter().map(GeoShape::Point));
+            }
+        }
+        _ => {}
+    }
+}
+
+fn topojson_line_from_arc_refs(
+    arc_refs: &Value,
+    decoded_arcs: &[Vec<(f64, f64)>],
+) -> Option<Vec<(f64, f64)>> {
+    let mut line = Vec::new();
+    for arc_ref in arc_refs.as_array()? {
+        let arc_index = arc_ref.as_i64()?;
+        let mut arc = topojson_arc_by_ref(arc_index, decoded_arcs)?;
+        if !line.is_empty() && !arc.is_empty() {
+            arc.remove(0);
+        }
+        line.extend(arc);
+    }
+    (!line.is_empty()).then_some(line)
+}
+
+fn topojson_arc_by_ref(arc_ref: i64, decoded_arcs: &[Vec<(f64, f64)>]) -> Option<Vec<(f64, f64)>> {
+    if arc_ref >= 0 {
+        return decoded_arcs.get(arc_ref as usize).cloned();
+    }
+    let index = (-arc_ref - 1) as usize;
+    let mut arc = decoded_arcs.get(index)?.clone();
+    arc.reverse();
+    Some(arc)
 }
 
 fn decode_topojson_arc(
@@ -413,28 +679,6 @@ fn parse_ascii_stl_vertices(body: &str) -> Vec<(f64, f64, f64)> {
             ))
         })
         .collect()
-}
-
-fn collect_geojson_positions(value: &Value, positions: &mut Vec<(f64, f64)>) {
-    match value {
-        Value::Array(items) => {
-            if items.len() >= 2 {
-                if let (Some(x), Some(y)) = (items[0].as_f64(), items[1].as_f64()) {
-                    positions.push((x, y));
-                    return;
-                }
-            }
-            for item in items {
-                collect_geojson_positions(item, positions);
-            }
-        }
-        Value::Object(map) => {
-            for value in map.values() {
-                collect_geojson_positions(value, positions);
-            }
-        }
-        _ => {}
-    }
 }
 
 fn geojson_bounds(positions: &[(f64, f64)]) -> (f64, f64, f64, f64) {

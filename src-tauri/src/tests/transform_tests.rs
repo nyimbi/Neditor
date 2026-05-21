@@ -545,6 +545,24 @@ fn geojson_transform_renders_static_svg_preview() {
 }
 
 #[test]
+fn geojson_transform_preserves_geometry_types_in_static_svg_preview() {
+    let artifact = run_transform(
+            "geojson".to_string(),
+            r#"{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"District"},"geometry":{"type":"Polygon","coordinates":[[[36.80,-1.30],[36.86,-1.30],[36.86,-1.24],[36.80,-1.24],[36.80,-1.30]]]}},{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[36.81,-1.29],[36.84,-1.26]]}}]}"#.to_string(),
+        )
+        .expect("geojson feature collection transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-geojson"));
+    assert!(artifact.html.contains("<polygon"));
+    assert!(artifact.html.contains("<circle"));
+    assert!(artifact.html.contains("1 polygons"));
+    assert!(artifact.html.contains("2 points"));
+    assert!(artifact.html.contains("7 coordinates"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn topojson_transform_renders_static_svg_preview() {
     let artifact = run_transform(
             "topojson".to_string(),
@@ -555,7 +573,8 @@ fn topojson_transform_renders_static_svg_preview() {
     assert_eq!(artifact.output_kind, "svg");
     assert!(artifact.html.contains("transform-topojson"));
     assert!(artifact.html.contains("<polyline"));
-    assert!(artifact.html.contains("1 arcs"));
+    assert!(artifact.html.contains("1 lines"));
+    assert!(artifact.html.contains("3 coordinates"));
     assert!(artifact.diagnostics.is_empty());
 
     let engines = list_transform_engines();
@@ -567,6 +586,22 @@ fn topojson_transform_renders_static_svg_preview() {
         topojson.get("execution").and_then(Value::as_str),
         Some("rust-native-svg")
     );
+}
+
+#[test]
+fn topojson_transform_resolves_object_arc_references() {
+    let artifact = run_transform(
+            "topojson".to_string(),
+            r#"{"type":"Topology","transform":{"scale":[0.01,0.01],"translate":[36.8,-1.3]},"objects":{"district":{"type":"Polygon","arcs":[[0,-2]]}},"arcs":[[[0,0],[6,0],[0,6]],[[0,0],[0,6],[6,0]]]}"#.to_string(),
+        )
+        .expect("topojson object transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-topojson"));
+    assert!(artifact.html.contains("<polygon"));
+    assert!(artifact.html.contains("1 polygons"));
+    assert!(artifact.html.contains("5 coordinates"));
+    assert!(artifact.diagnostics.is_empty());
 }
 
 #[test]
