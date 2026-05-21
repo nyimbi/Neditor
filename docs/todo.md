@@ -1267,8 +1267,10 @@ Finish:
 - Citation styles: title, author-year, key, numeric, and CSL-driven choices.
   Current coverage proves common CSL aliases for APA-style author-year output
   and IEEE-style numeric output, plus export option validation for alias
-  defaults; remaining work is full CSL processor fidelity beyond deterministic
-  native aliases.
+  defaults. Frontend persistence now preserves supported aliases such as `APA`
+  to `apa`, and the References/Settings selectors expose common aliases;
+  remaining work is full CSL processor fidelity beyond deterministic native
+  aliases.
 - Remaining citation diagnostics: richer CSL style validation and a future
   Rust-native CSL/Hayagriva adapter for named CSL styles beyond the built-in
   options.

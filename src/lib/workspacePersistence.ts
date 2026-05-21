@@ -2,7 +2,30 @@ import type { AiCleanupOptions } from "../types.js";
 
 export const WORKSPACE_SCHEMA_VERSION = 2;
 
-export type CitationStyle = "title" | "author-year" | "key" | "numeric";
+export const SUPPORTED_CITATION_STYLES = [
+  "title",
+  "neditor-title",
+  "author-year",
+  "author_year",
+  "apa",
+  "american-psychological-association",
+  "chicago-author-date",
+  "chicago",
+  "harvard",
+  "council-of-science-editors-author-date",
+  "key",
+  "citation-key",
+  "citation_key",
+  "numeric",
+  "ieee",
+  "vancouver",
+  "nature",
+  "american-medical-association",
+  "ama",
+  "elsevier-vancouver",
+] as const;
+
+export type CitationStyle = (typeof SUPPORTED_CITATION_STYLES)[number];
 export type LayoutPreset = "business" | "compact" | "presentation";
 export type PreviewTheme = "match" | "light" | "dark";
 export type SnapshotStorage = "app-data" | "project-local";
@@ -176,7 +199,9 @@ export function clampScrollRatio(value: number | undefined) {
 }
 
 export function normalizeCitationStyle(value: unknown): CitationStyle {
-  return value === "author-year" || value === "key" || value === "numeric" || value === "title" ? value : "title";
+  if (typeof value !== "string") return "title";
+  const normalized = value.trim().toLowerCase();
+  return (SUPPORTED_CITATION_STYLES as readonly string[]).includes(normalized) ? (normalized as CitationStyle) : "title";
 }
 
 export function normalizeLayoutPreset(value: unknown): LayoutPreset {

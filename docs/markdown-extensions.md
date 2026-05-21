@@ -267,7 +267,8 @@ author-year renderer; `ieee`, `vancouver`, `nature`,
 `american-medical-association`, `ama`, and `elsevier-vancouver` map to the
 numeric renderer. Unsupported `citationStyle` or `cslStyle` names produce a
 warning and fall back to title rendering until a full native CSL adapter is
-added.
+added. The References and Settings panels expose the common aliases so document
+metadata and export-default preferences can use the same supported style names.
 
 Diagnostics cover missing keys, duplicate bibliography keys, missing
 bibliography sources, and unsupported citation styles. The references panel

@@ -234,7 +234,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       includePageNumbers: false,
       layoutPreset: "compact",
     },
-    bibliographyDefaults: { citationStyle: "author-year" },
+    bibliographyDefaults: { citationStyle: "APA" },
     brandProfileDefaults: { color: "  #123456  ", watermark: "Draft" },
     gitIntegration: { enabled: false },
     aiCleanupDefaults: { preserveHeadings: true, convertTables: false },
@@ -277,9 +277,10 @@ test("workspace persistence migration versions and normalizes saved settings", (
     includeGlossary: true,
     includeAgenda: true,
   });
-  deepEqual(migrated.bibliographyDefaults, { citationStyle: "author-year" });
+  deepEqual(migrated.bibliographyDefaults, { citationStyle: "apa" });
   equal(normalizeCitationStyle("numeric"), "numeric");
-  equal(normalizeCitationStyle("apa"), "title");
+  equal(normalizeCitationStyle("ieee"), "ieee");
+  equal(normalizeCitationStyle("unknown-style"), "title");
   equal(migrated.brandProfileDefaults?.color, "#123456");
   equal(migrated.brandProfileDefaults?.watermark, "Draft");
   deepEqual(migrated.gitIntegration, { enabled: false, warnOnDirtyExport: true });

@@ -1741,6 +1741,18 @@ Dependency admission guard verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
 | `git diff --check` | Pass | No whitespace errors after the dependency admission guard update. |
 
+Citation alias preference verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed; workspace persistence now preserves supported CSL aliases such as `APA` as `apa` and still falls back to `title` for unknown styles. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding CSL alias options to References and Settings selectors. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting citation alias preference support; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after adding citation alias options. |
+| `pnpm run check:deps` | Pass | Dependency admission guard still passes after the citation preference update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
+| `git diff --check` | Pass | No whitespace errors after the citation alias preference update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

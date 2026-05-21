@@ -419,6 +419,13 @@
               <option value="author-year">Author-year</option>
               <option value="key">Key</option>
               <option value="numeric">Numeric</option>
+              <option value="apa">APA</option>
+              <option value="chicago-author-date">Chicago author-date</option>
+              <option value="harvard">Harvard</option>
+              <option value="ieee">IEEE</option>
+              <option value="vancouver">Vancouver</option>
+              <option value="nature">Nature</option>
+              <option value="ama">AMA</option>
             </select>
           </label>
           <h3>Citations</h3>
@@ -845,6 +852,13 @@
               <option value="author-year">Author-year</option>
               <option value="key">Key</option>
               <option value="numeric">Numeric</option>
+              <option value="apa">APA</option>
+              <option value="chicago-author-date">Chicago author-date</option>
+              <option value="harvard">Harvard</option>
+              <option value="ieee">IEEE</option>
+              <option value="vancouver">Vancouver</option>
+              <option value="nature">Nature</option>
+              <option value="ama">AMA</option>
             </select>
           </label>
           <h3>Brand profile defaults</h3>
@@ -1309,6 +1323,7 @@ import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
+import { SUPPORTED_CITATION_STYLES } from "./lib/workspacePersistence";
 import {
   appendConflictMergePart,
   moveConflictMergePart,
@@ -2971,7 +2986,7 @@ function inputValue(event: Event) {
 }
 
 function setCitationStyle(style: string) {
-  const supported = new Set(["title", "author-year", "key", "numeric"]);
+  const supported = new Set<string>(SUPPORTED_CITATION_STYLES);
   if (!supported.has(style)) return;
   store.updateText(upsertFrontMatterField(active.value.text, "citationStyle", style));
 }
