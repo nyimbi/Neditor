@@ -39,7 +39,17 @@ impl TransformExecutionOptions {
     }
 
     pub(crate) fn trusted(&self, name: &str) -> bool {
-        self.trusted_engines.get(name).copied().unwrap_or(false)
+        self.trusted_engines
+            .get(name)
+            .or_else(|| {
+                if name == "graphviz" {
+                    self.trusted_engines.get("dot")
+                } else {
+                    None
+                }
+            })
+            .copied()
+            .unwrap_or(false)
     }
 
     pub(crate) fn disabled(&self, name: &str) -> bool {
@@ -57,7 +67,16 @@ impl TransformExecutionOptions {
     }
 
     pub(crate) fn input_mode(&self, name: &str) -> Option<String> {
-        self.input_modes.get(name).cloned()
+        self.input_modes
+            .get(name)
+            .or_else(|| {
+                if name == "graphviz" {
+                    self.input_modes.get("dot")
+                } else {
+                    None
+                }
+            })
+            .cloned()
     }
 }
 

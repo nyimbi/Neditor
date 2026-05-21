@@ -1886,6 +1886,17 @@ External transform engine path readiness verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the external engine path readiness update. |
 
+Graphviz alias external transform settings verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_uses_dot_settings_for_graphviz_alias --lib` in `src-tauri` | Pass | Focused compiler proof confirms `graphviz` fences inherit the configured `dot` executable path, trust state, and stdin input mode, then execute through the external Graphviz adapter. |
+| `cargo test --locked external_transform_tests --lib` in `src-tauri` | Pass | 13 external transform tests passed after the Graphviz alias settings fix, including adapter invocation, disabled fallback, cache behavior, PlantUML PNG, and installed-engine conformance. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the Graphviz alias settings update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the Graphviz alias settings update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the Graphviz alias settings update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

@@ -684,6 +684,45 @@ fn compiler_uses_trusted_external_transform_preferences() {
 
 #[cfg(unix)]
 #[test]
+fn compiler_uses_dot_settings_for_graphviz_alias() {
+    let dot = write_executable_script(
+        "compiler-graphviz-alias-adapter",
+        "#!/bin/sh\nprintf '<svg data-args=\"%s\">' \"$*\"\ncat\nprintf '</svg>'\n",
+    );
+    let response = compile_with_options(
+        CompileRequest {
+            text: "---\ntitle: Graphviz Alias\n---\n# Graphviz Alias\n```graphviz\ndigraph { alias -> dot }\n```\n".to_string(),
+            file_path: None,
+        },
+        &json!({
+            "transformEnginePaths": { "dot": path_to_string(&dot) },
+            "trustedTransformEngines": { "dot": true },
+            "transformInputModes": { "dot": "stdin" },
+            "transformTimeoutMs": 1000
+        }),
+    );
+
+    let artifact = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "graphviz")
+        .expect("graphviz artifact");
+    assert_eq!(artifact.execution_kind, "external");
+    assert_eq!(artifact.input_mode, "stdin");
+    assert!(artifact
+        .engine_path
+        .as_deref()
+        .is_some_and(|path| path == path_to_string(&dot)));
+    assert!(artifact.html.contains("digraph { alias -> dot }"));
+    assert!(artifact.html.contains("-Tsvg"));
+    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("graphviz external transform completed")));
+    let _ = fs::remove_file(dot);
+}
+
+#[cfg(unix)]
+#[test]
 fn compiler_uses_trusted_graphviz_variant_transform_preferences() {
     let neato = write_executable_script(
         "compiler-neato-adapter",

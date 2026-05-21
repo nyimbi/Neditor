@@ -1061,7 +1061,9 @@ Finish:
 - Preserve installed-engine conformance locally where engines are available
   while expanding optional engine proof beyond Linux.
 - Keep Graphviz/DOT variants, D2, PlantUML, and Pikchr as real optional-engine
-  proof where available.
+  proof where available. Graphviz alias fences now inherit configured `dot`
+  path, trust, and input-mode settings so users do not need duplicate settings
+  for the `graphviz` fence spelling.
 - macOS evidence now verifies Graphviz `dot`, `circo`, `neato`, `fdp`,
   `osage`, `twopi`, D2, and PlantUML through `pnpm run check:engines` and
   `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture`;
