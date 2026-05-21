@@ -202,7 +202,8 @@ NEditor uses local verification rather than GitHub Actions. Run
 `pnpm run verify:local:full` for a release-grade baseline; it extends the quick
 checks with the production build, optional engine probe, native-watch check,
 clippy, full Rust tests, rendered export audit, Tauri no-bundle release compile,
-macOS `.app` bundle build/smoke on macOS, and desktop artifact smoke.
+macOS `.app` bundle build/smoke and DMG classification on macOS, and desktop
+artifact smoke.
 
 Use `pnpm run verify:local -- --list` or
 `pnpm run verify:local:full -- --list` to print the exact command sequence
@@ -247,6 +248,11 @@ bundle evidence. On macOS it checks `NEditor.app` Info.plist metadata, bundle
 identifier, version, executable, icon, copyright, and high-resolution flag after
 `./node_modules/.bin/tauri build --bundles app`.
 
+`pnpm run test:desktop-dmg` verifies macOS DMG packaging when this host can run
+`hdiutil`. In restricted execution environments it records the known sandboxed
+`hdiutil create` failure as `.tmp/desktop-bundle/macos-dmg-report.json` instead
+of treating it as app-bundle or metadata regression.
+
 `pnpm run test:tauri-webdriver` runs the Tauri WebDriver desktop smoke on
 Windows and Linux hosts with `tauri-driver` plus the platform WebDriver
 installed. The harness starts the built desktop binary, checks the native title,
@@ -269,13 +275,15 @@ pnpm run build
 ./node_modules/.bin/tauri build --no-bundle
 ./node_modules/.bin/tauri build --bundles app
 pnpm run test:desktop-bundle
+pnpm run test:desktop-dmg
 ```
 
 On macOS, `.app` bundle creation is part of `pnpm run verify:local:full` and the
-bundle checker writes `.tmp/desktop-bundle/macos-app-report.json`. DMG creation
-can fail in restricted execution environments at the `hdiutil create` step with
-`Device not configured`; that environment failure does not block app bundle
-compilation.
+bundle checker writes `.tmp/desktop-bundle/macos-app-report.json`. The DMG
+checker writes `.tmp/desktop-bundle/macos-dmg-report.json`; on this sandboxed
+host, `hdiutil create` cannot start `hdiejectd` and returns `Device not
+configured`, which classifies the failure as host-specific rather than an app
+bundle regression.
 
 ## Project Status
 

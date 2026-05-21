@@ -90,6 +90,7 @@ function platformBundleCommands() {
   return [
     command("Desktop macOS app bundle", "./node_modules/.bin/tauri", ["build", "--bundles", "app"]),
     command("Desktop bundle smoke", "pnpm", ["run", "test:desktop-bundle"]),
+    command("Desktop DMG classification", "pnpm", ["run", "test:desktop-dmg"]),
   ];
 }
 

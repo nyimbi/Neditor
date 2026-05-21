@@ -381,6 +381,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
   equal(scripts.build, "vue-tsc --noEmit && vite build");
   equal(scripts["test:desktop-bundle"], "node scripts/check-desktop-bundle.mjs");
+  equal(scripts["test:desktop-dmg"], "node scripts/check-desktop-dmg.mjs");
   equal(scripts["test:desktop-smoke"], "node scripts/check-desktop-smoke.mjs");
   equal(scripts["test:tauri-webdriver"], "node scripts/run-tauri-webdriver.mjs");
   equal(scripts["test:rendered-exports"], "node scripts/check-rendered-export-audit.mjs");

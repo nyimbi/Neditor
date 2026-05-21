@@ -607,8 +607,9 @@ Current local verification evidence:
   dependency admission, Markdown links, Rust formatting, Rust `cargo check
   --locked`, `git diff --check`, production build, optional engine probe,
   native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri
-  no-bundle release compile, macOS `.app` bundle build/smoke, desktop
-  artifact/native-command smoke, and the desktop WebDriver harness step.
+  no-bundle release compile, macOS `.app` bundle build/smoke plus DMG
+  classification, desktop artifact/native-command smoke, and the desktop
+  WebDriver harness step.
 - 2026-05-21: `cargo test --locked export_command_tests --lib` passed 28 export
   command tests, including blog/Substack package exports, LaTeX export, Google
   Docs package export, and native command workflow smoke.
@@ -1659,19 +1660,21 @@ Finish:
 
 ### 23. Cross-Platform Packaging Evidence
 
-Status: desktop shell compile and current-host macOS `.app` bundle evidence are
-tested; Windows/Linux package evidence and DMG/signing stance remain incomplete.
+Status: desktop shell compile, current-host macOS `.app` bundle evidence, and
+current-host macOS DMG failure classification are tested; Windows/Linux package
+evidence and signing/notarization stance remain incomplete.
 
 Finish:
 
-- Refresh macOS app bundle evidence on the current commit. Current evidence:
-  `./node_modules/.bin/tauri build --bundles app` and
-  `pnpm run test:desktop-bundle` pass, with
+- Current macOS app bundle evidence: `./node_modules/.bin/tauri build --bundles
+  app` and `pnpm run test:desktop-bundle` pass, with
   `.tmp/desktop-bundle/macos-app-report.json` recording Info.plist metadata,
   bundle identifier, version, executable, icon, copyright, and high-resolution
   flag.
-- Classify the documented macOS DMG `hdiutil create` failure as host-specific
-  or config-specific.
+- Current macOS DMG classification: `pnpm run test:desktop-dmg` records this
+  host's sandboxed `hdiutil create` failure, where `hdiejectd` cannot start and
+  `hdiutil` returns `Device not configured`, in
+  `.tmp/desktop-bundle/macos-dmg-report.json`.
 - Add Windows package evidence for the chosen `.msi`/`.exe` target.
 - Add Linux package evidence for AppImage/deb/rpm or the chosen bundle target.
 - Confirm icons, bundle identifier, app metadata, signing/notarization stance,
