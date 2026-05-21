@@ -81,6 +81,10 @@ Recent pushed checkpoints visible in current git history:
   sandboxed-host `hdiutil create` failure as
   `.tmp/desktop-bundle/macos-dmg-report.json` without masking unrelated
   packaging errors.
+- This update makes optional external-engine platform evidence inspectable.
+  `pnpm run check:engines` now writes
+  `.tmp/external-engines/probe-report.json` with platform, architecture,
+  installed Graphviz/DOT variants, D2, PlantUML, and missing optional engines.
 - This update makes browser workflow execution current-host evidence instead
   of stale archived evidence. `pnpm run test:e2e` now uses the project-local
   Playwright browser cache and passes all 42 Chromium workbench workflows
@@ -642,7 +646,7 @@ Current verification recorded on 2026-05-21:
 | `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes, a manual checklist report, `viewer-proof.json` executable viewer/package assertions, and a `pdflatex` compile proof on this host. |
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
-| `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe still reports Pikchr missing on this host. |
+| `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 42 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed through the focused workbench boot workflow on this host. |
 | `pnpm run test:e2e` | Pass | 42 Chromium browser workbench workflows passed locally on this host, including blog/Substack/LaTeX/Google Docs target handoffs. |
@@ -1120,8 +1124,9 @@ Baseline gaps:
 - The baseline now includes macOS `.app` bundle creation/smoke evidence and
   sandboxed-host DMG classification on the current host; Windows/Linux package
   bundle creation remains open.
-- The baseline does not include macOS/Windows optional external transform
-  engines.
+- The baseline includes macOS optional external transform engine evidence for
+  Graphviz/DOT variants, D2, and PlantUML; Pikchr and Windows optional-engine
+  evidence remain open.
 
 Optional packaging checks:
 

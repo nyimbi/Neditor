@@ -269,8 +269,10 @@ Current major verification gaps:
   checklist, and executable viewer/package proof under
   `.tmp/rendered-export-audit`; broader native viewer/platform manual QA remains
   under-proven.
-- Optional external transform engines are proven most strongly on Linux; macOS
-  and Windows evidence is missing or indirect.
+- Optional external transform engine evidence now includes current macOS
+  Graphviz/DOT variants, D2, and PlantUML proof via `pnpm run check:engines`
+  and `.tmp/external-engines/probe-report.json`; macOS Pikchr and Windows
+  optional-engine evidence remain open.
 - Accessibility has an initial static guard, but full keyboard/manual audit
   evidence is still missing. Performance now has compiler, repeated export
   loop, repeated edit/cache, export progress reporting, and compile-result

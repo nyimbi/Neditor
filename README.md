@@ -217,7 +217,8 @@ workflow through the same Playwright CLI path as the full browser suite.
 
 `pnpm run check:engines` probes optional external transform engines and reports
 installed/missing Graphviz/DOT, D2, PlantUML, Java-backed PlantUML, and Pikchr
-paths without failing just because an optional engine is absent.
+paths without failing just because an optional engine is absent. The probe also
+writes `.tmp/external-engines/probe-report.json` for local platform evidence.
 
 `pnpm run check:deps` verifies that every JavaScript and Rust dependency in the
 project manifests has an entry in the dependency admission record and that

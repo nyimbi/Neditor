@@ -1,7 +1,12 @@
 import { spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 const requireInstalled = process.argv.includes("--require-installed");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const reportPath = join(root, ".tmp", "external-engines", "probe-report.json");
 const engines = [
   {
     name: "Graphviz / DOT",
@@ -62,6 +67,7 @@ const engines = [
 
 const rows = engines.map(probeEngine);
 const missing = rows.filter((row) => row.status === "missing");
+writeReport(rows, missing);
 
 console.log(`NEditor external transform engine probe`);
 console.log(`Platform: ${process.platform} ${process.arch}`);
@@ -89,6 +95,9 @@ if (missing.length > 0) {
     process.exit(1);
   }
 }
+
+console.log("");
+console.log(`Wrote external transform engine probe report to ${relative(reportPath)}`);
 
 function probeEngine(engine) {
   const command = process.env[engine.env] || findFirstCommand([
@@ -154,4 +163,27 @@ function firstLine(text) {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .find(Boolean);
+}
+
+function writeReport(rows, missing) {
+  mkdirSync(dirname(reportPath), { recursive: true });
+  writeFileSync(
+    reportPath,
+    `${JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        platform: process.platform,
+        arch: process.arch,
+        requireInstalled,
+        engines: rows,
+        missing: missing.map((row) => row.command),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+function relative(path) {
+  return path.startsWith(root) ? path.slice(root.length + 1) : path;
 }
