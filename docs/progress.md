@@ -622,9 +622,11 @@ P0 gaps:
 
 P1 gaps:
 
-- Export fidelity now has a local rendered-export audit artifact bundle and
-  manual checklist. Broader manual review across more fixtures, viewers, and
-  platforms is still needed before the entire export surface can be complete.
+- Export fidelity now has a local rendered-export audit artifact bundle,
+  generated rich-block and option-heavy review cases, and a manual checklist.
+  Live Google Docs import, cross-platform native viewer checks, and human visual
+  review outside package/text inspection remain before the entire export surface
+  can be complete.
 - Export readiness has browser workflow coverage for the target-specific
   status/diagnostic path, but still needs a requirement-by-requirement audit.
 - Optional external transform evidence now includes current macOS Graphviz/DOT,
@@ -659,7 +661,7 @@ Current verification recorded on 2026-05-21 and 2026-05-22:
 | `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | 8 file command tests passed, including `reveal_command_for_existing_path_is_platform_specific_and_argument_safe`. |
 | `cargo test --locked desktop_native_command_workflow_smoke --lib` in `src-tauri` | Pass | Native command workflow smoke passed against real local files and direct export outputs. |
 | `cargo test --locked representative_rendered_export_artifacts_are_package_inspectable --lib` in `src-tauri` | Pass | Representative rendered/package export audit passed across HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package evidence. |
-| `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes, a manual checklist report, `viewer-proof.json` executable viewer/package assertions, publishing handoff metadata checks, LaTeX source checks, nested Google Docs DOCX checks, macOS Quick Look PDF classification, and a `pdflatex` compile proof on this host. |
+| `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes, a manual checklist report, `viewer-proof.json` executable viewer/package assertions, publishing handoff metadata checks, LaTeX source checks, nested Google Docs DOCX checks, macOS Quick Look PDF classification, `review-cases/rich-blocks` and `review-cases/option-heavy` artifact proof, and a `pdflatex` compile proof on this host. |
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
@@ -2245,17 +2247,30 @@ Transform template browser workflow verification:
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages transform templates" --project chromium` | Pass | Focused Chromium workflow passed on this host with the system-Chrome fallback, proving the Templates panel filters the Science `calc` library, previews and inserts the built-in "Dose by weight" template, creates and persists a custom `calc` template, and inserts the custom template from the command palette. |
 | `node scripts/run-e2e.mjs` | Pass | Full Chromium browser workflow suite passed all 43 tests after adding transform template management coverage. |
 
+Rendered export review-case verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:rendered-exports` | Pass | The rendered export audit now writes `review-cases/rich-blocks` and `review-cases/option-heavy` artifacts for HTML, PDF, DOCX, PPTX, and Markdown bundle targets, records them in `rendered-export-audit-report.json`, and checks required evidence through the Node viewer/package proof. |
+| `node --check scripts/check-rendered-export-audit.mjs` | Pass | The rendered export audit verifier remains syntactically valid after adding review-case proof collection. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting remains clean after adding generated review-case fixtures. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after adding generated review-case fixtures. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after recording the rendered export review-case evidence; all local links resolved. |
+| `pnpm run verify:local` | Pass | Quick local verification passed all 9 steps after the rendered export review-case update. |
+| `pnpm run build` | Pass | Vue typecheck and Vite production build passed after the rendered export review-case update. |
+| `git diff --check` | Pass | No whitespace errors after the rendered export review-case update. |
+
 ## Next Execution Order
 
-1. Expand browser coverage for export artifact fidelity, target-specific export
-   option matrices, progress/cancellation behavior if needed, remaining preview
-   modes, broader keyboard shortcuts, deeper workspace grouping, AI review-state
-   workflows, and table export modes.
+1. Execute live Google Docs import and cross-platform native viewer/import checks
+   for the rendered export package where supported.
 2. Execute the Windows/Linux Tauri-driver workflow harness on supported hosts
    and keep using the macOS app-authored launch report where WebDriver is
    officially unavailable.
 3. Use failures from workflow tests to drive implementation fixes.
-4. Expand export fixture proof for HTML/PDF/DOCX/PPTX/Markdown bundle parity.
+4. Continue expanding browser coverage for progress/cancellation behavior,
+   remaining preview modes, broader keyboard shortcuts, deeper workspace
+   grouping, AI review-state workflows, and table export modes.
 5. Add macOS/Windows optional transform engine evidence.
 6. Only after behavior is locked, modularize oversized frontend/store/backend
    modules.

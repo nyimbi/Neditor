@@ -21,6 +21,7 @@ const requiredFiles = [
   ["README.md", 100],
 ];
 const viewerProof = [];
+let auditReport = null;
 
 if (auditDir.includes(`${root}/.tmp/`)) {
   rmSync(auditDir, { recursive: true, force: true });
@@ -65,20 +66,47 @@ for (const [file, minBytes] of requiredFiles) {
 }
 
 if (issues.length === 0) {
-  const report = JSON.parse(readFileSync(join(auditDir, "rendered-export-audit-report.json"), "utf8"));
-  const targets = new Set(report.targets?.map((target) => target.target));
+  auditReport = JSON.parse(readFileSync(join(auditDir, "rendered-export-audit-report.json"), "utf8"));
+  const targets = new Set(auditReport.targets?.map((target) => target.target));
   for (const target of ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"]) {
     if (!targets.has(target)) {
       issues.push(`audit report is missing target ${target}`);
     }
   }
-  if (!Array.isArray(report.manualChecklist) || report.manualChecklist.length < 5) {
+  if (!Array.isArray(auditReport.manualChecklist) || auditReport.manualChecklist.length < 7) {
     issues.push("audit report manual checklist is incomplete");
+  }
+  const reviewCases = Array.isArray(auditReport.reviewCases) ? auditReport.reviewCases : [];
+  const reviewCaseSlugs = new Set(reviewCases.map((reviewCase) => reviewCase.slug));
+  for (const slug of ["rich-blocks", "option-heavy"]) {
+    if (!reviewCaseSlugs.has(slug)) {
+      issues.push(`audit report is missing rendered review case ${slug}`);
+    }
+  }
+  for (const reviewCase of reviewCases) {
+    const caseTargets = new Set(reviewCase.targets?.map((target) => target.target));
+    for (const target of ["html", "pdf", "docx", "pptx", "markdown-bundle"]) {
+      if (!caseTargets.has(target)) {
+        issues.push(`rendered review case ${reviewCase.slug} is missing target ${target}`);
+      }
+    }
+    for (const target of reviewCase.targets || []) {
+      const path = join(auditDir, target.path);
+      if (!existsSync(path)) {
+        issues.push(`rendered review case artifact is missing: ${target.path}`);
+      } else if (statSync(path).size < 500) {
+        issues.push(`rendered review case artifact is unexpectedly small: ${target.path}`);
+      }
+    }
   }
 }
 
 if (issues.length === 0) {
   collectViewerProof(issues, viewerProof);
+}
+
+if (issues.length === 0) {
+  collectReviewCaseProof(issues, viewerProof, auditReport);
 }
 
 if (issues.length === 0) {
@@ -333,6 +361,36 @@ function collectViewerProof(issues, assertions) {
     "Architecture diagram",
     "AI Provenance",
   ]);
+}
+
+function collectReviewCaseProof(issues, assertions, report) {
+  for (const reviewCase of report.reviewCases || []) {
+    const targets = new Map((reviewCase.targets || []).map((target) => [target.target, target.path]));
+    const htmlPath = targets.get("html");
+    const pdfPath = targets.get("pdf");
+    const docxPath = targets.get("docx");
+    const pptxPath = targets.get("pptx");
+    const bundlePath = targets.get("markdown-bundle");
+    const title = reviewCase.title;
+    assertContains(assertions, issues, `${reviewCase.slug}-html`, readFileSync(join(auditDir, htmlPath), "utf8"), [
+      title,
+      ...(reviewCase.requiredEvidence || []),
+    ]);
+    assertContains(assertions, issues, `${reviewCase.slug}-pdf`, readFileSync(join(auditDir, pdfPath), "latin1"), [
+      title,
+    ]);
+    assertContains(assertions, issues, `${reviewCase.slug}-docx`, readZipEntryText(join(auditDir, docxPath), "word/document.xml"), [
+      title,
+    ]);
+    const pptxSlides = listZipEntries(join(auditDir, pptxPath))
+      .filter((entry) => /^ppt\/slides\/slide\d+\.xml$/.test(entry))
+      .map((entry) => readZipEntryText(join(auditDir, pptxPath), entry))
+      .join("\n");
+    assertContains(assertions, issues, `${reviewCase.slug}-pptx`, pptxSlides, [title]);
+    assertContains(assertions, issues, `${reviewCase.slug}-bundle`, readZipEntryText(join(auditDir, bundlePath), "document.md"), [
+      title,
+    ]);
+  }
 }
 
 function collectMacQuickLookProof(issues, assertions) {
