@@ -251,6 +251,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     sidebar: "settings",
     transformEnginePaths: { dot: "/usr/bin/dot", bad: 10 },
     trustedTransformEngines: { dot: true, bad: "yes" },
+    disabledTransformEngines: { d2: true, dot: false, bad: "no" },
     transformInputModes: { dot: "stdin", bad: "pipe" },
     transformTimeoutMs: 99_999,
   });
@@ -299,6 +300,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.sidebar, "settings");
   deepEqual(migrated.transformEnginePaths, { dot: "/usr/bin/dot" });
   deepEqual(migrated.trustedTransformEngines, { dot: true });
+  deepEqual(migrated.disabledTransformEngines, { d2: true, dot: false });
   deepEqual(migrated.transformInputModes, { dot: "stdin" });
   equal(migrated.transformTimeoutMs, 30_000);
 });

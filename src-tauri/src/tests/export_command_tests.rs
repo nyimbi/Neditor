@@ -832,12 +832,13 @@ fn prepare_for_export_validates_transform_engine_options() {
             "transformTimeoutMs": 50000,
             "transformEnginePaths": { "dot": "dot" },
             "trustedTransformEngines": { "dot": "yes" },
+            "disabledTransformEngines": { "dot": "no" },
             "transformInputModes": { "dot": "pipe" }
         }),
     });
 
     assert!(!report.ready);
-    assert_eq!(report.error_count, 4);
+    assert_eq!(report.error_count, 5);
     assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
         .message
         .contains("transformTimeoutMs must be between 1 and 30000")));
@@ -847,6 +848,9 @@ fn prepare_for_export_validates_transform_engine_options() {
     assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
         .message
         .contains("trustedTransformEngines.dot must be true or false")));
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("disabledTransformEngines.dot must be true or false")));
     assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
         .message
         .contains("transformInputModes.dot must be stdin or file")));

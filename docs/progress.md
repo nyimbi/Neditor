@@ -1286,6 +1286,26 @@ Additional generated reference-section readiness verification:
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional disabled external-engine verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_skips_disabled_external_transform_without_trust_warning --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust compiler proof skips a configured-but-disabled DOT external engine before trust/path execution, falls back to the embedded renderer, and avoids external trust-failure diagnostics. |
+| `cargo test --locked prepare_for_export_validates_transform_engine_options --lib -- --nocapture` in `src-tauri` | Pass | Focused readiness proof now validates `disabledTransformEngines` as a boolean map alongside engine paths, trust, input mode, and timeout settings. |
+| `cargo test --locked external_transform_tests --lib` in `src-tauri` | Pass | 10 external transform tests passed, including trust gating, adapter invocation, disabled-engine fallback, non-executable paths, timeout, stderr, cache invalidation, and installed-engine conformance. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 19 export command tests passed after adding disabled-engine option validation. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 174 Rust library tests passed after adding the disabled external-engine setting and compiler fallback behavior. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the disabled-engine option update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after adding disabled external-engine option plumbing. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the Settings UI toggle and store state. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after adding disabled external-engine persistence migration coverage. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails passed after adding the disabled-engine checkbox. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the transform setup doc, matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests, including the external transform settings workflow. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "external transform engine" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused external transform settings workflow was discovered but did not execute assertions. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

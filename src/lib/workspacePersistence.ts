@@ -90,6 +90,7 @@ export interface PersistedWorkspace {
   sidebar?: SidebarPanel;
   transformEnginePaths?: Record<string, string>;
   trustedTransformEngines?: Record<string, boolean>;
+  disabledTransformEngines?: Record<string, boolean>;
   transformInputModes?: Record<string, TransformInputMode>;
   transformTimeoutMs?: number;
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
@@ -322,6 +323,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (sidebar) migrated.sidebar = sidebar;
   migrated.transformEnginePaths = stringRecord(raw.transformEnginePaths);
   migrated.trustedTransformEngines = booleanRecord(raw.trustedTransformEngines);
+  migrated.disabledTransformEngines = booleanRecord(raw.disabledTransformEngines);
   migrated.transformInputModes = inputModeRecord(raw.transformInputModes);
   const transformTimeoutMs = numberValue(raw.transformTimeoutMs);
   if (transformTimeoutMs !== undefined) migrated.transformTimeoutMs = Math.min(Math.max(transformTimeoutMs, 1), 30000);

@@ -362,6 +362,7 @@ export const useDocumentsStore = defineStore("documents", {
     transformEngines: [] as TransformEngineMetadata[],
     transformEnginePaths: {} as Record<string, string>,
     trustedTransformEngines: {} as Record<string, boolean>,
+    disabledTransformEngines: {} as Record<string, boolean>,
     transformInputModes: {} as Record<string, "stdin" | "file">,
     transformTimeoutMs: 5000,
     transformProbeResults: {} as Record<string, TransformProbeResult>,
@@ -471,6 +472,7 @@ export const useDocumentsStore = defineStore("documents", {
         }
         this.transformEnginePaths = persisted.transformEnginePaths || {};
         this.trustedTransformEngines = persisted.trustedTransformEngines || {};
+        this.disabledTransformEngines = persisted.disabledTransformEngines || {};
         this.transformInputModes = persisted.transformInputModes || {};
         if (typeof persisted.transformTimeoutMs === "number") {
           this.transformTimeoutMs = Math.min(Math.max(persisted.transformTimeoutMs, 1), 30000);
@@ -533,6 +535,7 @@ export const useDocumentsStore = defineStore("documents", {
         activePath: this.activeDocument?.path || null,
         transformEnginePaths: this.transformEnginePaths,
         trustedTransformEngines: this.trustedTransformEngines,
+        disabledTransformEngines: this.disabledTransformEngines,
         transformInputModes: this.transformInputModes,
         transformTimeoutMs: this.transformTimeoutMs,
       };
@@ -1229,6 +1232,7 @@ export const useDocumentsStore = defineStore("documents", {
         warnOnDirtyGit: this.gitIntegration.enabled && this.gitIntegration.warnOnDirtyExport,
         transformEnginePaths: this.transformEnginePaths,
         trustedTransformEngines: this.trustedTransformEngines,
+        disabledTransformEngines: this.disabledTransformEngines,
         transformInputModes: this.transformInputModes,
         transformTimeoutMs: this.transformTimeoutMs,
         watermark:
@@ -1243,6 +1247,7 @@ export const useDocumentsStore = defineStore("documents", {
         defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
         transformEnginePaths: this.transformEnginePaths,
         trustedTransformEngines: this.trustedTransformEngines,
+        disabledTransformEngines: this.disabledTransformEngines,
         transformInputModes: this.transformInputModes,
         transformTimeoutMs: this.transformTimeoutMs,
       };
@@ -1323,6 +1328,10 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async setTransformTrust(name: string, trusted: boolean) {
       this.trustedTransformEngines = { ...this.trustedTransformEngines, [name]: trusted };
+      await this.persistWorkspace();
+    },
+    async setTransformDisabled(name: string, disabled: boolean) {
+      this.disabledTransformEngines = { ...this.disabledTransformEngines, [name]: disabled };
       await this.persistWorkspace();
     },
     async setTransformInputMode(name: string, mode: "stdin" | "file") {

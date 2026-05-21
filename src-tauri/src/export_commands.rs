@@ -493,6 +493,7 @@ fn validate_transform_export_settings(options: &Value, diagnostics: &mut Vec<Doc
         Some(validate_transform_engine_path),
     );
     validate_bool_map(options, "trustedTransformEngines", diagnostics);
+    validate_bool_map(options, "disabledTransformEngines", diagnostics);
     validate_string_map(
         options,
         "transformInputModes",

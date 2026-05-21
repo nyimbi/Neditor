@@ -124,6 +124,18 @@ fn render_external_transform(
     options: &TransformExecutionOptions,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> Option<TransformArtifact> {
+    if options.disabled(name) {
+        diagnostics.push(diag(
+            "info",
+            format!("{name} external transform disabled; using embedded renderer."),
+            None,
+            None,
+            Some(
+                "Enable the external engine in settings when higher-fidelity rendering is needed.",
+            ),
+        ));
+        return None;
+    }
     let engine_path = options.engine_path(name)?;
     let request = ExternalTransformRequest {
         name: name.to_string(),

@@ -790,8 +790,8 @@ Required next coverage:
   progress/cancellation behavior if needed, and rendered/manual proof.
 - Run the large-document browser performance workflow on a host with Playwright
   Chromium installed, plus native desktop performance proof.
-- Remaining transform engine settings: disabled-engine and cross-platform
-  executable edge cases beyond the mocked browser workflow.
+- Remaining transform engine settings: cross-platform executable edge cases
+  beyond the mocked browser workflow.
 
 Completion criteria:
 
@@ -1038,6 +1038,9 @@ Finish:
   file size/mtime, adapter arguments, input mode, renderer version, and source
   hash; `external_transform_cache_invalidates_when_trusted_executable_changes`
   proves same-path executable rewrites do not serve stale cached output.
+- External engines now have an explicit per-engine disabled setting. Disabled
+  engines are skipped before trust/path execution checks, fall back to embedded
+  rendering when available, and avoid trust-failure noise.
 - Preserve diagnostics for missing executable, non-executable path, timeout,
   bad syntax, sidecar not produced, output limit, and stderr warnings.
 - Keep `docs/external-transform-platform-evidence.md` current when optional

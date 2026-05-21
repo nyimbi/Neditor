@@ -5,6 +5,7 @@ use std::collections::HashMap;
 pub(crate) struct TransformExecutionOptions {
     engine_paths: HashMap<String, String>,
     trusted_engines: HashMap<String, bool>,
+    disabled_engines: HashMap<String, bool>,
     input_modes: HashMap<String, String>,
     pub(crate) timeout_ms: Option<u64>,
 }
@@ -17,6 +18,7 @@ impl TransformExecutionOptions {
         Self {
             engine_paths: string_map_option(options, "transformEnginePaths"),
             trusted_engines: bool_map_option(options, "trustedTransformEngines"),
+            disabled_engines: bool_map_option(options, "disabledTransformEngines"),
             input_modes: string_map_option(options, "transformInputModes"),
             timeout_ms: options.get("transformTimeoutMs").and_then(Value::as_u64),
         }
@@ -38,6 +40,20 @@ impl TransformExecutionOptions {
 
     pub(crate) fn trusted(&self, name: &str) -> bool {
         self.trusted_engines.get(name).copied().unwrap_or(false)
+    }
+
+    pub(crate) fn disabled(&self, name: &str) -> bool {
+        self.disabled_engines
+            .get(name)
+            .or_else(|| {
+                if name == "graphviz" {
+                    self.disabled_engines.get("dot")
+                } else {
+                    None
+                }
+            })
+            .copied()
+            .unwrap_or(false)
     }
 
     pub(crate) fn input_mode(&self, name: &str) -> Option<String> {

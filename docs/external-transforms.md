@@ -8,6 +8,9 @@ NEditor can render several fenced-code transforms with native Rust fallbacks. Fo
 - Pikchr
 
 External engines are never trusted by default. Configure the executable path in Settings, enable trust for the specific engine, and keep the timeout/input-mode defaults unless the document requires otherwise.
+You can also disable a configured external engine per transform. Disabled
+engines are not executed, do not produce trust warnings, and fall back to the
+embedded renderer when one exists.
 
 Current platform evidence is tracked in
 [External transform platform evidence](external-transform-platform-evidence.md).
@@ -17,6 +20,7 @@ Current platform evidence is tracked in
 - Engine paths must point to real executable files.
 - Each engine has an adapter profile for arguments, stdin/file mode, output handling, and diagnostics.
 - Trust is per engine.
+- Disabled engines are skipped before trust/path execution checks.
 - Execution is bounded by timeout and output-size limits.
 - Cache keys include the transform name, source hash, engine path, engine file
   size and modified time, adapter arguments, input mode, and renderer version.

@@ -608,6 +608,46 @@ fn compiler_falls_back_when_external_transform_is_untrusted() {
         .any(|diagnostic| diagnostic.message.contains("dot external transform failed")));
 }
 
+#[test]
+fn compiler_skips_disabled_external_transform_without_trust_warning() {
+    let cat = Path::new("/bin/cat");
+    if !cat.exists() {
+        return;
+    }
+    let response = compile_with_options(
+        CompileRequest {
+            text:
+                "---\ntitle: Disabled Dot\n---\n# Disabled Dot\n```dot\ndigraph { a -> b }\n```\n"
+                    .to_string(),
+            file_path: None,
+        },
+        &json!({
+            "transformEnginePaths": { "dot": path_to_string(cat) },
+            "trustedTransformEngines": { "dot": false },
+            "disabledTransformEngines": { "dot": true }
+        }),
+    );
+
+    let artifact = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "dot")
+        .expect("dot artifact");
+    assert_eq!(artifact.execution_kind, "embedded");
+    assert_eq!(artifact.input_mode, "embedded");
+    assert!(artifact.html.contains("transform-dot"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("external transform failed")));
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.severity == "info"
+            && diagnostic
+                .message
+                .contains("dot external transform disabled; using embedded renderer.")
+    }));
+}
+
 #[cfg(unix)]
 #[test]
 fn external_transform_rejects_non_executable_engine_path() {
