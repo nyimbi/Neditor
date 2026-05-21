@@ -5,8 +5,8 @@ use crate::{
     },
     review::{parse_change_note, parse_review_comment},
     table_cells::{
-        html_table_cell, normalize_table_cell_rows, table_cell_from_markdown, table_cell_texts,
-        TableCell,
+        html_table_cell, markdown_table_rows, normalize_table_cell_rows, table_cell_from_markdown,
+        table_cell_texts, TableCell,
     },
     transforms::TransformArtifact,
 };
@@ -432,17 +432,20 @@ pub(crate) fn export_body_text_from_ast(ast: &DocumentAst) -> String {
                 id,
                 caption,
                 headers,
-                alignments: _,
+                alignments,
+                header_cells,
                 rows,
+                row_cells,
                 ..
-            } => {
-                let mut lines = Vec::new();
-                lines.push(table_export_title(id, caption, headers));
-                for row in rows {
-                    lines.push(format!("- {}", row.join(" | ")));
-                }
-                Some(lines.join("\n"))
-            }
+            } => Some(table_export_text(
+                id,
+                caption,
+                headers,
+                alignments,
+                header_cells,
+                rows,
+                row_cells,
+            )),
             DocumentBlock::Figure {
                 id,
                 src,
@@ -1312,6 +1315,26 @@ fn table_export_title(id: &Option<String>, caption: &Option<String>, headers: &[
         parts.push(headers.join(" | "));
     }
     parts.join(": ")
+}
+
+fn table_export_text(
+    id: &Option<String>,
+    caption: &Option<String>,
+    headers: &[String],
+    alignments: &[String],
+    header_cells: &[TableCell],
+    rows: &[Vec<String>],
+    row_cells: &[Vec<TableCell>],
+) -> String {
+    let mut lines = vec![table_export_title(id, caption, headers)];
+    lines.extend(markdown_table_rows(
+        headers,
+        alignments,
+        header_cells,
+        rows,
+        row_cells,
+    ));
+    lines.join("\n")
 }
 
 fn transform_export_text(name: &str, text: &str) -> String {

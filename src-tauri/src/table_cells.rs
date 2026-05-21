@@ -105,6 +105,90 @@ pub(crate) fn table_cell_texts(cells: &[TableCell]) -> Vec<String> {
         .collect()
 }
 
+pub(crate) fn markdown_table_rows(
+    headers: &[String],
+    alignments: &[String],
+    header_cells: &[TableCell],
+    rows: &[Vec<String>],
+    row_cells: &[Vec<TableCell>],
+) -> Vec<String> {
+    if headers.is_empty() {
+        return Vec::new();
+    }
+    let header_cells = populated_table_cells(header_cells, headers);
+    let mut output = vec![
+        markdown_table_row(&header_cells),
+        markdown_alignment_row(alignments, header_cells.len()),
+    ];
+    let row_cells = populated_table_row_cells(row_cells, rows);
+    output.extend(row_cells.iter().map(|row| markdown_table_row(row)));
+    output
+}
+
+fn populated_table_cells(cells: &[TableCell], fallback: &[String]) -> Vec<TableCell> {
+    if cells.is_empty() {
+        plain_table_cells(fallback)
+    } else {
+        cells.to_vec()
+    }
+}
+
+fn populated_table_row_cells(
+    cells: &[Vec<TableCell>],
+    fallback: &[Vec<String>],
+) -> Vec<Vec<TableCell>> {
+    if cells.is_empty() {
+        fallback.iter().map(|row| plain_table_cells(row)).collect()
+    } else {
+        cells.to_vec()
+    }
+}
+
+fn markdown_table_row(cells: &[TableCell]) -> String {
+    let cells = cells
+        .iter()
+        .map(markdown_table_cell)
+        .collect::<Vec<_>>()
+        .join(" | ");
+    format!("| {cells} |")
+}
+
+fn markdown_alignment_row(alignments: &[String], width: usize) -> String {
+    let cells = (0..width)
+        .map(|index| match alignments.get(index).map(String::as_str) {
+            Some("center") => ":---:",
+            Some("right") => "---:",
+            _ => "---",
+        })
+        .collect::<Vec<_>>()
+        .join(" | ");
+    format!("| {cells} |")
+}
+
+fn markdown_table_cell(cell: &TableCell) -> String {
+    if cell.covered {
+        return String::new();
+    }
+    let mut text = cell
+        .text
+        .replace('\\', "\\\\")
+        .replace('|', "\\|")
+        .replace('\n', " ");
+    let mut attrs = Vec::new();
+    if cell.colspan > 1 {
+        attrs.push(format!("colspan={}", cell.colspan));
+    }
+    if cell.rowspan > 1 {
+        attrs.push(format!("rowspan={}", cell.rowspan));
+    }
+    if !attrs.is_empty() {
+        text.push_str(" {");
+        text.push_str(&attrs.join(" "));
+        text.push('}');
+    }
+    text
+}
+
 fn covered_table_cell(continues_rowspan: bool) -> TableCell {
     TableCell {
         text: String::new(),

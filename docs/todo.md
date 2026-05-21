@@ -893,7 +893,10 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   `rich_markdown_blocks_survive_cross_target_exports`; remaining work is
   rendered/manual QA and more edge-case permutations.
 - Tables, merged cells, alignment, formulas, totals, captions, and large table
-  pagination/splitting.
+  pagination/splitting. Markdown bundle/text table export now keeps readable
+  header rows, alignment separator rows, escaped pipes, formula output rows, and
+  merged-cell span annotations alongside existing native PDF/DOCX/PPTX table
+  structures.
 - Figures, captions, cover crop/fit, relative media packaging, duplicate media
   names, and missing media diagnostics.
 - Generated `[LIST_OF_FIGURES]` and `[LIST_OF_TABLES]` sections now have a
@@ -1255,7 +1258,10 @@ Finish:
   unsupported dependencies, and mixed span/formula tables. Data source coverage
   now proves missing path, unsupported type, and unreadable file diagnostics.
 - Export parity for large, merged, formatted, summarized, sorted, and
-  formula-driven tables.
+  formula-driven tables. Text and Markdown bundle exports now preserve readable
+  Markdown-style table rows with alignment and span metadata for edited,
+  formula-driven, merged, and imported HTML tables; remaining work is rendered
+  table QA and non-sandboxed browser execution.
 
 ### 14. Bibliography, Citations, Index, Glossary, And Cross References
 

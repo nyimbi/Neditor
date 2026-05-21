@@ -1,6 +1,7 @@
 use super::*;
 use crate::table_cells::{
-    html_table_cell, normalize_table_cell_rows, plain_table_cells, table_cell_texts,
+    html_table_cell, markdown_table_rows, normalize_table_cell_rows, plain_table_cells,
+    table_cell_texts,
 };
 
 #[derive(Debug)]
@@ -722,9 +723,15 @@ pub(super) fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
         }
         DocumentBlock::CodeBlock { language, code, .. } => {
             if let Some(table) = export_table_from_delimited_code(language.as_deref(), code) {
-                let mut lines = vec![table_export_line(&None, &None, &table.headers)];
-                lines.extend(table.rows.iter().map(|row| row.join(" | ")));
-                return lines;
+                return table_export_lines(
+                    &None,
+                    &None,
+                    &table.headers,
+                    &table.alignments,
+                    &table.header_cells,
+                    &table.rows,
+                    &table.row_cells,
+                );
             }
             let mut lines = vec![format!("```{}", language.as_deref().unwrap_or(""))];
             lines.extend(code.lines().map(ToString::to_string));
@@ -750,14 +757,20 @@ pub(super) fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
             id,
             caption,
             headers,
-            alignments: _,
+            alignments,
+            header_cells,
             rows,
+            row_cells,
             ..
-        } => {
-            let mut lines = vec![table_export_line(id, caption, headers)];
-            lines.extend(rows.iter().map(|row| row.join(" | ")));
-            lines
-        }
+        } => table_export_lines(
+            id,
+            caption,
+            headers,
+            alignments,
+            header_cells,
+            rows,
+            row_cells,
+        ),
         DocumentBlock::Figure {
             id,
             src,
@@ -810,9 +823,15 @@ pub(super) fn block_export_lines(block: &DocumentBlock) -> Vec<String> {
         DocumentBlock::Transform { name, text, .. } => vec![transform_export_line(name, text)],
         DocumentBlock::RawHtml { html, .. } => {
             if let Some(table) = export_table_from_transform_html(html) {
-                let mut lines = vec![table_export_line(&None, &None, &table.headers)];
-                lines.extend(table.rows.iter().map(|row| row.join(" | ")));
-                return lines;
+                return table_export_lines(
+                    &None,
+                    &None,
+                    &table.headers,
+                    &table.alignments,
+                    &table.header_cells,
+                    &table.rows,
+                    &table.row_cells,
+                );
             }
             raw_html_export_lines(html)
         }
@@ -1042,6 +1061,26 @@ pub(super) fn table_export_line(
         parts.push(headers.join(" | "));
     }
     parts.join(": ")
+}
+
+pub(super) fn table_export_lines(
+    id: &Option<String>,
+    caption: &Option<String>,
+    headers: &[String],
+    alignments: &[String],
+    header_cells: &[TableCell],
+    rows: &[Vec<String>],
+    row_cells: &[Vec<TableCell>],
+) -> Vec<String> {
+    let mut lines = vec![table_export_line(id, caption, headers)];
+    lines.extend(markdown_table_rows(
+        headers,
+        alignments,
+        header_cells,
+        rows,
+        row_cells,
+    ));
+    lines
 }
 
 pub(super) fn equation_export_line(

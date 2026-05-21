@@ -302,6 +302,12 @@ fn edited_table_permutation_exports_alignment_escapes_and_formula_rows() {
 
     let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
         .expect("edited table permutation bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    assert!(bundled_text.contains("Table: tbl:scenario: Scenario grid"));
+    assert!(bundled_text.contains("| Scenario | Owner | Score | Status |"));
+    assert!(bundled_text.contains("| --- | :---: | ---: | --- |"));
+    assert!(bundled_text.contains("| Base \\| Case | Finance | $1,200.50 | Ready |"));
+    assert!(bundled_text.contains("| Max | Summary | 1200 | Formula |"));
     let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
     assert!(bundled_ast.contains("\"id\": \"tbl:scenario\""));
     assert!(bundled_ast.contains("Base | Case"));
@@ -366,6 +372,9 @@ fn merged_table_cells_flow_through_semantic_exports() {
 
     let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
         .expect("merged table bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    assert!(bundled_text.contains("| Phase {colspan=2} |  | Owner |"));
+    assert!(bundled_text.contains("| Discovery {rowspan=2} | Scope | PM |"));
     let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
     assert!(bundled_ast.contains(r#""colspan": 2"#));
     assert!(bundled_ast.contains(r#""rowspan": 2"#));
@@ -417,6 +426,9 @@ fn imported_html_table_spans_flow_through_semantic_exports() {
 
     let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
         .expect("imported merged table bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    assert!(bundled_text.contains("| Group {colspan=2} |  | Owner |"));
+    assert!(bundled_text.contains("| Discovery {rowspan=2} | Scope | PM |"));
     let bundled_ast = zip_entry_text(&bundle, "document-ast.json");
     assert!(bundled_ast.contains(r#""text": "Group""#));
     assert!(bundled_ast.contains(r#""colspan": 2"#));

@@ -77,6 +77,10 @@ Recent pushed checkpoints visible in current git history:
 - Follow-up export evidence extends the visual transform conformance fixture so
   that the same native Pikchr artifact survives HTML, PDF, DOCX, PPTX, and
   Markdown bundle outputs.
+- This update improves shared text and Markdown bundle table exports. Tables
+  now keep readable Markdown-style header rows, alignment separator rows,
+  escaped pipe cells, formula output rows, and merged-cell span annotations
+  instead of collapsing to caption plus data rows.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.
@@ -1961,6 +1965,17 @@ Citation manager repair workflow verification:
 | `pnpm run build` | Pass | Vue typecheck and Vite production build passed after wiring Citation manager actions into the workbench. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating citation manager docs, matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the citation manager update. |
+
+Table text and Markdown bundle export verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked table_tests --lib` in `src-tauri` | Pass | 9 table tests passed after making text/Markdown bundle table exports preserve header rows, alignment separators, escaped pipes, formula output rows, and merged-cell span annotations. |
+| `cargo test --locked export_conformance_tests --lib` in `src-tauri` | Pass | 16 export conformance tests still pass after the shared table text export change. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the table text export update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the table text export update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the table text export update. |
 
 ## Next Execution Order
 
