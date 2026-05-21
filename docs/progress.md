@@ -1803,6 +1803,19 @@ Browser workflow environment preflight verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors after the E2E preflight update. |
 
+Enabled export option matrix verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked enabled_export_option_matrix_survives_cross_target_artifacts --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust artifact proof covers enabled styles, syntax highlighting, cover pages, page numbers, glossary/comments/provenance appendices, PPTX agenda, presentation layout preset, watermark, text output, and Markdown bundle manifest evidence across HTML, PDF, DOCX, PPTX, and Markdown bundle artifacts. |
+| `cargo test --locked export_option_tests --lib` in `src-tauri` | Pass | 10 export option tests passed after adding the enabled cross-target option matrix fixture. |
+| `cargo test --locked export_conformance_tests --lib` in `src-tauri` | Pass | 16 export conformance tests still passed after adding the enabled option matrix proof. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the enabled option matrix fixture. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the enabled option matrix fixture. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
+| `git diff --check` | Pass | No whitespace errors after the enabled option matrix fixture. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

@@ -481,3 +481,173 @@ status: human-reviewed
         Some("compact")
     );
 }
+
+#[test]
+fn enabled_export_option_matrix_survives_cross_target_artifacts() {
+    let response = compile(CompileRequest {
+        text: r##"---
+title: Enabled Option Matrix
+status: approved
+approvedBy: QA
+approvedAt: 2026-05-21T10:00:00Z
+version: 2.0.0
+subtitle: Board-ready option proof
+legalDisclaimer: "For enabled option proof only."
+brand:
+  name: Matrix Brand
+  color: "#0F766E"
+layout:
+  header: "{{title}} | {{status}}"
+  footer: "{{classification}} | Page {{page}} of {{pages}}"
+classification: Internal
+---
+
+# Enabled Option Matrix
+
+## Evidence
+
+Enabled options should be visible in every target artifact family.
+
+```js
+const reviewed = true; // enabled proof
+```
+
+<!-- comment: author: QA | at: 2026-05-21 | resolved | Enabled comments appendix. -->
+<!-- change: author: QA | at: 2026-05-21T10:10:00Z | Confirmed enabled matrix. -->
+
+```glossary
+SLA: Service-level agreement.
+```
+
+```ai-source
+provider: OpenAI
+model: gpt-5.4
+date: 2026-05-21
+promptSummary: enabled option matrix synthesis
+reviewedBy: QA
+reviewedAt: 2026-05-21T10:15:00Z
+status: human-reviewed
+```
+"##
+        .to_string(),
+        file_path: None,
+    });
+    let options = json!({
+        "includeStyles": true,
+        "includeSyntaxHighlighting": true,
+        "coverPage": true,
+        "pageNumbers": true,
+        "includeGlossary": true,
+        "includeComments": true,
+        "includeProvenance": true,
+        "includeAgenda": true,
+        "layoutPreset": "presentation",
+        "watermark": "APPROVED"
+    });
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("<style>"));
+    assert!(html.contains("class=\"cover\""));
+    assert!(html.contains("Enabled Option Matrix | approved"));
+    assert!(html.contains("Internal | Page 1 of 1"));
+    assert!(html.contains("class=\"syn-keyword\""));
+    assert!(html.contains("APPROVED"));
+    assert!(html.contains("class=\"export-glossary\""));
+    assert!(html.contains("class=\"export-comments\""));
+    assert!(html.contains("class=\"export-provenance\""));
+    assert!(html.contains("For enabled option proof only."));
+
+    let pdf = String::from_utf8_lossy(&render_pdf_bytes(&response, &options)).into_owned();
+    assert!(pdf.contains("Cover: Enabled Option Matrix"));
+    assert!(pdf.contains("Page 1 of 1"));
+    assert!(pdf.contains("Layout preset: presentation"));
+    assert!(pdf.contains("Syntax highlighting: included"));
+    assert!(pdf.contains("Watermark: APPROVED"));
+    assert!(pdf.contains("Glossary"));
+    assert!(pdf.contains("Review Comments"));
+    assert!(pdf.contains("AI Provenance"));
+    assert!(pdf.contains("For enabled option proof only."));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
+    assert!(docx_document.contains("Cover: Enabled Option Matrix"));
+    assert!(docx_document.contains("Page 1 of 1"));
+    assert!(docx_document.contains("Layout preset: presentation"));
+    assert!(docx_document.contains("Syntax highlighting: included"));
+    assert!(docx_document.contains("Watermark: APPROVED"));
+    assert!(docx_document.contains("Glossary"));
+    assert!(docx_document.contains("Review Comments"));
+    assert!(docx_document.contains("AI Provenance"));
+    assert!(docx_document.contains("For enabled option proof only."));
+    assert!(docx_footer.contains("PAGE"));
+    assert!(docx_footer.contains("NUMPAGES"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Agenda"));
+    assert!(pptx_slides.contains("Evidence"));
+    assert!(pptx_slides.contains("Layout preset: presentation"));
+    assert!(pptx_slides.contains("Syntax highlighting: included"));
+    assert!(pptx_slides.contains("Watermark: APPROVED"));
+    assert!(pptx_slides.contains("Glossary"));
+    assert!(pptx_slides.contains("Review Comments"));
+    assert!(pptx_slides.contains("AI Provenance"));
+    assert!(pptx_slides.contains("For enabled option proof only."));
+
+    let exported_text = export::export_text(&response, &options);
+    assert!(exported_text.contains("Cover: Enabled Option Matrix"));
+    assert!(exported_text.contains("Footer: Internal | Page 1 of 1"));
+    assert!(exported_text.contains("Page 1 of 1"));
+    assert!(exported_text.contains("Layout preset: presentation"));
+    assert!(exported_text.contains("Syntax highlighting: included"));
+    assert!(exported_text.contains("Watermark: APPROVED"));
+    assert!(exported_text.contains("Glossary"));
+    assert!(exported_text.contains("Review Comments"));
+    assert!(exported_text.contains("AI Provenance"));
+    assert!(exported_text.contains("For enabled option proof only."));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_target = "markdown-bundle".to_string();
+    bundle_manifest.export_options = options.clone();
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_manifest = zip_entry_text(&bundle, "manifest.json");
+    assert!(bundled_text.contains("Layout preset: presentation"));
+    assert!(bundled_text.contains("Syntax highlighting: included"));
+    assert!(bundled_text.contains("Watermark: APPROVED"));
+    assert!(bundled_text.contains("Review Comments"));
+    assert!(bundled_text.contains("AI Provenance"));
+    let manifest_json: Value =
+        serde_json::from_str(&bundled_manifest).expect("bundle manifest json");
+    assert_eq!(
+        manifest_json
+            .pointer("/export_options/includeStyles")
+            .and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        manifest_json
+            .pointer("/export_options/includeSyntaxHighlighting")
+            .and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        manifest_json
+            .pointer("/export_options/includeAgenda")
+            .and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        manifest_json
+            .pointer("/export_options/layoutPreset")
+            .and_then(Value::as_str),
+        Some("presentation")
+    );
+    assert_eq!(
+        manifest_json
+            .pointer("/export_options/watermark")
+            .and_then(Value::as_str),
+        Some("APPROVED")
+    );
+}

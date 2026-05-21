@@ -1019,8 +1019,10 @@ Readiness should validate and report:
   readiness audit test coverage exists for export settings; external transform
   tests cover runtime stderr, missing output, output limits, and cache identity.
 - Export target options and target-specific blockers. Focused Rust coverage now
-  proves the PPTX approved-metadata blocker and malformed brand/citation
-  option shapes; more target-specific option combinations remain.
+  proves the PPTX approved-metadata blocker, malformed brand/citation option
+  shapes, disabled option matrix parity, and enabled option matrix parity across
+  HTML/PDF/DOCX/PPTX/text/Markdown bundle artifacts; more target-specific
+  option edge cases remain.
 - Target-specific option no-op visibility. Focused Rust coverage now proves
   valid-but-ignored options and empty appendix export options are surfaced as
   info diagnostics without blocking readiness. Markdown bundle exports now also
