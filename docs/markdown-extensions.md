@@ -221,6 +221,11 @@ Missing labels or captions can produce readiness warnings when the equation is
 used in a release-grade export.
 Captioned display equations render as numbered figures in preview and carry the
 human caption through HTML, PDF, DOCX, PPTX, and Markdown bundle exports.
+The native renderer covers common equation syntax used in business, finance,
+and academic drafts, including fractions, roots, superscripts, subscripts,
+Greek letters, sums, products, integrals, arrows, approximate/equality symbols,
+infinity, partial/nabla symbols, and simple `matrix`, `pmatrix`, `bmatrix`, and
+`vmatrix` environments.
 
 ## Citations And Bibliography
 

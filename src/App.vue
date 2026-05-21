@@ -5160,6 +5160,57 @@ select:hover {
   content: "√";
 }
 
+.preview-document .math-align-separator {
+  display: inline-block;
+  min-width: 1ch;
+}
+
+.preview-document .math-matrix {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+
+.preview-document .math-matrix::before,
+.preview-document .math-matrix::after {
+  font-size: 1.8em;
+  line-height: 1;
+}
+
+.preview-document .math-matrix.matrix-round::before {
+  content: "(";
+}
+
+.preview-document .math-matrix.matrix-round::after {
+  content: ")";
+}
+
+.preview-document .math-matrix.matrix-square::before {
+  content: "[";
+}
+
+.preview-document .math-matrix.matrix-square::after {
+  content: "]";
+}
+
+.preview-document .math-matrix.matrix-vertical::before,
+.preview-document .math-matrix.matrix-vertical::after {
+  content: "|";
+}
+
+.preview-document .math-matrix table {
+  width: auto;
+  border-collapse: collapse;
+  display: inline-table;
+}
+
+.preview-document .math-matrix td {
+  border: 0;
+  padding: 0 0.45ch;
+  text-align: center;
+}
+
 .preview-document .math-source-inline {
   position: absolute;
   width: 1px;

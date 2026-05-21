@@ -1712,6 +1712,23 @@ CSL alias rendering verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
 | `git diff --check` | Pass | No whitespace errors after the CSL alias update. |
 
+Broader equation syntax verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_renders_broader_latex_equation_syntax --lib -- --nocapture` in `src-tauri` | Pass | Focused equation proof renders sums, superscripts, subscripts, approximation/infinity/arrows, Omega, and a `bmatrix` environment, preserves AST equation metadata, emits HTML/export CSS, and keeps DOCX/PPTX text evidence. |
+| `cargo test --locked compiler_renders_block_and_inline_equations --lib -- --nocapture` in `src-tauri` | Pass | Existing equation regression still proves inline/display math, fractions, captions, labels, references, AST capture, and readiness cleanliness. |
+| `cargo test --locked captioned_equations_survive_cross_target_exports --lib -- --nocapture` in `src-tauri` | Pass | Existing cross-target equation regression still proves captioned equation text and references across HTML, PDF, DOCX, PPTX, and Markdown bundle outputs. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 195 Rust library tests passed after adding the broader native equation syntax coverage. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the equation renderer update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the equation renderer update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the preview/export math styling update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the equation renderer update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the broader equation subset; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after the math preview styling update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
+| `git diff --check` | Pass | No whitespace errors after the equation renderer update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

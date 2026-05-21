@@ -215,6 +215,9 @@ fn render_latex_visual(input: &str) -> String {
 }
 
 fn render_latex_expr(input: &str) -> String {
+    if let Some(matrix) = render_latex_matrix(input) {
+        return matrix;
+    }
     let mut output = String::new();
     let mut index = 0usize;
     while index < input.len() {
@@ -235,6 +238,12 @@ fn render_latex_expr(input: &str) -> String {
                     continue;
                 }
             }
+        } else if rest.starts_with("\\begin{") {
+            if let Some((matrix, after_matrix)) = render_latex_matrix_prefix(input, index) {
+                output.push_str(&matrix);
+                index = after_matrix;
+                continue;
+            }
         } else if rest.starts_with("\\sqrt") {
             if let Some((radicand, after_radicand)) =
                 parse_latex_braced(input, index + "\\sqrt".len())
@@ -254,6 +263,11 @@ fn render_latex_expr(input: &str) -> String {
         let Some(ch) = rest.chars().next() else {
             break;
         };
+        if ch == '&' {
+            output.push_str("<span class=\"math-align-separator\"> </span>");
+            index += ch.len_utf8();
+            continue;
+        }
         if ch == '^' || ch == '_' {
             if let Some((script, after_script)) = parse_latex_script(input, index + ch.len_utf8()) {
                 output.push_str(if ch == '^' { "<sup>" } else { "<sub>" });
@@ -267,6 +281,79 @@ fn render_latex_expr(input: &str) -> String {
         index += ch.len_utf8();
     }
     output
+}
+
+fn render_latex_matrix(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    let (environment, body) = parse_latex_environment(trimmed)?;
+    let bracket_class = matrix_bracket_class(environment)?;
+    Some(render_latex_matrix_body(bracket_class, body))
+}
+
+fn render_latex_matrix_prefix(input: &str, start: usize) -> Option<(String, usize)> {
+    let (environment, body, after_environment) = parse_latex_environment_prefix(input, start)?;
+    let bracket_class = matrix_bracket_class(environment)?;
+    Some((
+        render_latex_matrix_body(bracket_class, body),
+        after_environment,
+    ))
+}
+
+fn matrix_bracket_class(environment: &str) -> Option<&'static str> {
+    match environment {
+        "matrix" => Some("matrix-none"),
+        "pmatrix" => Some("matrix-round"),
+        "bmatrix" => Some("matrix-square"),
+        "vmatrix" => Some("matrix-vertical"),
+        _ => None,
+    }
+}
+
+fn render_latex_matrix_body(bracket_class: &str, body: &str) -> String {
+    let rows = body
+        .split("\\\\")
+        .map(str::trim)
+        .filter(|row| !row.is_empty())
+        .map(|row| {
+            row.split('&')
+                .map(str::trim)
+                .map(render_latex_expr)
+                .map(|cell| format!("<td>{cell}</td>"))
+                .collect::<Vec<_>>()
+                .join("")
+        })
+        .map(|row| format!("<tr>{row}</tr>"))
+        .collect::<Vec<_>>();
+    if rows.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<span class=\"math-matrix {bracket_class}\"><table><tbody>{}</tbody></table></span>",
+            rows.join("")
+        )
+    }
+}
+
+fn parse_latex_environment(input: &str) -> Option<(&str, &str)> {
+    let begin_marker = "\\begin{";
+    let after_begin = input.strip_prefix(begin_marker)?;
+    let (environment, after_environment) = after_begin.split_once('}')?;
+    let end_marker = format!("\\end{{{environment}}}");
+    let body = after_environment.strip_suffix(&end_marker)?;
+    Some((environment, body))
+}
+
+fn parse_latex_environment_prefix(input: &str, start: usize) -> Option<(&str, &str, usize)> {
+    let begin_marker = "\\begin{";
+    let after_begin_index = start + begin_marker.len();
+    let after_begin = input.get(after_begin_index..)?;
+    let (environment, after_environment) = after_begin.split_once('}')?;
+    let body_start = after_begin_index + environment.len() + 1;
+    let end_marker = format!("\\end{{{environment}}}");
+    let relative_end = after_environment.find(&end_marker)?;
+    let body = &after_environment[..relative_end];
+    let after_environment_index = body_start + relative_end + end_marker.len();
+    Some((environment, body, after_environment_index))
 }
 
 struct LatexCommand<'a> {
@@ -290,10 +377,32 @@ fn latex_command(input: &str) -> Option<LatexCommand<'_>> {
         "pi" => "π",
         "sigma" => "σ",
         "theta" => "θ",
+        "omega" => "ω",
+        "Omega" => "Ω",
+        "Delta" => "Δ",
+        "Sigma" => "Σ",
+        "sum" => "∑",
+        "prod" => "∏",
+        "int" => "∫",
+        "infty" => "∞",
+        "partial" => "∂",
+        "nabla" => "∇",
         "times" => "×",
         "cdot" => "·",
+        "pm" => "±",
+        "to" => "→",
+        "rightarrow" => "→",
+        "leftarrow" => "←",
+        "Rightarrow" => "⇒",
+        "Leftarrow" => "⇐",
+        "approx" => "≈",
+        "equiv" => "≡",
+        "lt" => "&lt;",
+        "gt" => "&gt;",
         "le" => "≤",
+        "leq" => "≤",
         "ge" => "≥",
+        "geq" => "≥",
         "neq" => "≠",
         _ => return None,
     };

@@ -900,8 +900,11 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   A focused rich-block export test now proves equation text and equation
   references across the artifact family, and a focused captioned-equation
   export test now proves equation captions survive HTML, PDF, DOCX, PPTX, and
-  Markdown bundle outputs. Remaining work is rendered visual QA and more math
-  syntax permutations.
+  Markdown bundle outputs. Additional focused coverage now proves sums,
+  superscripts, subscripts, arrows, approximation/infinity symbols, Omega,
+  simple matrix environments, preview/export CSS, AST capture, and DOCX/PPTX
+  text evidence. Remaining work is rendered visual QA and deeper LaTeX
+  permutations beyond the native subset.
 - Citations, bibliography, locators, missing keys, duplicate keys, and CSL
   behavior.
 - Cross references to headings, figures, tables, equations, appendices, and

@@ -42,6 +42,58 @@ fn compiler_renders_block_and_inline_equations() {
 }
 
 #[test]
+fn compiler_renders_broader_latex_equation_syntax() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Advanced Math\nstatus: approved\napprovedBy: QA\n---\n# Advanced Math\nInline \\(\\sum_{i=1}^{n} x_i \\approx \\infty\\) and \\(A \\to B\\).\n\n$$\n\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix} \\Rightarrow \\Omega\n$$ {#eq:matrix caption=\"Matrix model\"}\n\nSee {@eq:matrix}.\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.html.contains("∑"));
+    assert!(response.html.contains("≈"));
+    assert!(response.html.contains("∞"));
+    assert!(response.html.contains("→"));
+    assert!(response.html.contains("⇒"));
+    assert!(response.html.contains("Ω"));
+    assert!(response
+        .html
+        .contains("class=\"math-matrix matrix-square\""));
+    assert!(response.html.contains("<td>a</td>"));
+    assert!(response.html.contains("<td>d</td>"));
+    assert!(response.html.contains("<sup>n</sup>"));
+    assert!(response.html.contains("<sub>i=1</sub>"));
+    assert!(response.html.contains("<sub>i</sub>"));
+    assert!(response.html.contains("Equation 1: Matrix model"));
+    assert!(response
+        .compiled_markdown
+        .contains("See [Equation matrix](#eq:matrix)."));
+    assert!(response.document_ast.blocks.iter().any(|block| {
+        matches!(
+            block,
+            DocumentBlock::Equation { id, caption, text, .. }
+                if id.as_deref() == Some("eq:matrix")
+                    && caption.as_deref() == Some("Matrix model")
+                    && text.contains("\\begin{bmatrix}")
+        )
+    }));
+
+    let options = json!({});
+    let html = render_full_html(&response, &options);
+    assert!(html.contains(".math-matrix"));
+    assert!(html.contains("class=\"math-matrix matrix-square\""));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx advanced math");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Equation: eq:matrix"));
+    assert!(docx_document.contains("Matrix model"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx advanced math");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/");
+    assert!(pptx_slides
+        .iter()
+        .any(|slide| slide.contains("Equation: eq:matrix") && slide.contains("Matrix model")));
+}
+
+#[test]
 fn compiler_renders_markdown_footnotes() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Footnotes\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\n---\n# Footnotes\nA governed claim.[^risk]\n\n[^risk]: Reviewed by compliance.\n    Includes second-line evidence.\n".to_string(),
