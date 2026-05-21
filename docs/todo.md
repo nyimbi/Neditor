@@ -1438,6 +1438,8 @@ Candidate extraction targets:
 Constraints:
 
 - Preserve Vue SFC block order: template, script, style.
+- `pnpm run check:structure` now enforces the top-level `src/App.vue`
+  template, `<script setup>`, and style block order before future splits.
 - Keep diffs small and behavior-preserving.
 - Avoid styling churn during structural splits.
 

@@ -57,7 +57,7 @@ explicit platform checks.
 | Spec section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
 | 6.1 Application Shell | Tauri IPC commands exposed from Rust | Complete | `src-tauri/src/lib.rs`; `docs/ipc-command-coverage.md`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` verifies every spec 25.4 command is registered and documented | Keep coverage synchronized as new required IPC commands are added. |
-| 6.1 Application Shell | Vue SFC block order template/script/style | Partial | `src/App.vue` follows order | Preserve when modularizing; add lint/check if practical. |
+| 6.1 Application Shell | Vue SFC block order template/script/style | Complete | `src/App.vue` follows template/script/style order; `pnpm run check:structure` verifies the top-level Vue SFC block order and `<script setup>` contract | Keep the guard current if the primary shell is split into smaller SFCs. |
 | 6.2 Primary Layout | Toolbar, status bar, sidebar, editor, preview | Partial | `src/App.vue`; Playwright harness covers outline-sidebar heading navigation to source | Browser layout/accessibility checks across viewport sizes and native execution proof. |
 | 6.2 Primary Layout | Export preview, review, presentation outline modes | Partial | Mode controls and sidebars in `src/App.vue`; export mode now renders an export preview summary in the preview pane; Playwright harness covers export preview, review, and presentation outline routing | Native execution proof and product QA for each mode. |
 | 6.3 Editor | CodeMirror 6 engine | Complete | CodeMirror dependencies and imports in `src/App.vue` | None beyond ongoing behavior tests. |

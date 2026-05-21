@@ -1753,6 +1753,19 @@ Citation alias preference verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
 | `git diff --check` | Pass | No whitespace errors after the citation alias preference update. |
 
+Project structure guard verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:structure` | Pass | Verified `src/App.vue` keeps the required top-level `template`, `<script setup>`, and `style` block order. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed, including the package-script guard for `check:structure`. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the project structure guard. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the structure guard; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after adding the structure guard. |
+| `pnpm run check:deps` | Pass | Dependency admission guard still passes after adding the structure guard script. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
+| `git diff --check` | Pass | No whitespace errors after the structure guard update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

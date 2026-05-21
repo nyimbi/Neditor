@@ -13,6 +13,7 @@
     "check:deps": "node scripts/check-dependency-admission.mjs",
     "check:docs": "node scripts/check-markdown-links.mjs",
     "check:engines": "node scripts/check-external-engines.mjs",
+    "check:structure": "node scripts/check-project-structure.mjs",
     "test:desktop-smoke": "node scripts/check-desktop-smoke.mjs",
     "test:unit": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js",
     "test:e2e": "playwright test",

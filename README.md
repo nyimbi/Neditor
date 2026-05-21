@@ -183,6 +183,7 @@ pnpm run test:unit
 pnpm run build
 pnpm run check:docs
 pnpm run check:deps
+pnpm run check:structure
 pnpm run check:a11y
 pnpm run check:engines
 pnpm run test:desktop-smoke
