@@ -797,6 +797,9 @@ Completion criteria:
 
 - Browser workflow tests run locally with `pnpm run test:e2e` on hosts where
   Playwright browser installation and Chromium launch are available.
+- `pnpm run check:e2e-env` classifies local browser readiness before workflow
+  execution, including missing project-local Chromium versus macOS launch
+  permission failures.
 - Local sandbox limitations remain documented but are not used as completion
   evidence.
 - Browser coverage failures drive implementation fixes rather than broad

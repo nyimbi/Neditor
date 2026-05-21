@@ -1788,6 +1788,21 @@ Markdown bundle manifest sidecar verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
 | `git diff --check` | Pass | No whitespace errors after the Markdown bundle manifest update. |
 
+Browser workflow environment preflight verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright install chromium` | Pass | Installed/confirmed project-local Playwright Chromium without touching tracked files. |
+| `pnpm run check:e2e-env` | Blocked locally | The new preflight found project-local Playwright Chromium, then classified the remaining failure as a macOS Mach bootstrap permission denial rather than a missing browser. |
+| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test e2e/app-workflows.spec.ts --grep "boots the workbench" --project chromium` | Blocked locally | The focused workflow reached the installed browser executable and failed before app assertions with `bootstrap_check_in ... Permission denied (1100)`. |
+| `node --check scripts/check-e2e-environment.mjs` | Pass | The E2E environment preflight script parses successfully. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed, including the package-script guard for `check:e2e-env`. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the preflight script. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the preflight script; all local links resolved. |
+| `pnpm run check:deps` | Pass | Dependency admission guard still passes after adding the package script. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
+| `git diff --check` | Pass | No whitespace errors after the E2E preflight update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

@@ -208,6 +208,11 @@ above before publishing a slice. Browser workflow tests are available through
 `pnpm run test:e2e` when Playwright's local browser dependencies are installed
 and the host allows Chromium to launch.
 
+Use `pnpm run check:e2e-env` before browser workflow runs. It defaults to the
+project-local Playwright browser cache, reports the install command if Chromium
+is missing, and distinguishes missing browsers from macOS launch-permission
+failures.
+
 `pnpm run check:engines` probes optional external transform engines and reports
 installed/missing Graphviz/DOT, D2, PlantUML, Java-backed PlantUML, and Pikchr
 paths without failing just because an optional engine is absent.
