@@ -2036,6 +2036,18 @@ JSON Schema dialect transform verification:
 | `pnpm run verify:local` | Pass | The quick local verification baseline passed after the schema dialect update. |
 | `git diff --check` | Pass | No whitespace errors after the schema dialect update. |
 
+Full registered IPC command coverage verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked spec_25_4_ipc_commands_are_registered_and_documented --lib` in `src-tauri` | Pass | IPC coverage now proves the spec 25.4 command subset is registered and documented, the coverage table exactly matches every registered Tauri command, and each row has implementation/evidence columns. |
+| `cargo test --locked git_history_diff_commit_tag_and_restore_workflow --lib` in `src-tauri` | Pass | Git workflow proof now directly exercises `get_git_status` before diff, commit, history, tag, and restore operations. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the IPC coverage audit update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the IPC coverage audit update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating IPC coverage docs, matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run verify:local` | Pass | The quick local verification baseline passed after the IPC coverage audit update. |
+| `git diff --check` | Pass | No whitespace errors after the IPC coverage audit update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

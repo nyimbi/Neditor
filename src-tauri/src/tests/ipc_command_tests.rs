@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
 fn spec_25_4_ipc_commands_are_registered_and_documented() {
@@ -9,7 +9,8 @@ fn spec_25_4_ipc_commands_are_registered_and_documented() {
     );
 
     let registered = registered_tauri_commands();
-    let documented = documented_ipc_commands();
+    let documented_rows = documented_ipc_rows();
+    let documented = documented_rows.keys().cloned().collect::<BTreeSet<_>>();
 
     assert_subset(
         "registered Tauri commands",
@@ -24,9 +25,20 @@ fn spec_25_4_ipc_commands_are_registered_and_documented() {
         "docs/ipc-command-coverage.md",
     );
     assert_eq!(
-        required, documented,
-        "docs/ipc-command-coverage.md should cover the section 25.4 commands exactly"
+        registered, documented,
+        "docs/ipc-command-coverage.md should cover every registered Tauri command exactly"
     );
+    for (command, row) in documented_rows {
+        assert_eq!(
+            row.len(),
+            3,
+            "IPC coverage row for {command} should have command, implementation, and evidence columns"
+        );
+        assert!(
+            !row[1].trim().is_empty() && !row[2].trim().is_empty(),
+            "IPC coverage row for {command} should include implementation and evidence"
+        );
+    }
 }
 
 fn spec_25_4_commands() -> BTreeSet<String> {
@@ -41,7 +53,7 @@ fn spec_25_4_commands() -> BTreeSet<String> {
     markdown_backtick_list_items(section)
 }
 
-fn documented_ipc_commands() -> BTreeSet<String> {
+fn documented_ipc_rows() -> BTreeMap<String, Vec<String>> {
     let coverage = include_str!("../../../docs/ipc-command-coverage.md");
     coverage
         .lines()
@@ -50,11 +62,17 @@ fn documented_ipc_commands() -> BTreeSet<String> {
             if !trimmed.starts_with("| `") {
                 return None;
             }
-            trimmed
-                .trim_start_matches("| `")
-                .split('`')
-                .next()
-                .map(str::to_string)
+            let cells = trimmed
+                .trim_matches('|')
+                .split('|')
+                .map(|cell| cell.trim().to_string())
+                .collect::<Vec<_>>();
+            let command = cells
+                .first()
+                .and_then(|cell| cell.strip_prefix('`'))
+                .and_then(|cell| cell.split('`').next())?
+                .to_string();
+            Some((command, cells))
         })
         .collect()
 }

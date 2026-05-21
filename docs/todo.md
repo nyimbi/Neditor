@@ -61,9 +61,9 @@ NEditor is no longer a basic scaffold. The repository currently contains:
 - Backend tests across compiler, exports, transforms, tables, media packaging,
   validation, file commands, Git workflows, snapshots, review/provenance, and
   external engines.
-- An executable IPC coverage guard for the initial command surface in
-  specification section 25.4, plus `docs/ipc-command-coverage.md` as the
-  human-readable command evidence table.
+- An executable IPC coverage guard for the command surface in specification
+  section 25.4 and every currently registered Tauri command, plus
+  `docs/ipc-command-coverage.md` as the human-readable command evidence table.
 - MIT licensing in `LICENSE`, `package.json`, `src-tauri/Cargo.toml`, and
   the Tauri desktop bundle metadata.
 - Frontend unit tests for table parsing/serialization, conflict diff alignment,

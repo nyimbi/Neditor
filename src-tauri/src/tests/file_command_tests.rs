@@ -165,6 +165,11 @@ fn git_history_diff_commit_tag_and_restore_workflow() {
     run_git(&root, &["commit", "-m", "Initial document"]).expect("git commit");
     fs::write(&doc, "two\n").expect("write changed doc");
 
+    let status = get_git_status(Some(path_to_string(&doc))).expect("git status");
+    assert!(status.inside_repo);
+    assert!(status.dirty);
+    assert!(status.summary.iter().any(|entry| entry.contains("doc.md")));
+
     let diff = git_diff(GitPathRequest {
         path: path_to_string(&doc),
     })
