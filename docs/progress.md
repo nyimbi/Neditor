@@ -2048,6 +2048,19 @@ Full registered IPC command coverage verification:
 | `pnpm run verify:local` | Pass | The quick local verification baseline passed after the IPC coverage audit update. |
 | `git diff --check` | Pass | No whitespace errors after the IPC coverage audit update. |
 
+Example project export-audience verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked example_project_fixtures_compile_and_export --lib` in `src-tauri` | Pass | Example fixture proof now keeps README example links synchronized with executable fixtures and proves each example's title, audience metadata, representative feature markers, package metadata, source hash custom properties, semantic metadata, source map, diagnostics, and Markdown bundle evidence across HTML, PDF, DOCX, PPTX, and Markdown bundle artifacts. |
+| `cargo test --locked export_conformance_tests --lib` in `src-tauri` | Pass | 16 export conformance tests still pass after carrying `targetPersona` audience metadata into export metadata. |
+| `cargo test --locked export_option_tests --lib` in `src-tauri` | Pass | 10 export option tests still pass after adding audience metadata to HTML, plain text, DOCX/PPTX custom properties, and bundle text. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the audience metadata export update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the audience metadata export update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating README, user guide, Markdown extension docs, matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run verify:local` | Pass | The quick local verification baseline passed after the audience metadata export update. |
+| `git diff --check` | Pass | No whitespace errors after the audience metadata export update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

@@ -171,7 +171,9 @@ supported targets:
 - [AI-assisted draft with review provenance](examples/ai-assisted-draft.md)
 
 These examples are covered by Rust fixture tests so they stay executable instead
-of becoming stale marketing samples.
+of becoming stale marketing samples. The tests also keep the README links in
+sync and prove each example's audience metadata and representative features
+survive HTML, PDF, DOCX, PPTX, and Markdown bundle exports.
 
 ## Quick Start
 

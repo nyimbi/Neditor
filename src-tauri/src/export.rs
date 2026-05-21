@@ -7,7 +7,7 @@ use crate::{
     },
     generated_sections::toc_depth,
     layout::{matches_layout_break, LayoutSettings},
-    metadata_string, render_export_template, sha256_uri,
+    metadata_string, metadata_string_list, render_export_template, sha256_uri,
     table_cells::TableCell,
     tables::delimited_rows_for_export,
     CompileResponse, ExportManifest,

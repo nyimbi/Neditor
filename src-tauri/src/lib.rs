@@ -95,8 +95,8 @@ use transforms::external::{list_transform_engines, run_external_transform};
 use transforms::renderer::supported_transform;
 pub(crate) use utils::{
     escape_css, escape_html, escape_pdf, escape_xml, format_value, metadata_lookup,
-    metadata_string, path_to_string, render_export_template, sha256_hex, sha256_uri,
-    value_to_string,
+    metadata_string, metadata_string_list, path_to_string, render_export_template, sha256_hex,
+    sha256_uri, value_to_string,
 };
 use workspace_files::list_workspace_files;
 #[cfg(test)]

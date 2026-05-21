@@ -15,6 +15,25 @@ pub(crate) fn metadata_string(metadata: &Value, path: &str) -> Option<String> {
     metadata_lookup(metadata, path).map(value_to_string)
 }
 
+pub(crate) fn metadata_string_list(metadata: &Value, path: &str) -> Vec<String> {
+    match metadata_lookup(metadata, path) {
+        Some(Value::Array(values)) => values
+            .iter()
+            .map(value_to_string)
+            .filter(|value| !value.trim().is_empty())
+            .collect(),
+        Some(value) => {
+            let value = value_to_string(value);
+            if value.trim().is_empty() {
+                Vec::new()
+            } else {
+                vec![value]
+            }
+        }
+        None => Vec::new(),
+    }
+}
+
 pub(crate) fn render_export_template(
     template: &str,
     response: &CompileResponse,

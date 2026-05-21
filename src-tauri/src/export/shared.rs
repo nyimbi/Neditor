@@ -119,6 +119,11 @@ pub(super) fn render_custom_properties(response: &CompileResponse) -> String {
     );
     push_custom_property(
         &mut properties,
+        "NEditorTargetPersona",
+        &target_persona_summary(&response.metadata).unwrap_or_default(),
+    );
+    push_custom_property(
+        &mut properties,
         "NEditorSourceHash",
         &response.export_manifest.source_hash,
     );
@@ -185,6 +190,9 @@ pub(super) fn export_metadata_lines(response: &CompileResponse, options: &Value)
             lines.push(value);
         }
     }
+    if let Some(personas) = target_persona_summary(&response.metadata) {
+        lines.push(format!("Audience: {personas}"));
+    }
     if let Some(logo) = export_logo(&response.metadata) {
         lines.push(format!("Logo: {logo}"));
     }
@@ -199,6 +207,15 @@ pub(super) fn export_logo(metadata: &Value) -> Option<String> {
         .or_else(|| metadata_string(metadata, "layout.logo"))
         .or_else(|| metadata_string(metadata, "logo"))
         .filter(|value| !value.trim().is_empty())
+}
+
+pub(super) fn target_persona_summary(metadata: &Value) -> Option<String> {
+    let personas = metadata_string_list(metadata, "targetPersona");
+    if personas.is_empty() {
+        None
+    } else {
+        Some(personas.join(", "))
+    }
 }
 
 #[derive(Clone, Debug)]

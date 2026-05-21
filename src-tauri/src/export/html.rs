@@ -24,6 +24,8 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
     let version = metadata_string(&response.metadata, "version");
     let classification = metadata_string(&response.metadata, "classification");
     let brand = metadata_string(&response.metadata, "brand.name");
+    let audience =
+        target_persona_summary(&response.metadata).map(|value| format!("Audience: {value}"));
     let logo = export_logo(&response.metadata);
     let header_template = metadata_string(&response.metadata, "layout.header")
         .or_else(|| Some(response.semantic.title.clone()));
@@ -40,7 +42,7 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
         response,
         classification.as_deref().unwrap_or(""),
     );
-    let cover_meta = [author, date, version, classification, brand]
+    let cover_meta = [author, date, version, classification, brand, audience]
         .into_iter()
         .flatten()
         .map(|value| format!("<p>{}</p>", escape_html(&value)))

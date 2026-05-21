@@ -23,6 +23,8 @@ approvedBy: Board Secretary
 approvedAt: 2026-05-20T09:00:00Z
 classification: confidential
 client: Acme Holdings
+targetPersona:
+  - Executives and managers
 toc: true
 citationStyle: author-year
 brand:
@@ -38,7 +40,7 @@ Common fields:
 
 | Field | Purpose |
 | --- | --- |
-| `title`, `subtitle`, `author`, `client`, `classification` | Document identity and metadata. |
+| `title`, `subtitle`, `author`, `client`, `classification`, `targetPersona` | Document identity, audience, and metadata. |
 | `version`, `status`, `approvedBy`, `approvedAt` | Review and release governance. |
 | `toc`, `citationStyle` | Generated section and bibliography defaults. |
 | `brand` | Export brand name, color, logo, fonts, and defaults. |

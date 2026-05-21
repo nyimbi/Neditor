@@ -1657,6 +1657,9 @@ Needed docs:
 
 - Expand target-specific export option examples and rendered artifact
   screenshots as export fidelity proof grows.
+- Keep `targetPersona` audience metadata visible in export artifacts; current
+  example proof covers HTML cover metadata, Markdown bundle metadata/text, and
+  DOCX/PPTX custom package properties.
 - Add desktop/native workflow screenshots after the native smoke harness exists.
 - Keep user docs synchronized with matrix rows as features move from partial to
   complete.
@@ -1687,6 +1690,9 @@ Completion criteria:
   at least one executable fixture.
 - Keep every fixture exporting to HTML, PDF, DOCX, PPTX, and Markdown bundle.
 - Keep README links to the examples current.
+- Keep example fixture proof checking exported title, audience, representative
+  feature markers, package metadata, semantic metadata, source maps, diagnostics,
+  and bundle evidence.
 
 ## Recommended Execution Order
 
