@@ -49,6 +49,18 @@ character count, reading-time status, and source navigation from diagnostics.
 The command palette searches app actions, headings, citations, glossary terms,
 index terms, open documents, and workspace files.
 
+## Product Boundaries
+
+NEditor is a local-first desktop workbench for document files. It does not
+upload documents, synchronize drafts through a cloud service, or provide
+real-time multiplayer collaboration.
+
+The first release is not a mobile app, browser-hosted web app, server-side
+rendering service, full WYSIWYG editor, enterprise identity layer, or arbitrary
+plugin marketplace. Those may become separate product lines later, but the
+current app stays focused on local Markdown source, deterministic compilation,
+review evidence, and exportable deliverables.
+
 ## Files And Workspaces
 
 NEditor treats Markdown files as the source of truth.

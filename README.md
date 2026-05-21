@@ -35,6 +35,14 @@ be written quickly, reviewed carefully, exported consistently, and audited later
   possible, and external engines are trust-gated with timeouts, output limits,
   diagnostics, and deterministic cache keys.
 
+## What NEditor Is Not
+
+NEditor is deliberately scoped as a local-first, document-file-centered desktop
+workbench. The first release is not trying to be a real-time multiplayer suite,
+cloud document store, mobile app, full WYSIWYG editor, arbitrary plugin
+marketplace, server-side renderer, enterprise identity layer, or browser-based
+web app.
+
 ## Screenshots
 
 | Writing workbench | Export readiness |

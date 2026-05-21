@@ -1766,6 +1766,12 @@ Project structure guard verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
 | `git diff --check` | Pass | No whitespace errors after the structure guard update. |
 
+Non-goal documentation verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after adding first-release non-goals to the README and user guide; all local links resolved. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
