@@ -169,7 +169,7 @@ explicit platform checks.
 | 25.4 IPC commands | Required command list | Complete | `docs/ipc-command-coverage.md`; `src-tauri/src/lib.rs`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` parses the spec, coverage table, and Tauri handler registration, proves all spec-required commands are registered/documented, and proves the table exactly matches every registered command | Keep the table and guardrail test current if the spec command list changes. |
 | 26 Data storage | Preferences, recents, brand profiles, transform paths, snapshots, sidecars | Partial | `docs/storage-model.md`; Store plugin usage; schema-versioned workspace persistence migration; frontend unit migration/schema test; snapshot/export manifest modules; snapshot restore source/store scope tests; `export_document_writes_optional_sidecar_manifest` proves sidecar manifests across HTML, PDF, DOCX, PPTX, Markdown bundle, and disabled-manifest behavior | Native settings/snapshot storage proof and sidecar workflow proof in a real desktop run. |
 | 27 Implementation phases | Phase deliverables | Partial | Most phase surfaces exist | Phase completion must be proven by matrix and tests. |
-| 28 Acceptance criteria | Concrete app acceptance | Partial | Current build/test surfaces; `pnpm run check:e2e-env` now classifies local Playwright Chromium readiness before browser workflow execution | Fresh baseline plus workflow/export proof required. |
+| 28 Acceptance criteria | Concrete app acceptance | Partial | Current build/test surfaces; `pnpm run check:e2e-env` now classifies local Playwright Chromium readiness before browser workflow execution and currently reports installed Chromium blocked by macOS Mach bootstrap permissions; `pnpm exec playwright test --list` lists 41 browser workflow tests; `pnpm run test:desktop-smoke` checks desktop build artifacts | Fresh baseline plus executable browser/native workflow/export proof required. |
 | 29 Non-goals | Cloud collaboration and overreach controls | Complete | `docs/specification.md` lists first-release non-goals; `README.md` now states what NEditor is not; `docs/user-guide.md` documents product boundaries around local-first files, no cloud sync, no real-time multiplayer collaboration, no mobile/web app, no server-side rendering, no full WYSIWYG editor, no enterprise identity layer, and no arbitrary plugin marketplace; `pnpm run check:docs` verifies the linked docs | Revisit only if the first-release scope changes. |
 | 30 Architecture decisions | Licensing, editor, parser, PDF/DOCX/PPTX/citations/formulas/transforms/snapshots/dependency gate | Partial | `LICENSE`; `package.json`; `src-tauri/Cargo.toml`; `src-tauri/tauri.conf.json`; implementation follows many decisions; dependency doc exists; `pnpm run check:deps` guards manifest dependency admission coverage, canonical MIT license text, and MIT package metadata | Keep dependency admission current, document deviations, and broaden rendered/workflow proof for the remaining architecture decisions. |
 | 31 First milestone | Prove architecture with representative features | Partial | Current code strongly exceeds first milestone in breadth | Still unverified until fresh baseline and workflow tests pass. |
@@ -231,17 +231,18 @@ Current major verification gaps:
   workspace-file navigation, plus transform engine settings trust/probe
   diagnostics, target-specific export readiness manifest preview, export
   output/manifest path reporting, export success/failure diagnostics, and
-  blocked export diagnostics before file write.
-  Local focused execution is currently blocked because Playwright browser
-  installation in the sandbox fails with `EPERM` while creating
-  `/Users/nyimbiodero/Library/Caches/ms-playwright/__dirlock`.
+  blocked export diagnostics before file write. The current checked-in
+  browser harness lists 41 Chromium tests through
+  `pnpm exec playwright test --list`. Local execution is currently blocked on
+  this macOS host because Playwright Chromium is installed but launch fails
+  with a Mach bootstrap permission denial.
 - `pnpm run test:desktop-smoke` now checks the built Vite artifact, Tauri
   configuration, package/license metadata, and the release desktop binary after
   `./node_modules/.bin/tauri build --no-bundle`; a WebDriver/Tauri-driver
   workflow harness is still missing.
 - Current committed browser workflow tests exist, but local browser execution
-  depends on Playwright browser installation and host permissions; desktop user
-  journeys are still not covered by a WebDriver/Tauri-driver harness.
+  depends on host permissions that allow Chromium launch; desktop user journeys
+  are still not covered by a WebDriver/Tauri-driver harness.
 - Export tests rely heavily on package/text assertions; visual/rendered quality
   remains under-proven.
 - Optional external transform engines are proven most strongly on Linux; macOS
@@ -251,9 +252,9 @@ Current major verification gaps:
   loop, repeated edit/cache, export progress reporting, and compile-result
   cancellation coverage, preview debounce timing/coalescing coverage, and a
   bounded repeated compile/export memory-growth stress test. Browser
-  performance workflow execution still needs a host with Playwright Chromium
-  installed, deeper long-running memory profiling remains open, and native
-  desktop performance proof remains under-proven.
+  performance workflow execution still needs a host that permits Playwright
+  Chromium launch, deeper long-running memory profiling remains open, and
+  native desktop performance proof remains under-proven.
 
 ## Next Matrix Work
 

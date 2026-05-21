@@ -587,6 +587,9 @@ Current verification recorded on 2026-05-21:
 | --- | --- | --- |
 | `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | 8 file command tests passed, including `reveal_command_for_existing_path_is_platform_specific_and_argument_safe`. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 41 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
+| `pnpm run check:e2e-env` | Blocked locally | Project-local Playwright Chromium is installed, but this macOS session blocks Chromium launch with a Mach bootstrap permission denial. |
+| `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts; bounded GUI launch remains opt-in via `NEDITOR_DESKTOP_SMOKE_LAUNCH=1`. |
 
 Fresh baseline recorded on 2026-05-20:
 

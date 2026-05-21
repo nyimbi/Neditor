@@ -702,7 +702,17 @@ Completion criteria:
 
 ### 2. Keep The Browser Workflow Lane Passing While Expanding It
 
-Status: current browser workflow lane is green in CI; coverage remains partial.
+Status: current committed browser workflow discovery is healthy; execution
+coverage remains partial on this host.
+
+Current host evidence:
+
+- 2026-05-21: `pnpm exec playwright test --list` lists 41 Chromium workflow
+  tests in `e2e/app-workflows.spec.ts`.
+- 2026-05-21: `pnpm run check:e2e-env` finds project-local Playwright
+  Chromium, but this macOS session blocks Chromium launch with a Mach
+  bootstrap permission denial. Run browser workflows from a normal
+  terminal/session that permits Chromium launch.
 
 Current browser coverage in `e2e/app-workflows.spec.ts`:
 
@@ -799,8 +809,8 @@ Required next coverage:
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices,
   progress/cancellation behavior if needed, and rendered/manual proof.
-- Run the large-document browser performance workflow on a host with Playwright
-  Chromium installed, plus native desktop performance proof.
+- Run the large-document browser performance workflow on a host that permits
+  Playwright Chromium launch, plus native desktop performance proof.
 - Remaining transform engine settings: cross-platform executable edge cases
   beyond the mocked browser workflow.
 
