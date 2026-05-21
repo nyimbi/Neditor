@@ -1418,6 +1418,27 @@ Visual/data transform export-fidelity verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+BibTeX transform metadata/export verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked bibtex_transform_renders_bibliography_preview --lib -- --nocapture` in `src-tauri` | Pass | Focused transform proof covers inline BibTeX title, author, year, and date metadata parsing plus richer transform preview rendering. |
+| `cargo test --locked bibtex_transform_survives_cross_target_exports_with_metadata --lib -- --nocapture` in `src-tauri` | Pass | Focused export proof covers BibTeX transform artifacts, source ranges, output hashes, bibliography metadata, HTML, PDF, DOCX, PPTX, and Markdown bundle evidence. |
+| `cargo test --locked transform_tests --lib` in `src-tauri` | Pass | 34 transform tests passed after hardening inline BibTeX field parsing and preview output. |
+| `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 14 citation tests passed after the BibTeX parser update. |
+| `cargo test --locked export_conformance_tests --lib` in `src-tauri` | Pass | 15 export conformance tests passed after adding the BibTeX transform export fixture. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 183 Rust library tests passed after the BibTeX transform metadata/export evidence update. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the parser, renderer, and test updates. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the BibTeX parser and renderer update. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Rust static analysis passed with no warnings. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the docs/parser/test update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the BibTeX transform evidence update. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails passed after the update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating bibliography docs, matrix, TODO, and progress logs; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz variants, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

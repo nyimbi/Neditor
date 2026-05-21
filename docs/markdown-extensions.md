@@ -235,6 +235,10 @@ Use `[BIBLIOGRAPHY]` where references should render:
 }
 ```
 
+BibTeX fields may be split across lines or written inline; `title`, `author`,
+`year`, and `date` metadata is used in bibliography previews and export
+artifacts.
+
 ```md
 [BIBLIOGRAPHY]
 ```

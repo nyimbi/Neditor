@@ -275,6 +275,90 @@ fn safe_business_transforms_survive_cross_target_exports() {
 }
 
 #[test]
+fn bibtex_transform_survives_cross_target_exports_with_metadata() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Bibliography Transform Pack\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21T10:00:00Z\n---\n# Bibliography Transform Pack\n\n```bibtex\n@book{porter1985, title={Competitive Advantage}, author={Michael Porter}, year={1985}}\n@article{doe2026, title=\"Evidence Based Reports\", author=\"Jane Doe\", date=\"2026-05-21\"}\n```\n".to_string(),
+        file_path: None,
+    });
+    let options = json!({});
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    assert_eq!(response.bibliography.len(), 2);
+    assert!(response
+        .bibliography
+        .iter()
+        .any(|entry| entry.key == "porter1985"
+            && entry.author.as_deref() == Some("Michael Porter")
+            && entry.issued.as_deref() == Some("1985")));
+    assert!(response
+        .bibliography
+        .iter()
+        .any(|entry| entry.key == "doe2026"
+            && entry.author.as_deref() == Some("Jane Doe")
+            && entry.issued.as_deref() == Some("2026")));
+    let artifact = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "bibtex")
+        .expect("bibtex artifact");
+    assert_eq!(artifact.output_kind, "html");
+    assert_eq!(artifact.execution_kind, "embedded");
+    assert!(artifact.html.contains("<cite>Competitive Advantage</cite>"));
+    assert!(artifact.html.contains("Michael Porter"));
+    assert_eq!(artifact.source_hash.len(), 64);
+    assert_eq!(artifact.output_hash.len(), 64);
+    assert!(artifact.source_line.is_some());
+    assert!(artifact.end_source_line.is_some());
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("transform-bibtex"));
+    assert!(html.contains("Competitive Advantage"));
+    assert!(html.contains("Michael Porter"));
+    assert!(html.contains("Evidence Based Reports"));
+    assert!(html.contains("Jane Doe"));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Transform: bibtex"));
+    assert!(pdf_text.contains("Competitive Advantage"));
+    assert!(pdf_text.contains("Michael Porter"));
+    assert!(pdf_text.contains("Evidence Based Reports"));
+    assert!(pdf_text.contains("Jane Doe"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx bibtex transform pack");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Transform: bibtex"));
+    assert!(docx_document.contains("Competitive Advantage"));
+    assert!(docx_document.contains("Michael Porter"));
+    assert!(docx_document.contains("Evidence Based Reports"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx bibtex transform pack");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Bibliography Transform Pack"));
+    assert!(pptx_slides.contains("Transform: bibtex"));
+    assert!(pptx_slides.contains("Competitive Advantage"));
+    assert!(pptx_slides.contains("Evidence Based Reports"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_options = options.clone();
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_bibliography = zip_entry_text(&bundle, "bibliography.json");
+    let bundled_artifacts = zip_entry_text(&bundle, "transform-artifacts.json");
+    assert!(bundled_text.contains("Transform: bibtex"));
+    assert!(bundled_text.contains("Michael Porter"));
+    assert!(bundled_bibliography.contains("\"key\": \"porter1985\""));
+    assert!(bundled_bibliography.contains("\"author\": \"Michael Porter\""));
+    assert!(bundled_bibliography.contains("\"issued\": \"1985\""));
+    assert!(bundled_artifacts.contains("\"name\": \"bibtex\""));
+    assert!(bundled_artifacts.contains("\"output_hash\""));
+    assert!(bundled_artifacts.contains("\"source_line\""));
+}
+
+#[test]
 fn visual_data_transforms_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: r#"---

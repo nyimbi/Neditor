@@ -1478,6 +1478,9 @@ Current evidence:
 - Visual/data transform export proof now covers `chart`, `vega-lite`,
   `geojson`, `topojson`, `stl`, and `timeline` static SVG artifacts, output
   hashes, source ranges, HTML, PDF, DOCX, PPTX, and Markdown bundle evidence.
+- BibTeX transform proof now covers inline title/author/year/date metadata
+  parsing, richer preview rendering, cross-target export artifacts, bibliography
+  metadata JSON, source ranges, and output hashes.
 - Front matter documentation now calls out that metadata must be a YAML mapping
   and that invalid YAML/list/scalar metadata produces source-ranged diagnostics.
 - `pnpm run check:docs` discovers README plus all top-level docs Markdown files

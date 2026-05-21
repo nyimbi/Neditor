@@ -35,8 +35,20 @@ pub(crate) fn render_bibtex_html(
     }
     let mut html = String::from("<dl class=\"transform transform-bibtex\">");
     for entry in entries {
+        let metadata = [entry.author.as_deref(), entry.issued.as_deref()]
+            .into_iter()
+            .flatten()
+            .filter(|value| !value.trim().is_empty())
+            .map(escape_html)
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let metadata = if metadata.is_empty() {
+            String::new()
+        } else {
+            format!("<small>{metadata}</small>")
+        };
         html.push_str(&format!(
-            "<dt>{}</dt><dd>{}</dd>",
+            "<dt>{}</dt><dd><cite>{}</cite>{metadata}</dd>",
             escape_html(&entry.key),
             escape_html(&entry.title)
         ));

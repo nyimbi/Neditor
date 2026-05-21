@@ -379,14 +379,22 @@ fn qr_matrix_reserves_finder_separators() {
 fn bibtex_transform_renders_bibliography_preview() {
     let artifact = run_transform(
         "bibtex".to_string(),
-        "@book{porter1985, title={Competitive Advantage}}".to_string(),
+        "@book{porter1985, title={Competitive Advantage}, author={Michael Porter}, year={1985}}\n@article{doe2026, title=\"Evidence Based Reports\", author=\"Jane Doe\", date=\"2026-05-21\"}".to_string(),
     )
     .expect("bibtex transform");
 
     assert_eq!(artifact.output_kind, "html");
     assert!(artifact.html.contains("transform-bibtex"));
     assert!(artifact.html.contains("<dt>porter1985</dt>"));
-    assert!(artifact.html.contains("<dd>Competitive Advantage</dd>"));
+    assert!(artifact.html.contains("<cite>Competitive Advantage</cite>"));
+    assert!(artifact.html.contains("Michael Porter"));
+    assert!(artifact.html.contains("1985"));
+    assert!(artifact.html.contains("<dt>doe2026</dt>"));
+    assert!(artifact
+        .html
+        .contains("<cite>Evidence Based Reports</cite>"));
+    assert!(artifact.html.contains("Jane Doe"));
+    assert!(artifact.html.contains("2026"));
     assert!(artifact.diagnostics.is_empty());
 
     let engines = list_transform_engines();

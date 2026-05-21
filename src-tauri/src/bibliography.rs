@@ -435,11 +435,89 @@ fn yaml_issued_year(entry: &Value) -> Option<String> {
 }
 
 fn bibtex_field(raw: &str, field: &str) -> Option<String> {
-    raw.lines()
-        .find(|line| line.trim_start().starts_with(field))
-        .and_then(|line| line.split_once('='))
-        .map(|(_, value)| clean_bibliography_value(value))
-        .filter(|value| !value.is_empty())
+    let field_start = find_bibtex_field(raw, field)?;
+    let after_field = field_start + field.len();
+    let equals_offset = raw[after_field..].find('=')? + after_field;
+    let value_start = raw[equals_offset + 1..]
+        .char_indices()
+        .find(|(_, ch)| !ch.is_whitespace())
+        .map(|(index, _)| equals_offset + 1 + index)?;
+    let value = parse_bibtex_value(&raw[value_start..]);
+    Some(clean_bibliography_value(&value)).filter(|value| !value.is_empty())
+}
+
+fn find_bibtex_field(raw: &str, field: &str) -> Option<usize> {
+    for (index, _) in raw.char_indices() {
+        let Some(candidate) = raw.get(index..index + field.len()) else {
+            continue;
+        };
+        if !candidate.eq_ignore_ascii_case(field) {
+            continue;
+        }
+        let before = raw[..index].chars().next_back();
+        if before.is_some_and(is_bibtex_identifier_char) {
+            continue;
+        }
+        let after = &raw[index + field.len()..];
+        if after
+            .chars()
+            .find(|ch| !ch.is_whitespace())
+            .is_some_and(|ch| ch == '=')
+        {
+            return Some(index);
+        }
+    }
+    None
+}
+
+fn parse_bibtex_value(value: &str) -> String {
+    let Some(first) = value.chars().next() else {
+        return String::new();
+    };
+    if first == '{' {
+        let mut depth = 0usize;
+        let mut end = value.len();
+        for (index, ch) in value.char_indices() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        end = index + ch.len_utf8();
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        return value[..end].to_string();
+    }
+    if first == '"' {
+        let mut escaped = false;
+        for (index, ch) in value.char_indices().skip(1) {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == '"' {
+                return value[..index + ch.len_utf8()].to_string();
+            }
+        }
+        return value.to_string();
+    }
+    value
+        .split([',', '\n'])
+        .next()
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn is_bibtex_identifier_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-')
 }
 
 fn clean_bibliography_value(value: &str) -> String {
