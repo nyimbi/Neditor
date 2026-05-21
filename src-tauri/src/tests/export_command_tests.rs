@@ -248,6 +248,39 @@ fn prepare_for_export_reports_missing_citation_sources_with_precise_ranges() {
 }
 
 #[test]
+fn prepare_for_export_blocks_duplicate_reference_labels_in_manifest() {
+    let report = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: Duplicate Reference Labels\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Strategy {#sec:strategy}\n\n![Duplicate](data:image/svg+xml;base64,PHN2Zy8+){#sec:strategy caption=\"Duplicate\"}\n\nSee {@sec:strategy}.\n"
+            .to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 1, "{:#?}", report.diagnostics);
+    assert_eq!(report.manifest.readiness.error_count, 1);
+    assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
+    let duplicate = report
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message == "Duplicate reference label: sec:strategy")
+        .expect("duplicate label diagnostic");
+    assert_eq!(duplicate.severity, "error");
+    assert_eq!(duplicate.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(duplicate.line, Some(10));
+    assert!(duplicate
+        .related
+        .iter()
+        .any(|related| related == "First occurrence: untitled.md:8"));
+    assert!(report.manifest.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message == "Duplicate reference label: sec:strategy"
+            && diagnostic.suggestion.as_deref()
+                == Some("Rename one label so cross references resolve to one stable target.")
+    }));
+}
+
+#[test]
 fn prepare_for_export_reports_empty_generated_reference_sections() {
     let report = prepare_for_export(PrepareExportRequest {
         text: "---\ntitle: Empty Reference Sections\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\nindex: true\nglossarySection: true\n---\nplain text only.\n"

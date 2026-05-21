@@ -197,7 +197,9 @@ The result follows from equation {@eq:roi}.
 
 NEditor tracks references to headings, figures, tables, equations, appendices,
 and decisions. Broken references are reported in diagnostics and export
-readiness.
+readiness. Labels must be unique across headings, figures, tables, equations,
+appendices, and decisions; duplicate labels block export readiness because a
+cross reference would otherwise have more than one possible target.
 
 ## Equations
 

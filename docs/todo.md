@@ -969,6 +969,10 @@ Current evidence:
 - Readiness now warns when generated index or glossary sections are requested
   but no index terms or glossary entries exist, and the diagnostics are copied
   into export manifest readiness.
+- Readiness now blocks duplicate reference labels across headings, figures,
+  tables, equations, appendices, and decisions. The diagnostic includes the
+  duplicate source range, first-occurrence context, and manifest parity so
+  cross references cannot silently point at ambiguous targets.
 
 Readiness should validate and report:
 
@@ -992,9 +996,10 @@ Readiness should validate and report:
   expressions. Broad readiness audit test coverage exists for inline and table
   formula errors.
 - Figures, captions, references, glossary, and index. Broad readiness audit
-  test coverage exists for figure/table/equation caption-label warnings, and
+  test coverage exists for figure/table/equation caption-label warnings,
   focused readiness coverage now reports requested-but-empty generated index
-  and glossary sections.
+  and glossary sections, and duplicate reference labels now block readiness
+  with source ranges plus first-occurrence context.
 - Transform engines, trust state, executable paths, adapter input mode,
   timeouts, stderr, missing output, output limits, and cache identity. Broad
   readiness audit test coverage exists for export settings; external transform
@@ -1220,6 +1225,9 @@ external bibliography files, and the References panel displays duplicate entry
 locations. Citation style handling now supports title, author-year, key, and
 numeric styles, and unsupported CSL/style names produce a warning before
 falling back to title rendering.
+Duplicate cross-reference labels now produce source-ranged compiler/readiness
+errors and are copied into export manifests so repeated section, figure, table,
+equation, appendix, or decision anchors cannot make references ambiguous.
 
 Finish:
 

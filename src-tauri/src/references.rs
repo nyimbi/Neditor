@@ -1,5 +1,6 @@
 use crate::{
     compiler_support::fenced_code_marker,
+    compiler_types::Heading,
     diagnostics::{diag, with_range},
     source_mapping::diagnostic_location_for_generated_line,
     DocumentDiagnostic, SourceMapEntry,
@@ -18,13 +19,39 @@ pub(crate) struct CrossReference {
     pub(crate) source_file: Option<String>,
 }
 
-pub(crate) fn collect_labels(text: &str, heading_anchors: &[&str]) -> Vec<String> {
+#[derive(Clone)]
+struct LabelOccurrence {
+    key: String,
+    source_file: Option<String>,
+    line: Option<usize>,
+    column: usize,
+    end_column: usize,
+    origin: &'static str,
+}
+
+pub(crate) fn collect_labels(
+    text: &str,
+    headings: &[Heading],
+    source_map: &[SourceMapEntry],
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> Vec<String> {
     let mut labels = BTreeSet::new();
-    for anchor in heading_anchors {
-        labels.insert((*anchor).to_string());
+    let mut occurrences = Vec::new();
+    for heading in headings {
+        labels.insert(heading.anchor.clone());
+        let (source_file, source_line) =
+            diagnostic_location_for_generated_line(source_map, heading.line);
+        occurrences.push(LabelOccurrence {
+            key: heading.anchor.clone(),
+            source_file,
+            line: source_line,
+            column: 1,
+            end_column: heading.text.len().max(1),
+            origin: "heading",
+        });
     }
     let mut fence_marker = None;
-    for line in text.lines() {
+    for (line_index, line) in text.lines().enumerate() {
         if let Some(marker) = fence_marker {
             if line.trim_start().starts_with(marker) {
                 fence_marker = None;
@@ -35,16 +62,88 @@ pub(crate) fn collect_labels(text: &str, heading_anchors: &[&str]) -> Vec<String
             fence_marker = Some(marker);
             continue;
         }
-        for segment in line.split("{#").skip(1) {
-            if let Some((label, _)) = segment.split_once('}') {
-                let label = label.split_whitespace().next().unwrap_or("").trim();
-                if !label.is_empty() {
-                    labels.insert(label.to_string());
-                }
+        if line_is_markdown_heading(line) {
+            continue;
+        }
+        let generated_line = line_index + 1;
+        let (source_file, source_line) =
+            diagnostic_location_for_generated_line(source_map, generated_line);
+        let mut search_from = 0usize;
+        while let Some(relative_start) = line[search_from..].find("{#") {
+            let start = search_from + relative_start;
+            let key_start = start + 2;
+            let Some(relative_end) = line[key_start..].find('}') else {
+                break;
+            };
+            let raw_key_end = key_start + relative_end;
+            let label = line[key_start..raw_key_end]
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .trim();
+            if !label.is_empty() {
+                let key_end = key_start + label.len();
+                labels.insert(label.to_string());
+                occurrences.push(LabelOccurrence {
+                    key: label.to_string(),
+                    source_file: source_file.clone(),
+                    line: source_line,
+                    column: start + 1,
+                    end_column: key_end + 1,
+                    origin: "label",
+                });
             }
+            search_from = raw_key_end + 1;
         }
     }
+    validate_unique_labels(&occurrences, diagnostics);
     labels.into_iter().collect()
+}
+
+fn validate_unique_labels(
+    occurrences: &[LabelOccurrence],
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let mut first_by_key = HashMap::<&str, &LabelOccurrence>::new();
+    for occurrence in occurrences {
+        if let Some(first) = first_by_key.get(occurrence.key.as_str()) {
+            let mut diagnostic = with_range(
+                diag(
+                    "error",
+                    format!("Duplicate reference label: {}", occurrence.key),
+                    occurrence.source_file.clone(),
+                    occurrence.line,
+                    Some("Rename one label so cross references resolve to one stable target."),
+                ),
+                occurrence.column,
+                occurrence.line,
+                occurrence.end_column,
+            );
+            diagnostic.related.push(format!(
+                "First occurrence: {}:{}",
+                first
+                    .source_file
+                    .clone()
+                    .unwrap_or_else(|| "document".to_string()),
+                first.line.unwrap_or_default()
+            ));
+            diagnostic
+                .related
+                .push(format!("First origin: {}", first.origin));
+            diagnostic
+                .related
+                .push(format!("Duplicate origin: {}", occurrence.origin));
+            diagnostics.push(diagnostic);
+        } else {
+            first_by_key.insert(occurrence.key.as_str(), occurrence);
+        }
+    }
+}
+
+fn line_is_markdown_heading(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    let level = trimmed.chars().take_while(|ch| *ch == '#').count();
+    (1..=6).contains(&level) && trimmed.chars().nth(level) == Some(' ')
 }
 
 pub(crate) fn collect_cross_references(

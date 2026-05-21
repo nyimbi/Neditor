@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `e1596c2 Guard
-  contrast and motion accessibility modes`
+- Latest inspected committed baseline before this update: `cb0685a Name the
+  editor and preview work surfaces`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -53,6 +53,11 @@ Recent pushed checkpoints visible in current git history:
 - This update gives the primary source and preview surfaces deeper
   screen-reader semantics: CodeMirror content is now a named multiline textbox,
   and the rendered preview article is a focusable named document.
+- This update blocks duplicate reference labels across headings, figures,
+  tables, equations, appendices, and decisions. The compiler now emits
+  source-ranged duplicate-label diagnostics with first-occurrence context, and
+  export readiness copies those diagnostics into manifests so ambiguous cross
+  references cannot leave the editor as audit-ready deliverables.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.

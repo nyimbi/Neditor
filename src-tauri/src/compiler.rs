@@ -158,11 +158,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     let glossary = collect_glossary(&interpolated);
     let citation_references = collect_citation_references(&interpolated);
     let citations = citation_keys_from_references(&citation_references);
-    let semantic_heading_anchors = headings
-        .iter()
-        .map(|heading| heading.anchor.as_str())
-        .collect::<Vec<_>>();
-    let labels = collect_labels(&interpolated, &semantic_heading_anchors);
+    let labels = collect_labels(&interpolated, &headings, &source_map, &mut diagnostics);
     let cross_references =
         collect_cross_references(&interpolated, &labels, &source_map, &mut diagnostics);
     let reference_markdown = render_cross_references(&interpolated, &cross_references);

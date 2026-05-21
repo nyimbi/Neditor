@@ -149,6 +149,39 @@ fn cross_references_resolve_heading_appendix_and_decision_anchors() {
 }
 
 #[test]
+fn duplicate_reference_labels_are_reported_with_source_ranges() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Duplicate Labels\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nSee {@sec:strategy}.\n\n![Duplicate](data:image/svg+xml;base64,PHN2Zy8+){#sec:strategy caption=\"Duplicate\"}\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    let duplicate = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message == "Duplicate reference label: sec:strategy")
+        .expect("duplicate label diagnostic");
+    assert_eq!(duplicate.severity, "error");
+    assert_eq!(duplicate.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(duplicate.line, Some(9));
+    assert_eq!(duplicate.column, Some(49));
+    assert_eq!(duplicate.end_line, Some(9));
+    assert_eq!(duplicate.end_column, Some(63));
+    assert!(duplicate
+        .related
+        .iter()
+        .any(|related| related == "First occurrence: untitled.md:6"));
+    assert!(duplicate
+        .related
+        .iter()
+        .any(|related| related == "First origin: heading"));
+    assert!(duplicate
+        .related
+        .iter()
+        .any(|related| related == "Duplicate origin: label"));
+}
+
+#[test]
 fn compiler_renders_layout_break_directives() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Layout\nstatus: approved\napprovedBy: QA\n---\n# Layout\n{{page-break}}\n{{section-break columns=1}}\n\n```layout\ncolumns: 2\n```\n".to_string(),

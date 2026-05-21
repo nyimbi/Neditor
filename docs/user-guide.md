@@ -150,7 +150,9 @@ Research and business documents can keep reference metadata near the source.
 
 The references panel surfaces resolved bibliography entries, missing citation
 keys, and duplicate bibliography keys. Unsupported citation-style warnings are
-reported with the rest of the document diagnostics.
+reported with the rest of the document diagnostics. Reuse of the same section,
+figure, table, equation, appendix, or decision label is also reported as an
+export-blocking reference diagnostic so links stay deterministic.
 
 ## Review, Release, And AI Governance
 
