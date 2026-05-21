@@ -22,13 +22,13 @@ pub(crate) fn render_vega_lite_svg(
         }
     };
     let mark = vega_lite_mark(&spec);
-    if !matches!(mark.as_str(), "bar" | "line" | "point") {
+    if !matches!(mark.as_str(), "bar" | "line" | "point" | "area") {
         let diagnostic = diag(
             "warning",
             format!("Unsupported Vega-Lite mark for native preview: {mark}"),
             None,
             None,
-            Some("Use bar, line, or point marks for the native static preview."),
+            Some("Use bar, line, point, or area marks for the native static preview."),
         );
         artifact_diags.push(diagnostic.clone());
         diagnostics.push(diagnostic);
@@ -324,7 +324,23 @@ fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[(String, f64)])
             ));
         }
     } else {
-        if mark == "line" {
+        if mark == "area" {
+            let baseline = plot_bottom;
+            let area_points = points
+                .iter()
+                .map(|(x, y)| format!("{x},{y}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let area = match (points.first(), points.last()) {
+                (Some((first_x, _)), Some((last_x, _))) => {
+                    format!("{first_x},{baseline} {area_points} {last_x},{baseline}")
+                }
+                _ => String::new(),
+            };
+            svg.push_str(&format!(
+                "<polygon points=\"{area}\" fill=\"rgba(39,93,168,.18)\" stroke=\"#275DA8\" stroke-width=\"3\"/>"
+            ));
+        } else if mark == "line" {
             let polyline = points
                 .iter()
                 .map(|(x, y)| format!("{x},{y}"))

@@ -310,6 +310,15 @@ Common transform names:
 | `bibtex`, `glossary`, `timeline`, `roadmap`, `adr`, `diff`, `qr` | Business-document artifacts and generated sections. |
 | `vega-lite`, `geojson`, `topojson`, `stl` | Visual data previews with static export fallbacks. |
 
+Native visual-data transform subsets:
+
+| Transform | Native static subset |
+| --- | --- |
+| `vega-lite` | Inline JSON specs with `data.values`, `encoding.x.field`, `encoding.y.field`, numeric y values, and `bar`, `line`, `point`, or `area` marks. |
+| `geojson` | GeoJSON Feature, FeatureCollection, Geometry, and nested coordinate arrays rendered as static coordinate previews. |
+| `topojson` | Topology `arcs` arrays with optional `transform.scale` and `transform.translate`. |
+| `stl` | ASCII STL vertex data rendered as projected triangle previews. |
+
 Example chart:
 
 ````md

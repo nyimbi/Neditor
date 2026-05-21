@@ -1461,7 +1461,8 @@ Current evidence:
 - `docs/markdown-extensions.md` now provides a readable syntax reference for
   front matter, includes, generated sections, variables, variable filters,
   formulas, tables, figures, equations, citations, glossary/index, comments,
-  AI provenance, transforms, and export readiness markers.
+  AI provenance, transforms, native visual-data transform subsets, and export
+  readiness markers.
 - Front matter documentation now calls out that metadata must be a YAML mapping
   and that invalid YAML/list/scalar metadata produces source-ranged diagnostics.
 - `pnpm run check:docs` discovers README plus all top-level docs Markdown files

@@ -1306,6 +1306,20 @@ Additional disabled external-engine verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "external transform engine" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused external transform settings workflow was discovered but did not execute assertions. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional Vega-Lite native subset verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked vega_lite_area_mark_renders_static_svg_preview --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust transform proof renders native static Vega-Lite `area` marks as SVG polygons with no diagnostics. |
+| `cargo test --locked vega_lite_unsupported_marks_report_supported_static_subset --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust transform proof reports unsupported Vega-Lite marks with a suggestion naming the supported native subset: bar, line, point, or area. |
+| `cargo test --locked transform_tests --lib` in `src-tauri` | Pass | 30 transform tests passed after expanding the Vega-Lite native static renderer. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the visual-data renderer update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after adding native Vega-Lite area rendering. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the docs and backend transform update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting native visual-data transform subsets; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz/DOT, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

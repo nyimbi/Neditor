@@ -118,7 +118,7 @@ explicit platform checks.
 | 10.4.1 DOT/Graphviz | SVG diagrams and engines | Partial | Native fallback; external adapter; Linux installed-engine conformance | Engine variants and Windows/macOS proof. |
 | 10.4.2 PlantUML | SVG/PNG enterprise diagrams | Partial | External adapter and fallback | Real PlantUML cross-platform proof; PNG support decision. |
 | 10.4.3 D2 | SVG diagrams | Partial | External adapter and fallback | Cross-platform proof. |
-| 10.4.4 Vega-Lite | Charts | Partial | Native SVG subset in `visual_data.rs` | Document supported subset; broader Vega-Lite support or clear diagnostics. |
+| 10.4.4 Vega-Lite | Charts | Partial | Native SVG subset in `visual_data.rs`; `vega_lite_area_mark_renders_static_svg_preview` proves `area` joins `bar`, `line`, and `point` static rendering; `vega_lite_unsupported_marks_report_supported_static_subset` proves unsupported marks report the supported native subset; `docs/markdown-extensions.md` documents the native static subset | Broader Vega-Lite grammar support and visual/export fixture coverage. |
 | 10.4.5 Chart | Bar/line/pie/area/KPI | Partial | `chart.rs`; transform tests | Export/visual fixture coverage. |
 | 10.4.6 GeoJSON | Static map preview | Partial | `visual_data.rs`; transform tests | More geometry support or explicit subset docs. |
 | 10.4.7 TopoJSON | Static map preview | Partial | `visual_data.rs`; transform tests | More topology support or explicit subset docs. |

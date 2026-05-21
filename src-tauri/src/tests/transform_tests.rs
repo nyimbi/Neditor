@@ -610,6 +610,38 @@ fn vega_lite_transform_renders_static_svg_preview() {
 }
 
 #[test]
+fn vega_lite_area_mark_renders_static_svg_preview() {
+    let artifact = run_transform(
+            "vega-lite".to_string(),
+            r#"{"mark":"area","title":"Pipeline","data":{"values":[{"month":"Jan","value":10},{"month":"Feb","value":18},{"month":"Mar","value":14}]},"encoding":{"x":{"field":"month","type":"ordinal"},"y":{"field":"value","type":"quantitative"}}}"#.to_string(),
+        )
+        .expect("vega-lite area transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-vega-lite"));
+    assert!(artifact.html.contains("Pipeline"));
+    assert!(artifact.html.contains("<polygon"));
+    assert!(artifact.html.contains("rgba(39,93,168,.18)"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
+fn vega_lite_unsupported_marks_report_supported_static_subset() {
+    let artifact = run_transform(
+            "vega-lite".to_string(),
+            r#"{"mark":"arc","data":{"values":[{"label":"A","value":10}]},"encoding":{"x":{"field":"label"},"y":{"field":"value"}}}"#.to_string(),
+        )
+        .expect("vega-lite unsupported transform");
+
+    assert_eq!(artifact.output_kind, "html");
+    assert!(artifact.html.contains("Unsupported Vega-Lite mark"));
+    assert!(artifact.diagnostics.iter().any(|diagnostic| diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("bar, line, point, or area"))));
+}
+
+#[test]
 fn mermaid_transform_renders_simple_flowchart_svg() {
     let artifact = run_transform(
         "mermaid".to_string(),
