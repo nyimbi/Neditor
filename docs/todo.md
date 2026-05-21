@@ -1071,7 +1071,9 @@ Finish:
 - Native Pikchr fallback now handles compact semicolon-separated statements,
   connector labels, and common business shapes (`box`, `circle`/`ellipse`,
   `diamond`, `cylinder`, and `file`) so useful previews still render before an
-  optional external engine is installed.
+  optional external engine is installed. The visual transform export fixture now
+  proves that native Pikchr artifact across HTML, PDF, DOCX, PPTX, and Markdown
+  bundle outputs.
 - PlantUML now supports fence-level PNG output selection through `format=png`,
   `output=png`, or the `png` flag, with `compiler_uses_plantuml_png_fence_output_format`
   proving the trusted file-mode sidecar path and PNG data URL artifact.

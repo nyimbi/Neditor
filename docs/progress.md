@@ -74,6 +74,9 @@ Recent pushed checkpoints visible in current git history:
   "Gate"` render without requiring an external executable. The fallback now
   recognizes connector labels and common business shapes: box, circle/ellipse,
   diamond, cylinder, and file.
+- Follow-up export evidence extends the visual transform conformance fixture so
+  that the same native Pikchr artifact survives HTML, PDF, DOCX, PPTX, and
+  Markdown bundle outputs.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.

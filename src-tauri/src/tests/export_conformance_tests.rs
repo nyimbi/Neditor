@@ -729,6 +729,10 @@ y: revenue
 {"title":"Pipeline Trend","mark":"line","data":{"values":[{"month":"Jan","value":3},{"month":"Feb","value":8}]},"encoding":{"x":{"field":"month"},"y":{"field":"value"}}}
 ```
 
+```pikchr
+box "Intake"; arrow "approve"; diamond "Gate"; arrow; cylinder "Store"; arrow; file "Export"
+```
+
 ```geojson
 {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[36.80,-1.30],[36.86,-1.30],[36.86,-1.24],[36.80,-1.30]]]}},{"type":"Feature","geometry":{"type":"Point","coordinates":[36.83,-1.27]}}]}
 ```
@@ -766,6 +770,7 @@ endsolid sample
     for (name, output_kind) in [
         ("chart", "svg"),
         ("vega-lite", "svg"),
+        ("pikchr", "svg"),
         ("geojson", "svg"),
         ("topojson", "svg"),
         ("stl", "svg"),
@@ -798,6 +803,9 @@ endsolid sample
     assert!(html.contains("Revenue Plan"));
     assert!(html.contains("transform-vega-lite"));
     assert!(html.contains("Pipeline Trend"));
+    assert!(html.contains("transform-pikchr"));
+    assert!(html.contains("pikchr-diamond"));
+    assert!(html.contains("approve"));
     assert!(html.contains("transform-geojson"));
     assert!(html.contains("1 polygons / 1 points"));
     assert!(html.contains("transform-topojson"));
@@ -813,6 +821,8 @@ endsolid sample
     assert!(pdf_text.contains("Revenue Plan"));
     assert!(pdf_text.contains("Transform: vega-lite"));
     assert!(pdf_text.contains("Pipeline Trend"));
+    assert!(pdf_text.contains("Transform: pikchr"));
+    assert!(pdf_text.contains("Gate"));
     assert!(pdf_text.contains("Transform: geojson"));
     assert!(pdf_text.contains("1 polygons / 1 points"));
     assert!(pdf_text.contains("Transform: topojson"));
@@ -827,6 +837,8 @@ endsolid sample
     assert!(docx_document.contains("Transform: chart"));
     assert!(docx_document.contains("Revenue Plan"));
     assert!(docx_document.contains("Pipeline Trend"));
+    assert!(docx_document.contains("Transform: pikchr"));
+    assert!(docx_document.contains("Gate"));
     assert!(docx_document.contains("1 polygons / 1 points"));
     assert!(docx_document.contains("1 triangles / 3 vertices"));
     assert!(docx_document.contains("Export proof"));
@@ -836,6 +848,8 @@ endsolid sample
     assert!(pptx_slides.contains("Visual Transform Pack"));
     assert!(pptx_slides.contains("Transform: chart"));
     assert!(pptx_slides.contains("Pipeline Trend"));
+    assert!(pptx_slides.contains("Transform: pikchr"));
+    assert!(pptx_slides.contains("Gate"));
     assert!(pptx_slides.contains("1 polygons / 1 points"));
     assert!(pptx_slides.contains("1 triangles / 3 vertices"));
     assert!(pptx_slides.contains("Export proof"));
@@ -847,10 +861,12 @@ endsolid sample
     let bundled_artifacts = zip_entry_text(&bundle, "transform-artifacts.json");
     assert!(bundled_text.contains("Transform: chart"));
     assert!(bundled_text.contains("Pipeline Trend"));
+    assert!(bundled_text.contains("Transform: pikchr"));
     assert!(bundled_text.contains("1 triangles / 3 vertices"));
     for name in [
         "chart",
         "vega-lite",
+        "pikchr",
         "geojson",
         "topojson",
         "stl",
