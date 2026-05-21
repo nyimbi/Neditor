@@ -281,6 +281,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     theme: "solarized",
     previewTheme: "dark",
     toolbarDisplay: "icons",
+    codeFolding: false,
     editorPaneRatio: 0.95,
     editorFontSize: 99,
     previewLineHeight: 0.2,
@@ -319,6 +320,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.theme, undefined);
   equal(migrated.previewTheme, "dark");
   equal(migrated.toolbarDisplay, "icons");
+  equal(migrated.codeFolding, false);
   equal(migrated.editorPaneRatio, 0.75);
   equal(migrated.editorFontSize, 22);
   equal(migrated.previewLineHeight, 1);
@@ -371,11 +373,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
 
   ok(app.includes(':data-toolbar-display="store.toolbarDisplay"'));
   ok(app.includes('aria-label="Toolbar button display"'));
+  ok(app.includes('foldGutter()'));
+  ok(app.includes('codeFolding({ placeholderText: " folded " })'));
   ok(app.includes('class="icon-command"'));
-  for (const label of ["Document", "Manage", "Write", "Insert", "Review"]) {
+  for (const label of ["Document", "Manage", "Write", "Navigate", "Insert", "Review"]) {
     ok(app.includes(`label: "${label}"`), `missing ${label} command group`);
   }
-  for (const icon of ["saveAs", "snapshot", "equation", "comment"]) {
+  for (const icon of ["saveAs", "snapshot", "equation", "outline", "fold", "unfold", "comment"]) {
     ok(app.includes(`${icon}: [`), `missing ${icon} icon path`);
   }
 });

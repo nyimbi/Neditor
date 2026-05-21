@@ -91,6 +91,7 @@ export interface PersistedWorkspace {
   editorPaneRatio?: number;
   wordWrap?: boolean;
   lineNumbers?: boolean;
+  codeFolding?: boolean;
   highContrast?: boolean;
   reducedMotion?: boolean;
   autosave?: boolean;
@@ -312,7 +313,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (toolbarDisplay) migrated.toolbarDisplay = toolbarDisplay;
   const editorPaneRatio = numberValue(raw.editorPaneRatio);
   if (editorPaneRatio !== undefined) migrated.editorPaneRatio = clampPaneRatio(editorPaneRatio);
-  for (const key of ["wordWrap", "lineNumbers", "highContrast", "reducedMotion", "autosave", "autoSnapshot"] as const) {
+  for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot"] as const) {
     const value = booleanValue(raw[key]);
     if (value !== undefined) migrated[key] = value;
   }

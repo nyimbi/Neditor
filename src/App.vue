@@ -170,16 +170,19 @@
         </template>
 
         <template v-else-if="store.sidebar === 'outline'">
-          <h2>Outline</h2>
+          <h2>Outline <small>{{ outlineHeadings.length }}</small></h2>
+          <p v-if="!outlineHeadings.length" class="sidebar-hint">Add Markdown headings to build a document outline.</p>
           <button
             v-for="heading in outlineHeadings"
             :key="`${heading.line}-${heading.anchor}`"
             class="outline-row"
             :style="{ paddingLeft: `${heading.level * 10}px` }"
             type="button"
+            :aria-label="`Go to ${heading.text}, line ${heading.line}`"
             @click="goToSourceTarget(heading)"
           >
-            {{ heading.text }}
+            <span>{{ heading.text }}</span>
+            <small>Line {{ heading.line }}</small>
           </button>
         </template>
 
@@ -848,6 +851,7 @@
           </label>
           <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
           <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
+          <label><input v-model="store.codeFolding" type="checkbox" /> Code folding</label>
           <label><input v-model="store.highContrast" type="checkbox" /> High contrast</label>
           <label><input v-model="store.reducedMotion" type="checkbox" /> Reduced motion</label>
           <label><input v-model="store.autosave" type="checkbox" /> Autosave existing files</label>
@@ -1358,6 +1362,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorState, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, keymap, lineNumbers, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { addCursorAbove, addCursorBelow, defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { codeFolding, foldAll, foldGutter, foldKeymap, unfoldAll } from "@codemirror/language";
 import { markdown } from "@codemirror/lang-markdown";
 import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap, selectNextOccurrence } from "@codemirror/search";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
@@ -1545,8 +1550,13 @@ type ToolbarIconName =
   | "calc"
   | "equation"
   | "toc"
+  | "outline"
   | "comment"
-  | "find";
+  | "find"
+  | "previous"
+  | "next"
+  | "fold"
+  | "unfold";
 
 interface CommandBarAction {
   id: string;
@@ -1590,8 +1600,13 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   calc: ["M7 4h10v16H7z", "M10 8h4", "M10 12h1", "M14 12h1", "M10 16h1", "M14 16h1"],
   equation: ["M4 8h16", "M4 16h16", "M8 12h8"],
   toc: ["M5 7h2", "M10 7h9", "M5 12h2", "M10 12h9", "M5 17h2", "M10 17h9"],
+  outline: ["M5 5h14", "M5 10h10", "M5 15h14", "M5 20h8"],
   comment: ["M5 5h14v10H9l-4 4z"],
   find: ["M11 5a6 6 0 1 1 0 12 6 6 0 0 1 0-12z", "M16 16l4 4"],
+  previous: ["M15 6l-6 6 6 6"],
+  next: ["M9 6l6 6-6 6"],
+  fold: ["M5 7h14", "M8 12h8", "M11 17h2"],
+  unfold: ["M5 7h14", "M5 12h14", "M5 17h14"],
 };
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
@@ -1978,7 +1993,18 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "link", label: "Link", title: "Insert link", icon: "link", run: () => wrapSelection("[", "](https://)") },
       { id: "heading", label: "Heading", title: "Insert second-level heading", icon: "heading", run: () => insertAtLineStart("## ") },
       { id: "fence", label: "Fence", title: "Insert code fence", icon: "fence", run: () => insertBlock(codeFenceSnippet) },
-      { id: "find", label: "Find", title: "Find and replace", icon: "find", run: () => runEditorCommand(openSearchPanel) },
+    ],
+  },
+  {
+    id: "navigate",
+    label: "Navigate",
+    actions: [
+      { id: "search", label: "Search", title: "Find and replace", icon: "find", run: () => runEditorCommand(openSearchPanel) },
+      { id: "find-previous", label: "Prev", title: "Find previous match", icon: "previous", run: () => runEditorCommand(findPrevious) },
+      { id: "find-next", label: "Next", title: "Find next match", icon: "next", run: () => runEditorCommand(findNext) },
+      { id: "outline", label: "Outline", title: "Show document outline", icon: "outline", run: () => showOutline() },
+      { id: "fold-all", label: "Fold", title: "Fold all Markdown sections", icon: "fold", run: () => runEditorCommand(foldAll) },
+      { id: "unfold-all", label: "Unfold", title: "Unfold all Markdown sections", icon: "unfold", run: () => runEditorCommand(unfoldAll) },
     ],
   },
   {
@@ -2029,6 +2055,9 @@ const commands = computed(() => [
   { name: "Select next occurrence", group: "Edit", run: () => runEditorCommand(selectNextOccurrence) },
   { name: "Add cursor above", group: "Edit", run: () => runEditorCommand(addCursorAbove) },
   { name: "Add cursor below", group: "Edit", run: () => runEditorCommand(addCursorBelow) },
+  { name: "Show document outline", group: "Navigate", run: () => showOutline() },
+  { name: "Fold all sections", group: "Navigate", run: () => runEditorCommand(foldAll) },
+  { name: "Unfold all sections", group: "Navigate", run: () => runEditorCommand(unfoldAll) },
   { name: "Show toolbar icons and text", group: "View", run: () => (store.toolbarDisplay = "both") },
   { name: "Show toolbar icons only", group: "View", run: () => (store.toolbarDisplay = "icons") },
   { name: "Show toolbar text only", group: "View", run: () => (store.toolbarDisplay = "text") },
@@ -2218,6 +2247,7 @@ watch(
   () => [
     store.wordWrap,
     store.lineNumbers,
+    store.codeFolding,
     store.theme,
     store.previewTheme,
     store.toolbarDisplay,
@@ -2373,6 +2403,7 @@ watch(
 function editorExtensions() {
   return [
     ...(store.lineNumbers ? [lineNumbers()] : []),
+    ...(store.codeFolding ? [foldGutter(), codeFolding({ placeholderText: " folded " })] : []),
     lintGutter(),
     history(),
     EditorState.allowMultipleSelections.of(true),
@@ -2387,7 +2418,14 @@ function editorExtensions() {
       spellcheck: "true",
       autocapitalize: "sentences",
     }),
-    keymap.of([{ key: "Enter", run: continueMarkdownList }, ...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+    keymap.of([
+      { key: "Enter", run: continueMarkdownList },
+      ...closeBracketsKeymap,
+      ...defaultKeymap,
+      ...historyKeymap,
+      ...searchKeymap,
+      ...(store.codeFolding ? foldKeymap : []),
+    ]),
     EditorView.domEventHandlers({
       scroll: () => {
         syncPreviewScrollFromEditor();
@@ -2967,6 +3005,13 @@ function runEditorCommand(command: (view: EditorView) => boolean) {
   if (!editorView) return;
   command(editorView);
   editorView.focus();
+}
+
+function showOutline() {
+  store.sidebar = "outline";
+  void nextTick(() => {
+    workspacePane.value?.focus();
+  });
 }
 
 function activate(id: string) {
@@ -4859,7 +4904,10 @@ select:hover {
 }
 
 .outline-row {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
   width: 100%;
   margin-bottom: 2px;
   border: 0;
@@ -4867,9 +4915,15 @@ select:hover {
   text-align: left;
 }
 
+.outline-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .outline-row small {
-  display: block;
   color: #526171;
+  font-size: 11px;
 }
 
 .file-row {

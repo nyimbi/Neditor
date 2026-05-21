@@ -42,16 +42,19 @@ The main screen is a document workbench rather than a note-only editor.
 - Use focus mode for distraction-light drafting.
 - Use export, review, and presentation modes when preparing a deliverable.
 
-The editor supports Markdown highlighting, line numbers, word wrap, diagnostics,
-find and replace, smart list continuation, bracket pairing, word count,
-character count, reading-time status, and source navigation from diagnostics.
+The editor supports Markdown highlighting, line numbers, word wrap, code
+folding, diagnostics, find and replace, smart list continuation, bracket
+pairing, word count, character count, reading-time status, and source navigation
+from diagnostics.
 
 The command palette searches app actions, headings, citations, glossary terms,
 index terms, open documents, and workspace files.
 
-The top command bar is grouped around document, management, writing, insertion,
-review, and view workflows. In Settings or the command bar's Buttons selector,
-choose icons and text, icons only, or text only to match the density you want.
+The top command bar is grouped around document, management, writing, navigation,
+insertion, review, and view workflows. Use Navigate for search, previous/next
+matches, the left document outline, and fold/unfold section commands. In
+Settings or the command bar's Buttons selector, choose icons and text, icons
+only, or text only to match the density you want.
 
 ## Product Boundaries
 

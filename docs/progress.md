@@ -2196,6 +2196,18 @@ Command bar UI polish verification:
 | `pnpm run verify:local` | Pass | Quick local verification passed all 9 steps after the command-bar UI polish. |
 | `git diff --check` | Pass | No whitespace errors after the command-bar UI polish. |
 
+Editor ergonomics verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after enabling CodeMirror folding, persisted code-folding settings, and direct navigation controls. |
+| `pnpm run test:unit` | Pass | 17 frontend unit tests passed, including workspace migration for `codeFolding` and static guards for folding plus the Navigate command-bar group. |
+| `pnpm run check:a11y` | Pass | Static accessibility guardrails passed and rewrote `.tmp/accessibility/report.json` after adding search, outline, fold, and unfold controls. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting editor folding/navigation ergonomics; all local links resolved. |
+| `pnpm run build` | Pass | Vue typecheck and Vite production build passed after the editor ergonomics update. |
+| `pnpm run verify:local` | Pass | Quick local verification passed all 9 steps after the editor ergonomics update. |
+| `git diff --check` | Pass | No whitespace errors after the editor ergonomics update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

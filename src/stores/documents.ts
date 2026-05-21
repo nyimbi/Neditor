@@ -325,6 +325,7 @@ export const useDocumentsStore = defineStore("documents", {
     editorPaneRatio: 0.5,
     wordWrap: true,
     lineNumbers: true,
+    codeFolding: true,
     highContrast: false,
     reducedMotion: false,
     autosave: false,
@@ -457,6 +458,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (typeof persisted.editorPaneRatio === "number") this.editorPaneRatio = clampPaneRatio(persisted.editorPaneRatio);
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
+        if (typeof persisted.codeFolding === "boolean") this.codeFolding = persisted.codeFolding;
         if (typeof persisted.highContrast === "boolean") this.highContrast = persisted.highContrast;
         if (typeof persisted.reducedMotion === "boolean") this.reducedMotion = persisted.reducedMotion;
         if (typeof persisted.autosave === "boolean") this.autosave = persisted.autosave;
@@ -512,6 +514,7 @@ export const useDocumentsStore = defineStore("documents", {
         editorPaneRatio: this.editorPaneRatio,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,
+        codeFolding: this.codeFolding,
         highContrast: this.highContrast,
         reducedMotion: this.reducedMotion,
         autosave: this.autosave,
