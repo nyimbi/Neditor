@@ -48,7 +48,9 @@ Recent pushed checkpoints visible in current git history:
   `pnpm run test:rendered-exports`. The command generates local HTML, PDF,
   DOCX, PPTX, Markdown bundle, blog package, Substack package, LaTeX, and
   Google Docs package artifacts under `.tmp/rendered-export-audit`, plus a JSON
-  report with sizes, hashes, and a manual visual-review checklist.
+  report with sizes, hashes, and a manual visual-review checklist. On hosts
+  with `pdflatex`, it also compiles the generated `.tex` artifact into a proof
+  PDF under `.tmp/rendered-export-audit/latex-compile/`.
 - This update adds local-first blog and Substack publishing packages as export
   targets. `blog` and `substack` exports write ZIP packages containing
   compiled Markdown, standalone blog HTML, a minimal Substack copy/paste HTML
@@ -613,7 +615,7 @@ Current verification recorded on 2026-05-21:
 | `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | 8 file command tests passed, including `reveal_command_for_existing_path_is_platform_specific_and_argument_safe`. |
 | `cargo test --locked desktop_native_command_workflow_smoke --lib` in `src-tauri` | Pass | Native command workflow smoke passed against real local files and direct export outputs. |
 | `cargo test --locked representative_rendered_export_artifacts_are_package_inspectable --lib` in `src-tauri` | Pass | Representative rendered/package export audit passed across HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package evidence. |
-| `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes and a manual checklist report. |
+| `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes, a manual checklist report, and a `pdflatex` compile proof on this host. |
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe still reports Pikchr missing on this host. |

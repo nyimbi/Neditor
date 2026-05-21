@@ -307,9 +307,7 @@ fn render_latex_inlines(inlines: &[InlineNode]) -> String {
             InlineNode::Strong { text } => format!("\\textbf{{{}}}", latex_escape(text)),
             InlineNode::Emphasis { text } => format!("\\emph{{{}}}", latex_escape(text)),
             InlineNode::Code { text } => format!("\\texttt{{{}}}", latex_escape(text)),
-            InlineNode::Link { text, url } => {
-                format!("\\href{{{}}}{{{}}}", latex_escape(url), latex_escape(text))
-            }
+            InlineNode::Link { text, url } => render_latex_link(text, url),
             InlineNode::Citation { raw, .. } => latex_escape(raw),
             InlineNode::CrossReference { key, .. } => format!("\\ref{{{}}}", latex_label(key)),
             InlineNode::FootnoteReference { key, .. } => {
@@ -317,6 +315,17 @@ fn render_latex_inlines(inlines: &[InlineNode]) -> String {
             }
         })
         .collect::<String>()
+}
+
+fn render_latex_link(text: &str, url: &str) -> String {
+    if let Some(anchor) = url.strip_prefix('#').filter(|anchor| !anchor.is_empty()) {
+        return format!(
+            "\\hyperref[{}]{{{}}}",
+            latex_label(anchor),
+            latex_escape(text)
+        );
+    }
+    format!("\\href{{{}}}{{{}}}", latex_escape(url), latex_escape(text))
 }
 
 fn latex_inline_text(text: &str) -> String {

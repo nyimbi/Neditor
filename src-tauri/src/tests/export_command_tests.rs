@@ -191,7 +191,7 @@ fn export_document_writes_blog_and_substack_publish_packages() {
 
 #[test]
 fn export_document_writes_latex_and_google_docs_outputs() {
-    let source = "---\ntitle: Research Brief\nsubtitle: Import-ready evidence pack\nauthor: NEditor QA\ndate: 2026-05-21\nversion: 2.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Research Brief\n\nA **business** brief with a [source link](https://example.com/evidence).\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Review | Operations |\n\n$$\nROI = \\frac{Gain}{Cost}\n$$ {#eq:roi caption=\"Return on investment\"}\n".to_string();
+    let source = "---\ntitle: Research Brief\nsubtitle: Import-ready evidence pack\nauthor: NEditor QA\ndate: 2026-05-21\nversion: 2.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Research Brief\n\nA **business** brief with a [source link](https://example.com/evidence).\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Review | Operations |\n\nSee [Table controls](#tbl:controls).\n\n$$\nROI = \\frac{Gain}{Cost}\n$$ {#eq:roi caption=\"Return on investment\"}\n".to_string();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time should be after epoch")
@@ -214,6 +214,7 @@ fn export_document_writes_latex_and_google_docs_outputs() {
     assert!(latex.contains("\\section{Research Brief}"));
     assert!(latex.contains("\\textbf{business}"));
     assert!(latex.contains("\\href{https://example.com/evidence}{source link}"));
+    assert!(latex.contains("\\hyperref[tbl:controls]{Table controls}"));
     assert!(latex.contains("\\begin{longtable}"));
     assert!(latex.contains("\\label{tbl:controls}"));
     assert!(latex.contains("ROI = \\frac{Gain}{Cost}"));

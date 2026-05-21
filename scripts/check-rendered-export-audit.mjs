@@ -1,4 +1,4 @@
-import { rmSync, existsSync, statSync, readFileSync } from "node:fs";
+import { rmSync, existsSync, statSync, readFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
@@ -72,6 +72,37 @@ if (issues.length === 0) {
   }
   if (!Array.isArray(report.manualChecklist) || report.manualChecklist.length < 5) {
     issues.push("audit report manual checklist is incomplete");
+  }
+}
+
+if (issues.length === 0) {
+  const pdflatex = spawnSync("pdflatex", ["--version"], { stdio: "ignore" });
+  if (pdflatex.status === 0) {
+    const latexBuildDir = join(auditDir, "latex-compile");
+    rmSync(latexBuildDir, { recursive: true, force: true });
+    mkdirSync(latexBuildDir, { recursive: true });
+    const latexArgs = [
+      "-interaction=nonstopmode",
+      "-halt-on-error",
+      "-output-directory",
+      latexBuildDir,
+      join(auditDir, "rendered-export-audit.tex"),
+    ];
+    const firstCompile = spawnSync("pdflatex", latexArgs, { stdio: "inherit" });
+    const secondCompile =
+      firstCompile.status === 0
+        ? spawnSync("pdflatex", latexArgs, { stdio: "inherit" })
+        : firstCompile;
+    if (secondCompile.status !== 0) {
+      issues.push("pdflatex failed to compile rendered-export-audit.tex");
+    } else {
+      const compiledPdf = join(latexBuildDir, "rendered-export-audit.pdf");
+      if (!existsSync(compiledPdf) || statSync(compiledPdf).size < 1000) {
+        issues.push("pdflatex did not produce a meaningful rendered-export-audit.pdf");
+      }
+    }
+  } else {
+    console.log("Skipping LaTeX compile proof because pdflatex is not installed.");
   }
 }
 

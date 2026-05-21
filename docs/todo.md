@@ -946,7 +946,9 @@ Current evidence:
 - `pnpm run test:rendered-exports` generates reviewable HTML, PDF, DOCX, PPTX,
   Markdown bundle, blog package, Substack package, LaTeX, and Google Docs
   package artifacts under `.tmp/rendered-export-audit`, plus a JSON report with
-  hashes and a manual visual-review checklist.
+  hashes and a manual visual-review checklist. When `pdflatex` is installed,
+  it also compiles the generated LaTeX artifact into
+  `.tmp/rendered-export-audit/latex-compile/rendered-export-audit.pdf`.
 
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
 
