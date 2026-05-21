@@ -2274,10 +2274,16 @@ Desktop native automation smoke verification:
 | `pnpm run test:desktop-smoke` | Pass | Desktop artifact and native command workflow smoke still pass without GUI launch enabled. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS GUI launch smoke passed and `.tmp/desktop-smoke/launch-report.json` recorded app-authored Tauri window metadata plus System Events evidence for process `neditor`, one `NEditor` window, and native window size `1440x920`. |
 
+Live Google Docs import attempt:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| Google Drive `_import_document` with `.tmp/rendered-export-audit/rendered-export-audit.docx` | Blocked by connector authorization | The connector reached the Google Drive upload-conversion endpoint for a native Google Docs import, but Drive returned `403 Forbidden`; the exported DOCX/package remains locally verified, and live import proof needs a refreshed Google Drive OAuth scope or another authorized Drive session. |
+
 ## Next Execution Order
 
-1. Execute live Google Docs import and cross-platform native viewer/import checks
-   for the rendered export package where supported.
+1. Refresh Google Drive connector authorization for document upload/conversion,
+   then re-run live Google Docs import proof for the rendered export package.
 2. Execute the Windows/Linux Tauri-driver workflow harness on supported hosts
    and keep using the macOS app-authored launch report where WebDriver is
    officially unavailable.
