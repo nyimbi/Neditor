@@ -1286,6 +1286,11 @@ Current evidence:
 - The status bar now exposes status messages, file-watch status, compile
   progress, export progress, and errors as labeled live regions. Browser
   harness discovery now lists a live-region status/progress workflow.
+- Diagnostics are now exposed as named lists with labeled list items in both
+  the sidebar and export surfaces, and conflict diff cells are named groups
+  that announce side, change type, line number, and text. The static
+  accessibility guard checks those contracts, and the browser harness asserts
+  the diagnostic and conflict accessible names.
 
 Finish:
 
@@ -1295,8 +1300,8 @@ Finish:
   broaden coverage for nested conflict/table-editor controls.
 - ARIA labels and roles for custom controls.
 - High contrast and reduced motion behavior.
-- Broader screen-reader labels for diagnostics, table cells, and conflict diff
-  rows.
+- Broader screen-reader labels for table cells and deeper editor/preview
+  interactions.
 - Broader automated checks where practical plus manual checklist evidence.
 
 ### 17. Performance And Large Documents

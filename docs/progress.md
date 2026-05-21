@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `25bc28f Prove
-  snapshot and release workflows in the workbench`
+- Latest inspected committed baseline before this update: `7aff68f Announce
+  workbench status changes accessibly`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -31,6 +31,13 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- `7aff68f` announced workbench status changes accessibly.
+- `8d73d69` managed focus across workbench modals.
+- `4ce66b5` improved keyboard access to workbench regions.
+- This update labels compiler, readiness, and export diagnostics as
+  screen-reader list items, labels conflict diff cells as side-specific groups,
+  and extends the static accessibility guard plus browser harness assertions for
+  those names.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.
@@ -1561,6 +1568,16 @@ Status/progress live-region accessibility verification:
 | `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the status/progress live-region update. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery now lists 41 Chromium workflow tests, including `exposes status and progress messages as live regions`. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "status and progress" --project chromium` | Blocked locally | The Vite server started, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence used. |
+
+Diagnostic/conflict screen-reader accessibility verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails now verify diagnostic article labels, named diagnostic lists, and conflict diff cell group labels. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding diagnostic and conflict diff accessible names. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the diagnostic/conflict accessibility update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; diagnostic navigation and external conflict merge workflows now assert accessible list/listitem/group names. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "diagnostics\|merges external conflict" --project chromium` | Blocked locally | The Vite server started and selected the relevant workflows, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; the escalated browser install request was rejected by the auto-review layer, so no workaround was attempted and no GitHub Actions evidence was used. |
 
 ## Next Execution Order
 

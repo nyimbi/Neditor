@@ -173,21 +173,25 @@
 
         <template v-else-if="store.sidebar === 'diagnostics'">
           <h2>Diagnostics</h2>
-          <article
-            v-for="diagnostic in active.compile?.diagnostics || []"
-            :key="`${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.column || ''}-${diagnostic.message}`"
-            class="diagnostic"
-            :class="diagnostic.severity"
-          >
-            <strong>{{ diagnostic.severity }}</strong>
-            <p>{{ diagnostic.message }}</p>
-            <small v-if="diagnosticLocation(diagnostic)">{{ diagnosticLocation(diagnostic) }}</small>
-            <small v-if="diagnostic.suggestion">{{ diagnostic.suggestion }}</small>
-            <ul v-if="diagnostic.related.length" class="diagnostic-related">
-              <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
-            </ul>
-            <button v-if="canNavigateDiagnostic(diagnostic)" type="button" @click="goToSourceTarget(diagnostic)">Go to source</button>
-          </article>
+          <section role="list" aria-label="Compiler diagnostics">
+            <article
+              v-for="diagnostic in active.compile?.diagnostics || []"
+              :key="`${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.column || ''}-${diagnostic.message}`"
+              class="diagnostic"
+              :class="diagnostic.severity"
+              role="listitem"
+              :aria-label="diagnosticAnnouncementLabel(diagnostic)"
+            >
+              <strong>{{ diagnostic.severity }}</strong>
+              <p>{{ diagnostic.message }}</p>
+              <small v-if="diagnosticLocation(diagnostic)">{{ diagnosticLocation(diagnostic) }}</small>
+              <small v-if="diagnostic.suggestion">{{ diagnostic.suggestion }}</small>
+              <ul v-if="diagnostic.related.length" class="diagnostic-related">
+                <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
+              </ul>
+              <button v-if="canNavigateDiagnostic(diagnostic)" type="button" @click="goToSourceTarget(diagnostic)">Go to source</button>
+            </article>
+          </section>
         </template>
 
         <template v-else-if="store.sidebar === 'tables'">
@@ -578,12 +582,14 @@
               </li>
             </ol>
           </article>
-          <section v-if="store.exportReadiness?.diagnostics.length" class="export-diagnostic-report" aria-label="Export readiness diagnostics">
+          <section v-if="store.exportReadiness?.diagnostics.length" class="export-diagnostic-report" role="list" aria-label="Export readiness diagnostics">
             <article
               v-for="diagnostic in store.exportReadiness.diagnostics"
               :key="`${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.message}`"
               class="diagnostic"
               :class="diagnostic.severity"
+              role="listitem"
+              :aria-label="diagnosticAnnouncementLabel(diagnostic)"
             >
               <strong>{{ diagnostic.severity }}</strong>
               <p>{{ diagnostic.message }}</p>
@@ -606,20 +612,24 @@
                 <small>{{ step.detail }}</small>
               </li>
             </ol>
-            <article
-              v-for="diagnostic in store.lastExportDiagnostics"
-              :key="`export-${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.message}`"
-              class="diagnostic"
-              :class="diagnostic.severity"
-            >
-              <strong>{{ diagnostic.severity }}</strong>
-              <p>{{ diagnostic.message }}</p>
-              <small v-if="diagnosticLocation(diagnostic)">{{ diagnosticLocation(diagnostic) }}</small>
-              <small v-if="diagnostic.suggestion">{{ diagnostic.suggestion }}</small>
-              <ul v-if="diagnostic.related.length" class="diagnostic-related">
-                <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
-              </ul>
-            </article>
+            <section v-if="store.lastExportDiagnostics.length" class="export-diagnostic-report" role="list" aria-label="Last export diagnostics">
+              <article
+                v-for="diagnostic in store.lastExportDiagnostics"
+                :key="`export-${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.message}`"
+                class="diagnostic"
+                :class="diagnostic.severity"
+                role="listitem"
+                :aria-label="diagnosticAnnouncementLabel(diagnostic)"
+              >
+                <strong>{{ diagnostic.severity }}</strong>
+                <p>{{ diagnostic.message }}</p>
+                <small v-if="diagnosticLocation(diagnostic)">{{ diagnosticLocation(diagnostic) }}</small>
+                <small v-if="diagnostic.suggestion">{{ diagnostic.suggestion }}</small>
+                <ul v-if="diagnostic.related.length" class="diagnostic-related">
+                  <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
+                </ul>
+              </article>
+            </section>
           </section>
           <h3>Manifest</h3>
           <pre>{{ manifestPreview }}</pre>
@@ -1184,7 +1194,11 @@
             <div class="conflict-diff-head">Local</div>
             <div class="conflict-diff-head">External</div>
             <template v-for="row in conflictDiffRows" :key="row.key">
-              <div :class="['conflict-diff-cell', `is-${row.kind}`]">
+              <div
+                :class="['conflict-diff-cell', `is-${row.kind}`]"
+                role="group"
+                :aria-label="conflictDiffCellLabel(row, 'local')"
+              >
                 <button
                   type="button"
                   :disabled="row.localLine === null || isConflictMergePartSelected(row, 'local')"
@@ -1195,7 +1209,11 @@
                 </button>
                 <pre><span>{{ row.localLine || "" }}</span>{{ row.local }}</pre>
               </div>
-              <div :class="['conflict-diff-cell', `is-${row.kind}`]">
+              <div
+                :class="['conflict-diff-cell', `is-${row.kind}`]"
+                role="group"
+                :aria-label="conflictDiffCellLabel(row, 'external')"
+              >
                 <button
                   type="button"
                   :disabled="row.externalLine === null || isConflictMergePartSelected(row, 'external')"
@@ -2402,6 +2420,21 @@ function canNavigateDiagnostic(diagnostic: DocumentDiagnostic) {
 function diagnosticLocation(diagnostic: DocumentDiagnostic) {
   const parts = [diagnostic.source_file, diagnostic.line ? `line ${diagnostic.line}` : ""].filter(Boolean);
   return parts.join(": ");
+}
+
+function diagnosticAnnouncementLabel(diagnostic: DocumentDiagnostic) {
+  const location = diagnosticLocation(diagnostic);
+  const suggestion = diagnostic.suggestion ? ` Suggested fix: ${diagnostic.suggestion}` : "";
+  return `${diagnostic.severity} diagnostic: ${diagnostic.message}${location ? ` at ${location}` : ""}${suggestion}`;
+}
+
+function conflictDiffCellLabel(row: ConflictDiffRow, source: ConflictMergeSource) {
+  const line = source === "local" ? row.localLine : row.externalLine;
+  const text = source === "local" ? row.local : row.external;
+  const side = source === "local" ? "Local" : "External";
+  const change = row.kind === "equal" ? "unchanged" : row.kind === source ? "changed" : "empty";
+  const location = line === null ? "no matching line" : `line ${line}`;
+  return `${side} ${change} ${location}: ${text.trim() || "blank line"}`;
 }
 
 function previewGeneratedLineForDiagnostic(diagnostic: DocumentDiagnostic) {

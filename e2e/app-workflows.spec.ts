@@ -1563,7 +1563,9 @@ test("navigates compiler diagnostics to the source range", async ({ page }) => {
 
   await page.getByLabel("Sidebar panel").selectOption("diagnostics");
 
-  const diagnostic = page.locator(".sidebar .diagnostic").filter({ hasText: "Mock diagnostic target needs review." });
+  const diagnosticsList = page.getByRole("list", { name: "Compiler diagnostics" });
+  const diagnostic = diagnosticsList.getByRole("listitem", { name: /warning diagnostic: Mock diagnostic target needs review/ });
+  await expect(diagnostic).toBeVisible();
   await expect(diagnostic).toContainText("/workspace/diagnostic-navigation.md: line");
   await expect(diagnostic).toContainText("Resolve the marked diagnostic target before publishing.");
   await diagnostic.getByRole("button", { name: "Go to source" }).click();
@@ -2274,6 +2276,8 @@ test("merges external conflict text back into the original file", async ({ page 
 
   const conflictDialog = page.getByRole("dialog", { name: "External file conflict" });
   const mergeComposition = conflictDialog.getByRole("region", { name: "Merge composition" });
+  await expect(conflictDialog.getByRole("group", { name: /Local changed line \d+: status: in-review/ })).toBeVisible();
+  await expect(conflictDialog.getByRole("group", { name: /External changed line \d+: status: approved/ })).toBeVisible();
   await expect(mergeComposition).toContainText("0 selected lines");
   await conflictDialog.getByRole("button", { name: "Add external line 3 to merge" }).click();
   await conflictDialog.getByRole("button", { name: "Add external line 8 to merge" }).click();

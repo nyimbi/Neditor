@@ -17,6 +17,8 @@ checkFormControls();
 checkDialogs();
 checkSkipLinks();
 checkStatusAnnouncements();
+checkDiagnosticLabels();
+checkConflictDiffLabels();
 
 if (issues.length > 0) {
   console.error("Accessibility guard failed:");
@@ -127,6 +129,44 @@ function checkStatusAnnouncements() {
   }
 }
 
+function checkDiagnosticLabels() {
+  const diagnosticArticles = [...template.matchAll(/<article\b[^>]*class\s*=\s*["']diagnostic["'][^>]*>/g)];
+  if (diagnosticArticles.length === 0) {
+    issues.push(`${sourcePath}:1 diagnostic articles are missing`);
+    return;
+  }
+  for (const match of diagnosticArticles) {
+    const attrs = match[0];
+    if (!/\brole\s*=\s*["']listitem["']/.test(attrs)) {
+      issues.push(`${sourcePath}:${lineFor(match.index)} diagnostic article must be a listitem`);
+    }
+    if (!/:aria-label\s*=\s*["']diagnosticAnnouncementLabel\(diagnostic\)["']/.test(attrs)) {
+      issues.push(`${sourcePath}:${lineFor(match.index)} diagnostic article needs diagnosticAnnouncementLabel aria-label`);
+    }
+  }
+  for (const label of ["Compiler diagnostics", "Export readiness diagnostics", "Last export diagnostics"]) {
+    const pattern = new RegExp(`\\brole\\s*=\\s*["']list["'][^>]*\\baria-label\\s*=\\s*["']${escapeRegExp(label)}["']|\\baria-label\\s*=\\s*["']${escapeRegExp(label)}["'][^>]*\\brole\\s*=\\s*["']list["']`);
+    if (!pattern.test(template)) {
+      issues.push(`${sourcePath}:1 ${label} must be exposed as a named diagnostic list`);
+    }
+  }
+}
+
+function checkConflictDiffLabels() {
+  const conflictDiff = template.match(/<section\b[^>]*class\s*=\s*["']conflict-diff["'][\s\S]*?<\/section>/);
+  if (!conflictDiff) {
+    issues.push(`${sourcePath}:1 conflict diff section is missing`);
+    return;
+  }
+  const markup = conflictDiff[0];
+  for (const source of ["local", "external"]) {
+    const pattern = new RegExp(`role\\s*=\\s*["']group["'][\\s\\S]*?:aria-label\\s*=\\s*["']conflictDiffCellLabel\\(row, '${source}'\\)["']|:aria-label\\s*=\\s*["']conflictDiffCellLabel\\(row, '${source}'\\)["'][\\s\\S]*?role\\s*=\\s*["']group["']`);
+    if (!pattern.test(markup)) {
+      issues.push(`${sourcePath}:1 conflict diff ${source} cell must be a named group`);
+    }
+  }
+}
+
 function hasAccessibleName(attrs) {
   return /\b(:?aria-label|aria-labelledby|title)\s*=/.test(attrs);
 }
@@ -150,4 +190,8 @@ function isGenericButtonText(text) {
 
 function lineFor(index) {
   return template.slice(0, index).split("\n").length + 1;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
