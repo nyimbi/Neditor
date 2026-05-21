@@ -201,19 +201,18 @@ NEditor uses local verification rather than GitHub Actions. Run
 `pnpm run verify:local` before publishing a normal slice. Run
 `pnpm run verify:local:full` for a release-grade baseline; it extends the quick
 checks with the production build, optional engine probe, native-watch check,
-clippy, full Rust tests, Tauri no-bundle release compile, and desktop artifact
-smoke.
+clippy, full Rust tests, rendered export audit, Tauri no-bundle release compile,
+and desktop artifact smoke.
 
 Use `pnpm run verify:local -- --list` or
 `pnpm run verify:local:full -- --list` to print the exact command sequence
 without running it. Browser workflow tests are available through
-`pnpm run test:e2e` when Playwright's local browser dependencies are installed
-and the host allows Chromium to launch.
+`pnpm run test:e2e` directly when Playwright's local browser dependencies are
+installed and the host allows Chromium to launch.
 
 Use `pnpm run check:e2e-env` before browser workflow runs. It defaults to the
-project-local Playwright browser cache, reports the install command if Chromium
-is missing, and distinguishes missing browsers from macOS launch-permission
-failures.
+project-local Playwright browser cache and runs the focused workbench boot
+workflow through the same Playwright CLI path as the full browser suite.
 
 `pnpm run check:engines` probes optional external transform engines and reports
 installed/missing Graphviz/DOT, D2, PlantUML, Java-backed PlantUML, and Pikchr

@@ -634,7 +634,7 @@ Current verification recorded on 2026-05-21:
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe still reports Pikchr missing on this host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 42 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
-| `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed on this host. |
+| `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed through the focused workbench boot workflow on this host. |
 | `pnpm run test:e2e` | Pass | 42 Chromium browser workbench workflows passed locally on this host, including blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, and `processAlive: true` evidence. |

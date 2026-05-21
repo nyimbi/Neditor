@@ -590,6 +590,8 @@ green before claiming a slice is complete:
 
 - `pnpm run verify:local` for routine completed slices.
 - `pnpm run verify:local:full` for a release-grade local baseline.
+- `pnpm run check:e2e-env` and `pnpm run test:e2e` for the browser workflow
+  lane on hosts where Chromium can launch.
 - `pnpm run verify:local -- --list` or
   `pnpm run verify:local:full -- --list` to inspect the exact local command
   plan before running it.
@@ -734,8 +736,8 @@ Current host evidence:
 
 - 2026-05-21: `pnpm exec playwright test --list` lists 42 Chromium workflow
   tests in `e2e/app-workflows.spec.ts`.
-- 2026-05-21: `pnpm run check:e2e-env` finds project-local Playwright
-  Chromium.
+- 2026-05-21: `pnpm run check:e2e-env` passes the focused workbench boot
+  workflow through the project-local Playwright Chromium path.
 - 2026-05-21: `pnpm run test:e2e` passed all 42 Chromium browser workflows,
   including the blog/Substack/LaTeX/Google Docs export-target handoff test.
 
@@ -843,9 +845,9 @@ Completion criteria:
 
 - Browser workflow tests run locally with `pnpm run test:e2e` on hosts where
   Playwright browser installation and Chromium launch are available.
-- `pnpm run check:e2e-env` classifies local browser readiness before workflow
-  execution, including missing project-local Chromium versus macOS launch
-  permission failures.
+- `pnpm run check:e2e-env` proves local browser readiness by running the
+  focused workbench boot workflow through the same project-local Playwright
+  path used by full browser execution.
 - Local sandbox limitations remain documented but are not used as completion
   evidence.
 - Browser coverage failures drive implementation fixes rather than broad
