@@ -576,14 +576,11 @@ Status: active.
 GitHub Actions has been removed from the project. The local baseline must stay
 green before claiming a slice is complete:
 
-- `pnpm run test:unit`
-- `pnpm run build`
-- `cd src-tauri && cargo fmt --check`
-- `cd src-tauri && cargo check --locked`
-- `cd src-tauri && cargo check --locked --features native-watch`
-- `cd src-tauri && cargo clippy --locked --all-targets -- -D warnings`
-- `cd src-tauri && cargo test --locked`
-- `./node_modules/.bin/tauri build --no-bundle`
+- `pnpm run verify:local` for routine completed slices.
+- `pnpm run verify:local:full` for a release-grade local baseline.
+- `pnpm run verify:local -- --list` or
+  `pnpm run verify:local:full -- --list` to inspect the exact local command
+  plan before running it.
 
 Older remote run notes in this file explain past fixes only; do not use them as
 current completion evidence.

@@ -1,0 +1,89 @@
+import { spawnSync } from "node:child_process";
+import { dirname, join, resolve } from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const mode = process.argv.includes("--full") ? "full" : "quick";
+const listOnly = process.argv.includes("--list");
+
+const quickCommands = [
+  command("Frontend typecheck", "pnpm", ["run", "check"]),
+  command("Frontend unit tests", "pnpm", ["run", "test:unit"]),
+  command("Project structure guard", "pnpm", ["run", "check:structure"]),
+  command("Accessibility guard", "pnpm", ["run", "check:a11y"]),
+  command("Dependency/license admission", "pnpm", ["run", "check:deps"]),
+  command("Markdown links", "pnpm", ["run", "check:docs"]),
+  command("Rust formatting", "cargo", ["fmt", "--check"], "src-tauri"),
+  command("Rust dev check", "cargo", ["check", "--locked"], "src-tauri"),
+  command("Whitespace check", "git", ["diff", "--check"]),
+];
+
+const fullCommands = [
+  ...quickCommands,
+  command("Frontend production build", "pnpm", ["run", "build"]),
+  command("Optional engine probe", "pnpm", ["run", "check:engines"]),
+  command(
+    "Rust native-watch check",
+    "cargo",
+    ["check", "--locked", "--features", "native-watch"],
+    "src-tauri",
+  ),
+  command(
+    "Rust clippy",
+    "cargo",
+    ["clippy", "--locked", "--all-targets", "--", "-D", "warnings"],
+    "src-tauri",
+  ),
+  command("Rust tests", "cargo", ["test", "--locked"], "src-tauri"),
+  command(
+    "Desktop release compile",
+    "./node_modules/.bin/tauri",
+    ["build", "--no-bundle"],
+  ),
+  command("Desktop artifact smoke", "pnpm", ["run", "test:desktop-smoke"]),
+];
+
+const commands = mode === "full" ? fullCommands : quickCommands;
+
+if (listOnly) {
+  console.log(`NEditor local verification (${mode}) will run:`);
+  for (const item of commands) {
+    console.log(`- ${item.label}: ${formatCommand(item)}`);
+  }
+  process.exit(0);
+}
+
+console.log(`Running NEditor local verification (${mode}) with ${commands.length} steps.`);
+for (const item of commands) {
+  console.log(`\n==> ${item.label}`);
+  console.log(`$ ${formatCommand(item)}`);
+  const result = spawnSync(item.cmd, item.args, {
+    cwd: item.cwd,
+    env: process.env,
+    shell: process.platform === "win32",
+    stdio: "inherit",
+  });
+  if (result.status !== 0) {
+    const code = result.status ?? 1;
+    console.error(`\nLocal verification failed at "${item.label}" with exit code ${code}.`);
+    process.exit(code);
+  }
+}
+
+console.log(`\nNEditor local verification (${mode}) passed.`);
+
+function command(label, cmd, args, cwd = ".") {
+  return {
+    label,
+    cmd,
+    args,
+    cwd: join(root, cwd),
+  };
+}
+
+function formatCommand(item) {
+  const relativeCwd = item.cwd === root ? "." : item.cwd.slice(root.length + 1);
+  const rendered = [item.cmd, ...item.args].join(" ");
+  return relativeCwd === "." ? rendered : `(cd ${relativeCwd} && ${rendered})`;
+}

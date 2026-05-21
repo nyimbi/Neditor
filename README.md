@@ -187,24 +187,20 @@ manager fetches in restricted-network environments.
 ## Verification
 
 ```sh
-pnpm run test:unit
-pnpm run build
-pnpm run check:docs
-pnpm run check:deps
-pnpm run check:structure
-pnpm run check:a11y
-pnpm run check:engines
-pnpm run test:desktop-smoke
-cd src-tauri && cargo fmt --check
-cd src-tauri && cargo check --locked
-cd src-tauri && cargo check --locked --features native-watch
-cd src-tauri && cargo clippy --locked --all-targets -- -D warnings
-cd src-tauri && cargo test --locked
-./node_modules/.bin/tauri build --no-bundle
+pnpm run verify:local
+pnpm run verify:local:full
 ```
 
-NEditor uses local verification rather than GitHub Actions. Run the commands
-above before publishing a slice. Browser workflow tests are available through
+NEditor uses local verification rather than GitHub Actions. Run
+`pnpm run verify:local` before publishing a normal slice. Run
+`pnpm run verify:local:full` for a release-grade baseline; it extends the quick
+checks with the production build, optional engine probe, native-watch check,
+clippy, full Rust tests, Tauri no-bundle release compile, and desktop artifact
+smoke.
+
+Use `pnpm run verify:local -- --list` or
+`pnpm run verify:local:full -- --list` to print the exact command sequence
+without running it. Browser workflow tests are available through
 `pnpm run test:e2e` when Playwright's local browser dependencies are installed
 and the host allows Chromium to launch.
 

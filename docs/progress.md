@@ -2003,6 +2003,16 @@ Direct export sidecar-manifest readiness verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the sidecar-manifest readiness update. |
 
+Local verification runner verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run verify:local` | Pass | New quick local baseline passed all 9 steps: frontend typecheck, frontend unit tests, project structure, accessibility, dependency/license admission, Markdown links, Rust formatting, Rust dev check, and whitespace checks. |
+| `pnpm run verify:local -- --list` | Pass | Printed the quick local baseline command plan without running it. |
+| `pnpm run verify:local:full -- --list` | Pass | Printed the release-grade local baseline command plan, including build, optional engine probe, native-watch, clippy, full Rust tests, Tauri no-bundle compile, and desktop artifact smoke. |
+| `pnpm run test:unit` | Pass | 15 frontend unit tests passed after adding package-script coverage for `verify:local` and `verify:local:full`. |
+| `git diff --check` | Pass | No whitespace errors after adding the local verification runner. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

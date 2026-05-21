@@ -15,6 +15,8 @@
     "check:engines": "node scripts/check-external-engines.mjs",
     "check:e2e-env": "node scripts/check-e2e-environment.mjs",
     "check:structure": "node scripts/check-project-structure.mjs",
+    "verify:local": "node scripts/run-local-verification.mjs",
+    "verify:local:full": "node scripts/run-local-verification.mjs --full",
     "test:desktop-smoke": "node scripts/check-desktop-smoke.mjs",
     "test:unit": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js",
     "test:e2e": "playwright test",

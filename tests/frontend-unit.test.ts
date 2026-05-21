@@ -364,7 +364,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.transformTimeoutMs, 30_000);
 });
 
-test("local verification scripts expose frontend and browser checks", () => {
+test("local verification scripts expose local baseline checks", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
     scripts: Record<string, string>;
   };
@@ -377,6 +377,8 @@ test("local verification scripts expose frontend and browser checks", () => {
   equal(scripts["check:engines"], "node scripts/check-external-engines.mjs");
   equal(scripts["check:e2e-env"], "node scripts/check-e2e-environment.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
+  equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
+  equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
   equal(scripts.build, "vue-tsc --noEmit && vite build");
   equal(scripts["test:desktop-smoke"], "node scripts/check-desktop-smoke.mjs");
   equal(scripts["test:unit"], "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js");
