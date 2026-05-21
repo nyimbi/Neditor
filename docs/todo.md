@@ -1587,6 +1587,8 @@ Current evidence:
 - Visual/data transform export proof now covers `chart`, `vega-lite`,
   `geojson`, `topojson`, `stl`, and `timeline` static SVG artifacts, output
   hashes, source ranges, HTML, PDF, DOCX, PPTX, and Markdown bundle evidence.
+- Vega-Lite native static previews now support `encoding.color.field` grouping
+  for series charts, including per-series marks and legends.
 - BibTeX transform proof now covers inline title/author/year/date metadata
   parsing, richer preview rendering, cross-target export artifacts, bibliography
   metadata JSON, source ranges, and output hashes.

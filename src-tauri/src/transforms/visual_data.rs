@@ -40,7 +40,8 @@ pub(crate) fn render_vega_lite_svg(
     let Some(y_field) = vega_lite_encoding_field(&spec, "y") else {
         return vega_lite_missing_field("y", artifact_diags, diagnostics);
     };
-    let values = vega_lite_values(&spec, &x_field, &y_field);
+    let color_field = vega_lite_encoding_field(&spec, "color");
+    let values = vega_lite_values(&spec, &x_field, &y_field, color_field.as_deref());
     if values.is_empty() {
         let diagnostic = diag(
             "warning",
@@ -198,7 +199,19 @@ fn vega_lite_encoding_field(spec: &Value, channel: &str) -> Option<String> {
         .map(ToString::to_string)
 }
 
-fn vega_lite_values(spec: &Value, x_field: &str, y_field: &str) -> Vec<(String, f64)> {
+#[derive(Clone, Debug)]
+struct VegaLiteDatum {
+    label: String,
+    value: f64,
+    series: Option<String>,
+}
+
+fn vega_lite_values(
+    spec: &Value,
+    x_field: &str,
+    y_field: &str,
+    color_field: Option<&str>,
+) -> Vec<VegaLiteDatum> {
     spec.pointer("/data/values")
         .and_then(Value::as_array)
         .into_iter()
@@ -208,7 +221,15 @@ fn vega_lite_values(spec: &Value, x_field: &str, y_field: &str) -> Vec<(String, 
             let y = row
                 .get(y_field)
                 .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))?;
-            Some((x, y))
+            let series = color_field
+                .and_then(|field| row.get(field))
+                .map(value_to_axis_label)
+                .filter(|value| !value.trim().is_empty());
+            Some(VegaLiteDatum {
+                label: x,
+                value: y,
+                series,
+            })
         })
         .collect()
 }
@@ -239,10 +260,10 @@ fn vega_lite_missing_field(
     )
 }
 
-fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[(String, f64)]) -> String {
+fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[VegaLiteDatum]) -> String {
     let max = values
         .iter()
-        .map(|(_, value)| *value)
+        .map(|datum| datum.value)
         .reduce(f64::max)
         .unwrap_or(1.0)
         .max(1.0);
@@ -251,68 +272,164 @@ fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[(String, f64)])
     let plot_left = 72usize;
     let plot_bottom = 262usize;
     let plot_width = 680usize;
-    let step = plot_width / values.len().max(1);
+    let labels = unique_vega_labels(values);
+    let series = unique_vega_series(values);
+    let step = plot_width / labels.len().max(1);
     let mut svg = format!(
         "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><text x=\"72\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><line x1=\"72\" y1=\"262\" x2=\"770\" y2=\"262\" stroke=\"#94a3b8\"/><line x1=\"72\" y1=\"54\" x2=\"72\" y2=\"262\" stroke=\"#94a3b8\"/>",
         escape_html(title)
     );
-    let points = values
-        .iter()
-        .enumerate()
-        .map(|(index, (_, value))| {
-            let x = plot_left + index * step + step / 2;
-            let y = plot_bottom - ((*value / max) * 190.0) as usize;
-            (x, y)
-        })
-        .collect::<Vec<_>>();
+    render_vega_axis_labels(&mut svg, &labels, plot_left, step);
     if mark == "bar" {
-        for (index, (label, value)) in values.iter().enumerate() {
-            let bar_height = ((*value / max) * 190.0) as usize;
-            let x = plot_left + index * step + 8;
+        let series_count = series.len().max(1);
+        let bar_width = ((step.saturating_sub(16)) / series_count).max(4);
+        for datum in values {
+            let label_index = labels
+                .iter()
+                .position(|label| label == &datum.label)
+                .unwrap_or(0);
+            let series_index = datum
+                .series
+                .as_ref()
+                .and_then(|name| series.iter().position(|series| series == name))
+                .unwrap_or(0);
+            let bar_height = ((datum.value / max) * 190.0) as usize;
+            let x = plot_left + label_index * step + 8 + series_index * bar_width;
             let y = plot_bottom - bar_height;
+            let color = VEGA_SERIES_COLORS[series_index % VEGA_SERIES_COLORS.len()];
+            let series_attr = datum
+                .series
+                .as_deref()
+                .map(|series| format!(" data-series=\"{}\"", escape_html(series)))
+                .unwrap_or_default();
             svg.push_str(&format!(
-                "<rect x=\"{x}\" y=\"{y}\" width=\"{}\" height=\"{bar_height}\" fill=\"#275DA8\"/><text x=\"{x}\" y=\"286\" font-size=\"12\">{}</text>",
-                step.saturating_sub(16),
-                escape_html(label)
+                "<rect x=\"{x}\" y=\"{y}\" width=\"{bar_width}\" height=\"{bar_height}\" fill=\"{color}\"{series_attr}/>"
             ));
         }
     } else {
-        if mark == "area" {
-            let baseline = plot_bottom;
-            let area_points = points
+        let series_names = if series.is_empty() {
+            vec![String::new()]
+        } else {
+            series.clone()
+        };
+        for (series_index, series_name) in series_names.iter().enumerate() {
+            let points = values
                 .iter()
-                .map(|(x, y)| format!("{x},{y}"))
-                .collect::<Vec<_>>()
-                .join(" ");
-            let area = match (points.first(), points.last()) {
-                (Some((first_x, _)), Some((last_x, _))) => {
-                    format!("{first_x},{baseline} {area_points} {last_x},{baseline}")
-                }
-                _ => String::new(),
+                .filter(|datum| match (&datum.series, series_name.is_empty()) {
+                    (None, true) => true,
+                    (Some(name), false) => name == series_name,
+                    _ => false,
+                })
+                .filter_map(|datum| {
+                    let label_index = labels.iter().position(|label| label == &datum.label)?;
+                    let x = plot_left + label_index * step + step / 2;
+                    let y = plot_bottom - ((datum.value / max) * 190.0) as usize;
+                    Some((x, y, datum.label.as_str()))
+                })
+                .collect::<Vec<_>>();
+            let color = VEGA_SERIES_COLORS[series_index % VEGA_SERIES_COLORS.len()];
+            let series_attr = if series_name.is_empty() {
+                String::new()
+            } else {
+                format!(" data-series=\"{}\"", escape_html(series_name))
             };
-            svg.push_str(&format!(
-                "<polygon points=\"{area}\" fill=\"rgba(39,93,168,.18)\" stroke=\"#275DA8\" stroke-width=\"3\"/>"
-            ));
-        } else if mark == "line" {
-            let polyline = points
-                .iter()
-                .map(|(x, y)| format!("{x},{y}"))
-                .collect::<Vec<_>>()
-                .join(" ");
-            svg.push_str(&format!(
-                "<polyline points=\"{polyline}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"3\"/>"
-            ));
-        }
-        for ((x, y), (label, _)) in points.iter().zip(values.iter()) {
-            svg.push_str(&format!(
-                "<circle cx=\"{x}\" cy=\"{y}\" r=\"5\" fill=\"#275DA8\"/><text x=\"{}\" y=\"286\" font-size=\"12\">{}</text>",
-                x.saturating_sub(12),
-                escape_html(label)
-            ));
+            if mark == "area" {
+                let baseline = plot_bottom;
+                let area_points = points
+                    .iter()
+                    .map(|(x, y, _)| format!("{x},{y}"))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let area = match (points.first(), points.last()) {
+                    (Some((first_x, _, _)), Some((last_x, _, _))) => {
+                        format!("{first_x},{baseline} {area_points} {last_x},{baseline}")
+                    }
+                    _ => String::new(),
+                };
+                svg.push_str(&format!(
+                    "<polygon points=\"{area}\" fill=\"{}\" fill-opacity=\"0.18\" stroke=\"{color}\" stroke-width=\"3\"{series_attr}/>",
+                    color
+                ));
+            } else if mark == "line" {
+                let polyline = points
+                    .iter()
+                    .map(|(x, y, _)| format!("{x},{y}"))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                svg.push_str(&format!(
+                    "<polyline points=\"{polyline}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"3\"{series_attr}/>"
+                ));
+            }
+            for (x, y, label) in points {
+                let label = if series_name.is_empty() {
+                    label.to_string()
+                } else {
+                    format!("{label}: {series_name}")
+                };
+                svg.push_str(&format!(
+                    "<circle cx=\"{x}\" cy=\"{y}\" r=\"5\" fill=\"{color}\" aria-label=\"{}\"{series_attr}/>",
+                    escape_html(&label)
+                ));
+            }
         }
     }
+    render_vega_legend(&mut svg, &series);
     svg.push_str("</svg>");
     svg
+}
+
+const VEGA_SERIES_COLORS: [&str; 8] = [
+    "#275DA8", "#0f766e", "#b45309", "#7c3aed", "#be123c", "#15803d", "#0369a1", "#a21caf",
+];
+
+fn unique_vega_labels(values: &[VegaLiteDatum]) -> Vec<String> {
+    let mut labels = Vec::new();
+    for datum in values {
+        if !labels.iter().any(|label| label == &datum.label) {
+            labels.push(datum.label.clone());
+        }
+    }
+    labels
+}
+
+fn unique_vega_series(values: &[VegaLiteDatum]) -> Vec<String> {
+    let mut series = Vec::new();
+    for datum in values {
+        if let Some(name) = &datum.series {
+            if !series.iter().any(|series| series == name) {
+                series.push(name.clone());
+            }
+        }
+    }
+    series
+}
+
+fn render_vega_axis_labels(svg: &mut String, labels: &[String], plot_left: usize, step: usize) {
+    for (index, label) in labels.iter().enumerate() {
+        let x = plot_left + index * step + step / 2;
+        svg.push_str(&format!(
+            "<text x=\"{}\" y=\"286\" font-size=\"12\" text-anchor=\"middle\">{}</text>",
+            x,
+            escape_html(label)
+        ));
+    }
+}
+
+fn render_vega_legend(svg: &mut String, series: &[String]) {
+    if series.is_empty() {
+        return;
+    }
+    for (index, series) in series.iter().enumerate() {
+        let x = 600usize;
+        let y = 60 + index * 20;
+        let color = VEGA_SERIES_COLORS[index % VEGA_SERIES_COLORS.len()];
+        svg.push_str(&format!(
+            "<g class=\"vega-legend-item\"><rect x=\"{x}\" y=\"{}\" width=\"12\" height=\"12\" fill=\"{color}\"/><text x=\"{}\" y=\"{y}\" font-size=\"12\" fill=\"#334155\">{}</text></g>",
+            y.saturating_sub(10),
+            x + 18,
+            escape_html(series)
+        ));
+    }
 }
 
 #[derive(Clone, Debug)]

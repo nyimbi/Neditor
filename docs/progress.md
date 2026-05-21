@@ -1918,6 +1918,18 @@ Transform registry alias metadata verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating transform docs, matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the transform registry alias metadata update. |
 
+Vega-Lite grouped-series static preview verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked vega_lite --lib` in `src-tauri` | Pass | Four Vega-Lite tests passed, including `encoding.color.field` grouped/series rendering with per-series marks and legends. |
+| `cargo test --locked transform_tests --lib` in `src-tauri` | Pass | 38 transform tests passed after adding Vega-Lite grouped-series rendering. |
+| `cargo test --locked visual_data_transforms_survive_cross_target_exports --lib` in `src-tauri` | Pass | Existing visual-data cross-target export proof remains clean for HTML, PDF, DOCX, PPTX, and Markdown bundle evidence. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the Vega-Lite grouped-series update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the Vega-Lite grouped-series update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating transform docs, matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the Vega-Lite grouped-series update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

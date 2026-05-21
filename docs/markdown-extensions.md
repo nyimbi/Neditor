@@ -365,7 +365,7 @@ Native visual-data transform subsets:
 
 | Transform | Native static subset |
 | --- | --- |
-| `vega-lite` | Inline JSON specs with `data.values`, `encoding.x.field`, `encoding.y.field`, numeric y values, and `bar`, `line`, `point`, or `area` marks. |
+| `vega-lite` | Inline JSON specs with `data.values`, `encoding.x.field`, `encoding.y.field`, optional `encoding.color.field` grouping/series, numeric y values, and `bar`, `line`, `point`, or `area` marks. |
 | `geojson` | GeoJSON Feature, FeatureCollection, GeometryCollection, Point/MultiPoint, LineString/MultiLineString, Polygon, and MultiPolygon rendered as typed static SVG map previews. |
 | `topojson` | Topology `arcs` arrays with optional `transform.scale` and `transform.translate`, plus object geometries that reference arcs, including reversed arc references. |
 | `stl` | ASCII STL vertex data rendered as projected triangle previews. |

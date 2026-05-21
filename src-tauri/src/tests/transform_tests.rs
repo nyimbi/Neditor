@@ -758,7 +758,25 @@ fn vega_lite_area_mark_renders_static_svg_preview() {
     assert!(artifact.html.contains("transform-vega-lite"));
     assert!(artifact.html.contains("Pipeline"));
     assert!(artifact.html.contains("<polygon"));
-    assert!(artifact.html.contains("rgba(39,93,168,.18)"));
+    assert!(artifact.html.contains("fill-opacity=\"0.18\""));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
+fn vega_lite_color_encoding_renders_grouped_series_preview() {
+    let artifact = run_transform(
+            "vega-lite".to_string(),
+            r##"{"mark":"line","title":"Revenue by Region","data":{"values":[{"month":"Jan","region":"East","revenue":120},{"month":"Feb","region":"East","revenue":135},{"month":"Jan","region":"West","revenue":98},{"month":"Feb","region":"West","revenue":112}]},"encoding":{"x":{"field":"month","type":"ordinal"},"y":{"field":"revenue","type":"quantitative"},"color":{"field":"region","type":"nominal"}}}"##.to_string(),
+        )
+        .expect("vega-lite color transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("Revenue by Region"));
+    assert!(artifact.html.contains("data-series=\"East\""));
+    assert!(artifact.html.contains("data-series=\"West\""));
+    assert!(artifact.html.contains("vega-legend-item"));
+    assert!(artifact.html.contains("Jan: East"));
+    assert!(artifact.html.contains("<polyline"));
     assert!(artifact.diagnostics.is_empty());
 }
 
