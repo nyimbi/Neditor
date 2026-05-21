@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `5542f8f Block
-  ambiguous reference labels before export`
+- Latest inspected committed baseline before this update: `011691f Make missing
+  citations repairable in the workbench`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -69,6 +69,11 @@ Recent pushed checkpoints visible in current git history:
 - This update tightens the dependency-admission guard so NEditor stays MIT
   licensed in the root `LICENSE`, npm package metadata, Cargo crate metadata,
   and Tauri desktop bundle metadata.
+- This update improves the native Pikchr fallback so compact
+  semicolon-separated diagrams such as `box "A"; arrow "approve"; diamond
+  "Gate"` render without requiring an external executable. The fallback now
+  recognizes connector labels and common business shapes: box, circle/ellipse,
+  diamond, cylinder, and file.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.

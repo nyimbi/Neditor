@@ -76,47 +76,104 @@ pub(crate) fn render_pikchr_svg(
     artifact_diags: &mut Vec<DocumentDiagnostic>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> String {
-    let nodes = parse_pikchr_nodes(body);
-    if nodes.is_empty() {
+    let diagram = parse_pikchr_diagram(body);
+    if diagram.nodes.is_empty() {
         let diagnostic = diag(
             "warning",
-            "Pikchr native preview did not find any box or circle nodes.",
+            "Pikchr native preview did not find any supported shape nodes.",
             None,
             None,
-            Some("Use simple lines such as box \"Start\"; arrow; box \"Done\", or configure an external Pikchr engine."),
+            Some("Use simple statements such as box \"Start\"; arrow; diamond \"Decision\", or configure an external Pikchr engine."),
         );
         artifact_diags.push(diagnostic.clone());
         diagnostics.push(diagnostic);
         return "<section class=\"transform transform-pikchr transform-error\">No Pikchr nodes found</section>".to_string();
     }
-    let has_arrows = body
-        .lines()
-        .any(|line| line.trim_start().starts_with("arrow"))
-        || nodes.len() > 1;
-    let width = nodes.len().max(1) * 190 + 60;
+    let has_arrows = diagram.explicit_arrows || diagram.nodes.len() > 1;
+    let width = diagram.nodes.len().max(1) * 190 + 60;
     let mut svg = format!(
         "<svg class=\"transform transform-pikchr\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} 180\" role=\"img\"><defs><marker id=\"pikchr-arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\"><path d=\"M0,0 L0,6 L9,3 z\" fill=\"#275DA8\"/></marker></defs>"
     );
-    for (index, node) in nodes.iter().enumerate() {
+    for (index, node) in diagram.nodes.iter().enumerate() {
         let x = 40 + index * 190;
         let y = 62;
-        if has_arrows && index + 1 < nodes.len() {
+        if has_arrows && index + 1 < diagram.nodes.len() {
             svg.push_str(&format!(
                 "<line x1=\"{}\" y1=\"90\" x2=\"{}\" y2=\"90\" stroke=\"#275DA8\" stroke-width=\"3\" marker-end=\"url(#pikchr-arrow)\"/>",
                 x + 120,
                 x + 180
             ));
+            if let Some(label) = diagram
+                .connector_labels
+                .get(index)
+                .and_then(|label| label.as_ref())
+                .filter(|label| !label.trim().is_empty())
+            {
+                svg.push_str(&format!(
+                    "<text x=\"{}\" y=\"76\" text-anchor=\"middle\" font-size=\"12\" fill=\"#475569\">{}</text>",
+                    x + 150,
+                    escape_html(label)
+                ));
+            }
         }
         match node.shape {
             PikchrShape::Circle => {
                 svg.push_str(&format!(
-                    "<ellipse cx=\"{}\" cy=\"90\" rx=\"60\" ry=\"34\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
+                    "<ellipse class=\"pikchr-node pikchr-circle\" cx=\"{}\" cy=\"90\" rx=\"60\" ry=\"34\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
                     x + 60
+                ));
+            }
+            PikchrShape::Cylinder => {
+                svg.push_str(&format!(
+                    "<rect class=\"pikchr-node pikchr-cylinder\" x=\"{x}\" y=\"{}\" width=\"120\" height=\"46\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
+                    y + 10
+                ));
+                svg.push_str(&format!(
+                    "<ellipse cx=\"{}\" cy=\"{}\" rx=\"60\" ry=\"12\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
+                    x + 60,
+                    y + 10
+                ));
+                svg.push_str(&format!(
+                    "<path d=\"M{x} {} C{x} {} {} {} {} {}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
+                    y + 56,
+                    y + 72,
+                    x + 120,
+                    y + 72,
+                    x + 120,
+                    y + 56
+                ));
+            }
+            PikchrShape::Diamond => {
+                svg.push_str(&format!(
+                    "<polygon class=\"pikchr-node pikchr-diamond\" points=\"{},{} {},{} {},{} {},{}\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
+                    x + 60,
+                    y,
+                    x + 120,
+                    y + 28,
+                    x + 60,
+                    y + 56,
+                    x,
+                    y + 28
+                ));
+            }
+            PikchrShape::File => {
+                svg.push_str(&format!(
+                    "<path class=\"pikchr-node pikchr-file\" d=\"M{x} {y} H{} L{} {} V{} H{x} Z\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
+                    x + 92,
+                    x + 120,
+                    y + 28,
+                    y + 56
+                ));
+                svg.push_str(&format!(
+                    "<path d=\"M{} {y} V{} H{}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
+                    x + 92,
+                    y + 28,
+                    x + 120
                 ));
             }
             PikchrShape::Box => {
                 svg.push_str(&format!(
-                    "<rect x=\"{x}\" y=\"{y}\" width=\"120\" height=\"56\" rx=\"6\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>"
+                    "<rect class=\"pikchr-node pikchr-box\" x=\"{x}\" y=\"{y}\" width=\"120\" height=\"56\" rx=\"6\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>"
                 ));
             }
         }
@@ -259,6 +316,9 @@ fn render_simple_graph_svg(name: &str, graph: &MermaidGraph) -> String {
 enum PikchrShape {
     Box,
     Circle,
+    Cylinder,
+    Diamond,
+    File,
 }
 
 struct PikchrNode {
@@ -266,30 +326,60 @@ struct PikchrNode {
     label: String,
 }
 
-fn parse_pikchr_nodes(body: &str) -> Vec<PikchrNode> {
+struct PikchrDiagram {
+    nodes: Vec<PikchrNode>,
+    connector_labels: Vec<Option<String>>,
+    explicit_arrows: bool,
+}
+
+fn parse_pikchr_diagram(body: &str) -> PikchrDiagram {
+    let mut diagram = PikchrDiagram {
+        nodes: Vec::new(),
+        connector_labels: Vec::new(),
+        explicit_arrows: false,
+    };
+    for statement in pikchr_statements(body) {
+        if let Some(node) = parse_pikchr_node(statement) {
+            diagram.nodes.push(node);
+        } else if pikchr_command(statement) == Some("arrow") {
+            diagram.explicit_arrows = true;
+            diagram
+                .connector_labels
+                .push(extract_first_quoted(statement));
+        }
+    }
+    diagram
+}
+
+fn pikchr_statements(body: &str) -> impl Iterator<Item = &str> {
     body.lines()
-        .filter_map(|line| {
-            let trimmed = line.trim();
-            if trimmed.starts_with("box") {
-                Some(PikchrNode {
-                    shape: PikchrShape::Box,
-                    label: pikchr_label(trimmed, "box"),
-                })
-            } else if trimmed.starts_with("circle") || trimmed.starts_with("ellipse") {
-                let command = if trimmed.starts_with("circle") {
-                    "circle"
-                } else {
-                    "ellipse"
-                };
-                Some(PikchrNode {
-                    shape: PikchrShape::Circle,
-                    label: pikchr_label(trimmed, command),
-                })
-            } else {
-                None
-            }
-        })
-        .collect()
+        .flat_map(|line| line.split(';'))
+        .map(str::trim)
+        .filter(|statement| !statement.is_empty())
+}
+
+fn parse_pikchr_node(statement: &str) -> Option<PikchrNode> {
+    let command = pikchr_command(statement)?;
+    let shape = match command {
+        "box" => PikchrShape::Box,
+        "circle" | "ellipse" | "oval" => PikchrShape::Circle,
+        "cylinder" => PikchrShape::Cylinder,
+        "diamond" => PikchrShape::Diamond,
+        "file" => PikchrShape::File,
+        _ => return None,
+    };
+    Some(PikchrNode {
+        shape,
+        label: pikchr_label(statement, command),
+    })
+}
+
+fn pikchr_command(statement: &str) -> Option<&str> {
+    statement
+        .trim_start()
+        .split(|ch: char| ch.is_whitespace() || ch == '(')
+        .next()
+        .filter(|command| !command.is_empty())
 }
 
 fn pikchr_label(line: &str, command: &str) -> String {

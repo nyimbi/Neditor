@@ -110,7 +110,7 @@ If an engine is installed through a package manager shim, verify that the shim w
 | --- | --- | --- | --- |
 | Graphviz / DOT | stdin | SVG stdout | `dot` and `graphviz` fences use `dot -Tsvg` semantics. `circo`, `neato`, `fdp`, `osage`, and `twopi` are separate Graphviz engine entries with their own executable paths and the same no-shell `-Tsvg` adapter. |
 | D2 | stdin | SVG stdout | Uses SVG export profile. |
-| Pikchr | stdin | SVG stdout | Native fallback covers simple diagrams. `pikchr-cli` executables receive a temporary `.pikchr` source file path as their positional argument. |
+| Pikchr | stdin | SVG stdout | Native fallback covers simple semicolon- or line-separated `box`, `circle`/`ellipse`, `diamond`, `cylinder`, `file`, and `arrow` statements with connector labels. `pikchr-cli` executables receive a temporary `.pikchr` source file path as their positional argument. |
 | PlantUML | file | SVG or PNG sidecar | File mode avoids version-specific stdin behavior. Use `format=png`, `output=png`, or the `png` flag on a `plantuml` fence when a PNG artifact is required; otherwise NEditor requests SVG. |
 
 ## Troubleshooting

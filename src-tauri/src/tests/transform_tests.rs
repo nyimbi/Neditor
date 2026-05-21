@@ -180,6 +180,28 @@ fn transform_aliases_render_through_canonical_artifacts() {
 }
 
 #[test]
+fn pikchr_native_fallback_handles_semicolon_shapes_and_arrow_labels() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Pikchr Shapes\nstatus: approved\napprovedBy: QA\n---\n# Pikchr Shapes\n```pikchr\nbox \"Intake\"; arrow \"approve\"; diamond \"Gate\"; arrow; cylinder \"Store\"; arrow; file \"Export\"\n```\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert!(response.html.contains("transform-pikchr"));
+    assert!(response.html.contains("pikchr-box"));
+    assert!(response.html.contains("pikchr-diamond"));
+    assert!(response.html.contains("pikchr-cylinder"));
+    assert!(response.html.contains("pikchr-file"));
+    assert!(response.html.contains("approve"));
+    assert!(response.html.contains("Intake"));
+    assert!(response.html.contains("Export"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("Pikchr native preview")));
+}
+
+#[test]
 fn external_diagram_fallbacks_render_simple_native_svgs() {
     for (name, body, expected) in [
         (

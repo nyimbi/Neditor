@@ -1068,6 +1068,10 @@ Finish:
   `osage`, `twopi`, D2, and PlantUML through `pnpm run check:engines` and
   `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture`;
   Pikchr remains missing on this host.
+- Native Pikchr fallback now handles compact semicolon-separated statements,
+  connector labels, and common business shapes (`box`, `circle`/`ellipse`,
+  `diamond`, `cylinder`, and `file`) so useful previews still render before an
+  optional external engine is installed.
 - PlantUML now supports fence-level PNG output selection through `format=png`,
   `output=png`, or the `png` flag, with `compiler_uses_plantuml_png_fence_output_format`
   proving the trusted file-mode sidecar path and PNG data URL artifact.
