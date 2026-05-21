@@ -272,7 +272,10 @@ metadata and export-default preferences can use the same supported style names.
 
 Diagnostics cover missing keys, duplicate bibliography keys, missing
 bibliography sources, and unsupported citation styles. The references panel
-exposes resolved entries and problems.
+exposes resolved entries and problems. Rendered citations are keyboard
+focusable and expose citation-detail popovers in preview and HTML exports,
+using bibliography metadata when a key resolves and an explicit missing-entry
+message when it does not.
 
 ## Glossary And Index
 

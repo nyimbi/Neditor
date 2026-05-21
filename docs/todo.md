@@ -1278,6 +1278,10 @@ equation, appendix, or decision anchors cannot make references ambiguous.
 Malformed cross-reference labels and reference keys now reject empty keys,
 spaces, slash characters, and unclosed markers with source-ranged
 compiler/readiness errors that are copied into export manifests.
+Citation preview popovers now render from bibliography metadata in preview and
+HTML exports. The focused citation export conformance test proves resolved
+titles, locators, multi-key citation details, and missing-entry messages remain
+available on focus/hover while DOCX and PPTX citation output still passes.
 
 Finish:
 

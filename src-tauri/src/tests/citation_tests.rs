@@ -505,6 +505,11 @@ fn citation_export_conformance_covers_required_cases() {
     assert!(html.contains("Porter 1985; Doe 2026"));
     assert!(html.contains("Porter 1985, p. 42"));
     assert!(html.contains("missing bibliography entry"));
+    assert!(response
+        .html
+        .contains(r#"data-citation-detail="@porter1985: Competitive Advantage""#));
+    assert!(html.contains("data-citation-detail"));
+    assert!(html.contains("content:attr(data-citation-detail)"));
     assert!(html.contains("Bibliography"));
     assert!(html.contains("Competitive Advantage"));
     assert!(html.contains("Evidence Based Reports"));

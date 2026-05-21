@@ -969,10 +969,11 @@ fn render_citation_span(
         format!("({label})")
     };
     format!(
-        "<span class=\"citation\" tabindex=\"0\" title=\"{}\" aria-label=\"Citation: {}\" data-citation-keys=\"{}\">{}</span>",
+        "<span class=\"citation\" tabindex=\"0\" title=\"{}\" aria-label=\"Citation: {}\" data-citation-keys=\"{}\" data-citation-detail=\"{}\">{}</span>",
         escape_html(&details),
         escape_html(&details),
         escape_html(&keys),
+        escape_html(&details),
         escape_html(&display_label)
     )
 }

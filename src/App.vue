@@ -5119,11 +5119,33 @@ select:hover {
   color: #174a8c;
   cursor: help;
   font-weight: 600;
+  position: relative;
 }
 
 .preview-document .citation:focus {
   outline: 2px solid #275da8;
   outline-offset: 2px;
+}
+
+.preview-document .citation[data-citation-detail]:hover::after,
+.preview-document .citation[data-citation-detail]:focus::after {
+  content: attr(data-citation-detail);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  width: max-content;
+  max-width: min(320px, 80vw);
+  white-space: normal;
+  background: #111827;
+  color: #ffffff;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
+  padding: 8px 10px;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  font-weight: 500;
 }
 
 .preview-document .callout {

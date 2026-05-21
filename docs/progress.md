@@ -1930,6 +1930,19 @@ Vega-Lite grouped-series static preview verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating transform docs, matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the Vega-Lite grouped-series update. |
 
+Citation preview popover verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked citation_export_conformance_covers_required_cases --lib` in `src-tauri` | Pass | Focused citation export proof passed after adding compiler-rendered citation detail attributes and preview/full-HTML popover CSS. |
+| `cargo test --locked citation_tests --lib` in `src-tauri` | Pass | 18 citation tests passed, covering BibTeX/CSL/Hayagriva import, duplicate diagnostics, style aliases, numeric rendering, AST citation preservation, and the new citation popover evidence. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the citation popover update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the citation popover update. |
+| `pnpm run check:a11y` | Pass | Static App.vue accessibility guardrails passed after adding focus-visible citation popovers. |
+| `pnpm run build` | Pass | Vue typecheck and Vite production build passed after adding preview citation popover CSS. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating citation docs, matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the citation popover update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
