@@ -837,8 +837,8 @@ Required next coverage:
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices, and rendered audit
   proof now have executable coverage; broader manual viewer/platform QA remains.
-- Run the large-document browser performance workflow on a host that permits
-  Playwright Chromium launch; native command workflow timing is now recorded by
+- The large-document browser performance workflow now passes locally through
+  `pnpm run test:e2e`; native command workflow timing is recorded by
   `pnpm run test:desktop-smoke`.
 - Remaining transform engine settings: cross-platform executable edge cases
   beyond the mocked browser workflow.
@@ -1470,7 +1470,10 @@ Current evidence:
 
 - `pnpm run check:a11y` checks `src/App.vue` for accessible button names,
   form-control labels, dialog labels/modal state, dialog focusability/keyboard
-  handling, required skip-link targets, and status/progress live regions.
+  handling, required skip-link targets, status/progress live regions,
+  diagnostic list labels, conflict diff cell group labels, table editor labels,
+  contrast/motion CSS contracts, and editor/preview surface semantics. It now
+  writes `.tmp/accessibility/report.json` with 10 named pass/fail checks.
 - Modal close buttons, command-palette search, and conflict merge-line controls
   now have explicit labels exposed to assistive technology.
 - The workbench now exposes visible-on-focus skip links to the command bar,
@@ -1506,8 +1509,8 @@ Finish:
 
 - Complete keyboard-only navigation through tabs, modals, command palette,
   table editor, conflict UI, and deeper editor/preview interactions.
-- Run modal focus workflows on a host with Playwright Chromium installed, then
-  broaden coverage for nested conflict/table-editor controls.
+- Keep modal focus workflows in the full local browser suite and broaden
+  coverage for nested conflict/table-editor controls.
 - ARIA labels and roles for custom controls.
 - Broader keyboard and screen-reader testing for deeper editor/preview
   interactions.
@@ -1554,16 +1557,15 @@ Current evidence:
   `.tmp/desktop-smoke/native-command-report.json` with release binary metadata,
   frontend bundle counts, native command workflow status, and duration for the
   real-file desktop command smoke.
-- `e2e/app-workflows.spec.ts` includes a large-document editing workflow that
+- `pnpm run test:e2e` passes the large-document editing workflow locally; it
   appends source text, waits for preview update, checks elapsed browser time,
-  and verifies editor-to-preview scroll sync. Local execution still requires
-  installing the Playwright Chromium binary.
+  and verifies editor-to-preview scroll sync.
 
 Finish:
 
 - Deeper long-running memory profiling beyond bounded test loops.
-- Run the large-document browser workflow where Playwright Chromium is
-  installed.
+- Add deeper long-running memory/native profiling beyond bounded test loops and
+  command-smoke timing.
 
 ## P2 - Architecture And Maintainability
 

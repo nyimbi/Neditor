@@ -1,8 +1,14 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourcePath = "src/App.vue";
-const source = readFileSync(sourcePath, "utf8");
+const reportPath = resolve(
+  process.env.NEDITOR_ACCESSIBILITY_REPORT || join(root, ".tmp", "accessibility", "report.json"),
+);
+const source = readFileSync(join(root, sourcePath), "utf8");
 const templateStart = source.indexOf("<template>");
 const scriptStart = source.indexOf("<script");
 const templateEnd = source.lastIndexOf("</template>", scriptStart);
@@ -11,19 +17,72 @@ const template =
     ? source.slice(templateStart + "<template>".length, templateEnd)
     : "";
 const issues = [];
+const checks = [
+  {
+    id: "button-names",
+    description: "Buttons expose descriptive text, aria labels, labelled-by references, or titles.",
+    run: checkButtons,
+  },
+  {
+    id: "form-control-labels",
+    description: "Inputs, selects, and textareas are labelled directly or by wrapping labels.",
+    run: checkFormControls,
+  },
+  {
+    id: "dialog-contracts",
+    description: "Dialogs are modal, named, focusable, and keyboard handled.",
+    run: checkDialogs,
+  },
+  {
+    id: "skip-links",
+    description: "Primary workbench regions have visible-on-focus skip links and focusable targets.",
+    run: checkSkipLinks,
+  },
+  {
+    id: "status-announcements",
+    description: "Status, watch, compile, export, and error messages are exposed as live regions.",
+    run: checkStatusAnnouncements,
+  },
+  {
+    id: "diagnostic-labels",
+    description: "Diagnostic collections and items are exposed as named lists and list items.",
+    run: checkDiagnosticLabels,
+  },
+  {
+    id: "conflict-diff-labels",
+    description: "Conflict diff cells are named groups with source-side context.",
+    run: checkConflictDiffLabels,
+  },
+  {
+    id: "table-editor-labels",
+    description: "Table editor grid, cells, totals, and controls are labelled.",
+    run: checkTableEditorLabels,
+  },
+  {
+    id: "contrast-motion-css",
+    description: "High-contrast and reduced-motion CSS contracts are enforced.",
+    run: checkContrastMotionCss,
+  },
+  {
+    id: "editor-preview-surfaces",
+    description: "Editor and preview surfaces expose document-oriented screen-reader semantics.",
+    run: checkEditorPreviewSurfaceLabels,
+  },
+];
+const checkResults = [];
 
-checkButtons();
-checkFormControls();
-checkDialogs();
-checkSkipLinks();
-checkStatusAnnouncements();
-checkDiagnosticLabels();
-checkConflictDiffLabels();
-checkTableEditorLabels();
-checkContrastMotionCss();
-checkEditorPreviewSurfaceLabels();
+for (const check of checks) {
+  const issueCountBefore = issues.length;
+  check.run();
+  checkResults.push({
+    id: check.id,
+    description: check.description,
+    status: issues.length === issueCountBefore ? "pass" : "fail",
+  });
+}
 
 if (issues.length > 0) {
+  writeReport("fail", checkResults, issues);
   console.error("Accessibility guard failed:");
   for (const issue of issues) {
     console.error(`- ${issue}`);
@@ -31,7 +90,8 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
-console.log("Checked App.vue template accessibility guardrails.");
+writeReport("pass", checkResults, issues);
+console.log(`Checked App.vue template accessibility guardrails; wrote ${reportPath}.`);
 
 function checkButtons() {
   const buttonPattern = /<button\b([^>]*)>([\s\S]*?)<\/button>/g;
@@ -308,4 +368,28 @@ function cssBlock(selector) {
     }
   }
   return "";
+}
+
+function writeReport(status, checks, issues) {
+  mkdirSync(dirname(reportPath), { recursive: true });
+  writeFileSync(
+    reportPath,
+    `${JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        source: sourcePath,
+        status,
+        summary: {
+          checks: checks.length,
+          passed: checks.filter((check) => check.status === "pass").length,
+          failed: checks.filter((check) => check.status === "fail").length,
+          issues: issues.length,
+        },
+        checks,
+        issues,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }

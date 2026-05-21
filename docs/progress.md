@@ -2164,6 +2164,13 @@ Example project export-audience verification:
 | `pnpm run verify:local` | Pass | The quick local verification baseline passed after the audience metadata export update. |
 | `git diff --check` | Pass | No whitespace errors after the audience metadata export update. |
 
+Accessibility report and browser-performance evidence verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run verify:local` | Pass | Quick local verification passed after making `pnpm run check:a11y` emit `.tmp/accessibility/report.json`; the report recorded 10 named checks, 10 passed, 0 failed, and 0 issues. |
+| `pnpm run test:e2e` | Pass | 42 Chromium browser workflows passed locally, including skip links, modal focus, status/progress live regions, accessible diagnostics/conflict/table/source/preview semantics, large-document edit/preview responsiveness, and blog/Substack/LaTeX/Google Docs export handoffs. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export
