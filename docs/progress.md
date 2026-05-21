@@ -1657,6 +1657,24 @@ Editor/preview screen-reader surface verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "boots the workbench" --project chromium` | Blocked locally | The Vite server started and selected the boot workflow, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence was used. |
 | `git diff --check` | Pass | No whitespace errors after the editor/preview accessibility update. |
 
+Malformed reference marker validation verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked malformed_reference_markers_are_reported_with_source_ranges --lib -- --nocapture` in `src-tauri` | Pass | Focused compiler proof rejects malformed heading labels, figure labels, empty cross references, slash-containing keys, and unclosed cross-reference markers with source-ranged errors while preserving generated heading anchors. |
+| `cargo test --locked prepare_for_export_blocks_malformed_reference_markers_in_manifest --lib -- --nocapture` in `src-tauri` | Pass | Focused readiness proof blocks export for malformed labels/references and copies the source-ranged diagnostics into the export manifest readiness evidence. |
+| `cargo test --locked duplicate_reference_labels_are_reported_with_source_ranges --lib -- --nocapture` in `src-tauri` | Pass | Existing duplicate-label regression still reports the duplicate anchor with first/duplicate origin context after tightening label parsing. |
+| `cargo test --locked prepare_for_export_blocks_duplicate_reference_labels_in_manifest --lib -- --nocapture` in `src-tauri` | Pass | Existing export-readiness duplicate-label regression still copies duplicate-anchor diagnostics into the manifest. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 190 Rust library tests passed after strict reference marker validation and the shared label extractor fix for labels with attributes. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the reference validation update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the compiler/reference validation update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the backend and docs update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the reference validation slice. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting strict reference key rules; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after the reference validation slice. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
+| `git diff --check` | Pass | No whitespace errors after the reference validation update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

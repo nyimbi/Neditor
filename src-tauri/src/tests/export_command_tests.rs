@@ -281,6 +281,44 @@ fn prepare_for_export_blocks_duplicate_reference_labels_in_manifest() {
 }
 
 #[test]
+fn prepare_for_export_blocks_malformed_reference_markers_in_manifest() {
+    let report = prepare_for_export(PrepareExportRequest {
+            text: "---\ntitle: Malformed Reference Markers\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Strategy {#sec:bad label}\n\nSee {@sec:bad label}.\n".to_string(),
+            file_path: None,
+            target: "pdf".to_string(),
+            options: json!({ "includeManifest": true, "warnOnDirtyGit": false }),
+        });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 2, "{:#?}", report.diagnostics);
+    assert_eq!(report.manifest.readiness.error_count, 2);
+    assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
+    for expected in [
+        "Malformed reference label: sec:bad label",
+        "Malformed reference cross reference: sec:bad label",
+    ] {
+        let diagnostic = report
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message == expected)
+            .unwrap_or_else(|| panic!("missing diagnostic: {expected}\n{:#?}", report.diagnostics));
+        assert_eq!(diagnostic.severity, "error");
+        assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
+        assert_eq!(
+            diagnostic.suggestion.as_deref(),
+            Some(
+                "Use only letters, numbers, colon, underscore, dash, or period in reference keys."
+            )
+        );
+        assert!(report
+            .manifest
+            .diagnostics
+            .iter()
+            .any(|manifest_diagnostic| manifest_diagnostic.message == expected));
+    }
+}
+
+#[test]
 fn prepare_for_export_reports_empty_generated_reference_sections() {
     let report = prepare_for_export(PrepareExportRequest {
         text: "---\ntitle: Empty Reference Sections\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\nindex: true\nglossarySection: true\n---\nplain text only.\n"

@@ -199,7 +199,11 @@ NEditor tracks references to headings, figures, tables, equations, appendices,
 and decisions. Broken references are reported in diagnostics and export
 readiness. Labels must be unique across headings, figures, tables, equations,
 appendices, and decisions; duplicate labels block export readiness because a
-cross reference would otherwise have more than one possible target.
+cross reference would otherwise have more than one possible target. Label and
+cross-reference keys may use letters, numbers, colon, underscore, dash, and
+period only. Empty keys, spaces, slash characters, and unclosed `{#` / `{@`
+markers are source-ranged errors and block export manifests instead of being
+silently truncated.
 
 ## Equations
 

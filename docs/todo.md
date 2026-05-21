@@ -1236,6 +1236,9 @@ falling back to title rendering.
 Duplicate cross-reference labels now produce source-ranged compiler/readiness
 errors and are copied into export manifests so repeated section, figure, table,
 equation, appendix, or decision anchors cannot make references ambiguous.
+Malformed cross-reference labels and reference keys now reject empty keys,
+spaces, slash characters, and unclosed markers with source-ranged
+compiler/readiness errors that are copied into export manifests.
 
 Finish:
 

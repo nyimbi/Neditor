@@ -182,6 +182,58 @@ fn duplicate_reference_labels_are_reported_with_source_ranges() {
 }
 
 #[test]
+fn malformed_reference_markers_are_reported_with_source_ranges() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Malformed References\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:bad label}\n![Bad](data:image/svg+xml;base64,PHN2Zy8+){#fig:bad/label caption=\"Bad\"}\nSee {@sec:bad label}, {@}, and {@fig:bad/label}.\nUnclosed {@sec:missing\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response
+        .semantic
+        .headings
+        .iter()
+        .any(|heading| heading.text == "Strategy" && heading.anchor == "strategy"));
+    assert!(!response
+        .semantic
+        .labels
+        .iter()
+        .any(|label| label == "sec:bad" || label == "fig:bad/label"));
+
+    for expected in [
+        "Malformed reference label: sec:bad label",
+        "Malformed reference label: fig:bad/label",
+        "Malformed reference cross reference: sec:bad label",
+        "Malformed reference cross reference: <empty>",
+        "Malformed reference cross reference: fig:bad/label",
+        "Unclosed reference cross reference marker: {@",
+    ] {
+        let diagnostic = response
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message == expected)
+            .unwrap_or_else(|| {
+                panic!(
+                    "missing diagnostic: {expected}\n{:#?}",
+                    response.diagnostics
+                )
+            });
+        assert_eq!(diagnostic.severity, "error");
+        assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
+        assert!(diagnostic.line.is_some(), "{diagnostic:#?}");
+        assert!(diagnostic.column.is_some(), "{diagnostic:#?}");
+        assert!(diagnostic.end_column.is_some(), "{diagnostic:#?}");
+        assert_eq!(
+            diagnostic.suggestion.as_deref(),
+            Some(if expected.starts_with("Unclosed") {
+                "Close the reference marker with } or remove the incomplete marker."
+            } else {
+                "Use only letters, numbers, colon, underscore, dash, or period in reference keys."
+            })
+        );
+    }
+}
+
+#[test]
 fn compiler_renders_layout_break_directives() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Layout\nstatus: approved\napprovedBy: QA\n---\n# Layout\n{{page-break}}\n{{section-break columns=1}}\n\n```layout\ncolumns: 2\n```\n".to_string(),

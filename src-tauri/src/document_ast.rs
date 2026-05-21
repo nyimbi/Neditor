@@ -1668,11 +1668,32 @@ fn table_alignment(cell: &str) -> String {
 }
 
 pub(crate) fn extract_label(text: &str) -> Option<String> {
+    extract_raw_label(text).and_then(|label| parse_reference_label_key(label).map(str::to_string))
+}
+
+pub(crate) fn extract_raw_label(text: &str) -> Option<&str> {
     text.split("{#")
         .nth(1)
         .and_then(|rest| rest.split_once('}'))
-        .map(|(label, _)| label.split_whitespace().next().unwrap_or("").to_string())
-        .filter(|label| !label.is_empty())
+        .map(|(label, _)| label)
+}
+
+fn parse_reference_label_key(raw_label: &str) -> Option<&str> {
+    let trimmed = raw_label.trim();
+    let mut split = trimmed.splitn(2, char::is_whitespace);
+    let key = split.next().unwrap_or("");
+    let rest = split.next().unwrap_or("").trim();
+    if !rest.is_empty() && !rest.contains('=') {
+        return None;
+    }
+    is_valid_reference_key(key).then_some(key)
+}
+
+pub(crate) fn is_valid_reference_key(key: &str) -> bool {
+    !key.is_empty()
+        && key
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, ':' | '_' | '-' | '.'))
 }
 
 pub(crate) fn extract_quoted_attribute(text: &str, key: &str) -> Option<String> {
