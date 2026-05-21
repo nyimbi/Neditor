@@ -42,6 +42,7 @@ const fullCommands = [
     "./node_modules/.bin/tauri",
     ["build", "--no-bundle"],
   ),
+  ...platformBundleCommands(),
   command("Desktop artifact smoke", "pnpm", ["run", "test:desktop-smoke"]),
   command("Desktop WebDriver smoke", "pnpm", ["run", "test:tauri-webdriver"]),
 ];
@@ -82,6 +83,14 @@ function command(label, cmd, args, cwd = ".") {
     args,
     cwd: join(root, cwd),
   };
+}
+
+function platformBundleCommands() {
+  if (process.platform !== "darwin") return [];
+  return [
+    command("Desktop macOS app bundle", "./node_modules/.bin/tauri", ["build", "--bundles", "app"]),
+    command("Desktop bundle smoke", "pnpm", ["run", "test:desktop-bundle"]),
+  ];
 }
 
 function formatCommand(item) {

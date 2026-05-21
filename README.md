@@ -202,7 +202,7 @@ NEditor uses local verification rather than GitHub Actions. Run
 `pnpm run verify:local:full` for a release-grade baseline; it extends the quick
 checks with the production build, optional engine probe, native-watch check,
 clippy, full Rust tests, rendered export audit, Tauri no-bundle release compile,
-and desktop artifact smoke.
+macOS `.app` bundle build/smoke on macOS, and desktop artifact smoke.
 
 Use `pnpm run verify:local -- --list` or
 `pnpm run verify:local:full -- --list` to print the exact command sequence
@@ -242,6 +242,11 @@ native launch smoke. The launch smoke writes
 window, captured output, and `processAlive: true` evidence when the app remains
 running until the timeout.
 
+`pnpm run test:desktop-bundle` verifies the current host's packaged desktop
+bundle evidence. On macOS it checks `NEditor.app` Info.plist metadata, bundle
+identifier, version, executable, icon, copyright, and high-resolution flag after
+`./node_modules/.bin/tauri build --bundles app`.
+
 `pnpm run test:tauri-webdriver` runs the Tauri WebDriver desktop smoke on
 Windows and Linux hosts with `tauri-driver` plus the platform WebDriver
 installed. The harness starts the built desktop binary, checks the native title,
@@ -263,12 +268,14 @@ and local toolchains.
 pnpm run build
 ./node_modules/.bin/tauri build --no-bundle
 ./node_modules/.bin/tauri build --bundles app
+pnpm run test:desktop-bundle
 ```
 
-On macOS, `.app` bundle creation is known to work in this workspace. DMG
-creation can fail in restricted execution environments at the `hdiutil create`
-step with `Device not configured`; that environment failure does not block app
-bundle compilation.
+On macOS, `.app` bundle creation is part of `pnpm run verify:local:full` and the
+bundle checker writes `.tmp/desktop-bundle/macos-app-report.json`. DMG creation
+can fail in restricted execution environments at the `hdiutil create` step with
+`Device not configured`; that environment failure does not block app bundle
+compilation.
 
 ## Project Status
 

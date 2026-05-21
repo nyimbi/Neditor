@@ -71,6 +71,11 @@ Recent pushed checkpoints visible in current git history:
   and checks the native dirty-title marker, runs export readiness through the
   desktop UI/command path, and verifies selected preferences persist across a
   desktop session restart before restoring them.
+- This update makes macOS app bundle proof executable. `pnpm run verify:local:full`
+  now builds `NEditor.app` on macOS and `pnpm run test:desktop-bundle` verifies
+  the bundle Info.plist metadata, identifier, version, executable, icon, copyright,
+  and high-resolution flag while writing
+  `.tmp/desktop-bundle/macos-app-report.json`.
 - This update makes browser workflow execution current-host evidence instead
   of stale archived evidence. `pnpm run test:e2e` now uses the project-local
   Playwright browser cache and passes all 42 Chromium workbench workflows
@@ -632,11 +637,13 @@ Current verification recorded on 2026-05-21:
 | `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes, a manual checklist report, `viewer-proof.json` executable viewer/package assertions, and a `pdflatex` compile proof on this host. |
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
-| `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe still reports Pikchr missing on this host. |
+| `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe still reports Pikchr missing on this host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 42 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed through the focused workbench boot workflow on this host. |
 | `pnpm run test:e2e` | Pass | 42 Chromium browser workbench workflows passed locally on this host, including blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke. |
+| `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
+| `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, and `processAlive: true` evidence. |
 | `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, export readiness, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip. |
 
@@ -1104,8 +1111,9 @@ Baseline gaps:
   include a passing browser execution result from this sandbox.
 - The baseline does not include desktop WebDriver/Tauri-driver workflow tests.
 - The baseline does not include rendered visual QA for PDF/DOCX/PPTX outputs.
-- The baseline does not include full macOS/Windows/Linux package bundle
-  creation.
+- The baseline now includes macOS `.app` bundle creation and smoke evidence on
+  the current host; Windows/Linux package bundle creation and macOS DMG
+  classification remain open.
 - The baseline does not include macOS/Windows optional external transform
   engines.
 
@@ -1118,7 +1126,9 @@ Optional packaging checks:
 
 Known packaging note from `README.md`:
 
-- macOS app bundle builds have previously succeeded.
+- macOS app bundle builds are now current-host verified by
+  `./node_modules/.bin/tauri build --bundles app` plus
+  `pnpm run test:desktop-bundle`.
 - DMG bundling previously reached app bundle creation and then failed in
   `hdiutil create` with `Device not configured`; this needs refreshed
   classification as host-specific or config-specific.

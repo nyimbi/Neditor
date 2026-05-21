@@ -32,7 +32,7 @@ explicit platform checks.
 | 2 Source Prompt Extension | Window title reflects file and dirty state | Partial | `windowTitle` getter and `setWindowTitle` in `src/App.vue`; Playwright harness asserts clean, dirty, and saved browser document titles | Native desktop title assertion. |
 | 2 Source Prompt Extension | Toolbar commands and keyboard shortcuts | Partial | `src/App.vue` toolbar, command palette, shortcut handler; `pnpm run test:e2e` passed 42 Chromium workflows locally on 2026-05-21, including search/replace, Markdown formatting commands, multi-cursor commands, command-palette heading/citation/glossary/index/include/open-document/workspace navigation, and toolbar insertion workflows | Native desktop command execution proof. |
 | 2 Source Prompt Extension | Light/dark/system theme and typography | Partial | Settings in `src/App.vue`; persisted preferences in store; Playwright harness asserts theme, preview theme, high contrast, reduced motion, and editor/preview typography application plus reload persistence | Visual/accessibility verification across themes in a real browser/native runtime. |
-| 2 Source Prompt Extension | Cross-platform packaging | Partial | `README.md` packaging note; local Tauri build commands | Full local/manual bundle evidence for Windows/Linux and refreshed macOS bundle/DMG status. |
+| 2 Source Prompt Extension | Cross-platform packaging | Partial | `README.md` packaging note; local Tauri build commands; `./node_modules/.bin/tauri build --bundles app` builds `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host; `pnpm run test:desktop-bundle` verifies the `.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag while writing `.tmp/desktop-bundle/macos-app-report.json` | Full local/manual bundle evidence for Windows/Linux, DMG classification, and signing/notarization stance. |
 | 3 Product Positioning | Local-first document workbench, not cloud suite | Partial | `README.md`; `docs/user-guide.md`; local file/snapshot/Git/export design | Fixture workflows and platform proof still need to reinforce positioning. |
 | 4 Target Users | Business, technical, research, product users | Complete | Example project front matter declares consultants, technical writers, researchers and analysts, product and engineering teams, executives and managers, students and academics, developers, and teams using AI chat output; `example_fixture_tests::example_project_fixtures_compile_and_export` verifies each persona compiles, every README example link maps to an executable fixture, and audience metadata survives HTML, PDF, DOCX, PPTX, and Markdown bundle exports | Keep new personas represented by executable example fixtures. |
 
@@ -198,9 +198,9 @@ Current direct evidence:
   alignment, and conflict merge composition under `tests/frontend-unit.test.ts`.
 - Local full verification covers frontend checks/tests, frontend production
   build, dependency/docs/accessibility guards, Rust formatting/checks/clippy,
-  native-watch check, 212 Rust tests, optional engine probing, Tauri no-bundle
-  release compile, strengthened desktop smoke, and the desktop WebDriver
-  harness step on the current host.
+  native-watch check, 213 Rust tests, optional engine probing, Tauri no-bundle
+  release compile, macOS `.app` bundle build/smoke on this host, strengthened
+  desktop smoke, and the desktop WebDriver harness step on the current host.
 - `pnpm run check:docs` now discovers README plus all top-level docs Markdown
   files and checks local links, including the user guide, Markdown extensions
   reference, and `docs/specification.md` architecture figure target.
@@ -245,6 +245,11 @@ Current major verification gaps:
   reveals real local files; the bounded native GUI launch smoke also passes on
   the current macOS host and writes `.tmp/desktop-smoke/launch-report.json`
   with PID, elapsed window, captured output, and `processAlive: true` evidence.
+- macOS packaging now has current executable evidence: `./node_modules/.bin/tauri
+  build --bundles app` builds `NEditor.app`, and `pnpm run test:desktop-bundle`
+  verifies Info.plist metadata, bundle identifier, version, executable, icon,
+  copyright, and high-resolution flag while writing
+  `.tmp/desktop-bundle/macos-app-report.json`.
 - Current committed browser workflow tests exist, but local browser execution
   depends on host permissions that allow Chromium launch. A Tauri-driver
   WebDriver harness now exists for supported Windows/Linux hosts; macOS records

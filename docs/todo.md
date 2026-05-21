@@ -607,8 +607,8 @@ Current local verification evidence:
   dependency admission, Markdown links, Rust formatting, Rust `cargo check
   --locked`, `git diff --check`, production build, optional engine probe,
   native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri
-  no-bundle release compile, desktop artifact/native-command smoke, and the
-  desktop WebDriver harness step.
+  no-bundle release compile, macOS `.app` bundle build/smoke, desktop
+  artifact/native-command smoke, and the desktop WebDriver harness step.
 - 2026-05-21: `cargo test --locked export_command_tests --lib` passed 28 export
   command tests, including blog/Substack package exports, LaTeX export, Google
   Docs package export, and native command workflow smoke.
@@ -1659,11 +1659,17 @@ Finish:
 
 ### 23. Cross-Platform Packaging Evidence
 
-Status: desktop shell compile is tested; full bundle evidence is incomplete.
+Status: desktop shell compile and current-host macOS `.app` bundle evidence are
+tested; Windows/Linux package evidence and DMG/signing stance remain incomplete.
 
 Finish:
 
-- Refresh macOS app bundle evidence on the current commit.
+- Refresh macOS app bundle evidence on the current commit. Current evidence:
+  `./node_modules/.bin/tauri build --bundles app` and
+  `pnpm run test:desktop-bundle` pass, with
+  `.tmp/desktop-bundle/macos-app-report.json` recording Info.plist metadata,
+  bundle identifier, version, executable, icon, copyright, and high-resolution
+  flag.
 - Classify the documented macOS DMG `hdiutil create` failure as host-specific
   or config-specific.
 - Add Windows package evidence for the chosen `.msi`/`.exe` target.

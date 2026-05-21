@@ -17,6 +17,7 @@
     "check:structure": "node scripts/check-project-structure.mjs",
     "verify:local": "node scripts/run-local-verification.mjs",
     "verify:local:full": "node scripts/run-local-verification.mjs --full",
+    "test:desktop-bundle": "node scripts/check-desktop-bundle.mjs",
     "test:desktop-smoke": "node scripts/check-desktop-smoke.mjs",
     "test:tauri-webdriver": "node scripts/run-tauri-webdriver.mjs",
     "test:rendered-exports": "node scripts/check-rendered-export-audit.mjs",
