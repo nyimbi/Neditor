@@ -310,6 +310,21 @@ Common transform names:
 | `bibtex`, `glossary`, `timeline`, `roadmap`, `adr`, `diff`, `qr` | Business-document artifacts and generated sections. |
 | `vega-lite`, `geojson`, `topojson`, `stl` | Visual data previews with static export fallbacks. |
 
+First-release native business transforms:
+
+| Transform | Supported syntax |
+| --- | --- |
+| `timeline` | One event per line, usually `date: label`. Rendered as a static SVG timeline. |
+| `roadmap` | One item per line, `stage: text`, with optional pipe metadata such as `status=active`, `owner=Docs`, or `due=2026-06-30`. |
+| `adr` | One `key: value` row per line for fields such as `Status`, `Context`, `Decision`, and `Consequences`. |
+| `diff` | Unified-diff-style text. Additions, deletions, and hunk headers are classified and summarized. |
+| `qr` | UTF-8 payload text rendered as a static SVG QR code for short URLs, artifact paths, or release-pack references. |
+
+Execution-heavy second-wave transforms such as `python`, `r`, `sql`,
+`wavedrom`, `nomnoml`, `latex`, and raw `html` are not first-release native
+transforms. They stay deferred until NEditor has a safe sandbox or static
+renderer for each one; raw HTML should be avoided for release documents.
+
 Native visual-data transform subsets:
 
 | Transform | Native static subset |

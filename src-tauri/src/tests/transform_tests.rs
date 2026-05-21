@@ -495,11 +495,15 @@ fn timeline_transform_renders_static_svg_preview() {
 fn business_workflow_transforms_render_static_html() {
     let roadmap = run_transform(
         "roadmap".to_string(),
-        "Now: Drafting\nNext: Review\nLater: Publish".to_string(),
+        "Now: Drafting | status=active | owner=Docs\nNext: Review | due=2026-06-01\nLater: Publish"
+            .to_string(),
     )
     .expect("roadmap transform");
     assert_eq!(roadmap.output_kind, "html");
     assert!(roadmap.html.contains("transform-roadmap"));
+    assert!(roadmap.html.contains("roadmap-item"));
+    assert!(roadmap.html.contains("roadmap-meta-status"));
+    assert!(roadmap.html.contains("active"));
     assert!(roadmap.html.contains("Review"));
 
     let adr = run_transform(
@@ -509,12 +513,15 @@ fn business_workflow_transforms_render_static_html() {
     .expect("adr transform");
     assert_eq!(adr.output_kind, "html");
     assert!(adr.html.contains("transform-adr"));
+    assert!(adr.html.contains("adr-status"));
+    assert!(adr.html.contains("adr-decision"));
     assert!(adr.html.contains("Use local-first exports"));
 
     let diff = run_transform("diff".to_string(), "@@ -1 +1 @@\n-old\n+new".to_string())
         .expect("diff transform");
     assert_eq!(diff.output_kind, "html");
     assert!(diff.html.contains("transform-diff"));
+    assert!(diff.html.contains("1 additions / 1 deletions / 1 hunks"));
     assert!(diff.html.contains("diff-del"));
     assert!(diff.html.contains("diff-add"));
 }

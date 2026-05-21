@@ -1379,6 +1379,26 @@ Additional visual-data map geometry verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Safe business transform completion verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked business_workflow_transforms_render_static_html --lib -- --nocapture` in `src-tauri` | Pass | Focused transform proof covers roadmap metadata, ADR key classes, diff summaries, and static HTML classes for safe business workflow transforms. |
+| `cargo test --locked safe_business_transforms_survive_cross_target_exports --lib -- --nocapture` in `src-tauri` | Pass | Focused export proof covers roadmap, ADR, diff, and QR transform artifacts, source ranges, output hashes, HTML, PDF, DOCX, PPTX, and Markdown bundle evidence. |
+| `cargo test --locked transform_tests --lib` in `src-tauri` | Pass | 34 transform tests passed after improving first-release native business transforms. |
+| `cargo test --locked export_conformance_tests --lib` in `src-tauri` | Pass | 13 export conformance tests passed after adding safe business transform cross-target artifact proof. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 181 Rust library tests passed after the safe business transform and export evidence update. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the renderer and test updates. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the business transform renderer update. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Rust static analysis passed with no warnings. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the docs and renderer update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the safe business transform update. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails passed after the update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting safe first-release and deferred second-wave transforms; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz variants, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

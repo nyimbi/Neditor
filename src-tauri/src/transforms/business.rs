@@ -66,13 +66,20 @@ pub(crate) fn render_roadmap_html(body: &str) -> String {
         .map(str::trim)
         .filter(|line| !line.is_empty())
         .map(|line| {
-            let (stage, text) = line
+            let (stage, remainder) = line
                 .split_once(':')
                 .or_else(|| line.split_once('-'))
                 .map(|(stage, text)| (stage.trim(), text.trim()))
                 .unwrap_or(("Item", line));
+            let parts = remainder
+                .split('|')
+                .map(str::trim)
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>();
+            let text = parts.first().copied().unwrap_or(remainder);
+            let metadata = roadmap_metadata(&parts[1..]);
             format!(
-                "<article><strong>{}</strong><p>{}</p></article>",
+                "<article class=\"roadmap-item\"><strong>{}</strong><p>{}</p>{metadata}</article>",
                 escape_html(stage),
                 escape_html(text)
             )
@@ -93,8 +100,9 @@ pub(crate) fn render_adr_html(body: &str) -> String {
                 .split_once(':')
                 .map(|(key, value)| (key.trim(), value.trim()))
                 .unwrap_or(("Note", line));
+            let class = business_key_class(key);
             format!(
-                "<tr><th>{}</th><td>{}</td></tr>",
+                "<tr class=\"adr-{class}\"><th>{}</th><td>{}</td></tr>",
                 escape_html(key),
                 escape_html(value)
             )
@@ -106,14 +114,20 @@ pub(crate) fn render_adr_html(body: &str) -> String {
 }
 
 pub(crate) fn render_diff_html(body: &str) -> String {
+    let mut additions = 0usize;
+    let mut deletions = 0usize;
+    let mut hunks = 0usize;
     let lines = body
         .lines()
         .map(|line| {
             let class = if line.starts_with('+') && !line.starts_with("+++") {
+                additions += 1;
                 "add"
             } else if line.starts_with('-') && !line.starts_with("---") {
+                deletions += 1;
                 "del"
             } else if line.starts_with("@@") {
+                hunks += 1;
                 "hunk"
             } else {
                 "ctx"
@@ -122,5 +136,52 @@ pub(crate) fn render_diff_html(body: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    format!("<pre class=\"transform transform-diff\">{lines}</pre>")
+    format!(
+        "<section class=\"transform transform-diff\"><p class=\"diff-summary\">{additions} additions / {deletions} deletions / {hunks} hunks</p><pre>{lines}</pre></section>"
+    )
+}
+
+fn roadmap_metadata(parts: &[&str]) -> String {
+    if parts.is_empty() {
+        return String::new();
+    }
+    let items = parts
+        .iter()
+        .map(|part| {
+            let (key, value) = part
+                .split_once('=')
+                .or_else(|| part.split_once(':'))
+                .map(|(key, value)| (key.trim(), value.trim()))
+                .unwrap_or(("detail", *part));
+            format!(
+                "<span class=\"roadmap-meta roadmap-meta-{}\"><b>{}</b>: {}</span>",
+                business_key_class(key),
+                escape_html(key),
+                escape_html(value)
+            )
+        })
+        .collect::<String>();
+    format!("<small>{items}</small>")
+}
+
+fn business_key_class(value: &str) -> String {
+    let class = value
+        .chars()
+        .filter_map(|character| {
+            if character.is_ascii_alphanumeric() {
+                Some(character.to_ascii_lowercase())
+            } else if character.is_whitespace() || matches!(character, '-' | '_' | '.') {
+                Some('-')
+            } else {
+                None
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    if class.is_empty() {
+        "field".to_string()
+    } else {
+        class
+    }
 }

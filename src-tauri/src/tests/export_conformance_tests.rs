@@ -201,6 +201,80 @@ fn rich_markdown_blocks_survive_cross_target_exports() {
 }
 
 #[test]
+fn safe_business_transforms_survive_cross_target_exports() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Business Transform Pack\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21T08:00:00Z\n---\n# Business Transform Pack\n\n```roadmap\nQ1: Launch beta | status=active | owner=Product\nQ2: Expand exports | due=2026-06-30 | owner=Docs\n```\n\n```adr\nStatus: accepted\nContext: Exports must be auditable.\nDecision: Keep static transform artifacts in every export.\nConsequences: Manifests carry output hashes.\n```\n\n```diff\n@@ -1 +1 @@\n-draft export\n+audited export\n```\n\n```qr\nhttps://neditor.local/export-pack\n```\n".to_string(),
+        file_path: None,
+    });
+    let options = json!({});
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    for name in ["roadmap", "adr", "diff", "qr"] {
+        let artifact = response
+            .transform_artifacts
+            .iter()
+            .find(|artifact| artifact.name == name)
+            .unwrap_or_else(|| panic!("missing {name} artifact"));
+        assert_eq!(artifact.execution_kind, "embedded");
+        assert_eq!(artifact.source_hash.len(), 64);
+        assert_eq!(artifact.output_hash.len(), 64);
+        assert!(artifact.source_line.is_some());
+        assert!(artifact.end_source_line.is_some());
+    }
+
+    let html = render_full_html(&response, &options);
+    assert!(html.contains("transform-roadmap"));
+    assert!(html.contains("roadmap-meta-status"));
+    assert!(html.contains("transform-adr"));
+    assert!(html.contains("adr-decision"));
+    assert!(html.contains("transform-diff"));
+    assert!(html.contains("1 additions / 1 deletions / 1 hunks"));
+    assert!(html.contains("transform-qr"));
+
+    let pdf = render_pdf_bytes(&response, &options);
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("Transform: roadmap"));
+    assert!(pdf_text.contains("Launch beta"));
+    assert!(pdf_text.contains("Transform: adr"));
+    assert!(pdf_text.contains("Keep static transform artifacts"));
+    assert!(pdf_text.contains("Transform: diff"));
+    assert!(pdf_text.contains("audited export"));
+    assert!(pdf_text.contains("Transform: qr"));
+    assert!(pdf_text.contains("https://neditor.local/export-pack"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx transform pack");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Transform: roadmap"));
+    assert!(docx_document.contains("Launch beta"));
+    assert!(docx_document.contains("Keep static transform artifacts"));
+    assert!(docx_document.contains("audited export"));
+    assert!(docx_document.contains("https://neditor.local/export-pack"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx transform pack");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Business Transform Pack"));
+    assert!(pptx_slides.contains("Transform: roadmap"));
+    assert!(pptx_slides.contains("Keep static transform artifacts"));
+    assert!(pptx_slides.contains("audited export"));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_options = options.clone();
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_artifacts = zip_entry_text(&bundle, "transform-artifacts.json");
+    assert!(bundled_text.contains("Transform: roadmap"));
+    assert!(bundled_text.contains("Keep static transform artifacts"));
+    for name in ["roadmap", "adr", "diff", "qr"] {
+        assert!(bundled_artifacts.contains(&format!("\"name\": \"{name}\"")));
+    }
+    assert!(bundled_artifacts.contains("\"source_line\""));
+    assert!(bundled_artifacts.contains("\"output_hash\""));
+}
+
+#[test]
 fn captioned_equations_survive_cross_target_exports() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Captioned Equation\nstatus: approved\napprovedBy: QA\n---\n# Captioned Equation\n\n$$\nconfidence = signal / noise\n$$ {#eq:confidence caption=\"Confidence score\"}\n\nSee {@eq:confidence}.\n".to_string(),
