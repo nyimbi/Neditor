@@ -1,6 +1,7 @@
-import { rmSync, existsSync, statSync, readFileSync, mkdirSync } from "node:fs";
+import { rmSync, existsSync, statSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { inflateRawSync } from "node:zlib";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +20,7 @@ const requiredFiles = [
   ["rendered-export-audit-report.json", 500],
   ["README.md", 100],
 ];
+const viewerProof = [];
 
 if (auditDir.includes(`${root}/.tmp/`)) {
   rmSync(auditDir, { recursive: true, force: true });
@@ -76,6 +78,10 @@ if (issues.length === 0) {
 }
 
 if (issues.length === 0) {
+  collectViewerProof(issues, viewerProof);
+}
+
+if (issues.length === 0) {
   const pdflatex = spawnSync("pdflatex", ["--version"], { stdio: "ignore" });
   if (pdflatex.status === 0) {
     const latexBuildDir = join(auditDir, "latex-compile");
@@ -112,4 +118,192 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
+writeFileSync(
+  join(auditDir, "viewer-proof.json"),
+  `${JSON.stringify({ generatedAt: new Date().toISOString(), assertions: viewerProof }, null, 2)}\n`,
+);
 console.log(`Rendered export audit artifacts verified in ${auditDir}`);
+
+function collectViewerProof(issues, assertions) {
+  const html = readTextArtifact("rendered-export-audit.html");
+  assertContains(assertions, issues, "html", html, [
+    "class=\"cover\"",
+    "APPROVED",
+    "Control summary",
+    "transform-chart",
+    "Architecture diagram",
+    "export-comments",
+    "AI Provenance",
+    "Legal Disclaimer",
+  ]);
+
+  const pdfText = readFileSync(join(auditDir, "rendered-export-audit.pdf"), "latin1");
+  assertContains(assertions, issues, "pdf-text", pdfText, [
+    "Cover: Rendered Export Audit",
+    "Watermark: APPROVED",
+    "Page 1 of 6",
+    "Review Comments",
+    "AI Provenance",
+    "Legal Disclaimer",
+  ]);
+
+  const docx = join(auditDir, "rendered-export-audit.docx");
+  const docxEntries = listZipEntries(docx);
+  assertEntries(assertions, issues, "docx-package", docxEntries, [
+    "word/document.xml",
+    "word/header1.xml",
+    "word/footer1.xml",
+    "word/comments.xml",
+    "docProps/core.xml",
+    "docProps/custom.xml",
+  ]);
+  assertContains(assertions, issues, "docx-document", readZipEntryText(docx, "word/document.xml"), [
+    "Cover: Rendered Export Audit",
+    "Table: tbl:controls: Control summary",
+    "Architecture diagram",
+    "Review Comments",
+    "AI Provenance",
+    "Legal Disclaimer",
+  ]);
+  assertContains(assertions, issues, "docx-custom-properties", readZipEntryText(docx, "docProps/custom.xml"), [
+    "NEditorApprovedBy",
+    "Release QA",
+    "NEditorLegalDisclaimer",
+    "For rendered export audit only.",
+  ]);
+
+  const pptx = join(auditDir, "rendered-export-audit.pptx");
+  const pptxEntries = listZipEntries(pptx);
+  assertEntries(assertions, issues, "pptx-package", pptxEntries, [
+    "ppt/presentation.xml",
+    "ppt/slides/slide1.xml",
+    "ppt/slides/slide3.xml",
+    "docProps/custom.xml",
+  ]);
+  const pptxSlides = pptxEntries
+    .filter((entry) => /^ppt\/slides\/slide\d+\.xml$/.test(entry))
+    .map((entry) => readZipEntryText(pptx, entry))
+    .join("\n");
+  assertContains(assertions, issues, "pptx-slides", pptxSlides, [
+    "Rendered Export Audit",
+    "Control summary",
+    "Export manifest",
+    "Review Comments",
+    "AI Provenance",
+    "Watermark: APPROVED",
+  ]);
+
+  const markdownBundle = join(auditDir, "rendered-export-audit.markdown-bundle.zip");
+  assertEntries(assertions, issues, "markdown-bundle-package", listZipEntries(markdownBundle), [
+    "document.md",
+    "manifest.json",
+    "document-ast.json",
+    "transform-artifacts.json",
+    "media/image1.svg",
+  ]);
+  assertContains(assertions, issues, "markdown-bundle-manifest", readZipEntryText(markdownBundle, "manifest.json"), [
+    "chart-7c90163b489345d0419c71dceb12fef4b97a7bc06da83500852fceab86bf2011",
+    "Export Confidence",
+    "markdown-bundle",
+  ]);
+
+  const blog = join(auditDir, "rendered-export-audit.blog.zip");
+  assertEntries(assertions, issues, "blog-package", listZipEntries(blog), [
+    "post.md",
+    "post.html",
+    "substack-copy.html",
+    "post.txt",
+    "metadata.json",
+    "rss-item.xml",
+    "manifest.json",
+  ]);
+
+  const substack = join(auditDir, "rendered-export-audit.substack.zip");
+  assertEntries(assertions, issues, "substack-package", listZipEntries(substack), [
+    "post.md",
+    "post.html",
+    "substack-copy.html",
+    "post.txt",
+    "metadata.json",
+    "manifest.json",
+  ]);
+
+  const googleDocs = join(auditDir, "rendered-export-audit.google-docs.zip");
+  assertEntries(assertions, issues, "google-docs-package", listZipEntries(googleDocs), [
+    "document.docx",
+    "document.html",
+    "document.md",
+    "document.txt",
+    "metadata.json",
+    "manifest.json",
+    "README.md",
+  ]);
+  assertContains(assertions, issues, "google-docs-html", readZipEntryText(googleDocs, "document.html"), [
+    "Rendered Export Audit",
+    "Control summary",
+    "AI Provenance",
+  ]);
+}
+
+function readTextArtifact(file) {
+  return readFileSync(join(auditDir, file), "utf8");
+}
+
+function assertContains(assertions, issues, scope, text, needles) {
+  for (const needle of needles) {
+    const passed = text.includes(needle);
+    assertions.push({ scope, assertion: `contains ${needle}`, passed });
+    if (!passed) issues.push(`${scope} is missing expected text: ${needle}`);
+  }
+}
+
+function assertEntries(assertions, issues, scope, entries, expectedEntries) {
+  const entrySet = new Set(entries);
+  for (const entry of expectedEntries) {
+    const passed = entrySet.has(entry);
+    assertions.push({ scope, assertion: `contains ${entry}`, passed });
+    if (!passed) issues.push(`${scope} is missing expected package entry: ${entry}`);
+  }
+}
+
+function listZipEntries(path) {
+  return Array.from(readZipEntries(path).keys());
+}
+
+function readZipEntryText(path, entryName) {
+  const entries = readZipEntries(path);
+  const entry = entries.get(entryName);
+  if (!entry) throw new Error(`missing ZIP entry ${entryName} in ${path}`);
+  return entry.toString("utf8");
+}
+
+function readZipEntries(path) {
+  const buffer = readFileSync(path);
+  const entries = new Map();
+  let offset = 0;
+  while (offset + 30 <= buffer.length) {
+    const signature = buffer.readUInt32LE(offset);
+    if (signature !== 0x04034b50) break;
+    const method = buffer.readUInt16LE(offset + 8);
+    const compressedSize = buffer.readUInt32LE(offset + 18);
+    const fileNameLength = buffer.readUInt16LE(offset + 26);
+    const extraLength = buffer.readUInt16LE(offset + 28);
+    const nameStart = offset + 30;
+    const nameEnd = nameStart + fileNameLength;
+    const dataStart = nameEnd + extraLength;
+    const dataEnd = dataStart + compressedSize;
+    const name = buffer.subarray(nameStart, nameEnd).toString("utf8");
+    const compressed = buffer.subarray(dataStart, dataEnd);
+    if (!name.endsWith("/")) {
+      entries.set(name, unzipEntryData(method, compressed, name));
+    }
+    offset = dataEnd;
+  }
+  return entries;
+}
+
+function unzipEntryData(method, data, name) {
+  if (method === 0) return data;
+  if (method === 8) return inflateRawSync(data);
+  throw new Error(`unsupported ZIP compression method ${method} for ${name}`);
+}

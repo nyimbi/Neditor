@@ -958,8 +958,9 @@ Current evidence:
 - `pnpm run test:rendered-exports` generates reviewable HTML, PDF, DOCX, PPTX,
   Markdown bundle, blog package, Substack package, LaTeX, and Google Docs
   package artifacts under `.tmp/rendered-export-audit`, plus a JSON report with
-  hashes and a manual visual-review checklist. When `pdflatex` is installed,
-  it also compiles the generated LaTeX artifact into
+  hashes, a manual visual-review checklist, and `viewer-proof.json` with
+  executable HTML/PDF/DOCX/PPTX/package assertions. When `pdflatex` is
+  installed, it also compiles the generated LaTeX artifact into
   `.tmp/rendered-export-audit/latex-compile/rendered-export-audit.pdf`.
 
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
@@ -998,7 +999,8 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   depth/numbering plus page-numbered PDF lines and DOCX TOC field output.
 - Review comments, change notes, release metadata, AI provenance, legal
   disclaimers, draft warnings, and approval metadata. The legal-disclaimer and
-  approval-metadata path is now covered by the export conformance fixture.
+  approval-metadata path is now covered by the export conformance fixture and
+  rendered export viewer-proof assertions.
 - Page size, orientation, margins, columns, breaks, keep-with-next,
   keep-together, headers, footers, watermarks, cover pages, page numbers,
   brand profile, logo, colors, and fonts.

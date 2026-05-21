@@ -226,8 +226,9 @@ NEditor package metadata still declares MIT licensing.
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
 DOCX, PPTX, Markdown bundle, blog package, Substack package, LaTeX, Google Docs
-package, hashes, and a manual visual-review checklist. When `pdflatex` is
-installed, it also compiles the generated `.tex` file into
+package, hashes, a manual visual-review checklist, and `viewer-proof.json` with
+executable HTML/PDF/DOCX/PPTX/package assertions. When `pdflatex` is installed,
+it also compiles the generated `.tex` file into
 `.tmp/rendered-export-audit/latex-compile/`.
 
 `pnpm run test:desktop-smoke` verifies the local Vite build, Tauri
