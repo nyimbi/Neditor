@@ -1505,6 +1505,9 @@ Finish:
 
 - Keep `docs/dependency-admission.md` updated for Playwright and any future
   test/runtime dependencies.
+- `pnpm run check:deps` now fails if a `package.json` or `src-tauri/Cargo.toml`
+  dependency lacks a dependency-admission row or if project MIT license metadata
+  is removed.
 - Revisit `@tauri-apps/plugin-shell` if external transforms remain entirely
   Rust-backend driven.
 - Confirm licenses, runtime impact, alternatives, and security posture for all

@@ -1729,6 +1729,18 @@ Broader equation syntax verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
 | `git diff --check` | Pass | No whitespace errors after the equation renderer update. |
 
+Dependency admission guard verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:deps` | Pass | Checked dependency admission records for 39 manifest dependencies across `package.json` and `src-tauri/Cargo.toml`, and verified project MIT license metadata. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the dependency admission guard; all local links resolved. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed, including the package-script guard for `check:deps`. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding the dependency admission command. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails still pass after the dependency admission update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; full browser execution remains dependent on a locally installed Playwright Chromium. |
+| `git diff --check` | Pass | No whitespace errors after the dependency admission guard update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

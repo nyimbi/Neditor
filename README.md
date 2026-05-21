@@ -182,6 +182,7 @@ manager fetches in restricted-network environments.
 pnpm run test:unit
 pnpm run build
 pnpm run check:docs
+pnpm run check:deps
 pnpm run check:a11y
 pnpm run check:engines
 pnpm run test:desktop-smoke
@@ -201,6 +202,10 @@ and the host allows Chromium to launch.
 `pnpm run check:engines` probes optional external transform engines and reports
 installed/missing Graphviz/DOT, D2, PlantUML, Java-backed PlantUML, and Pikchr
 paths without failing just because an optional engine is absent.
+
+`pnpm run check:deps` verifies that every JavaScript and Rust dependency in the
+project manifests has an entry in the dependency admission record and that
+NEditor package metadata still declares MIT licensing.
 
 `pnpm run test:desktop-smoke` verifies the local Vite build, Tauri
 configuration, package metadata, MIT license metadata, and release desktop

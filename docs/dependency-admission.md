@@ -2,6 +2,12 @@
 
 This record satisfies the dependency admission gate in `docs/specification.md`.
 
+`pnpm run check:deps` verifies that every dependency declared in `package.json`
+and `src-tauri/Cargo.toml` appears in this record, that each recorded license
+expectation is permissive, and that the repository package metadata still
+declares MIT licensing. Add or update a row here before adding a manifest
+dependency.
+
 ## JavaScript Runtime Dependencies
 
 | Package | Version | License expectation | Purpose | Packaging | Simpler in-house alternative | Export/security impact |
