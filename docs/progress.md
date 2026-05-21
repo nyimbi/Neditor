@@ -1943,6 +1943,17 @@ Citation preview popover verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating citation docs, matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the citation popover update. |
 
+Citation manager repair workflow verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 15 frontend unit tests passed, including new bibliography-manager helper proof for citation-key normalization, locator citation insertion, resolved BibTeX copy generation, and deduplicated missing-key stubs. |
+| `pnpm run check:a11y` | Pass | Static App.vue accessibility guardrails passed after adding Citation manager actions in the References sidebar. |
+| `pnpm run check:structure` | Pass | Project structure guardrails passed with the new bibliography manager helper module. |
+| `pnpm run build` | Pass | Vue typecheck and Vite production build passed after wiring Citation manager actions into the workbench. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating citation manager docs, matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the citation manager update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

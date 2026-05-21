@@ -1282,6 +1282,11 @@ Citation preview popovers now render from bibliography metadata in preview and
 HTML exports. The focused citation export conformance test proves resolved
 titles, locators, multi-key citation details, and missing-entry messages remain
 available on focus/hover while DOCX and PPTX citation output still passes.
+The References sidebar now has citation-manager repair actions: insert the
+bibliography marker, insert a BibTeX template, generate deduplicated stubs for
+missing keys, reinsert citation references, and copy resolved entries as
+editable BibTeX blocks. Frontend unit coverage locks the key normalization,
+locator citation, resolved-entry copy, and missing-key stub generation.
 
 Finish:
 
@@ -1293,7 +1298,8 @@ Finish:
 - Duplicate bibliography key UI and readiness reporting. Current coverage shows
   duplicate entry locations and source-range readiness diagnostics for BibTeX,
   CSL JSON, Hayagriva YAML, and separate external bibliography files; remaining
-  work is richer citation manager UX.
+  work is native workflow execution and deeper rendered/manual citation manager
+  QA.
 - Citation styles: title, author-year, key, numeric, and CSL-driven choices.
   Current coverage proves common CSL aliases for APA-style author-year output
   and IEEE-style numeric output, plus export option validation for alias

@@ -429,6 +429,13 @@
             </select>
           </label>
           <h3>Citations</h3>
+          <section class="reference-manager" aria-label="Citation manager">
+            <div class="reference-actions">
+              <button type="button" @click="insertBlock(bibliographySnippet)">Insert bibliography marker</button>
+              <button type="button" @click="insertBlock(bibliographyTemplateSnippet)">Insert BibTeX template</button>
+              <button type="button" :disabled="!missingCitationKeys.length" @click="insertMissingCitationStubs">Insert missing key stubs</button>
+            </div>
+          </section>
           <button
             v-for="citation in active.compile?.semantic.citation_references || []"
             :key="`${citation.key}-${citation.line}-${citation.column}`"
@@ -445,11 +452,21 @@
               <p>@{{ entry.key }}</p>
               <small>{{ entry.title }}</small>
               <small>{{ [entry.author, entry.issued].filter(Boolean).join(" | ") }}</small>
+              <div class="reference-actions">
+                <button type="button" @click="insertCitationReference(entry.key)">Cite again</button>
+                <button type="button" @click="insertBlock(bibliographyEntryStub(entry))">Insert entry copy</button>
+              </div>
             </article>
           </template>
           <template v-if="missingCitationKeys.length">
             <h3>Missing keys</h3>
-            <p v-for="key in missingCitationKeys" :key="key" class="error">@{{ key }}</p>
+            <article v-for="key in missingCitationKeys" :key="key" class="snapshot-row">
+              <p class="error">@{{ key }}</p>
+              <div class="reference-actions">
+                <button type="button" @click="insertBlock(bibliographyEntryStub({ key }))">Insert stub</button>
+                <button type="button" @click="insertCitationReference(key)">Cite again</button>
+              </div>
+            </article>
           </template>
           <template v-if="active.compile?.semantic.duplicate_bibliography_keys.length">
             <h3>Duplicate keys</h3>
@@ -1321,6 +1338,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap, selectNextOccurrence } from "@codemirror/search";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
+import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import { markdownListContinuation } from "./lib/markdownEditing";
@@ -1507,6 +1525,7 @@ const equationSnippet = "$$\nE = mc^2\n$$ {#eq:energy}\n";
 const tocSnippet = "[TOC]\n";
 const indexSnippet = "[INDEX]\n";
 const bibliographySnippet = "[BIBLIOGRAPHY]\n";
+const bibliographyTemplateSnippet = "```bibtex\n@misc{source2026,\n  title = {Source title},\n  author = {Author},\n  year = {2026}\n}\n```\n";
 const listOfFiguresSnippet = "[LIST_OF_FIGURES]\n";
 const listOfTablesSnippet = "[LIST_OF_TABLES]\n";
 const glossarySectionSnippet = "[GLOSSARY]\n";
@@ -2989,6 +3008,16 @@ function setCitationStyle(style: string) {
   const supported = new Set<string>(SUPPORTED_CITATION_STYLES);
   if (!supported.has(style)) return;
   store.updateText(upsertFrontMatterField(active.value.text, "citationStyle", style));
+}
+
+function insertCitationReference(key: string) {
+  const snippet = citationReferenceSnippet(key);
+  if (snippet) insertBlock(snippet);
+}
+
+function insertMissingCitationStubs() {
+  const snippet = bibliographyStubsForMissingKeys(missingCitationKeys.value);
+  if (snippet) insertBlock(snippet);
 }
 
 function setFrontMatterField(key: string, value: string) {

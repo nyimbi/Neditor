@@ -167,11 +167,14 @@ Research and business documents can keep reference metadata near the source.
 
 The references panel surfaces resolved bibliography entries, missing citation
 keys, and duplicate bibliography keys. Unsupported citation-style warnings are
-reported with the rest of the document diagnostics. Reuse of the same section,
-figure, table, equation, appendix, or decision label is also reported as an
-export-blocking reference diagnostic so links stay deterministic. Malformed
-labels and cross references, including empty keys, spaces, slash characters,
-and unclosed markers, are also export-blocking diagnostics with source ranges.
+reported with the rest of the document diagnostics. The same panel can insert
+the bibliography marker, add a BibTeX template, create stubs for missing keys,
+reinsert citation references, and copy resolved entries as editable BibTeX
+blocks. Reuse of the same section, figure, table, equation, appendix, or
+decision label is also reported as an export-blocking reference diagnostic so
+links stay deterministic. Malformed labels and cross references, including
+empty keys, spaces, slash characters, and unclosed markers, are also
+export-blocking diagnostics with source ranges.
 
 ## Review, Release, And AI Governance
 

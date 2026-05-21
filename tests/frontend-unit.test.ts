@@ -8,6 +8,12 @@ import {
   isLatestDocumentTaskCurrent,
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
+import {
+  bibliographyEntryStub,
+  bibliographyStubsForMissingKeys,
+  citationReferenceSnippet,
+  normalizeCitationKey,
+} from "../src/lib/bibliographyManager.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
@@ -127,6 +133,25 @@ test("table draft sorting preserves summary rows and typed ordering", () => {
   deepEqual(sortTableDraftRows(draft, 1, "desc").rows.map((row) => row[0]), ["East", "North", "West", "Total"]);
   deepEqual(sortTableDraftRows(draft, 2, "asc").rows.map((row) => row[0]), ["East", "North", "West", "Total"]);
   deepEqual(sortTableDraftRows(draft, 0, "asc").rows.map((row) => row[0]), ["East", "North", "West", "Total"]);
+});
+
+test("bibliography manager helpers generate repairable citation snippets", () => {
+  equal(normalizeCitationKey(" @Risk 2026! "), "Risk-2026");
+  equal(citationReferenceSnippet("@porter1985", "p. 42"), "[@porter1985, p. 42]");
+  equal(citationReferenceSnippet(""), "");
+  equal(
+    bibliographyEntryStub({
+      key: "porter1985",
+      title: "Competitive {Advantage}",
+      author: "Porter, Michael E.",
+      issued: "1985-01-01",
+    }),
+    "@misc{porter1985,\n  title = {Competitive Advantage},\n  author = {Porter, Michael E.},\n  year = {1985}\n}",
+  );
+  equal(
+    bibliographyStubsForMissingKeys(["@missing2026", "missing2026", "other key"]),
+    "```bibtex\n@misc{missing2026,\n  title = {TODO: Add title},\n  author = {TODO},\n  year = {TODO}\n}\n\n@misc{other-key,\n  title = {TODO: Add title},\n  author = {TODO},\n  year = {TODO}\n}\n```\n",
+  );
 });
 
 test("conflict diff keeps local and external edits aligned for merge UI", () => {
