@@ -19,6 +19,7 @@ checkSkipLinks();
 checkStatusAnnouncements();
 checkDiagnosticLabels();
 checkConflictDiffLabels();
+checkTableEditorLabels();
 
 if (issues.length > 0) {
   console.error("Accessibility guard failed:");
@@ -163,6 +164,28 @@ function checkConflictDiffLabels() {
     const pattern = new RegExp(`role\\s*=\\s*["']group["'][\\s\\S]*?:aria-label\\s*=\\s*["']conflictDiffCellLabel\\(row, '${source}'\\)["']|:aria-label\\s*=\\s*["']conflictDiffCellLabel\\(row, '${source}'\\)["'][\\s\\S]*?role\\s*=\\s*["']group["']`);
     if (!pattern.test(markup)) {
       issues.push(`${sourcePath}:1 conflict diff ${source} cell must be a named group`);
+    }
+  }
+}
+
+function checkTableEditorLabels() {
+  const grid = template.match(/<div\b[^>]*class\s*=\s*["']table-editor-grid["'][\s\S]*?<\/div>/);
+  if (!grid) {
+    issues.push(`${sourcePath}:1 table editor grid is missing`);
+    return;
+  }
+  const markup = grid[0];
+  if (!/\brole\s*=\s*["']group["']/.test(markup) || !/\baria-label\s*=\s*["']Table editor grid["']/.test(markup)) {
+    issues.push(`${sourcePath}:1 table editor grid must be a named group`);
+  }
+  for (const helper of ["tableHeaderLabel(columnIndex)", "tableCellLabel(rowIndex, columnIndex)", "tableTotalLabel(columnIndex)"]) {
+    if (!markup.includes(`:aria-label="${helper}"`)) {
+      issues.push(`${sourcePath}:1 table editor grid must use ${helper}`);
+    }
+  }
+  for (const label of ["Row ${rowIndex + 1} controls", "Sort controls for column", "Move controls for column"]) {
+    if (!markup.includes(label)) {
+      issues.push(`${sourcePath}:1 table editor grid is missing ${label} group labels`);
     }
   }
 }

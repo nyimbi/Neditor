@@ -290,7 +290,12 @@
             <section v-if="tableDraftIssues.length" class="table-issues" aria-label="Table validation">
               <p v-for="issue in tableDraftIssues" :key="issue.message" :class="issue.severity">{{ issue.message }}</p>
             </section>
-            <div class="table-editor-grid" :style="{ gridTemplateColumns: `220px repeat(${tableDraft.headers.length}, minmax(132px, 1fr)) 44px` }">
+            <div
+              class="table-editor-grid"
+              role="group"
+              aria-label="Table editor grid"
+              :style="{ gridTemplateColumns: `220px repeat(${tableDraft.headers.length}, minmax(132px, 1fr)) 44px` }"
+            >
               <span></span>
               <input
                 v-for="(_, columnIndex) in tableDraft.headers"
@@ -326,13 +331,19 @@
               </select>
               <span></span>
               <span>Sort</span>
-              <span v-for="(_, columnIndex) in tableDraft.headers" :key="`sort-${columnIndex}`" class="column-actions">
+              <span
+                v-for="(_, columnIndex) in tableDraft.headers"
+                :key="`sort-${columnIndex}`"
+                class="column-actions"
+                role="group"
+                :aria-label="`Sort controls for column ${spreadsheetColumnName(columnIndex + 1)}`"
+              >
                 <button type="button" :aria-label="`Sort column ${spreadsheetColumnName(columnIndex + 1)} ascending`" @click="sortTableRows(columnIndex, 'asc')">Asc</button>
                 <button type="button" :aria-label="`Sort column ${spreadsheetColumnName(columnIndex + 1)} descending`" @click="sortTableRows(columnIndex, 'desc')">Desc</button>
               </span>
               <span></span>
               <template v-for="(row, rowIndex) in tableDraft.rows" :key="`row-${rowIndex}`">
-                <span class="row-actions">
+                <span class="row-actions" role="group" :aria-label="`Row ${rowIndex + 1} controls`">
                   <button type="button" :disabled="rowIndex === 0" :aria-label="`Move row ${rowIndex + 1} up`" @click="moveTableRow(rowIndex, -1)">Up</button>
                   <button type="button" :disabled="rowIndex === tableDraft.rows.length - 1" :aria-label="`Move row ${rowIndex + 1} down`" @click="moveTableRow(rowIndex, 1)">Down</button>
                   <button type="button" :aria-label="`Copy row ${rowIndex + 1}`" @click="duplicateTableRow(rowIndex)">Copy</button>
@@ -348,12 +359,22 @@
                 <span></span>
               </template>
               <span>Totals</span>
-              <output v-for="(total, columnIndex) in tableColumnTotals" :key="`total-${columnIndex}`">
+              <output
+                v-for="(total, columnIndex) in tableColumnTotals"
+                :key="`total-${columnIndex}`"
+                :aria-label="tableTotalLabel(columnIndex)"
+              >
                 {{ total || "-" }}
               </output>
               <span></span>
               <span>Move column</span>
-              <span v-for="(_, columnIndex) in tableDraft.headers" :key="`move-col-${columnIndex}`" class="column-actions">
+              <span
+                v-for="(_, columnIndex) in tableDraft.headers"
+                :key="`move-col-${columnIndex}`"
+                class="column-actions"
+                role="group"
+                :aria-label="`Move controls for column ${spreadsheetColumnName(columnIndex + 1)}`"
+              >
                 <button type="button" :disabled="columnIndex === 0" :aria-label="`Move column ${spreadsheetColumnName(columnIndex + 1)} left`" @click="moveTableColumn(columnIndex, -1)">Left</button>
                 <button type="button" :disabled="columnIndex === tableDraft.headers.length - 1" :aria-label="`Move column ${spreadsheetColumnName(columnIndex + 1)} right`" @click="moveTableColumn(columnIndex, 1)">Right</button>
               </span>
@@ -3826,6 +3847,13 @@ function tableCellLabel(rowIndex: number, columnIndex: number) {
   const header = draft?.headers[columnIndex]?.trim();
   const column = spreadsheetColumnName(columnIndex + 1);
   return header ? `${header}, row ${rowIndex + 1}, column ${column}` : `Row ${rowIndex + 1}, column ${column}`;
+}
+
+function tableTotalLabel(columnIndex: number) {
+  const draft = tableDraft.value;
+  const header = draft?.headers[columnIndex]?.trim();
+  const column = spreadsheetColumnName(columnIndex + 1);
+  return header ? `Total for ${header}, column ${column}` : `Total for column ${column}`;
 }
 
 async function goToSourceTarget(target: {

@@ -38,6 +38,9 @@ Recent pushed checkpoints visible in current git history:
   screen-reader list items, labels conflict diff cells as side-specific groups,
   and extends the static accessibility guard plus browser harness assertions for
   those names.
+- This update also names the table editor grid, row/column control groups, and
+  totals so screen-reader users can navigate the dense table editing surface by
+  structure rather than visual position alone.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.
@@ -1578,6 +1581,18 @@ Diagnostic/conflict screen-reader accessibility verification:
 | `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the diagnostic/conflict accessibility update. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; diagnostic navigation and external conflict merge workflows now assert accessible list/listitem/group names. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "diagnostics\|merges external conflict" --project chromium` | Blocked locally | The Vite server started and selected the relevant workflows, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; the escalated browser install request was rejected by the auto-review layer, so no workaround was attempted and no GitHub Actions evidence was used. |
+
+Table-editor screen-reader accessibility verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails now verify the table editor grid name, header/cell/total label helpers, and row/sort/move control group labels. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding table editor grid/action/total labels. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the table editor accessibility update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating matrix, TODO, and progress logs; all local links resolved. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; the table workflows now assert table grid/action/total accessible names. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "pasted tables\|table structure" --project chromium` | Blocked locally | The Vite server started and selected the two table workflows, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence was used. |
+| `git diff --check` | Pass | No whitespace errors after the diagnostic/conflict/table accessibility updates. |
 
 ## Next Execution Order
 

@@ -2522,8 +2522,10 @@ test("edits pasted tables with sorting, formulas, and merged cells", async ({ pa
   );
   await page.getByRole("button", { name: "Replace from paste" }).click();
 
-  const tableGrid = page.locator(".table-editor-grid");
+  const tableGrid = page.getByRole("group", { name: "Table editor grid" });
   const markdownPreview = page.getByLabel("Markdown preview");
+  await expect(tableGrid.getByRole("group", { name: "Sort controls for column B" })).toBeVisible();
+  await expect(tableGrid.getByRole("group", { name: "Row 1 controls" })).toBeVisible();
   await expect(markdownPreview).toHaveValue(/Table: Regional sales \{#tbl:sales\}/);
   await expect(page.getByLabel("Revenue, row 1, column B")).toHaveValue("900");
 
@@ -2558,7 +2560,7 @@ test("edits table structure with formats and cancels draft changes", async ({ pa
   await expect(page.getByLabel("Value, row 1, column B")).toHaveValue("125000");
 
   await page.getByLabel("Column B format").selectOption("currency");
-  await expect(page.locator(".table-editor-grid output").nth(1)).toHaveText("$125000");
+  await expect(page.getByLabel("Total for Value, column B")).toHaveText("$125000");
 
   await page.getByRole("button", { name: "Add row" }).click();
   await page.getByLabel("Item, row 2, column A").fill("Cost");
@@ -2570,6 +2572,7 @@ test("edits table structure with formats and cancels draft changes", async ({ pa
 
   await page.getByRole("button", { name: "Add column" }).click();
   await page.getByLabel("Column C header").fill("Margin");
+  await expect(page.getByRole("group", { name: "Move controls for column C" })).toBeVisible();
   await page.getByLabel("Margin, row 1, column C").fill("0.42");
   await expect(markdownPreview).toHaveValue(/Margin/);
   await expect(markdownPreview).toHaveValue(/0\.42/);
