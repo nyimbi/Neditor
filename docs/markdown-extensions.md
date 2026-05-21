@@ -339,6 +339,18 @@ External engines are disabled until trusted. See
 [External transform setup](external-transforms.md) for Graphviz, D2, PlantUML,
 and Pikchr setup.
 
+PlantUML exports default to SVG. When a trusted PlantUML executable is
+configured, request PNG output per fence with `format=png`, `output=png`, or
+the `png` flag:
+
+````md
+```plantuml format=png
+@startuml
+Alice -> Bob: approve
+@enduml
+```
+````
+
 ## Export Readiness Markers
 
 Before export, NEditor validates the compiled document for issues such as:

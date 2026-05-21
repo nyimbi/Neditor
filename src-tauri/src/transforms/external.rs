@@ -30,6 +30,7 @@ pub(crate) struct ExternalTransformRequest {
     pub(crate) engine_path: Option<String>,
     pub(crate) trusted: bool,
     pub(crate) input_mode: Option<String>,
+    pub(crate) output_format: Option<String>,
     pub(crate) timeout_ms: Option<u64>,
     pub(crate) max_input_bytes: Option<usize>,
     pub(crate) max_output_bytes: Option<usize>,
@@ -134,9 +135,12 @@ pub(crate) fn run_external_transform(
     if !matches!(input_mode, "stdin" | "file") {
         return Err("External transform input_mode must be 'stdin' or 'file'.".to_string());
     }
+    let output_format =
+        normalize_external_output_format(&request.name, request.output_format.as_deref())?;
     let source_hash = sha256_hex(request.body.as_bytes());
     let (engine_identity, engine_version) = external_engine_identity(&engine_path)?;
-    let adapter = external_engine_adapter(&request.name, input_mode, None, &engine_path)?;
+    let adapter =
+        external_engine_adapter(&request.name, input_mode, output_format, None, &engine_path)?;
     let renderer_identity = adapter.cache_identity(&format!(
         "{engine_identity};{EXTERNAL_TRANSFORM_RENDERER_VERSION}"
     ));
@@ -151,6 +155,7 @@ pub(crate) fn run_external_transform(
         body: &request.body,
         engine_path: &engine_path,
         input_mode,
+        output_format,
         timeout_ms,
         max_output_bytes: output_limit,
         renderer_identity: &renderer_identity,
@@ -212,6 +217,7 @@ impl ExternalEngineAdapter {
 fn external_engine_adapter(
     name: &str,
     input_mode: &str,
+    output_format: &'static str,
     temp_path: Option<&Path>,
     engine_path: &Path,
 ) -> Result<ExternalEngineAdapter, String> {
@@ -242,13 +248,13 @@ fn external_engine_adapter(
         ("plantuml", "stdin") => Ok(ExternalEngineAdapter::stdout(
             "plantuml",
             "stdin",
-            vec!["-tsvg".to_string(), "-pipe".to_string()],
+            vec![format!("-t{output_format}"), "-pipe".to_string()],
         )),
         ("plantuml", "file") => Ok(ExternalEngineAdapter::sidecar(
             "plantuml",
             "file",
-            vec!["-tsvg".to_string(), temp],
-            "svg",
+            vec![format!("-t{output_format}"), temp],
+            output_format,
         )),
         ("pikchr", "stdin") if pikchr_uses_source_file_argument(engine_path) => {
             Ok(ExternalEngineAdapter::stdout("pikchr", "stdin", vec![temp]))
@@ -271,6 +277,27 @@ fn pikchr_uses_source_file_argument(engine_path: &Path) -> bool {
             let name = name.to_ascii_lowercase();
             name == "pikchr-cli" || name.starts_with("pikchr-cli-")
         })
+}
+
+fn normalize_external_output_format(
+    name: &str,
+    output_format: Option<&str>,
+) -> Result<&'static str, String> {
+    let requested = output_format
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("svg")
+        .to_ascii_lowercase();
+    match (name, requested.as_str()) {
+        ("plantuml", "svg" | "png") => Ok(if requested == "png" { "png" } else { "svg" }),
+        ("plantuml", _) => {
+            Err("PlantUML external output_format must be 'svg' or 'png'.".to_string())
+        }
+        (_, "svg") => Ok("svg"),
+        (_, _) => Err(format!(
+            "{name} external transform only supports SVG output in the current adapter."
+        )),
+    }
 }
 
 fn external_transform_requires_temp_input(
@@ -499,6 +526,7 @@ struct ExternalTransformExecution<'a> {
     body: &'a str,
     engine_path: &'a Path,
     input_mode: &'a str,
+    output_format: &'static str,
     timeout_ms: u64,
     max_output_bytes: usize,
     renderer_identity: &'a str,
@@ -531,8 +559,13 @@ fn execute_external_transform(
         temp_input = Some(path);
     }
 
-    let adapter =
-        external_engine_adapter(name, input_mode, temp_input.as_deref(), request.engine_path)?;
+    let adapter = external_engine_adapter(
+        name,
+        input_mode,
+        request.output_format,
+        temp_input.as_deref(),
+        request.engine_path,
+    )?;
     if let (Some(input_path), Some(output_suffix)) =
         (temp_input.as_deref(), adapter.sidecar_output_suffix)
     {
@@ -669,18 +702,36 @@ fn execute_external_transform(
         ));
     }
 
-    let output_text = String::from_utf8_lossy(stdout).to_string();
-    let rendered_output = if output_text.trim_start().starts_with('<') {
-        output_text
-            .lines()
-            .map(str::trim)
-            .collect::<Vec<_>>()
-            .join("")
+    let (rendered_output, output_kind) = if request.output_format == "png" {
+        (
+            format!(
+                "<img class=\"transform-image transform-{}-png\" alt=\"{} diagram\" src=\"data:image/png;base64,{}\"/>",
+                escape_html(name),
+                escape_html(name),
+                encode_base64(stdout)
+            ),
+            "png",
+        )
     } else {
-        format!("<pre>{}</pre>", escape_external_pre_text(&output_text))
+        let output_text = String::from_utf8_lossy(stdout).to_string();
+        let rendered = if output_text.trim_start().starts_with('<') {
+            output_text
+                .lines()
+                .map(str::trim)
+                .collect::<Vec<_>>()
+                .join("")
+        } else {
+            format!("<pre>{}</pre>", escape_external_pre_text(&output_text))
+        };
+        let output_kind = if rendered.contains("<svg") {
+            "svg"
+        } else {
+            "html"
+        };
+        (rendered, output_kind)
     };
     let html = format!(
-        "<section class=\"transform transform-{} transform-external\" data-transform=\"{}\">{rendered_output}</section>",
+        "<section class=\"transform transform-{} transform-external\" data-transform=\"{}\" data-output-kind=\"{output_kind}\">{rendered_output}</section>",
         escape_html(name),
         escape_html(name)
     );
@@ -723,6 +774,9 @@ fn execute_external_transform(
     diagnostic
         .related
         .push(format!("output_channel: {output_channel}"));
+    diagnostic
+        .related
+        .push(format!("output_format: {}", request.output_format));
     diagnostic.related.push(format!(
         "status: {}",
         status
@@ -739,7 +793,7 @@ fn execute_external_transform(
     Ok(TransformArtifact {
         id: format!("{name}-{source_hash}"),
         name: name.to_string(),
-        output_kind: if html.contains("<svg") { "svg" } else { "html" }.to_string(),
+        output_kind: output_kind.to_string(),
         output_hash,
         cache_key,
         execution_kind: "external".to_string(),
@@ -762,6 +816,29 @@ fn escape_external_pre_text(text: &str) -> String {
     escape_html(text)
         .replace("\r\n", "&#10;")
         .replace('\n', "&#10;")
+}
+
+fn encode_base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut output = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let first = chunk[0];
+        let second = *chunk.get(1).unwrap_or(&0);
+        let third = *chunk.get(2).unwrap_or(&0);
+        output.push(ALPHABET[(first >> 2) as usize] as char);
+        output.push(ALPHABET[(((first & 0b0000_0011) << 4) | (second >> 4)) as usize] as char);
+        if chunk.len() > 1 {
+            output.push(ALPHABET[(((second & 0b0000_1111) << 2) | (third >> 6)) as usize] as char);
+        } else {
+            output.push('=');
+        }
+        if chunk.len() > 2 {
+            output.push(ALPHABET[(third & 0b0011_1111) as usize] as char);
+        } else {
+            output.push('=');
+        }
+    }
+    output
 }
 
 fn transform_engine(
@@ -908,7 +985,7 @@ fn transform_adapter_profile(name: &str) -> &'static str {
         "osage" => "Graphviz osage adapter: invokes -Tsvg and captures SVG from stdout.",
         "twopi" => "Graphviz twopi adapter: invokes -Tsvg and captures SVG from stdout.",
         "d2" => "D2 adapter: invokes input-to-stdout mode with '-' as the output target.",
-        "plantuml" => "PlantUML adapter: uses -tsvg -pipe for stdin, or reads PlantUML's SVG sidecar for file mode.",
+        "plantuml" => "PlantUML adapter: uses -tsvg/-tpng with -pipe for stdin, or reads PlantUML's SVG/PNG sidecar for file mode.",
         "pikchr" => "Pikchr adapter: passes stdin directly, a temporary Pikchr source file, or a temporary source file path for pikchr-cli.",
         _ => "No external adapter; rendered by the embedded Rust engine.",
     }

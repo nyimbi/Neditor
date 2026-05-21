@@ -1341,6 +1341,25 @@ Additional Graphviz variant external-engine verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests, including the external transform settings workflow. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Additional PlantUML PNG output verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked external_transform_adapters_shape_engine_specific_invocations --lib -- --nocapture` in `src-tauri` | Pass | Adapter proof covers PlantUML SVG sidecars and PNG sidecars, including `-tpng`, sidecar `png` output, `output_format: png`, and PNG data URL embedding. |
+| `cargo test --locked compiler_uses_plantuml_png_fence_output_format --lib -- --nocapture` in `src-tauri` | Pass | Focused compiler proof routes a trusted ````plantuml format=png```` fence through file-mode external execution and emits a PNG transform artifact. |
+| `cargo test --locked external_transform_tests --lib -- --nocapture` in `src-tauri` | Pass | 12 external transform tests passed after adding PlantUML PNG output selection; installed-engine conformance still verified Graphviz variants, D2, and PlantUML SVG with Pikchr skipped because it is not installed. |
+| `cargo test --locked transform_tests --lib` in `src-tauri` | Pass | 32 transform tests passed after adding PlantUML PNG fence support. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 178 Rust library tests passed after adding PlantUML PNG output selection. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the PlantUML PNG update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after adding external transform output-format plumbing. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the transform and docs update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the docs and transform update. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails passed after the PlantUML PNG output update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating external transform docs, matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz variants, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

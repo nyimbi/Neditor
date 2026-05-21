@@ -1032,9 +1032,12 @@ Finish:
   `osage`, `twopi`, D2, and PlantUML through `pnpm run check:engines` and
   `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture`;
   Pikchr remains missing on this host.
+- PlantUML now supports fence-level PNG output selection through `format=png`,
+  `output=png`, or the `png` flag, with `compiler_uses_plantuml_png_fence_output_format`
+  proving the trusted file-mode sidecar path and PNG data URL artifact.
 - Add Windows manual evidence for all optional engines.
 - Confirm Windows `.exe` paths and package-manager shims.
-- Confirm PlantUML file mode on all platforms.
+- Confirm PlantUML SVG and PNG file mode on all platforms.
 - Confirm Pikchr stdin/file/argument mode for each supported executable shape.
 - Cache invalidation now includes adapter identity, executable path, executable
   file size/mtime, adapter arguments, input mode, renderer version, and source

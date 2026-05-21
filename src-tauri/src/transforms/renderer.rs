@@ -150,6 +150,7 @@ fn render_external_transform(
         engine_path: Some(engine_path),
         trusted: options.trusted(name),
         input_mode: options.input_mode(name),
+        output_format: external_output_format(name, fence_options),
         timeout_ms: options.timeout_ms,
         max_input_bytes: None,
         max_output_bytes: None,
@@ -176,4 +177,21 @@ fn render_external_transform(
 
 fn external_transform_supported(name: &str) -> bool {
     graphviz_command(name).is_some() || matches!(name, "pikchr" | "plantuml" | "d2")
+}
+
+fn external_output_format(name: &str, fence_options: &Value) -> Option<String> {
+    if name != "plantuml" {
+        return None;
+    }
+    if fence_options
+        .get("png")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Some("png".to_string());
+    }
+    ["format", "output", "outputFormat"]
+        .iter()
+        .find_map(|key| fence_options.get(*key).and_then(Value::as_str))
+        .map(ToString::to_string)
 }

@@ -14,6 +14,7 @@ fn external_transforms_are_trust_gated_and_limited() {
         engine_path: Some(graphviz_path.clone()),
         trusted: false,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(1024),
@@ -34,6 +35,7 @@ fn external_transforms_are_trust_gated_and_limited() {
         engine_path: Some(graphviz_path.clone()),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(3),
         max_output_bytes: Some(1024),
@@ -47,6 +49,7 @@ fn external_transforms_are_trust_gated_and_limited() {
         engine_path: Some(graphviz_path.clone()),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(3),
@@ -61,6 +64,7 @@ fn external_transforms_are_trust_gated_and_limited() {
         engine_path: Some(graphviz_path.clone()),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(1024),
@@ -121,6 +125,7 @@ fn external_transforms_are_trust_gated_and_limited() {
         engine_path: Some(graphviz_path.clone()),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(1024),
@@ -150,6 +155,7 @@ fn external_transforms_are_trust_gated_and_limited() {
         engine_path: Some(graphviz_path.clone()),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(1024),
@@ -180,6 +186,7 @@ fn external_transforms_are_trust_gated_and_limited() {
         engine_path: Some(graphviz_path),
         trusted: true,
         input_mode: Some("file".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(1024),
@@ -204,6 +211,7 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
         engine_path: Some(path_to_string(&d2)),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(2048),
@@ -227,6 +235,7 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
         engine_path: Some(path_to_string(&plantuml)),
         trusted: true,
         input_mode: Some("file".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(2048),
@@ -246,6 +255,49 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
             .related
             .iter()
             .any(|related| related == "output_channel: sidecar svg")
+    }));
+
+    let plantuml_png = write_executable_script(
+            "plantuml-png-adapter",
+            "#!/bin/sh\nlast=\"\"\nfor arg in \"$@\"; do last=\"$arg\"; done\nout=\"${last%.*}.png\"\nprintf 'png-bytes' > \"$out\"\n",
+        );
+    let plantuml_png_artifact = run_external_transform(ExternalTransformRequest {
+        name: "plantuml".to_string(),
+        body: "@startuml\nAlice -> Bob: hi\n@enduml".to_string(),
+        engine_path: Some(path_to_string(&plantuml_png)),
+        trusted: true,
+        input_mode: Some("file".to_string()),
+        output_format: Some("png".to_string()),
+        timeout_ms: Some(1000),
+        max_input_bytes: Some(1024),
+        max_output_bytes: Some(2048),
+    })
+    .expect("plantuml png file adapter transform");
+    assert_eq!(plantuml_png_artifact.output_kind, "png");
+    assert!(plantuml_png_artifact
+        .html
+        .contains("data:image/png;base64,cG5nLWJ5dGVz"));
+    assert!(plantuml_png_artifact
+        .html
+        .contains("transform-plantuml-png"));
+    assert!(plantuml_png_artifact.diagnostics.iter().any(|diagnostic| {
+        diagnostic.related.iter().any(|related| {
+            related.starts_with("adapter_args: -tpng ")
+                && related.contains("neditor-plantuml-")
+                && related.ends_with(".puml")
+        })
+    }));
+    assert!(plantuml_png_artifact.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .related
+            .iter()
+            .any(|related| related == "output_channel: sidecar png")
+    }));
+    assert!(plantuml_png_artifact.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .related
+            .iter()
+            .any(|related| related == "output_format: png")
     }));
 
     use std::os::unix::fs::PermissionsExt;
@@ -272,6 +324,7 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
         engine_path: Some(path_to_string(&pikchr_cli)),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(2048),
@@ -335,6 +388,7 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
 
     let _ = fs::remove_file(d2);
     let _ = fs::remove_file(plantuml);
+    let _ = fs::remove_file(plantuml_png);
     let _ = fs::remove_file(pikchr_cli);
 }
 
@@ -362,6 +416,7 @@ fn external_transform_cache_invalidates_when_trusted_executable_changes() {
         engine_path: Some(script_path.clone()),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(4096),
@@ -390,6 +445,7 @@ fn external_transform_cache_invalidates_when_trusted_executable_changes() {
         engine_path: Some(script_path),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(4096),
@@ -516,6 +572,7 @@ fn external_transform_conformance_runs_installed_engines() {
             engine_path: Some(path_to_string(&path)),
             trusted: true,
             input_mode: Some(case.input_mode.to_string()),
+            output_format: None,
             timeout_ms: Some(15_000),
             max_input_bytes: Some(16_384),
             max_output_bytes: Some(1_048_576),
@@ -668,6 +725,49 @@ fn compiler_uses_trusted_graphviz_variant_transform_preferences() {
     let _ = fs::remove_file(neato);
 }
 
+#[cfg(unix)]
+#[test]
+fn compiler_uses_plantuml_png_fence_output_format() {
+    let plantuml = write_executable_script(
+            "compiler-plantuml-png-adapter",
+            "#!/bin/sh\nlast=\"\"\nfor arg in \"$@\"; do last=\"$arg\"; done\nout=\"${last%.*}.png\"\nprintf 'png-bytes' > \"$out\"\n",
+        );
+    let response = compile_with_options(
+        CompileRequest {
+            text:
+                "---\ntitle: PlantUML PNG\n---\n# PlantUML PNG\n```plantuml format=png\n@startuml\nAlice -> Bob: hi\n@enduml\n```\n"
+                    .to_string(),
+            file_path: None,
+        },
+        &json!({
+            "transformEnginePaths": { "plantuml": path_to_string(&plantuml) },
+            "trustedTransformEngines": { "plantuml": true },
+            "transformInputModes": { "plantuml": "file" },
+            "transformTimeoutMs": 1000
+        }),
+    );
+
+    let artifact = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "plantuml")
+        .expect("plantuml artifact");
+    assert_eq!(artifact.execution_kind, "external");
+    assert_eq!(artifact.output_kind, "png");
+    assert_eq!(artifact.input_mode, "file");
+    assert_eq!(
+        artifact.options.get("format").and_then(Value::as_str),
+        Some("png")
+    );
+    assert!(artifact.html.contains("data:image/png;base64,cG5nLWJ5dGVz"));
+    assert!(response.html.contains("data-output-kind=\"png\""));
+    assert!(response.html.contains("transform-plantuml-png"));
+    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("plantuml external transform completed")));
+    let _ = fs::remove_file(plantuml);
+}
+
 #[test]
 fn compiler_falls_back_when_external_transform_is_untrusted() {
     let cat = Path::new("/bin/cat");
@@ -765,6 +865,7 @@ fn external_transform_rejects_non_executable_engine_path() {
         engine_path: Some(path_to_string(&script)),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(1024),
@@ -799,6 +900,7 @@ fn external_transform_timeout_covers_blocked_stdin() {
         engine_path: Some(path_to_string(&script)),
         trusted: true,
         input_mode: Some("stdin".to_string()),
+        output_format: None,
         timeout_ms: Some(50),
         max_input_bytes: Some(1024 * 1024),
         max_output_bytes: Some(1024),
@@ -837,6 +939,7 @@ fn external_transform_exit_errors_include_stderr() {
         engine_path: Some(path_to_string(&script)),
         trusted: true,
         input_mode: Some("file".to_string()),
+        output_format: None,
         timeout_ms: Some(1000),
         max_input_bytes: Some(1024),
         max_output_bytes: Some(1024),
