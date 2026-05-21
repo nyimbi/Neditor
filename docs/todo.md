@@ -870,7 +870,10 @@ Needed desktop smoke coverage:
   readiness, HTML/PDF/DOCX/PPTX/Markdown bundle export, sidecar manifests, and
   reveal command construction without requiring a GUI session.
 - App boots as a Tauri desktop shell. Covered on this macOS host by
-  `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`.
+  `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`, which writes
+  `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured
+  output, and `processAlive: true` evidence when the app survives the bounded
+  launch window.
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
   script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native

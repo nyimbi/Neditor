@@ -237,7 +237,10 @@ command workflow smoke that opens, watches, compiles, checks readiness, exports,
 and reveals real local files through the Rust command surface. On machines that
 allow GUI app startup, run
 `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` for a bounded
-native launch smoke.
+native launch smoke. The launch smoke writes
+`.tmp/desktop-smoke/launch-report.json` with the binary path, PID, elapsed
+window, captured output, and `processAlive: true` evidence when the app remains
+running until the timeout.
 
 `pnpm run test:tauri-webdriver` runs the Tauri WebDriver desktop smoke on
 Windows and Linux hosts with `tauri-driver` plus the platform WebDriver

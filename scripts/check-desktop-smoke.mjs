@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -121,6 +121,7 @@ function runNativeCommandWorkflowSmoke() {
 
 async function launchDesktop(path) {
   await new Promise((resolveLaunch) => {
+    const startedAt = Date.now();
     const child = spawn(path, [], {
       cwd: root,
       env: {
@@ -129,12 +130,34 @@ async function launchDesktop(path) {
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
+    const report = {
+      platform: process.platform,
+      binary: relative(path),
+      pid: child.pid,
+      timeoutMs: launchTimeoutMs,
+      status: "started",
+      observedMs: 0,
+      processAlive: false,
+      stdout: "",
+      stderr: "",
+    };
     let stdout = "";
     let stderr = "";
     let settled = false;
     const timeout = setTimeout(() => {
       if (settled) return;
       settled = true;
+      report.observedMs = Date.now() - startedAt;
+      report.processAlive = isProcessAlive(child.pid);
+      report.stdout = stdout.trim();
+      report.stderr = stderr.trim();
+      if (!report.processAlive) {
+        report.status = "not-running-at-timeout";
+        issues.push(`desktop launch process was not alive after ${report.observedMs}ms`);
+      } else {
+        report.status = "survived-until-timeout";
+      }
+      writeLaunchReport(report);
       child.kill("SIGTERM");
       resolveLaunch();
     }, launchTimeoutMs);
@@ -148,6 +171,10 @@ async function launchDesktop(path) {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      report.status = "spawn-error";
+      report.observedMs = Date.now() - startedAt;
+      report.stderr = error.message;
+      writeLaunchReport(report);
       issues.push(`desktop launch failed: ${error.message}`);
       resolveLaunch();
     });
@@ -155,11 +182,35 @@ async function launchDesktop(path) {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      if (code !== 0) {
-        const detail = [stdout.trim(), stderr.trim()].filter(Boolean).join("\n");
-        issues.push(`desktop launch exited early with code ${code ?? "none"} signal ${signal ?? "none"}${detail ? `: ${detail}` : ""}`);
-      }
+      report.status = "exited-early";
+      report.observedMs = Date.now() - startedAt;
+      report.processAlive = false;
+      report.stdout = stdout.trim();
+      report.stderr = stderr.trim();
+      writeLaunchReport(report);
+      const detail = [stdout.trim(), stderr.trim()].filter(Boolean).join("\n");
+      issues.push(
+        `desktop launch exited before the ${launchTimeoutMs}ms smoke window with code ${
+          code ?? "none"
+        } signal ${signal ?? "none"}${detail ? `: ${detail}` : ""}`,
+      );
       resolveLaunch();
     });
   });
+}
+
+function isProcessAlive(pid) {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function writeLaunchReport(report) {
+  const directory = join(root, ".tmp", "desktop-smoke");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "launch-report.json"), `${JSON.stringify(report, null, 2)}\n`);
 }
