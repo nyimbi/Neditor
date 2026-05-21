@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `4c6f306 Label the
-  table editor for screen readers`
+- Latest inspected committed baseline before this update: `770cd11 Add local
+  desktop build smoke proof`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -46,6 +46,10 @@ Recent pushed checkpoints visible in current git history:
   desktop binary produced by `./node_modules/.bin/tauri build --no-bundle`. The
   same harness has an opt-in bounded GUI launch mode for hosts that permit
   desktop app startup.
+- This update hardens high-contrast and reduced-motion accessibility by adding
+  static CSS guardrails for black-on-white high-contrast colors, focus outlines,
+  and zero-duration motion, plus browser harness assertions for the computed
+  settings state.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.
@@ -1612,6 +1616,18 @@ Desktop artifact smoke verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Blocked locally | Bounded GUI launch smoke requires elevated desktop app launch permission; the escalation request was rejected by the auto-review layer, so no workaround was attempted. |
 | `git diff --check` | Pass | No whitespace errors after the desktop smoke harness update. |
+
+High-contrast/reduced-motion accessibility verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:a11y` | Pass | Static Vue/CSS accessibility guardrails now verify high-contrast shell/control/focus styles and reduced-motion data/media-query styles. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding high-contrast focus CSS and settings workflow assertions. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the accessibility guard update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating matrix, TODO, and progress logs; all local links resolved. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests; the settings workflow now asserts high-contrast computed colors and reduced-motion zero-duration transitions. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "persists editor settings" --project chromium` | Blocked locally | The Vite server started and selected the settings workflow, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence was used. |
+| `git diff --check` | Pass | No whitespace errors after the high-contrast/reduced-motion accessibility update. |
 
 ## Next Execution Order
 

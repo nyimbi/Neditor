@@ -4087,6 +4087,12 @@ select:hover {
   background: #fff6a3;
 }
 
+.app-shell[data-high-contrast="true"] :focus-visible,
+.app-shell[data-high-contrast="true"] .skip-links a:focus {
+  outline: 3px solid #000000;
+  outline-offset: 2px;
+}
+
 .app-shell[data-reduced-motion="true"] * {
   scroll-behavior: auto;
   transition-duration: 0s;

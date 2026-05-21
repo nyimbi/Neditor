@@ -1422,6 +1422,9 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await expect(appShell).toHaveAttribute("data-high-contrast", "true");
   await expect(appShell).toHaveAttribute("data-reduced-motion", "true");
   await expect(previewPane).toHaveAttribute("data-preview-theme", "dark");
+  await expect.poll(() => appShell.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(255, 255, 255)");
+  await expect.poll(() => page.getByRole("button", { name: "Commands" }).evaluate((element) => getComputedStyle(element).borderTopColor)).toBe("rgb(0, 0, 0)");
+  await expect.poll(() => editorContent.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0s");
   await expect(previewDocument).toHaveAttribute("style", /font-family: Georgia, serif; font-size: 19px; line-height: 1\.9/);
   await expect.poll(() => editorContent.evaluate((element) => getComputedStyle(element).fontSize)).toBe("18px");
 
@@ -1442,6 +1445,8 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await expect(appShell).toHaveAttribute("data-high-contrast", "true");
   await expect(appShell).toHaveAttribute("data-reduced-motion", "true");
   await expect(previewPane).toHaveAttribute("data-preview-theme", "dark");
+  await expect.poll(() => appShell.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(255, 255, 255)");
+  await expect.poll(() => editorContent.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0s");
   await expect.poll(() => editorContent.evaluate((element) => getComputedStyle(element).fontSize)).toBe("18px");
   await expect(page.getByLabel("Word wrap")).not.toBeChecked();
   await expect(page.getByLabel("Line numbers")).not.toBeChecked();

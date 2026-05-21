@@ -20,6 +20,7 @@ checkStatusAnnouncements();
 checkDiagnosticLabels();
 checkConflictDiffLabels();
 checkTableEditorLabels();
+checkContrastMotionCss();
 
 if (issues.length > 0) {
   console.error("Accessibility guard failed:");
@@ -190,6 +191,39 @@ function checkTableEditorLabels() {
   }
 }
 
+function checkContrastMotionCss() {
+  if (!/:data-high-contrast\s*=\s*["']store\.highContrast \? 'true' : 'false'["']/.test(template)) {
+    issues.push(`${sourcePath}:1 app shell must expose high-contrast state`);
+  }
+  if (!/:data-reduced-motion\s*=\s*["']store\.reducedMotion \? 'true' : 'false'["']/.test(template)) {
+    issues.push(`${sourcePath}:1 app shell must expose reduced-motion state`);
+  }
+  const highContrastBlock = cssBlock(".app-shell[data-high-contrast=\"true\"]");
+  if (!highContrastBlock.includes("color: #000000") || !highContrastBlock.includes("background: #ffffff")) {
+    issues.push(`${sourcePath}:1 high contrast shell must force black-on-white colors`);
+  }
+  const highContrastControls = cssBlock(".app-shell[data-high-contrast=\"true\"] .titlebar");
+  for (const declaration of ["border-color: #000000", "color: #000000", "background: #ffffff"]) {
+    if (!highContrastControls.includes(declaration)) {
+      issues.push(`${sourcePath}:1 high contrast controls must include ${declaration}`);
+    }
+  }
+  const highContrastFocus = cssBlock(".app-shell[data-high-contrast=\"true\"] :focus-visible");
+  if (!highContrastFocus.includes("outline: 3px solid #000000")) {
+    issues.push(`${sourcePath}:1 high contrast focus state must use a black outline`);
+  }
+  const reducedMotionBlock = cssBlock(".app-shell[data-reduced-motion=\"true\"] *");
+  for (const declaration of ["scroll-behavior: auto", "transition-duration: 0s", "animation-duration: 0s", "animation-iteration-count: 1"]) {
+    if (!reducedMotionBlock.includes(declaration)) {
+      issues.push(`${sourcePath}:1 reduced-motion mode must include ${declaration}`);
+    }
+  }
+  const mediaReducedMotionBlock = cssBlock("@media (prefers-reduced-motion: reduce)");
+  if (!mediaReducedMotionBlock.includes(".app-shell *") || !mediaReducedMotionBlock.includes("transition-duration: 0s")) {
+    issues.push(`${sourcePath}:1 prefers-reduced-motion media query must disable app shell transitions`);
+  }
+}
+
 function hasAccessibleName(attrs) {
   return /\b(:?aria-label|aria-labelledby|title)\s*=/.test(attrs);
 }
@@ -217,4 +251,23 @@ function lineFor(index) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function cssBlock(selector) {
+  const start = source.indexOf(selector);
+  if (start < 0) return "";
+  const open = source.indexOf("{", start);
+  if (open < 0) return "";
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(open + 1, index);
+      }
+    }
+  }
+  return "";
 }

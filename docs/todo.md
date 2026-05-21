@@ -1302,6 +1302,10 @@ Current evidence:
   cells, totals, row controls, sort controls, and move-column controls. The
   static accessibility guard checks those label helpers, and the table workflow
   harness asserts the exposed grid/action/total names.
+- High-contrast and reduced-motion modes now have static CSS guardrails. The
+  settings workflow harness asserts black-on-white high-contrast computed
+  colors and zero-duration motion when the preferences are enabled and after
+  reload.
 
 Finish:
 
@@ -1310,7 +1314,6 @@ Finish:
 - Run modal focus workflows on a host with Playwright Chromium installed, then
   broaden coverage for nested conflict/table-editor controls.
 - ARIA labels and roles for custom controls.
-- High contrast and reduced motion behavior.
 - Broader screen-reader labels for deeper editor/preview interactions.
 - Broader automated checks where practical plus manual checklist evidence.
 
