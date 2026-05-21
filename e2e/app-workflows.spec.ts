@@ -2805,3 +2805,65 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
   await expect(page.getByRole("list", { name: "Export readiness diagnostics" })).toContainText("target:pptx");
   await expect(page.locator(".status-bar")).toContainText("1 errors block export");
 });
+
+test("publishes and hands off extended export targets", async ({ page }) => {
+  await page.locator(".cm-content").click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.keyboard.insertText(
+    [
+      "---",
+      "title: Publishing Handoff",
+      "version: 1.0.0",
+      "status: approved",
+      "approvedBy: QA",
+      "approvedAt: 2026-05-21",
+      "---",
+      "",
+      "# Publishing Handoff",
+      "",
+      "A package-ready update with a table, link, and equation.",
+      "",
+      "| Metric | Value |",
+      "| --- | ---: |",
+      "| Revenue | 42 |",
+      "",
+      "See [the appendix](#appendix).",
+      "",
+      "$$x = y + z$$",
+    ].join("\n"),
+  );
+  await expect.poll(() => editorText(page)).toContain("Publishing Handoff");
+
+  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await page.getByLabel("View mode").selectOption("export");
+  const targetSelect = page.getByLabel("Target");
+  const exportPreview = page.getByRole("region", { name: "Export preview summary" });
+  const exportResult = page.getByRole("region", { name: "Export result" });
+
+  const targets = [
+    { value: "blog", label: "Blog package", path: "/exports/publishing.blog.zip" },
+    { value: "substack", label: "Substack package", path: "/exports/publishing.substack.zip" },
+    { value: "latex", label: "LaTeX", path: "/exports/publishing.tex" },
+    { value: "google-docs", label: "Google Docs package", path: "/exports/publishing.google-docs.zip" },
+  ];
+
+  for (const target of targets) {
+    await expect(targetSelect.locator(`option[value="${target.value}"]`)).toHaveText(target.label);
+    await targetSelect.selectOption(target.value);
+    await expect(targetSelect).toHaveValue(target.value);
+    await expect(exportPreview).toContainText(`${target.value.toUpperCase()} export preview`);
+
+    await page.getByRole("button", { name: "Prepare for export" }).click();
+    await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
+    await expect(page.locator(".sidebar").getByText(`"export_target": "${target.value}"`)).toBeVisible();
+    await expect(page.locator(".sidebar").getByText('"includeManifest": true')).toBeVisible();
+    await expect(exportPreview).toContainText("ready");
+
+    await queueDialogSelection(page, target.path);
+    await page.getByRole("button", { name: "Export document" }).click();
+    await expect(exportResult).toContainText(`Output: ${target.path}`);
+    await expect(exportResult).toContainText(`Manifest: ${target.path}.manifest.json`);
+    await expect(exportResult).toContainText(`Mock ${target.value} export wrote ${target.path}`);
+    await expect(page.locator(".status-bar")).toContainText(`Exported ${target.path} with manifest ${target.path}.manifest.json`);
+  }
+});

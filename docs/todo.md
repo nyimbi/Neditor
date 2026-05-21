@@ -137,8 +137,9 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 41 Chromium browser workbench workflows
-  locally on 2026-05-21 using the project-local Playwright browser cache.
+- `pnpm run test:e2e`: passed all 42 Chromium browser workbench workflows
+  locally on 2026-05-21 using the project-local Playwright browser cache,
+  including blog/Substack/LaTeX/Google Docs export-target handoffs.
 - `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture`:
   passed and proves no-bibliography citation readiness emits a broad source
   warning plus precise per-key missing citation diagnostics that are copied
@@ -576,7 +577,7 @@ Resolved local environment caveat:
 - Earlier local Playwright runs were blocked by browser-cache and macOS launch
   permissions. As of 2026-05-21, `pnpm run check:e2e-env` passes the
   project-local Chromium launch preflight and `pnpm run test:e2e` passes all
-  41 Chromium workbench workflows locally.
+  42 Chromium workbench workflows locally.
 
 ## P0 - Immediate Blockers
 
@@ -610,7 +611,7 @@ Current local verification evidence:
   command tests, including blog/Substack package exports, LaTeX export, Google
   Docs package export, and native command workflow smoke.
 - 2026-05-21: `pnpm run check:e2e-env` and `pnpm run test:e2e` passed locally;
-  the browser run covered all 41 Chromium workbench workflows.
+  the browser run covered all 42 Chromium workbench workflows.
 - 2026-05-21: `pnpm run verify:local` passed after hardening the `reveal_path`
   command builder. The run covered frontend typecheck, frontend unit tests,
   project structure, accessibility, dependency admission, Markdown links, Rust
@@ -725,17 +726,18 @@ Completion criteria:
 
 ### 2. Keep The Browser Workflow Lane Passing While Expanding It
 
-Status: current committed browser workflow discovery is healthy; execution
-coverage remains partial on this host.
+Status: current committed browser workflow discovery and execution are healthy;
+normal sandboxed Chromium launch may still fail on macOS, so use the project
+wrapper from a terminal/session that permits Chromium launch.
 
 Current host evidence:
 
-- 2026-05-21: `pnpm exec playwright test --list` lists 41 Chromium workflow
+- 2026-05-21: `pnpm exec playwright test --list` lists 42 Chromium workflow
   tests in `e2e/app-workflows.spec.ts`.
 - 2026-05-21: `pnpm run check:e2e-env` finds project-local Playwright
-  Chromium, but this macOS session blocks Chromium launch with a Mach
-  bootstrap permission denial. Run browser workflows from a normal
-  terminal/session that permits Chromium launch.
+  Chromium.
+- 2026-05-21: `pnpm run test:e2e` passed all 42 Chromium browser workflows,
+  including the blog/Substack/LaTeX/Google Docs export-target handoff test.
 
 Current browser coverage in `e2e/app-workflows.spec.ts`:
 
