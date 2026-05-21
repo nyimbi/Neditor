@@ -377,6 +377,8 @@ info:
 servers:
   - url: https://api.example.test
     description: Production
+security:
+  - ApiKeyAuth: []
 paths:
   /accounts:
     parameters:
@@ -388,6 +390,10 @@ paths:
     get:
       summary: List accounts
       operationId: listAccounts
+      deprecated: true
+      externalDocs:
+        description: Runbook
+        url: https://docs.example.test/accounts
       tags:
         - Accounts
       parameters:
@@ -405,7 +411,24 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Account"
+              examples:
+                success:
+                  summary: Example account list
+          headers:
+            X-RateLimit-Remaining:
+              description: Remaining calls
+              schema:
+                type: integer
+          links:
+            accountById:
+              operationId: getAccount
+              description: Fetch a single account
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
   schemas:
     Account:
       type: object
@@ -427,9 +450,40 @@ components:
   "description": "Account payload contract",
   "type": "object",
   "required": ["id", "transactions"],
+  "additionalProperties": false,
+  "patternProperties": {
+    "^x-": { "type": "string", "description": "Extension value" }
+  },
+  "dependentRequired": {
+    "b": ["cc"]
+  },
+  "dependentSchemas": {
+    "cc": {
+      "properties": {
+        "b": { "type": "string", "minLength": 3 }
+      }
+    }
+  },
   "properties": {
     "id": { "type": "string", "format": "uuid", "description": "Account id" },
     "balance": { "type": "number", "minimum": 0, "default": 0 },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "tuple": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "string", "description": "Code" },
+        { "type": "number", "multipleOf": 0.01 }
+      ]
+    },
+    "payment": {
+      "oneOf": [
+        { "type": "string", "const": "cash" },
+        { "$ref": "#/definitions/CardPayment" }
+      ]
+    },
     "transactions": {
       "type": "array",
       "items": {
@@ -482,11 +536,27 @@ components:
     assert!(html.contains("Ledger API"));
     assert!(html.contains("https://api.example.test"));
     assert!(html.contains("listAccounts"));
+    assert!(html.contains("deprecated"));
+    assert!(html.contains("Runbook"));
+    assert!(html.contains("ApiKeyAuth"));
+    assert!(html.contains("Security schemes"));
+    assert!(html.contains("X-API-Key"));
     assert!(html.contains("tenant"));
     assert!(html.contains("array&lt;ref Account&gt;"));
+    assert!(html.contains("examples: success"));
+    assert!(html.contains("X-RateLimit-Remaining"));
+    assert!(html.contains("getAccount"));
     assert!(html.contains("Component schemas"));
     assert!(html.contains("transform-json-schema"));
     assert!(html.contains("Account Payload"));
+    assert!(html.contains("additionalProperties: false"));
+    assert!(html.contains("dependentRequired: b -&gt; cc"));
+    assert!(html.contains("patternProperties[^x-]"));
+    assert!(html.contains("dependentSchemas[cc].b"));
+    assert!(html.contains("tuple.prefixItems[1]"));
+    assert!(html.contains("multipleOf: 0.01"));
+    assert!(html.contains("payment.oneOf[2]"));
+    assert!(html.contains("ref: CardPayment"));
     assert!(html.contains("transactions[]"));
     assert!(html.contains("enum: credit, debit"));
 
@@ -494,9 +564,18 @@ components:
     let pdf_text = String::from_utf8_lossy(&pdf);
     assert!(pdf_text.contains("Ledger API"));
     assert!(pdf_text.contains("listAccounts"));
+    assert!(pdf_text.contains("ApiKeyAuth"));
+    assert!(pdf_text.contains("X-RateLimit-Remaining"));
+    assert!(pdf_text.contains("getAccount"));
     assert!(pdf_text.contains("tenant"));
     assert!(pdf_text.contains("Account id"));
     assert!(pdf_text.contains("Account Payload"));
+    assert!(pdf_text.contains("additionalProperties:"));
+    assert!(pdf_text.contains("false;"));
+    assert!(pdf_text.contains("patternProperties[^x-]"));
+    assert!(pdf_text.contains("dependentSchemas[cc].b"));
+    assert!(pdf_text.contains("tuple.prefixItems[1]"));
+    assert!(pdf_text.contains("payment.oneOf[2]"));
     assert!(pdf_text.contains("transactions[]"));
     assert!(pdf_text.contains("enum: credit, debit"));
 
@@ -504,15 +583,24 @@ components:
     let docx_document = zip_entry_text(&docx, "word/document.xml");
     assert!(docx_document.contains("Ledger API"));
     assert!(docx_document.contains("listAccounts"));
+    assert!(docx_document.contains("ApiKeyAuth"));
+    assert!(docx_document.contains("X-RateLimit-Remaining"));
     assert!(docx_document.contains("Account id"));
     assert!(docx_document.contains("Account Payload"));
+    assert!(docx_document.contains("patternProperties[^x-]"));
+    assert!(docx_document.contains("tuple.prefixItems[1]"));
+    assert!(docx_document.contains("payment.oneOf[2]"));
     assert!(docx_document.contains("transactions[]"));
 
     let pptx = render_pptx_bytes(&response, &options).expect("pptx api schema transform pack");
     let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
     assert!(pptx_slides.contains("API Schema Transform Pack"));
     assert!(pptx_slides.contains("Ledger API"));
+    assert!(pptx_slides.contains("ApiKeyAuth"));
+    assert!(pptx_slides.contains("X-RateLimit-Remaining"));
     assert!(pptx_slides.contains("Account Payload"));
+    assert!(pptx_slides.contains("patternProperties[^x-]"));
+    assert!(pptx_slides.contains("tuple.prefixItems[1]"));
 
     let mut bundle_manifest = response.export_manifest.clone();
     bundle_manifest.export_options = options.clone();
@@ -520,7 +608,11 @@ components:
     let bundled_text = zip_entry_text(&bundle, "document.txt");
     let bundled_artifacts = zip_entry_text(&bundle, "transform-artifacts.json");
     assert!(bundled_text.contains("Ledger API"));
+    assert!(bundled_text.contains("ApiKeyAuth"));
+    assert!(bundled_text.contains("X-RateLimit-Remaining"));
     assert!(bundled_text.contains("Account Payload"));
+    assert!(bundled_text.contains("patternProperties[^x-]"));
+    assert!(bundled_text.contains("payment.oneOf[2]"));
     for name in ["openapi", "json-schema"] {
         assert!(bundled_artifacts.contains(&format!("\"name\": \"{name}\"")));
     }

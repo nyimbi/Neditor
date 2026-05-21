@@ -87,7 +87,7 @@ pub(crate) fn render_openapi_html(
     }
     html.push_str(&render_openapi_servers(&value));
     html.push_str(
-        "<table class=\"transform-table openapi\"><thead><tr><th>Method</th><th>Path</th><th>Operation</th><th>Parameters</th><th>Request body</th><th>Responses</th></tr></thead><tbody>",
+        "<table class=\"transform-table openapi\"><thead><tr><th>Method</th><th>Path</th><th>Operation</th><th>Security</th><th>Parameters</th><th>Request body</th><th>Responses</th></tr></thead><tbody>",
     );
     if let Some(paths) = value.get("paths").and_then(Value::as_object) {
         for (path, path_item) in paths {
@@ -118,10 +118,13 @@ pub(crate) fn render_openapi_html(
                         parameters.extend(operation_parameters.iter());
                     }
                     html.push_str(&format!(
-                        "<tr><td><code>{}</code></td><td><code>{}</code></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                        "<tr><td><code>{}</code></td><td><code>{}</code></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                         escape_html(&method.to_ascii_uppercase()),
                         escape_html(path),
                         operation_label,
+                        render_openapi_security(
+                            operation.get("security").or_else(|| value.get("security"))
+                        ),
                         render_openapi_parameters(&parameters),
                         render_openapi_request_body(operation.get("requestBody")),
                         render_openapi_responses(operation.get("responses"))
@@ -131,6 +134,7 @@ pub(crate) fn render_openapi_html(
         }
     }
     html.push_str("</tbody></table>");
+    html.push_str(&render_openapi_security_schemes(&value));
     html.push_str(&render_openapi_components(&value));
     html.push_str("</section>");
     html
@@ -264,13 +268,79 @@ fn operation_label(summary: &str, operation_id: &str, operation: &Value) -> Stri
     if !operation_id.is_empty() {
         parts.push(format!("<code>{}</code>", escape_html(operation_id)));
     }
+    if operation
+        .get("deprecated")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        parts.push("<small>deprecated</small>".to_string());
+    }
     if !tags.is_empty() {
         parts.push(format!("<small>{tags}</small>"));
+    }
+    if let Some(external_docs) = operation.get("externalDocs").and_then(Value::as_object) {
+        let url = external_docs
+            .get("url")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let description = external_docs
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or("External docs");
+        if !url.is_empty() {
+            parts.push(format!(
+                "<small>{}: <code>{}</code></small>",
+                escape_html(description),
+                escape_html(url)
+            ));
+        }
     }
     if parts.is_empty() {
         "&nbsp;".to_string()
     } else {
         parts.join("<br>")
+    }
+}
+
+fn render_openapi_security(security: Option<&Value>) -> String {
+    let Some(security) = security.and_then(Value::as_array) else {
+        return "&nbsp;".to_string();
+    };
+    if security.is_empty() {
+        return "none".to_string();
+    }
+    let items = security
+        .iter()
+        .filter_map(Value::as_object)
+        .flat_map(|requirement| {
+            requirement.iter().map(|(scheme, scopes)| {
+                let scopes = scopes
+                    .as_array()
+                    .map(|scopes| {
+                        scopes
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .map(escape_html)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    })
+                    .unwrap_or_default();
+                if scopes.is_empty() {
+                    format!("<li><code>{}</code></li>", escape_html(scheme))
+                } else {
+                    format!(
+                        "<li><code>{}</code> scopes: {scopes}</li>",
+                        escape_html(scheme)
+                    )
+                }
+            })
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    if items.is_empty() {
+        "&nbsp;".to_string()
+    } else {
+        format!("<ul>{items}</ul>")
     }
 }
 
@@ -373,11 +443,16 @@ fn render_openapi_responses(responses: Option<&Value>) -> String {
                 .and_then(Value::as_str)
                 .unwrap_or("");
             let content = render_openapi_content(response.get("content"));
-            let detail = [escape_html(description), content]
-                .into_iter()
-                .filter(|part| !part.is_empty())
-                .collect::<Vec<_>>()
-                .join(" ");
+            let detail = [
+                escape_html(description),
+                content,
+                render_openapi_headers(response.get("headers")),
+                render_openapi_links(response.get("links")),
+            ]
+            .into_iter()
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
             format!(
                 "<li><code>{}</code>: {}</li>",
                 escape_html(status),
@@ -408,18 +483,170 @@ fn render_openapi_content(content: Option<&Value>) -> String {
                 .get("schema")
                 .map(schema_type_summary)
                 .unwrap_or_default();
-            if schema.is_empty() {
+            let examples = render_openapi_media_examples(media);
+            if schema.is_empty() && examples.is_empty() {
                 format!("<code>{}</code>", escape_html(content_type))
             } else {
-                format!(
-                    "<code>{}</code> {}",
-                    escape_html(content_type),
-                    escape_html(&schema)
-                )
+                [
+                    format!(
+                        "<code>{}</code> {}",
+                        escape_html(content_type),
+                        escape_html(&schema)
+                    ),
+                    examples,
+                ]
+                .into_iter()
+                .filter(|part| !part.trim().is_empty())
+                .collect::<Vec<_>>()
+                .join(" ")
             }
         })
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+fn render_openapi_media_examples(media: &Value) -> String {
+    let mut names = Vec::new();
+    if media.get("example").is_some() {
+        names.push("example".to_string());
+    }
+    if let Some(examples) = media.get("examples").and_then(Value::as_object) {
+        names.extend(examples.keys().cloned());
+    }
+    if names.is_empty() {
+        String::new()
+    } else {
+        format!("examples: {}", escape_html(&names.join(", ")))
+    }
+}
+
+fn render_openapi_headers(headers: Option<&Value>) -> String {
+    let Some(headers) = headers.and_then(Value::as_object) else {
+        return String::new();
+    };
+    let items = headers
+        .iter()
+        .map(|(name, header)| {
+            if let Some(reference) = header.get("$ref").and_then(Value::as_str) {
+                return format!(
+                    "<li><code>{}</code>: ref {}</li>",
+                    escape_html(name),
+                    escape_html(&reference_tail(reference))
+                );
+            }
+            let description = header
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let schema = header
+                .get("schema")
+                .map(schema_type_summary)
+                .unwrap_or_default();
+            [
+                format!("<code>{}</code>", escape_html(name)),
+                escape_html(description),
+                escape_html(&schema),
+            ]
+            .into_iter()
+            .filter(|part| !part.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+        })
+        .filter(|item| !item.is_empty())
+        .map(|item| format!("<li>{item}</li>"))
+        .collect::<Vec<_>>()
+        .join("");
+    if items.is_empty() {
+        String::new()
+    } else {
+        format!("headers:<ul>{items}</ul>")
+    }
+}
+
+fn render_openapi_links(links: Option<&Value>) -> String {
+    let Some(links) = links.and_then(Value::as_object) else {
+        return String::new();
+    };
+    let items = links
+        .iter()
+        .map(|(name, link)| {
+            if let Some(reference) = link.get("$ref").and_then(Value::as_str) {
+                return format!(
+                    "<li><code>{}</code>: ref {}</li>",
+                    escape_html(name),
+                    escape_html(&reference_tail(reference))
+                );
+            }
+            let target = link
+                .get("operationId")
+                .or_else(|| link.get("operationRef"))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let description = link
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            [
+                format!("<code>{}</code>", escape_html(name)),
+                escape_html(target),
+                escape_html(description),
+            ]
+            .into_iter()
+            .filter(|part| !part.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+        })
+        .filter(|item| !item.is_empty())
+        .map(|item| format!("<li>{item}</li>"))
+        .collect::<Vec<_>>()
+        .join("");
+    if items.is_empty() {
+        String::new()
+    } else {
+        format!("links:<ul>{items}</ul>")
+    }
+}
+
+fn render_openapi_security_schemes(value: &Value) -> String {
+    let Some(schemes) = value
+        .pointer("/components/securitySchemes")
+        .and_then(Value::as_object)
+    else {
+        return String::new();
+    };
+    if schemes.is_empty() {
+        return String::new();
+    }
+    let items = schemes
+        .iter()
+        .map(|(name, scheme)| {
+            let kind = scheme.get("type").and_then(Value::as_str).unwrap_or("");
+            let location = scheme.get("in").and_then(Value::as_str).unwrap_or("");
+            let header_name = scheme.get("name").and_then(Value::as_str).unwrap_or("");
+            let flows = scheme
+                .get("flows")
+                .and_then(Value::as_object)
+                .map(|flows| flows.keys().cloned().collect::<Vec<_>>().join(", "))
+                .unwrap_or_default();
+            let parts = [
+                escape_html(kind),
+                escape_html(location),
+                escape_html(header_name),
+                if flows.is_empty() {
+                    String::new()
+                } else {
+                    format!("flows: {}", escape_html(&flows))
+                },
+            ]
+            .into_iter()
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+            format!("<li><code>{}</code> {parts}</li>", escape_html(name))
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    format!("<section class=\"api-security\"><h4>Security schemes</h4><ul>{items}</ul></section>")
 }
 
 fn render_openapi_components(value: &Value) -> String {
@@ -496,6 +723,16 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
             );
         }
     }
+    if let Some(properties) = schema.get("patternProperties").and_then(Value::as_object) {
+        for (pattern, child_schema) in properties {
+            collect_schema_rows(
+                &schema_child_path(field, &format!("patternProperties[{pattern}]")),
+                child_schema,
+                false,
+                rows,
+            );
+        }
+    }
     if let Some(items) = schema.get("items") {
         let child_prefix = if prefix.is_empty() || prefix == "root" {
             "items[]".to_string()
@@ -504,6 +741,36 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
         };
         collect_schema_rows(&child_prefix, items, false, rows);
     }
+    if let Some(items) = schema.get("prefixItems").and_then(Value::as_array) {
+        for (index, item) in items.iter().enumerate() {
+            collect_schema_rows(
+                &schema_child_path(field, &format!("prefixItems[{}]", index + 1)),
+                item,
+                false,
+                rows,
+            );
+        }
+    }
+    for keyword in ["additionalProperties", "contains", "propertyNames"] {
+        if let Some(child_schema) = schema.get(keyword).filter(|value| value.is_object()) {
+            collect_schema_rows(
+                &schema_child_path(field, keyword),
+                child_schema,
+                false,
+                rows,
+            );
+        }
+    }
+    if let Some(dependent_schemas) = schema.get("dependentSchemas").and_then(Value::as_object) {
+        for (property, child_schema) in dependent_schemas {
+            collect_schema_rows(
+                &schema_child_path(field, &format!("dependentSchemas[{property}]")),
+                child_schema,
+                false,
+                rows,
+            );
+        }
+    }
     for keyword in ["allOf", "anyOf", "oneOf"] {
         if let Some(variants) = schema.get(keyword).and_then(Value::as_array) {
             for (index, variant) in variants.iter().enumerate() {
@@ -511,6 +778,14 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
                 collect_schema_rows(&child_prefix, variant, false, rows);
             }
         }
+    }
+}
+
+fn schema_child_path(parent: &str, child: &str) -> String {
+    if parent.is_empty() || parent == "root" {
+        child.to_string()
+    } else {
+        format!("{parent}.{child}")
     }
 }
 
@@ -559,8 +834,15 @@ fn schema_constraints(schema: &Value) -> String {
         "maxLength",
         "minItems",
         "maxItems",
+        "minProperties",
+        "maxProperties",
+        "multipleOf",
         "default",
         "example",
+        "readOnly",
+        "writeOnly",
+        "deprecated",
+        "uniqueItems",
     ] {
         if let Some(value) = schema.get(key) {
             constraints.push(format!("{key}: {}", structured_value_summary(value)));
@@ -571,6 +853,39 @@ fn schema_constraints(schema: &Value) -> String {
     }
     if let Some(reference) = schema.get("$ref").and_then(Value::as_str) {
         constraints.push(format!("ref: {}", reference_tail(reference)));
+    }
+    if let Some(additional_properties) = schema.get("additionalProperties") {
+        if additional_properties.is_boolean() {
+            constraints.push(format!(
+                "additionalProperties: {}",
+                structured_value_summary(additional_properties)
+            ));
+        }
+    }
+    if let Some(dependent_required) = schema.get("dependentRequired").and_then(Value::as_object) {
+        let summary = dependent_required
+            .iter()
+            .map(|(property, requirements)| {
+                let required = requirements
+                    .as_array()
+                    .map(|items| {
+                        items
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    })
+                    .unwrap_or_default();
+                format!("{property} -> {required}")
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+        if !summary.is_empty() {
+            constraints.push(format!("dependentRequired: {summary}"));
+        }
+    }
+    if let Some(examples) = schema.get("examples").and_then(Value::as_array) {
+        constraints.push(format!("examples: {}", value_list_summary(examples)));
     }
     constraints.join("; ")
 }

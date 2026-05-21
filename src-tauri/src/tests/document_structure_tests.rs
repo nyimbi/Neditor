@@ -675,6 +675,8 @@ info:
 servers:
   - url: https://api.example.test
     description: Production
+security:
+  - ApiKeyAuth: []
 paths:
   /accounts:
     parameters:
@@ -686,8 +688,12 @@ paths:
     get:
       summary: List accounts
       operationId: listAccounts
+      deprecated: true
       tags:
         - Accounts
+      externalDocs:
+        description: Runbook
+        url: https://docs.example.test/accounts
       parameters:
         - name: limit
           in: query
@@ -703,6 +709,18 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Account"
+              examples:
+                success:
+                  summary: Example account list
+          headers:
+            X-RateLimit-Remaining:
+              description: Remaining calls
+              schema:
+                type: integer
+          links:
+            accountById:
+              operationId: getAccount
+              description: Fetch a single account
     post:
       summary: Create account
       requestBody:
@@ -711,10 +729,17 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/Account"
+            example:
+              id: "11111111-1111-1111-1111-111111111111"
       responses:
         "201":
           description: Created account
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
   schemas:
     Account:
       type: object
@@ -742,9 +767,40 @@ components:
   "description": "Account payload",
   "type": "object",
   "required": ["id", "transactions"],
+  "additionalProperties": false,
+  "patternProperties": {
+    "^x-": { "type": "string", "description": "Extension value" }
+  },
+  "dependentRequired": {
+    "b": ["cc"]
+  },
+  "dependentSchemas": {
+    "cc": {
+      "properties": {
+        "b": { "type": "string", "minLength": 3 }
+      }
+    }
+  },
   "properties": {
     "id": { "type": "string", "format": "uuid", "description": "Account id" },
     "balance": { "type": "number", "minimum": 0, "default": 0 },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "tuple": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "string", "description": "Code" },
+        { "type": "number", "multipleOf": 0.01 }
+      ]
+    },
+    "payment": {
+      "oneOf": [
+        { "type": "string", "const": "cash" },
+        { "$ref": "#/definitions/CardPayment" }
+      ]
+    },
     "transactions": {
       "type": "array",
       "items": {
@@ -768,9 +824,17 @@ components:
     assert!(response.html.contains("https://api.example.test"));
     assert!(response.html.contains("List accounts"));
     assert!(response.html.contains("listAccounts"));
+    assert!(response.html.contains("deprecated"));
+    assert!(response.html.contains("Runbook"));
+    assert!(response.html.contains("ApiKeyAuth"));
+    assert!(response.html.contains("Security schemes"));
+    assert!(response.html.contains("X-API-Key"));
     assert!(response.html.contains("tenant"));
     assert!(response.html.contains("limit"));
     assert!(response.html.contains("application/json"));
+    assert!(response.html.contains("examples: success"));
+    assert!(response.html.contains("X-RateLimit-Remaining"));
+    assert!(response.html.contains("getAccount"));
     assert!(response.html.contains("array&lt;ref Account&gt;"));
     assert!(response.html.contains("Component schemas"));
     assert!(response.html.contains("owner.email"));
@@ -779,6 +843,14 @@ components:
     assert!(response.html.contains("transactions[]"));
     assert!(response.html.contains("format: uuid"));
     assert!(response.html.contains("minimum: 0"));
+    assert!(response.html.contains("additionalProperties: false"));
+    assert!(response.html.contains("dependentRequired: b -&gt; cc"));
+    assert!(response.html.contains("patternProperties[^x-]"));
+    assert!(response.html.contains("dependentSchemas[cc].b"));
+    assert!(response.html.contains("tuple.prefixItems[1]"));
+    assert!(response.html.contains("multipleOf: 0.01"));
+    assert!(response.html.contains("payment.oneOf[2]"));
+    assert!(response.html.contains("ref: CardPayment"));
     assert!(response.html.contains("enum: credit, debit"));
 }
 

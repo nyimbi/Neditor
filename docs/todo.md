@@ -1484,6 +1484,11 @@ Current evidence:
 - OpenAPI and JSON Schema transform proof now covers structured documentation
   artifacts, semantic table caption preservation, output hashes, source ranges,
   HTML, PDF, DOCX, PPTX, and Markdown bundle evidence.
+- OpenAPI rendering now covers security requirements, deprecated operations,
+  external docs, response media examples, response headers, response links, and
+  security schemes; JSON Schema rendering now covers pattern properties, tuple
+  `prefixItems`, dependent required/dependent schemas, `additionalProperties`,
+  and `oneOf` composition across the export artifact family.
 - Front matter documentation now calls out that metadata must be a YAML mapping
   and that invalid YAML/list/scalar metadata produces source-ranged diagnostics.
 - `pnpm run check:docs` discovers README plus all top-level docs Markdown files
