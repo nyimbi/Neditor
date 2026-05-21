@@ -66,6 +66,9 @@ Recent pushed checkpoints visible in current git history:
   glossary, review-comment, or AI-provenance appendices now produce
   manifest-backed info diagnostics when the document has no matching content,
   while populated appendices remain clean.
+- This update tightens the dependency-admission guard so NEditor stays MIT
+  licensed in the root `LICENSE`, npm package metadata, Cargo crate metadata,
+  and Tauri desktop bundle metadata.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.

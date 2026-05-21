@@ -26,13 +26,35 @@ const forbiddenLicenseTokens = [
 
 const packageJson = JSON.parse(readText("package.json"));
 const cargoToml = readText("src-tauri/Cargo.toml");
+const tauriConfig = JSON.parse(readText("src-tauri/tauri.conf.json"));
 const licenseText = readText("LICENSE");
 const admission = readText("docs/dependency-admission.md");
 const admittedRows = parseAdmissionRows(admission);
 
 requireEqual(packageJson.license, "MIT", "package.json must keep NEditor under MIT");
 requireIncludes(cargoToml, 'license = "MIT"', "src-tauri/Cargo.toml must keep NEditor under MIT");
-requireIncludes(licenseText, "MIT License", "LICENSE must contain the MIT license text");
+requireEqual(tauriConfig.bundle?.license, "MIT", "src-tauri/tauri.conf.json bundle license must stay MIT");
+requireEqual(
+  tauriConfig.bundle?.licenseFile,
+  "../LICENSE",
+  "src-tauri/tauri.conf.json bundle licenseFile must point at the root LICENSE",
+);
+requireIncludes(licenseText, "MIT License", "LICENSE must contain the MIT license title");
+requireIncludes(
+  licenseText,
+  "Copyright (c) 2026 NEditor Contributors",
+  "LICENSE must name the NEditor copyright holder",
+);
+requireIncludes(
+  licenseText,
+  "Permission is hereby granted, free of charge, to any person obtaining a copy",
+  "LICENSE must contain the MIT permission grant",
+);
+requireIncludes(
+  licenseText,
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND',
+  "LICENSE must contain the MIT warranty disclaimer",
+);
 
 const manifestDependencies = [
   ...javascriptManifestDependencies(packageJson),
