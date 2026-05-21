@@ -1,5 +1,6 @@
 use crate::{
     compile_with_options,
+    compiler_support::supported_citation_style,
     compiler_types::{
         export_progress_steps, export_readiness_summary, ExportProgressStep, ExportReadinessSummary,
     },
@@ -289,18 +290,10 @@ fn validate_export_settings(
             Some("Use html, pdf, docx, pptx, or markdown-bundle."),
         ));
     }
-    if options
-        .get("watermark")
-        .is_some_and(|value| !value.is_string())
-    {
-        diagnostics.push(diag(
-            "error",
-            "Export watermark must be a string.",
-            None,
-            None,
-            Some("Use a text watermark or remove the option."),
-        ));
-    }
+    validate_optional_string(options, "watermark", "Export watermark", diagnostics);
+    validate_brand_color_option(options, diagnostics);
+    validate_default_citation_style_option(options, diagnostics);
+    validate_default_brand_profile_option(options, diagnostics);
     for option in [
         "includeManifest",
         "includeStyles",
@@ -311,6 +304,9 @@ fn validate_export_settings(
         "includeComments",
         "includeProvenance",
         "includeAgenda",
+        "warnOnDirtyGit",
+        "includeCoverPage",
+        "includePageNumbers",
     ] {
         if options.get(option).is_some_and(|value| !value.is_boolean()) {
             diagnostics.push(diag(
@@ -338,6 +334,136 @@ fn validate_export_settings(
     }
     validate_transform_export_settings(options, diagnostics);
     validate_target_specific_export_options(target, options, diagnostics);
+}
+
+fn validate_optional_string(
+    options: &Value,
+    key: &str,
+    label: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> Option<String> {
+    let value = options.get(key)?;
+    let Some(text) = value.as_str() else {
+        diagnostics.push(diag(
+            "error",
+            format!("{label} must be a string."),
+            None,
+            None,
+            Some("Use a text value or remove the option."),
+        ));
+        return None;
+    };
+    Some(text.to_string())
+}
+
+fn validate_brand_color_option(options: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {
+    let Some(color) = validate_optional_string(options, "brandColor", "brandColor", diagnostics)
+    else {
+        return;
+    };
+    if !color.trim().is_empty() && !is_hex_color(&color) {
+        diagnostics.push(diag(
+            "error",
+            "brandColor must be a hex color such as #275DA8.",
+            None,
+            None,
+            Some("Use the color picker value or remove the option."),
+        ));
+    }
+}
+
+fn validate_default_citation_style_option(
+    options: &Value,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(value) = options.get("defaultCitationStyle") else {
+        return;
+    };
+    let Some(style) = value.as_str() else {
+        diagnostics.push(diag(
+            "error",
+            "defaultCitationStyle must be a string.",
+            None,
+            None,
+            Some("Use title, author-year, key, or numeric."),
+        ));
+        return;
+    };
+    if !supported_citation_style(style) {
+        diagnostics.push(diag(
+            "error",
+            "defaultCitationStyle must be title, author-year, key, or numeric.",
+            None,
+            None,
+            Some("Choose one of the built-in citation styles or remove the default."),
+        ));
+    }
+}
+
+fn validate_default_brand_profile_option(
+    options: &Value,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(value) = options.get("defaultBrandProfile") else {
+        return;
+    };
+    let Some(fields) = value.as_object() else {
+        diagnostics.push(diag(
+            "error",
+            "defaultBrandProfile must be an object.",
+            None,
+            None,
+            Some("Use brand profile fields such as name, color, logo, font, header, and footer."),
+        ));
+        return;
+    };
+    for key in [
+        "name",
+        "logo",
+        "font",
+        "header",
+        "footer",
+        "watermark",
+        "legalDisclaimer",
+    ] {
+        if fields.get(key).is_some_and(|field| !field.is_string()) {
+            diagnostics.push(diag(
+                "error",
+                format!("defaultBrandProfile.{key} must be a string."),
+                None,
+                None,
+                Some("Use string values for brand profile defaults."),
+            ));
+        }
+    }
+    if let Some(color) = fields.get("color") {
+        let Some(color) = color.as_str() else {
+            diagnostics.push(diag(
+                "error",
+                "defaultBrandProfile.color must be a string.",
+                None,
+                None,
+                Some("Use a hex color string such as #275DA8."),
+            ));
+            return;
+        };
+        if !color.trim().is_empty() && !is_hex_color(color) {
+            diagnostics.push(diag(
+                "error",
+                "defaultBrandProfile.color must be a hex color such as #275DA8.",
+                None,
+                None,
+                Some("Use the brand color picker value or remove the default color."),
+            ));
+        }
+    }
+}
+
+fn is_hex_color(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    matches!(bytes.len(), 4 | 7)
+        && bytes.first() == Some(&b'#')
+        && bytes[1..].iter().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn validate_target_specific_export_options(

@@ -381,6 +381,8 @@ Before export, NEditor validates the compiled document for issues such as:
 - Missing includes, media, citations, labels, captions, and references.
 - Formula and table formula errors.
 - Transform engine trust, path, timeout, stderr, output, and cache details.
+- Export option shape, including citation-style defaults, brand colors, brand
+  profile fields, and boolean toggles.
 - Unresolved comments and malformed change notes.
 - Incomplete AI provenance or missing human review metadata.
 

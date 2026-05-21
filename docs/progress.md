@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `cb0685a Name the
-  editor and preview work surfaces`
+- Latest inspected committed baseline before this update: `5542f8f Block
+  ambiguous reference labels before export`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -58,6 +58,10 @@ Recent pushed checkpoints visible in current git history:
   source-ranged duplicate-label diagnostics with first-occurrence context, and
   export readiness copies those diagnostics into manifests so ambiguous cross
   references cannot leave the editor as audit-ready deliverables.
+- This update also hardens export option readiness: malformed default citation
+  styles, non-hex brand colors, malformed default brand profile fields,
+  dirty-Git warning flags, and legacy cover/page-number aliases now fail
+  readiness with manifest-backed diagnostics instead of being ignored.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.

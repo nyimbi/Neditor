@@ -800,6 +800,67 @@ fn prepare_for_export_validates_target_and_options() {
 }
 
 #[test]
+fn prepare_for_export_validates_brand_and_default_style_options() {
+    let source = "---\ntitle: Branded Export\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Branded Export\n".to_string();
+    let valid = prepare_for_export(PrepareExportRequest {
+        text: source.clone(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({
+            "warnOnDirtyGit": false,
+            "brandColor": "#123ABC",
+            "defaultCitationStyle": "numeric",
+            "includeCoverPage": true,
+            "includePageNumbers": true,
+            "defaultBrandProfile": {
+                "name": "Acme",
+                "color": "#275DA8",
+                "logo": "data:image/svg+xml;base64,PHN2Zy8+",
+                "font": "Inter",
+                "header": "{{title}}",
+                "footer": "Page {{page}} of {{pages}}",
+                "watermark": "INTERNAL",
+                "legalDisclaimer": "Internal only."
+            }
+        }),
+    });
+    assert!(valid.ready, "{:#?}", valid.diagnostics);
+
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source,
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({
+            "warnOnDirtyGit": "no",
+            "brandColor": "blue",
+            "defaultCitationStyle": "apa",
+            "includeCoverPage": "yes",
+            "includePageNumbers": "yes",
+            "defaultBrandProfile": {
+                "color": "blue",
+                "logo": 42,
+                "header": false
+            }
+        }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 8, "{:#?}", report.diagnostics);
+    for expected in [
+        "brandColor must be a hex color",
+        "defaultCitationStyle must be title, author-year, key, or numeric",
+        "defaultBrandProfile.logo must be a string",
+        "defaultBrandProfile.header must be a string",
+        "defaultBrandProfile.color must be a hex color",
+        "warnOnDirtyGit must be true or false",
+        "includeCoverPage must be true or false",
+        "includePageNumbers must be true or false",
+    ] {
+        assert_readiness_contains(&report, expected);
+    }
+}
+
+#[test]
 fn prepare_for_export_reports_target_specific_pptx_blockers() {
     let draft_presentation =
         "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: in-review\n---\n# Board Deck\n"

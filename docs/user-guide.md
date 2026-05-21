@@ -203,6 +203,10 @@ Export options cover manifests, styles, syntax highlighting, cover pages, page
 numbers, layout presets, comments appendix, AI provenance appendix, glossary
 appendix, PPTX agenda, citation style, brand profile, dirty-Git warnings,
 transform engine settings, and draft watermark behavior.
+Readiness also audits those options before writing: invalid citation-style
+defaults, non-hex brand colors, malformed brand profile fields, and non-boolean
+export toggles are reported in the same manifest-backed diagnostics as document
+content problems.
 
 When `includeManifest` is enabled, NEditor writes sidecar evidence beside the
 artifact. The manifest records source hashes, include hashes, export options,

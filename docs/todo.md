@@ -966,6 +966,10 @@ Current evidence:
 - Target-specific option audits now report non-blocking info diagnostics when
   valid options are ignored by the selected target, including non-PPTX agenda
   options and Markdown bundle render-only options.
+- Export option audits now reject malformed readiness settings before writing:
+  invalid default citation styles, non-hex brand colors, malformed default
+  brand profile fields, dirty-Git warning flags, and legacy cover/page-number
+  aliases all produce manifest-backed diagnostics.
 - Readiness now warns when generated index or glossary sections are requested
   but no index terms or glossary entries exist, and the diagnostics are copied
   into export manifest readiness.
@@ -1005,8 +1009,8 @@ Readiness should validate and report:
   readiness audit test coverage exists for export settings; external transform
   tests cover runtime stderr, missing output, output limits, and cache identity.
 - Export target options and target-specific blockers. Focused Rust coverage now
-  proves the PPTX approved-metadata blocker; more target-specific option
-  combinations remain.
+  proves the PPTX approved-metadata blocker and malformed brand/citation
+  option shapes; more target-specific option combinations remain.
 - Target-specific option no-op visibility. Focused Rust coverage now proves
   valid-but-ignored options are surfaced as info diagnostics without blocking
   readiness.
