@@ -231,6 +231,10 @@ Recent pushed checkpoints visible in current git history:
 - This update adds `pnpm run check:a11y` as a static accessibility guard for
   the Vue workbench template and fixes exposed labeling gaps in modal close
   buttons, command-palette search, and conflict merge-line controls.
+- This update adds visible-on-focus skip links for keyboard users, makes the
+  command bar, workspace, sidebar, Markdown source, live preview, and status
+  bar programmatically focusable skip targets, extends `pnpm run check:a11y` to
+  guard those targets, and adds a Playwright workflow for skip-link focus.
 - This update adds
   `performance_tests::compiler_stress_handles_large_documents_with_many_artifacts`,
   which stress-compiles a large Markdown source with nested includes, many
@@ -1518,6 +1522,16 @@ Direct export sidecar manifest verification:
 | `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz variants, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
+
+Keyboard skip-link accessibility verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails now verify accessible controls, dialog labeling, and required skip-link targets for commands, workspace, sidebar, source, preview, and status. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding skip-link focus handling and target landmarks. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the accessibility update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery now lists 39 Chromium workflow tests, including `exposes keyboard skip links to primary workbench regions`. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "skip links" --project chromium` | Blocked locally | The Vite server started, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence used. |
 
 ## Next Execution Order
 

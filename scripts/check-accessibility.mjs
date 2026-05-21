@@ -15,6 +15,7 @@ const issues = [];
 checkButtons();
 checkFormControls();
 checkDialogs();
+checkSkipLinks();
 
 if (issues.length > 0) {
   console.error("Accessibility guard failed:");
@@ -65,6 +66,34 @@ function checkDialogs() {
     }
     if (!hasAccessibleName(attrs)) {
       issues.push(`${sourcePath}:${lineFor(match.index)} dialog needs aria-label or aria-labelledby`);
+    }
+  }
+}
+
+function checkSkipLinks() {
+  const skipLinks = template.match(/<nav\b[^>]*class\s*=\s*["'][^"']*\bskip-links\b[^"']*["'][\s\S]*?<\/nav>/);
+  if (!skipLinks) {
+    issues.push(`${sourcePath}:1 skip-links navigation is missing`);
+    return;
+  }
+  const hrefPattern = /href\s*=\s*["']#([^"']+)["']/g;
+  const targets = [...skipLinks[0].matchAll(hrefPattern)].map((match) => match[1]);
+  const requiredTargets = [
+    "main-commands",
+    "document-workspace",
+    "document-sidebar",
+    "markdown-source",
+    "live-preview",
+    "document-status",
+  ];
+  for (const target of requiredTargets) {
+    if (!targets.includes(target)) {
+      issues.push(`${sourcePath}:1 skip-links navigation is missing #${target}`);
+      continue;
+    }
+    const targetPattern = new RegExp(`\\bid\\s*=\\s*["']${target}["'][^>]*\\btabindex\\s*=\\s*["']-1["']|\\btabindex\\s*=\\s*["']-1["'][^>]*\\bid\\s*=\\s*["']${target}["']`);
+    if (!targetPattern.test(template)) {
+      issues.push(`${sourcePath}:1 skip target #${target} must exist and be programmatically focusable`);
     }
   }
 }

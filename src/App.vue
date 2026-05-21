@@ -6,6 +6,15 @@
     :data-high-contrast="store.highContrast ? 'true' : 'false'"
     :data-reduced-motion="store.reducedMotion ? 'true' : 'false'"
   >
+    <nav class="skip-links" aria-label="Keyboard shortcuts">
+      <a href="#main-commands" @click="focusSkipTarget">Skip to commands</a>
+      <a href="#document-workspace" @click="focusSkipTarget">Skip to workspace</a>
+      <a href="#document-sidebar" @click="focusSkipTarget">Skip to sidebar</a>
+      <a href="#markdown-source" @click="focusSkipTarget">Skip to source</a>
+      <a href="#live-preview" @click="focusSkipTarget">Skip to preview</a>
+      <a href="#document-status" @click="focusSkipTarget">Skip to status</a>
+    </nav>
+
     <header class="titlebar">
       <section class="document-tabs" aria-label="Open documents">
         <section
@@ -52,7 +61,7 @@
       </section>
     </header>
 
-    <nav class="command-bar" aria-label="Main commands">
+    <nav id="main-commands" class="command-bar" aria-label="Main commands" tabindex="-1">
       <button type="button" @click="store.newDocument">New</button>
       <button type="button" @click="openDocument">Open</button>
       <button type="button" @click="openFolder">Open Folder</button>
@@ -126,8 +135,8 @@
       </ul>
     </section>
 
-    <main ref="workspacePane" class="workspace" :class="`mode-${store.mode}`" :style="workspaceStyle">
-      <aside class="sidebar" aria-label="Document workspace">
+    <main id="document-workspace" ref="workspacePane" class="workspace" :class="`mode-${store.mode}`" :style="workspaceStyle" tabindex="-1">
+      <aside id="document-sidebar" class="sidebar" aria-label="Document workspace" tabindex="-1">
         <template v-if="store.sidebar === 'files'">
           <h2>Workspace</h2>
           <button type="button" @click="openFolder">Open folder</button>
@@ -948,7 +957,7 @@
         </template>
       </aside>
 
-      <section v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation'" class="editor-pane" aria-label="Markdown source">
+      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation'" class="editor-pane" aria-label="Markdown source" tabindex="-1">
         <div ref="editorHost" class="editor-host"></div>
       </section>
 
@@ -968,10 +977,12 @@
 
       <section
         ref="previewPane"
+        id="live-preview"
         v-show="store.mode !== 'source' && store.mode !== 'focus'"
         class="preview-pane"
         :data-preview-theme="store.previewTheme"
         aria-label="Live preview"
+        tabindex="-1"
         @scroll="syncEditorScrollFromPreview"
       >
         <section v-if="store.mode === 'export'" class="export-preview-summary" aria-label="Export preview summary">
@@ -1001,7 +1012,7 @@
       </section>
     </main>
 
-    <footer class="status-bar">
+    <footer id="document-status" class="status-bar" tabindex="-1">
       <span>{{ store.statusMessage }}</span>
       <span v-if="store.externalConflict" class="conflict-actions">
         <button type="button" @click="conflictOpen = true">Compare</button>
@@ -2506,6 +2517,17 @@ function handlePaneSplitterKeydown(event: KeyboardEvent) {
   }
 }
 
+function focusSkipTarget(event: Event) {
+  const link = event.currentTarget as HTMLAnchorElement | null;
+  const targetId = link?.hash?.slice(1);
+  if (!targetId) return;
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView({ block: "nearest", inline: "nearest" });
+  target.focus({ preventScroll: true });
+}
+
 function runEditorCommand(command: (view: EditorView) => boolean) {
   if (!editorView) return;
   command(editorView);
@@ -3855,6 +3877,35 @@ select:hover {
     animation-duration: 0s;
     animation-iteration-count: 1;
   }
+}
+
+.skip-links {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.skip-links a {
+  transform: translateY(-180%);
+  border: 2px solid #18212f;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: #ffffff;
+  color: #18212f;
+  font-weight: 700;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.skip-links a:focus {
+  transform: translateY(0);
+  outline: 3px solid #f6c343;
+  outline-offset: 2px;
 }
 
 .titlebar,

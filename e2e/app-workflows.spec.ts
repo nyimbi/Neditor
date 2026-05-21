@@ -1211,6 +1211,23 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.locator(".sidebar").getByRole("heading", { name: "Outline" })).toBeVisible();
 });
 
+test("exposes keyboard skip links to primary workbench regions", async ({ page }) => {
+  for (const [linkName, targetSelector] of [
+    ["Skip to commands", "#main-commands"],
+    ["Skip to workspace", "#document-workspace"],
+    ["Skip to sidebar", "#document-sidebar"],
+    ["Skip to source", "#markdown-source"],
+    ["Skip to preview", "#live-preview"],
+    ["Skip to status", "#document-status"],
+  ] as const) {
+    const skipLink = page.getByRole("link", { name: linkName });
+    await skipLink.focus();
+    await expect(skipLink).toBeFocused();
+    await skipLink.press("Enter");
+    await expect(page.locator(targetSelector)).toBeFocused();
+  }
+});
+
 test("syncs editor and preview scrolling and jumps preview headings to source", async ({ page }) => {
   const longPreviewDocument = [
     "---",

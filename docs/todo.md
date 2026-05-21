@@ -1271,14 +1271,19 @@ Status: partial automated guard exists; full accessibility audit remains open.
 Current evidence:
 
 - `pnpm run check:a11y` checks `src/App.vue` for accessible button names,
-  form-control labels, and dialog labels/modal state.
+  form-control labels, dialog labels/modal state, and required skip-link
+  targets.
 - Modal close buttons, command-palette search, and conflict merge-line controls
   now have explicit labels exposed to assistive technology.
+- The workbench now exposes visible-on-focus skip links to the command bar,
+  workspace, sidebar, Markdown source, live preview, and status bar. Each
+  target is programmatically focusable, and the browser workflow harness now
+  lists a skip-link focus test for those primary regions.
 
 Finish:
 
-- Keyboard-only navigation through toolbar, sidebar, tabs, editor, preview,
-  modals, command palette, table editor, and conflict UI.
+- Complete keyboard-only navigation through tabs, modals, command palette,
+  table editor, conflict UI, and deeper editor/preview interactions.
 - Focus management in all modals.
 - ARIA labels and roles for custom controls.
 - High contrast and reduced motion behavior.
