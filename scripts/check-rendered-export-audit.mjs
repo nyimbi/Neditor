@@ -397,47 +397,68 @@ function collectMacQuickLookProof(issues, assertions) {
   if (process.platform !== "darwin") return;
   const qlmanage = spawnSync("qlmanage", ["-h"], { stdio: "ignore" });
   if (qlmanage.status !== 0) {
-    assertions.push({ scope: "macos-quicklook-pdf", assertion: "qlmanage available", passed: false });
-    issues.push("qlmanage is unavailable for macOS Quick Look PDF proof");
+    assertions.push({ scope: "macos-quicklook", assertion: "qlmanage available", passed: false });
+    issues.push("qlmanage is unavailable for macOS Quick Look proof");
     return;
   }
   const quicklookDir = join(auditDir, "quicklook");
   rmSync(quicklookDir, { recursive: true, force: true });
   mkdirSync(quicklookDir, { recursive: true });
-  const result = spawnSync(
-    "qlmanage",
-    ["-t", "-s", "900", "-o", quicklookDir, join(auditDir, "rendered-export-audit.pdf")],
+
+  const nativeArtifacts = [
     {
-      encoding: "utf8",
-      timeout: 15_000,
-    },
-  );
-  const output = [result.stdout?.trim(), result.stderr?.trim()].filter(Boolean).join("\n");
-  const thumbnail = join(quicklookDir, "rendered-export-audit.pdf.png");
-  if (output.includes("sandbox initialization failed: Operation not permitted")) {
-    assertions.push({
       scope: "macos-quicklook-pdf",
       assertion: "renders PDF thumbnail through Quick Look",
-      passed: false,
-      skipped: true,
-      reason: "qlmanage cannot initialize its sandbox when launched from this Node verifier on the current host",
+      path: "rendered-export-audit.pdf",
+    },
+    {
+      scope: "macos-quicklook-docx",
+      assertion: "renders DOCX thumbnail through Quick Look",
+      path: "rendered-export-audit.docx",
+    },
+    {
+      scope: "macos-quicklook-pptx",
+      assertion: "renders PPTX thumbnail through Quick Look",
+      path: "rendered-export-audit.pptx",
+    },
+  ];
+
+  for (const artifact of nativeArtifacts) {
+    const result = spawnSync(
+      "qlmanage",
+      ["-t", "-s", "900", "-o", quicklookDir, join(auditDir, artifact.path)],
+      {
+        encoding: "utf8",
+        timeout: 15_000,
+      },
+    );
+    const output = [result.stdout?.trim(), result.stderr?.trim()].filter(Boolean).join("\n");
+    const thumbnail = join(quicklookDir, `${artifact.path}.png`);
+    if (output.includes("sandbox initialization failed: Operation not permitted")) {
+      assertions.push({
+        scope: artifact.scope,
+        assertion: artifact.assertion,
+        passed: false,
+        skipped: true,
+        reason: "qlmanage cannot initialize its sandbox when launched from this Node verifier on the current host",
+      });
+      continue;
+    }
+    const passed =
+      result.status === 0 &&
+      existsSync(thumbnail) &&
+      statSync(thumbnail).isFile() &&
+      statSync(thumbnail).size > 10_000;
+    assertions.push({
+      scope: artifact.scope,
+      assertion: artifact.assertion,
+      passed,
+      thumbnail: relativeToAudit(thumbnail),
+      bytes: existsSync(thumbnail) ? statSync(thumbnail).size : 0,
     });
-    return;
-  }
-  const passed =
-    result.status === 0 &&
-    existsSync(thumbnail) &&
-    statSync(thumbnail).isFile() &&
-    statSync(thumbnail).size > 10_000;
-  assertions.push({
-    scope: "macos-quicklook-pdf",
-    assertion: "renders PDF thumbnail through Quick Look",
-    passed,
-    thumbnail: relativeToAudit(thumbnail),
-    bytes: existsSync(thumbnail) ? statSync(thumbnail).size : 0,
-  });
-  if (!passed) {
-    issues.push(`macOS Quick Look did not render a meaningful PDF thumbnail${output ? `:\n${output}` : ""}`);
+    if (!passed) {
+      issues.push(`macOS Quick Look did not render a meaningful thumbnail for ${artifact.path}${output ? `:\n${output}` : ""}`);
+    }
   }
 }
 
