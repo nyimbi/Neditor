@@ -1492,6 +1492,10 @@ Current evidence:
 - OpenAPI callback, webhook, and discriminator details now flow through the
   native renderer and export artifacts; JSON Schema conditional branches and
   `$defs` rows now flow through the same semantic-table export path.
+- Direct export sidecar manifest proof now covers HTML, PDF, DOCX, PPTX, and
+  Markdown bundle targets with structured JSON equality between the written
+  sidecar and returned manifest, exact output paths, actual output SHA-256
+  hashes, readiness, and progress-step parity.
 - Front matter documentation now calls out that metadata must be a YAML mapping
   and that invalid YAML/list/scalar metadata produces source-ranged diagnostics.
 - `pnpm run check:docs` discovers README plus all top-level docs Markdown files

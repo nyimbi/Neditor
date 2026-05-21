@@ -1501,6 +1501,24 @@ OpenAPI callbacks/webhooks and JSON Schema dialect verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
+Direct export sidecar manifest verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked export_document_writes_optional_sidecar_manifest --lib -- --nocapture` in `src-tauri` | Pass | Focused direct-export proof covers HTML, PDF, DOCX, PPTX, and Markdown bundle sidecar manifests, structured sidecar/response manifest equality, exact output paths, actual output SHA-256 hashes, readiness, and progress-step parity. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 19 export-command tests passed after hardening direct sidecar manifest parity assertions. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | 184 Rust library tests passed after the direct export sidecar manifest proof update. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the export command test update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the export command test update. |
+| `cargo clippy --locked --all-targets -- -D warnings` in `src-tauri` | Pass | Rust static analysis passed with no warnings. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the docs/test update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the direct sidecar manifest evidence update. |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails passed after the update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating matrix, TODO, and progress logs; all local links resolved. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 still reports Graphviz variants, D2, and PlantUML installed; Pikchr remains a missing optional engine. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 38 Chromium workflow tests. |
+| `git diff --check` | Pass | No whitespace errors in the slice. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

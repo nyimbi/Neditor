@@ -1,5 +1,6 @@
 use super::*;
-use crate::export_commands::ExportReadinessReport;
+use crate::export_commands::{ExportReadinessReport, ExportResponse};
+use std::path::Path;
 
 #[test]
 fn prepare_for_export_blocks_warning_cleanliness() {
@@ -411,8 +412,9 @@ fn export_document_writes_optional_sidecar_manifest() {
     })
     .expect("successful html export");
 
-    let manifest_path = response.manifest_path.expect("manifest path");
-    let manifest_text = fs::read_to_string(&manifest_path).expect("manifest file");
+    let manifest_path = response.manifest_path.as_deref().expect("manifest path");
+    let manifest_text = fs::read_to_string(manifest_path).expect("manifest file");
+    let output_bytes = fs::read(&output).expect("html output bytes");
     assert!(output.exists());
     assert!(manifest_text.contains("\"document_title\": \"Manifest Ready\""));
     assert!(manifest_text.contains("\"document_version\": \"1.0.0\""));
@@ -442,6 +444,7 @@ fn export_document_writes_optional_sidecar_manifest() {
         .output_hash
         .as_deref()
         .is_some_and(|hash| hash.starts_with("sha256:")));
+    assert_export_manifest_matches_response(&manifest_text, &response, &output, &output_bytes);
     assert!(response.manifest.diagnostics.is_empty());
     assert!(response.manifest.readiness.ready);
     assert_eq!(response.manifest.readiness.error_count, 0);
@@ -470,8 +473,11 @@ fn export_document_writes_optional_sidecar_manifest() {
         options: json!({ "includeManifest": true }),
     })
     .expect("successful docx export with manifest");
-    let docx_manifest_path = docx_response.manifest_path.expect("docx manifest path");
-    let docx_manifest_text = fs::read_to_string(&docx_manifest_path).expect("docx manifest file");
+    let docx_manifest_path = docx_response
+        .manifest_path
+        .as_deref()
+        .expect("docx manifest path");
+    let docx_manifest_text = fs::read_to_string(docx_manifest_path).expect("docx manifest file");
     let docx_bytes = fs::read(&docx_output).expect("docx output bytes");
     assert!(docx_output.exists());
     assert!(docx_bytes.starts_with(b"PK"));
@@ -489,6 +495,12 @@ fn export_document_writes_optional_sidecar_manifest() {
         .output_hash
         .as_deref()
         .is_some_and(|hash| hash.starts_with("sha256:")));
+    assert_export_manifest_matches_response(
+        &docx_manifest_text,
+        &docx_response,
+        &docx_output,
+        &docx_bytes,
+    );
 
     for (target, extension, expected) in [
         ("pdf", "pdf", "PDF-1.4"),
@@ -529,6 +541,12 @@ fn export_document_writes_optional_sidecar_manifest() {
             .output_hash
             .as_deref()
             .is_some_and(|hash| hash.starts_with("sha256:")));
+        assert_export_manifest_matches_response(
+            &target_manifest_text,
+            &target_response,
+            &target_output,
+            &target_bytes,
+        );
     }
 
     let no_manifest_output = root.join("ready-no-manifest.html");
@@ -545,6 +563,53 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(!PathBuf::from(format!("{}.manifest.json", no_manifest_output.display())).exists());
 
     fs::remove_dir_all(root).expect("clean export manifest dir");
+}
+
+fn assert_export_manifest_matches_response(
+    manifest_text: &str,
+    response: &ExportResponse,
+    output_path: &Path,
+    output_bytes: &[u8],
+) {
+    let sidecar_manifest: Value =
+        serde_json::from_str(manifest_text).expect("sidecar manifest json");
+    let response_manifest =
+        serde_json::to_value(&response.manifest).expect("response manifest json");
+    assert_eq!(sidecar_manifest, response_manifest);
+    assert_eq!(response.output_path, path_to_string(output_path));
+    assert_eq!(
+        response.manifest.output_path.as_deref(),
+        Some(path_to_string(output_path).as_str())
+    );
+    assert_eq!(
+        response.manifest.output_hash.as_deref(),
+        Some(sha256_uri(output_bytes).as_str())
+    );
+    assert_eq!(
+        sidecar_manifest.get("output_hash").and_then(Value::as_str),
+        Some(sha256_uri(output_bytes).as_str())
+    );
+    assert_eq!(
+        sidecar_manifest
+            .get("readiness")
+            .and_then(|readiness| readiness.get("ready"))
+            .and_then(Value::as_bool),
+        Some(response.manifest.readiness.ready)
+    );
+    assert!(response
+        .manifest
+        .progress_steps
+        .iter()
+        .any(|step| step.id == "render" && step.state == "complete"));
+    assert!(response
+        .manifest
+        .progress_steps
+        .iter()
+        .any(|step| step.id == "manifest" && step.state == "complete"));
+    assert_eq!(
+        serde_json::to_value(&response.progress_steps).expect("response progress json"),
+        serde_json::to_value(&response.manifest.progress_steps).expect("manifest progress json")
+    );
 }
 
 #[test]
