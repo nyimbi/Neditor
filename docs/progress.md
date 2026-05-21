@@ -240,6 +240,10 @@ Recent pushed checkpoints visible in current git history:
   and focus return to the invoking control. The static accessibility guard now
   requires dialog focusability and keyboard handling, and the browser harness
   lists a modal focus/Escape workflow.
+- This update makes status-bar messages, file-watch state, compile progress,
+  export progress, and errors screen-reader visible with labeled live regions.
+  The static accessibility guard now requires those live regions, and the
+  browser harness lists a status/progress live-region workflow.
 - This update adds
   `performance_tests::compiler_stress_handles_large_documents_with_many_artifacts`,
   which stress-compiles a large Markdown source with nested includes, many
@@ -1547,6 +1551,16 @@ Modal focus accessibility verification:
 | `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the modal focus update. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery now lists 40 Chromium workflow tests, including `manages modal focus and Escape return paths`. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "modal focus" --project chromium` | Blocked locally | The Vite server started, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence used. |
+
+Status/progress live-region accessibility verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:a11y` | Pass | Static Vue template accessibility guardrails now verify accessible controls, dialog focus handling, required skip-link targets, and status/progress live regions. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after adding labeled status, watch, compile, export, and error live regions. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests passed after the status/progress live-region update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery now lists 41 Chromium workflow tests, including `exposes status and progress messages as live regions`. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "status and progress" --project chromium` | Blocked locally | The Vite server started, but Playwright could not launch because the Chromium headless-shell executable is missing from `/Users/nyimbiodero/Library/Caches/ms-playwright/chromium_headless_shell-1223/...`; no GitHub Actions evidence used. |
 
 ## Next Execution Order
 

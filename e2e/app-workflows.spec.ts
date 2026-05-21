@@ -1248,6 +1248,15 @@ test("manages modal focus and Escape return paths", async ({ page }) => {
   await expect(commandsButton).toBeFocused();
 });
 
+test("exposes status and progress messages as live regions", async ({ page }) => {
+  const statusBar = page.locator("#document-status");
+  await expect(statusBar).toHaveAttribute("aria-label", "Document status and progress");
+  await expect(statusBar.locator(".status-message")).toHaveAttribute("role", "status");
+  await expect(statusBar.locator(".status-message")).toHaveAttribute("aria-live", "polite");
+  await expect(statusBar.locator(".status-message")).toHaveAttribute("aria-atomic", "true");
+  await expect(statusBar.locator(".word-stats")).toHaveAttribute("aria-label", /Document statistics:/);
+});
+
 test("syncs editor and preview scrolling and jumps preview headings to source", async ({ page }) => {
   const longPreviewDocument = [
     "---",

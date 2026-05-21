@@ -1272,7 +1272,7 @@ Current evidence:
 
 - `pnpm run check:a11y` checks `src/App.vue` for accessible button names,
   form-control labels, dialog labels/modal state, dialog focusability/keyboard
-  handling, and required skip-link targets.
+  handling, required skip-link targets, and status/progress live regions.
 - Modal close buttons, command-palette search, and conflict merge-line controls
   now have explicit labels exposed to assistive technology.
 - The workbench now exposes visible-on-focus skip links to the command bar,
@@ -1283,6 +1283,9 @@ Current evidence:
   focus, trap Tab at the dialog edge, close on Escape, and restore focus to the
   invoking control. Browser harness discovery now lists a modal focus/Escape
   return workflow.
+- The status bar now exposes status messages, file-watch status, compile
+  progress, export progress, and errors as labeled live regions. Browser
+  harness discovery now lists a live-region status/progress workflow.
 
 Finish:
 
@@ -1292,8 +1295,8 @@ Finish:
   broaden coverage for nested conflict/table-editor controls.
 - ARIA labels and roles for custom controls.
 - High contrast and reduced motion behavior.
-- Screen-reader labels for diagnostics, status messages, table cells, conflict
-  diff rows, and export progress.
+- Broader screen-reader labels for diagnostics, table cells, and conflict diff
+  rows.
 - Broader automated checks where practical plus manual checklist evidence.
 
 ### 17. Performance And Large Documents

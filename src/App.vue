@@ -1012,22 +1012,64 @@
       </section>
     </main>
 
-    <footer id="document-status" class="status-bar" tabindex="-1">
-      <span>{{ store.statusMessage }}</span>
+    <footer id="document-status" class="status-bar" aria-label="Document status and progress" tabindex="-1">
+      <span
+        class="status-message"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        :aria-label="`Status message: ${store.statusMessage || 'No status message'}`"
+      >
+        {{ store.statusMessage }}
+      </span>
       <span v-if="store.externalConflict" class="conflict-actions">
         <button type="button" @click="conflictOpen = true">Compare</button>
         <button type="button" @click="store.acceptExternalChanges">Accept external</button>
         <button type="button" @click="store.keepLocalChanges">Keep local</button>
         <button type="button" @click="saveConflictCopy">Save copy</button>
       </span>
-      <span>{{ wordStats }}</span>
-      <span v-if="watchStatus">{{ watchStatus }}</span>
-      <span v-if="store.compileProgress" class="compile-actions">
+      <span class="word-stats" :aria-label="`Document statistics: ${wordStats}`">{{ wordStats }}</span>
+      <span
+        v-if="watchStatus"
+        class="watch-status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        :aria-label="`File watch status: ${watchStatus}`"
+      >
+        {{ watchStatus }}
+      </span>
+      <span
+        v-if="store.compileProgress"
+        class="compile-actions"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        :aria-label="`Compile progress: ${store.compileProgress}`"
+      >
         {{ store.compileProgress }}
         <button type="button" @click="store.cancelActiveCompile">Cancel compile</button>
       </span>
-      <span v-if="store.exportProgress">{{ store.exportProgress }}</span>
-      <span v-if="store.lastError" class="error">{{ store.lastError }}</span>
+      <span
+        v-if="store.exportProgress"
+        class="export-progress"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        :aria-label="`Export progress: ${store.exportProgress}`"
+      >
+        {{ store.exportProgress }}
+      </span>
+      <span
+        v-if="store.lastError"
+        class="error"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+        :aria-label="`Error: ${store.lastError}`"
+      >
+        {{ store.lastError }}
+      </span>
     </footer>
 
     <section

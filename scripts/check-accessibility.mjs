@@ -16,6 +16,7 @@ checkButtons();
 checkFormControls();
 checkDialogs();
 checkSkipLinks();
+checkStatusAnnouncements();
 
 if (issues.length > 0) {
   console.error("Accessibility guard failed:");
@@ -101,6 +102,28 @@ function checkSkipLinks() {
     if (!targetPattern.test(template)) {
       issues.push(`${sourcePath}:1 skip target #${target} must exist and be programmatically focusable`);
     }
+  }
+}
+
+function checkStatusAnnouncements() {
+  const statusBar = template.match(/<footer\b[^>]*id\s*=\s*["']document-status["'][\s\S]*?<\/footer>/);
+  if (!statusBar) {
+    issues.push(`${sourcePath}:1 document status footer is missing`);
+    return;
+  }
+  const markup = statusBar[0];
+  if (!/\baria-label\s*=\s*["']Document status and progress["']/.test(markup)) {
+    issues.push(`${sourcePath}:1 document status footer needs an accessible label`);
+  }
+  for (const className of ["status-message", "watch-status", "compile-actions", "export-progress"]) {
+    const pattern = new RegExp(`class\\s*=\\s*["'][^"']*\\b${className}\\b[^"']*["'][\\s\\S]*?role\\s*=\\s*["']status["'][\\s\\S]*?aria-live\\s*=\\s*["']polite["'][\\s\\S]*?aria-atomic\\s*=\\s*["']true["']`);
+    if (!pattern.test(markup)) {
+      issues.push(`${sourcePath}:1 ${className} must be a polite atomic status live region`);
+    }
+  }
+  const errorPattern = /class\s*=\s*["'][^"']*\berror\b[^"']*["'][\s\S]*?role\s*=\s*["']alert["'][\s\S]*?aria-live\s*=\s*["']assertive["'][\s\S]*?aria-atomic\s*=\s*["']true["']/;
+  if (!errorPattern.test(markup)) {
+    issues.push(`${sourcePath}:1 error status must be an assertive atomic alert live region`);
   }
 }
 
