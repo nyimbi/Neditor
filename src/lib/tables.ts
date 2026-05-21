@@ -444,6 +444,25 @@ export function compareTableCells(left: string, right: string, format: TableForm
   return left.localeCompare(right);
 }
 
+export function sortTableDraftRows(
+  draft: TableDraft,
+  columnIndex: number,
+  direction: TableSortDirection,
+): TableDraft {
+  const normalized = normalizeTableDraft(draft);
+  const format = normalized.formats[columnIndex] || "text";
+  const multiplier = direction === "asc" ? 1 : -1;
+  const sortableRows = normalized.rows.filter((row) => !isTableSummaryRow(row));
+  const summaryRows = normalized.rows.filter(isTableSummaryRow);
+  const rows = [
+    ...sortableRows.sort(
+      (left, right) => multiplier * compareTableCells(left[columnIndex] || "", right[columnIndex] || "", format),
+    ),
+    ...summaryRows,
+  ];
+  return { ...normalized, rows };
+}
+
 function formatTableCell(value: string, format: TableFormat) {
   const span = parseTableCellSpan(value);
   const trimmed = span.text.trim();

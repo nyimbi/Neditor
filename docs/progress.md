@@ -1862,6 +1862,19 @@ Smart Markdown list continuation verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests, including the existing editor ergonomics workflow. |
 | `git diff --check` | Pass | No whitespace errors after the smart Markdown list continuation update. |
 
+Table editor typed sorting verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 14 frontend unit tests passed after extracting table draft sorting and covering text, currency, and date ordering while retaining summary/formula rows at the bottom. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after wiring the extracted table draft sorting helper into the table editor. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue accessibility guardrails still pass after the table sorting helper extraction. |
+| `pnpm run check:structure` | Pass | The project structure guard still passes after the table sorting helper extraction. |
+| `cargo check --locked` in `src-tauri` | Pass | Backend dev-profile check remains clean after the frontend table editor update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests, including the existing table editor workflows. |
+| `git diff --check` | Pass | No whitespace errors after the table editor typed sorting update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

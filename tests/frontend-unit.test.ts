@@ -29,6 +29,7 @@ import {
   parseTablePaste,
   serializeMarkdownTable,
   setTableCellSpan,
+  sortTableDraftRows,
   tableColumnRange,
   validateTableDraft,
   type TableDraft,
@@ -106,6 +107,26 @@ test("table span helpers preserve merged-cell attributes through serialization",
   ok(!validateTableDraft(draft).some((issue) => issue.severity === "error"));
   ok(serializeMarkdownTable(draft).join("\n").includes("Discovery {colspan=2}"));
   ok(serializeMarkdownTable(draft).join("\n").includes("Delivery {rowspan=2}"));
+});
+
+test("table draft sorting preserves summary rows and typed ordering", () => {
+  const draft: TableDraft = {
+    id: "tbl:sort",
+    caption: "Sort behavior",
+    headers: ["Region", "Revenue", "Due"],
+    alignments: ["left", "right", "left"],
+    formats: ["text", "currency", "date"],
+    rows: [
+      ["West", "$800", "2026-05-03"],
+      ["East", "$1,200", "2026-05-01"],
+      ["North", "$950", "2026-05-02"],
+      ["Total", "=SUM(B1:B3)", ""],
+    ],
+  };
+
+  deepEqual(sortTableDraftRows(draft, 1, "desc").rows.map((row) => row[0]), ["East", "North", "West", "Total"]);
+  deepEqual(sortTableDraftRows(draft, 2, "asc").rows.map((row) => row[0]), ["East", "North", "West", "Total"]);
+  deepEqual(sortTableDraftRows(draft, 0, "asc").rows.map((row) => row[0]), ["East", "North", "West", "Total"]);
 });
 
 test("conflict diff keeps local and external edits aligned for merge UI", () => {

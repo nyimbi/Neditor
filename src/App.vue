@@ -1334,7 +1334,6 @@ import {
   type ConflictMergeSource,
 } from "./lib/workflows";
 import {
-  compareTableCells,
   formatTableTotal,
   inferTableFormat,
   isFormulaCell,
@@ -1347,6 +1346,7 @@ import {
   parseTableCellSpan,
   serializeMarkdownTable,
   setTableCellSpan,
+  sortTableDraftRows,
   spreadsheetColumnName,
   tableColumnRange,
   validateTableDraft,
@@ -3864,12 +3864,7 @@ function replaceTableFromPaste() {
 function sortTableRows(columnIndex: number, direction: TableSortDirection) {
   const draft = tableDraft.value;
   if (!draft) return;
-  const format = draft.formats[columnIndex];
-  const sortableRows = draft.rows.filter((row) => !isTableSummaryRow(row));
-  const summaryRows = draft.rows.filter(isTableSummaryRow);
-  const multiplier = direction === "asc" ? 1 : -1;
-  sortableRows.sort((left, right) => multiplier * compareTableCells(left[columnIndex] || "", right[columnIndex] || "", format));
-  draft.rows = [...sortableRows, ...summaryRows];
+  tableDraft.value = sortTableDraftRows(draft, columnIndex, direction);
 }
 
 function tableHeaderLabel(columnIndex: number) {

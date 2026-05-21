@@ -1225,7 +1225,9 @@ Status: broad implementation exists; workflow and artifact proof need expansion.
 Finish:
 
 - Table editor workflows for paste, add/remove rows/columns, sort, format,
-  totals, merged cells, readable Markdown output, and cancellation.
+  totals, merged cells, readable Markdown output, and cancellation. Frontend
+  unit coverage now proves text, currency, and date sorting semantics while
+  retaining summary/formula rows at the bottom.
 - Named table/range references and formula dependency graph proof. Focused Rust
   coverage now proves named table/range formulas compile and survive HTML, PDF,
   DOCX, PPTX, Markdown bundle text, and Markdown bundle AST outputs.
