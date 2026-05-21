@@ -1875,6 +1875,17 @@ Table editor typed sorting verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests, including the existing table editor workflows. |
 | `git diff --check` | Pass | No whitespace errors after the table editor typed sorting update. |
 
+External transform engine path readiness verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked prepare_for_export_validates_transform_engine --lib` in `src-tauri` | Pass | Two focused readiness tests passed, proving transform option shape checks plus real executable-path validation for configured external engines; missing files, directories, and non-executable paths fail readiness while disabled engine paths are ignored. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 25 export command tests passed after adding executable-path readiness validation. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the external engine path readiness update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the external engine path readiness update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the external engine path readiness update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

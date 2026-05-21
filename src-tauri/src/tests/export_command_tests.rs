@@ -1185,6 +1185,81 @@ fn prepare_for_export_validates_transform_engine_options() {
         .contains("transformInputModes.dot must be stdin or file")));
 }
 
+#[cfg(unix)]
+#[test]
+fn prepare_for_export_validates_transform_engine_paths_before_export() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-transform-path-test-{unique}"));
+    fs::create_dir_all(&root).expect("create transform path test dir");
+    let missing = root.join("missing-dot");
+    let directory = root.join("engine-directory");
+    fs::create_dir_all(&directory).expect("create directory engine path");
+    let non_executable = root.join("plantuml");
+    fs::write(&non_executable, "#!/bin/sh\nexit 0\n").expect("write non executable engine");
+    let mut permissions = fs::metadata(&non_executable)
+        .expect("non executable metadata")
+        .permissions();
+    permissions.set_mode(0o644);
+    fs::set_permissions(&non_executable, permissions).expect("set non executable permissions");
+    let executable = write_executable_script("export-path-pikchr", "#!/bin/sh\nprintf '<svg />'\n");
+
+    let report = prepare_for_export(PrepareExportRequest {
+        text: "---\ntitle: Engine Paths\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Ready".to_string(),
+        file_path: None,
+        target: "pdf".to_string(),
+        options: json!({
+            "warnOnDirtyGit": false,
+            "transformEnginePaths": {
+                "dot": path_to_string(&missing),
+                "d2": path_to_string(&directory),
+                "plantuml": path_to_string(&non_executable),
+                "pikchr": path_to_string(&executable),
+                "graphviz": path_to_string(&missing)
+            },
+            "disabledTransformEngines": {
+                "graphviz": true
+            }
+        }),
+    });
+
+    assert!(!report.ready);
+    assert_eq!(report.error_count, 3, "{:#?}", report.diagnostics);
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .message
+            .contains("transformEnginePaths.dot does not point to an executable file")
+            && diagnostic.source_file.as_deref() == Some(path_to_string(&missing).as_str())
+    }));
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .message
+            .contains("transformEnginePaths.d2 does not point to an executable file")
+            && diagnostic.source_file.as_deref() == Some(path_to_string(&directory).as_str())
+    }));
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .message
+            .contains("transformEnginePaths.plantuml is not executable")
+            && diagnostic.source_file.as_deref() == Some(path_to_string(&non_executable).as_str())
+    }));
+    assert!(!report
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("transformEnginePaths.pikchr")));
+    assert!(!report
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("transformEnginePaths.graphviz")));
+
+    let _ = fs::remove_file(executable);
+    fs::remove_dir_all(root).expect("clean transform path test dir");
+}
+
 #[test]
 fn prepare_for_export_carries_broad_readiness_audit_to_manifest() {
     let source = r#"---

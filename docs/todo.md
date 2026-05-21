@@ -1018,8 +1018,10 @@ Readiness should validate and report:
   with source ranges plus first-occurrence context.
 - Transform engines, trust state, executable paths, adapter input mode,
   timeouts, stderr, missing output, output limits, and cache identity. Broad
-  readiness audit test coverage exists for export settings; external transform
-  tests cover runtime stderr, missing output, output limits, and cache identity.
+  readiness audit test coverage exists for export settings; focused readiness
+  coverage now proves configured engine paths must be executable files before
+  export, while disabled engines remain ignored. External transform tests cover
+  runtime stderr, missing output, output limits, and cache identity.
 - Export target options and target-specific blockers. Focused Rust coverage now
   proves the PPTX approved-metadata blocker, malformed brand/citation option
   shapes, disabled option matrix parity, and enabled option matrix parity across
@@ -1078,6 +1080,9 @@ Finish:
 - External engines now have an explicit per-engine disabled setting. Disabled
   engines are skipped before trust/path execution checks, fall back to embedded
   rendering when available, and avoid trust-failure noise.
+- Prepare-for-export readiness now rejects configured missing, directory, and
+  non-executable external engine paths before export, while still ignoring
+  disabled engine paths.
 - Preserve diagnostics for missing executable, non-executable path, timeout,
   bad syntax, sidecar not produced, output limit, and stderr warnings.
 - Keep `docs/external-transform-platform-evidence.md` current when optional

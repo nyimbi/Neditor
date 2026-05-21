@@ -682,12 +682,7 @@ fn validate_transform_export_settings(options: &Value, diagnostics: &mut Vec<Doc
             ));
         }
     }
-    validate_string_map(
-        options,
-        "transformEnginePaths",
-        diagnostics,
-        Some(validate_transform_engine_path),
-    );
+    validate_transform_engine_paths(options, diagnostics);
     validate_bool_map(options, "trustedTransformEngines", diagnostics);
     validate_bool_map(options, "disabledTransformEngines", diagnostics);
     validate_string_map(
@@ -761,15 +756,46 @@ fn validate_bool_map(options: &Value, key: &str, diagnostics: &mut Vec<DocumentD
     }
 }
 
+fn validate_transform_engine_paths(options: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {
+    let Some(value) = options.get("transformEnginePaths") else {
+        return;
+    };
+    let Some(fields) = value.as_object() else {
+        diagnostics.push(diag(
+            "error",
+            "transformEnginePaths must be an object.",
+            None,
+            None,
+            Some("Use transform names as keys."),
+        ));
+        return;
+    };
+    for (name, field) in fields {
+        let Some(path) = field.as_str() else {
+            diagnostics.push(diag(
+                "error",
+                format!("transformEnginePaths.{name} must be a string."),
+                None,
+                None,
+                Some("Use string values for transform engine settings."),
+            ));
+            continue;
+        };
+        validate_transform_engine_path(name, path, options, diagnostics);
+    }
+}
+
 fn validate_transform_engine_path(
     name: &str,
     path: &str,
+    options: &Value,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
-    if path.trim().is_empty() {
+    if path.trim().is_empty() || transform_engine_disabled(options, name) {
         return;
     }
-    if !Path::new(path).is_absolute() {
+    let path = Path::new(path);
+    if !path.is_absolute() {
         diagnostics.push(diag(
             "error",
             format!("transformEnginePaths.{name} must be an absolute path."),
@@ -777,7 +803,59 @@ fn validate_transform_engine_path(
             None,
             Some("Use an absolute executable path; shell lookup is disabled."),
         ));
+        return;
     }
+    if !path.is_file() {
+        diagnostics.push(diag(
+            "error",
+            format!("transformEnginePaths.{name} does not point to an executable file."),
+            Some(path.display().to_string()),
+            None,
+            Some("Choose the actual engine binary path or disable this transform engine."),
+        ));
+        return;
+    }
+    validate_transform_engine_executable(name, path, diagnostics);
+}
+
+fn transform_engine_disabled(options: &Value, name: &str) -> bool {
+    options
+        .get("disabledTransformEngines")
+        .and_then(Value::as_object)
+        .and_then(|fields| fields.get(name))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+#[cfg(unix)]
+fn validate_transform_engine_executable(
+    name: &str,
+    path: &Path,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let Ok(metadata) = fs::metadata(path) else {
+        return;
+    };
+    if metadata.permissions().mode() & 0o111 != 0 {
+        return;
+    }
+    diagnostics.push(diag(
+        "error",
+        format!("transformEnginePaths.{name} is not executable."),
+        Some(path.display().to_string()),
+        None,
+        Some("Make the selected engine executable or choose a different binary path."),
+    ));
+}
+
+#[cfg(not(unix))]
+fn validate_transform_engine_executable(
+    _name: &str,
+    _path: &Path,
+    _diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
 }
 
 fn validate_transform_input_mode(
