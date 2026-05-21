@@ -1007,7 +1007,9 @@ Readiness should validate and report:
   current-host browser execution, native workflow proof, and broader platform
   coverage.
 - Broken local links and missing media. Broad readiness audit test coverage
-  exists.
+  exists, and Markdown bundles now include `media-uses.json` so every packaged
+  figure media use can be traced back to its figure ID, caption, source file,
+  source range, bundle path, hash, and per-use fit/crop metadata.
 - Citations, bibliography files, missing keys, duplicate keys, and style
   issues. Broad readiness audit test coverage now covers missing bibliography
   source; separate citation tests cover missing and duplicate keys.
@@ -1018,7 +1020,9 @@ Readiness should validate and report:
   test coverage exists for figure/table/equation caption-label warnings,
   focused readiness coverage now reports requested-but-empty generated index
   and glossary sections, and duplicate reference labels now block readiness
-  with source ranges plus first-occurrence context.
+  with source ranges plus first-occurrence context. Markdown bundle exports now
+  add per-figure media-use evidence for IDs, captions, alt text, source ranges,
+  bundle paths, hashes, and fit/crop metadata.
 - Transform engines, trust state, executable paths, adapter input mode,
   timeouts, stderr, missing output, output limits, and cache identity. Broad
   readiness audit test coverage exists for export settings; focused readiness

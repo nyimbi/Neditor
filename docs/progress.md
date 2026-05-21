@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `011691f Make missing
-  citations repairable in the workbench`
+- Latest inspected committed baseline before this update: `71f35fc Preserve
+  table structure in text exports`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -81,6 +81,11 @@ Recent pushed checkpoints visible in current git history:
   now keep readable Markdown-style header rows, alignment separator rows,
   escaped pipe cells, formula output rows, and merged-cell span annotations
   instead of collapsing to caption plus data rows.
+- This update adds `media-uses.json` to Markdown bundle exports. Bundles now
+  preserve per-figure audit evidence for each packaged media use, including
+  figure IDs, captions, alt text, source files, source ranges, bundle paths,
+  hashes, and per-use float/fit/position metadata while keeping shared media
+  bytes deduplicated.
 - `25bc28f` added titlebar release status visibility, Versioning-panel snapshot
   create/list/restore controls, and browser harness coverage for snapshot
   restore plus release tagging workflows.
@@ -1976,6 +1981,17 @@ Table text and Markdown bundle export verification:
 | `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the table text export update. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the table text export update. |
+
+Markdown bundle figure/media audit verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked media_export_tests --lib` in `src-tauri` | Pass | 7 media export tests passed after adding `media-uses.json`, proving local media source ranges, reused-media per-figure crop metadata, and include-relative duplicate media traceability in Markdown bundles. |
+| `cargo test --locked export_conformance_tests --lib` in `src-tauri` | Pass | 16 export conformance tests still pass after adding the Markdown bundle media-use map. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the bundle media-use update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the bundle media-use update. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the bundle media-use update. |
 
 ## Next Execution Order
 

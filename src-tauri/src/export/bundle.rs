@@ -119,6 +119,10 @@ pub(crate) fn render_markdown_bundle_bytes(
             .map_err(|err| err.to_string())?;
         zip.write_all(render_bundle_media_map(&media)?.as_bytes())
             .map_err(|err| err.to_string())?;
+        zip.start_file("media-uses.json", options)
+            .map_err(|err| err.to_string())?;
+        zip.write_all(render_bundle_media_uses(response, &media)?.as_bytes())
+            .map_err(|err| err.to_string())?;
     }
     let bundled_includes = collect_bundle_includes(manifest);
     if !bundled_includes.is_empty() {
@@ -191,6 +195,59 @@ fn render_bundle_media_map(media: &[ExportMedia]) -> Result<String, String> {
                 entry["height_px"] = json!(dimensions.height_px);
             }
             entry
+        })
+        .collect::<Vec<_>>();
+    serde_json::to_string_pretty(&entries).map_err(|err| err.to_string())
+}
+
+fn render_bundle_media_uses(
+    response: &CompileResponse,
+    media: &[ExportMedia],
+) -> Result<String, String> {
+    let entries = response
+        .document_ast
+        .blocks
+        .iter()
+        .filter_map(|block| {
+            let DocumentBlock::Figure {
+                line,
+                end_line,
+                id,
+                src: Some(src),
+                alt,
+                caption,
+                float,
+                fit,
+                position,
+                source,
+            } = block
+            else {
+                return None;
+            };
+            let source_file = source.as_ref().map(|range| range.source_file.as_str());
+            let item = media
+                .iter()
+                .find(|item| item.source == *src && item.source_file.as_deref() == source_file)?;
+            Some(json!({
+                "id": id,
+                "source": src,
+                "source_file": source_file,
+                "bundle_path": item.path,
+                "content_type": item.content_type,
+                "hash": sha256_uri(&item.bytes),
+                "alt": alt,
+                "caption": caption,
+                "float": normalized_float(float.as_deref()),
+                "fit": normalized_fit(fit.as_deref()),
+                "position": normalized_position(position.as_deref()),
+                "line": line,
+                "end_line": end_line,
+                "source_range": source.as_ref().map(|range| json!({
+                    "source_file": range.source_file,
+                    "source_line": range.source_line,
+                    "end_source_line": range.end_source_line,
+                })),
+            }))
         })
         .collect::<Vec<_>>();
     serde_json::to_string_pretty(&entries).map_err(|err| err.to_string())

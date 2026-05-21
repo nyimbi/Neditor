@@ -119,6 +119,24 @@ fn export_packages_local_figure_media_relative_to_source_file() {
     let media_map = zip_entry_text(&bundle, "media-map.json");
     assert!(media_map.contains(r#""width_px": 320.0"#));
     assert!(media_map.contains(r#""height_px": 180.0"#));
+    let media_uses: serde_json::Value =
+        serde_json::from_str(&zip_entry_text(&bundle, "media-uses.json")).expect("media uses json");
+    let uses = media_uses.as_array().expect("media uses array");
+    assert_eq!(uses.len(), 1);
+    let local_use = &uses[0];
+    let doc_path = path_to_string(&doc);
+    assert_eq!(local_use["id"], "fig:local");
+    assert_eq!(local_use["caption"], "Local diagram");
+    assert_eq!(local_use["alt"], "Diagram");
+    assert_eq!(local_use["source"], "assets/diagram.svg");
+    assert_eq!(local_use["source_file"].as_str(), Some(doc_path.as_str()));
+    assert_eq!(local_use["bundle_path"], "media/image1.svg");
+    assert_eq!(local_use["content_type"], "image/svg+xml");
+    assert_eq!(
+        local_use["source_range"]["source_file"].as_str(),
+        Some(doc_path.as_str())
+    );
+    assert_eq!(local_use["source_range"]["source_line"], 7);
 
     fs::remove_dir_all(root).expect("clean media export fixture");
 }
@@ -282,6 +300,28 @@ fn pptx_repeated_media_keeps_per_figure_crop_settings() {
             .count(),
         1
     );
+    let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+        .expect("reused media bundle");
+    let media_map = zip_entry_text(&bundle, "media-map.json");
+    assert_eq!(
+        media_map
+            .matches(r#""bundle_path": "media/image1.svg""#)
+            .count(),
+        1
+    );
+    let media_uses: serde_json::Value =
+        serde_json::from_str(&zip_entry_text(&bundle, "media-uses.json")).expect("media uses json");
+    let uses = media_uses.as_array().expect("media uses array");
+    assert_eq!(uses.len(), 2);
+    assert_eq!(uses[0]["id"], "fig:contain");
+    assert_eq!(uses[0]["caption"], "Contain");
+    assert_eq!(uses[0]["fit"], "contain");
+    assert_eq!(uses[0]["bundle_path"], "media/image1.svg");
+    assert_eq!(uses[1]["id"], "fig:cover");
+    assert_eq!(uses[1]["caption"], "Cover");
+    assert_eq!(uses[1]["fit"], "cover");
+    assert_eq!(uses[1]["position"], "top");
+    assert_eq!(uses[1]["bundle_path"], "media/image1.svg");
 
     fs::remove_dir_all(root).expect("clean repeated media fixture");
 }
@@ -422,6 +462,31 @@ fn export_keeps_duplicate_relative_media_from_includes_distinct() {
     assert!(slides
         .iter()
         .any(|slide| slide.contains(r#"r:embed="rIdImage2""#)));
+
+    let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+        .expect("include media bundle");
+    assert!(zip_entry_text(&bundle, "media/image1.svg").contains("<text>A</text>"));
+    assert!(zip_entry_text(&bundle, "media/image2.svg").contains("<text>B</text>"));
+    let media_uses: serde_json::Value =
+        serde_json::from_str(&zip_entry_text(&bundle, "media-uses.json")).expect("media uses json");
+    let uses = media_uses.as_array().expect("media uses array");
+    assert_eq!(uses.len(), 2);
+    let chapter_a_path = path_to_string(&chapter_a.join("section.md"));
+    let chapter_b_path = path_to_string(&chapter_b.join("section.md"));
+    assert_eq!(uses[0]["id"], "fig:a");
+    assert_eq!(uses[0]["caption"], "A diagram");
+    assert_eq!(
+        uses[0]["source_file"].as_str(),
+        Some(chapter_a_path.as_str())
+    );
+    assert_eq!(uses[0]["bundle_path"], "media/image1.svg");
+    assert_eq!(uses[1]["id"], "fig:b");
+    assert_eq!(uses[1]["caption"], "B diagram");
+    assert_eq!(
+        uses[1]["source_file"].as_str(),
+        Some(chapter_b_path.as_str())
+    );
+    assert_eq!(uses[1]["bundle_path"], "media/image2.svg");
 
     fs::remove_dir_all(root).expect("clean include media export fixture");
 }
