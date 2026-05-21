@@ -139,6 +139,15 @@ Supported patterns include arithmetic, percentages, named values, forward
 references, table formulas, and dependency diagnostics. Circular dependencies
 are reported as diagnostics.
 
+The Templates panel includes reusable `calc` blocks for business cases such as
+ROI, break-even volume, SaaS unit economics, runway, NPV, pipeline coverage,
+retention, reorder points, capacity, variance, weighted scoring, and KPI
+indexes; scientific cases such as dilution, molarity, ideal gas calculations,
+decay, Ohm's law, density, kinetic energy, replicate summaries, and dosing; and
+mathematical cases such as linear/quadratic models, distance, weighted
+averages, Bayes updates, expected value, normalization, compound growth,
+measurement error, and index change.
+
 ## Tables And Data Sources
 
 Standard Markdown tables remain readable source:
@@ -398,6 +407,12 @@ y: revenue
 External engines are disabled until trusted. See
 [External transform setup](external-transforms.md) for Graphviz, D2, PlantUML,
 and Pikchr setup.
+
+The same Templates panel also includes starter blocks for chart, Vega-Lite,
+timeline, roadmap, ADR, Mermaid, Pikchr, DOT, PlantUML, CSV, JSON Schema,
+OpenAPI, and QR transforms. Duplicate any built-in template to create a
+workspace custom template, then edit the name, category, transform, tags, and
+fenced body.
 
 PlantUML exports default to SVG. When a trusted PlantUML executable is
 configured, request PNG output per fence with `format=png`, `output=png`, or

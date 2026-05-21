@@ -17,6 +17,7 @@ import {
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
+import { builtinTransformTemplates, normalizeCustomTransformTemplates, transformTemplateMarkdown } from "../src/lib/transformTemplates.js";
 import { migratePersistedWorkspace, normalizeCitationStyle, WORKSPACE_SCHEMA_VERSION } from "../src/lib/workspacePersistence.js";
 import {
   appendConflictMergeLine,
@@ -314,6 +315,18 @@ test("workspace persistence migration versions and normalizes saved settings", (
     disabledTransformEngines: { d2: true, dot: false, bad: "no" },
     transformInputModes: { dot: "stdin", bad: "pipe" },
     transformTimeoutMs: 99_999,
+    customTransformTemplates: [
+      {
+        id: "custom-margin",
+        name: "Custom margin",
+        category: "Finance",
+        transform: "calc",
+        summary: "Reusable margin block.",
+        body: "```calc\nrevenue = 1\ncost = 1\n```\n",
+        tags: ["margin", 42],
+      },
+      { id: "missing-body", name: "Ignored" },
+    ],
   });
 
   equal(migrated.schemaVersion, WORKSPACE_SCHEMA_VERSION);
@@ -366,6 +379,44 @@ test("workspace persistence migration versions and normalizes saved settings", (
   deepEqual(migrated.disabledTransformEngines, { d2: true, dot: false });
   deepEqual(migrated.transformInputModes, { dot: "stdin" });
   equal(migrated.transformTimeoutMs, 30_000);
+  deepEqual(migrated.customTransformTemplates, [
+    {
+      id: "custom-margin",
+      name: "Custom margin",
+      category: "Finance",
+      transform: "calc",
+      summary: "Reusable margin block.",
+      body: "```calc\nrevenue = 1\ncost = 1\n```",
+      tags: ["margin"],
+    },
+  ]);
+});
+
+test("transform template library covers reusable calculations and custom template normalization", () => {
+  const calcTemplates = builtinTransformTemplates.filter((template) => template.transform === "calc");
+  const businessTemplates = calcTemplates.filter((template) => template.category === "Business");
+  const scienceTemplates = calcTemplates.filter((template) => template.category === "Science");
+  const mathTemplates = calcTemplates.filter((template) => template.category === "Mathematics");
+
+  ok(calcTemplates.length >= 30);
+  ok(businessTemplates.length >= 12);
+  ok(scienceTemplates.length >= 8);
+  ok(mathTemplates.length >= 8);
+  for (const transform of ["chart", "vega-lite", "timeline", "roadmap", "adr", "mermaid", "pikchr", "dot", "plantuml", "csv", "json-schema", "openapi", "qr"]) {
+    ok(builtinTransformTemplates.some((template) => template.transform === transform), `missing ${transform} template`);
+  }
+  ok(transformTemplateMarkdown(builtinTransformTemplates[0]).endsWith("\n"));
+  deepEqual(normalizeCustomTransformTemplates([{ id: "x", name: "X", transform: "calc", body: "```calc\nx = 1\n```\n" }]), [
+    {
+      id: "x",
+      name: "X",
+      category: "Custom",
+      transform: "calc",
+      summary: "Reusable transform template.",
+      body: "```calc\nx = 1\n```",
+      tags: [],
+    },
+  ]);
 });
 
 test("workbench command bar exposes icon display controls and workflow groups", () => {
@@ -379,9 +430,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   for (const label of ["Document", "Manage", "Write", "Navigate", "Insert", "Review"]) {
     ok(app.includes(`label: "${label}"`), `missing ${label} command group`);
   }
-  for (const icon of ["saveAs", "snapshot", "equation", "outline", "fold", "unfold", "comment"]) {
+  for (const icon of ["saveAs", "snapshot", "templates", "equation", "outline", "fold", "unfold", "comment"]) {
     ok(app.includes(`${icon}: [`), `missing ${icon} icon path`);
   }
+  ok(app.includes('store.sidebar === \'templates\''));
 });
 
 test("local verification scripts expose local baseline checks", () => {

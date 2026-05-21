@@ -56,6 +56,12 @@ matches, the left document outline, and fold/unfold section commands. In
 Settings or the command bar's Buttons selector, choose icons and text, icons
 only, or text only to match the density you want.
 
+Use the Templates panel or Insert > Templates to browse reusable transform
+blocks. The built-in library includes business, scientific, and mathematical
+`calc` blocks, plus chart, diagram, timeline, roadmap, ADR, CSV, OpenAPI, JSON
+Schema, and QR templates. Built-ins can be inserted directly or duplicated into
+custom templates that are saved with the workspace.
+
 ## Product Boundaries
 
 NEditor is a local-first desktop workbench for document files. It does not

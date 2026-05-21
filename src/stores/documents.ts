@@ -4,6 +4,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/plugin-fs";
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
+import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "../lib/transformTemplates";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import {
   clampAutosaveDelay,
@@ -314,6 +315,7 @@ export const useDocumentsStore = defineStore("documents", {
       | "outline"
       | "diagnostics"
       | "tables"
+      | "templates"
       | "references"
       | "exports"
       | "versioning"
@@ -382,6 +384,7 @@ export const useDocumentsStore = defineStore("documents", {
     disabledTransformEngines: {} as Record<string, boolean>,
     transformInputModes: {} as Record<string, "stdin" | "file">,
     transformTimeoutMs: 5000,
+    customTransformTemplates: [] as CustomTransformTemplate[],
     transformProbeResults: {} as Record<string, TransformProbeResult>,
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
@@ -487,7 +490,7 @@ export const useDocumentsStore = defineStore("documents", {
         }
         if (
           persisted.sidebar &&
-          ["files", "outline", "diagnostics", "tables", "references", "exports", "versioning", "review", "settings"].includes(persisted.sidebar)
+          ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "settings"].includes(persisted.sidebar)
         ) {
           this.sidebar = persisted.sidebar;
         }
@@ -498,6 +501,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (typeof persisted.transformTimeoutMs === "number") {
           this.transformTimeoutMs = Math.min(Math.max(persisted.transformTimeoutMs, 1), 30000);
         }
+        this.customTransformTemplates = normalizeCustomTransformTemplates(persisted.customTransformTemplates);
         if (persisted.openFiles?.length) {
           await this.restoreWorkspace(persisted.openFiles, persisted.activePath || null, persisted.pinnedFiles || [], persisted.scrollPositions || {});
         }
@@ -561,6 +565,7 @@ export const useDocumentsStore = defineStore("documents", {
         disabledTransformEngines: this.disabledTransformEngines,
         transformInputModes: this.transformInputModes,
         transformTimeoutMs: this.transformTimeoutMs,
+        customTransformTemplates: this.customTransformTemplates,
       };
       await preferencesStore.set("workspace", normalizePersistedWorkspaceForSave(workspace));
       await preferencesStore.save();
@@ -1363,6 +1368,21 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async setTransformTimeout(timeoutMs: number) {
       this.transformTimeoutMs = Math.min(Math.max(Number(timeoutMs) || 1, 1), 30000);
+      await this.persistWorkspace();
+    },
+    async saveCustomTransformTemplate(template: CustomTransformTemplate) {
+      const [normalized] = normalizeCustomTransformTemplates([template]);
+      if (!normalized) return;
+      const existingIndex = this.customTransformTemplates.findIndex((candidate) => candidate.id === normalized.id);
+      if (existingIndex >= 0) {
+        this.customTransformTemplates = this.customTransformTemplates.map((candidate, index) => (index === existingIndex ? normalized : candidate));
+      } else {
+        this.customTransformTemplates = [...this.customTransformTemplates, normalized];
+      }
+      await this.persistWorkspace();
+    },
+    async deleteCustomTransformTemplate(id: string) {
+      this.customTransformTemplates = this.customTransformTemplates.filter((template) => template.id !== id);
       await this.persistWorkspace();
     },
     setEditorPaneRatio(value: number, persist = true) {

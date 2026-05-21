@@ -2208,6 +2208,18 @@ Editor ergonomics verification:
 | `pnpm run verify:local` | Pass | Quick local verification passed all 9 steps after the editor ergonomics update. |
 | `git diff --check` | Pass | No whitespace errors after the editor ergonomics update. |
 
+Transform template library verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the Templates sidebar, template command actions, custom template editor, and workspace persistence. |
+| `pnpm run test:unit` | Pass | 18 frontend unit tests passed, including built-in transform template breadth, custom template normalization, and persistence migration coverage. |
+| `pnpm run check:a11y` | Pass | Static accessibility guardrails passed after adding the template filters, list, preview details, and custom editor controls. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting transform templates; all local links resolved. |
+| `pnpm run build` | Pass | Vue typecheck and Vite production build passed after the transform template library update. |
+| `pnpm run verify:local` | Pass | Quick local verification passed all 9 steps after the transform template update. |
+| `git diff --check` | Pass | No whitespace errors after the transform template update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

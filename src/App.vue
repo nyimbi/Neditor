@@ -73,7 +73,7 @@
             class="icon-command"
             :class="{ primary: action.primary }"
             :disabled="action.disabled"
-            :aria-label="action.title || action.label"
+            :aria-label="action.label"
             :title="action.title || action.label"
             @click="runCommandBarAction(action)"
           >
@@ -107,6 +107,7 @@
             <option value="outline">Outline</option>
             <option value="diagnostics">Diagnostics</option>
             <option value="tables">Tables</option>
+            <option value="templates">Templates</option>
             <option value="references">References</option>
             <option value="exports">Exports</option>
             <option value="versioning">Versioning</option>
@@ -423,6 +424,92 @@
             </label>
           </template>
           <p v-else>No Markdown table selected.</p>
+        </template>
+
+        <template v-else-if="store.sidebar === 'templates'">
+          <h2>Templates <small>{{ filteredTransformTemplates.length }}</small></h2>
+          <section class="template-filters" aria-label="Transform template filters">
+            <label>
+              Search
+              <input v-model="templateQuery" placeholder="margin, dose, roadmap" />
+            </label>
+            <label>
+              Category
+              <select v-model="templateCategory">
+                <option value="all">All</option>
+                <option v-for="category in transformTemplateCategoryOptions" :key="category" :value="category">{{ category }}</option>
+              </select>
+            </label>
+            <label>
+              Transform
+              <select v-model="templateTransform">
+                <option value="all">All</option>
+                <option v-for="transform in transformTemplateKindOptions" :key="transform" :value="transform">{{ transform }}</option>
+              </select>
+            </label>
+          </section>
+          <section class="template-list" role="list" aria-label="Transform templates">
+            <article
+              v-for="template in filteredTransformTemplates"
+              :key="`${template.source}-${template.id}`"
+              class="template-card"
+              role="listitem"
+            >
+              <header>
+                <strong>{{ template.name }}</strong>
+                <small>{{ template.category }} | {{ template.transform }} | {{ template.source }}</small>
+              </header>
+              <p>{{ template.summary }}</p>
+              <div class="template-tags" aria-label="Template tags">
+                <small v-for="tag in template.tags" :key="`${template.id}-${tag}`">{{ tag }}</small>
+              </div>
+              <details>
+                <summary>Preview</summary>
+                <pre>{{ template.body }}</pre>
+              </details>
+              <div class="template-actions">
+                <button type="button" @click="insertTransformTemplate(template)">Insert</button>
+                <button type="button" @click="duplicateTransformTemplate(template)">Duplicate</button>
+                <button v-if="template.source === 'custom'" type="button" @click="editCustomTransformTemplate(template)">Edit</button>
+                <button v-if="template.source === 'custom'" type="button" @click="store.deleteCustomTransformTemplate(template.id)">Delete</button>
+              </div>
+            </article>
+          </section>
+          <section class="custom-template-editor" aria-label="Custom transform template editor">
+            <h3>Custom template</h3>
+            <label>
+              Name
+              <input v-model="customTemplateDraft.name" />
+            </label>
+            <label>
+              Category
+              <input v-model="customTemplateDraft.category" />
+            </label>
+            <label>
+              Transform
+              <select v-model="customTemplateDraft.transform">
+                <option v-for="transform in transformTemplateKindOptions" :key="transform" :value="transform">{{ transform }}</option>
+              </select>
+            </label>
+            <label>
+              Summary
+              <input v-model="customTemplateDraft.summary" />
+            </label>
+            <label>
+              Tags
+              <input v-model="customTemplateTags" placeholder="finance, kpi" />
+            </label>
+            <label>
+              Body
+              <textarea v-model="customTemplateDraft.body" rows="10"></textarea>
+            </label>
+            <div class="template-actions">
+              <button type="button" @click="startNewCustomTemplate">New custom</button>
+              <button type="button" :disabled="!customTemplateIsValid" @click="saveCustomTransformTemplate">
+                {{ editingCustomTemplateId ? "Save custom" : "Create custom" }}
+              </button>
+            </div>
+          </section>
         </template>
 
         <template v-else-if="store.sidebar === 'references'">
@@ -1371,6 +1458,16 @@ import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferen
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import { markdownListContinuation } from "./lib/markdownEditing";
+import {
+  blankCustomTransformTemplate,
+  builtinTransformTemplates,
+  createCustomTransformTemplateId,
+  transformTemplateCategories,
+  transformTemplateKinds,
+  transformTemplateMarkdown,
+  type CustomTransformTemplate,
+  type TransformTemplate,
+} from "./lib/transformTemplates";
 import { SUPPORTED_CITATION_STYLES } from "./lib/workspacePersistence";
 import {
   appendConflictMergePart,
@@ -1455,6 +1552,11 @@ const tableSpanRow = ref(0);
 const tableSpanColumn = ref(0);
 const tableSpanColspan = ref(1);
 const tableSpanRowspan = ref(1);
+const templateQuery = ref("");
+const templateCategory = ref("all");
+const templateTransform = ref("all");
+const customTemplateDraft = ref<CustomTransformTemplate>(blankCustomTransformTemplate());
+const editingCustomTemplateId = ref("");
 const draggedTabId = ref("");
 
 type FigureCropPosition = "center" | "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -1548,6 +1650,7 @@ type ToolbarIconName =
   | "table"
   | "figure"
   | "calc"
+  | "templates"
   | "equation"
   | "toc"
   | "outline"
@@ -1598,6 +1701,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   table: ["M4 5h16v14H4z", "M4 10h16", "M4 15h16", "M10 5v14", "M15 5v14"],
   figure: ["M4 5h16v14H4z", "M8 13l3-3 3 4 2-2 4 5", "M8 8h.01"],
   calc: ["M7 4h10v16H7z", "M10 8h4", "M10 12h1", "M14 12h1", "M10 16h1", "M14 16h1"],
+  templates: ["M4 5h7v6H4z", "M13 5h7v6h-7z", "M4 13h7v6H4z", "M13 13h7v6h-7z"],
   equation: ["M4 8h16", "M4 16h16", "M8 12h8"],
   toc: ["M5 7h2", "M10 7h9", "M5 12h2", "M10 12h9", "M5 17h2", "M10 17h9"],
   outline: ["M5 5h14", "M5 10h10", "M5 15h14", "M5 20h8"],
@@ -1958,6 +2062,37 @@ const diagnosticSignature = computed(() =>
     )
     .join("\n"),
 );
+const allTransformTemplates = computed<TransformTemplate[]>(() => [
+  ...builtinTransformTemplates,
+  ...store.customTransformTemplates.map((template) => ({ ...template, source: "custom" as const })),
+]);
+const transformTemplateCategoryOptions = computed(() =>
+  [...new Set([...transformTemplateCategories, ...store.customTransformTemplates.map((template) => template.category).filter(Boolean)])].sort(),
+);
+const transformTemplateKindOptions = computed(() =>
+  [...new Set([...transformTemplateKinds, ...store.customTransformTemplates.map((template) => template.transform).filter(Boolean)])].sort(),
+);
+const filteredTransformTemplates = computed(() => {
+  const query = templateQuery.value.trim().toLowerCase();
+  return allTransformTemplates.value.filter((template) => {
+    if (templateCategory.value !== "all" && template.category !== templateCategory.value) return false;
+    if (templateTransform.value !== "all" && template.transform !== templateTransform.value) return false;
+    if (!query) return true;
+    return [template.name, template.category, template.transform, template.summary, ...template.tags].join(" ").toLowerCase().includes(query);
+  });
+});
+const customTemplateTags = computed({
+  get: () => customTemplateDraft.value.tags.join(", "),
+  set: (value: string) => {
+    customTemplateDraft.value.tags = value
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  },
+});
+const customTemplateIsValid = computed(
+  () => Boolean(customTemplateDraft.value.name.trim() && customTemplateDraft.value.transform.trim() && customTemplateDraft.value.body.trim()),
+);
 const commandBarGroups = computed<CommandBarGroup[]>(() => [
   {
     id: "document",
@@ -2014,6 +2149,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "table", label: "Table", title: "Insert table", icon: "table", run: () => insertBlock(tableSnippet) },
       { id: "figure", label: "Figure", title: "Insert figure", icon: "figure", run: () => insertFigureSnippet() },
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
+      { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
       { id: "equation", label: "Equation", title: "Insert equation", icon: "equation", run: () => insertBlock(equationSnippet) },
       { id: "toc", label: "TOC", title: "Insert table of contents", icon: "toc", run: () => insertBlock(tocSnippet) },
       { id: "ai-source", label: "AI Source", title: "Insert AI source block", icon: "ai", run: () => insertBlock(aiSnippet) },
@@ -2066,6 +2202,7 @@ const commands = computed(() => [
   { name: "Inline code selection", group: "Markdown", run: () => wrapSelection("`") },
   { name: "Add review comment", group: "Review", run: () => (store.sidebar = "review") },
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
+  { name: "Open transform templates", group: "Transforms", run: () => openTransformTemplates() },
   { name: "Insert code fence", group: "Snippet", run: () => insertBlock(codeFenceSnippet) },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
   { name: "Insert cover figure", group: "Snippet", run: () => insertFigureSnippet() },
@@ -2088,6 +2225,11 @@ const commands = computed(() => [
   { name: "Insert layout directive", group: "Snippet", run: () => insertBlock(layoutSnippet) },
   { name: "Insert review comment", group: "Snippet", run: () => insertBlock(commentSnippet) },
   { name: "Insert AI source", group: "Snippet", run: () => insertBlock(aiSnippet) },
+  ...allTransformTemplates.value.map((template) => ({
+    name: `Insert ${template.name} template`,
+    group: `Template ${template.category}`,
+    run: () => insertTransformTemplate(template),
+  })),
   {
     name: active.value.pinned ? "Unpin active tab" : "Pin active tab",
     group: "Workspace",
@@ -3012,6 +3154,56 @@ function showOutline() {
   void nextTick(() => {
     workspacePane.value?.focus();
   });
+}
+
+function openTransformTemplates() {
+  store.sidebar = "templates";
+  void nextTick(() => {
+    workspacePane.value?.focus();
+  });
+}
+
+function insertTransformTemplate(template: TransformTemplate) {
+  insertBlock(transformTemplateMarkdown(template));
+  store.statusMessage = `Inserted ${template.name} template`;
+}
+
+function startNewCustomTemplate() {
+  customTemplateDraft.value = blankCustomTransformTemplate();
+  editingCustomTemplateId.value = "";
+}
+
+function duplicateTransformTemplate(template: TransformTemplate) {
+  customTemplateDraft.value = {
+    id: createCustomTransformTemplateId(),
+    name: `${template.name} copy`,
+    category: template.category,
+    transform: template.transform,
+    summary: template.summary,
+    body: template.body,
+    tags: [...template.tags],
+  };
+  editingCustomTemplateId.value = "";
+}
+
+function editCustomTransformTemplate(template: TransformTemplate) {
+  customTemplateDraft.value = {
+    id: template.id,
+    name: template.name,
+    category: template.category,
+    transform: template.transform,
+    summary: template.summary,
+    body: template.body,
+    tags: [...template.tags],
+  };
+  editingCustomTemplateId.value = template.id;
+}
+
+async function saveCustomTransformTemplate() {
+  if (!customTemplateIsValid.value) return;
+  await store.saveCustomTransformTemplate(customTemplateDraft.value);
+  editingCustomTemplateId.value = customTemplateDraft.value.id;
+  store.statusMessage = `Saved ${customTemplateDraft.value.name} template`;
 }
 
 function activate(id: string) {
@@ -5185,6 +5377,61 @@ select:hover {
 
 .snapshot-row p {
   margin: 0 0 4px;
+}
+
+.template-filters,
+.custom-template-editor {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.template-list {
+  display: grid;
+  gap: 10px;
+}
+
+.template-card {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #c9d2dc;
+  background: #ffffff;
+}
+
+.template-card header {
+  display: grid;
+  gap: 2px;
+}
+
+.template-card p {
+  margin: 0;
+}
+
+.template-card pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+.template-tags,
+.template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.template-tags small {
+  padding: 2px 6px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+}
+
+.custom-template-editor {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #d8e0e8;
 }
 
 .crop-focus-pad {

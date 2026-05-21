@@ -1,4 +1,5 @@
 import type { AiCleanupOptions } from "../types.js";
+import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "./transformTemplates.js";
 
 export const WORKSPACE_SCHEMA_VERSION = 2;
 
@@ -40,7 +41,7 @@ export type ExportTarget =
   | "latex"
   | "google-docs";
 export type WorkbenchMode = "split" | "source" | "preview" | "focus" | "export" | "review" | "presentation";
-export type SidebarPanel = "files" | "outline" | "diagnostics" | "tables" | "references" | "exports" | "versioning" | "review" | "settings";
+export type SidebarPanel = "files" | "outline" | "diagnostics" | "tables" | "templates" | "references" | "exports" | "versioning" | "review" | "settings";
 export type ThemePreference = "system" | "light" | "dark";
 export type ToolbarDisplay = "both" | "icons" | "text";
 export type TransformInputMode = "stdin" | "file";
@@ -128,6 +129,7 @@ export interface PersistedWorkspace {
   disabledTransformEngines?: Record<string, boolean>;
   transformInputModes?: Record<string, TransformInputMode>;
   transformTimeoutMs?: number;
+  customTransformTemplates?: CustomTransformTemplate[];
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
 }
 
@@ -367,7 +369,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (mode) migrated.mode = mode;
   const sidebar = enumValue(
     raw.sidebar,
-    ["files", "outline", "diagnostics", "tables", "references", "exports", "versioning", "review", "settings"] as const,
+    ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "settings"] as const,
   );
   if (sidebar) migrated.sidebar = sidebar;
   migrated.transformEnginePaths = stringRecord(raw.transformEnginePaths);
@@ -376,6 +378,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   migrated.transformInputModes = inputModeRecord(raw.transformInputModes);
   const transformTimeoutMs = numberValue(raw.transformTimeoutMs);
   if (transformTimeoutMs !== undefined) migrated.transformTimeoutMs = Math.min(Math.max(transformTimeoutMs, 1), 30000);
+  migrated.customTransformTemplates = normalizeCustomTransformTemplates(raw.customTransformTemplates);
   return migrated;
 }
 
