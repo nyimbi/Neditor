@@ -71,9 +71,11 @@ Recent pushed checkpoints visible in current git history:
   `processAlive: true` evidence when NEditor remains running until timeout.
 - This update deepens the supported Windows/Linux Tauri WebDriver harness. In
   addition to native launch/title/shell checks, it now creates a dirty document
-  and checks the native dirty-title marker, runs export readiness through the
-  desktop UI/command path, and verifies selected preferences persist across a
-  desktop session restart before restoring them.
+  and checks the native dirty-title marker, filters and inserts the built-in
+  "Dose by weight" calc template through the Templates panel and verifies the
+  inserted source reaches the desktop preview, runs export readiness through
+  the desktop UI/command path, and verifies selected preferences persist across
+  a desktop session restart before restoring them.
 - This update makes macOS app bundle proof executable. `pnpm run verify:local:full`
   now builds `NEditor.app` on macOS and `pnpm run test:desktop-bundle` verifies
   the bundle Info.plist metadata, identifier, version, executable, icon, copyright,
@@ -99,8 +101,9 @@ Recent pushed checkpoints visible in current git history:
   including the native process name, window count, window name, and window size.
 - This update makes desktop WebDriver evidence durable. `pnpm run
   test:tauri-webdriver` now writes `.tmp/desktop-webdriver/report.json` with
-  dependency and assertion evidence on Windows/Linux, or the official macOS
-  unsupported-platform reason plus the launch-smoke fallback.
+  the supported workflow plan plus dependency and assertion evidence on
+  Windows/Linux, or the official macOS unsupported-platform reason plus the
+  launch-smoke fallback.
 - This update deepens rendered export handoff proof. `pnpm run
   test:rendered-exports` now asserts blog/Substack metadata and copy artifacts,
   LaTeX source structure, Google Docs import metadata, and the nested DOCX
@@ -682,7 +685,7 @@ Current verification recorded on 2026-05-21 and 2026-05-22:
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, `processAlive: true`, app-authored native window evidence, and System Events process/window evidence (`processName: neditor`, `windowCount: 1`, `window.name: NEditor`, `1440x920`). |
-| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, export readiness, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip in `.tmp/desktop-webdriver/report.json`. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, Templates-panel calc insertion to source/preview, export readiness, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip plus the supported workflow plan in `.tmp/desktop-webdriver/report.json`. |
 
 Fresh baseline recorded on 2026-05-20:
 
@@ -2276,6 +2279,17 @@ Desktop native automation smoke verification:
 | `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke verifier syntax remained valid after adding macOS System Events evidence capture. |
 | `pnpm run test:desktop-smoke` | Pass | Desktop artifact and native command workflow smoke still pass without GUI launch enabled. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS GUI launch smoke passed and `.tmp/desktop-smoke/launch-report.json` recorded app-authored Tauri window metadata plus System Events evidence for process `neditor`, one `NEditor` window, and native window size `1440x920`. |
+
+Desktop WebDriver harness verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/run-tauri-webdriver.mjs` | Pass | Desktop WebDriver harness syntax remains valid after adding the Templates-panel source/preview workflow. |
+| `pnpm run test:unit` | Pass | 18 frontend unit tests passed, including the static guard that the desktop WebDriver harness covers dirty title, transform-template insertion, export readiness, preference restart persistence, and the supported workflow plan. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS | This host still records the official unsupported WKWebView-driver skip, but `.tmp/desktop-webdriver/report.json` now includes the supported Windows/Linux workflow plan with the calc-template source/preview assertion. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the WebDriver evidence notes; all local links resolved. |
+| `pnpm run verify:local` | Pass | Quick local verification passed all 9 steps after the desktop WebDriver harness update. |
+| `git diff --check` | Pass | No whitespace errors after the desktop WebDriver harness update. |
 
 Live Google Docs import attempt:
 

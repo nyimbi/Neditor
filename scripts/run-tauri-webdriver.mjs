@@ -12,6 +12,15 @@ const application = desktopBinaryPath();
 const reportPath = join(root, ".tmp", "desktop-webdriver", "report.json");
 const macosUnsupportedMessage =
   "Official Tauri WebDriver currently supports desktop automation on Windows and Linux only; macOS has no WKWebView driver in that stack.";
+const webdriverWorkflowPlan = [
+  "initial native title includes NEditor",
+  "desktop shell renders primary commands",
+  "native WebDriver switches modes and opens command palette",
+  "native title exposes dirty document state",
+  "desktop template insertion reaches editor and preview",
+  "desktop export readiness returns manifest progress evidence",
+  "desktop preferences persist across WebDriver restart",
+];
 const report = {
   generatedAt: new Date().toISOString(),
   platform: process.platform,
@@ -22,6 +31,7 @@ const report = {
   required,
   status: "pending",
   supportedDesktopPlatforms: ["linux", "win32"],
+  workflowPlan: webdriverWorkflowPlan,
   dependencies: [],
   assertions: [],
   skippedReason: null,
@@ -120,6 +130,7 @@ async function runWebDriverSmoke() {
     await assertInitialShell(session);
     await assertModeSwitchAndCommandPalette(session);
     await assertDirtyTitleWorkflow(session);
+    await assertTransformTemplateWorkflow(session);
     await assertExportReadinessWorkflow(session);
     originalPreferences = await readDesktopPreferences(session);
     session = await assertPreferenceRestartWorkflow(session, originalPreferences);
@@ -215,6 +226,51 @@ async function assertDirtyTitleWorkflow(session) {
     throw new Error(`native title did not expose dirty state: ${JSON.stringify(nativeTitle.value)}`);
   }
   recordAssertion("native title exposes dirty document state");
+}
+
+async function assertTransformTemplateWorkflow(session) {
+  await showSidebar(session, "templates", "Custom template");
+  await execute(session, `
+    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
+    const controlByLabel = ${controlByLabelScript};
+    const category = controlByLabel('Category', 'select');
+    category.value = 'Science';
+    category.dispatchEvent(new Event('change', { bubbles: true }));
+    const transform = controlByLabel('Transform', 'select');
+    transform.value = 'calc';
+    transform.dispatchEvent(new Event('change', { bubbles: true }));
+    const search = controlByLabel('Search', 'input');
+    search.value = 'dose';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    const template = [...document.querySelectorAll('.template-card')].find((item) => normalized(item.textContent || '').includes('Dose by weight'));
+    if (!template) throw new Error('Dose by weight template was not visible in the desktop template panel');
+    const preview = template.querySelector('details');
+    if (preview && !preview.open) preview.querySelector('summary')?.click();
+    const insert = [...template.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Insert');
+    if (!insert) throw new Error('Dose by weight template did not expose an Insert button');
+    insert.click();
+    return true;
+  `);
+  const inserted = await waitForValue(
+    session,
+    `
+      return {
+        editor: document.querySelector('.cm-content')?.textContent || '',
+        preview: document.querySelector('.preview-document')?.textContent || '',
+        status: document.querySelector('.status-bar')?.textContent || '',
+      };
+    `,
+    (value) =>
+      String(value?.editor || "").includes("weight_kg = 72") &&
+      String(value?.editor || "").includes("total_dose_mg") &&
+      String(value?.preview || "").includes("Total dose") &&
+      String(value?.status || "").includes("Inserted Dose by weight template"),
+    "template insertion in editor and preview",
+  );
+  if (!String(inserted.preview || "").includes("mg")) {
+    throw new Error(`desktop preview did not render the inserted calculation output: ${JSON.stringify(inserted)}`);
+  }
+  recordAssertion("desktop template insertion reaches editor and preview");
 }
 
 async function assertExportReadinessWorkflow(session) {

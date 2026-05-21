@@ -465,10 +465,15 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   const script = readFileSync("scripts/run-tauri-webdriver.mjs", "utf8");
 
   ok(script.includes("assertDirtyTitleWorkflow(session)"));
+  ok(script.includes("assertTransformTemplateWorkflow(session)"));
   ok(script.includes("assertExportReadinessWorkflow(session)"));
   ok(script.includes("assertPreferenceRestartWorkflow(session, originalPreferences)"));
+  ok(script.includes("desktop template insertion reaches editor and preview"));
+  ok(script.includes("Dose by weight"));
+  ok(script.includes(".preview-document"));
   ok(script.includes("document.querySelector('.sidebar pre')"));
   ok(script.includes('"export_target": "html"'));
+  ok(script.includes("workflowPlan: webdriverWorkflowPlan"));
   ok(script.includes("persisted desktop preferences after restart"));
   ok(script.includes("Official Tauri WebDriver currently supports desktop automation on Windows and Linux only"));
 });
