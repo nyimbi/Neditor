@@ -1833,6 +1833,22 @@ Extended LaTeX equation notation verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors after the extended LaTeX renderer update. |
 
+AI paste code fence cleanup verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked ai_cleanup_tests --lib` in `src-tauri` | Pass | 11 AI cleanup tests passed after adding code-fence normalization and rich HTML `<pre><code>` conversion coverage. |
+| `cargo test --locked --lib` in `src-tauri` | Pass | Full Rust library suite passed with 200 tests after the AI cleanup code-fence update. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the AI cleanup code-fence update. |
+| `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the AI cleanup code-fence update. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after the backend AI cleanup update and documentation changes. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the matrix, TODO, and progress log; all local links resolved. |
+| `pnpm run check:a11y` | Pass | Static Vue accessibility guardrails still pass after the backend AI cleanup update. |
+| `pnpm run check:structure` | Pass | The project structure guard still passes after the backend AI cleanup update. |
+| `pnpm run test:unit` | Pass | 12 frontend unit tests still pass after the backend AI cleanup update. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests, including the existing AI paste workflows. |
+| `git diff --check` | Pass | No whitespace errors after the AI cleanup code-fence update. |
+
 ## Next Execution Order
 
 1. Expand browser coverage for export artifact fidelity, target-specific export

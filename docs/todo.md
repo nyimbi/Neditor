@@ -1201,7 +1201,11 @@ Finish:
   appendix, replace document, merge into section, replace selection, citation
   TODO, draft marker, and provenance block workflows are now covered in the
   browser harness locally.
-- Rich clipboard paste behavior where the runtime supports it.
+- Rich clipboard paste behavior where the runtime supports it. Backend cleanup
+  now converts rich `<pre><code>` clipboard blocks into Markdown fences,
+  preserves escaped code text, normalizes common AI `Copy code`, spaced
+  backtick, and tilde fence variants, and keeps citation TODO insertion out of
+  fenced code.
 - Provenance block aliases.
 - AI-assisted section review-state toggles. The Review sidebar toggles
   `ai-source` blocks and AI-assisted section markers between needs-review and

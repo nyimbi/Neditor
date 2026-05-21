@@ -28,6 +28,7 @@ pub(crate) fn cleanup_ai_paste(request: AiCleanupRequest) -> AiCleanupResponse {
     let mut cleaned = request.text.replace("\r\n", "\n");
     cleaned = remove_chat_labels(&cleaned, &mut issues);
     cleaned = normalize_rich_html_clipboard(&cleaned, &mut issues);
+    cleaned = normalize_ai_code_fences(&cleaned, &mut issues);
     if !request.preserve_headings {
         cleaned = remove_duplicate_markdown_headings(&cleaned, &mut issues);
     }
@@ -196,6 +197,7 @@ fn normalize_rich_html_clipboard(text: &str, issues: &mut Vec<String>) -> String
     let mut output = String::new();
     let mut input = text.replace("\r\n", "\n").replace('\r', "\n");
     input = strip_html_comments(&input);
+    input = convert_html_pre_code_blocks(&input, issues);
     let mut index = 0usize;
     let mut link_stack = Vec::new();
 
@@ -244,6 +246,120 @@ fn strip_html_comments(text: &str) -> String {
     }
     output.push_str(remainder);
     output
+}
+
+fn convert_html_pre_code_blocks(text: &str, issues: &mut Vec<String>) -> String {
+    let mut output = String::new();
+    let mut remainder = text;
+    let mut converted = 0usize;
+
+    while let Some(pre_start) = find_ascii_case_insensitive(remainder, "<pre") {
+        output.push_str(&remainder[..pre_start]);
+        let pre_remainder = &remainder[pre_start..];
+        let Some(pre_tag_end) = pre_remainder.find('>') else {
+            output.push_str(pre_remainder);
+            remainder = "";
+            break;
+        };
+        let body_start = pre_start + pre_tag_end + 1;
+        let body_remainder = &remainder[body_start..];
+        let Some(pre_close) = find_ascii_case_insensitive(body_remainder, "</pre>") else {
+            output.push_str(pre_remainder);
+            remainder = "";
+            break;
+        };
+        let body = &body_remainder[..pre_close];
+        let (language, code_body) = html_pre_code_body(body);
+        let plain = strip_html_tags_to_text(code_body)
+            .trim_matches('\n')
+            .to_string();
+
+        if !output.is_empty() && !output.ends_with("\n\n") {
+            if output.ends_with('\n') {
+                output.push('\n');
+            } else {
+                output.push_str("\n\n");
+            }
+        }
+        output.push_str("```");
+        output.push_str(&language);
+        output.push('\n');
+        output.push_str(&plain);
+        output.push_str("\n```\n\n");
+
+        converted += 1;
+        remainder = &body_remainder[pre_close + "</pre>".len()..];
+    }
+
+    output.push_str(remainder);
+    if converted > 0 {
+        issues.push(format!(
+            "Converted {converted} rich HTML code block(s) to Markdown fences."
+        ));
+    }
+    output
+}
+
+fn html_pre_code_body(body: &str) -> (String, &str) {
+    let Some(code_start) = find_ascii_case_insensitive(body, "<code") else {
+        return (String::new(), body);
+    };
+    let code_remainder = &body[code_start..];
+    let Some(code_tag_end) = code_remainder.find('>') else {
+        return (String::new(), body);
+    };
+    let code_tag = &code_remainder[1..code_tag_end];
+    let code_body_start = code_start + code_tag_end + 1;
+    let code_body_remainder = &body[code_body_start..];
+    let Some(code_close) = find_ascii_case_insensitive(code_body_remainder, "</code>") else {
+        return (language_from_code_tag(code_tag), code_body_remainder);
+    };
+    (
+        language_from_code_tag(code_tag),
+        &code_body_remainder[..code_close],
+    )
+}
+
+fn language_from_code_tag(tag: &str) -> String {
+    for key in ["class", "data-language", "lang"] {
+        if let Some(value) = html_attribute(tag, key) {
+            if let Some(language) = value.split_whitespace().find_map(normalize_fence_language) {
+                return language;
+            }
+        }
+    }
+    String::new()
+}
+
+fn strip_html_tags_to_text(text: &str) -> String {
+    let mut output = String::new();
+    let mut index = 0usize;
+    while index < text.len() {
+        let remainder = &text[index..];
+        let Some(tag_start) = remainder.find('<') else {
+            output.push_str(remainder);
+            break;
+        };
+        output.push_str(&remainder[..tag_start]);
+        let tag_absolute_start = index + tag_start;
+        let tag_remainder = &text[tag_absolute_start..];
+        let Some(tag_end) = tag_remainder.find('>') else {
+            output.push_str(tag_remainder);
+            break;
+        };
+        let raw_tag = tag_remainder[1..tag_end].trim().to_ascii_lowercase();
+        if raw_tag.starts_with("br") {
+            output.push('\n');
+        }
+        index = tag_absolute_start + tag_end + 1;
+    }
+    output
+}
+
+fn find_ascii_case_insensitive(haystack: &str, needle: &str) -> Option<usize> {
+    haystack
+        .to_ascii_lowercase()
+        .find(&needle.to_ascii_lowercase())
 }
 
 fn push_markdown_for_html_tag(raw_tag: &str, output: &mut String, link_stack: &mut Vec<String>) {
@@ -422,6 +538,96 @@ fn normalize_markdown_lists(
         issues.push("Normalized bullet characters to Markdown list markers.".to_string());
     }
     output
+}
+
+fn normalize_ai_code_fences(text: &str, issues: &mut Vec<String>) -> String {
+    let mut output = Vec::new();
+    let mut in_code_fence = false;
+    let mut normalized = 0usize;
+    let mut removed_copy_labels = 0usize;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if !in_code_fence && is_ai_copy_code_label(trimmed) {
+            removed_copy_labels += 1;
+            continue;
+        }
+        if let Some((marker, raw_language)) = ai_code_fence_parts(trimmed) {
+            if in_code_fence {
+                if trimmed != "```" {
+                    normalized += 1;
+                }
+                output.push("```".to_string());
+                in_code_fence = false;
+                continue;
+            }
+            let language = raw_language
+                .and_then(normalize_fence_language)
+                .unwrap_or_default();
+            let normalized_line = if language.is_empty() {
+                "```".to_string()
+            } else {
+                format!("```{language}")
+            };
+            if marker != "```" || trimmed != normalized_line || line != trimmed {
+                normalized += 1;
+            }
+            output.push(normalized_line);
+            in_code_fence = true;
+            continue;
+        }
+        output.push(line.to_string());
+    }
+
+    if normalized > 0 {
+        issues.push(format!("Normalized {normalized} AI code fence marker(s)."));
+    }
+    if removed_copy_labels > 0 {
+        issues.push(format!(
+            "Removed {removed_copy_labels} AI code copy label(s)."
+        ));
+    }
+    output.join("\n")
+}
+
+fn ai_code_fence_parts(line: &str) -> Option<(&'static str, Option<&str>)> {
+    if let Some(rest) = line.strip_prefix("```") {
+        return Some(("```", Some(rest.trim()).filter(|value| !value.is_empty())));
+    }
+    if let Some(rest) = line.strip_prefix("~~~") {
+        return Some(("~~~", Some(rest.trim()).filter(|value| !value.is_empty())));
+    }
+    None
+}
+
+fn normalize_fence_language(raw: &str) -> Option<String> {
+    let mut value = raw
+        .trim()
+        .trim_matches('`')
+        .trim()
+        .trim_start_matches("{.")
+        .trim_start_matches('{')
+        .trim_end_matches('}')
+        .trim();
+    if value.to_ascii_lowercase().starts_with("language-") {
+        value = &value["language-".len()..];
+    }
+    let token = value.split_whitespace().next().unwrap_or("").trim();
+    if token.is_empty()
+        || token.eq_ignore_ascii_case("copy")
+        || token.eq_ignore_ascii_case("code")
+        || token.eq_ignore_ascii_case("copy-code")
+    {
+        return None;
+    }
+    Some(token.to_ascii_lowercase())
+}
+
+fn is_ai_copy_code_label(line: &str) -> bool {
+    matches!(
+        line.to_ascii_lowercase().as_str(),
+        "copy code" | "copy" | "code"
+    )
 }
 
 fn strip_ai_bullet_prefix(line: &str) -> Option<&str> {

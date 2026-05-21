@@ -202,6 +202,76 @@ fn ai_cleanup_normalizes_rich_html_clipboard_content() {
 }
 
 #[test]
+fn ai_cleanup_normalizes_ai_code_fence_variants() {
+    let response = cleanup_ai_paste(AiCleanupRequest {
+            text: "Copy code\n``` python\nprint(\"24% growth\")\n```\n\n~~~ TypeScript\nconst revenue = 24;\n~~~\n\nRevenue grew 24%.".to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+            insert_citation_todos: true,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
+        });
+
+    assert!(response
+        .cleaned_markdown
+        .contains("```python\nprint(\"24% growth\")\n```"));
+    assert!(response
+        .cleaned_markdown
+        .contains("```typescript\nconst revenue = 24;\n```"));
+    assert!(!response.cleaned_markdown.contains("Copy code"));
+    assert!(!response
+        .cleaned_markdown
+        .contains("print(\"24% growth\") <!-- TODO: citation needed -->"));
+    assert!(!response
+        .cleaned_markdown
+        .contains("const revenue = 24; <!-- TODO: citation needed -->"));
+    assert!(response
+        .cleaned_markdown
+        .contains("Revenue grew 24%. <!-- TODO: citation needed -->"));
+    assert!(response
+        .issues
+        .iter()
+        .any(|issue| issue.contains("AI code fence")));
+    assert!(response
+        .issues
+        .iter()
+        .any(|issue| issue.contains("AI code copy label")));
+}
+
+#[test]
+fn ai_cleanup_converts_rich_html_pre_code_blocks_to_fences() {
+    let response = cleanup_ai_paste(AiCleanupRequest {
+            text: "<p>Use this:</p><pre><code class=\"language-python\">for item in items:\n    print(&lt;tag&gt;)</code></pre><p>Revenue grew 24%.</p>"
+                .to_string(),
+            add_provenance: false,
+            mark_as_draft: false,
+            insert_citation_todos: true,
+            preserve_headings: false,
+            convert_numbered_lists: true,
+            convert_tables: true,
+        });
+
+    assert!(response
+        .cleaned_markdown
+        .contains("```python\nfor item in items:\n    print(<tag>)\n```"));
+    assert!(!response
+        .cleaned_markdown
+        .contains("print(<tag>) <!-- TODO: citation needed -->"));
+    assert!(response
+        .cleaned_markdown
+        .contains("Revenue grew 24%. <!-- TODO: citation needed -->"));
+    assert!(response
+        .issues
+        .iter()
+        .any(|issue| issue.contains("rich HTML code block")));
+    assert!(response
+        .issues
+        .iter()
+        .any(|issue| issue.contains("rich HTML clipboard")));
+}
+
+#[test]
 fn ai_cleanup_preserves_code_fence_content() {
     let response = cleanup_ai_paste(AiCleanupRequest {
             text: "Assistant:\n```text\n• literal bullet\nA\tB\nRevenue grew 24%.\n```\n\n• Real bullet\nA\tB\nRevenue grew 24%.".to_string(),
