@@ -108,6 +108,10 @@ Recent pushed checkpoints visible in current git history:
   test:rendered-exports` now asserts blog/Substack metadata and copy artifacts,
   LaTeX source structure, Google Docs import metadata, and the nested DOCX
   package inside the Google Docs handoff ZIP.
+- This update expands macOS native DOCX extraction proof. The rendered export
+  audit now runs `textutil` against the primary DOCX, the Google Docs handoff
+  package's nested DOCX, and each rendered review-case DOCX, with all assertions
+  recorded in `viewer-proof.json` and `manual-review.html`.
 - This update adds macOS native rendered-viewer classification. The rendered
   export audit now attempts Quick Look thumbnails for the generated PDF, DOCX,
   and PPTX artifacts and records either thumbnail evidence or the current
@@ -682,7 +686,7 @@ Current verification recorded on 2026-05-21 and 2026-05-22:
 | `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | 8 file command tests passed, including `reveal_command_for_existing_path_is_platform_specific_and_argument_safe`. |
 | `cargo test --locked desktop_native_command_workflow_smoke --lib` in `src-tauri` | Pass | Native command workflow smoke passed against real local files and direct export outputs. |
 | `cargo test --locked representative_rendered_export_artifacts_are_package_inspectable --lib` in `src-tauri` | Pass | Representative rendered/package export audit passed across HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package evidence. |
-| `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes, a manual checklist report, `manual-review.html`, `viewer-proof.json` executable viewer/package assertions, publishing handoff metadata checks, LaTeX source checks, nested Google Docs DOCX checks, macOS Quick Look PDF/DOCX/PPTX thumbnail classification, `review-cases/rich-blocks` and `review-cases/option-heavy` artifact proof, and a `pdflatex` compile proof on this host. |
+| `pnpm run test:rendered-exports` | Pass | Generated and verified `.tmp/rendered-export-audit` artifacts for HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package outputs, including hashes, a manual checklist report, `manual-review.html`, `viewer-proof.json` executable viewer/package assertions, publishing handoff metadata checks, LaTeX source checks, nested Google Docs DOCX checks, macOS `textutil` extraction for primary/nested/review-case DOCX files, macOS Quick Look PDF/DOCX/PPTX thumbnail classification, `review-cases/rich-blocks` and `review-cases/option-heavy` artifact proof, and a `pdflatex` compile proof on this host. |
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
@@ -2199,7 +2203,7 @@ Publishing and Google Docs handoff workflow verification:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed after adding machine-readable publish/import workflow metadata to blog, Substack, and Google Docs packages. |
-| `pnpm run test:rendered-exports` | Pass | Rendered export audit passed with package assertions for blog/Substack publish workflow metadata, Google Docs import workflow metadata, LaTeX source checks, nested Google Docs DOCX package checks, macOS `textutil` DOCX text extraction, and `pdflatex` compile proof. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit passed with package assertions for blog/Substack publish workflow metadata, Google Docs import workflow metadata, LaTeX source checks, nested Google Docs DOCX package checks, macOS `textutil` extraction for primary/nested DOCX files, and `pdflatex` compile proof. |
 
 Performance audit report verification:
 
@@ -2293,8 +2297,8 @@ Rendered export review-case verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `pnpm run test:rendered-exports` | Pass | The rendered export audit now writes `manual-review.html` plus `review-cases/rich-blocks` and `review-cases/option-heavy` artifacts for HTML, PDF, DOCX, PPTX, and Markdown bundle targets, records them in `rendered-export-audit-report.json`, checks required evidence through the Node viewer/package proof, and attempts macOS Quick Look thumbnails for primary PDF/DOCX/PPTX artifacts. |
-| `node --check scripts/check-rendered-export-audit.mjs` | Pass | The rendered export audit verifier remains syntactically valid after adding review-case proof collection. |
+| `pnpm run test:rendered-exports` | Pass | The rendered export audit now writes `manual-review.html` plus `review-cases/rich-blocks` and `review-cases/option-heavy` artifacts for HTML, PDF, DOCX, PPTX, and Markdown bundle targets, records them in `rendered-export-audit-report.json`, checks required evidence through the Node viewer/package proof, runs macOS `textutil` extraction against the primary DOCX, nested Google Docs DOCX, and both review-case DOCX files, and attempts macOS Quick Look thumbnails for primary PDF/DOCX/PPTX artifacts. |
+| `node --check scripts/check-rendered-export-audit.mjs` | Pass | The rendered export audit verifier remains syntactically valid after adding broader macOS textutil proof collection. |
 | `cargo fmt --check` in `src-tauri` | Pass | Rust formatting remains clean after adding generated review-case fixtures. |
 | `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after adding generated review-case fixtures. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after recording the rendered export review-case evidence; all local links resolved. |

@@ -110,7 +110,7 @@ if (issues.length === 0) {
 }
 
 if (issues.length === 0) {
-  collectMacTextutilProof(issues, viewerProof);
+  collectMacTextutilProof(issues, viewerProof, auditReport);
 }
 
 if (issues.length === 0) {
@@ -469,33 +469,70 @@ function collectMacQuickLookProof(issues, assertions) {
   }
 }
 
-function collectMacTextutilProof(issues, assertions) {
+function collectMacTextutilProof(issues, assertions, report) {
   if (process.platform !== "darwin") return;
-  const result = spawnSync(
-    "textutil",
-    ["-convert", "txt", "-stdout", join(auditDir, "rendered-export-audit.docx")],
-    {
-      encoding: "utf8",
-      timeout: 15_000,
-    },
-  );
-  if (result.status !== 0) {
-    assertions.push({
-      scope: "macos-textutil-docx",
-      assertion: "extracts DOCX text through macOS textutil",
-      passed: false,
-      stderr: result.stderr?.trim() || "",
-    });
-    issues.push("macOS textutil failed to extract rendered-export-audit.docx");
-    return;
-  }
-  assertContains(assertions, issues, "macos-textutil-docx", result.stdout ?? "", [
+  assertMacTextutilDocx(issues, assertions, "macos-textutil-docx", join(auditDir, "rendered-export-audit.docx"), [
     "Rendered Export Audit",
     "Control summary",
     "Review Comments",
     "AI Provenance",
     "Legal Disclaimer",
   ]);
+
+  const nativeProofDir = join(auditDir, "native-proof");
+  mkdirSync(nativeProofDir, { recursive: true });
+  const googleDocsDocx = readZipEntries(join(auditDir, "rendered-export-audit.google-docs.zip")).get("document.docx");
+  if (!googleDocsDocx) {
+    issues.push("Google Docs package is missing nested document.docx for native textutil proof");
+  } else {
+    const googleDocsDocxPath = join(nativeProofDir, "google-docs-document.docx");
+    writeFileSync(googleDocsDocxPath, googleDocsDocx);
+    assertMacTextutilDocx(issues, assertions, "macos-textutil-google-docs-docx", googleDocsDocxPath, [
+      "Rendered Export Audit",
+      "Control summary",
+      "Architecture diagram",
+      "AI Provenance",
+    ]);
+  }
+
+  for (const reviewCase of report.reviewCases || []) {
+    const docxTarget = (reviewCase.targets || []).find((target) => target.target === "docx");
+    if (!docxTarget?.path) {
+      issues.push(`rendered review case ${reviewCase.slug} is missing DOCX target for native textutil proof`);
+      continue;
+    }
+    assertMacTextutilDocx(
+      issues,
+      assertions,
+      `macos-textutil-review-${reviewCase.slug}`,
+      join(auditDir, docxTarget.path),
+      [...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || [])].filter(Boolean))],
+    );
+  }
+}
+
+function assertMacTextutilDocx(issues, assertions, scope, path, needles) {
+  const result = spawnSync("textutil", ["-convert", "txt", "-stdout", path], {
+    encoding: "utf8",
+    timeout: 15_000,
+  });
+  if (result.status !== 0) {
+    assertions.push({
+      scope,
+      assertion: "extracts DOCX text through macOS textutil",
+      passed: false,
+      stderr: result.stderr?.trim() || "",
+    });
+    issues.push(`macOS textutil failed to extract ${relativeToAudit(path)}`);
+    return;
+  }
+  assertContains(
+    assertions,
+    issues,
+    scope,
+    result.stdout ?? "",
+    needles,
+  );
 }
 
 function writeManualReviewDashboard(report, assertions) {
