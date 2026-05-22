@@ -172,7 +172,7 @@ Recent pushed checkpoints visible in current git history:
   the evidence under `.tmp/rendered-export-audit/office-preview/`, and maps it
   into `viewer-proof.json`, `manual-review.html`, and `visual-review-summary.json`.
 - This update makes browser workflow execution current-host evidence instead
-  of stale archived evidence. `pnpm run test:e2e` now passes all 48 Chromium
+  of stale archived evidence. `pnpm run test:e2e` now passes all 49 Chromium
   workbench workflows locally through the system-Chrome fallback when bundled
   Playwright Chromium is missing, including editor/preview typing, settings persistence, command
   palette navigation, responsive desktop/narrow layout proof, fold/unfold controls, file/save/rename/reveal flows, snapshots, workspace
@@ -679,7 +679,7 @@ P0 gaps:
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in that retired workflow.
-- Browser-level workflow tests now pass locally with 48 Chromium tests through
+- Browser-level workflow tests now pass locally with 49 Chromium tests through
   `pnpm run test:e2e`. The current macOS proof used the system-Chrome fallback
   because bundled Playwright Chromium is missing on this host, and
   `.tmp/e2e-browser/report.json` records `source: system-chromium`, the Chrome
@@ -749,9 +749,9 @@ Current verification recorded on 2026-05-21 and 2026-05-22:
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
-| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 48 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 49 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host by falling back from the missing Playwright bundled Chromium path to `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; `.tmp/e2e-environment/report.json` records `source: system-chromium`, the expected bundled path, and the passing command tail. |
-| `pnpm run test:e2e` | Pass | 48 Chromium browser workbench workflows passed locally on this host, including responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
+| `pnpm run test:e2e` | Pass | 49 Chromium browser workbench workflows passed locally on this host, including responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
@@ -2454,6 +2454,14 @@ External transform engine smoke verification:
 | `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture` in `src-tauri` | Pass | Rust conformance continues to verify installed Graphviz variants, D2, and PlantUML through NEditor's external transform execution path, with Pikchr skipped because it is not installed. |
 | `pnpm run test:unit` | Pass | 21 frontend unit tests passed, including static guards that `check:engines` keeps smoke artifacts, incompatible-engine failure reporting, PlantUML file-mode proof, and Pikchr CLI detection wired. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the stronger external-engine platform evidence; all local links resolved. |
+
+Export profile persistence verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 21 frontend unit tests passed, including workspace migration coverage for named export profiles and static guards for Export sidebar profile controls plus store save/apply/delete actions. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding normalized export profile persistence and profile manager UI. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "saves and reapplies reusable export profiles" --project chromium` | Pass | Browser workflow passed with the system-Chrome fallback, proving a branded PDF export profile can be saved, export settings can drift, the profile can be reapplied, and the saved profile survives reload. |
 
 Live Google Docs import attempt:
 

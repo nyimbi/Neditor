@@ -137,7 +137,7 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 48 Chromium browser workbench workflows
+- `pnpm run test:e2e`: passed all 49 Chromium browser workbench workflows
   locally on 2026-05-22 through the system-Chrome fallback because bundled
   Playwright Chromium is missing on this host, including HTML, blog/Substack,
   LaTeX, Google Docs export-target handoffs, and deep keyboard-only operation
@@ -738,12 +738,12 @@ wrapper from a terminal/session that permits Chromium launch.
 
 Current host evidence:
 
-- 2026-05-22: `pnpm exec playwright test --list` lists 48 Chromium workflow
+- 2026-05-22: `pnpm exec playwright test --list` lists 49 Chromium workflow
   tests in `e2e/app-workflows.spec.ts`.
 - 2026-05-22: `pnpm run check:e2e-env` passes the focused workbench boot
   workflow through the system-Chrome fallback because bundled Playwright
   Chromium is missing on this host.
-- 2026-05-22: `pnpm run test:e2e` passed all 48 Chromium browser workflows,
+- 2026-05-22: `pnpm run test:e2e` passed all 49 Chromium browser workflows,
   including the HTML, blog/Substack, LaTeX, and Google Docs export-target
   handoff tests plus deep keyboard-only workbench operation.
 
@@ -1077,7 +1077,9 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   rendered export viewer-proof assertions.
 - Page size, orientation, margins, columns, breaks, keep-with-next,
   keep-together, headers, footers, watermarks, cover pages, page numbers,
-  brand profile, logo, colors, and fonts.
+  brand profile, logo, colors, and fonts. Named export profiles now let users
+  save and reapply target, export-option, citation, and brand defaults through
+  the Export sidebar; remaining work is visual QA across more rendered targets.
 - Transform artifacts from native renderers and external engines.
 
 Needed proof:

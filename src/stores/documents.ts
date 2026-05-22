@@ -20,9 +20,12 @@ import {
   normalizeBrandProfileDefaults,
   normalizeCitationStyle,
   normalizeExportDefaults,
+  normalizeExportProfiles,
   normalizeGitIntegrationPreferences,
   normalizePersistedWorkspaceForSave,
   type ExportDefaults,
+  type ExportProfile,
+  type ExportTarget,
   type PersistedScrollPosition,
   type PersistedWorkspace,
   type PreviewTheme,
@@ -89,6 +92,12 @@ interface TransformProbeResult {
 }
 
 const staleSaveConflictMessage = "File changed on disk since it was opened; resolve the external conflict before saving.";
+
+function exportProfileId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `export-profile-${Date.now().toString(36)}`;
+}
 
 function parseAiAssistedMarker(line: string) {
   const content = line.match(/<!--\s*ai-assisted:(.*?)-->/)?.[1] || "";
@@ -349,16 +358,7 @@ export const useDocumentsStore = defineStore("documents", {
     previewFontSize: 14,
     editorLineHeight: 1.55,
     previewLineHeight: 1.65,
-    exportTarget: "html" as
-      | "html"
-      | "pdf"
-      | "docx"
-      | "pptx"
-      | "markdown-bundle"
-      | "blog"
-      | "substack"
-      | "latex"
-      | "google-docs",
+    exportTarget: "html" as ExportTarget,
     exportDefaults: {
       includeManifest: true,
       includeStyles: true,
@@ -373,6 +373,8 @@ export const useDocumentsStore = defineStore("documents", {
     } as ExportDefaults,
     bibliographyDefaults: normalizeBibliographyDefaults({}),
     brandProfileDefaults: normalizeBrandProfileDefaults({}),
+    exportProfiles: [] as ExportProfile[],
+    activeExportProfileId: "",
     gitIntegration: normalizeGitIntegrationPreferences({}),
     aiCleanupDefaults: normalizeAiCleanupDefaults({}),
     gitStatus: null as GitStatus | null,
@@ -488,6 +490,11 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.exportDefaults) this.exportDefaults = normalizeExportDefaults(persisted.exportDefaults);
         if (persisted.bibliographyDefaults) this.bibliographyDefaults = normalizeBibliographyDefaults(persisted.bibliographyDefaults);
         if (persisted.brandProfileDefaults) this.brandProfileDefaults = normalizeBrandProfileDefaults(persisted.brandProfileDefaults);
+        this.exportProfiles = normalizeExportProfiles(persisted.exportProfiles);
+        this.activeExportProfileId =
+          persisted.activeExportProfileId && this.exportProfiles.some((profile) => profile.id === persisted.activeExportProfileId)
+            ? persisted.activeExportProfileId
+            : "";
         if (persisted.gitIntegration) this.gitIntegration = normalizeGitIntegrationPreferences(persisted.gitIntegration);
         if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
         this.recentFiles = persisted.recentFiles || [];
@@ -546,6 +553,8 @@ export const useDocumentsStore = defineStore("documents", {
         exportDefaults: this.exportDefaults,
         bibliographyDefaults: this.bibliographyDefaults,
         brandProfileDefaults: this.brandProfileDefaults,
+        exportProfiles: this.exportProfiles,
+        activeExportProfileId: this.activeExportProfileId,
         gitIntegration: this.gitIntegration,
         aiCleanupDefaults: this.aiCleanupDefaults,
         recentFiles: this.recentFiles.slice(0, 20),
@@ -1275,6 +1284,49 @@ export const useDocumentsStore = defineStore("documents", {
         this.exportProgress = "";
         this.exportBusy = false;
       }
+    },
+    saveCurrentExportProfile(name: string) {
+      const profileName = name.trim() || "Export profile";
+      const existing = this.activeExportProfileId
+        ? this.exportProfiles.find((profile) => profile.id === this.activeExportProfileId)
+        : null;
+      const profile: ExportProfile = {
+        id: existing?.id || exportProfileId(),
+        name: profileName,
+        exportTarget: this.exportTarget,
+        exportDefaults: normalizeExportDefaults(this.exportDefaults),
+        bibliographyDefaults: normalizeBibliographyDefaults(this.bibliographyDefaults),
+        brandProfileDefaults: normalizeBrandProfileDefaults(this.brandProfileDefaults),
+      };
+      if (existing) {
+        this.exportProfiles = this.exportProfiles.map((item) => (item.id === existing.id ? profile : item));
+      } else {
+        this.exportProfiles = normalizeExportProfiles([...this.exportProfiles, profile]);
+      }
+      this.activeExportProfileId = profile.id;
+      this.statusMessage = `Saved export profile "${profile.name}"`;
+      void this.persistWorkspace();
+      return profile;
+    },
+    async applyExportProfile(id: string) {
+      const profile = this.exportProfiles.find((item) => item.id === id);
+      if (!profile) return;
+      this.exportTarget = profile.exportTarget;
+      this.exportDefaults = normalizeExportDefaults(profile.exportDefaults);
+      this.bibliographyDefaults = normalizeBibliographyDefaults(profile.bibliographyDefaults);
+      this.brandProfileDefaults = normalizeBrandProfileDefaults(profile.brandProfileDefaults);
+      this.activeExportProfileId = profile.id;
+      this.exportReadiness = null;
+      this.statusMessage = `Applied export profile "${profile.name}"`;
+      await this.compileActive();
+      await this.persistWorkspace();
+    },
+    deleteExportProfile(id: string) {
+      const profile = this.exportProfiles.find((item) => item.id === id);
+      this.exportProfiles = this.exportProfiles.filter((item) => item.id !== id);
+      if (this.activeExportProfileId === id) this.activeExportProfileId = "";
+      if (profile) this.statusMessage = `Deleted export profile "${profile.name}"`;
+      void this.persistWorkspace();
     },
     exportOptionsForActive() {
       const defaults = normalizeExportDefaults(this.exportDefaults);

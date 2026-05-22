@@ -3185,6 +3185,50 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
   await expect(page.locator(".status-bar")).toContainText("1 errors block export");
 });
 
+test("saves and reapplies reusable export profiles", async ({ page }) => {
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await page.getByLabel("Brand name").fill("Acme Board");
+  await page.getByLabel("Brand color").fill("#006699");
+  await page.getByLabel("Footer template").fill("Confidential");
+  await page.getByLabel("Citation style").selectOption("ieee");
+
+  await page.getByLabel("Sidebar panel").selectOption("exports");
+  const targetSelect = page.getByLabel("Target");
+  const layoutSelect = page.getByLabel("Layout preset");
+  await targetSelect.selectOption("pdf");
+  await layoutSelect.selectOption("compact");
+  await page.getByLabel("Export manifest").uncheck();
+  await page.getByLabel("Cover page").uncheck();
+  await page.getByLabel("Page numbers").uncheck();
+  await page.getByLabel("Profile name").fill("Client PDF");
+  await page.getByRole("button", { name: "Save profile" }).click();
+
+  await expect(page.locator(".status-bar")).toContainText('Saved export profile "Client PDF"');
+  await expect(page.getByLabel("Saved profile")).toContainText("Client PDF");
+
+  await targetSelect.selectOption("html");
+  await layoutSelect.selectOption("presentation");
+  await page.getByLabel("Export manifest").check();
+  await page.getByLabel("Cover page").check();
+  await page.getByLabel("Page numbers").check();
+
+  await page.getByLabel("Saved profile").selectOption({ label: "Client PDF" });
+  await expect(targetSelect).toHaveValue("pdf");
+  await expect(layoutSelect).toHaveValue("compact");
+  await expect(page.getByLabel("Export manifest")).not.toBeChecked();
+  await expect(page.getByLabel("Cover page")).not.toBeChecked();
+  await expect(page.getByLabel("Page numbers")).not.toBeChecked();
+  await expect(page.locator(".sidebar-hint").filter({ hasText: "PDF / compact / Acme Board" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Market Entry Report" })).toBeVisible();
+  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await expect(page.getByLabel("Saved profile")).toContainText("Client PDF");
+  await page.getByLabel("Saved profile").selectOption({ label: "Client PDF" });
+  await expect(page.getByLabel("Target")).toHaveValue("pdf");
+  await expect(page.getByLabel("Layout preset")).toHaveValue("compact");
+});
+
 test("publishes and hands off extended export targets", async ({ page }) => {
   await page.locator(".cm-content").click();
   await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");

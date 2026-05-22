@@ -775,6 +775,28 @@
 
         <template v-else-if="store.sidebar === 'exports'">
           <h2>Export</h2>
+          <section class="export-profile-manager" aria-label="Export profiles">
+            <h3>Profiles</h3>
+            <label>
+              Saved profile
+              <select :value="store.activeExportProfileId" @change="selectExportProfile(inputValue($event))">
+                <option value="">Current settings</option>
+                <option v-for="profile in store.exportProfiles" :key="profile.id" :value="profile.id">
+                  {{ profile.name }}
+                </option>
+              </select>
+            </label>
+            <label>
+              Profile name
+              <input v-model="exportProfileName" type="text" />
+            </label>
+            <div class="export-actions">
+              <button class="template-action-primary" type="button" @click="saveExportProfileFromPanel">Save profile</button>
+              <button type="button" :disabled="!store.activeExportProfileId" @click="deleteActiveExportProfile">Delete profile</button>
+            </div>
+            <p v-if="activeExportProfile" class="sidebar-hint">{{ exportProfileSummary }}</p>
+            <p v-else class="sidebar-hint">Save reusable HTML, PDF, Office, publishing, and brand settings for repeat exports.</p>
+          </section>
           <label>
             Target
             <select v-model="store.exportTarget">
@@ -1676,6 +1698,7 @@ const templateTransform = ref("all");
 const customTemplateDraft = ref<CustomTransformTemplate>(blankCustomTransformTemplate());
 const editingCustomTemplateId = ref("");
 const draggedTabId = ref("");
+const exportProfileName = ref("Client delivery");
 
 type FigureCropPosition = "center" | "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -1897,6 +1920,21 @@ const nativeMenuExportTargets: Record<string, ExportTarget> = {
 let unlistenNativeMenuCommand: UnlistenFn | null = null;
 
 const active = computed(() => store.activeDocument);
+const activeExportProfile = computed(() => store.exportProfiles.find((profile) => profile.id === store.activeExportProfileId) || null);
+const exportProfileSummary = computed(() => {
+  const profile = activeExportProfile.value;
+  if (!profile) return "";
+  const enabled = [
+    profile.exportDefaults.includeManifest && "manifest",
+    profile.exportDefaults.coverPage && "cover",
+    profile.exportDefaults.pageNumbers && "page numbers",
+    profile.exportDefaults.includeComments && "comments",
+    profile.exportDefaults.includeProvenance && "AI provenance",
+    profile.exportDefaults.includeGlossary && "glossary",
+  ].filter(Boolean);
+  const brand = profile.brandProfileDefaults.name || profile.brandProfileDefaults.color;
+  return `${profile.exportTarget.toUpperCase()} / ${profile.exportDefaults.layoutPreset}${brand ? ` / ${brand}` : ""}${enabled.length ? ` / ${enabled.join(", ")}` : ""}`;
+});
 const previewDocumentStyle = computed(() => ({
   fontFamily: store.previewFont,
   fontSize: `${clampUiFontSize(store.previewFontSize)}px`,
@@ -2723,6 +2761,10 @@ watch(
     void store.persistWorkspace();
   },
 );
+
+watch(activeExportProfile, (profile) => {
+  if (profile) exportProfileName.value = profile.name;
+});
 
 watch(
   () => store.bibliographyDefaults.citationStyle,
@@ -4579,6 +4621,25 @@ async function exportDocumentAs(target: typeof store.exportTarget) {
   store.sidebar = "exports";
   await nextTick();
   await exportDocument();
+}
+
+function selectExportProfile(id: string) {
+  if (id) {
+    void store.applyExportProfile(id);
+    return;
+  }
+  store.activeExportProfileId = "";
+  void store.persistWorkspace();
+}
+
+function saveExportProfileFromPanel() {
+  const profile = store.saveCurrentExportProfile(exportProfileName.value);
+  exportProfileName.value = profile.name;
+}
+
+function deleteActiveExportProfile() {
+  if (!store.activeExportProfileId) return;
+  store.deleteExportProfile(store.activeExportProfileId);
 }
 
 async function prepareForExport() {
@@ -6565,6 +6626,16 @@ select:hover {
   flex-wrap: wrap;
   gap: 6px;
   margin: 8px 0 10px;
+}
+
+.export-profile-manager {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #d8e0e8;
+}
+
+.export-profile-manager h3 {
+  margin: 0 0 8px;
 }
 
 .template-action-primary {

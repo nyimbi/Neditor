@@ -74,6 +74,15 @@ export interface BrandProfileDefaults {
   legalDisclaimer: string;
 }
 
+export interface ExportProfile {
+  id: string;
+  name: string;
+  exportTarget: ExportTarget;
+  exportDefaults: ExportDefaults;
+  bibliographyDefaults: BibliographyDefaults;
+  brandProfileDefaults: BrandProfileDefaults;
+}
+
 export interface GitIntegrationPreferences {
   enabled: boolean;
   warnOnDirtyExport: boolean;
@@ -114,6 +123,8 @@ export interface PersistedWorkspace {
   };
   bibliographyDefaults?: Partial<BibliographyDefaults>;
   brandProfileDefaults?: Partial<BrandProfileDefaults>;
+  exportProfiles?: Partial<ExportProfile>[];
+  activeExportProfileId?: string;
   gitIntegration?: Partial<GitIntegrationPreferences>;
   recentFiles?: string[];
   recentFolders?: string[];
@@ -277,6 +288,41 @@ export function normalizeBrandProfileDefaults(defaults: Partial<BrandProfileDefa
   };
 }
 
+function normalizeExportProfile(profile: unknown, index: number): ExportProfile | null {
+  if (!isRecord(profile)) return null;
+  const id = stringValue(profile.id)?.trim() || `export-profile-${index + 1}`;
+  const name = stringValue(profile.name)?.trim() || `Export profile ${index + 1}`;
+  const exportTarget =
+    enumValue(profile.exportTarget, ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"] as const) ||
+    "html";
+  return {
+    id,
+    name,
+    exportTarget,
+    exportDefaults: isRecord(profile.exportDefaults) ? normalizeExportDefaults(profile.exportDefaults) : normalizeExportDefaults({}),
+    bibliographyDefaults: isRecord(profile.bibliographyDefaults)
+      ? normalizeBibliographyDefaults(profile.bibliographyDefaults)
+      : normalizeBibliographyDefaults({}),
+    brandProfileDefaults: isRecord(profile.brandProfileDefaults)
+      ? normalizeBrandProfileDefaults(profile.brandProfileDefaults)
+      : normalizeBrandProfileDefaults({}),
+  };
+}
+
+export function normalizeExportProfiles(value: unknown): ExportProfile[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const profiles: ExportProfile[] = [];
+  for (const item of value) {
+    const profile = normalizeExportProfile(item, profiles.length);
+    if (!profile || seen.has(profile.id)) continue;
+    seen.add(profile.id);
+    profiles.push(profile);
+    if (profiles.length >= 20) break;
+  }
+  return profiles;
+}
+
 export function normalizeGitIntegrationPreferences(defaults: Partial<GitIntegrationPreferences>): GitIntegrationPreferences {
   return {
     enabled: typeof defaults.enabled === "boolean" ? defaults.enabled : true,
@@ -359,6 +405,14 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (isRecord(raw.exportDefaults)) migrated.exportDefaults = normalizeExportDefaults(raw.exportDefaults);
   if (isRecord(raw.bibliographyDefaults)) migrated.bibliographyDefaults = normalizeBibliographyDefaults(raw.bibliographyDefaults);
   if (isRecord(raw.brandProfileDefaults)) migrated.brandProfileDefaults = normalizeBrandProfileDefaults(raw.brandProfileDefaults);
+  const exportProfiles = normalizeExportProfiles(raw.exportProfiles);
+  if (exportProfiles.length) {
+    migrated.exportProfiles = exportProfiles;
+    const activeExportProfileId = stringValue(raw.activeExportProfileId);
+    if (activeExportProfileId && exportProfiles.some((profile) => profile.id === activeExportProfileId)) {
+      migrated.activeExportProfileId = activeExportProfileId;
+    }
+  }
   if (isRecord(raw.gitIntegration)) migrated.gitIntegration = normalizeGitIntegrationPreferences(raw.gitIntegration);
   if (isRecord(raw.aiCleanupDefaults)) migrated.aiCleanupDefaults = normalizeAiCleanupDefaults(raw.aiCleanupDefaults);
   migrated.recentFiles = stringArray(raw.recentFiles, 20);

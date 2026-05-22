@@ -303,6 +303,26 @@ test("workspace persistence migration versions and normalizes saved settings", (
     },
     bibliographyDefaults: { citationStyle: "APA" },
     brandProfileDefaults: { color: "  #123456  ", watermark: "Draft" },
+    activeExportProfileId: "client-pdf",
+    exportProfiles: [
+      {
+        id: "client-pdf",
+        name: " Client PDF ",
+        exportTarget: "pdf",
+        exportDefaults: { includeManifest: false, layoutPreset: "compact", pageNumbers: false },
+        bibliographyDefaults: { citationStyle: "ieee" },
+        brandProfileDefaults: { name: "Acme", color: " #006699 ", footer: "Confidential" },
+      },
+      {
+        id: "client-pdf",
+        name: "Duplicate ignored",
+      },
+      {
+        id: "client-html",
+        name: "",
+        exportTarget: "html",
+      },
+    ],
     gitIntegration: { enabled: false },
     aiCleanupDefaults: { preserveHeadings: true, convertTables: false },
     recentFiles: ["/a.md", 42, "/a.md", "/b.md"],
@@ -365,6 +385,37 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(normalizeCitationStyle("unknown-style"), "title");
   equal(migrated.brandProfileDefaults?.color, "#123456");
   equal(migrated.brandProfileDefaults?.watermark, "Draft");
+  equal(migrated.activeExportProfileId, "client-pdf");
+  deepEqual(migrated.exportProfiles?.map((profile) => profile.id), ["client-pdf", "client-html"]);
+  deepEqual(migrated.exportProfiles?.[0], {
+    id: "client-pdf",
+    name: "Client PDF",
+    exportTarget: "pdf",
+    exportDefaults: {
+      includeManifest: false,
+      includeStyles: true,
+      includeSyntaxHighlighting: true,
+      coverPage: true,
+      pageNumbers: false,
+      layoutPreset: "compact",
+      includeComments: true,
+      includeProvenance: true,
+      includeGlossary: true,
+      includeAgenda: true,
+    },
+    bibliographyDefaults: { citationStyle: "ieee" },
+    brandProfileDefaults: {
+      name: "Acme",
+      color: "#006699",
+      logo: "",
+      font: "",
+      header: "",
+      footer: "Confidential",
+      watermark: "",
+      legalDisclaimer: "",
+    },
+  });
+  equal(migrated.exportProfiles?.[1]?.name, "Export profile 2");
   deepEqual(migrated.gitIntegration, { enabled: false, warnOnDirtyExport: true });
   deepEqual(migrated.aiCleanupDefaults, {
     addProvenance: true,
@@ -447,6 +498,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Toolbar text size"'));
   ok(app.includes("Export HTML"));
   ok(app.includes("exportDocumentAs(\"html\")"));
+  ok(app.includes('aria-label="Export profiles"'));
+  ok(app.includes("saveCurrentExportProfile"));
+  ok(store.includes("saveCurrentExportProfile"));
+  ok(store.includes("applyExportProfile"));
+  ok(store.includes("deleteExportProfile"));
   ok(app.includes('listen<string>("neditor-menu-command"'));
   ok(app.includes('"neditor-export-html": "html"'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Export")'));
