@@ -7,12 +7,13 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const launchRequested =
   process.argv.includes("--launch") || process.env.NEDITOR_DESKTOP_SMOKE_LAUNCH === "1";
-const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 6000);
+const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 8000);
 const nativeWindowReportPath = join(root, ".tmp", "desktop-smoke", "native-window-report.json");
 const nativeUiReportPath = join(root, ".tmp", "desktop-smoke", "native-ui-report.json");
 const nativeWorkflowReportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-report.json");
 const nativeWorkflowFilePath = join(root, ".tmp", "desktop-smoke", "native-workflow-file.md");
 const nativeWorkflowExportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.html");
+const nativeWorkflowCopyPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.md");
 const issues = [];
 
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
@@ -168,6 +169,7 @@ async function launchDesktop(path) {
     rmSync(nativeWorkflowReportPath, { force: true });
     rmSync(nativeWorkflowFilePath, { force: true });
     rmSync(nativeWorkflowExportPath, { force: true });
+    rmSync(nativeWorkflowCopyPath, { force: true });
     rmSync(`${nativeWorkflowExportPath}.manifest.json`, { force: true });
     const child = spawn(path, [], {
       cwd: root,
@@ -373,6 +375,10 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow dirtied opened real file",
     "native workflow reverted saved real file",
     "native workflow blocked stale save with external conflict",
+    "native workflow kept local conflict changes",
+    "native workflow saved kept-local conflict changes",
+    "native workflow saved local conflict copy",
+    "native workflow merged external conflict changes",
     "native workflow accepted external conflict changes",
     "native workflow restored real file after conflict proof",
     "native workflow opened command palette",
@@ -420,6 +426,10 @@ function validateNativeWorkflowReport(launchReport) {
   if (String(fileWorkflow.filePath || "").replaceAll("\\", "/") !== expectedFilePath) {
     issues.push(`native workflow report did not include real file workflow path: ${JSON.stringify(fileWorkflow)}`);
   }
+  const expectedCopyPath = nativeWorkflowCopyPath.replaceAll("\\", "/");
+  if (String(fileWorkflow.copyPath || "").replaceAll("\\", "/") !== expectedCopyPath) {
+    issues.push(`native workflow report did not include local conflict copy path: ${JSON.stringify(fileWorkflow)}`);
+  }
   if (!existsSync(nativeWorkflowFilePath)) {
     issues.push(`native workflow saved Markdown file was not written: ${relative(nativeWorkflowFilePath)}`);
   } else {
@@ -428,9 +438,20 @@ function validateNativeWorkflowReport(launchReport) {
       !markdown.includes("Market Entry Report") ||
       markdown.includes("Native smoke revert marker") ||
       markdown.includes("External native conflict edit") ||
-      markdown.includes("Local unsaved native conflict edit")
+      markdown.includes("Local unsaved native conflict edit") ||
+      markdown.includes("Keep-local native conflict edit") ||
+      markdown.includes("Save-copy native conflict edit") ||
+      markdown.includes("Merged native conflict edit")
     ) {
       issues.push("native workflow saved Markdown file did not preserve reverted document content");
+    }
+  }
+  if (!existsSync(nativeWorkflowCopyPath)) {
+    issues.push(`native workflow local conflict copy was not written: ${relative(nativeWorkflowCopyPath)}`);
+  } else {
+    const copy = readFileSync(nativeWorkflowCopyPath, "utf8");
+    if (!copy.includes("Save-copy native conflict edit")) {
+      issues.push("native workflow local conflict copy did not preserve local conflict text");
     }
   }
   if (!String(payload.editorSnippet || "").includes("weight_kg = 72")) {

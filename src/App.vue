@@ -2892,6 +2892,63 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
     }),
   );
 
+  await store.keepLocalChanges();
+  await nextTick();
+  record(
+    "native workflow kept local conflict changes",
+    !store.externalConflict && active.value.dirty && active.value.text.includes("Local unsaved native conflict edit"),
+    JSON.stringify({ title: active.value.title, dirty: active.value.dirty, statusMessage: store.statusMessage }),
+  );
+  await store.saveActive(filePath);
+  await nextTick();
+  await waitForNativeWorkflowCondition(
+    () => active.value.path === filePath && !active.value.dirty && !store.externalConflict,
+    800,
+  );
+  record(
+    "native workflow saved kept-local conflict changes",
+    active.value.path === filePath && active.value.text.includes("Local unsaved native conflict edit") && !active.value.dirty && !store.externalConflict,
+    JSON.stringify({ title: active.value.title, dirty: active.value.dirty, statusMessage: store.statusMessage }),
+  );
+
+  const saveCopyExternalText = `${savedText}\n\nExternal save-copy native conflict edit.`;
+  const saveCopyLocalText = `${savedText}\n\nSave-copy native conflict edit.`;
+  await openNativeWorkflowConflict(filePath, saveCopyExternalText, saveCopyLocalText);
+  const copyPath = await invoke<string | null>("desktop_workflow_smoke_export_path", { extension: "md" }).catch(() => null);
+  if (copyPath) {
+    await store.saveLocalConflictCopy(copyPath);
+    await nextTick();
+  }
+  record(
+    "native workflow saved local conflict copy",
+    Boolean(copyPath && active.value.path === copyPath && active.value.text.includes("Save-copy native conflict edit") && !store.externalConflict && !active.value.dirty),
+    JSON.stringify({ copyPath, activePath: active.value.path, dirty: active.value.dirty, statusMessage: store.statusMessage }),
+  );
+
+  const mergeExternalText = `${savedText}\n\nExternal merge native conflict edit.`;
+  const mergeLocalText = `${savedText}\n\nLocal merge native conflict edit.`;
+  const mergedText = `${savedText}\n\nMerged native conflict edit.\nExternal merge native conflict edit.\nLocal merge native conflict edit.`;
+  await openNativeWorkflowConflict(filePath, mergeExternalText, mergeLocalText);
+  await store.applyConflictMerge(mergedText);
+  await nextTick();
+  await store.saveActive(filePath);
+  await nextTick();
+  await waitForNativeWorkflowCondition(
+    () => active.value.path === filePath && active.value.text.includes("Merged native conflict edit") && !active.value.dirty && !store.externalConflict,
+    800,
+  );
+  record(
+    "native workflow merged external conflict changes",
+    active.value.path === filePath &&
+      active.value.text.includes("Merged native conflict edit") &&
+      active.value.text.includes("External merge native conflict edit") &&
+      active.value.text.includes("Local merge native conflict edit") &&
+      !active.value.dirty &&
+      !store.externalConflict,
+    JSON.stringify({ title: active.value.title, dirty: active.value.dirty, statusMessage: store.statusMessage }),
+  );
+
+  await openNativeWorkflowConflict(filePath, externalText, localText);
   await store.acceptExternalChanges();
   await nextTick();
   await waitForNativeWorkflowCondition(
@@ -2915,10 +2972,24 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
 
   return {
     filePath,
+    copyPath,
     title: active.value.title,
     recentFiles: store.recentFiles.slice(0, 5),
     recentlyClosed: store.recentlyClosed.slice(0, 5),
   };
+}
+
+async function openNativeWorkflowConflict(filePath: string, externalText: string, localText: string) {
+  await store.openPath(filePath);
+  await nextTick();
+  await invoke("save_file", { request: { path: filePath, text: externalText, expected_hash: null } });
+  await setNativeWorkflowText(localText);
+  await store.saveActive();
+  await nextTick();
+  await waitForNativeWorkflowCondition(
+    () => store.externalConflict?.reason === "root" && store.externalConflict.path === filePath && active.value.text === localText,
+    800,
+  );
 }
 
 async function setNativeWorkflowText(text: string) {

@@ -898,8 +898,10 @@ Needed desktop smoke coverage:
   and validates split/source/preview/focus/export/review/presentation mode
   switching, export/review/presentation sidebar routing, command-palette
   opening, Science `calc` template insertion into source, rendered preview
-  output, dirty title mutation, HTML export readiness progress evidence, and a
-  real app-initiated HTML export with sidecar manifest/output-hash evidence.
+  output, dirty title mutation, HTML export readiness progress evidence, a
+  real app-initiated HTML export with sidecar manifest/output-hash evidence,
+  and stale-save conflict recovery through keep-local plus save, save-copy,
+  merge, accept-external, and final file restoration assertions.
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
   script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native
@@ -915,7 +917,11 @@ Needed desktop smoke coverage:
 - Dirty title/status behavior. Covered on macOS by the app-authored native
   workflow smoke and in the supported-platform WebDriver harness; still needs
   WebDriver execution on Windows/Linux.
-- External file watcher and conflict flow with real file changes.
+- External conflict flow with real file changes. Covered for deterministic
+  stale-save mutations in the app-authored native workflow smoke, including
+  keep-local plus save, save-copy, merge, accept-external, and restoration.
+  Native watcher-event delivery inside a long-running desktop session remains
+  open.
 - Export readiness and one real export invocation. Export readiness is covered
   by the app-authored native workflow smoke and the supported-platform WebDriver
   harness; real export invocation is covered by the native command smoke and by

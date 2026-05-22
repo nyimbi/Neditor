@@ -1141,8 +1141,16 @@ export const useDocumentsStore = defineStore("documents", {
       await this.refreshGitStatus();
     },
     keepLocalChanges() {
-      if (this.externalConflict?.externalHash) {
-        this.rememberIgnoredConflict(this.externalConflict.path, this.externalConflict.externalHash);
+      const conflict = this.externalConflict;
+      if (conflict?.externalHash) {
+        this.rememberIgnoredConflict(conflict.path, conflict.externalHash);
+      }
+      if (conflict?.reason === "root") {
+        const doc = this.documents.find((document) => document.id === conflict.documentId) || this.activeDocument;
+        this.setActiveDocument(doc.id);
+        doc.savedHash = conflict.externalHash;
+        doc.savedText = conflict.externalText || doc.savedText;
+        this.externalHash = conflict.externalHash;
       }
       this.externalConflict = null;
       this.statusMessage = "Keeping local edits";
