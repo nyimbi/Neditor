@@ -116,7 +116,10 @@ Recent pushed checkpoints visible in current git history:
 - This update makes optional external-engine platform evidence inspectable.
   `pnpm run check:engines` now writes
   `.tmp/external-engines/probe-report.json` with platform, architecture,
-  installed Graphviz/DOT variants, D2, PlantUML, and missing optional engines.
+  installed Graphviz/DOT variants, D2, PlantUML, missing optional engines, and
+  SVG smoke artifacts under `.tmp/external-engines/artifacts/` for every
+  installed engine. Installed engines now have to pass the adapter-shaped smoke
+  render before the probe reports them compatible.
 - This update adds native command workflow timing evidence to the desktop
   smoke. `pnpm run test:desktop-smoke` now writes
   `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata,
@@ -592,8 +595,9 @@ Implemented or substantially present, pending the conservative caveats in
   and source hash, with a regression test proving same-path executable rewrites
   do not serve stale cached output.
 - Optional external engine platform evidence can now be refreshed locally with
-  `pnpm run check:engines`; the latest macOS record proves dot, d2, and
-  PlantUML execution paths and records the missing Pikchr gap.
+  `pnpm run check:engines`; the latest macOS record proves Graphviz variants,
+  D2, and PlantUML version plus SVG smoke-render paths and records the missing
+  Pikchr gap.
 - Rust-native structured-document transforms for JSON, YAML, OpenAPI, and JSON
   Schema, including nested schema/reference output for API and schema docs.
 - Business features including AI paste cleanup, table editor logic, formula
@@ -2427,6 +2431,17 @@ Rendered export Office preview verification:
 | `pnpm run test:rendered-exports` | Pass | Rendered export audit passed and now writes `.tmp/rendered-export-audit/office-preview/office-preview-docx.html`, `.tmp/rendered-export-audit/office-preview/office-preview-pptx.html`, review-case DOCX/PPTX preview dashboards, and Chromium screenshots for each preview when the browser fallback is available. |
 | `pnpm run test:unit` | Pass | 20 frontend unit tests passed, including static guards that the rendered export audit keeps the Office preview proof, screenshots, and summary mapping wired. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the generated Office preview export proof; all local links resolved. |
+
+External transform engine smoke verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/check-external-engines.mjs` | Pass | Optional engine probe syntax remains valid after adding adapter-shaped smoke artifact generation. |
+| `pnpm run check:engines` | Partial pass | Darwin arm64 reports Graphviz `dot`, `circo`, `neato`, `fdp`, `osage`, `twopi`, D2, and PlantUML installed and smoke-compatible; `.tmp/external-engines/probe-report.json` records SVG smoke artifacts under `.tmp/external-engines/artifacts/` for each installed engine, while Pikchr remains missing as an explicit optional-engine gap. |
+| `node -e 'const r=require("./.tmp/external-engines/probe-report.json"); ... smoke ...'` | Pass | Probe report contains 8 installed engines, 8 passing smoke artifacts, zero incompatible engines, and the expected missing `pikchr or pikchr-cli` entry. |
+| `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture` in `src-tauri` | Pass | Rust conformance continues to verify installed Graphviz variants, D2, and PlantUML through NEditor's external transform execution path, with Pikchr skipped because it is not installed. |
+| `pnpm run test:unit` | Pass | 21 frontend unit tests passed, including static guards that `check:engines` keeps smoke artifacts, incompatible-engine failure reporting, PlantUML file-mode proof, and Pikchr CLI detection wired. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the stronger external-engine platform evidence; all local links resolved. |
 
 Live Google Docs import attempt:
 

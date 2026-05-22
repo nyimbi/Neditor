@@ -1228,8 +1228,10 @@ Finish:
 - macOS evidence now verifies Graphviz `dot`, `circo`, `neato`, `fdp`,
   `osage`, `twopi`, D2, and PlantUML through `pnpm run check:engines` and
   `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture`;
-  the engine probe writes `.tmp/external-engines/probe-report.json`; Pikchr
-  remains missing on this host.
+  the engine probe writes `.tmp/external-engines/probe-report.json` plus
+  inspectable SVG smoke artifacts under `.tmp/external-engines/artifacts/` for
+  every installed engine and fails if an installed engine cannot render the
+  expected adapter-shaped smoke output; Pikchr remains missing on this host.
 - Native Pikchr fallback now handles compact semicolon-separated statements,
   connector labels, and common business shapes (`box`, `circle`/`ellipse`,
   `diamond`, `cylinder`, and `file`) so useful previews still render before an

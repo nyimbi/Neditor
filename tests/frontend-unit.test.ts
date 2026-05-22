@@ -498,6 +498,17 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
 });
 
+test("external engine probe records render smoke artifacts", () => {
+  const script = readFileSync("scripts/check-external-engines.mjs", "utf8");
+
+  ok(script.includes("artifactDir"));
+  ok(script.includes("runSmoke"));
+  ok(script.includes("Installed engines with failed smoke proof"));
+  ok(script.includes("plantuml-file"));
+  ok(script.includes("pikchr-cli"));
+  ok(script.includes("missingNeedles"));
+});
+
 test("rendered export audit exposes structured manual sign-off workflow", () => {
   const script = readFileSync("scripts/check-rendered-export-audit.mjs", "utf8");
 

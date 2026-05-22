@@ -221,9 +221,12 @@ project-local Playwright browser cache, records the browser source under
 through the same Playwright CLI path as the full browser suite.
 
 `pnpm run check:engines` probes optional external transform engines and reports
-installed/missing Graphviz/DOT, D2, PlantUML, Java-backed PlantUML, and Pikchr
-paths without failing just because an optional engine is absent. The probe also
-writes `.tmp/external-engines/probe-report.json` for local platform evidence.
+installed/missing Graphviz/DOT variants, D2, PlantUML, Java-backed PlantUML, and
+Pikchr paths without failing just because an optional engine is absent. For each
+installed engine it also renders a small SVG smoke artifact through the adapter
+shape NEditor uses, writes those files under `.tmp/external-engines/artifacts/`,
+and records paths, versions, byte counts, and compatibility status in
+`.tmp/external-engines/probe-report.json` for local platform evidence.
 
 `pnpm run check:deps` verifies that every JavaScript and Rust dependency in the
 project manifests has an entry in the dependency admission record and that
