@@ -525,6 +525,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("write_desktop_workflow_smoke_report"));
   ok(app.includes("desktop_workflow_smoke_file_path"));
   ok(app.includes("desktop_workflow_smoke_export_path"));
+  ok(app.includes("emit_desktop_workflow_smoke_menu_command"));
   ok(app.includes("native workflow saved document to real file"));
   ok(app.includes("native workflow opened saved real file"));
   ok(app.includes("native workflow reverted saved real file"));
@@ -545,6 +546,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow inserted calc template into source"));
   ok(app.includes("native workflow prepared html export readiness"));
   ok(app.includes("native workflow wrote html export artifact"));
+  ok(app.includes("native workflow exported html from native menu command"));
   ok(app.includes("collectNativeModeEvidence"));
   ok(app.includes("[\"split\", \"source\", \"preview\", \"focus\", \"export\", \"review\", \"presentation\"]"));
   ok(app.includes("collectNativeThemeAccessibilityEvidence"));
@@ -557,6 +559,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(rust.includes("fn write_desktop_ui_smoke_report"));
   ok(rust.includes("fn desktop_workflow_smoke_enabled"));
   ok(rust.includes("fn write_desktop_workflow_smoke_report"));
+  ok(rust.includes("fn emit_desktop_workflow_smoke_menu_command"));
   ok(rust.includes("NEDITOR_DESKTOP_UI_SMOKE_REPORT"));
   ok(rust.includes("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT"));
   ok(smoke.includes("native-ui-report.json"));
@@ -570,6 +573,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native workflow included watcher file was not written"));
   ok(smoke.includes("native workflow local conflict copy was not written"));
   ok(smoke.includes("native workflow HTML export artifact was not written"));
+  ok(smoke.includes("native-menu HTML export evidence"));
   ok(smoke.includes("native workflow report did not include theme/accessibility evidence"));
   ok(smoke.includes("native UI report did not include rendered preview identity or content"));
   ok(smoke.includes("status = \"limited\""));

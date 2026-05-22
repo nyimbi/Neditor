@@ -398,6 +398,7 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow exposed dirty title",
     "native workflow prepared html export readiness",
     "native workflow wrote html export artifact",
+    "native workflow exported html from native menu command",
     "native workflow applied dark theme attribute",
     "native workflow applied high contrast attributes and colors",
     "native workflow applied reduced motion",
@@ -489,6 +490,7 @@ function validateNativeWorkflowReport(launchReport) {
     issues.push(`native workflow report did not include HTML export readiness evidence: ${JSON.stringify(payload.exportReadiness)}`);
   }
   const exportResult = payload.exportResult || {};
+  const nativeMenuExportResult = payload.nativeMenuExportResult || {};
   const expectedExportPath = nativeWorkflowExportPath.replaceAll("\\", "/");
   if (
     exportResult.target !== "html" ||
@@ -497,6 +499,15 @@ function validateNativeWorkflowReport(launchReport) {
     !exportResult.progressSteps.includes("render")
   ) {
     issues.push(`native workflow report did not include HTML export write evidence: ${JSON.stringify(exportResult)}`);
+  }
+  if (
+    nativeMenuExportResult.target !== "html" ||
+    nativeMenuExportResult.sidebar !== "exports" ||
+    String(nativeMenuExportResult.outputPath || "").replaceAll("\\", "/") !== expectedExportPath ||
+    !Array.isArray(nativeMenuExportResult.progressSteps) ||
+    !nativeMenuExportResult.progressSteps.some((step) => String(step).startsWith("render:complete"))
+  ) {
+    issues.push(`native workflow report did not include native-menu HTML export evidence: ${JSON.stringify(nativeMenuExportResult)}`);
   }
   if (!existsSync(nativeWorkflowExportPath)) {
     issues.push(`native workflow HTML export artifact was not written: ${relative(nativeWorkflowExportPath)}`);

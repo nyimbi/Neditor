@@ -162,6 +162,7 @@ pub fn run() {
             desktop_workflow_smoke_enabled,
             desktop_workflow_smoke_file_path,
             desktop_workflow_smoke_export_path,
+            emit_desktop_workflow_smoke_menu_command,
             write_desktop_workflow_smoke_report
         ])
         .run(tauri::generate_context!())
@@ -346,6 +347,18 @@ fn desktop_workflow_smoke_file_path(extension: String) -> Result<Option<String>,
 #[tauri::command]
 fn desktop_workflow_smoke_export_path(extension: String) -> Result<Option<String>, String> {
     desktop_workflow_smoke_artifact_path("native-workflow-export", extension)
+}
+
+#[tauri::command]
+fn emit_desktop_workflow_smoke_menu_command(app: AppHandle, command: String) -> Result<(), String> {
+    if std::env::var("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT").is_err() {
+        return Err("desktop workflow smoke menu command is disabled".to_string());
+    }
+    if !command.starts_with("neditor-") {
+        return Err("desktop workflow smoke menu command must be an NEditor command".to_string());
+    }
+    app.emit("neditor-menu-command", command)
+        .map_err(|error| error.to_string())
 }
 
 fn desktop_workflow_smoke_artifact_path(

@@ -901,6 +901,8 @@ Needed desktop smoke coverage:
   opening, Science `calc` template insertion into source, rendered preview
   output, dirty title mutation, HTML export readiness progress evidence, a
   real app-initiated HTML export with sidecar manifest/output-hash evidence,
+  guarded native menu-event routing for `File` -> `Export` -> `HTML Export`
+  through the same readiness-backed HTML export path,
   and stale-save conflict recovery through keep-local plus save, save-copy,
   merge, accept-external, and final file restoration assertions.
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
@@ -928,9 +930,10 @@ Needed desktop smoke coverage:
   by the app-authored native workflow smoke and the supported-platform WebDriver
   harness; real export invocation is covered by the native command smoke and by
   the app-authored launched-webview smoke, which writes an HTML artifact and
-  sidecar manifest under `.tmp/desktop-smoke/`; supported-platform WebDriver
-  execution is still needed if the harness grows a dialog-free native export
-  path.
+  sidecar manifest under `.tmp/desktop-smoke/` and now replays the native menu
+  event for the direct HTML export route without opening a picker in the smoke
+  environment; supported-platform WebDriver execution is still needed if the
+  harness grows a dialog-free native export path.
 - Preferences persistence across restart. Covered in the supported-platform
   WebDriver harness; still needs execution on Windows/Linux.
 

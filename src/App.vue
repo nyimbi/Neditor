@@ -2889,6 +2889,41 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       ),
       JSON.stringify(exportResult),
     );
+    store.lastExportOutputPath = "";
+    store.lastExportManifestPath = "";
+    store.lastExportProgressSteps = [];
+    store.lastExportDiagnostics = [];
+    await invoke("emit_desktop_workflow_smoke_menu_command", { command: "neditor-export-html" }).catch(() => undefined);
+    await waitForNativeWorkflowCondition(
+      () =>
+        Boolean(
+          exportOutputPath &&
+            store.exportTarget === "html" &&
+            store.sidebar === "exports" &&
+            store.lastExportOutputPath === exportOutputPath &&
+            store.lastExportProgressSteps.some((step) => step.id === "render" && step.state === "complete") &&
+            !store.lastExportDiagnostics.some((diagnostic) => diagnostic.severity === "error"),
+        ),
+      2400,
+    );
+    const nativeMenuExportResult = {
+      target: store.exportTarget,
+      sidebar: store.sidebar,
+      outputPath: store.lastExportOutputPath,
+      manifestPath: store.lastExportManifestPath,
+      progressSteps: store.lastExportProgressSteps.map((step) => `${step.id}:${step.state}`),
+      diagnostics: store.lastExportDiagnostics.map((diagnostic) => diagnostic.severity),
+    };
+    record(
+      "native workflow exported html from native menu command",
+      Boolean(
+        exportOutputPath &&
+          store.lastExportOutputPath === exportOutputPath &&
+          store.lastExportProgressSteps.some((step) => step.id === "render" && step.state === "complete") &&
+          store.sidebar === "exports",
+      ),
+      JSON.stringify(nativeMenuExportResult),
+    );
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
 
     const passed = assertions.every((assertion) => assertion.passed);
@@ -2904,6 +2939,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       previewSnippet: text("#live-preview").slice(0, 2000),
       themeAccessibility,
       exportResult,
+      nativeMenuExportResult,
       exportReadiness: store.exportReadiness
         ? {
             ready: store.exportReadiness.ready,
@@ -4509,10 +4545,13 @@ async function exportDocument() {
     "google-docs": "zip",
   };
   const extension = extensions[store.exportTarget];
-  const path = await save({
-    filters: [{ name: store.exportTarget.toUpperCase(), extensions: [extension] }],
-    defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")}.${extension}`,
-  });
+  const smokeExportPath = await invoke<string | null>("desktop_workflow_smoke_export_path", { extension }).catch(() => null);
+  const path =
+    smokeExportPath ||
+    (await save({
+      filters: [{ name: store.exportTarget.toUpperCase(), extensions: [extension] }],
+      defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")}.${extension}`,
+    }));
   if (path) await store.exportActive(path);
 }
 

@@ -1,6 +1,6 @@
 # NEditor IPC Command Coverage
 
-Updated: 2026-05-21
+Updated: 2026-05-22
 
 This table tracks the full registered Tauri IPC command surface, including the
 initial commands required by `docs/specification.md` section 25.4 and later
@@ -43,4 +43,7 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `cleanup_ai_paste` | `src-tauri/src/ai_cleanup.rs` | `ai_cleanup_tests::ai_cleanup_normalizes_chat_artifacts`; `ai_cleanup_tests::ai_cleanup_converts_rich_html_clipboard_content`; `ai_cleanup_tests::ai_cleanup_normalizes_ai_code_fence_variants` |
 | `write_desktop_ui_smoke_report` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates the guarded native UI smoke report when `NEDITOR_DESKTOP_UI_SMOKE_REPORT` is set |
 | `desktop_workflow_smoke_enabled` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates the guarded app-authored native workflow smoke gate |
+| `desktop_workflow_smoke_file_path` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates deterministic native workflow Markdown/include file paths under `.tmp/desktop-smoke/` |
+| `desktop_workflow_smoke_export_path` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates deterministic native workflow export and conflict-copy paths under `.tmp/desktop-smoke/` |
+| `emit_desktop_workflow_smoke_menu_command` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates guarded native menu-event routing for `File` -> `Export` -> `HTML Export` |
 | `write_desktop_workflow_smoke_report` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates the guarded native workflow report when `NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT` is set |

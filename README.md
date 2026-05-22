@@ -258,7 +258,10 @@ native launch smoke. The launch smoke writes
 window, captured output, and `processAlive: true` evidence when the app remains
 running until the timeout, plus `.tmp/desktop-smoke/native-window-report.json`
 with app-authored package, identifier, main-window title, visibility, size, and
-scale-factor evidence.
+scale-factor evidence, `.tmp/desktop-smoke/native-ui-report.json` with rendered
+workbench surface evidence, and `.tmp/desktop-smoke/native-workflow-report.json`
+with native mode, real-file, conflict, transform-template, readiness, HTML
+export, and guarded native menu-event export evidence.
 
 `pnpm run test:desktop-bundle` verifies the current host's packaged desktop
 bundle evidence. On macOS it checks `NEditor.app` Info.plist metadata, bundle
