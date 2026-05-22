@@ -150,7 +150,7 @@ Export panel target.
 
 | Target | What it is for | Current support |
 | --- | --- | --- |
-| HTML | Web previews, review copies, static publishing | Styles, syntax highlighting, semantic sections, transform artifacts, manifests |
+| HTML | Web previews, review copies, static publishing | Standalone document metadata, language, canonical links, styles, syntax highlighting, semantic sections, transform artifacts, manifests |
 | PDF | Board papers, reports, proposals, release packs | Paged layout model, page options, headers/footers, watermarks, tables, figures |
 | DOCX | Word-compatible client deliverables | Document structure, paragraphs, tables, comments/provenance appendices, manifests |
 | PPTX | Presentation-style summaries and executive decks | Slide packaging, agenda option, table splitting, manifest sidecars |

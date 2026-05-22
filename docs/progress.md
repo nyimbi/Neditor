@@ -76,6 +76,11 @@ Recent pushed checkpoints visible in current git history:
   export readiness, success/failure diagnostics, output paths, manifest paths,
   and target handoffs; the native workflow smoke writes a real HTML export with
   sidecar manifest and output-hash proof from the launched Tauri webview.
+- This update hardens HTML export as a standalone web document. Rendered HTML
+  now carries a language attribute, viewport and generator metadata, status,
+  version, source-hash, author/approval metadata, description fallback, and
+  canonical links when present; focused Rust export tests and the rendered
+  export audit cover the contract.
 - This update fixes the native keep-local conflict path. Choosing keep-local for
   a root-file conflict now acknowledges the exact external hash that was
   reviewed, so the next save deliberately overwrites that known revision instead

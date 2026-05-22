@@ -9,6 +9,15 @@ fn export_renderers_return_non_empty_artifacts() {
 
     let html = render_full_html(&response, &json!({ "watermark": "DRAFT" }));
     assert!(html.contains("<!doctype html>"));
+    assert!(html.contains("<html lang=\"en\">"));
+    assert!(
+        html.contains(r#"<meta name="viewport" content="width=device-width, initial-scale=1">"#)
+    );
+    assert!(html.contains(r#"<meta name="generator" content="NEditor">"#));
+    assert!(html.contains(r#"<meta name="neditor-status" content="approved">"#));
+    assert!(html.contains(r#"<meta name="neditor-version" content="1.2.0">"#));
+    assert!(html.contains(r#"<meta name="author" content="QA">"#));
+    assert!(html.contains(r#"<meta name="neditor-source-hash" content="sha256:"#));
     assert!(html.contains("class=\"cover\""));
     assert!(html.contains("class=\"cover-logo\""));
     assert!(html.contains("Page {{page}} of {{pages}}") || html.contains("Page 1 of 1"));
@@ -75,6 +84,38 @@ fn export_renderers_return_non_empty_artifacts() {
             .expect("bundle bytes")
             .starts_with(b"PK")
     );
+}
+
+#[test]
+fn html_export_writes_standalone_web_metadata() {
+    let response = compile(CompileRequest {
+        text: r#"---
+title: Public Brief
+subtitle: Market entry update
+author: Strategy Office
+language: en-GB
+canonicalUrl: https://example.com/public-brief
+status: published
+approvedBy: QA
+---
+
+# Public Brief
+
+Ship this as a standalone HTML review copy.
+"#
+        .to_string(),
+        file_path: None,
+    });
+
+    let metadata_language_html = render_full_html(&response, &json!({}));
+    assert!(metadata_language_html.contains(r#"<html lang="en-GB">"#));
+
+    let html = render_full_html(&response, &json!({ "htmlLanguage": "fr-CA" }));
+    assert!(html.contains(r#"<html lang="fr-CA">"#));
+    assert!(html.contains(r#"<meta name="description" content="Market entry update">"#));
+    assert!(html.contains(r#"<meta name="author" content="Strategy Office">"#));
+    assert!(html.contains(r#"<meta name="neditor-status" content="published">"#));
+    assert!(html.contains(r#"<link rel="canonical" href="https://example.com/public-brief">"#));
 }
 
 #[test]
