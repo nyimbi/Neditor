@@ -1641,6 +1641,57 @@ test("navigates source from the outline sidebar", async ({ page }) => {
   await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
 });
 
+test("folds and unfolds Markdown sections from toolbar and commands", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/folding-ergonomics.md",
+    [
+      "---",
+      "title: Folding Ergonomics",
+      "status: draft",
+      "---",
+      "",
+      "# Folding Ergonomics",
+      "",
+      "## Section One",
+      "",
+      "First foldable section paragraph.",
+      "",
+      "```calc",
+      "revenue = 125000",
+      "cost = 74000",
+      "profit = revenue - cost",
+      "```",
+      "",
+      "## Section Two",
+      "",
+      "Second foldable section paragraph.",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/folding-ergonomics.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const foldedPlaceholders = page.locator(".cm-foldPlaceholder");
+  await expect(foldedPlaceholders).toHaveCount(0);
+  await page.getByRole("button", { name: "Fold", exact: true }).click();
+  await expect.poll(async () => foldedPlaceholders.count()).toBeGreaterThan(0);
+
+  await page.getByRole("button", { name: "Unfold", exact: true }).click();
+  await expect(foldedPlaceholders).toHaveCount(0);
+  await expect(page.locator(".cm-line").filter({ hasText: "profit = revenue - cost" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Fold all sections");
+  await page.getByRole("button", { name: /Fold all sections Navigate/ }).click();
+  await expect.poll(async () => foldedPlaceholders.count()).toBeGreaterThan(0);
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Unfold all sections");
+  await page.getByRole("button", { name: /Unfold all sections Navigate/ }).click();
+  await expect(foldedPlaceholders).toHaveCount(0);
+  await expect(page.locator(".cm-line").filter({ hasText: "Second foldable section paragraph." })).toBeVisible();
+});
+
 test("navigates compiler diagnostics to the source range", async ({ page }) => {
   const diagnosticDocument = [
     "---",
