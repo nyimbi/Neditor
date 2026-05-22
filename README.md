@@ -235,7 +235,11 @@ DOCX, PPTX, Markdown bundle, blog package, Substack package, LaTeX, Google Docs
 package, hashes, a manual visual-review checklist, and `viewer-proof.json` with
 executable HTML/PDF/DOCX/PPTX/package assertions, publishing handoff workflow
 metadata checks, LaTeX source checks, Google Docs import workflow checks, and
-nested Google Docs DOCX checks. On macOS it also extracts DOCX text through
+nested Google Docs DOCX checks. It also writes
+`visual-review-summary.json`, which maps export targets and review cases to
+browser screenshots, PDF raster thumbnails, native tool proof, skipped
+host-limitation records, and a deliberately pending human sign-off state. On
+macOS it also extracts DOCX text through
 `textutil` and attempts a bounded Quick Look PDF thumbnail proof, recording
 either the thumbnail assertion or the host sandbox limitation in
 `viewer-proof.json`. When `pdflatex` is installed, it also compiles the

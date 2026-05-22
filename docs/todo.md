@@ -1005,7 +1005,10 @@ Current evidence:
   executable HTML/PDF/DOCX/PPTX/package assertions, blog/Substack publish
   workflow metadata and copy artifact assertions, LaTeX source assertions,
   Google Docs import workflow metadata assertions, and nested Google Docs DOCX
-  package assertions. When Poppler tools are installed, it also verifies PDF
+  package assertions. It now also writes `visual-review-summary.json`, mapping
+  primary targets and review cases to browser screenshot proof, Poppler raster
+  proof, macOS native-tool proof, skipped host-limitations, and an explicit
+  `pending-human-review` sign-off state. When Poppler tools are installed, it also verifies PDF
   metadata and extracted text through `pdfinfo` and `pdftotext`, and renders
   PNG PDF review thumbnails through `pdftoppm` under
   `.tmp/rendered-export-audit/raster-proof/` with links in `manual-review.html`.

@@ -180,8 +180,10 @@ writeFileSync(
   join(auditDir, "viewer-proof.json"),
   `${JSON.stringify({ generatedAt: new Date().toISOString(), assertions: viewerProof }, null, 2)}\n`,
 );
+writeVisualReviewSummary(auditReport, viewerProof);
 writeManualReviewDashboard(auditReport, viewerProof);
 verifyManualReviewDashboard(issues, viewerProof);
+verifyVisualReviewSummary(issues, auditReport, viewerProof);
 if (issues.length > 0) {
   console.error("Rendered export audit failed:");
   for (const issue of issues) console.error(`- ${issue}`);
@@ -1001,6 +1003,146 @@ function verifyManualReviewDashboard(issues, assertions) {
       issues.push(`manual-review.html is missing expected content: ${expected}`);
     }
   }
+}
+
+function writeVisualReviewSummary(report, assertions) {
+  const generatedAt = new Date().toISOString();
+  const assertionList = Array.isArray(assertions) ? assertions : [];
+  const primaryTargets = (report.targets || []).map((target) => ({
+    target: target.target,
+    path: target.path,
+    bytes: target.bytes,
+    sha256: target.sha256,
+    evidence: targetEvidence(target.target, assertionList),
+  }));
+  const reviewCases = (report.reviewCases || []).map((reviewCase) => ({
+    slug: reviewCase.slug,
+    title: reviewCase.title,
+    requiredEvidence: reviewCase.requiredEvidence || [],
+    targets: (reviewCase.targets || []).map((target) => ({
+      target: target.target,
+      path: target.path,
+      bytes: target.bytes,
+      sha256: target.sha256,
+      evidence: targetEvidence(`${reviewCase.slug}:${target.target}`, assertionList),
+    })),
+  }));
+  const thumbnails = assertionList
+    .filter((assertion) => assertion.thumbnail)
+    .map((assertion) => ({
+      scope: assertion.scope,
+      path: assertion.thumbnail,
+      passed: Boolean(assertion.passed),
+      bytes: assertion.bytes || 0,
+      width: assertion.width || 0,
+      height: assertion.height || 0,
+    }));
+  const skipped = assertionList
+    .filter((assertion) => assertion.skipped)
+    .map((assertion) => ({
+      scope: assertion.scope,
+      assertion: assertion.assertion,
+      reason: assertion.reason || "Unavailable on this verifier host.",
+    }));
+  const summary = {
+    generatedAt,
+    auditDirectory: auditDir,
+    manualReviewDashboard: "manual-review.html",
+    viewerProof: "viewer-proof.json",
+    humanSignoff: {
+      status: "pending-human-review",
+      reason:
+        "This automated summary records executable visual/package evidence and host limitations; it does not replace manual review in native viewers.",
+    },
+    primaryTargets,
+    reviewCases,
+    visualEvidence: {
+      browser: assertionFamily(assertionList, "browser-visual"),
+      pdfRaster: assertionFamily(assertionList, "pdftoppm"),
+      popplerText: assertionFamily(assertionList, "pdf"),
+      macosTextutil: assertionFamily(assertionList, "macos-textutil"),
+      macosQuickLook: assertionFamily(assertionList, "macos-quicklook"),
+      thumbnails,
+      skipped,
+    },
+  };
+  writeFileSync(join(auditDir, "visual-review-summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
+}
+
+function verifyVisualReviewSummary(issues, report, assertions) {
+  const path = join(auditDir, "visual-review-summary.json");
+  if (!existsSync(path)) {
+    issues.push("visual-review-summary.json was not generated");
+    return;
+  }
+  if (statSync(path).size < 1000) {
+    issues.push(`visual-review-summary.json is unexpectedly small: ${statSync(path).size} bytes`);
+    return;
+  }
+  const summary = JSON.parse(readFileSync(path, "utf8"));
+  const targetSet = new Set((summary.primaryTargets || []).map((target) => target.target));
+  for (const target of ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"]) {
+    if (!targetSet.has(target)) issues.push(`visual-review-summary.json is missing primary target ${target}`);
+  }
+  if (summary.humanSignoff?.status !== "pending-human-review") {
+    issues.push("visual-review-summary.json must keep human sign-off marked pending");
+  }
+  if (summary.manualReviewDashboard !== "manual-review.html" || summary.viewerProof !== "viewer-proof.json") {
+    issues.push("visual-review-summary.json does not link the manual dashboard and viewer proof");
+  }
+  const expectedReviewCases = new Set((report.reviewCases || []).map((reviewCase) => reviewCase.slug));
+  const actualReviewCases = new Set((summary.reviewCases || []).map((reviewCase) => reviewCase.slug));
+  for (const slug of expectedReviewCases) {
+    if (!actualReviewCases.has(slug)) issues.push(`visual-review-summary.json is missing review case ${slug}`);
+  }
+  const browserEvidenceExists = assertions.some((assertion) => String(assertion.scope || "").startsWith("browser-visual"));
+  if (browserEvidenceExists && !summary.visualEvidence?.browser?.length) {
+    issues.push("visual-review-summary.json is missing browser visual evidence");
+  }
+  const thumbnailEvidenceExists = assertions.some((assertion) => assertion.thumbnail);
+  if (thumbnailEvidenceExists && !summary.visualEvidence?.thumbnails?.length) {
+    issues.push("visual-review-summary.json is missing generated thumbnail evidence");
+  }
+}
+
+function assertionFamily(assertions, prefix) {
+  return assertions
+    .filter((assertion) => String(assertion.scope || "").startsWith(prefix))
+    .map((assertion) => ({
+      scope: assertion.scope,
+      assertion: assertion.assertion,
+      passed: Boolean(assertion.passed),
+      skipped: Boolean(assertion.skipped),
+      reason: assertion.reason || "",
+      thumbnail: assertion.thumbnail || "",
+      bytes: assertion.bytes || 0,
+      width: assertion.width || 0,
+      height: assertion.height || 0,
+    }));
+}
+
+function targetEvidence(target, assertions) {
+  const scopesByTarget = {
+    html: ["browser-visual-primary-html", "html"],
+    pdf: ["pdfinfo-primary", "pdftotext-primary", "pdftoppm-primary", "macos-quicklook-pdf"],
+    docx: ["docx-package", "docx-document", "macos-textutil-docx", "macos-quicklook-docx"],
+    pptx: ["pptx-package", "pptx-slides", "macos-quicklook-pptx"],
+    "markdown-bundle": ["markdown-bundle-package", "markdown-bundle-manifest"],
+    blog: ["blog-package", "blog-metadata", "blog-post"],
+    substack: ["substack-package", "substack-metadata", "substack-copy"],
+    latex: ["latex-source"],
+    "google-docs": ["google-docs-package", "google-docs-metadata", "google-docs-docx-document"],
+  };
+  const [reviewSlug, reviewTarget] = String(target).includes(":") ? String(target).split(":") : ["", target];
+  const prefixes = reviewSlug ? [`${reviewSlug}-${reviewTarget}`, `browser-visual-review-${reviewSlug}`] : scopesByTarget[target] || [target];
+  return assertions
+    .filter((assertion) => prefixes.some((prefix) => String(assertion.scope || "").startsWith(prefix)))
+    .map((assertion) => ({
+      scope: assertion.scope,
+      passed: Boolean(assertion.passed),
+      skipped: Boolean(assertion.skipped),
+      thumbnail: assertion.thumbnail || "",
+    }));
 }
 
 function targetRow(target) {

@@ -281,10 +281,10 @@ Current major verification gaps:
   transform artifacts, Markdown bundle manifests, blog/Substack packages,
   LaTeX source, and Google Docs packages.
   `pnpm run test:rendered-exports` also writes reviewable artifacts,
-  `manual-review.html`, a manual checklist, and executable viewer/package proof under
+  `manual-review.html`, `visual-review-summary.json`, a manual checklist, and executable viewer/package proof under
   `.tmp/rendered-export-audit`; that proof now includes publishing/import
   workflow metadata checks, LaTeX source checks, nested Google Docs DOCX package
-  checks, and macOS `textutil` extraction for the primary DOCX, nested Google
+  checks, visual-summary mapping from targets/review cases to screenshot/raster/native-tool evidence with explicit pending human sign-off, and macOS `textutil` extraction for the primary DOCX, nested Google
   Docs DOCX, and rendered review-case DOCX files. On macOS it also attempts
   Quick Look thumbnails for primary PDF/DOCX/PPTX artifacts and records either
   thumbnail evidence or host limitations. When Chromium can launch, it captures
