@@ -983,11 +983,13 @@ Current evidence:
   workflow metadata and copy artifact assertions, LaTeX source assertions,
   Google Docs import workflow metadata assertions, and nested Google Docs DOCX
   package assertions. When Poppler tools are installed, it also verifies PDF
-  metadata and extracted text through `pdfinfo` and `pdftotext`. On macOS it
-  extracts DOCX text through `textutil`, attempts a Quick Look PDF thumbnail,
-  and records either thumbnail evidence or the current host's `qlmanage`
-  sandbox limitation in `viewer-proof.json`. When `pdflatex` is installed, it
-  also compiles the generated LaTeX artifact into
+  metadata and extracted text through `pdfinfo` and `pdftotext`, and renders
+  PNG PDF review thumbnails through `pdftoppm` under
+  `.tmp/rendered-export-audit/raster-proof/` with links in `manual-review.html`.
+  On macOS it extracts DOCX text through `textutil`, attempts a Quick Look PDF
+  thumbnail, and records either thumbnail evidence or the current host's
+  `qlmanage` sandbox limitation in `viewer-proof.json`. When `pdflatex` is
+  installed, it also compiles the generated LaTeX artifact into
   `.tmp/rendered-export-audit/latex-compile/rendered-export-audit.pdf`.
 
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
@@ -1477,7 +1479,8 @@ Finish:
 - Visual/manual review of representative PDF/DOCX/PPTX outputs; the rendered
   export audit now classifies whether macOS Quick Look PDF thumbnailing can run
   from the verifier on the current host and verifies PDF text through Poppler
-  when available.
+  when available. It also renders Poppler PNG thumbnails for representative
+  PDFs when `pdftoppm` is available.
 - Overflow handling for large figures, equations, tables, code blocks, and long
   unbroken words.
 

@@ -110,6 +110,10 @@ if (issues.length === 0) {
 }
 
 if (issues.length === 0) {
+  collectPdfRasterProof(issues, viewerProof, auditReport);
+}
+
+if (issues.length === 0) {
   collectReviewCaseProof(issues, viewerProof, auditReport);
 }
 
@@ -163,7 +167,7 @@ writeFileSync(
   `${JSON.stringify({ generatedAt: new Date().toISOString(), assertions: viewerProof }, null, 2)}\n`,
 );
 writeManualReviewDashboard(auditReport, viewerProof);
-verifyManualReviewDashboard(issues);
+verifyManualReviewDashboard(issues, viewerProof);
 if (issues.length > 0) {
   console.error("Rendered export audit failed:");
   for (const issue of issues) console.error(`- ${issue}`);
@@ -485,6 +489,87 @@ function assertPdfText(issues, assertions, scope, path, needles) {
   assertContains(assertions, issues, scope, result.stdout ?? "", needles);
 }
 
+function collectPdfRasterProof(issues, assertions, report) {
+  const pdftoppm = commandResult("pdftoppm", ["-v"]);
+  if (pdftoppm.error) {
+    assertions.push({
+      scope: "pdftoppm-pdf-raster",
+      assertion: "pdftoppm available for PDF raster thumbnails",
+      passed: false,
+      skipped: true,
+      reason: "Poppler pdftoppm is not installed on this host",
+    });
+    return;
+  }
+
+  const rasterDir = join(auditDir, "raster-proof");
+  rmSync(rasterDir, { recursive: true, force: true });
+  mkdirSync(rasterDir, { recursive: true });
+  renderPdfRasterPages(issues, assertions, "primary", join(auditDir, "rendered-export-audit.pdf"), join(rasterDir, "primary"), 2);
+
+  for (const reviewCase of report.reviewCases || []) {
+    const pdfTarget = (reviewCase.targets || []).find((target) => target.target === "pdf");
+    if (!pdfTarget?.path) {
+      issues.push(`rendered review case ${reviewCase.slug} is missing PDF target for raster proof`);
+      continue;
+    }
+    renderPdfRasterPages(
+      issues,
+      assertions,
+      `review-${reviewCase.slug}`,
+      join(auditDir, pdfTarget.path),
+      join(rasterDir, `review-${reviewCase.slug}`),
+      1,
+    );
+  }
+}
+
+function renderPdfRasterPages(issues, assertions, scope, path, outputPrefix, lastPage) {
+  const result = spawnSync("pdftoppm", ["-png", "-r", "96", "-f", "1", "-l", String(lastPage), path, outputPrefix], {
+    encoding: "utf8",
+    timeout: 20_000,
+  });
+  if (result.status !== 0) {
+    assertions.push({
+      scope: `pdftoppm-${scope}`,
+      assertion: "renders PDF pages to PNG thumbnails",
+      passed: false,
+      stderr: result.stderr?.trim() || "",
+    });
+    issues.push(`pdftoppm failed to rasterize ${relativeToAudit(path)}`);
+    return;
+  }
+
+  for (let page = 1; page <= lastPage; page += 1) {
+    const thumbnail = `${outputPrefix}-${page}.png`;
+    const dimensions = existsSync(thumbnail) ? pngDimensions(thumbnail) : null;
+    const bytes = existsSync(thumbnail) ? statSync(thumbnail).size : 0;
+    const passed = Boolean(dimensions && dimensions.width >= 500 && dimensions.height >= 500 && bytes > 10_000);
+    assertions.push({
+      scope: `pdftoppm-${scope}-page-${page}`,
+      assertion: `renders PDF page ${page} to a non-empty PNG thumbnail`,
+      passed,
+      thumbnail: relativeToAudit(thumbnail),
+      bytes,
+      width: dimensions?.width || 0,
+      height: dimensions?.height || 0,
+    });
+    if (!passed) {
+      issues.push(`pdftoppm did not render a meaningful thumbnail for ${relativeToAudit(path)} page ${page}`);
+    }
+  }
+}
+
+function pngDimensions(path) {
+  const data = readFileSync(path);
+  const pngSignature = "89504e470d0a1a0a";
+  if (data.subarray(0, 8).toString("hex") !== pngSignature) return null;
+  return {
+    width: data.readUInt32BE(16),
+    height: data.readUInt32BE(20),
+  };
+}
+
 function collectMacQuickLookProof(issues, assertions) {
   if (process.platform !== "darwin") return;
   const qlmanage = spawnSync("qlmanage", ["-h"], { stdio: "ignore" });
@@ -655,6 +740,15 @@ function writeManualReviewDashboard(report, assertions) {
       return `<tr class="${state}"><td>${escapeHtml(assertion.scope || "")}</td><td>${escapeHtml(assertion.assertion || "")}</td><td>${state}</td><td>${escapeHtml(String(detail || ""))}</td></tr>`;
     })
     .join("\n");
+  const thumbnails = assertions
+    .filter((assertion) => assertion.passed && assertion.thumbnail)
+    .map(
+      (assertion) => `<figure>
+  <a href="${escapeHtml(assertion.thumbnail)}"><img src="${escapeHtml(assertion.thumbnail)}" alt="${escapeHtml(assertion.scope)} thumbnail"></a>
+  <figcaption><code>${escapeHtml(assertion.scope)}</code><br>${Number(assertion.width || 0)}x${Number(assertion.height || 0)} px, ${Number(assertion.bytes || 0).toLocaleString("en-US")} bytes</figcaption>
+</figure>`,
+    )
+    .join("\n");
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -673,6 +767,10 @@ function writeManualReviewDashboard(report, assertions) {
     .skipped td { background: #fff8e5; }
     .review-case { border-top: 2px solid #d9e2ec; padding-top: 1rem; }
     .hash { word-break: break-all; }
+    .thumbnail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1rem 0 2rem; }
+    figure { margin: 0; padding: 0.75rem; border: 1px solid #cbd5df; background: #f8fafc; }
+    figure img { display: block; width: 100%; height: auto; border: 1px solid #d9e2ec; background: white; }
+    figcaption { margin-top: 0.5rem; font-size: 0.9rem; color: #52606d; }
   </style>
 </head>
 <body>
@@ -692,6 +790,10 @@ function writeManualReviewDashboard(report, assertions) {
   <h2>Review Cases</h2>
   ${reviewCases}
 
+  <h2>PDF Raster Review Thumbnails</h2>
+  <p>These PNG thumbnails are generated from exported PDFs with Poppler <code>pdftoppm</code> when it is available on the verifier host. They provide fast visual entry points for manual PDF review.</p>
+  <div class="thumbnail-grid">${thumbnails || "<p>No PDF raster thumbnails were generated on this host.</p>"}</div>
+
   <h2>Executable Viewer And Package Proof</h2>
   <table>
     <thead><tr><th>Scope</th><th>Assertion</th><th>Status</th><th>Detail</th></tr></thead>
@@ -703,7 +805,7 @@ function writeManualReviewDashboard(report, assertions) {
   writeFileSync(join(auditDir, "manual-review.html"), html);
 }
 
-function verifyManualReviewDashboard(issues) {
+function verifyManualReviewDashboard(issues, assertions) {
   const path = join(auditDir, "manual-review.html");
   if (!existsSync(path)) {
     issues.push("manual-review.html was not generated");
@@ -714,17 +816,20 @@ function verifyManualReviewDashboard(issues) {
     return;
   }
   const html = readFileSync(path, "utf8");
-  for (const expected of [
+  const expectedContent = [
     "Rendered Export Manual Review",
     "rendered-export-audit.pdf",
     "rendered-export-audit.google-docs.zip",
     "review-cases/rich-blocks/rich-blocks.html",
     "review-cases/option-heavy/option-heavy.html",
     "Executable Viewer And Package Proof",
-    "pdfinfo-primary",
-    "pdftotext-primary",
+    "PDF Raster Review Thumbnails",
     "macos-quicklook-pdf",
-  ]) {
+  ];
+  for (const scope of ["pdfinfo-primary", "pdftotext-primary", "pdftoppm-primary-page-1"]) {
+    if (assertions.some((assertion) => assertion.scope === scope)) expectedContent.push(scope);
+  }
+  for (const expected of expectedContent) {
     if (!html.includes(expected)) {
       issues.push(`manual-review.html is missing expected content: ${expected}`);
     }
