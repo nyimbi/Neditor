@@ -4465,19 +4465,27 @@ async function desktopWorkflowSmokeMarkdownPath() {
   return invoke<string | null>("desktop_workflow_smoke_file_path", { extension: "md" }).catch(() => null);
 }
 
+async function desktopWorkflowSmokeNamedMarkdownPath(fileStem: string) {
+  return invoke<string | null>("desktop_workflow_smoke_named_path", { fileStem, extension: "md" }).catch(() => null);
+}
+
 async function renameDocument() {
-  const path = await save({
-    filters: [{ name: "Markdown", extensions: ["md"] }],
-    defaultPath: active.value.title.endsWith(".md") ? active.value.title : `${active.value.title}.md`,
-  });
+  const path =
+    (await desktopWorkflowSmokeNamedMarkdownPath("native-workflow-renamed")) ||
+    (await save({
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+      defaultPath: active.value.title.endsWith(".md") ? active.value.title : `${active.value.title}.md`,
+    }));
   if (path) await store.renameActive(path);
 }
 
 async function duplicateDocument() {
-  const path = await save({
-    filters: [{ name: "Markdown", extensions: ["md"] }],
-    defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")} copy.md`,
-  });
+  const path =
+    (await desktopWorkflowSmokeNamedMarkdownPath("native-workflow-duplicate")) ||
+    (await save({
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+      defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")} copy.md`,
+    }));
   if (path) await store.duplicateActive(path);
 }
 

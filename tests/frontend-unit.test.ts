@@ -518,13 +518,17 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("assertDirtyTitleWorkflow(session)"));
   ok(script.includes("assertTransformTemplateWorkflow(session)"));
   ok(script.includes("assertFileSaveOpenWorkflow(session)"));
+  ok(script.includes("assertRenameDuplicateRevealWorkflow(session)"));
   ok(script.includes("assertExportReadinessWorkflow(session)"));
   ok(script.includes("assertHtmlExportWriteWorkflow(session)"));
   ok(script.includes("assertPreferenceRestartWorkflow(session, originalPreferences)"));
   ok(script.includes("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT"));
   ok(script.includes("native-workflow-file.md"));
+  ok(script.includes("native-workflow-renamed.md"));
+  ok(script.includes("native-workflow-duplicate.md"));
   ok(script.includes("native-workflow-export.html"));
   ok(script.includes("desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path"));
+  ok(script.includes("desktop WebDriver renames, duplicates, and reveals real Markdown files"));
   ok(script.includes("desktop WebDriver writes HTML export through dialog-free smoke path"));
   ok(script.includes("desktop template insertion reaches editor and preview"));
   ok(script.includes("Dose by weight"));
@@ -546,7 +550,9 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("desktop_workflow_smoke_enabled"));
   ok(app.includes("write_desktop_workflow_smoke_report"));
   ok(app.includes("desktop_workflow_smoke_file_path"));
+  ok(app.includes("desktop_workflow_smoke_named_path"));
   ok(app.includes("desktopWorkflowSmokeMarkdownPath"));
+  ok(app.includes("desktopWorkflowSmokeNamedMarkdownPath"));
   ok(app.includes("desktop_workflow_smoke_export_path"));
   ok(app.includes("emit_desktop_workflow_smoke_menu_command"));
   ok(app.includes("native workflow saved document to real file"));
@@ -581,6 +587,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("previewLabel"));
   ok(rust.includes("fn write_desktop_ui_smoke_report"));
   ok(rust.includes("fn desktop_workflow_smoke_enabled"));
+  ok(rust.includes("fn desktop_workflow_smoke_named_path"));
   ok(rust.includes("fn write_desktop_workflow_smoke_report"));
   ok(rust.includes("fn emit_desktop_workflow_smoke_menu_command"));
   ok(rust.includes("NEDITOR_DESKTOP_UI_SMOKE_REPORT"));

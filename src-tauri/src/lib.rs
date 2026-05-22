@@ -161,6 +161,7 @@ pub fn run() {
             write_desktop_ui_smoke_report,
             desktop_workflow_smoke_enabled,
             desktop_workflow_smoke_file_path,
+            desktop_workflow_smoke_named_path,
             desktop_workflow_smoke_export_path,
             emit_desktop_workflow_smoke_menu_command,
             write_desktop_workflow_smoke_report
@@ -342,6 +343,22 @@ fn desktop_workflow_smoke_enabled() -> bool {
 #[tauri::command]
 fn desktop_workflow_smoke_file_path(extension: String) -> Result<Option<String>, String> {
     desktop_workflow_smoke_artifact_path("native-workflow-file", extension)
+}
+
+#[tauri::command]
+fn desktop_workflow_smoke_named_path(
+    file_stem: String,
+    extension: String,
+) -> Result<Option<String>, String> {
+    let safe_file_stem = file_stem
+        .trim()
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '-' || *ch == '_')
+        .collect::<String>();
+    if safe_file_stem.is_empty() {
+        return Err("desktop workflow smoke file stem is empty".to_string());
+    }
+    desktop_workflow_smoke_artifact_path(&safe_file_stem, extension)
 }
 
 #[tauri::command]

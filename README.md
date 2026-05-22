@@ -285,13 +285,14 @@ installed. The harness starts the built desktop binary, checks the native title,
 switches view mode, opens the command palette, creates a dirty document and
 checks the native dirty-title marker, inserts a Science calc template through
 the Templates panel, saves and reopens a real Markdown file through the guarded
-dialog-free smoke path, runs export readiness through the desktop command path,
-writes a real HTML export, validates the sidecar manifest/output hash, and
-verifies selected preferences survive a desktop session restart before restoring
-them. It writes `.tmp/desktop-webdriver/report.json` with dependency, assertion,
-file artifact, export artifact, pass, or skip evidence. On macOS, official Tauri WebDriver is skipped
-because the supported stack does not provide a WKWebView driver; use the bounded
-desktop launch smoke there.
+dialog-free smoke path, renames, duplicates, and reveals deterministic Markdown
+files, runs export readiness through the desktop command path, writes a real HTML
+export, validates the sidecar manifest/output hash, and verifies selected
+preferences survive a desktop session restart before restoring them. It writes
+`.tmp/desktop-webdriver/report.json` with dependency, assertion, file artifact,
+export artifact, pass, or skip evidence. On macOS, official Tauri WebDriver is
+skipped because the supported stack does not provide a WKWebView driver; use the
+bounded desktop launch smoke there.
 
 `cargo check` and `cargo test` require crates.io access the first time Rust
 dependencies are resolved. After dependencies are present, the project is

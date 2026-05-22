@@ -12,6 +12,8 @@ const application = desktopBinaryPath();
 const reportPath = join(root, ".tmp", "desktop-webdriver", "report.json");
 const workflowReportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-report.json");
 const workflowFilePath = join(root, ".tmp", "desktop-webdriver", "native-workflow-file.md");
+const workflowRenamedPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-renamed.md");
+const workflowDuplicatePath = join(root, ".tmp", "desktop-webdriver", "native-workflow-duplicate.md");
 const workflowExportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-export.html");
 const workflowExportManifestPath = `${workflowExportPath}.manifest.json`;
 const macosUnsupportedMessage =
@@ -23,6 +25,7 @@ const webdriverWorkflowPlan = [
   "native title exposes dirty document state",
   "desktop template insertion reaches editor and preview",
   "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
+  "desktop WebDriver renames, duplicates, and reveals real Markdown files",
   "desktop export readiness returns manifest progress evidence",
   "desktop WebDriver writes HTML export through dialog-free smoke path",
   "desktop preferences persist across WebDriver restart",
@@ -113,6 +116,8 @@ try {
 
 async function runWebDriverSmoke() {
   rmSync(workflowFilePath, { force: true });
+  rmSync(workflowRenamedPath, { force: true });
+  rmSync(workflowDuplicatePath, { force: true });
   rmSync(workflowExportPath, { force: true });
   rmSync(workflowExportManifestPath, { force: true });
   rmSync(workflowReportPath, { force: true });
@@ -150,6 +155,7 @@ async function runWebDriverSmoke() {
     await assertDirtyTitleWorkflow(session);
     await assertTransformTemplateWorkflow(session);
     await assertFileSaveOpenWorkflow(session);
+    await assertRenameDuplicateRevealWorkflow(session);
     await assertExportReadinessWorkflow(session);
     await assertHtmlExportWriteWorkflow(session);
     originalPreferences = await readDesktopPreferences(session);
@@ -360,6 +366,100 @@ async function assertFileSaveOpenWorkflow(session) {
     expectedPath,
   };
   recordAssertion("desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path");
+}
+
+async function assertRenameDuplicateRevealWorkflow(session) {
+  await execute(session, `
+    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
+    const renameButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Rename');
+    if (!renameButton) throw new Error('Rename button was not visible in the desktop command bar');
+    renameButton.click();
+    return true;
+  `);
+  const renamed = await waitForValue(
+    session,
+    `
+      return {
+        title: document.title,
+        tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+        status: document.querySelector('.status-bar')?.textContent || '',
+        editor: document.querySelector('.cm-content')?.textContent || '',
+      };
+    `,
+    (value) =>
+      !String(value?.title || "").startsWith("* ") &&
+      String(value?.tab || "").includes("native-workflow-renamed") &&
+      String(value?.status || "").includes("Renamed") &&
+      String(value?.editor || "").includes("weight_kg = 72"),
+    "renamed real Markdown file",
+  );
+  if (!existsSync(workflowRenamedPath)) {
+    throw new Error(`desktop WebDriver renamed Markdown file was not written: ${relative(workflowRenamedPath)}`);
+  }
+  if (existsSync(workflowFilePath)) {
+    throw new Error(`desktop WebDriver rename left the old Markdown path behind: ${relative(workflowFilePath)}`);
+  }
+
+  await execute(session, `
+    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
+    const duplicateButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Duplicate');
+    if (!duplicateButton) throw new Error('Duplicate button was not visible in the desktop command bar');
+    duplicateButton.click();
+    return true;
+  `);
+  const duplicated = await waitForValue(
+    session,
+    `
+      return {
+        title: document.title,
+        tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+        status: document.querySelector('.status-bar')?.textContent || '',
+        editor: document.querySelector('.cm-content')?.textContent || '',
+      };
+    `,
+    (value) =>
+      !String(value?.title || "").startsWith("* ") &&
+      String(value?.tab || "").includes("native-workflow-duplicate") &&
+      String(value?.status || "").includes("Duplicated") &&
+      String(value?.editor || "").includes("total_dose_mg"),
+    "duplicated real Markdown file",
+  );
+  if (!existsSync(workflowDuplicatePath)) {
+    throw new Error(`desktop WebDriver duplicate Markdown file was not written: ${relative(workflowDuplicatePath)}`);
+  }
+  const duplicateText = readFileSync(workflowDuplicatePath, "utf8");
+  if (!duplicateText.includes("weight_kg = 72") || !duplicateText.includes("total_dose_mg")) {
+    throw new Error(`desktop WebDriver duplicate Markdown file did not preserve template content: ${relative(workflowDuplicatePath)}`);
+  }
+
+  await execute(session, `
+    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
+    const revealButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Reveal');
+    if (!revealButton) throw new Error('Reveal button was not visible in the desktop command bar');
+    revealButton.click();
+    return true;
+  `);
+  const revealed = await waitForValue(
+    session,
+    `
+      return {
+        status: document.querySelector('.status-bar')?.textContent || '',
+      };
+    `,
+    (value) => String(value?.status || "").includes("Revealed native-workflow-duplicate.md"),
+    "revealed duplicated Markdown file",
+  );
+  report.fileArtifacts = {
+    ...report.fileArtifacts,
+    renamedPath: relative(workflowRenamedPath),
+    renamedBytes: statSync(workflowRenamedPath).size,
+    duplicatePath: relative(workflowDuplicatePath),
+    duplicateBytes: statSync(workflowDuplicatePath).size,
+    renameTitle: renamed.title,
+    duplicateTitle: duplicated.title,
+    revealStatus: revealed.status,
+  };
+  recordAssertion("desktop WebDriver renames, duplicates, and reveals real Markdown files");
 }
 
 async function assertExportReadinessWorkflow(session) {

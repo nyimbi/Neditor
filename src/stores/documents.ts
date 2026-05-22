@@ -852,6 +852,7 @@ export const useDocumentsStore = defineStore("documents", {
       const doc = this.activeDocument;
       if (!doc.path) throw new Error("Save the document before revealing it.");
       await invoke("reveal_path", { path: doc.path });
+      this.statusMessage = `Revealed ${doc.title} in file manager`;
     },
     updateText(text: string) {
       const doc = this.activeDocument;
