@@ -3017,9 +3017,20 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
   await expect.poll(() => editorText(page)).toContain("a -> b");
 
   await page.getByLabel("Sidebar panel").selectOption("exports");
-  await page.getByLabel("Target").selectOption("pptx");
   await page.getByLabel("View mode").selectOption("export");
+  const targetSelect = page.getByLabel("Target");
   const exportPreview = page.getByRole("region", { name: "Export preview summary" });
+  await expect(exportPreview).toContainText("HTML export preview");
+  await queueDialogSelection(page, "/exports/market.html");
+  await page.getByRole("button", { name: "Export HTML" }).click();
+  const exportResult = page.getByRole("region", { name: "Export result" });
+  await expect(targetSelect).toHaveValue("html");
+  await expect(exportResult).toContainText("Output: /exports/market.html");
+  await expect(exportResult).toContainText("Manifest: /exports/market.html.manifest.json");
+  await expect(exportResult).toContainText("Mock html export wrote /exports/market.html");
+  await expect(page.locator(".status-bar")).toContainText("Exported /exports/market.html with manifest /exports/market.html.manifest.json");
+
+  await targetSelect.selectOption("pptx");
   await expect(exportPreview).toContainText("PPTX export preview");
   await expect(exportPreview).toContainText("readiness not run");
   await expect(exportPreview).toContainText("1 transform artifacts");
@@ -3040,7 +3051,6 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
 
   await queueDialogSelection(page, "/exports/market.pptx");
   await page.getByRole("button", { name: "Export document" }).click();
-  const exportResult = page.getByRole("region", { name: "Export result" });
   await expect(exportResult).toContainText("Output: /exports/market.pptx");
   await expect(exportResult).toContainText("Manifest: /exports/market.pptx.manifest.json");
   await expect(exportResult).toContainText("Mock pptx export wrote /exports/market.pptx");

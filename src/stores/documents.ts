@@ -13,6 +13,7 @@ import {
   clampPaneRatio,
   clampScrollRatio,
   clampSnapshotInterval,
+  clampToolbarTextSize,
   migratePersistedWorkspace,
   normalizeAiCleanupDefaults,
   normalizeBibliographyDefaults,
@@ -241,6 +242,11 @@ function isStaleSaveConflict(error: unknown) {
   return errorText(error).includes(staleSaveConflictMessage);
 }
 
+function isMissingTauriBackendError(error: unknown) {
+  const message = errorText(error);
+  return message.includes("reading 'invoke'") || message.includes("__TAURI_INTERNALS__");
+}
+
 function equivalentSha256Hash(left?: string | null, right?: string | null) {
   const normalize = (value?: string | null) => (value || "").replace(/^sha256:/, "");
   return Boolean(left && right && normalize(left) === normalize(right));
@@ -325,6 +331,7 @@ export const useDocumentsStore = defineStore("documents", {
     theme: "system" as "system" | "light" | "dark",
     previewTheme: "match" as PreviewTheme,
     toolbarDisplay: "both" as ToolbarDisplay,
+    toolbarTextSize: 10,
     editorPaneRatio: 0.5,
     wordWrap: true,
     lineNumbers: true,
@@ -459,6 +466,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.toolbarDisplay === "both" || persisted.toolbarDisplay === "icons" || persisted.toolbarDisplay === "text") {
           this.toolbarDisplay = persisted.toolbarDisplay;
         }
+        if (typeof persisted.toolbarTextSize === "number") this.toolbarTextSize = clampToolbarTextSize(persisted.toolbarTextSize);
         if (typeof persisted.editorPaneRatio === "number") this.editorPaneRatio = clampPaneRatio(persisted.editorPaneRatio);
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
@@ -507,7 +515,7 @@ export const useDocumentsStore = defineStore("documents", {
           await this.restoreWorkspace(persisted.openFiles, persisted.activePath || null, persisted.pinnedFiles || [], persisted.scrollPositions || {});
         }
       } catch (error) {
-        this.lastError = error instanceof Error ? error.message : String(error);
+        this.lastError = isMissingTauriBackendError(error) ? "" : errorText(error);
       }
     },
     async persistWorkspace() {
@@ -516,6 +524,7 @@ export const useDocumentsStore = defineStore("documents", {
         theme: this.theme,
         previewTheme: this.previewTheme,
         toolbarDisplay: this.toolbarDisplay,
+        toolbarTextSize: this.toolbarTextSize,
         editorPaneRatio: this.editorPaneRatio,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,
@@ -870,7 +879,12 @@ export const useDocumentsStore = defineStore("documents", {
         await this.syncFileWatcher();
       } catch (error) {
         if (isLatestDocumentTaskCurrent(this.compileTaskGate, snapshot, this.activeDocument)) {
-          this.lastError = error instanceof Error ? error.message : String(error);
+          if (isMissingTauriBackendError(error)) {
+            this.lastError = "";
+            this.statusMessage = "Editing locally; preview backend unavailable in browser";
+          } else {
+            this.lastError = errorText(error);
+          }
         }
       } finally {
         if (isLatestDocumentTaskCurrent(this.compileTaskGate, snapshot, this.activeDocument)) {
@@ -1307,9 +1321,13 @@ export const useDocumentsStore = defineStore("documents", {
       await this.listSnapshots();
     },
     async listSnapshots() {
-      this.snapshots = await invoke<SnapshotListItem[]>("list_snapshots", {
-        request: { file_path: this.activeDocument?.path, storage: this.snapshotStorage },
-      });
+      try {
+        this.snapshots = await invoke<SnapshotListItem[]>("list_snapshots", {
+          request: { file_path: this.activeDocument?.path, storage: this.snapshotStorage },
+        });
+      } catch {
+        this.snapshots = [];
+      }
     },
     async restoreSnapshot(snapshotPath: string) {
       await this.snapshotBeforeDestructiveAction("pre-snapshot-restore");

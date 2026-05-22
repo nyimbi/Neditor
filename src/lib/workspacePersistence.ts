@@ -89,6 +89,7 @@ export interface PersistedWorkspace {
   theme?: ThemePreference;
   previewTheme?: PreviewTheme;
   toolbarDisplay?: ToolbarDisplay;
+  toolbarTextSize?: number;
   editorPaneRatio?: number;
   wordWrap?: boolean;
   lineNumbers?: boolean;
@@ -193,6 +194,10 @@ export function clampLineHeight(value: number) {
 
 export function clampFontSize(value: number) {
   return Math.min(Math.max(Number(value) || 14, 12), 22);
+}
+
+export function clampToolbarTextSize(value: number) {
+  return Math.min(Math.max(Number(value) || 10, 9), 15);
 }
 
 export function clampAutosaveDelay(value: number) {
@@ -313,6 +318,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (previewTheme) migrated.previewTheme = previewTheme;
   const toolbarDisplay = enumValue(raw.toolbarDisplay, ["both", "icons", "text"] as const);
   if (toolbarDisplay) migrated.toolbarDisplay = toolbarDisplay;
+  const toolbarTextSize = numberValue(raw.toolbarTextSize);
+  if (toolbarTextSize !== undefined) migrated.toolbarTextSize = clampToolbarTextSize(toolbarTextSize);
   const editorPaneRatio = numberValue(raw.editorPaneRatio);
   if (editorPaneRatio !== undefined) migrated.editorPaneRatio = clampPaneRatio(editorPaneRatio);
   for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot"] as const) {

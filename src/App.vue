@@ -6,6 +6,7 @@
     :data-toolbar-display="store.toolbarDisplay"
     :data-high-contrast="store.highContrast ? 'true' : 'false'"
     :data-reduced-motion="store.reducedMotion ? 'true' : 'false'"
+    :style="appShellStyle"
   >
     <nav class="skip-links" aria-label="Keyboard shortcuts">
       <a href="#main-commands" @click="focusSkipTarget">Skip to commands</a>
@@ -27,9 +28,15 @@
           @drop="dropTabOnGroup(group)"
         >
           <header class="tab-group-header" :title="group.title">
-            <span>{{ group.label }}</span>
-            <small>{{ group.documents.length }}</small>
-            <button type="button" aria-label="Close tab group" @click="closeTabGroup(group)">x</button>
+            <span class="tab-group-title">
+              <span>{{ group.label }}</span>
+              <small>{{ group.documents.length }}</small>
+            </span>
+            <button class="tab-icon-button" type="button" aria-label="Close tab group" title="Close tab group" @click="closeTabGroup(group)">
+              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                <path v-for="path in toolbarIconPaths('close')" :key="path" :d="path"></path>
+              </svg>
+            </button>
           </header>
           <div
             v-for="document in group.documents"
@@ -40,18 +47,32 @@
             @dragstart="draggedTabId = document.id"
             @dragend="draggedTabId = ''"
           >
-            <button class="tab-main" type="button" @click="activate(document.id)">
-              <span>{{ document.dirty ? "*" : "" }}{{ document.title }}</span>
+            <button
+              class="tab-main"
+              type="button"
+              :aria-label="`${document.dirty ? 'Unsaved ' : ''}${document.title}`"
+              @click="activate(document.id)"
+            >
+              <span v-if="document.dirty" class="tab-dirty" aria-hidden="true"></span>
+              <span>{{ document.title }}</span>
             </button>
             <button
-              class="tab-close"
+              class="tab-icon-button"
+              :class="{ active: document.pinned }"
               type="button"
               :aria-label="document.pinned ? 'Unpin document' : 'Pin document'"
+              :title="document.pinned ? 'Unpin document' : 'Pin document'"
               @click="store.togglePin(document.id)"
             >
-              {{ document.pinned ? "!" : "^" }}
+              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                <path v-for="path in toolbarIconPaths('pin')" :key="path" :d="path"></path>
+              </svg>
             </button>
-            <button class="tab-close" type="button" aria-label="Close document" @click="closeDocument(document.id)">x</button>
+            <button class="tab-icon-button" type="button" aria-label="Close document" title="Close document" @click="closeDocument(document.id)">
+              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                <path v-for="path in toolbarIconPaths('close')" :key="path" :d="path"></path>
+              </svg>
+            </button>
           </div>
         </section>
       </section>
@@ -63,31 +84,34 @@
     </header>
 
     <nav id="main-commands" class="command-bar" aria-label="Main commands" tabindex="-1">
-      <section v-for="group in commandBarGroups" :key="group.id" class="command-group" :aria-label="`${group.label} commands`">
-        <span class="command-group-label">{{ group.label }}</span>
-        <div class="command-group-actions">
-          <button
-            v-for="action in group.actions"
-            :key="action.id"
-            type="button"
-            class="icon-command"
-            :class="{ primary: action.primary }"
-            :disabled="action.disabled"
-            :aria-label="action.label"
-            :title="action.title || action.label"
-            @click="runCommandBarAction(action)"
-          >
-            <span class="command-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path v-for="path in toolbarIconPaths(action.icon)" :key="path" :d="path"></path>
-              </svg>
-            </span>
-            <span class="command-label">{{ action.label }}</span>
-          </button>
-        </div>
+      <section v-for="row in commandToolbarRows" :key="row.id" class="command-toolbar-row" :aria-label="`${row.label} toolbar`">
+        <span class="command-toolbar-title">{{ row.label }}</span>
+        <section v-for="group in row.groups" :key="group.id" class="command-group" :aria-label="`${group.label} commands`">
+          <span class="command-group-label">{{ group.label }}</span>
+          <div class="command-group-actions">
+            <button
+              v-for="action in group.actions"
+              :key="action.id"
+              type="button"
+              class="icon-command"
+              :class="{ primary: action.primary }"
+              :disabled="action.disabled"
+              :aria-label="action.label"
+              :title="action.title || action.label"
+              @click="runCommandBarAction(action)"
+            >
+              <span class="command-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path v-for="path in toolbarIconPaths(action.icon)" :key="path" :d="path"></path>
+                </svg>
+              </span>
+              <span class="command-label">{{ action.label }}</span>
+            </button>
+          </div>
+        </section>
       </section>
-      <section class="command-group command-group-view" aria-label="View commands">
-        <span class="command-group-label">View</span>
+      <section class="command-toolbar-row command-toolbar-row-view" aria-label="View toolbar">
+        <span class="command-toolbar-title">View</span>
         <label class="compact-field">
           <span>Mode</span>
           <select v-model="store.mode" aria-label="View mode">
@@ -122,6 +146,18 @@
             <option value="icons">Icons only</option>
             <option value="text">Text only</option>
           </select>
+        </label>
+        <label class="compact-field compact-field-range">
+          <span>Text</span>
+          <input
+            v-model.number="store.toolbarTextSize"
+            aria-label="Toolbar text size"
+            type="range"
+            min="9"
+            max="15"
+            step="1"
+          />
+          <output aria-label="Current toolbar text size">{{ store.toolbarTextSize }}px</output>
         </label>
       </section>
     </nav>
@@ -455,11 +491,18 @@
               class="template-card"
               role="listitem"
             >
-              <header>
-                <strong>{{ template.name }}</strong>
-                <small>{{ template.category }} | {{ template.transform }} | {{ template.source }}</small>
+              <header class="template-card-header">
+                <div>
+                  <strong>{{ template.name }}</strong>
+                  <small>{{ template.summary }}</small>
+                </div>
+                <span class="template-source">{{ template.source }}</span>
               </header>
-              <p>{{ template.summary }}</p>
+              <div class="template-meta" aria-label="Template metadata">
+                <small class="template-meta-summary">{{ template.category }} | {{ template.transform }} | {{ template.source }}</small>
+                <span>{{ template.category }}</span>
+                <span>{{ template.transform }}</span>
+              </div>
               <div v-if="templateFillFields(template).length" class="template-fill-fields" aria-label="Template fill values">
                 <span>Fill</span>
                 <code v-for="field in templateFillFields(template)" :key="`${template.id}-${field.name}`" :title="`${field.name} = ${field.value}`">
@@ -474,10 +517,38 @@
                 <pre>{{ template.body }}</pre>
               </details>
               <div class="template-actions">
-                <button type="button" @click="insertTransformTemplate(template)">Insert</button>
-                <button type="button" @click="duplicateTransformTemplate(template)">Duplicate</button>
-                <button v-if="template.source === 'custom'" type="button" @click="editCustomTransformTemplate(template)">Edit</button>
-                <button v-if="template.source === 'custom'" type="button" @click="store.deleteCustomTransformTemplate(template.id)">Delete</button>
+                <button class="template-action-primary" type="button" @click="insertTransformTemplate(template)">
+                  <span class="button-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path v-for="path in toolbarIconPaths('templates')" :key="path" :d="path"></path>
+                    </svg>
+                  </span>
+                  Insert
+                </button>
+                <button type="button" @click="duplicateTransformTemplate(template)">
+                  <span class="button-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path v-for="path in toolbarIconPaths('duplicate')" :key="path" :d="path"></path>
+                    </svg>
+                  </span>
+                  Duplicate
+                </button>
+                <button v-if="template.source === 'custom'" type="button" @click="editCustomTransformTemplate(template)">
+                  <span class="button-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path v-for="path in toolbarIconPaths('rename')" :key="path" :d="path"></path>
+                    </svg>
+                  </span>
+                  Edit
+                </button>
+                <button v-if="template.source === 'custom'" class="danger-action" type="button" @click="store.deleteCustomTransformTemplate(template.id)">
+                  <span class="button-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path v-for="path in toolbarIconPaths('close')" :key="path" :d="path"></path>
+                    </svg>
+                  </span>
+                  Delete
+                </button>
               </div>
             </article>
           </section>
@@ -735,8 +806,18 @@
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
           <label><input v-model="store.exportDefaults.includeAgenda" type="checkbox" /> PPTX agenda</label>
-          <button type="button" :disabled="store.exportBusy" @click="prepareForExport">Prepare for export</button>
-          <button type="button" :disabled="store.exportBusy" @click="exportDocument">Export document</button>
+          <div class="export-actions">
+            <button class="template-action-primary" type="button" :disabled="store.exportBusy" @click="exportDocumentAs('html')">
+              <span class="button-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path v-for="path in toolbarIconPaths('html')" :key="path" :d="path"></path>
+                </svg>
+              </span>
+              Export HTML
+            </button>
+            <button type="button" :disabled="store.exportBusy" @click="prepareForExport">Prepare for export</button>
+            <button type="button" :disabled="store.exportBusy" @click="exportDocument">Export document</button>
+          </div>
           <article v-if="store.exportReadiness" class="readiness" :class="{ ready: store.exportReadiness.ready }">
             <strong>{{ store.exportReadiness.ready ? "Ready" : "Needs attention" }}</strong>
             <p>{{ store.exportReadiness.error_count }} errors, {{ store.exportReadiness.warning_count }} warnings, {{ store.exportReadiness.info_count }} info</p>
@@ -951,6 +1032,11 @@
               <option value="icons">Icons only</option>
               <option value="text">Text only</option>
             </select>
+          </label>
+          <label>
+            Toolbar text size
+            <input v-model.number="store.toolbarTextSize" type="range" min="9" max="15" step="1" />
+            <output>{{ store.toolbarTextSize }}px</output>
           </label>
           <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
           <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
@@ -1520,7 +1606,19 @@ import { useDocumentsStore } from "./stores/documents";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument } from "./types";
 
 const store = useDocumentsStore();
-const appWindow = getCurrentWindow();
+type WindowTitleTarget = {
+  setTitle(title: string): Promise<void>;
+};
+
+function getWindowTitleTarget(): WindowTitleTarget | null {
+  try {
+    return getCurrentWindow();
+  } catch {
+    return null;
+  }
+}
+
+const appWindow = getWindowTitleTarget();
 const editorHost = ref<HTMLElement | null>(null);
 const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
@@ -1677,7 +1775,10 @@ type ToolbarIconName =
   | "previous"
   | "next"
   | "fold"
-  | "unfold";
+  | "unfold"
+  | "html"
+  | "pin"
+  | "close";
 
 interface CommandBarAction {
   id: string;
@@ -1693,6 +1794,12 @@ interface CommandBarGroup {
   id: string;
   label: string;
   actions: CommandBarAction[];
+}
+
+interface CommandToolbarRow {
+  id: string;
+  label: string;
+  groups: CommandBarGroup[];
 }
 
 const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
@@ -1729,6 +1836,9 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   next: ["M9 6l6 6-6 6"],
   fold: ["M5 7h14", "M8 12h8", "M11 17h2"],
   unfold: ["M5 7h14", "M5 12h14", "M5 17h14"],
+  html: ["M8 8l-4 4 4 4", "M16 8l4 4-4 4", "M14 5l-4 14"],
+  pin: ["M14 4l6 6-4 1-4 6-1 3-1-1-3-3-3-3-1-1 3-1 6-4z", "M9 15l-5 5"],
+  close: ["M6 6l12 12", "M18 6L6 18"],
 };
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
@@ -1777,6 +1887,9 @@ const previewDocumentStyle = computed(() => ({
   fontFamily: store.previewFont,
   fontSize: `${clampUiFontSize(store.previewFontSize)}px`,
   lineHeight: String(clampUiLineHeight(store.previewLineHeight)),
+}));
+const appShellStyle = computed(() => ({
+  "--toolbar-font-size": `${clampToolbarTextSize(store.toolbarTextSize)}px`,
 }));
 const previewDocumentLabel = computed(() => {
   const title = active.value.compile?.semantic.title || active.value.title || "Untitled document";
@@ -2121,6 +2234,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "open", label: "Open", title: "Open document", icon: "open", run: () => openDocument() },
       { id: "save", label: "Save", title: "Save document", icon: "save", primary: true, run: () => saveDocument() },
       { id: "save-as", label: "Save As", title: "Save document as", icon: "saveAs", run: () => saveDocumentAs() },
+      { id: "export-html", label: "HTML", title: "Export HTML", icon: "html", run: () => exportDocumentAs("html") },
       { id: "export", label: "Export", title: "Export document", icon: "export", disabled: store.exportBusy, run: () => exportDocument() },
     ],
   },
@@ -2184,6 +2298,22 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     ],
   },
 ]);
+const commandToolbarRows = computed<CommandToolbarRow[]>(() => {
+  const byId = new Map(commandBarGroups.value.map((group) => [group.id, group]));
+  const rows = [
+    { id: "file", label: "File", groupIds: ["document", "manage"] },
+    { id: "writing", label: "Writing", groupIds: ["write", "insert"] },
+    { id: "review-navigation", label: "Review & Navigate", groupIds: ["navigate", "review"] },
+  ];
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    groups: row.groupIds.flatMap((id) => {
+      const group = byId.get(id);
+      return group ? [group] : [];
+    }),
+  }));
+});
 const commands = computed(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
@@ -2195,6 +2325,7 @@ const commands = computed(() => [
   { name: "Rename document", group: "File", run: () => void renameDocument() },
   { name: "Duplicate document", group: "File", run: () => void duplicateDocument() },
   { name: "Prepare for export", group: "Export", run: () => void prepareForExport() },
+  { name: "Export HTML", group: "Export", run: () => void exportDocumentAs("html") },
   { name: "Export document", group: "Export", run: () => void exportDocument() },
   { name: "Create snapshot", group: "Versioning", run: () => void snapshotActive() },
   { name: "Refresh Git diff", group: "Versioning", run: () => void store.refreshGitDiff() },
@@ -2416,6 +2547,7 @@ watch(
     store.theme,
     store.previewTheme,
     store.toolbarDisplay,
+    store.toolbarTextSize,
     store.highContrast,
     store.reducedMotion,
     store.editorFont,
@@ -2443,6 +2575,7 @@ watch(
 watch(
   () => store.exportTarget,
   () => {
+    store.exportReadiness = null;
     void store.persistWorkspace();
   },
 );
@@ -2541,7 +2674,7 @@ watch(
 
 function setWindowTitle(title: string) {
   document.title = title;
-  void appWindow.setTitle(title).catch(() => undefined);
+  void appWindow?.setTitle(title).catch(() => undefined);
 }
 
 async function reportDesktopUiSmoke() {
@@ -3841,6 +3974,10 @@ function clampUiFontSize(value: number) {
   return Math.min(Math.max(Number(value) || 14, 12), 22);
 }
 
+function clampToolbarTextSize(value: number) {
+  return Math.min(Math.max(Number(value) || 10, 9), 15);
+}
+
 function clampAutosaveDelay(value: number) {
   return Math.min(Math.max(Number(value) || 1500, 500), 30000);
 }
@@ -4050,6 +4187,13 @@ async function exportDocument() {
     defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")}.${extension}`,
   });
   if (path) await store.exportActive(path);
+}
+
+async function exportDocumentAs(target: typeof store.exportTarget) {
+  store.exportTarget = target;
+  store.sidebar = "exports";
+  await nextTick();
+  await exportDocument();
 }
 
 async function prepareForExport() {
@@ -4903,8 +5047,22 @@ select {
 }
 
 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 4px 10px;
   cursor: pointer;
+}
+
+button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
 }
 
 button:hover,
@@ -4951,6 +5109,27 @@ select:hover {
   background: #203b58;
 }
 
+.app-shell[data-theme="dark"] .tab,
+.app-shell[data-theme="dark"] .tab-group-header,
+.app-shell[data-theme="dark"] .command-group,
+.app-shell[data-theme="dark"] .template-card,
+.app-shell[data-theme="dark"] .template-source,
+.app-shell[data-theme="dark"] .template-meta span,
+.app-shell[data-theme="dark"] .status-message,
+.app-shell[data-theme="dark"] .word-stats,
+.app-shell[data-theme="dark"] .watch-status,
+.app-shell[data-theme="dark"] .export-progress {
+  border-color: #34465a;
+  background: #1b2736;
+  color: #dce7f3;
+}
+
+.app-shell[data-theme="dark"] .template-card-header small,
+.app-shell[data-theme="dark"] .template-fill-fields,
+.app-shell[data-theme="dark"] .sidebar-hint {
+  color: #aebdcc;
+}
+
 @media (prefers-color-scheme: dark) {
   .app-shell[data-theme="system"] {
     color: #e6edf5;
@@ -4977,6 +5156,27 @@ select:hover {
     border-color: #587ea9;
     background: #203b58;
   }
+
+  .app-shell[data-theme="system"] .tab,
+  .app-shell[data-theme="system"] .tab-group-header,
+  .app-shell[data-theme="system"] .command-group,
+  .app-shell[data-theme="system"] .template-card,
+  .app-shell[data-theme="system"] .template-source,
+  .app-shell[data-theme="system"] .template-meta span,
+  .app-shell[data-theme="system"] .status-message,
+  .app-shell[data-theme="system"] .word-stats,
+  .app-shell[data-theme="system"] .watch-status,
+  .app-shell[data-theme="system"] .export-progress {
+    border-color: #34465a;
+    background: #1b2736;
+    color: #dce7f3;
+  }
+
+  .app-shell[data-theme="system"] .template-card-header small,
+  .app-shell[data-theme="system"] .template-fill-fields,
+  .app-shell[data-theme="system"] .sidebar-hint {
+    color: #aebdcc;
+  }
 }
 
 .app-shell[data-high-contrast="true"] {
@@ -4990,6 +5190,16 @@ select:hover {
 .app-shell[data-high-contrast="true"] .status-bar,
 .app-shell[data-high-contrast="true"] .sidebar,
 .app-shell[data-high-contrast="true"] .release-badge,
+.app-shell[data-high-contrast="true"] .tab,
+.app-shell[data-high-contrast="true"] .tab-group-header,
+.app-shell[data-high-contrast="true"] .command-group,
+.app-shell[data-high-contrast="true"] .template-card,
+.app-shell[data-high-contrast="true"] .template-source,
+.app-shell[data-high-contrast="true"] .template-meta span,
+.app-shell[data-high-contrast="true"] .status-message,
+.app-shell[data-high-contrast="true"] .word-stats,
+.app-shell[data-high-contrast="true"] .watch-status,
+.app-shell[data-high-contrast="true"] .export-progress,
 .app-shell[data-high-contrast="true"] button,
 .app-shell[data-high-contrast="true"] select,
 .app-shell[data-high-contrast="true"] input,
@@ -5039,7 +5249,9 @@ select:hover {
 }
 
 .skip-links a {
-  transform: translateY(-180%);
+  position: absolute;
+  top: -999px;
+  left: 0;
   border: 2px solid #18212f;
   border-radius: 6px;
   padding: 6px 10px;
@@ -5051,7 +5263,8 @@ select:hover {
 }
 
 .skip-links a:focus {
-  transform: translateY(0);
+  position: static;
+  transform: none;
   outline: 3px solid #f6c343;
   outline-offset: 2px;
 }
@@ -5078,9 +5291,9 @@ select:hover {
 
 .tab-group {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   flex: 0 0 auto;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
   padding-right: 8px;
   border-right: 1px solid #d7dee7;
@@ -5093,49 +5306,49 @@ select:hover {
 
 .tab-group-header {
   display: flex;
-  min-width: 72px;
+  align-items: center;
+  gap: 5px;
+  min-width: 76px;
   max-width: 140px;
-  flex-direction: column;
-  justify-content: center;
+  min-height: 28px;
+  padding: 2px 4px 2px 6px;
+  border: 1px solid #d7dee7;
+  border-radius: 6px;
+  background: #ffffff;
   color: #526171;
   font-size: 11px;
   line-height: 1.2;
   text-transform: uppercase;
 }
 
-.tab-group-header span {
+.tab-group-title {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+}
+
+.tab-group-title span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tab-group-header small {
+.tab-group-title small {
   color: #7b8794;
   font-size: 10px;
-}
-
-.tab-group-header button {
-  width: 18px;
-  height: 18px;
-  margin-top: 3px;
-  padding: 0;
-  border: 1px solid #c5cfdb;
-  border-radius: 4px;
-  background: #fff;
-  color: #526171;
-  font-size: 11px;
-  line-height: 1;
 }
 
 .tab {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   max-width: 220px;
   min-height: 30px;
+  padding: 0 3px 0 0;
   border: 1px solid #bac4d1;
   border-radius: 6px;
-  background: #edf1f5;
+  background: #f3f6fa;
 }
 
 .tab[draggable="true"] {
@@ -5145,11 +5358,17 @@ select:hover {
 .tab.active {
   border-color: #275da8;
   background: #ffffff;
+  box-shadow: inset 0 -2px 0 #275da8;
 }
 
 .tab-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   flex: 1;
+  min-height: 28px;
+  padding: 4px 8px;
   border: 0;
   background: transparent;
   text-align: left;
@@ -5163,12 +5382,30 @@ select:hover {
   white-space: nowrap;
 }
 
-.tab-close {
-  min-width: 20px;
-  min-height: 20px;
+.tab-dirty {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #c68a1a;
+}
+
+.tab-icon-button {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
   padding: 0;
-  border: 0;
+  border-color: transparent;
   background: transparent;
+  color: #607083;
+}
+
+.tab-icon-button:hover,
+.tab-icon-button.active {
+  border-color: #c5cfdb;
+  background: #eef4fb;
+  color: #174a88;
 }
 
 .window-meta,
@@ -5231,39 +5468,63 @@ select:hover {
 }
 
 .command-bar {
+  display: grid;
   align-items: stretch;
-  gap: 0;
-  min-height: 58px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  gap: 4px;
+  min-height: 0;
+  overflow: visible;
   padding: 6px 8px;
   border-bottom-color: #b9c6d4;
-  background: #ffffff;
+  background: #f7f9fc;
+}
+
+.command-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+.command-toolbar-title {
+  width: 92px;
+  flex: 0 0 92px;
+  color: #5b6c80;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.command-toolbar-row-view {
+  align-items: center;
 }
 
 .command-group {
-  display: grid;
-  grid-template-columns: auto minmax(0, max-content);
+  display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: 6px;
-  padding: 0 10px;
-  border-right: 1px solid #d9e1ea;
+  gap: 5px;
+  min-height: 34px;
+  padding: 3px 5px;
+  border: 1px solid #d9e1ea;
+  border-radius: 6px;
+  background: #ffffff;
 }
 
 .command-group:first-child {
-  padding-left: 2px;
+  padding-left: 7px;
 }
 
 .command-group:last-child {
-  border-right: 0;
-  padding-right: 2px;
+  padding-right: 7px;
 }
 
 .command-group-label {
-  min-width: 48px;
+  min-width: auto;
   color: #607083;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1.1;
@@ -5282,17 +5543,20 @@ select:hover {
   justify-content: center;
   gap: 6px;
   min-width: 34px;
-  height: 36px;
-  padding: 0 8px;
+  height: 28px;
+  padding: 0 6px;
   border-color: #c5d0dc;
   background: #f8fafc;
   color: #203044;
+  font-size: var(--toolbar-font-size, 10px);
+  line-height: 1.1;
   white-space: nowrap;
 }
 
 .icon-command.primary {
-  border-color: #9fb6d3;
-  background: #eef5ff;
+  border-color: #7fa2cd;
+  background: #eaf3ff;
+  color: #143f70;
 }
 
 .icon-command:disabled {
@@ -5304,14 +5568,14 @@ select:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
 }
 
 .command-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -5340,16 +5604,17 @@ select:hover {
 }
 
 .command-group-view {
-  grid-template-columns: auto repeat(3, max-content);
+  grid-template-columns: auto repeat(3, minmax(104px, max-content));
 }
 
 .compact-field {
   display: inline-grid;
+  flex: 0 0 auto;
   grid-template-columns: auto minmax(84px, max-content);
   align-items: center;
   gap: 5px;
   color: #526171;
-  font-size: 11px;
+  font-size: var(--toolbar-font-size, 10px);
   font-weight: 700;
 }
 
@@ -5358,8 +5623,23 @@ select:hover {
 }
 
 .compact-field select {
-  height: 36px;
+  height: 28px;
   min-width: 96px;
+  font-size: var(--toolbar-font-size, 10px);
+}
+
+.compact-field input[type="range"] {
+  width: 92px;
+}
+
+.compact-field output {
+  min-width: 32px;
+  color: #526171;
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-field-range {
+  grid-template-columns: auto 92px 32px;
 }
 
 .trust-prompt {
@@ -5770,6 +6050,10 @@ select:hover {
   margin-bottom: 12px;
 }
 
+.template-filters {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
 .template-list {
   display: grid;
   gap: 10px;
@@ -5778,18 +6062,71 @@ select:hover {
 .template-card {
   display: grid;
   gap: 8px;
-  padding: 8px;
+  padding: 10px;
   border: 1px solid #c9d2dc;
+  border-left: 3px solid #2f6f7e;
+  border-radius: 7px;
   background: #ffffff;
 }
 
-.template-card header {
+.template-card-header {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.template-card-header div {
+  display: grid;
+  min-width: 0;
   gap: 2px;
 }
 
-.template-card p {
-  margin: 0;
+.template-card-header strong,
+.template-card-header small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.template-card-header small {
+  color: #526171;
+  line-height: 1.35;
+}
+
+.template-source {
+  align-self: start;
+  padding: 2px 6px;
+  border: 1px solid #c7d5e5;
+  border-radius: 999px;
+  background: #f2f7fc;
+  color: #31516f;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.template-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.template-meta-summary {
+  flex: 1 0 100%;
+  color: #526171;
+  font-size: 11px;
+}
+
+.template-meta span {
+  padding: 2px 7px;
+  border: 1px solid #d8e0e8;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #44566a;
+  font-size: 11px;
+  font-weight: 650;
 }
 
 .template-card pre {
@@ -5831,6 +6168,43 @@ select:hover {
   padding: 2px 6px;
   border: 1px solid #d8e0e8;
   background: #f8fafc;
+}
+
+.template-actions button {
+  min-height: 28px;
+  padding: 3px 8px;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
+.template-action-primary {
+  border-color: #7fa2cd;
+  background: #eaf3ff;
+  color: #143f70;
+  font-weight: 700;
+}
+
+.danger-action {
+  border-color: #e3b7b7;
+  background: #fff5f5;
+  color: #9b1c1c;
+}
+
+.button-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.button-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .custom-template-editor {
@@ -6405,10 +6779,12 @@ select:hover {
 
 .status-bar {
   justify-content: space-between;
+  gap: 8px;
   overflow-x: auto;
   overflow-y: hidden;
   border-top: 1px solid #c9d2dc;
   border-bottom: 0;
+  background: #f8fafc;
   white-space: nowrap;
 }
 
@@ -6417,9 +6793,29 @@ select:hover {
 .watch-status,
 .export-progress,
 .error {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
   min-width: 0;
+  padding: 1px 7px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.status-message {
+  max-width: 36vw;
+  border-color: #d9e1ea;
+  background: #ffffff;
+  color: #324156;
+}
+
+.word-stats,
+.watch-status,
+.export-progress {
+  background: #eef3f8;
+  color: #4a5b6d;
 }
 
 .conflict-actions,
@@ -6430,6 +6826,8 @@ select:hover {
 }
 
 .error {
+  border-color: #efc7c7;
+  background: #fff5f5;
   color: #c24141;
 }
 
@@ -6659,6 +7057,22 @@ select:hover {
 }
 
 @media (max-width: 900px) {
+  .command-bar {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .command-toolbar-row {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 3px;
+  }
+
+  .command-group,
+  .compact-field {
+    max-width: 100%;
+  }
+
   .workspace,
   .workspace.mode-source,
   .workspace.mode-focus,
@@ -6692,6 +7106,42 @@ select:hover {
 
   .compare-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-shell {
+    grid-template-rows: 38px auto minmax(0, 1fr) 34px;
+  }
+
+  .command-group,
+  .command-toolbar-row-view {
+    width: 100%;
+  }
+
+  .command-toolbar-title {
+    width: 72px;
+    flex-basis: 72px;
+  }
+
+  .command-group-actions {
+    flex-wrap: nowrap;
+  }
+
+  .compact-field {
+    grid-template-columns: auto max-content;
+  }
+
+  .compact-field select {
+    min-width: 104px;
+  }
+
+  .compact-field-range {
+    grid-template-columns: auto 92px 32px;
+  }
+
+  .status-bar {
+    justify-content: start;
   }
 }
 </style>

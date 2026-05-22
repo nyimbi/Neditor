@@ -287,6 +287,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     theme: "solarized",
     previewTheme: "dark",
     toolbarDisplay: "icons",
+    toolbarTextSize: 20,
     codeFolding: false,
     editorPaneRatio: 0.95,
     editorFontSize: 99,
@@ -338,6 +339,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.theme, undefined);
   equal(migrated.previewTheme, "dark");
   equal(migrated.toolbarDisplay, "icons");
+  equal(migrated.toolbarTextSize, 15);
   equal(migrated.codeFolding, false);
   equal(migrated.editorPaneRatio, 0.75);
   equal(migrated.editorFontSize, 22);
@@ -439,17 +441,24 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const types = readFileSync("src/types.ts", "utf8");
 
   ok(app.includes(':data-toolbar-display="store.toolbarDisplay"'));
+  ok(app.includes(':style="appShellStyle"'));
   ok(app.includes('aria-label="Toolbar button display"'));
+  ok(app.includes('aria-label="Toolbar text size"'));
+  ok(app.includes("Export HTML"));
+  ok(app.includes("exportDocumentAs(\"html\")"));
+  ok(app.includes("commandToolbarRows"));
+  ok(app.includes("command-toolbar-row"));
   ok(app.includes('foldGutter()'));
   ok(app.includes('codeFolding({ placeholderText: " folded " })'));
   ok(app.includes('class="icon-command"'));
   for (const label of ["Document", "Manage", "Write", "Navigate", "Insert", "Review"]) {
     ok(app.includes(`label: "${label}"`), `missing ${label} command group`);
   }
-  for (const icon of ["saveAs", "snapshot", "templates", "equation", "outline", "fold", "unfold", "comment"]) {
+  for (const icon of ["saveAs", "snapshot", "templates", "equation", "outline", "fold", "unfold", "comment", "html"]) {
     ok(app.includes(`${icon}: [`), `missing ${icon} icon path`);
   }
   ok(app.includes('store.sidebar === \'templates\''));
+  ok(store.includes("toolbarTextSize: 10"));
   ok(types.includes("savedText?: string"));
   ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
   ok(store.includes("doc.savedText = response.text"));
