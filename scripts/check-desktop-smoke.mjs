@@ -379,6 +379,9 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow created and listed app-data snapshot",
     "native workflow dirtied document before snapshot restore",
     "native workflow restored app-data snapshot",
+    "native workflow created and listed project-local snapshot",
+    "native workflow dirtied document before project-local snapshot restore",
+    "native workflow restored project-local snapshot",
     "native workflow reloaded clean external watcher change",
     "native workflow restored clean watcher reload",
     "native workflow watched included file with native driver",
@@ -494,14 +497,26 @@ function validateNativeWorkflowReport(launchReport) {
   }
   const snapshotEvidence = payload.snapshotEvidence || {};
   if (
-    snapshotEvidence.created?.storage !== "app-data" ||
-    snapshotEvidence.created?.listed !== true ||
-    snapshotEvidence.created?.label !== "native-smoke" ||
-    !String(snapshotEvidence.created?.snapshotPath || "").endsWith(".md") ||
-    snapshotEvidence.restored?.containsMutation !== false ||
-    !String(snapshotEvidence.restored?.restoredText || "").includes("Market Entry Report")
+    snapshotEvidence.appData?.created?.storage !== "app-data" ||
+    snapshotEvidence.appData?.created?.listed !== true ||
+    snapshotEvidence.appData?.created?.label !== "native-smoke" ||
+    !String(snapshotEvidence.appData?.created?.snapshotPath || "").endsWith(".md") ||
+    snapshotEvidence.appData?.restored?.containsMutation !== false ||
+    !String(snapshotEvidence.appData?.restored?.restoredText || "").includes("Market Entry Report")
   ) {
     issues.push(`native workflow report did not include app-data snapshot restore evidence: ${JSON.stringify(snapshotEvidence)}`);
+  }
+  const projectLocalSnapshotPath = String(snapshotEvidence.projectLocal?.created?.snapshotPath || "").replaceAll("\\", "/");
+  if (
+    snapshotEvidence.projectLocal?.created?.storage !== "project-local" ||
+    snapshotEvidence.projectLocal?.created?.listed !== true ||
+    snapshotEvidence.projectLocal?.created?.label !== "native-project-smoke" ||
+    !projectLocalSnapshotPath.includes("/.neditor/snapshots/") ||
+    !projectLocalSnapshotPath.endsWith(".md") ||
+    snapshotEvidence.projectLocal?.restored?.containsMutation !== false ||
+    !String(snapshotEvidence.projectLocal?.restored?.restoredText || "").includes("Market Entry Report")
+  ) {
+    issues.push(`native workflow report did not include project-local snapshot restore evidence: ${JSON.stringify(snapshotEvidence)}`);
   }
   const exportProfileEvidence = payload.exportProfileEvidence || {};
   if (

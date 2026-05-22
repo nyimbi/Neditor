@@ -2466,6 +2466,13 @@ Export profile persistence verification:
 | `pnpm run check` | Pass | Vue typecheck passed after adding normalized export profile persistence and profile manager UI. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "saves and reapplies reusable export profiles" --project chromium` | Pass | Browser workflow passed with the system-Chrome fallback, proving a branded PDF export profile can be saved, export settings can drift, the profile can be reapplied, and the saved profile survives reload. |
 
+Native project-local snapshot verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Launched native smoke validates both app-data and project-local snapshot create/list/restore flows, including `.neditor/snapshots` path evidence for the project-local snapshot and mutation removal after restore. |
+| `rg -n "native workflow created and listed project-local snapshot\|native workflow restored project-local snapshot\|native-project-smoke\|/.neditor/snapshots" .tmp/desktop-smoke/native-workflow-report.json .tmp/desktop-smoke/launch-report.json` | Pass | Native desktop workflow evidence records project-local snapshot creation/listing with label `native-project-smoke`, `.neditor/snapshots` storage, and restoration after a mutation. |
+
 Live Google Docs import attempt:
 
 | Command | Result | Evidence |

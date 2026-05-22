@@ -3024,7 +3024,7 @@ async function collectNativeSnapshotEvidence(record: (name: string, passed: bool
   const created = await store.createSnapshot("native-smoke");
   await store.listSnapshots();
   const listedSnapshot = store.snapshots.find((snapshot) => snapshot.snapshot_path === created.snapshot_path);
-  const createdEvidence = {
+  const appDataCreated = {
     storage: store.snapshotStorage,
     snapshotPath: created.snapshot_path,
     listed: Boolean(listedSnapshot),
@@ -3035,7 +3035,7 @@ async function collectNativeSnapshotEvidence(record: (name: string, passed: bool
   record(
     "native workflow created and listed app-data snapshot",
     Boolean(created.snapshot_path && listedSnapshot?.label === "native-smoke" && listedSnapshot.hash),
-    JSON.stringify(createdEvidence),
+    JSON.stringify(appDataCreated),
   );
 
   const mutatedText = `${originalText}\n\nNative snapshot mutation.`;
@@ -3043,7 +3043,7 @@ async function collectNativeSnapshotEvidence(record: (name: string, passed: bool
   record("native workflow dirtied document before snapshot restore", active.value.text.includes("Native snapshot mutation"), active.value.title);
   await store.restoreSnapshot(created.snapshot_path);
   await nextTick();
-  const restoreEvidence = {
+  const appDataRestored = {
     restoredText: active.value.text.slice(0, 120),
     containsMutation: active.value.text.includes("Native snapshot mutation"),
     statusMessage: store.statusMessage,
@@ -3052,12 +3052,63 @@ async function collectNativeSnapshotEvidence(record: (name: string, passed: bool
   record(
     "native workflow restored app-data snapshot",
     active.value.text === originalText && !active.value.text.includes("Native snapshot mutation"),
-    JSON.stringify(restoreEvidence),
+    JSON.stringify(appDataRestored),
   );
   await store.saveActive(filePath);
+
+  store.snapshotStorage = "project-local";
+  await store.persistWorkspace();
+  const projectCreated = await store.createSnapshot("native-project-smoke");
+  await store.listSnapshots();
+  const listedProjectSnapshot = store.snapshots.find((snapshot) => snapshot.snapshot_path === projectCreated.snapshot_path);
+  const projectSnapshotPath = projectCreated.snapshot_path.replace(/\\/g, "/");
+  const projectLocalCreated = {
+    storage: store.snapshotStorage,
+    snapshotPath: projectCreated.snapshot_path,
+    listed: Boolean(listedProjectSnapshot),
+    label: listedProjectSnapshot?.label || "",
+    sourcePath: filePath,
+    hash: listedProjectSnapshot?.hash || "",
+  };
+  record(
+    "native workflow created and listed project-local snapshot",
+    Boolean(
+      projectCreated.snapshot_path &&
+        projectSnapshotPath.includes("/.neditor/snapshots/") &&
+        listedProjectSnapshot?.label === "native-project-smoke" &&
+        listedProjectSnapshot.hash,
+    ),
+    JSON.stringify(projectLocalCreated),
+  );
+
+  const projectMutatedText = `${originalText}\n\nNative project-local snapshot mutation.`;
+  await setNativeWorkflowText(projectMutatedText);
+  record(
+    "native workflow dirtied document before project-local snapshot restore",
+    active.value.text.includes("Native project-local snapshot mutation"),
+    active.value.title,
+  );
+  await store.restoreSnapshot(projectCreated.snapshot_path);
+  await nextTick();
+  const projectLocalRestored = {
+    restoredText: active.value.text.slice(0, 120),
+    containsMutation: active.value.text.includes("Native project-local snapshot mutation"),
+    statusMessage: store.statusMessage,
+    snapshotCount: store.snapshots.length,
+  };
+  record(
+    "native workflow restored project-local snapshot",
+    active.value.text === originalText && !active.value.text.includes("Native project-local snapshot mutation"),
+    JSON.stringify(projectLocalRestored),
+  );
+  await store.saveActive(filePath);
+
   store.snapshotStorage = originalStorage;
   await store.persistWorkspace();
-  return { created: createdEvidence, restored: restoreEvidence };
+  return {
+    appData: { created: appDataCreated, restored: appDataRestored },
+    projectLocal: { created: projectLocalCreated, restored: projectLocalRestored },
+  };
 }
 
 async function collectNativeExportProfileEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
