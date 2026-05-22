@@ -148,7 +148,9 @@ pub fn run() {
             run_transform,
             run_external_transform,
             cleanup_ai_paste,
-            write_desktop_ui_smoke_report
+            write_desktop_ui_smoke_report,
+            desktop_workflow_smoke_enabled,
+            write_desktop_workflow_smoke_report
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");
@@ -189,6 +191,26 @@ fn write_desktop_ui_smoke_report(payload: serde_json::Value) -> Result<(), Strin
     let Ok(report_path) = std::env::var("NEDITOR_DESKTOP_UI_SMOKE_REPORT") else {
         return Ok(());
     };
+    write_guarded_desktop_report(report_path, payload)
+}
+
+#[tauri::command]
+fn desktop_workflow_smoke_enabled() -> bool {
+    std::env::var("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT").is_ok()
+}
+
+#[tauri::command]
+fn write_desktop_workflow_smoke_report(payload: serde_json::Value) -> Result<(), String> {
+    let Ok(report_path) = std::env::var("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT") else {
+        return Ok(());
+    };
+    write_guarded_desktop_report(report_path, payload)
+}
+
+fn write_guarded_desktop_report(
+    report_path: String,
+    payload: serde_json::Value,
+) -> Result<(), String> {
     let payload = serde_json::json!({
         "generatedAt": chrono::Utc::now().to_rfc3339(),
         "payload": payload,

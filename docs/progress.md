@@ -2334,7 +2334,22 @@ Desktop native automation smoke verification:
 | --- | --- | --- |
 | `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke verifier syntax remained valid after adding macOS System Events evidence capture. |
 | `pnpm run test:desktop-smoke` | Pass | Desktop artifact and native command workflow smoke still pass without GUI launch enabled. |
-| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS GUI launch smoke passed and `.tmp/desktop-smoke/launch-report.json` recorded app-authored Tauri window metadata plus app-authored Vue workbench UI evidence; System Events evidence is classified as limited on this host because it exposed the `neditor` process but not a window. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS GUI launch smoke passed and `.tmp/desktop-smoke/launch-report.json` recorded app-authored Tauri window metadata, app-authored Vue workbench UI evidence, and the new `.tmp/desktop-smoke/native-workflow-report.json` proof. The workflow report asserts native preview-mode switching, command-palette opening, Science `calc` template insertion into source, rendered preview output (`Total dose: 360 mg`), dirty title mutation, and HTML export readiness progress evidence; System Events evidence remains classified as limited on this host because it exposed the `neditor` process but not a window. |
+
+Desktop app-authored workflow smoke verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the guarded desktop workflow smoke path. |
+| `pnpm run test:unit` | Pass | 19 frontend unit tests passed, including static coverage that the native workflow smoke gate, writer command, report validator, and expected workflow assertions remain wired. |
+| `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke verifier syntax remained valid after adding native workflow report validation. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting remained clean after registering the guarded workflow smoke commands. |
+| `cargo check --locked` in `src-tauri` | Pass | Tauri command registration for the workflow smoke gate/report compiled cleanly. |
+| `pnpm run build` | Pass | Vue typecheck and Vite production build passed before rebuilding the release desktop binary. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Rebuilt the release desktop binary consumed by the native workflow launch smoke. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Launch smoke validated `.tmp/desktop-smoke/native-workflow-report.json` with passing assertions for native mode switch, command palette, calc-template source insertion, rendered preview, dirty title, and HTML export readiness. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "boots the workbench\|manages transform templates" --project chromium` | Pass | Focused browser workflows still passed with the system-Chrome fallback after adding the guarded native workflow IPC calls to app boot. |
+| `pnpm run verify:local` | Pass | Quick local verification passed all 9 steps after adding the native workflow smoke report. |
 
 Desktop WebDriver harness verification:
 

@@ -498,15 +498,25 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   const smoke = readFileSync("scripts/check-desktop-smoke.mjs", "utf8");
 
   ok(app.includes("write_desktop_ui_smoke_report"));
+  ok(app.includes("desktop_workflow_smoke_enabled"));
+  ok(app.includes("write_desktop_workflow_smoke_report"));
+  ok(app.includes("native workflow inserted calc template into source"));
+  ok(app.includes("native workflow prepared html export readiness"));
   ok(app.includes("commandLabels"));
   ok(app.includes("#document-workspace"));
   ok(app.includes("#live-preview"));
   ok(app.includes("previewLabel"));
   ok(rust.includes("fn write_desktop_ui_smoke_report"));
+  ok(rust.includes("fn desktop_workflow_smoke_enabled"));
+  ok(rust.includes("fn write_desktop_workflow_smoke_report"));
   ok(rust.includes("NEDITOR_DESKTOP_UI_SMOKE_REPORT"));
+  ok(rust.includes("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT"));
   ok(smoke.includes("native-ui-report.json"));
+  ok(smoke.includes("native-workflow-report.json"));
   ok(smoke.includes("validateNativeUiReport"));
+  ok(smoke.includes("validateNativeWorkflowReport"));
   ok(smoke.includes("native UI report did not include command button"));
+  ok(smoke.includes("native workflow report did not include passing assertion"));
   ok(smoke.includes("native UI report did not include rendered preview identity or content"));
   ok(smoke.includes("status = \"limited\""));
 });

@@ -7,9 +7,10 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const launchRequested =
   process.argv.includes("--launch") || process.env.NEDITOR_DESKTOP_SMOKE_LAUNCH === "1";
-const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 3000);
+const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 6000);
 const nativeWindowReportPath = join(root, ".tmp", "desktop-smoke", "native-window-report.json");
 const nativeUiReportPath = join(root, ".tmp", "desktop-smoke", "native-ui-report.json");
+const nativeWorkflowReportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-report.json");
 const issues = [];
 
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
@@ -28,6 +29,7 @@ const smokeReport = {
   nativeCommandWorkflow: null,
   nativeWindow: null,
   nativeUi: null,
+  nativeWorkflow: null,
   nativeAutomation: null,
 };
 
@@ -161,6 +163,7 @@ async function launchDesktop(path) {
     const startedAt = Date.now();
     rmSync(nativeWindowReportPath, { force: true });
     rmSync(nativeUiReportPath, { force: true });
+    rmSync(nativeWorkflowReportPath, { force: true });
     const child = spawn(path, [], {
       cwd: root,
       env: {
@@ -168,6 +171,7 @@ async function launchDesktop(path) {
         RUST_BACKTRACE: "1",
         NEDITOR_DESKTOP_SMOKE_REPORT: nativeWindowReportPath,
         NEDITOR_DESKTOP_UI_SMOKE_REPORT: nativeUiReportPath,
+        NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT: nativeWorkflowReportPath,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -199,6 +203,7 @@ async function launchDesktop(path) {
         report.status = "survived-until-timeout";
         validateNativeWindowReport(report);
         validateNativeUiReport(report);
+        validateNativeWorkflowReport(report);
         collectNativeAutomationReport(report, child.pid);
       }
       writeLaunchReport(report);
@@ -333,6 +338,50 @@ function validateNativeUiReport(launchReport) {
   }
   if (!Number.isFinite(payload.viewport?.width) || !Number.isFinite(payload.viewport?.height)) {
     issues.push(`native UI report did not include viewport dimensions: ${JSON.stringify(payload.viewport)}`);
+  }
+}
+
+function validateNativeWorkflowReport(launchReport) {
+  if (!existsSync(nativeWorkflowReportPath)) {
+    issues.push(`native workflow smoke report was not written: ${relative(nativeWorkflowReportPath)}`);
+    return;
+  }
+  let report;
+  try {
+    report = JSON.parse(readFileSync(nativeWorkflowReportPath, "utf8"));
+  } catch (error) {
+    issues.push(`native workflow smoke report is not valid JSON: ${error.message}`);
+    return;
+  }
+  smokeReport.nativeWorkflow = report;
+  launchReport.nativeWorkflow = report;
+  const payload = report.payload || {};
+  if (payload.status !== "passed") {
+    issues.push(`native workflow smoke did not pass: ${JSON.stringify(payload)}`);
+  }
+  const assertionNames = new Set((payload.assertions || []).filter((assertion) => assertion?.passed === true).map((assertion) => assertion.name));
+  for (const assertion of [
+    "native workflow starts with NEditor title",
+    "native workflow switched preview mode",
+    "native workflow opened command palette",
+    "native workflow found dose template",
+    "native workflow inserted calc template into source",
+    "native workflow rendered calc template preview",
+    "native workflow exposed dirty title",
+    "native workflow prepared html export readiness",
+  ]) {
+    if (!assertionNames.has(assertion)) {
+      issues.push(`native workflow report did not include passing assertion: ${assertion}`);
+    }
+  }
+  if (!String(payload.editorSnippet || "").includes("weight_kg = 72")) {
+    issues.push("native workflow report did not include inserted calc source");
+  }
+  if (!String(payload.previewSnippet || "").includes("Total dose")) {
+    issues.push("native workflow report did not include rendered calc preview");
+  }
+  if (payload.exportReadiness?.target !== "html" || !Array.isArray(payload.exportReadiness?.progressSteps)) {
+    issues.push(`native workflow report did not include HTML export readiness evidence: ${JSON.stringify(payload.exportReadiness)}`);
   }
 }
 

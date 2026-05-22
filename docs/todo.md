@@ -858,7 +858,7 @@ Completion criteria:
 ### 3. Add Desktop WebDriver/Tauri Workflow Smoke Tests
 
 Status: WebDriver harness exists; bounded macOS GUI launch, app-authored native
-UI reporting, and native command smoke are locally verified; supported
+UI/workflow reporting, and native command smoke are locally verified; supported
 Windows/Linux WebDriver execution remains open.
 
 Browser tests prove the Vue workbench under mocked Tauri IPC. They do not prove
@@ -886,6 +886,12 @@ Needed desktop smoke coverage:
   validates command labels, source/sidebar/preview/status surfaces, active
   document identity, preview label, status text, toolbar display, and viewport
   dimensions.
+- Native webview performs real in-app workflows. Covered on this macOS host by
+  the same launch smoke, which now writes
+  `.tmp/desktop-smoke/native-workflow-report.json` through guarded Tauri IPC
+  and validates native mode switching, command-palette opening, Science `calc`
+  template insertion into source, rendered preview output, dirty title mutation,
+  and HTML export readiness progress evidence.
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
   script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native
@@ -896,13 +902,15 @@ Needed desktop smoke coverage:
   macOS it records an explicit official-platform skip plus the bounded launch
   smoke fallback.
 - New/open/save/save-as with real local files.
-- Dirty title/status behavior. Covered in the supported-platform WebDriver
-  harness; still needs execution on Windows/Linux.
+- Dirty title/status behavior. Covered on macOS by the app-authored native
+  workflow smoke and in the supported-platform WebDriver harness; still needs
+  WebDriver execution on Windows/Linux.
 - External file watcher and conflict flow with real file changes.
 - Export readiness and one real export invocation. Export readiness is covered
-  in the supported-platform WebDriver harness; real export invocation is covered
-  by the native command smoke and still needs supported-platform WebDriver
-  execution if the harness grows a dialog-free native export path.
+  by the app-authored native workflow smoke and the supported-platform WebDriver
+  harness; real export invocation is covered by the native command smoke and
+  still needs supported-platform WebDriver execution if the harness grows a
+  dialog-free native export path.
 - Preferences persistence across restart. Covered in the supported-platform
   WebDriver harness; still needs execution on Windows/Linux.
 

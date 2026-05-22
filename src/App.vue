@@ -2333,7 +2333,10 @@ onMounted(async () => {
   scheduleAutosave();
   scheduleAutoSnapshot();
   setWindowTitle(store.windowTitle);
-  void nextTick().then(reportDesktopUiSmoke);
+  void nextTick().then(async () => {
+    await reportDesktopUiSmoke();
+    await runDesktopWorkflowSmokeIfEnabled();
+  });
   window.addEventListener("keydown", handleShortcut);
 });
 
@@ -2575,6 +2578,100 @@ async function reportDesktopUiSmoke() {
       },
     },
   }).catch(() => undefined);
+}
+
+async function runDesktopWorkflowSmokeIfEnabled() {
+  const enabled = await invoke<boolean>("desktop_workflow_smoke_enabled").catch(() => false);
+  if (!enabled) return;
+
+  const assertions: Array<{ name: string; passed: boolean; detail?: string }> = [];
+  const record = (name: string, passed: boolean, detail?: string) => {
+    assertions.push({ name, passed, ...(detail ? { detail } : {}) });
+  };
+  const text = (selector: string) => document.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim() || "";
+
+  try {
+    record("native workflow starts with NEditor title", document.title.includes("NEditor"), document.title);
+
+    store.mode = "preview";
+    await nextTick();
+    record(
+      "native workflow switched preview mode",
+      Boolean(document.querySelector("#document-workspace")?.className.includes("mode-preview")),
+      document.querySelector("#document-workspace")?.className || "",
+    );
+
+    commandPaletteOpen.value = true;
+    await nextTick();
+    record(
+      "native workflow opened command palette",
+      Boolean(document.querySelector('[role="dialog"][aria-label="Command palette"]')),
+    );
+    commandPaletteOpen.value = false;
+    store.mode = "split";
+    await nextTick();
+
+    openTransformTemplates();
+    templateCategory.value = "Science";
+    templateTransform.value = "calc";
+    templateQuery.value = "dose";
+    await nextTick();
+    const doseTemplate = filteredTransformTemplates.value.find((template) => template.id === "calc-science-dose");
+    record("native workflow found dose template", Boolean(doseTemplate));
+    if (doseTemplate) {
+      insertTransformTemplate(doseTemplate);
+      flushEditorTextToStore();
+      await store.compileActive();
+      await nextTick();
+    }
+    record("native workflow inserted calc template into source", active.value.text.includes("weight_kg = 72"));
+    record("native workflow rendered calc template preview", text("#live-preview").includes("Total dose"));
+    record("native workflow exposed dirty title", document.title.startsWith("* "), document.title);
+
+    store.exportTarget = "html";
+    await store.prepareForExport();
+    await nextTick();
+    const readinessTarget = store.exportReadiness?.manifest?.export_target;
+    record("native workflow prepared html export readiness", readinessTarget === "html", JSON.stringify(readinessTarget));
+
+    const passed = assertions.every((assertion) => assertion.passed);
+    await writeDesktopWorkflowSmokeReport({
+      status: passed ? "passed" : "failed",
+      assertions,
+      title: document.title,
+      mode: store.mode,
+      sidebar: store.sidebar,
+      editorSnippet: smokeSnippetAround(active.value.text, "weight_kg = 72"),
+      previewSnippet: text("#live-preview").slice(0, 800),
+      exportReadiness: store.exportReadiness
+        ? {
+            ready: store.exportReadiness.ready,
+            errors: store.exportReadiness.error_count,
+            warnings: store.exportReadiness.warning_count,
+            target: store.exportReadiness.manifest?.export_target,
+            progressSteps: store.exportReadiness.progress_steps.map((step) => step.id),
+          }
+        : null,
+    });
+  } catch (error) {
+    await writeDesktopWorkflowSmokeReport({
+      status: "failed",
+      assertions,
+      error: error instanceof Error ? error.message : String(error),
+      title: document.title,
+    });
+  }
+}
+
+async function writeDesktopWorkflowSmokeReport(payload: Record<string, unknown>) {
+  await invoke("write_desktop_workflow_smoke_report", { payload }).catch(() => undefined);
+}
+
+function smokeSnippetAround(text: string, needle: string) {
+  const index = text.indexOf(needle);
+  if (index < 0) return text.slice(0, 800);
+  const start = Math.max(0, index - 240);
+  return text.slice(start, start + 800);
 }
 
 watch(diagnosticSignature, () => {
