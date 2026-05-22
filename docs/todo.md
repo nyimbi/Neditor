@@ -838,8 +838,9 @@ Required next coverage:
   and manual theme review remain open.
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
-- External conflict modal: native desktop proof and deeper manual UX QA for
-  the new line-composition tray.
+- External conflict modal: native desktop proof now covers rendered modal
+  controls plus local/external merge-base seeding; remaining work is deeper
+  manual UX QA for dialog-driven save-copy and full line-composition gestures.
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices, and rendered audit
   proof now have executable coverage; broader manual viewer/platform QA remains.
@@ -1271,8 +1272,10 @@ Finish:
   browser execution is now available through the system-Chrome fallback, and
   the launched native smoke now covers clean root watcher reload, stale-save
   blocking, keep-local plus save, save-copy, merge, accept-external, and file
-  restoration against a real Markdown file. Remaining work is manual/modal
-  coverage for conflict composition in a desktop window.
+  restoration against a real Markdown file, plus rendered native conflict modal
+  controls and local/external merge-base seeding. Remaining work is manual UX
+  coverage for dialog-driven save-copy and full line-composition gestures in a
+  desktop window.
 - Multi-tab watcher switching beyond the current tab-activation proof.
 - Stale watcher cleanup when tabs close or paths move beyond current
   recent-path cleanup coverage.

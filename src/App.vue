@@ -2985,6 +2985,46 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
     }),
   );
 
+  conflictOpen.value = true;
+  await nextTick();
+  await waitForNativeWorkflowCondition(() => Boolean(document.querySelector('[aria-label="External file conflict"]')), 800);
+  const conflictModal = document.querySelector('[aria-label="External file conflict"]') as HTMLElement | null;
+  record(
+    "native workflow rendered conflict modal controls",
+    Boolean(
+      conflictModal?.textContent?.includes("External Changes") &&
+        conflictModal.textContent.includes(filePath) &&
+        conflictModal.textContent.includes("Local unsaved native conflict edit") &&
+        conflictModal.textContent.includes("External native conflict edit") &&
+        nativeWorkflowButtonExists("Use local as merge base", conflictModal) &&
+        nativeWorkflowButtonExists("Use external as merge base", conflictModal) &&
+        nativeWorkflowButtonExists("Apply merged text", conflictModal) &&
+        nativeWorkflowButtonExists("Keep local", conflictModal) &&
+        nativeWorkflowButtonExists("Save copy", conflictModal) &&
+        nativeWorkflowButtonExists("Accept external", conflictModal),
+    ),
+    JSON.stringify({
+      hasDialog: Boolean(conflictModal),
+      conflictText: conflictModal?.textContent?.slice(0, 300) || "",
+    }),
+  );
+  await clickNativeWorkflowButton("Use local as merge base", conflictModal);
+  await waitForNativeWorkflowCondition(() => mergedConflictText.value.includes("Local unsaved native conflict edit"), 800);
+  record(
+    "native workflow conflict modal seeded local merge base",
+    mergedConflictText.value.includes("Local unsaved native conflict edit"),
+    JSON.stringify({ mergedConflictText: mergedConflictText.value.slice(-160) }),
+  );
+  await clickNativeWorkflowButton("Use external as merge base", conflictModal);
+  await waitForNativeWorkflowCondition(() => mergedConflictText.value.includes("External native conflict edit"), 800);
+  record(
+    "native workflow conflict modal seeded external merge base",
+    mergedConflictText.value.includes("External native conflict edit"),
+    JSON.stringify({ mergedConflictText: mergedConflictText.value.slice(-160) }),
+  );
+  closeConflictDialog();
+  await nextTick();
+
   await store.keepLocalChanges();
   await nextTick();
   record(
@@ -3101,6 +3141,22 @@ async function waitForNativeWorkflowCondition(check: () => boolean, timeoutMs: n
     if (check()) return true;
   }
   return check();
+}
+
+function nativeWorkflowButtonExists(label: string, root: ParentNode | null = document) {
+  return Boolean(nativeWorkflowButton(label, root));
+}
+
+function nativeWorkflowButton(label: string, root: ParentNode | null = document) {
+  return Array.from(root?.querySelectorAll("button") || []).find((button) => button.textContent?.trim() === label) as HTMLButtonElement | undefined;
+}
+
+async function clickNativeWorkflowButton(label: string, root: ParentNode | null = document) {
+  const button = nativeWorkflowButton(label, root);
+  if (!button) return false;
+  button.click();
+  await nextTick();
+  return true;
 }
 
 async function collectNativeModeEvidence(record: (name: string, passed: boolean, detail?: string) => void) {

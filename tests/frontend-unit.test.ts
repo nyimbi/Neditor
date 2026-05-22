@@ -525,6 +525,9 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow recompiled clean included watcher change"));
   ok(app.includes("native workflow restored included watcher root"));
   ok(app.includes("native workflow blocked stale save with external conflict"));
+  ok(app.includes("native workflow rendered conflict modal controls"));
+  ok(app.includes("native workflow conflict modal seeded local merge base"));
+  ok(app.includes("native workflow conflict modal seeded external merge base"));
   ok(app.includes("native workflow kept local conflict changes"));
   ok(app.includes("native workflow saved kept-local conflict changes"));
   ok(app.includes("native workflow saved local conflict copy"));
