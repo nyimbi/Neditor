@@ -4249,6 +4249,11 @@ function resolveIncludePath(parentPath: string, target: string) {
 }
 
 async function openDocument() {
+  const smokePath = await desktopWorkflowSmokeMarkdownPath();
+  if (smokePath) {
+    await store.openPath(smokePath);
+    return;
+  }
   const selected = await open({
     multiple: false,
     filters: [{ name: "Markdown", extensions: ["md", "markdown", "mdown", "txt"] }],
@@ -4447,11 +4452,17 @@ async function saveDocument() {
 }
 
 async function saveDocumentAs() {
-  const path = await save({
-    filters: [{ name: "Markdown", extensions: ["md"] }],
-    defaultPath: active.value.title.endsWith(".md") ? active.value.title : `${active.value.title}.md`,
-  });
+  const path =
+    (await desktopWorkflowSmokeMarkdownPath()) ||
+    (await save({
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+      defaultPath: active.value.title.endsWith(".md") ? active.value.title : `${active.value.title}.md`,
+    }));
   if (path) await store.saveActive(path);
+}
+
+async function desktopWorkflowSmokeMarkdownPath() {
+  return invoke<string | null>("desktop_workflow_smoke_file_path", { extension: "md" }).catch(() => null);
 }
 
 async function renameDocument() {

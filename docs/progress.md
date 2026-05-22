@@ -97,11 +97,11 @@ Recent pushed checkpoints visible in current git history:
   addition to native launch/title/shell checks, it now creates a dirty document
   and checks the native dirty-title marker, filters and inserts the built-in
   "Dose by weight" calc template through the Templates panel and verifies the
-  inserted source reaches the desktop preview, runs export readiness through
-  the desktop UI/command path, writes a real HTML export through the guarded
-  dialog-free smoke path, validates the output artifact plus sidecar manifest
-  hash, and verifies selected preferences persist across a desktop session
-  restart before restoring them.
+  inserted source reaches the desktop preview, saves and reopens a real Markdown
+  file through the guarded dialog-free smoke path, runs export readiness through
+  the desktop UI/command path, writes a real HTML export, validates the output
+  artifact plus sidecar manifest hash, and verifies selected preferences persist
+  across a desktop session restart before restoring them.
 - This update makes macOS app bundle proof executable. `pnpm run verify:local:full`
   now builds `NEditor.app` on macOS and `pnpm run test:desktop-bundle` verifies
   the bundle Info.plist metadata, identifier, version, executable, icon, copyright,
@@ -734,7 +734,7 @@ Current verification recorded on 2026-05-21 and 2026-05-22:
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, `processAlive: true`, app-authored native window evidence, and app-authored native UI evidence. `.tmp/desktop-smoke/native-ui-report.json` records command labels including New/Open/Save/Templates/Commands, source/sidebar/preview/status surface presence, active document `Market Entry Report`, preview label `Rendered preview for Market Entry Report, draft`, and viewport dimensions; System Events process evidence is recorded as `limited` on this host because it exposed the process but not a window. |
-| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, Templates-panel calc insertion to source/preview, export readiness, real HTML export writing through the guarded dialog-free smoke path with sidecar manifest/output-hash validation, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip plus the supported workflow plan in `.tmp/desktop-webdriver/report.json`. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, Templates-panel calc insertion to source/preview, real Markdown save/open, export readiness, real HTML export writing through the guarded dialog-free smoke path with sidecar manifest/output-hash validation, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip plus the supported workflow plan in `.tmp/desktop-webdriver/report.json`. |
 
 Fresh baseline recorded on 2026-05-20:
 
@@ -2395,12 +2395,12 @@ Desktop WebDriver harness verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `node --check scripts/run-tauri-webdriver.mjs` | Pass | Desktop WebDriver harness syntax remains valid after adding the guarded dialog-free HTML export write workflow. |
-| `pnpm run check` | Pass | Vue typecheck passed after extending the desktop WebDriver harness and evidence docs. |
-| `pnpm run test:unit` | Pass | 19 frontend unit tests passed, including the static guard that the desktop WebDriver harness covers dirty title, transform-template insertion, export readiness, real HTML export writing, manifest hash validation, preference restart persistence, and the supported workflow plan. |
-| `pnpm run test:tauri-webdriver` | Skipped on macOS | This host still records the official unsupported WKWebView-driver skip, but `.tmp/desktop-webdriver/report.json` now includes the supported Windows/Linux workflow plan with the real HTML export write assertion and `.tmp/desktop-webdriver/native-workflow-report.json` smoke path. |
-| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the WebDriver HTML export evidence notes; all local links resolved. |
-| `git diff --check` | Pass | No whitespace errors after the desktop WebDriver HTML export harness update. |
+| `node --check scripts/run-tauri-webdriver.mjs` | Pass | Desktop WebDriver harness syntax remains valid after adding guarded dialog-free Markdown save/open and HTML export write workflows. |
+| `pnpm run check` | Pass | Vue typecheck passed after extending the desktop smoke path used by the WebDriver harness. |
+| `pnpm run test:unit` | Pass | 20 frontend unit tests passed, including static guards that the desktop WebDriver harness covers dirty title, transform-template insertion, real Markdown save/open, export readiness, real HTML export writing, manifest hash validation, preference restart persistence, and the supported workflow plan. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS | This host still records the official unsupported WKWebView-driver skip, but `.tmp/desktop-webdriver/report.json` now includes the supported Windows/Linux workflow plan with real Markdown save/open plus real HTML export write assertions, `.tmp/desktop-webdriver/native-workflow-file.md`, and `.tmp/desktop-webdriver/native-workflow-report.json` smoke paths. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the WebDriver file/export evidence notes; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors after the desktop WebDriver file/export harness update. |
 
 Rendered export manual sign-off verification:
 

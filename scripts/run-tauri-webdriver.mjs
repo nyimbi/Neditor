@@ -11,6 +11,7 @@ const timeoutMs = Number(process.env.NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS || 30_00
 const application = desktopBinaryPath();
 const reportPath = join(root, ".tmp", "desktop-webdriver", "report.json");
 const workflowReportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-report.json");
+const workflowFilePath = join(root, ".tmp", "desktop-webdriver", "native-workflow-file.md");
 const workflowExportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-export.html");
 const workflowExportManifestPath = `${workflowExportPath}.manifest.json`;
 const macosUnsupportedMessage =
@@ -21,6 +22,7 @@ const webdriverWorkflowPlan = [
   "native WebDriver switches modes and opens command palette",
   "native title exposes dirty document state",
   "desktop template insertion reaches editor and preview",
+  "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
   "desktop export readiness returns manifest progress evidence",
   "desktop WebDriver writes HTML export through dialog-free smoke path",
   "desktop preferences persist across WebDriver restart",
@@ -37,8 +39,10 @@ const report = {
   supportedDesktopPlatforms: ["linux", "win32"],
   workflowPlan: webdriverWorkflowPlan,
   workflowSmokeReport: relative(workflowReportPath),
+  workflowFilePath: relative(workflowFilePath),
   dependencies: [],
   assertions: [],
+  fileArtifacts: null,
   exportArtifacts: null,
   skippedReason: null,
   fallback: null,
@@ -108,6 +112,7 @@ try {
 }
 
 async function runWebDriverSmoke() {
+  rmSync(workflowFilePath, { force: true });
   rmSync(workflowExportPath, { force: true });
   rmSync(workflowExportManifestPath, { force: true });
   rmSync(workflowReportPath, { force: true });
@@ -144,6 +149,7 @@ async function runWebDriverSmoke() {
     await assertModeSwitchAndCommandPalette(session);
     await assertDirtyTitleWorkflow(session);
     await assertTransformTemplateWorkflow(session);
+    await assertFileSaveOpenWorkflow(session);
     await assertExportReadinessWorkflow(session);
     await assertHtmlExportWriteWorkflow(session);
     originalPreferences = await readDesktopPreferences(session);
@@ -285,6 +291,75 @@ async function assertTransformTemplateWorkflow(session) {
     throw new Error(`desktop preview did not render the inserted calculation output: ${JSON.stringify(inserted)}`);
   }
   recordAssertion("desktop template insertion reaches editor and preview");
+}
+
+async function assertFileSaveOpenWorkflow(session) {
+  const expectedPath = workflowFilePath.replaceAll("\\", "/");
+  await execute(session, `
+    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
+    const saveButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Save');
+    if (!saveButton) throw new Error('Save button was not visible in the desktop command bar');
+    saveButton.click();
+    return true;
+  `);
+  await waitForValue(
+    session,
+    `
+      return {
+        title: document.title,
+        tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+        status: document.querySelector('.status-bar')?.textContent || '',
+        editor: document.querySelector('.cm-content')?.textContent || '',
+      };
+    `,
+    (value) =>
+      !String(value?.title || "").startsWith("* ") &&
+      String(value?.tab || "").includes("native-workflow-file") &&
+      String(value?.editor || "").includes("weight_kg = 72"),
+    "saved real Markdown file",
+  );
+  if (!existsSync(workflowFilePath)) {
+    throw new Error(`desktop WebDriver Markdown file was not written: ${relative(workflowFilePath)}`);
+  }
+  const savedText = readFileSync(workflowFilePath, "utf8");
+  if (!savedText.includes("weight_kg = 72") || !savedText.includes("total_dose_mg")) {
+    throw new Error(`desktop WebDriver Markdown file did not include inserted template content: ${relative(workflowFilePath)}`);
+  }
+
+  await execute(session, `
+    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
+    const newButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'New');
+    if (!newButton) throw new Error('New button was not visible in the desktop command bar');
+    newButton.click();
+    const openButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Open');
+    if (!openButton) throw new Error('Open button was not visible in the desktop command bar');
+    openButton.click();
+    return true;
+  `);
+  const reopened = await waitForValue(
+    session,
+    `
+      return {
+        title: document.title,
+        tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+        status: document.querySelector('.status-bar')?.textContent || '',
+        editor: document.querySelector('.cm-content')?.textContent || '',
+      };
+    `,
+    (value) =>
+      !String(value?.title || "").startsWith("* ") &&
+      String(value?.tab || "").includes("native-workflow-file") &&
+      String(value?.editor || "").includes("weight_kg = 72") &&
+      String(value?.editor || "").includes("total_dose_mg"),
+    "reopened real Markdown file",
+  );
+  report.fileArtifacts = {
+    path: relative(workflowFilePath),
+    bytes: statSync(workflowFilePath).size,
+    title: reopened.title,
+    expectedPath,
+  };
+  recordAssertion("desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path");
 }
 
 async function assertExportReadinessWorkflow(session) {
