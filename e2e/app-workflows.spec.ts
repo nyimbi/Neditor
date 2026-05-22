@@ -236,6 +236,8 @@ async function installTauriMock(page: Page, stateKey: string) {
         .map((line) => {
           if (line.startsWith("# ")) return `<h1 id="${escapeHtml(line.slice(2).toLowerCase().replace(/\s+/g, "-"))}">${escapeHtml(line.slice(2))}</h1>`;
           if (line.startsWith("## ")) return `<h2 id="${escapeHtml(line.slice(3).toLowerCase().replace(/\s+/g, "-"))}">${escapeHtml(line.slice(3))}</h2>`;
+          const tocItem = line.match(/^\s*-\s+\[(.+?)\]\(#(.+?)\)$/);
+          if (tocItem) return `<li><a href="#${escapeHtml(tocItem[2])}">${escapeHtml(tocItem[1])}</a></li>`;
           if (line.trim().startsWith("|")) return `<pre>${escapeHtml(line)}</pre>`;
           if (!line.trim() || line.trim() === "---") return "";
           return `<p>${escapeHtml(line)}</p>`;
@@ -257,6 +259,16 @@ async function installTauriMock(page: Page, stateKey: string) {
           },
         ];
       });
+    }
+
+    function injectGeneratedToc(text: string) {
+      if (!text.includes("[TOC]")) return text;
+      const headings = headingsFromMarkdown(text.replace("[TOC]", ""));
+      const toc = headings
+        .filter((heading) => heading.level <= 3)
+        .map((heading) => `${"  ".repeat(Math.max(0, heading.level - 1))}- [${heading.text}](#${heading.anchor})`)
+        .join("\n");
+      return text.replace("[TOC]", `## Table of Contents\n\n${toc}`);
     }
 
     function citationReferencesFromMarkdown(text: string) {
@@ -544,21 +556,22 @@ async function installTauriMock(page: Page, stateKey: string) {
 
     function compileMarkdown(text: string, filePath = "/workspace/market.md") {
       const expanded = expandIncludes(text, filePath);
+      const compiled = injectGeneratedToc(expanded.compiled);
       const title = titleFromMarkdown(text);
       const status = statusFromMarkdown(text);
       const documentSet = frontMatterValue(text, "documentSet") || frontMatterValue(text, "document_set") || frontMatterValue(text, "set");
       const version = frontMatterValue(text, "version") || "1.0.0";
       const approvedBy = frontMatterValue(text, "approvedBy");
       const approvedAt = frontMatterValue(text, "approvedAt");
-      const headings = headingsFromMarkdown(expanded.compiled);
-      const citationReferences = citationReferencesFromMarkdown(expanded.compiled);
-      const bibliography = bibliographyFromMarkdown(expanded.compiled, filePath);
+      const headings = headingsFromMarkdown(compiled);
+      const citationReferences = citationReferencesFromMarkdown(compiled);
+      const bibliography = bibliographyFromMarkdown(compiled, filePath);
       const duplicateKeys = duplicateBibliographyKeys(bibliography);
-      const glossary = glossaryFromMarkdown(expanded.compiled);
-      const indexTerms = indexTermsFromMarkdown(expanded.compiled);
-      const aiSources = aiSourcesFromMarkdown(expanded.compiled);
-      const aiAssistedSections = aiAssistedSectionsFromMarkdown(expanded.compiled);
-      const transformArtifacts = transformArtifactsFromMarkdown(expanded.compiled, filePath);
+      const glossary = glossaryFromMarkdown(compiled);
+      const indexTerms = indexTermsFromMarkdown(compiled);
+      const aiSources = aiSourcesFromMarkdown(compiled);
+      const aiAssistedSections = aiAssistedSectionsFromMarkdown(compiled);
+      const transformArtifacts = transformArtifactsFromMarkdown(compiled, filePath);
       const sourceHash = hash(text);
       const metadata = {
         title,
@@ -569,9 +582,9 @@ async function installTauriMock(page: Page, stateKey: string) {
         ...(documentSet ? { documentSet, document_set: documentSet } : {}),
       };
       const diagnostics = expanded.diagnostics;
-      const diagnosticLineIndex = expanded.compiled.split("\n").findIndex((line) => line.includes("DIAGNOSTIC_TARGET"));
+      const diagnosticLineIndex = compiled.split("\n").findIndex((line) => line.includes("DIAGNOSTIC_TARGET"));
       if (diagnosticLineIndex >= 0) {
-        const line = expanded.compiled.split("\n")[diagnosticLineIndex] || "";
+        const line = compiled.split("\n")[diagnosticLineIndex] || "";
         diagnostics.push({
           severity: "warning",
           message: "Mock diagnostic target needs review.",
@@ -612,8 +625,8 @@ async function installTauriMock(page: Page, stateKey: string) {
         app_version: "e2e-mock",
       };
       return {
-        compiled_markdown: expanded.compiled,
-        html: `${htmlFromMarkdown(expanded.compiled)}${transformArtifacts.map((artifact) => artifact.html).join("\n")}`,
+        compiled_markdown: compiled,
+        html: `${htmlFromMarkdown(compiled)}${transformArtifacts.map((artifact) => artifact.html).join("\n")}`,
         semantic: {
           title,
           status,
@@ -1361,6 +1374,46 @@ test("syncs editor and preview scrolling and jumps preview headings to source", 
 
   await expect(page.locator(".cm-line").filter({ hasText: "## Navigation Target" })).toBeVisible();
   await expect.poll(() => editorScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+});
+
+test("renders generated table of contents in preview and links back to source", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/toc-preview.md",
+    [
+      "---",
+      "title: TOC Preview Proof",
+      "status: approved",
+      "---",
+      "",
+      "# TOC Preview Proof",
+      "",
+      "[TOC]",
+      "",
+      "## Executive Summary",
+      "",
+      "Opening summary.",
+      "",
+      "## Findings",
+      "",
+      "Evidence section.",
+      "",
+      "### Detail Note",
+      "",
+      "Drill-down detail.",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/toc-preview.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const preview = page.getByRole("region", { name: "Live preview" });
+  await expect(preview.getByRole("heading", { name: "Table of Contents" })).toBeVisible();
+  await expect(preview.getByRole("link", { name: "Executive Summary" })).toHaveAttribute("href", "#executive-summary");
+  await expect(preview.getByRole("link", { name: "Findings" })).toHaveAttribute("href", "#findings");
+  await expect(preview.getByRole("link", { name: "Detail Note" })).toHaveAttribute("href", "#detail-note");
+
+  await preview.getByRole("link", { name: "Findings" }).click();
+  await expect(page.locator(".cm-line").filter({ hasText: "## Findings" })).toBeVisible();
 });
 
 test("updates the live preview after source edits", async ({ page }) => {
