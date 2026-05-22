@@ -1990,6 +1990,8 @@ test("manages transform templates and inserts reusable workflows", async ({ page
 
   const doseTemplate = sidebar.getByRole("listitem").filter({ hasText: "Dose by weight" });
   await expect(doseTemplate).toContainText("Science | calc | builtin");
+  await expect(doseTemplate.getByLabel("Template fill values")).toContainText("weight_kg");
+  await expect(doseTemplate.getByLabel("Template fill values")).toContainText("tablet_strength_mg");
   await expect(doseTemplate).toContainText("clinical");
   await doseTemplate.getByText("Preview").click();
   await expect(doseTemplate.locator("pre")).toContainText("total_dose_mg");

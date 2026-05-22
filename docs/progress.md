@@ -2304,8 +2304,16 @@ Transform template browser workflow verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages transform templates" --project chromium` | Pass | Focused Chromium workflow passed on this host with the system-Chrome fallback, proving the Templates panel filters the Science `calc` library, previews and inserts the built-in "Dose by weight" template, inserts a built-in chart transform template, creates/edits/duplicates/deletes a custom `calc` template, persists the custom template library, and inserts the custom template from the command palette. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages transform templates" --project chromium` | Pass | Focused Chromium workflow passed on this host with the system-Chrome fallback, proving the Templates panel filters the Science `calc` library, exposes fill values for the built-in "Dose by weight" template, previews and inserts it, inserts a built-in chart transform template, creates/edits/duplicates/deletes a custom `calc` template, persists the custom template library, and inserts the custom template from the command palette. |
 | `node scripts/run-e2e.mjs` | Pass | Full Chromium browser workflow suite passed all 47 tests after broadening transform template management coverage. |
+
+Transform template fill-field verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding derived fill-field metadata to template cards and the custom template editor. |
+| `pnpm run test:unit` | Pass | 19 frontend unit tests passed, including template-library breadth, calc fill-field extraction for the "Dose by weight" template, structured transform fill-field extraction, and custom template normalization. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages transform templates" --project chromium` | Pass | Focused Chromium workflow passed with system Chrome and verified fill-value chips before template insertion. |
 
 Rendered export review-case verification:
 

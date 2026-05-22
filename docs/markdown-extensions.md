@@ -412,7 +412,9 @@ The same Templates panel also includes starter blocks for chart, Vega-Lite,
 timeline, roadmap, ADR, Mermaid, Pikchr, DOT, PlantUML, CSV, JSON Schema,
 OpenAPI, and QR transforms. Duplicate any built-in template to create a
 workspace custom template, then edit the name, category, transform, tags, and
-fenced body.
+fenced body. Template cards expose detected fill values, such as literal `calc`
+inputs or top-level structured fields, so reusable workflows are easier to
+adapt after insertion.
 
 PlantUML exports default to SVG. When a trusted PlantUML executable is
 configured, request PNG output per fence with `format=png`, `output=png`, or

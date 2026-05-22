@@ -460,6 +460,12 @@
                 <small>{{ template.category }} | {{ template.transform }} | {{ template.source }}</small>
               </header>
               <p>{{ template.summary }}</p>
+              <div v-if="templateFillFields(template).length" class="template-fill-fields" aria-label="Template fill values">
+                <span>Fill</span>
+                <code v-for="field in templateFillFields(template)" :key="`${template.id}-${field.name}`" :title="`${field.name} = ${field.value}`">
+                  {{ field.name }}
+                </code>
+              </div>
               <div class="template-tags" aria-label="Template tags">
                 <small v-for="tag in template.tags" :key="`${template.id}-${tag}`">{{ tag }}</small>
               </div>
@@ -503,6 +509,16 @@
               Body
               <textarea v-model="customTemplateDraft.body" rows="10"></textarea>
             </label>
+            <div v-if="customTemplateFillFields.length" class="template-fill-fields" aria-label="Detected template fill values">
+              <span>Fill</span>
+              <code
+                v-for="field in customTemplateFillFields"
+                :key="`${customTemplateDraft.id}-${field.name}`"
+                :title="`${field.name} = ${field.value}`"
+              >
+                {{ field.name }}
+              </code>
+            </div>
             <div class="template-actions">
               <button type="button" @click="startNewCustomTemplate">New custom</button>
               <button type="button" :disabled="!customTemplateIsValid" @click="saveCustomTransformTemplate">
@@ -1463,6 +1479,7 @@ import {
   blankCustomTransformTemplate,
   builtinTransformTemplates,
   createCustomTransformTemplateId,
+  transformTemplateFillFields,
   transformTemplateCategories,
   transformTemplateKinds,
   transformTemplateMarkdown,
@@ -2094,6 +2111,7 @@ const customTemplateTags = computed({
 const customTemplateIsValid = computed(
   () => Boolean(customTemplateDraft.value.name.trim() && customTemplateDraft.value.transform.trim() && customTemplateDraft.value.body.trim()),
 );
+const customTemplateFillFields = computed(() => transformTemplateFillFields(customTemplateDraft.value));
 const commandBarGroups = computed<CommandBarGroup[]>(() => [
   {
     id: "document",
@@ -3199,6 +3217,10 @@ function openTransformTemplates() {
   void nextTick(() => {
     workspacePane.value?.focus();
   });
+}
+
+function templateFillFields(template: Pick<TransformTemplate, "body" | "transform">) {
+  return transformTemplateFillFields(template);
 }
 
 function insertTransformTemplate(template: TransformTemplate) {
@@ -5458,10 +5480,31 @@ select:hover {
 }
 
 .template-tags,
+.template-fill-fields,
 .template-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.template-fill-fields {
+  align-items: center;
+  color: #4a5b6d;
+}
+
+.template-fill-fields span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.template-fill-fields code {
+  padding: 2px 6px;
+  border: 1px solid #bfcedc;
+  background: #f2f6fa;
+  color: #183247;
+  font-family: inherit;
+  font-size: 0.78rem;
 }
 
 .template-tags small {

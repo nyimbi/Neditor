@@ -13,6 +13,12 @@ export interface TransformTemplate {
 
 export type CustomTransformTemplate = Omit<TransformTemplate, "source">;
 
+export interface TransformTemplateFillField {
+  name: string;
+  value: string;
+  source: "calc-assignment" | "structured-field";
+}
+
 const fenceTicks = "```";
 
 function fenced(transform: string, content: string, options = "") {
@@ -985,6 +991,23 @@ export function transformTemplateMarkdown(template: Pick<TransformTemplate, "bod
   return `${template.body.trimEnd()}\n`;
 }
 
+export function transformTemplateFillFields(template: Pick<TransformTemplate, "body" | "transform">): TransformTemplateFillField[] {
+  const fields: TransformTemplateFillField[] = [];
+  const seen = new Set<string>();
+  const fencePattern = /```([A-Za-z0-9_-]+)[^\n]*\n([\s\S]*?)\n```/g;
+  let match: RegExpExecArray | null;
+  while ((match = fencePattern.exec(template.body))) {
+    const transform = match[1] || template.transform;
+    const content = match[2] || "";
+    if (transform === "calc") {
+      collectCalcFillFields(content, fields, seen);
+    } else {
+      collectStructuredFillFields(content, fields, seen);
+    }
+  }
+  return fields.slice(0, 12);
+}
+
 export function createCustomTransformTemplateId() {
   return `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -1032,4 +1055,36 @@ function stringValue(value: unknown) {
 function stringArray(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+}
+
+function collectCalcFillFields(content: string, fields: TransformTemplateFillField[], seen: Set<string>) {
+  for (const line of content.split("\n")) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$/);
+    if (!match) continue;
+    const name = match[1];
+    const value = match[2].replace(/\s+#.*$/, "").trim();
+    if (!isEditableLiteral(value) || seen.has(name)) continue;
+    seen.add(name);
+    fields.push({ name, value, source: "calc-assignment" });
+  }
+}
+
+function collectStructuredFillFields(content: string, fields: TransformTemplateFillField[], seen: Set<string>) {
+  for (const line of content.split("\n")) {
+    const match = line.match(/^([A-Za-z][A-Za-z0-9 _-]{1,40}):\s*(.+?)\s*$/);
+    if (!match) continue;
+    const name = match[1].trim();
+    const value = match[2].trim();
+    if (!value || value === "|" || value.startsWith("{") || value.startsWith("[") || seen.has(name)) continue;
+    seen.add(name);
+    fields.push({ name, value, source: "structured-field" });
+  }
+}
+
+function isEditableLiteral(value: string) {
+  return (
+    /^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(value) ||
+    /^(['"]).*\1$/.test(value) ||
+    /^(true|false)$/i.test(value)
+  );
 }

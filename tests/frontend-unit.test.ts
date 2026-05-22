@@ -17,7 +17,12 @@ import {
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
-import { builtinTransformTemplates, normalizeCustomTransformTemplates, transformTemplateMarkdown } from "../src/lib/transformTemplates.js";
+import {
+  builtinTransformTemplates,
+  normalizeCustomTransformTemplates,
+  transformTemplateFillFields,
+  transformTemplateMarkdown,
+} from "../src/lib/transformTemplates.js";
 import { migratePersistedWorkspace, normalizeCitationStyle, WORKSPACE_SCHEMA_VERSION } from "../src/lib/workspacePersistence.js";
 import {
   appendConflictMergeLine,
@@ -405,6 +410,15 @@ test("transform template library covers reusable calculations and custom templat
   for (const transform of ["chart", "vega-lite", "timeline", "roadmap", "adr", "mermaid", "pikchr", "dot", "plantuml", "csv", "json-schema", "openapi", "qr"]) {
     ok(builtinTransformTemplates.some((template) => template.transform === transform), `missing ${transform} template`);
   }
+  const doseTemplate = builtinTransformTemplates.find((template) => template.id === "calc-science-dose");
+  if (!doseTemplate) throw new Error("missing dose template");
+  deepEqual(
+    transformTemplateFillFields(doseTemplate).map((field) => field.name),
+    ["weight_kg", "dose_mg_per_kg", "tablet_strength_mg"],
+  );
+  const chartTemplate = builtinTransformTemplates.find((template) => template.transform === "chart");
+  if (!chartTemplate) throw new Error("missing chart template");
+  ok(transformTemplateFillFields(chartTemplate).some((field) => field.name === "title"));
   ok(transformTemplateMarkdown(builtinTransformTemplates[0]).endsWith("\n"));
   deepEqual(normalizeCustomTransformTemplates([{ id: "x", name: "X", transform: "calc", body: "```calc\nx = 1\n```\n" }]), [
     {

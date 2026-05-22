@@ -60,7 +60,9 @@ Use the Templates panel or Insert > Templates to browse reusable transform
 blocks. The built-in library includes business, scientific, and mathematical
 `calc` blocks, plus chart, diagram, timeline, roadmap, ADR, CSV, OpenAPI, JSON
 Schema, and QR templates. Built-ins can be inserted directly or duplicated into
-custom templates that are saved with the workspace.
+custom templates that are saved with the workspace. Template cards show the
+detected fill values for calculation and structured transform bodies before
+insertion.
 
 ## Product Boundaries
 
