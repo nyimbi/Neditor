@@ -998,10 +998,14 @@ Current evidence:
   metadata and extracted text through `pdfinfo` and `pdftotext`, and renders
   PNG PDF review thumbnails through `pdftoppm` under
   `.tmp/rendered-export-audit/raster-proof/` with links in `manual-review.html`.
-  On macOS it extracts DOCX text through `textutil`, attempts a Quick Look PDF
-  thumbnail, and records either thumbnail evidence or the current host's
-  `qlmanage` sandbox limitation in `viewer-proof.json`. When `pdflatex` is
-  installed, it also compiles the generated LaTeX artifact into
+  When Chromium can launch, it captures visual screenshots for the primary HTML
+  export, `manual-review.html`, and the rich-block/option-heavy HTML review
+  cases under `.tmp/rendered-export-audit/browser-visual-proof/`, with DOM and
+  scroll metrics recorded in `viewer-proof.json`. On macOS it extracts DOCX
+  text through `textutil`, attempts Quick Look thumbnails for PDF/DOCX/PPTX,
+  and records either thumbnail evidence or host limitations in
+  `viewer-proof.json`. When `pdflatex` is installed, it also compiles the
+  generated LaTeX artifact into
   `.tmp/rendered-export-audit/latex-compile/rendered-export-audit.pdf`.
 
 Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:

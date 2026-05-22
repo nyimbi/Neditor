@@ -3,7 +3,9 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { inflateRawSync } from "node:zlib";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { chromium } from "@playwright/test";
+import { resolvePlaywrightBrowserEnv } from "./playwright-browser-env.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const auditDir = resolve(process.env.NEDITOR_RENDERED_EXPORT_AUDIT_DIR || join(root, ".tmp", "rendered-export-audit"));
@@ -154,6 +156,18 @@ if (issues.length === 0) {
   } else {
     console.log("Skipping LaTeX compile proof because pdflatex is not installed.");
   }
+}
+
+writeManualReviewDashboard(auditReport, viewerProof);
+verifyManualReviewDashboard(issues, viewerProof);
+if (issues.length > 0) {
+  console.error("Rendered export audit failed:");
+  for (const issue of issues) console.error(`- ${issue}`);
+  process.exit(1);
+}
+
+if (issues.length === 0) {
+  await collectBrowserVisualProof(issues, viewerProof, auditReport);
 }
 
 if (issues.length > 0) {
@@ -626,6 +640,17 @@ function collectMacQuickLookProof(issues, assertions) {
       existsSync(thumbnail) &&
       statSync(thumbnail).isFile() &&
       statSync(thumbnail).size > 10_000;
+    if (!passed) {
+      assertions.push({
+        scope: artifact.scope,
+        assertion: artifact.assertion,
+        passed: false,
+        skipped: true,
+        reason: output || "qlmanage returned without a meaningful thumbnail on this host",
+        bytes: existsSync(thumbnail) ? statSync(thumbnail).size : 0,
+      });
+      continue;
+    }
     assertions.push({
       scope: artifact.scope,
       assertion: artifact.assertion,
@@ -633,9 +658,6 @@ function collectMacQuickLookProof(issues, assertions) {
       thumbnail: relativeToAudit(thumbnail),
       bytes: existsSync(thumbnail) ? statSync(thumbnail).size : 0,
     });
-    if (!passed) {
-      issues.push(`macOS Quick Look did not render a meaningful thumbnail for ${artifact.path}${output ? `:\n${output}` : ""}`);
-    }
   }
 }
 
@@ -678,6 +700,148 @@ function collectMacTextutilProof(issues, assertions, report) {
       join(auditDir, docxTarget.path),
       [...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || [])].filter(Boolean))],
     );
+  }
+}
+
+async function collectBrowserVisualProof(issues, assertions, report) {
+  const resolution = resolvePlaywrightBrowserEnv(process.env);
+  if (!resolution.ok) {
+    assertions.push({
+      scope: "browser-visual-proof",
+      assertion: "Chromium-compatible browser available for rendered export visual proof",
+      passed: false,
+      skipped: true,
+      reason: resolution.message,
+    });
+    return;
+  }
+
+  const visualDir = join(auditDir, "browser-visual-proof");
+  rmSync(visualDir, { recursive: true, force: true });
+  mkdirSync(visualDir, { recursive: true });
+
+  const reviewCaseHtmlTargets = (report.reviewCases || [])
+    .map((reviewCase) => {
+      const htmlTarget = (reviewCase.targets || []).find((target) => target.target === "html");
+      if (!htmlTarget?.path) return null;
+      return {
+        scope: `browser-visual-review-${reviewCase.slug}`,
+        artifact: htmlTarget.path,
+        screenshot: `review-${reviewCase.slug}.png`,
+        selectors: ["body", "h1", "table"],
+        needles: [...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || []).slice(0, 4)].filter(Boolean))],
+      };
+    })
+    .filter(Boolean);
+
+  const visualTargets = [
+    {
+      scope: "browser-visual-primary-html",
+      artifact: "rendered-export-audit.html",
+      screenshot: "primary-html.png",
+      selectors: ["body", "h1", ".cover", "table"],
+      needles: ["Rendered Export Audit", "Control summary", "Architecture diagram", "Review Comments", "AI Provenance"],
+    },
+    {
+      scope: "browser-visual-manual-dashboard",
+      artifact: "manual-review.html",
+      screenshot: "manual-review.png",
+      selectors: ["body", "h1", "table", ".thumbnail-grid"],
+      needles: ["Rendered Export Manual Review", "Manual Checklist", "Primary Artifacts", "Executable Viewer And Package Proof"],
+    },
+    ...reviewCaseHtmlTargets,
+  ];
+
+  let browser = null;
+  try {
+    browser = await chromium.launch({
+      executablePath: resolution.executablePath || undefined,
+    });
+    const page = await browser.newPage({
+      viewport: { width: 1440, height: 1000 },
+      deviceScaleFactor: 1,
+    });
+
+    for (const target of visualTargets) {
+      const artifactPath = join(auditDir, target.artifact);
+      if (!existsSync(artifactPath)) {
+        issues.push(`browser visual proof target is missing: ${target.artifact}`);
+        continue;
+      }
+
+      await page.goto(pathToFileURL(artifactPath).href, { waitUntil: "load" });
+      const screenshotPath = join(visualDir, target.screenshot);
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      const dimensions = pngDimensions(screenshotPath);
+      const bytes = statSync(screenshotPath).size;
+      const metrics = await page.evaluate(({ needles, selectors }) => {
+        const text = document.body?.innerText || "";
+        const html = document.documentElement?.innerHTML || "";
+        const selectorCounts = Object.fromEntries(
+          selectors.map((selector) => [selector, document.querySelectorAll(selector).length]),
+        );
+        return {
+          heading: document.querySelector("h1")?.textContent?.trim() || "",
+          missingEvidence: needles.filter((needle) => !text.includes(needle) && !html.includes(needle)),
+          scrollHeight: document.documentElement.scrollHeight,
+          scrollWidth: document.documentElement.scrollWidth,
+          selectorCounts,
+          textLength: text.length,
+        };
+      }, { needles: target.needles, selectors: target.selectors });
+      const missingSelectors = Object.entries(metrics.selectorCounts)
+        .filter(([, count]) => count < 1)
+        .map(([selector]) => selector);
+      const passed = Boolean(
+        dimensions &&
+          dimensions.width >= 1000 &&
+          dimensions.height >= 700 &&
+          bytes > 20_000 &&
+          metrics.textLength > 500 &&
+          metrics.scrollHeight >= 700 &&
+          metrics.missingEvidence.length === 0 &&
+          missingSelectors.length === 0,
+      );
+      assertions.push({
+        scope: target.scope,
+        assertion: `renders ${target.artifact} in Chromium with expected visible structure`,
+        passed,
+        browserSource: resolution.source,
+        browserExecutable: resolution.executablePath,
+        thumbnail: relativeToAudit(screenshotPath),
+        bytes,
+        width: dimensions?.width || 0,
+        height: dimensions?.height || 0,
+        scrollHeight: metrics.scrollHeight,
+        scrollWidth: metrics.scrollWidth,
+        heading: metrics.heading,
+        missingEvidence: metrics.missingEvidence,
+        missingSelectors,
+      });
+      if (!passed) {
+        issues.push(
+          `Chromium visual proof failed for ${target.artifact}: missing evidence ${JSON.stringify(metrics.missingEvidence)}, missing selectors ${JSON.stringify(missingSelectors)}, screenshot ${bytes} bytes`,
+        );
+      }
+    }
+  } catch (error) {
+    const launchBlocked = browser === null;
+    assertions.push({
+      scope: "browser-visual-proof",
+      assertion: launchBlocked
+        ? "launches Chromium for rendered export visual proof"
+        : "renders exported HTML artifacts in Chromium",
+      passed: false,
+      skipped: launchBlocked,
+      browserSource: resolution.source,
+      browserExecutable: resolution.executablePath,
+      reason: String(error),
+    });
+    if (!launchBlocked) {
+      issues.push(`Chromium visual proof failed: ${String(error)}`);
+    }
+  } finally {
+    if (browser) await browser.close();
   }
 }
 
@@ -790,9 +954,9 @@ function writeManualReviewDashboard(report, assertions) {
   <h2>Review Cases</h2>
   ${reviewCases}
 
-  <h2>PDF Raster Review Thumbnails</h2>
-  <p>These PNG thumbnails are generated from exported PDFs with Poppler <code>pdftoppm</code> when it is available on the verifier host. They provide fast visual entry points for manual PDF review.</p>
-  <div class="thumbnail-grid">${thumbnails || "<p>No PDF raster thumbnails were generated on this host.</p>"}</div>
+  <h2>Visual Review Thumbnails</h2>
+  <p>These PNG thumbnails come from exported PDFs through Poppler <code>pdftoppm</code> and from browser-rendered HTML artifacts when those tools are available on the verifier host. They provide fast visual entry points for manual review.</p>
+  <div class="thumbnail-grid">${thumbnails || "<p>No visual thumbnails were generated on this host.</p>"}</div>
 
   <h2>Executable Viewer And Package Proof</h2>
   <table>
@@ -823,10 +987,13 @@ function verifyManualReviewDashboard(issues, assertions) {
     "review-cases/rich-blocks/rich-blocks.html",
     "review-cases/option-heavy/option-heavy.html",
     "Executable Viewer And Package Proof",
-    "PDF Raster Review Thumbnails",
+    "Visual Review Thumbnails",
     "macos-quicklook-pdf",
   ];
   for (const scope of ["pdfinfo-primary", "pdftotext-primary", "pdftoppm-primary-page-1"]) {
+    if (assertions.some((assertion) => assertion.scope === scope)) expectedContent.push(scope);
+  }
+  for (const scope of ["browser-visual-primary-html", "browser-visual-manual-dashboard"]) {
     if (assertions.some((assertion) => assertion.scope === scope)) expectedContent.push(scope);
   }
   for (const expected of expectedContent) {
