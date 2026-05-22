@@ -1269,6 +1269,42 @@ test("exposes keyboard skip links to primary workbench regions", async ({ page }
   }
 });
 
+test("keeps primary workbench regions accessible across desktop and narrow viewports", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await page.getByLabel("Sidebar panel").selectOption("outline");
+  const workspace = page.locator(".workspace");
+  const sidebar = page.locator(".sidebar");
+  const editor = page.getByRole("region", { name: "Markdown source" });
+  const preview = page.getByRole("region", { name: "Live preview" });
+
+  await expect(sidebar.getByRole("heading", { name: "Outline" })).toBeVisible();
+  await expect(editor).toBeVisible();
+  await expect(preview).toBeVisible();
+  await expect.poll(() => workspace.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBeGreaterThan(1);
+
+  await page.setViewportSize({ width: 390, height: 820 });
+  await expect(sidebar.getByRole("heading", { name: "Outline" })).toBeVisible();
+  await expect(editor).toBeVisible();
+  await expect(preview).toBeVisible();
+  await expect.poll(() => workspace.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(1);
+  await expect.poll(() => sidebar.evaluate((element) => getComputedStyle(element).display)).toBe("block");
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+      })),
+    )
+    .toEqual({ scrollWidth: 390, viewportWidth: 390 });
+
+  for (const selector of ["#main-commands", "#document-sidebar", "#markdown-source", "#live-preview", "#document-status"]) {
+    const box = await page.locator(selector).boundingBox();
+    expect(box, `${selector} should have a rendered box`).not.toBeNull();
+    expect(box!.x, `${selector} should not overflow left`).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width, `${selector} should not overflow right`).toBeLessThanOrEqual(391);
+  }
+});
+
 test("manages modal focus and Escape return paths", async ({ page }) => {
   const aiPasteButton = page.getByRole("button", { name: "AI Paste" });
   await aiPasteButton.click();
@@ -1940,7 +1976,7 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/opt/bin/d2");
 });
 
-test("manages transform templates and inserts reusable calc workflows", async ({ page }) => {
+test("manages transform templates and inserts reusable workflows", async ({ page }) => {
   await page.getByRole("button", { name: "Templates" }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("templates");
 
@@ -1961,6 +1997,15 @@ test("manages transform templates and inserts reusable calc workflows", async ({
   await expect.poll(() => editorText(page)).toContain("weight_kg = 72");
   await expect.poll(() => editorText(page)).toContain("Total dose: {{=total_dose_mg}} mg");
   await expect(page.locator(".status-bar")).toContainText("Inserted Dose by weight template");
+
+  await templateFilters.getByLabel("Category").selectOption("Charts");
+  await templateFilters.getByLabel("Transform").selectOption("chart");
+  await templateFilters.getByLabel("Search").fill("kpi");
+  const chartTemplate = sidebar.getByRole("listitem").filter({ hasText: "KPI bar chart" });
+  await expect(chartTemplate).toContainText("Charts | chart | builtin");
+  await chartTemplate.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => editorText(page)).toContain("```chart");
+  await expect.poll(() => editorText(page)).toContain("title: Quarterly KPI plan");
 
   const customEditor = page.getByRole("region", { name: "Custom transform template editor" });
   await customEditor.getByLabel("Name").fill("Custom Safety Margin");
@@ -1986,6 +2031,17 @@ test("manages transform templates and inserts reusable calc workflows", async ({
   await templateFilters.getByLabel("Search").fill("safety margin");
   const customTemplate = sidebar.getByRole("listitem").filter({ hasText: "Custom Safety Margin" });
   await expect(customTemplate).toContainText("Business | calc | custom");
+  await customTemplate.getByRole("button", { name: "Edit" }).click();
+  await customEditor.getByLabel("Summary").fill("Reusable safety stock margin calculation with review note.");
+  await customEditor.getByRole("button", { name: "Save custom" }).click();
+  await expect(customTemplate).toContainText("review note");
+  await customTemplate.getByRole("button", { name: "Duplicate" }).click();
+  await customEditor.getByLabel("Name").fill("Temporary Safety Margin Template");
+  await customEditor.getByRole("button", { name: "Create custom" }).click();
+  const temporaryTemplate = sidebar.getByRole("listitem").filter({ hasText: "Temporary Safety Margin Template" });
+  await expect(temporaryTemplate).toContainText("Business | calc | custom");
+  await temporaryTemplate.getByRole("button", { name: "Delete" }).click();
+  await expect(temporaryTemplate).toHaveCount(0);
   await customTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain("margin_units = available_units - required_units");
 

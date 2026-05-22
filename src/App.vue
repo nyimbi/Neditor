@@ -4682,6 +4682,7 @@ select:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   padding: 0 10px;
   border-bottom: 1px solid #c9d2dc;
   background: #f7f9fb;
@@ -4800,6 +4801,9 @@ select:hover {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .release-badge {
@@ -6000,8 +6004,21 @@ select:hover {
 
 .status-bar {
   justify-content: space-between;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-top: 1px solid #c9d2dc;
   border-bottom: 0;
+  white-space: nowrap;
+}
+
+.status-message,
+.word-stats,
+.watch-status,
+.export-progress,
+.error {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .conflict-actions,
@@ -6251,11 +6268,21 @@ select:hover {
   }
 
   .sidebar {
-    display: none;
+    display: block;
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid #c9d2dc;
   }
 
   .pane-splitter {
     display: none;
+  }
+
+  .editor-pane,
+  .preview-pane {
+    min-height: 320px;
+    border-right: 0;
+    border-bottom: 1px solid #c9d2dc;
   }
 
   .preview-document {
