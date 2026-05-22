@@ -151,6 +151,12 @@ Recent pushed checkpoints visible in current git history:
   `.tmp/rendered-export-audit/browser-visual-proof/`, records dimensions,
   scroll metrics, expected evidence, and browser source in `viewer-proof.json`,
   and links the screenshots from the manual review dashboard.
+- This update adds generated Office visual proof for DOCX/PPTX exports. The
+  rendered export audit now derives reviewable HTML dashboards from the actual
+  Office package XML for primary and review-case DOCX/PPTX artifacts, screenshots
+  those dashboards through the resolved Chromium browser when available, records
+  the evidence under `.tmp/rendered-export-audit/office-preview/`, and maps it
+  into `viewer-proof.json`, `manual-review.html`, and `visual-review-summary.json`.
 - This update makes browser workflow execution current-host evidence instead
   of stale archived evidence. `pnpm run test:e2e` now passes all 47 Chromium
   workbench workflows locally through the system-Chrome fallback when bundled
@@ -2413,11 +2419,20 @@ Rendered export manual sign-off verification:
 | `rg -n "visual-review-signoff\|humanSignoff\|human-signoff\|manual-signoff-template\|NEDITOR_RENDERED_EXPORT_SIGNOFF" .tmp/rendered-export-audit/visual-review-summary.json .tmp/rendered-export-audit/viewer-proof.json .tmp/rendered-export-audit/manual-review.html .tmp/rendered-export-audit/visual-review-signoff.template.json` | Pass | Generated audit artifacts include the sign-off template, manual dashboard instructions, summary sign-off link, passing template proof, and skipped completed-signoff proof. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the rendered export manual sign-off workflow; all local links resolved. |
 
+Rendered export Office preview verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/check-rendered-export-audit.mjs` | Pass | Rendered export audit verifier syntax remains valid after adding generated Office preview extraction and screenshot proof. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit passed and now writes `.tmp/rendered-export-audit/office-preview/office-preview-docx.html`, `.tmp/rendered-export-audit/office-preview/office-preview-pptx.html`, review-case DOCX/PPTX preview dashboards, and Chromium screenshots for each preview when the browser fallback is available. |
+| `pnpm run test:unit` | Pass | 20 frontend unit tests passed, including static guards that the rendered export audit keeps the Office preview proof, screenshots, and summary mapping wired. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the generated Office preview export proof; all local links resolved. |
+
 Live Google Docs import attempt:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| Google Drive `_import_document` with `.tmp/rendered-export-audit/rendered-export-audit.docx` | Blocked by connector authorization | The connector reached the Google Drive upload-conversion endpoint for a native Google Docs import, but Drive returned `403 Forbidden`; the exported DOCX/package remains locally verified, and live import proof needs a refreshed Google Drive OAuth scope or another authorized Drive session. |
+| Google Drive `_import_document` with `.tmp/rendered-export-audit/rendered-export-audit.docx` | Blocked by connector authorization | The current connector call returned `token_expired` before upload/conversion; an earlier attempt reached the Drive upload-conversion endpoint and returned `403 Forbidden`. The exported DOCX/package remains locally verified, and live import proof needs a refreshed Google Drive OAuth scope or another authorized Drive session. |
 
 ## Next Execution Order
 

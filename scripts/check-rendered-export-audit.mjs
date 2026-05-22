@@ -173,6 +173,10 @@ if (issues.length === 0) {
   await collectBrowserVisualProof(issues, viewerProof, auditReport);
 }
 
+if (issues.length === 0) {
+  await collectOfficePreviewProof(issues, viewerProof, auditReport);
+}
+
 if (issues.length > 0) {
   console.error("Rendered export audit failed:");
   for (const issue of issues) console.error(`- ${issue}`);
@@ -853,6 +857,309 @@ async function collectBrowserVisualProof(issues, assertions, report) {
   }
 }
 
+async function collectOfficePreviewProof(issues, assertions, report) {
+  const previewDir = join(auditDir, "office-preview");
+  rmSync(previewDir, { recursive: true, force: true });
+  mkdirSync(previewDir, { recursive: true });
+
+  const previewTargets = [
+    officePreviewTarget("office-preview-docx", "DOCX", "Primary DOCX export", "rendered-export-audit.docx", [
+      "Rendered Export Audit",
+      "Control summary",
+      "Architecture diagram",
+      "Review Comments",
+      "AI Provenance",
+      "Legal Disclaimer",
+    ]),
+    officePreviewTarget("office-preview-pptx", "PPTX", "Primary PPTX export", "rendered-export-audit.pptx", [
+      "Rendered Export Audit",
+      "Control summary",
+      "Export manifest",
+      "Review Comments",
+      "AI Provenance",
+      "Watermark: APPROVED",
+    ]),
+  ];
+
+  for (const reviewCase of report.reviewCases || []) {
+    const targets = new Map((reviewCase.targets || []).map((target) => [target.target, target.path]));
+    const requiredEvidence = [...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || [])].filter(Boolean))];
+    const presentationEvidence = [
+      ...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || []).filter((item) => item === "INTERNAL")].filter(Boolean)),
+    ];
+    const docxPath = targets.get("docx");
+    const pptxPath = targets.get("pptx");
+    if (docxPath) {
+      previewTargets.push(
+        officePreviewTarget(
+          `office-preview-review-${reviewCase.slug}-docx`,
+          "DOCX",
+          `${reviewCase.title} DOCX review case`,
+          docxPath,
+          requiredEvidence,
+        ),
+      );
+    }
+    if (pptxPath) {
+      previewTargets.push(
+        officePreviewTarget(
+          `office-preview-review-${reviewCase.slug}-pptx`,
+          "PPTX",
+          `${reviewCase.title} PPTX review case`,
+          pptxPath,
+          presentationEvidence,
+        ),
+      );
+    }
+  }
+
+  for (const target of previewTargets) {
+    const artifactPath = join(auditDir, target.path);
+    if (!existsSync(artifactPath)) {
+      issues.push(`Office preview source is missing: ${target.path}`);
+      continue;
+    }
+
+    const extracted = target.kind === "DOCX" ? extractDocxPreview(artifactPath) : extractPptxPreview(artifactPath);
+    const missingEvidence = target.needles.filter((needle) => !extracted.searchText.includes(needle));
+    const htmlPath = join(previewDir, `${target.scope}.html`);
+    writeFileSync(htmlPath, officePreviewHtml(target, extracted));
+    const bytes = statSync(htmlPath).size;
+    const passed = bytes > 1500 && extracted.searchText.length > 100 && missingEvidence.length === 0;
+    assertions.push({
+      scope: target.scope,
+      assertion: `extracts ${target.kind} text into reviewable Office preview`,
+      passed,
+      path: relativeToAudit(htmlPath),
+      bytes,
+      textLength: extracted.searchText.length,
+      slideCount: extracted.slideCount || 0,
+      paragraphCount: extracted.paragraphCount || 0,
+      missingEvidence,
+    });
+    if (!passed) {
+      issues.push(`Office preview proof failed for ${target.path}: missing evidence ${JSON.stringify(missingEvidence)}`);
+    }
+  }
+
+  const resolution = resolvePlaywrightBrowserEnv(process.env);
+  if (!resolution.ok) {
+    assertions.push({
+      scope: "office-preview-browser",
+      assertion: "Chromium-compatible browser available for Office preview screenshots",
+      passed: false,
+      skipped: true,
+      reason: resolution.message,
+    });
+    return;
+  }
+
+  let browser = null;
+  try {
+    browser = await chromium.launch({
+      executablePath: resolution.executablePath || undefined,
+    });
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 900 },
+      deviceScaleFactor: 1,
+    });
+
+    for (const target of previewTargets) {
+      const htmlPath = join(previewDir, `${target.scope}.html`);
+      if (!existsSync(htmlPath)) continue;
+      await page.goto(pathToFileURL(htmlPath).href, { waitUntil: "load" });
+      const screenshotPath = join(previewDir, `${target.scope}.png`);
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      const dimensions = pngDimensions(screenshotPath);
+      const bytes = statSync(screenshotPath).size;
+      const metrics = await page.evaluate((needles) => {
+        const text = document.body?.innerText || "";
+        return {
+          heading: document.querySelector("h1")?.textContent?.trim() || "",
+          missingEvidence: needles.filter((needle) => !text.includes(needle)),
+          rows: document.querySelectorAll("tbody tr").length,
+          textLength: text.length,
+          scrollHeight: document.documentElement.scrollHeight,
+        };
+      }, target.needles);
+      const passed = Boolean(
+        dimensions &&
+          dimensions.width >= 900 &&
+          dimensions.height >= 650 &&
+          bytes > 20_000 &&
+          metrics.textLength > 300 &&
+          metrics.rows >= 1 &&
+          metrics.missingEvidence.length === 0,
+      );
+      assertions.push({
+        scope: `${target.scope}-screenshot`,
+        assertion: `renders ${target.kind} Office preview screenshot`,
+        passed,
+        browserSource: resolution.source,
+        browserExecutable: resolution.executablePath,
+        thumbnail: relativeToAudit(screenshotPath),
+        bytes,
+        width: dimensions?.width || 0,
+        height: dimensions?.height || 0,
+        scrollHeight: metrics.scrollHeight,
+        heading: metrics.heading,
+        rows: metrics.rows,
+        missingEvidence: metrics.missingEvidence,
+      });
+      if (!passed) {
+        issues.push(
+          `Office preview screenshot failed for ${target.path}: missing evidence ${JSON.stringify(metrics.missingEvidence)}, screenshot ${bytes} bytes`,
+        );
+      }
+    }
+  } catch (error) {
+    assertions.push({
+      scope: "office-preview-browser",
+      assertion: browser === null ? "launches Chromium for Office preview screenshots" : "renders Office preview screenshots",
+      passed: false,
+      skipped: browser === null,
+      browserSource: resolution.source,
+      browserExecutable: resolution.executablePath,
+      reason: String(error),
+    });
+    if (browser !== null) {
+      issues.push(`Office preview screenshot proof failed: ${String(error)}`);
+    }
+  } finally {
+    if (browser) await browser.close();
+  }
+}
+
+function officePreviewTarget(scope, kind, title, path, needles) {
+  return {
+    scope,
+    kind,
+    title,
+    path,
+    needles: [...new Set(needles.filter(Boolean))],
+  };
+}
+
+function extractDocxPreview(path) {
+  const entries = readZipEntries(path);
+  const documentXml = entries.get("word/document.xml")?.toString("utf8") || "";
+  const headerXml = entries.get("word/header1.xml")?.toString("utf8") || "";
+  const footerXml = entries.get("word/footer1.xml")?.toString("utf8") || "";
+  const commentsXml = entries.get("word/comments.xml")?.toString("utf8") || "";
+  const paragraphs = [
+    ...officeParagraphs(documentXml),
+    ...officeParagraphs(headerXml),
+    ...officeParagraphs(footerXml),
+    ...officeParagraphs(commentsXml),
+  ].filter(Boolean);
+  return {
+    sections: [
+      {
+        label: "Document, headers, footers, and comments",
+        rows: paragraphs.map((text, index) => ({ label: `Text ${index + 1}`, text })),
+      },
+    ],
+    searchText: paragraphs.join("\n"),
+    paragraphCount: paragraphs.length,
+  };
+}
+
+function extractPptxPreview(path) {
+  const entries = readZipEntries(path);
+  const slides = Array.from(entries.keys())
+    .filter((entry) => /^ppt\/slides\/slide\d+\.xml$/.test(entry))
+    .sort((left, right) => slideNumber(left) - slideNumber(right))
+    .map((entry) => {
+      const text = officeText(entries.get(entry).toString("utf8"));
+      return {
+        label: entry.replace("ppt/slides/", "").replace(".xml", ""),
+        text,
+      };
+    })
+    .filter((slide) => slide.text);
+  return {
+    sections: [
+      {
+        label: "Slides",
+        rows: slides,
+      },
+    ],
+    searchText: slides.map((slide) => slide.text).join("\n"),
+    slideCount: slides.length,
+  };
+}
+
+function officePreviewHtml(target, extracted) {
+  const sections = extracted.sections
+    .map((section) => {
+      const rows = section.rows
+        .map(
+          (row) => `<tr><th>${escapeHtml(row.label)}</th><td>${escapeHtml(row.text)}</td></tr>`,
+        )
+        .join("\n");
+      return `<section>
+  <h2>${escapeHtml(section.label)}</h2>
+  <table>
+    <tbody>${rows}</tbody>
+  </table>
+</section>`;
+    })
+    .join("\n");
+  const evidence = target.needles.map((needle) => `<li><code>${escapeHtml(needle)}</code></li>`).join("\n");
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(target.title)}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.5; margin: 2rem; color: #1f2933; }
+    h1, h2 { line-height: 1.2; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0 2rem; table-layout: fixed; }
+    th, td { border: 1px solid #cbd5df; padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+    th { width: 12rem; background: #edf2f7; }
+    td { overflow-wrap: anywhere; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(target.title)}</h1>
+  <p><strong>Source:</strong> <code>${escapeHtml(target.path)}</code></p>
+  <p><strong>Format:</strong> ${escapeHtml(target.kind)}</p>
+  <h2>Required Evidence</h2>
+  <ul>${evidence}</ul>
+  ${sections}
+</body>
+</html>
+`;
+}
+
+function officeParagraphs(xml) {
+  const paragraphs = [];
+  for (const match of xml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)) {
+    const text = officeText(match[0]);
+    if (text) paragraphs.push(text);
+  }
+  return paragraphs;
+}
+
+function officeText(xml) {
+  const values = [];
+  const normalized = xml
+    .replace(/<w:tab\s*\/>/g, "\t")
+    .replace(/<w:br\s*\/>/g, "\n")
+    .replace(/<a:br\s*\/>/g, "\n");
+  for (const match of normalized.matchAll(/<(?:w|a):t(?:\s[^>]*)?>([\s\S]*?)<\/(?:w|a):t>/g)) {
+    values.push(decodeXml(match[1]));
+  }
+  return values.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function slideNumber(entry) {
+  const match = entry.match(/slide(\d+)\.xml$/);
+  return match ? Number(match[1]) : 0;
+}
+
 function assertMacTextutilDocx(issues, assertions, scope, path, needles) {
   const result = spawnSync("textutil", ["-convert", "txt", "-stdout", path], {
     encoding: "utf8",
@@ -1129,7 +1436,7 @@ function writeManualReviewDashboard(report, assertions) {
   const proofRows = assertions
     .map((assertion) => {
       const state = assertion.skipped ? "skipped" : assertion.passed ? "passed" : "failed";
-      const detail = assertion.reason || assertion.thumbnail || assertion.stderr || "";
+      const detail = assertion.reason || assertion.thumbnail || assertion.path || assertion.stderr || "";
       return `<tr class="${state}"><td>${escapeHtml(assertion.scope || "")}</td><td>${escapeHtml(assertion.assertion || "")}</td><td>${state}</td><td>${escapeHtml(String(detail || ""))}</td></tr>`;
     })
     .join("\n");
@@ -1185,7 +1492,7 @@ function writeManualReviewDashboard(report, assertions) {
   ${reviewCases}
 
   <h2>Visual Review Thumbnails</h2>
-  <p>These PNG thumbnails come from exported PDFs through Poppler <code>pdftoppm</code> and from browser-rendered HTML artifacts when those tools are available on the verifier host. They provide fast visual entry points for manual review.</p>
+  <p>These PNG thumbnails come from exported PDFs through Poppler <code>pdftoppm</code>, browser-rendered HTML artifacts, and Office XML preview dashboards for DOCX/PPTX artifacts when those tools are available on the verifier host. They provide fast visual entry points for manual review.</p>
   <div class="thumbnail-grid">${thumbnails || "<p>No visual thumbnails were generated on this host.</p>"}</div>
 
   <h2>Executable Viewer And Package Proof</h2>
@@ -1226,6 +1533,9 @@ function verifyManualReviewDashboard(issues, assertions) {
     if (assertions.some((assertion) => assertion.scope === scope)) expectedContent.push(scope);
   }
   for (const scope of ["browser-visual-primary-html", "browser-visual-manual-dashboard"]) {
+    if (assertions.some((assertion) => assertion.scope === scope)) expectedContent.push(scope);
+  }
+  for (const scope of ["office-preview-docx", "office-preview-pptx"]) {
     if (assertions.some((assertion) => assertion.scope === scope)) expectedContent.push(scope);
   }
   for (const expected of expectedContent) {
@@ -1295,6 +1605,7 @@ function writeVisualReviewSummary(report, assertions, humanSignoff) {
       popplerText: assertionFamily(assertionList, "pdf"),
       macosTextutil: assertionFamily(assertionList, "macos-textutil"),
       macosQuickLook: assertionFamily(assertionList, "macos-quicklook"),
+      officePreview: assertionFamily(assertionList, "office-preview"),
       thumbnails,
       skipped,
     },
@@ -1339,6 +1650,10 @@ function verifyVisualReviewSummary(issues, report, assertions) {
   if (thumbnailEvidenceExists && !summary.visualEvidence?.thumbnails?.length) {
     issues.push("visual-review-summary.json is missing generated thumbnail evidence");
   }
+  const officePreviewExists = assertions.some((assertion) => String(assertion.scope || "").startsWith("office-preview"));
+  if (officePreviewExists && !summary.visualEvidence?.officePreview?.length) {
+    issues.push("visual-review-summary.json is missing Office preview evidence");
+  }
 }
 
 function assertionFamily(assertions, prefix) {
@@ -1350,6 +1665,7 @@ function assertionFamily(assertions, prefix) {
       passed: Boolean(assertion.passed),
       skipped: Boolean(assertion.skipped),
       reason: assertion.reason || "",
+      path: assertion.path || "",
       thumbnail: assertion.thumbnail || "",
       bytes: assertion.bytes || 0,
       width: assertion.width || 0,
@@ -1361,8 +1677,8 @@ function targetEvidence(target, assertions) {
   const scopesByTarget = {
     html: ["browser-visual-primary-html", "html"],
     pdf: ["pdfinfo-primary", "pdftotext-primary", "pdftoppm-primary", "macos-quicklook-pdf"],
-    docx: ["docx-package", "docx-document", "macos-textutil-docx", "macos-quicklook-docx"],
-    pptx: ["pptx-package", "pptx-slides", "macos-quicklook-pptx"],
+    docx: ["docx-package", "docx-document", "macos-textutil-docx", "macos-quicklook-docx", "office-preview-docx"],
+    pptx: ["pptx-package", "pptx-slides", "macos-quicklook-pptx", "office-preview-pptx"],
     "markdown-bundle": ["markdown-bundle-package", "markdown-bundle-manifest"],
     blog: ["blog-package", "blog-metadata", "blog-post"],
     substack: ["substack-package", "substack-metadata", "substack-copy"],
@@ -1370,7 +1686,9 @@ function targetEvidence(target, assertions) {
     "google-docs": ["google-docs-package", "google-docs-metadata", "google-docs-docx-document"],
   };
   const [reviewSlug, reviewTarget] = String(target).includes(":") ? String(target).split(":") : ["", target];
-  const prefixes = reviewSlug ? [`${reviewSlug}-${reviewTarget}`, `browser-visual-review-${reviewSlug}`] : scopesByTarget[target] || [target];
+  const prefixes = reviewSlug
+    ? [`${reviewSlug}-${reviewTarget}`, `browser-visual-review-${reviewSlug}`, `office-preview-review-${reviewSlug}-${reviewTarget}`]
+    : scopesByTarget[target] || [target];
   return assertions
     .filter((assertion) => prefixes.some((prefix) => String(assertion.scope || "").startsWith(prefix)))
     .map((assertion) => ({
@@ -1475,6 +1793,15 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function decodeXml(value) {
+  return String(value)
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .replaceAll("&amp;", "&");
 }
 
 function unzipEntryData(method, data, name) {

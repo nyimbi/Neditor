@@ -505,6 +505,11 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
   ok(script.includes("NEDITOR_RENDERED_EXPORT_SIGNOFF"));
   ok(script.includes("collectHumanSignoffEvidence"));
   ok(script.includes("validateCompletedSignoff"));
+  ok(script.includes("collectOfficePreviewProof"));
+  ok(script.includes("office-preview-docx"));
+  ok(script.includes("office-preview-pptx"));
+  ok(script.includes("Office preview screenshots"));
+  ok(script.includes("visualEvidence?.officePreview"));
   ok(script.includes('"pending-human-review"'));
   ok(script.includes('"human-reviewed"'));
   ok(script.includes("allPrimaryArtifactsReviewed"));

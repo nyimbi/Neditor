@@ -237,13 +237,14 @@ executable HTML/PDF/DOCX/PPTX/package assertions, publishing handoff workflow
 metadata checks, LaTeX source checks, Google Docs import workflow checks, and
 nested Google Docs DOCX checks. It also writes
 `visual-review-summary.json`, which maps export targets and review cases to
-browser screenshots, PDF raster thumbnails, native tool proof, skipped
-host-limitation records, and human sign-off state. The audit also writes
+browser screenshots, PDF raster thumbnails, generated DOCX/PPTX Office preview
+dashboards, native tool proof, skipped host-limitation records, and human
+sign-off state. The audit also writes
 `visual-review-signoff.template.json`; fill a copy and rerun with
 `NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json` to validate completed
 manual native-viewer review. On macOS it also extracts DOCX text through
-`textutil` and attempts a bounded Quick Look PDF thumbnail proof, recording
-either the thumbnail assertion or the host sandbox limitation in
+`textutil` and attempts bounded Quick Look PDF/DOCX/PPTX thumbnail proof,
+recording either thumbnail assertions or host sandbox limitations in
 `viewer-proof.json`. When `pdflatex` is installed, it also compiles the
 generated `.tex` file into `.tmp/rendered-export-audit/latex-compile/`.
 
