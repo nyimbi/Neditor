@@ -2627,6 +2627,28 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     await nextTick();
     const readinessTarget = store.exportReadiness?.manifest?.export_target;
     record("native workflow prepared html export readiness", readinessTarget === "html", JSON.stringify(readinessTarget));
+    const exportOutputPath = await invoke<string | null>("desktop_workflow_smoke_export_path", { extension: "html" }).catch(() => null);
+    if (exportOutputPath) {
+      await store.exportActive(exportOutputPath);
+      await nextTick();
+    }
+    const exportResult = {
+      target: store.exportTarget,
+      outputPath: store.lastExportOutputPath,
+      manifestPath: store.lastExportManifestPath,
+      progressSteps: store.lastExportProgressSteps.map((step) => step.id),
+      diagnostics: store.lastExportDiagnostics.map((diagnostic) => diagnostic.severity),
+    };
+    record(
+      "native workflow wrote html export artifact",
+      Boolean(
+        exportOutputPath &&
+          store.lastExportOutputPath === exportOutputPath &&
+          store.lastExportProgressSteps.some((step) => step.id === "render" && step.state === "complete") &&
+          !store.lastExportDiagnostics.some((diagnostic) => diagnostic.severity === "error"),
+      ),
+      JSON.stringify(exportResult),
+    );
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
 
     const passed = assertions.every((assertion) => assertion.passed);
@@ -2640,6 +2662,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       editorSnippet: smokeSnippetAround(active.value.text, "weight_kg = 72"),
       previewSnippet: text("#live-preview").slice(0, 800),
       themeAccessibility,
+      exportResult,
       exportReadiness: store.exportReadiness
         ? {
             ready: store.exportReadiness.ready,

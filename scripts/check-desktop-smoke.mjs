@@ -11,6 +11,7 @@ const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 6
 const nativeWindowReportPath = join(root, ".tmp", "desktop-smoke", "native-window-report.json");
 const nativeUiReportPath = join(root, ".tmp", "desktop-smoke", "native-ui-report.json");
 const nativeWorkflowReportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-report.json");
+const nativeWorkflowExportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.html");
 const issues = [];
 
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
@@ -164,6 +165,8 @@ async function launchDesktop(path) {
     rmSync(nativeWindowReportPath, { force: true });
     rmSync(nativeUiReportPath, { force: true });
     rmSync(nativeWorkflowReportPath, { force: true });
+    rmSync(nativeWorkflowExportPath, { force: true });
+    rmSync(`${nativeWorkflowExportPath}.manifest.json`, { force: true });
     const child = spawn(path, [], {
       cwd: root,
       env: {
@@ -368,6 +371,7 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow rendered calc template preview",
     "native workflow exposed dirty title",
     "native workflow prepared html export readiness",
+    "native workflow wrote html export artifact",
     "native workflow applied dark theme attribute",
     "native workflow applied high contrast attributes and colors",
     "native workflow applied reduced motion",
@@ -409,6 +413,32 @@ function validateNativeWorkflowReport(launchReport) {
   }
   if (payload.exportReadiness?.target !== "html" || !Array.isArray(payload.exportReadiness?.progressSteps)) {
     issues.push(`native workflow report did not include HTML export readiness evidence: ${JSON.stringify(payload.exportReadiness)}`);
+  }
+  const exportResult = payload.exportResult || {};
+  const expectedExportPath = nativeWorkflowExportPath.replaceAll("\\", "/");
+  if (
+    exportResult.target !== "html" ||
+    String(exportResult.outputPath || "").replaceAll("\\", "/") !== expectedExportPath ||
+    !Array.isArray(exportResult.progressSteps) ||
+    !exportResult.progressSteps.includes("render")
+  ) {
+    issues.push(`native workflow report did not include HTML export write evidence: ${JSON.stringify(exportResult)}`);
+  }
+  if (!existsSync(nativeWorkflowExportPath)) {
+    issues.push(`native workflow HTML export artifact was not written: ${relative(nativeWorkflowExportPath)}`);
+  } else {
+    const html = readFileSync(nativeWorkflowExportPath, "utf8");
+    if (!html.includes("Total dose") || !html.includes("Market Entry Report")) {
+      issues.push("native workflow HTML export artifact did not include rendered document content");
+    }
+  }
+  if (!existsSync(`${nativeWorkflowExportPath}.manifest.json`)) {
+    issues.push(`native workflow HTML export manifest was not written: ${relative(`${nativeWorkflowExportPath}.manifest.json`)}`);
+  } else {
+    const manifest = readFileSync(`${nativeWorkflowExportPath}.manifest.json`, "utf8");
+    if (!manifest.includes('"export_target": "html"') || !manifest.includes('"output_hash"')) {
+      issues.push("native workflow HTML export manifest did not include target/hash evidence");
+    }
   }
   const theme = payload.themeAccessibility || {};
   if (

@@ -150,6 +150,7 @@ pub fn run() {
             cleanup_ai_paste,
             write_desktop_ui_smoke_report,
             desktop_workflow_smoke_enabled,
+            desktop_workflow_smoke_export_path,
             write_desktop_workflow_smoke_report
         ])
         .run(tauri::generate_context!())
@@ -197,6 +198,25 @@ fn write_desktop_ui_smoke_report(payload: serde_json::Value) -> Result<(), Strin
 #[tauri::command]
 fn desktop_workflow_smoke_enabled() -> bool {
     std::env::var("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT").is_ok()
+}
+
+#[tauri::command]
+fn desktop_workflow_smoke_export_path(extension: String) -> Result<Option<String>, String> {
+    let Ok(report_path) = std::env::var("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT") else {
+        return Ok(None);
+    };
+    let safe_extension = extension
+        .trim()
+        .trim_start_matches('.')
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .collect::<String>();
+    if safe_extension.is_empty() {
+        return Err("desktop workflow smoke export extension is empty".to_string());
+    }
+    let mut output_path = std::path::PathBuf::from(report_path);
+    output_path.set_file_name(format!("native-workflow-export.{safe_extension}"));
+    Ok(Some(path_to_string(&output_path)))
 }
 
 #[tauri::command]

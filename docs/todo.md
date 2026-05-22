@@ -912,9 +912,11 @@ Needed desktop smoke coverage:
 - External file watcher and conflict flow with real file changes.
 - Export readiness and one real export invocation. Export readiness is covered
   by the app-authored native workflow smoke and the supported-platform WebDriver
-  harness; real export invocation is covered by the native command smoke and
-  still needs supported-platform WebDriver execution if the harness grows a
-  dialog-free native export path.
+  harness; real export invocation is covered by the native command smoke and by
+  the app-authored launched-webview smoke, which writes an HTML artifact and
+  sidecar manifest under `.tmp/desktop-smoke/`; supported-platform WebDriver
+  execution is still needed if the harness grows a dialog-free native export
+  path.
 - Preferences persistence across restart. Covered in the supported-platform
   WebDriver harness; still needs execution on Windows/Linux.
 
