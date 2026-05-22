@@ -829,7 +829,10 @@ Required next coverage:
   tab drag/reorder edge cases.
 - Focus, export, review, and presentation mode local browser/native execution proof.
 - Broader keyboard shortcut coverage.
-- Theme/typography visual accessibility proof in a real browser/native runtime.
+- Theme/typography visual accessibility proof now has browser coverage and
+  app-authored macOS Tauri webview evidence for dark theme, high contrast,
+  reduced motion, editor font size, and preview typography; broader platform
+  and manual theme review remain open.
 - Remaining table editor flows: non-sandboxed browser execution and export
   fixture proof for edited tables.
 - External conflict modal: native desktop proof and deeper manual UX QA for

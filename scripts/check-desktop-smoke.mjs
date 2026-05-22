@@ -369,6 +369,11 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow rendered calc template preview",
     "native workflow exposed dirty title",
     "native workflow prepared html export readiness",
+    "native workflow applied dark theme attribute",
+    "native workflow applied high contrast attributes and colors",
+    "native workflow applied reduced motion",
+    "native workflow applied editor typography",
+    "native workflow applied preview theme and typography",
   ]) {
     if (!assertionNames.has(assertion)) {
       issues.push(`native workflow report did not include passing assertion: ${assertion}`);
@@ -382,6 +387,19 @@ function validateNativeWorkflowReport(launchReport) {
   }
   if (payload.exportReadiness?.target !== "html" || !Array.isArray(payload.exportReadiness?.progressSteps)) {
     issues.push(`native workflow report did not include HTML export readiness evidence: ${JSON.stringify(payload.exportReadiness)}`);
+  }
+  const theme = payload.themeAccessibility || {};
+  if (
+    theme.shellTheme !== "dark" ||
+    theme.highContrast !== "true" ||
+    theme.reducedMotion !== "true" ||
+    theme.previewTheme !== "dark" ||
+    theme.commandBorderColor !== "rgb(0, 0, 0)" ||
+    theme.editorTransitionDuration !== "0s" ||
+    theme.editorFontSize !== "18px" ||
+    !String(theme.previewStyle || "").includes("font-size: 19px")
+  ) {
+    issues.push(`native workflow report did not include theme/accessibility evidence: ${JSON.stringify(theme)}`);
   }
 }
 

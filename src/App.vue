@@ -2633,6 +2633,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     await nextTick();
     const readinessTarget = store.exportReadiness?.manifest?.export_target;
     record("native workflow prepared html export readiness", readinessTarget === "html", JSON.stringify(readinessTarget));
+    const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
 
     const passed = assertions.every((assertion) => assertion.passed);
     await writeDesktopWorkflowSmokeReport({
@@ -2643,6 +2644,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       sidebar: store.sidebar,
       editorSnippet: smokeSnippetAround(active.value.text, "weight_kg = 72"),
       previewSnippet: text("#live-preview").slice(0, 800),
+      themeAccessibility,
       exportReadiness: store.exportReadiness
         ? {
             ready: store.exportReadiness.ready,
@@ -2665,6 +2667,69 @@ async function runDesktopWorkflowSmokeIfEnabled() {
 
 async function writeDesktopWorkflowSmokeReport(payload: Record<string, unknown>) {
   await invoke("write_desktop_workflow_smoke_report", { payload }).catch(() => undefined);
+}
+
+async function collectNativeThemeAccessibilityEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const original = {
+    theme: store.theme,
+    previewTheme: store.previewTheme,
+    highContrast: store.highContrast,
+    reducedMotion: store.reducedMotion,
+    editorFontSize: store.editorFontSize,
+    previewFontSize: store.previewFontSize,
+    previewLineHeight: store.previewLineHeight,
+  };
+  store.theme = "dark";
+  store.previewTheme = "dark";
+  store.highContrast = true;
+  store.reducedMotion = true;
+  store.editorFontSize = 18;
+  store.previewFontSize = 19;
+  store.previewLineHeight = 1.9;
+  await nextTick();
+  await nextTick();
+
+  const shell = document.querySelector(".app-shell") as HTMLElement | null;
+  const commandButton = Array.from(document.querySelectorAll("#main-commands button")).find((button) =>
+    button.textContent?.replace(/\s+/g, " ").trim().includes("Commands"),
+  ) as HTMLElement | undefined;
+  const editorContent = document.querySelector(".cm-content") as HTMLElement | null;
+  const previewPane = document.querySelector(".preview-pane") as HTMLElement | null;
+  const previewDocument = document.querySelector(".preview-document") as HTMLElement | null;
+  const shellStyle = shell ? getComputedStyle(shell) : null;
+  const buttonStyle = commandButton ? getComputedStyle(commandButton) : null;
+  const editorStyle = editorContent ? getComputedStyle(editorContent) : null;
+  const evidence = {
+    shellTheme: shell?.dataset.theme || "",
+    highContrast: shell?.dataset.highContrast || "",
+    reducedMotion: shell?.dataset.reducedMotion || "",
+    previewTheme: previewPane?.dataset.previewTheme || "",
+    shellBackgroundColor: shellStyle?.backgroundColor || "",
+    commandBorderColor: buttonStyle?.borderTopColor || "",
+    editorTransitionDuration: editorStyle?.transitionDuration || "",
+    editorFontSize: editorStyle?.fontSize || "",
+    previewStyle: previewDocument?.getAttribute("style") || "",
+  };
+  record("native workflow applied dark theme attribute", evidence.shellTheme === "dark", evidence.shellTheme);
+  record("native workflow applied high contrast attributes and colors", evidence.highContrast === "true" && evidence.commandBorderColor === "rgb(0, 0, 0)", JSON.stringify(evidence));
+  record("native workflow applied reduced motion", evidence.reducedMotion === "true" && evidence.editorTransitionDuration === "0s", evidence.editorTransitionDuration);
+  record("native workflow applied editor typography", evidence.editorFontSize === "18px", evidence.editorFontSize);
+  record(
+    "native workflow applied preview theme and typography",
+    evidence.previewTheme === "dark" && evidence.previewStyle.includes("font-size: 19px") && evidence.previewStyle.includes("line-height: 1.9"),
+    evidence.previewStyle,
+  );
+
+  store.theme = original.theme;
+  store.previewTheme = original.previewTheme;
+  store.highContrast = original.highContrast;
+  store.reducedMotion = original.reducedMotion;
+  store.editorFontSize = original.editorFontSize;
+  store.previewFontSize = original.previewFontSize;
+  store.previewLineHeight = original.previewLineHeight;
+  await nextTick();
+  await store.persistWorkspace();
+  return evidence;
 }
 
 function smokeSnippetAround(text: string, needle: string) {
