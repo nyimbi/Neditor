@@ -857,9 +857,9 @@ Completion criteria:
 
 ### 3. Add Desktop WebDriver/Tauri Workflow Smoke Tests
 
-Status: WebDriver harness exists; bounded macOS GUI launch and native command
-smoke are locally verified; supported Windows/Linux WebDriver execution remains
-open.
+Status: WebDriver harness exists; bounded macOS GUI launch, app-authored native
+UI reporting, and native command smoke are locally verified; supported
+Windows/Linux WebDriver execution remains open.
 
 Browser tests prove the Vue workbench under mocked Tauri IPC. They do not prove
 native dialogs, real file permissions, window title behavior, real Tauri
@@ -880,6 +880,12 @@ Needed desktop smoke coverage:
   `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured
   output, and `processAlive: true` evidence when the app survives the bounded
   launch window.
+- Native webview renders the real Vue workbench. Covered on this macOS host by
+  the same launch smoke, which now writes
+  `.tmp/desktop-smoke/native-ui-report.json` through guarded Tauri IPC and
+  validates command labels, source/sidebar/preview/status surfaces, active
+  document identity, preview label, status text, toolbar display, and viewport
+  dimensions.
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
   script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native

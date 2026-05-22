@@ -1444,6 +1444,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorState, RangeSetBuilder } from "@codemirror/state";
@@ -2314,6 +2315,7 @@ onMounted(async () => {
   scheduleAutosave();
   scheduleAutoSnapshot();
   setWindowTitle(store.windowTitle);
+  void nextTick().then(reportDesktopUiSmoke);
   window.addEventListener("keydown", handleShortcut);
 });
 
@@ -2519,6 +2521,42 @@ watch(
 function setWindowTitle(title: string) {
   document.title = title;
   void appWindow.setTitle(title).catch(() => undefined);
+}
+
+async function reportDesktopUiSmoke() {
+  const text = (selector: string) => document.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim() || "";
+  const commandLabels = Array.from(document.querySelectorAll("#main-commands button"))
+    .map((button) => button.textContent?.replace(/\s+/g, " ").trim() || "")
+    .filter(Boolean);
+  await invoke("write_desktop_ui_smoke_report", {
+    payload: {
+      title: document.title,
+      activeDocumentTitle: active.value.title,
+      viewMode: store.mode,
+      sidebarPanel: store.sidebar,
+      toolbarDisplay: store.toolbarDisplay,
+      workspaceClass: document.querySelector("#document-workspace")?.className || "",
+      commandLabels,
+      surfaces: {
+        commands: Boolean(document.querySelector("#main-commands")),
+        sidebar: Boolean(document.querySelector("#document-sidebar")),
+        source: Boolean(document.querySelector("#markdown-source")),
+        preview: Boolean(document.querySelector("#live-preview")),
+        status: Boolean(document.querySelector("#document-status")),
+      },
+      surfaceText: {
+        sidebar: text("#document-sidebar").slice(0, 240),
+        preview: text("#live-preview").slice(0, 240),
+        status: text("#document-status").slice(0, 240),
+      },
+      previewLabel: document.querySelector(".preview-document")?.getAttribute("aria-label") || "",
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scrollWidth: document.documentElement.scrollWidth,
+      },
+    },
+  }).catch(() => undefined);
 }
 
 watch(diagnosticSignature, () => {

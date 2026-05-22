@@ -730,6 +730,7 @@ async function installTauriMock(page: Page, stateKey: string) {
       }
       if (cmd === "plugin:dialog|message") return confirmResponses.length ? (confirmResponses.shift() ? "Ok" : "Cancel") : "Ok";
       if (cmd === "plugin:dialog|confirm") return confirmResponses.length ? confirmResponses.shift() : true;
+      if (cmd === "write_desktop_ui_smoke_report") return null;
       if (cmd === "read_file") {
         return readMockFile(args.path as string);
       }

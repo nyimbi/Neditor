@@ -477,3 +477,22 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("persisted desktop preferences after restart"));
   ok(script.includes("Official Tauri WebDriver currently supports desktop automation on Windows and Linux only"));
 });
+
+test("desktop launch smoke records native UI workbench surfaces", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  const rust = readFileSync("src-tauri/src/lib.rs", "utf8");
+  const smoke = readFileSync("scripts/check-desktop-smoke.mjs", "utf8");
+
+  ok(app.includes("write_desktop_ui_smoke_report"));
+  ok(app.includes("commandLabels"));
+  ok(app.includes("#document-workspace"));
+  ok(app.includes("#live-preview"));
+  ok(app.includes("previewLabel"));
+  ok(rust.includes("fn write_desktop_ui_smoke_report"));
+  ok(rust.includes("NEDITOR_DESKTOP_UI_SMOKE_REPORT"));
+  ok(smoke.includes("native-ui-report.json"));
+  ok(smoke.includes("validateNativeUiReport"));
+  ok(smoke.includes("native UI report did not include command button"));
+  ok(smoke.includes("native UI report did not include rendered preview identity or content"));
+  ok(smoke.includes("status = \"limited\""));
+});

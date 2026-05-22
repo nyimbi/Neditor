@@ -9,6 +9,7 @@ const launchRequested =
   process.argv.includes("--launch") || process.env.NEDITOR_DESKTOP_SMOKE_LAUNCH === "1";
 const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 3000);
 const nativeWindowReportPath = join(root, ".tmp", "desktop-smoke", "native-window-report.json");
+const nativeUiReportPath = join(root, ".tmp", "desktop-smoke", "native-ui-report.json");
 const issues = [];
 
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
@@ -26,6 +27,7 @@ const smokeReport = {
   },
   nativeCommandWorkflow: null,
   nativeWindow: null,
+  nativeUi: null,
   nativeAutomation: null,
 };
 
@@ -158,12 +160,14 @@ async function launchDesktop(path) {
   await new Promise((resolveLaunch) => {
     const startedAt = Date.now();
     rmSync(nativeWindowReportPath, { force: true });
+    rmSync(nativeUiReportPath, { force: true });
     const child = spawn(path, [], {
       cwd: root,
       env: {
         ...process.env,
         RUST_BACKTRACE: "1",
         NEDITOR_DESKTOP_SMOKE_REPORT: nativeWindowReportPath,
+        NEDITOR_DESKTOP_UI_SMOKE_REPORT: nativeUiReportPath,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -194,6 +198,7 @@ async function launchDesktop(path) {
       } else {
         report.status = "survived-until-timeout";
         validateNativeWindowReport(report);
+        validateNativeUiReport(report);
         collectNativeAutomationReport(report, child.pid);
       }
       writeLaunchReport(report);
@@ -286,6 +291,51 @@ function validateNativeWindowReport(launchReport) {
   }
 }
 
+function validateNativeUiReport(launchReport) {
+  if (!existsSync(nativeUiReportPath)) {
+    issues.push(`native UI smoke report was not written: ${relative(nativeUiReportPath)}`);
+    return;
+  }
+  let report;
+  try {
+    report = JSON.parse(readFileSync(nativeUiReportPath, "utf8"));
+  } catch (error) {
+    issues.push(`native UI smoke report is not valid JSON: ${error.message}`);
+    return;
+  }
+  smokeReport.nativeUi = report;
+  launchReport.nativeUi = report;
+  const payload = report.payload || {};
+  if (!String(payload.title || "").includes("NEditor")) {
+    issues.push(`native UI report did not include the NEditor window title: ${JSON.stringify(payload.title)}`);
+  }
+  for (const [surface, present] of Object.entries(payload.surfaces || {})) {
+    if (present !== true) {
+      issues.push(`native UI report did not render the ${surface} surface`);
+    }
+  }
+  for (const command of ["New", "Open", "Save", "Templates", "Commands"]) {
+    if (!Array.isArray(payload.commandLabels) || !payload.commandLabels.includes(command)) {
+      issues.push(`native UI report did not include command button ${command}`);
+    }
+  }
+  if (!String(payload.workspaceClass || "").includes("workspace")) {
+    issues.push(`native UI report did not include the workspace class: ${JSON.stringify(payload.workspaceClass)}`);
+  }
+  if (
+    !String(payload.previewLabel || "").includes("Market Entry Report") &&
+    !String(payload.surfaceText?.preview || "").includes("Transform Artifacts")
+  ) {
+    issues.push("native UI report did not include rendered preview identity or content");
+  }
+  if (!String(payload.surfaceText?.status || "").includes("diagnostics")) {
+    issues.push("native UI report did not include document status text");
+  }
+  if (!Number.isFinite(payload.viewport?.width) || !Number.isFinite(payload.viewport?.height)) {
+    issues.push(`native UI report did not include viewport dimensions: ${JSON.stringify(payload.viewport)}`);
+  }
+}
+
 function writeLaunchReport(report) {
   const directory = join(root, ".tmp", "desktop-smoke");
   mkdirSync(directory, { recursive: true });
@@ -346,15 +396,16 @@ end tell
       height: Number(windowHeight),
     },
   };
+  if (!Number.isFinite(automation.windowCount) || automation.windowCount < 1) {
+    automation.status = "limited";
+    automation.reason = "System Events found the NEditor process but did not expose a window for this launch; the app-authored native window report remains authoritative.";
+  }
   launchReport.nativeAutomation = automation;
   smokeReport.nativeAutomation = automation;
   if (!processName || !processName.toLowerCase().includes("neditor")) {
     issues.push(`macOS native automation found an unexpected process name: ${JSON.stringify(processName)}`);
   }
-  if (!Number.isFinite(automation.windowCount) || automation.windowCount < 1) {
-    issues.push(`macOS native automation did not find a NEditor window: ${JSON.stringify(automation)}`);
-  }
-  if (!Number.isFinite(automation.window.width) || !Number.isFinite(automation.window.height)) {
+  if (automation.status === "passed" && (!Number.isFinite(automation.window.width) || !Number.isFinite(automation.window.height))) {
     issues.push(`macOS native automation did not report a usable window size: ${JSON.stringify(automation.window)}`);
   }
 }

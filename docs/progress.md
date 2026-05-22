@@ -40,6 +40,12 @@ Recent pushed checkpoints visible in current git history:
   script now also runs a native command workflow against real local files,
   covering save-as, open, watch, compile, export readiness, HTML/PDF/DOCX/PPTX/
   Markdown bundle export, sidecar manifests, and reveal command construction.
+- This update adds app-authored native UI launch proof. During bounded desktop
+  launch smoke, the Vue workbench sends a guarded Tauri IPC report that proves
+  the native webview rendered primary commands, source/preview/sidebar/status
+  surfaces, the active document identity, preview label, toolbar display, and
+  viewport dimensions; the smoke records it in
+  `.tmp/desktop-smoke/native-ui-report.json`.
 - This update adds a representative rendered export audit for a board-style
   fixture, checking inspectable HTML, PDF object structure, DOCX/PPTX package
   anatomy, core/custom properties, comments and AI provenance appendices,
@@ -697,7 +703,7 @@ Current verification recorded on 2026-05-21 and 2026-05-22:
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |
-| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, `processAlive: true`, app-authored native window evidence, and System Events process/window evidence (`processName: neditor`, `windowCount: 1`, `window.name: NEditor`, `1440x920`). |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, `processAlive: true`, app-authored native window evidence, and app-authored native UI evidence. `.tmp/desktop-smoke/native-ui-report.json` records command labels including New/Open/Save/Templates/Commands, source/sidebar/preview/status surface presence, active document `Market Entry Report`, preview label `Rendered preview for Market Entry Report, draft`, and viewport dimensions; System Events process evidence is recorded as `limited` on this host because it exposed the process but not a window. |
 | `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, Templates-panel calc insertion to source/preview, export readiness, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip plus the supported workflow plan in `.tmp/desktop-webdriver/report.json`. |
 
 Fresh baseline recorded on 2026-05-20:
@@ -2283,8 +2289,8 @@ Native desktop window smoke verification:
 | --- | --- | --- |
 | `cargo check --locked` in `src-tauri` | Pass | Tauri setup hook for the desktop smoke report compiled cleanly. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Rebuilt the release desktop binary consumed by the launch smoke after adding the app-authored native window report. |
-| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS launch smoke verified the release binary, native command workflow, process survival, and app-authored native window report. `.tmp/desktop-smoke/native-window-report.json` records package `NEditor`, identifier `com.neditor.desktop`, main-window title `NEditor`, visible `true`, size `2880x1840`, and scale factor `2`. |
-| `node --check scripts/check-desktop-smoke.mjs`, `cargo fmt --check` in `src-tauri`, `pnpm run build`, `pnpm run check` | Pass | Script syntax, Rust formatting, production frontend build, and Vue typecheck passed after the desktop smoke hardening. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS launch smoke verified the release binary, native command workflow, process survival, app-authored native window report, and app-authored native UI report. `.tmp/desktop-smoke/native-window-report.json` records package `NEditor`, identifier `com.neditor.desktop`, main-window title `NEditor`, visible `true`, size `2880x1840`, and scale factor `2`; `.tmp/desktop-smoke/native-ui-report.json` records rendered workbench commands, primary surfaces, document identity, preview label, status text, and viewport dimensions. |
+| `node --check scripts/check-desktop-smoke.mjs`, `cargo fmt --check` in `src-tauri`, `pnpm run build`, `pnpm run check` | Pass | Script syntax, Rust formatting, production frontend build, and Vue typecheck passed after the desktop UI smoke hardening. |
 
 Responsive layout workflow verification:
 
@@ -2320,7 +2326,7 @@ Desktop native automation smoke verification:
 | --- | --- | --- |
 | `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke verifier syntax remained valid after adding macOS System Events evidence capture. |
 | `pnpm run test:desktop-smoke` | Pass | Desktop artifact and native command workflow smoke still pass without GUI launch enabled. |
-| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS GUI launch smoke passed and `.tmp/desktop-smoke/launch-report.json` recorded app-authored Tauri window metadata plus System Events evidence for process `neditor`, one `NEditor` window, and native window size `1440x920`. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded macOS GUI launch smoke passed and `.tmp/desktop-smoke/launch-report.json` recorded app-authored Tauri window metadata plus app-authored Vue workbench UI evidence; System Events evidence is classified as limited on this host because it exposed the `neditor` process but not a window. |
 
 Desktop WebDriver harness verification:
 

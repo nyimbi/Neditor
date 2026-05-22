@@ -147,7 +147,8 @@ pub fn run() {
             list_transform_engines,
             run_transform,
             run_external_transform,
-            cleanup_ai_paste
+            cleanup_ai_paste,
+            write_desktop_ui_smoke_report
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");
@@ -181,6 +182,22 @@ fn write_desktop_smoke_report(app: &tauri::App) {
     if let Ok(serialized) = serde_json::to_string_pretty(&payload) {
         let _ = std::fs::write(report_path, format!("{serialized}\n"));
     }
+}
+
+#[tauri::command]
+fn write_desktop_ui_smoke_report(payload: serde_json::Value) -> Result<(), String> {
+    let Ok(report_path) = std::env::var("NEDITOR_DESKTOP_UI_SMOKE_REPORT") else {
+        return Ok(());
+    };
+    let payload = serde_json::json!({
+        "generatedAt": chrono::Utc::now().to_rfc3339(),
+        "payload": payload,
+    });
+    if let Some(parent) = std::path::Path::new(&report_path).parent() {
+        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let serialized = serde_json::to_string_pretty(&payload).map_err(|error| error.to_string())?;
+    std::fs::write(report_path, format!("{serialized}\n")).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
