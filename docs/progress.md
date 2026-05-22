@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-21
+Updated: 2026-05-22
 
 ## Active Goal
 
@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `1661653 Prove
-  LaTeX exports compile locally`
+- Latest inspected committed baseline before this update: `e8093e6 Make
+  document creation controls feel deliberate`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -71,6 +71,11 @@ Recent pushed checkpoints visible in current git history:
   labels. `google-docs` writes a local ZIP handoff with `document.docx`,
   standalone HTML, Markdown, plain text, metadata, assets, README, and embedded
   manifest evidence for Google Docs import workflows.
+- The current UI also exposes direct HTML export as a first-class action in the
+  grouped File toolbar and Export sidebar. Browser workflow coverage verifies
+  export readiness, success/failure diagnostics, output paths, manifest paths,
+  and target handoffs; the native workflow smoke writes a real HTML export with
+  sidecar manifest and output-hash proof from the launched Tauri webview.
 - This update strengthens the opt-in macOS desktop launch proof. The bounded
   launch smoke now writes `.tmp/desktop-smoke/launch-report.json` with the
   binary path, PID, observed launch window, captured output, and
@@ -630,8 +635,11 @@ P0 gaps:
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in that retired workflow.
 - Browser-level workflow tests now pass locally with 47 Chromium tests through
-  `pnpm run test:e2e` using the project-local Playwright browser cache. This
-  closes the prior local browser-cache/launch blocker and covers mocked file
+  `pnpm run test:e2e`. The current macOS proof used the system-Chrome fallback
+  because bundled Playwright Chromium is missing on this host, and
+  `.tmp/e2e-browser/report.json` records `source: system-chromium`, the Chrome
+  executable path, and exit status 0. This closes the prior local browser
+  launch blocker and covers mocked file
   lifecycle, save-as/recently-closed flows, stale-save conflict copy/merge/
   keep-local/accept-external recovery, clean watcher reload, watcher-originated
   dirty root-file conflicts, included-file recompilation/conflicts, restart
@@ -697,7 +705,7 @@ Current verification recorded on 2026-05-21 and 2026-05-22:
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 47 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
-| `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed through the focused workbench boot workflow on this host. |
+| `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host by falling back from the missing Playwright bundled Chromium path to `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; `.tmp/e2e-environment/report.json` records `source: system-chromium`, the expected bundled path, and the passing command tail. |
 | `pnpm run test:e2e` | Pass | 47 Chromium browser workbench workflows passed locally on this host, including responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, and blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |

@@ -137,9 +137,10 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 42 Chromium browser workbench workflows
-  locally on 2026-05-21 using the project-local Playwright browser cache,
-  including blog/Substack/LaTeX/Google Docs export-target handoffs.
+- `pnpm run test:e2e`: passed all 47 Chromium browser workbench workflows
+  locally on 2026-05-22 through the system-Chrome fallback because bundled
+  Playwright Chromium is missing on this host, including HTML, blog/Substack,
+  LaTeX, and Google Docs export-target handoffs.
 - `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture`:
   passed and proves no-bibliography citation readiness emits a broad source
   warning plus precise per-key missing citation diagnostics that are copied
@@ -735,12 +736,14 @@ wrapper from a terminal/session that permits Chromium launch.
 
 Current host evidence:
 
-- 2026-05-21: `pnpm exec playwright test --list` lists 42 Chromium workflow
+- 2026-05-22: `pnpm exec playwright test --list` lists 47 Chromium workflow
   tests in `e2e/app-workflows.spec.ts`.
-- 2026-05-21: `pnpm run check:e2e-env` passes the focused workbench boot
-  workflow through the project-local Playwright Chromium path.
-- 2026-05-21: `pnpm run test:e2e` passed all 42 Chromium browser workflows,
-  including the blog/Substack/LaTeX/Google Docs export-target handoff test.
+- 2026-05-22: `pnpm run check:e2e-env` passes the focused workbench boot
+  workflow through the system-Chrome fallback because bundled Playwright
+  Chromium is missing on this host.
+- 2026-05-22: `pnpm run test:e2e` passed all 47 Chromium browser workflows,
+  including the HTML, blog/Substack, LaTeX, and Google Docs export-target
+  handoff tests.
 
 Current browser coverage in `e2e/app-workflows.spec.ts`:
 
@@ -895,7 +898,8 @@ Needed desktop smoke coverage:
   and validates split/source/preview/focus/export/review/presentation mode
   switching, export/review/presentation sidebar routing, command-palette
   opening, Science `calc` template insertion into source, rendered preview
-  output, dirty title mutation, and HTML export readiness progress evidence.
+  output, dirty title mutation, HTML export readiness progress evidence, and a
+  real app-initiated HTML export with sidecar manifest/output-hash evidence.
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
   script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native
