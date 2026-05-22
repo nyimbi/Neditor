@@ -227,6 +227,9 @@ install paths and troubleshooting.
 ## Export Deliverables
 
 Exports are generated from the compiled semantic document model.
+Use `File` -> `Export` -> `HTML Export` for a direct standalone HTML write, or
+select HTML in the Export panel and run the same readiness-backed export
+workflow from there.
 
 Supported targets:
 

@@ -439,6 +439,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const app = readFileSync("src/App.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
+  const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
 
   ok(app.includes(':data-toolbar-display="store.toolbarDisplay"'));
   ok(app.includes(':style="appShellStyle"'));
@@ -446,6 +447,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Toolbar text size"'));
   ok(app.includes("Export HTML"));
   ok(app.includes("exportDocumentAs(\"html\")"));
+  ok(app.includes('listen<string>("neditor-menu-command"'));
+  ok(app.includes('"neditor-export-html": "html"'));
+  ok(tauriLib.includes('SubmenuBuilder::new(app, "Export")'));
+  ok(tauriLib.includes('SubmenuBuilder::new(app, "Edit")'));
+  ok(tauriLib.includes('SubmenuBuilder::new(app, "View")'));
+  ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
+  ok(app.includes('case "neditor-mode-export"'));
+  ok(tauriLib.includes('app.emit("neditor-menu-command", id)'));
   ok(app.includes("commandToolbarRows"));
   ok(app.includes("command-toolbar-row"));
   ok(app.includes('foldGutter()'));

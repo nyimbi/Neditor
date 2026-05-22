@@ -1547,6 +1547,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorState, RangeSetBuilder } from "@codemirror/state";
@@ -1606,6 +1607,7 @@ import { useDocumentsStore } from "./stores/documents";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument } from "./types";
 
 const store = useDocumentsStore();
+type ExportTarget = typeof store.exportTarget;
 type WindowTitleTarget = {
   setTitle(title: string): Promise<void>;
 };
@@ -1881,6 +1883,18 @@ const commentSnippet = "<!-- comment: unresolved | author: local | at: 2026-05-1
 const aiSnippet =
   "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\npromptSummary: \nreviewedBy: \nreviewedAt: \nstatus: needs-review\n```\n";
 const releaseStatuses = ["draft", "in-review", "approved", "published", "archived"];
+const nativeMenuExportTargets: Record<string, ExportTarget> = {
+  "neditor-export-html": "html",
+  "neditor-export-pdf": "pdf",
+  "neditor-export-docx": "docx",
+  "neditor-export-pptx": "pptx",
+  "neditor-export-markdown-bundle": "markdown-bundle",
+  "neditor-export-blog": "blog",
+  "neditor-export-substack": "substack",
+  "neditor-export-latex": "latex",
+  "neditor-export-google-docs": "google-docs",
+};
+let unlistenNativeMenuCommand: UnlistenFn | null = null;
 
 const active = computed(() => store.activeDocument);
 const previewDocumentStyle = computed(() => ({
@@ -2457,8 +2471,98 @@ const filteredCommands = computed(() => {
   return commands.value.filter((command) => `${command.name} ${command.group}`.toLowerCase().includes(query));
 });
 
+async function bindNativeMenuCommands() {
+  try {
+    unlistenNativeMenuCommand = await listen<string>("neditor-menu-command", (event) => {
+      void runNativeMenuCommand(event.payload);
+    });
+  } catch {
+    unlistenNativeMenuCommand = null;
+  }
+}
+
+async function runNativeMenuCommand(command: string) {
+  const exportTarget = nativeMenuExportTargets[command];
+  if (exportTarget) {
+    await exportDocumentAs(exportTarget);
+    return;
+  }
+
+  switch (command) {
+    case "neditor-new-document":
+      store.newDocument();
+      break;
+    case "neditor-open-document":
+      await openDocument();
+      break;
+    case "neditor-save-document":
+      await saveDocument();
+      break;
+    case "neditor-save-document-as":
+      await saveDocumentAs();
+      break;
+    case "neditor-prepare-export":
+      await prepareForExport();
+      store.sidebar = "exports";
+      break;
+    case "neditor-export-current":
+      await exportDocument();
+      break;
+    case "neditor-open-folder":
+      await openFolder();
+      break;
+    case "neditor-save-workspace":
+      await saveWorkspace();
+      break;
+    case "neditor-open-search":
+      runEditorCommand(openSearchPanel);
+      break;
+    case "neditor-mode-split":
+      store.mode = "split";
+      break;
+    case "neditor-mode-source":
+      store.mode = "source";
+      break;
+    case "neditor-mode-preview":
+      store.mode = "preview";
+      break;
+    case "neditor-mode-focus":
+      store.mode = "focus";
+      break;
+    case "neditor-mode-export":
+      store.mode = "export";
+      store.sidebar = "exports";
+      break;
+    case "neditor-show-outline":
+      store.sidebar = "outline";
+      break;
+    case "neditor-show-exports":
+      store.sidebar = "exports";
+      break;
+    case "neditor-insert-table":
+      insertBlock(tableSnippet);
+      break;
+    case "neditor-insert-code-fence":
+      insertBlock(codeFenceSnippet);
+      break;
+    case "neditor-insert-equation":
+      insertBlock(equationSnippet);
+      break;
+    case "neditor-insert-toc":
+      insertBlock(tocSnippet);
+      break;
+    case "neditor-open-templates":
+      store.sidebar = "templates";
+      break;
+    case "neditor-clean-ai-paste":
+      openAiPaste();
+      break;
+  }
+}
+
 onMounted(async () => {
   await store.boot();
+  await bindNativeMenuCommands();
   applyAiPasteDefaults();
   buildEditor();
   scheduleAutosave();
@@ -2479,6 +2583,8 @@ onBeforeUnmount(() => {
   window.clearTimeout(autoSnapshotHandle);
   window.clearTimeout(scrollPersistHandle);
   window.removeEventListener("keydown", handleShortcut);
+  unlistenNativeMenuCommand?.();
+  unlistenNativeMenuCommand = null;
   stopPaneResize();
 });
 

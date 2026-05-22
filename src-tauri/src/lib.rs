@@ -89,7 +89,10 @@ use git_support::run_git;
 #[cfg(test)]
 use git_types::{GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRequest};
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
-use tauri::Manager;
+use tauri::{
+    menu::{Menu, MenuItemBuilder, SubmenuBuilder},
+    AppHandle, Emitter, Manager, Runtime,
+};
 #[cfg(test)]
 use transforms::external::ExternalTransformRequest;
 use transforms::external::{list_transform_engines, run_external_transform};
@@ -107,6 +110,13 @@ use workspace_files::WorkspaceFileRequest;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .menu(build_neditor_menu)
+        .on_menu_event(|app, event| {
+            let id = event.id().as_ref();
+            if id.starts_with("neditor-") {
+                let _ = app.emit("neditor-menu-command", id);
+            }
+        })
         .manage(FileWatcherState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -156,6 +166,133 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");
+}
+
+fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let export_menu = SubmenuBuilder::new(app, "Export")
+        .item(&menu_item(app, "neditor-export-html", "HTML Export")?)
+        .separator()
+        .item(&menu_item(
+            app,
+            "neditor-prepare-export",
+            "Prepare for Export",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-export-current",
+            "Export Selected Target",
+        )?)
+        .separator()
+        .item(&menu_item(app, "neditor-export-pdf", "PDF Export")?)
+        .item(&menu_item(app, "neditor-export-docx", "DOCX Export")?)
+        .item(&menu_item(app, "neditor-export-pptx", "PPTX Export")?)
+        .item(&menu_item(
+            app,
+            "neditor-export-markdown-bundle",
+            "Markdown Bundle Export",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-export-blog",
+            "Blog Package Export",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-export-substack",
+            "Substack Package Export",
+        )?)
+        .item(&menu_item(app, "neditor-export-latex", "LaTeX Export")?)
+        .item(&menu_item(
+            app,
+            "neditor-export-google-docs",
+            "Google Docs Package Export",
+        )?)
+        .build()?;
+
+    let file_menu = SubmenuBuilder::new(app, "File")
+        .item(&menu_item(app, "neditor-new-document", "New Document")?)
+        .item(&menu_item(app, "neditor-open-document", "Open Document")?)
+        .separator()
+        .item(&menu_item(app, "neditor-save-document", "Save Document")?)
+        .item(&menu_item(
+            app,
+            "neditor-save-document-as",
+            "Save Document As",
+        )?)
+        .separator()
+        .item(&export_menu)
+        .separator()
+        .item(&menu_item(app, "neditor-open-folder", "Open Folder")?)
+        .item(&menu_item(app, "neditor-save-workspace", "Save Workspace")?)
+        .separator()
+        .close_window()
+        .build()?;
+
+    let edit_menu = SubmenuBuilder::new(app, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .separator()
+        .item(&menu_item(app, "neditor-open-search", "Find and Replace")?)
+        .build()?;
+
+    let view_menu = SubmenuBuilder::new(app, "View")
+        .item(&menu_item(app, "neditor-mode-split", "Split View")?)
+        .item(&menu_item(app, "neditor-mode-source", "Source Only")?)
+        .item(&menu_item(app, "neditor-mode-preview", "Preview Only")?)
+        .item(&menu_item(app, "neditor-mode-focus", "Focus Mode")?)
+        .item(&menu_item(app, "neditor-mode-export", "Export Preview")?)
+        .separator()
+        .item(&menu_item(app, "neditor-show-outline", "Document Outline")?)
+        .item(&menu_item(app, "neditor-show-exports", "Export Panel")?)
+        .separator()
+        .fullscreen()
+        .build()?;
+
+    let writing_tools_menu = SubmenuBuilder::new(app, "Writing Tools")
+        .item(&menu_item(app, "neditor-open-search", "Find and Replace")?)
+        .separator()
+        .item(&menu_item(app, "neditor-insert-table", "Insert Table")?)
+        .item(&menu_item(
+            app,
+            "neditor-insert-code-fence",
+            "Insert Code Fence",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-insert-equation",
+            "Insert Equation",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-insert-toc",
+            "Insert Table of Contents",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-open-templates",
+            "Transform Templates",
+        )?)
+        .separator()
+        .item(&menu_item(app, "neditor-clean-ai-paste", "Clean AI Paste")?)
+        .build()?;
+
+    Menu::with_items(
+        app,
+        &[&file_menu, &edit_menu, &view_menu, &writing_tools_menu],
+    )
+}
+
+fn menu_item<R: Runtime>(
+    app: &AppHandle<R>,
+    id: &'static str,
+    label: &'static str,
+) -> tauri::Result<tauri::menu::MenuItem<R>> {
+    MenuItemBuilder::with_id(id, label).build(app)
 }
 
 fn write_desktop_smoke_report(app: &tauri::App) {

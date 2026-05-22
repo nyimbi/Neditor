@@ -144,6 +144,9 @@ artifacts:
 
 NEditor exports from the compiled semantic document model rather than treating
 preview HTML as the only source of truth.
+HTML export is available as a first-class File menu action (`File` -> `Export`
+-> `HTML Export`), a toolbar command, a command-palette command, and the default
+Export panel target.
 
 | Target | What it is for | Current support |
 | --- | --- | --- |
