@@ -2593,13 +2593,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
   try {
     record("native workflow starts with NEditor title", document.title.includes("NEditor"), document.title);
 
-    store.mode = "preview";
-    await nextTick();
-    record(
-      "native workflow switched preview mode",
-      Boolean(document.querySelector("#document-workspace")?.className.includes("mode-preview")),
-      document.querySelector("#document-workspace")?.className || "",
-    );
+    const modeEvidence = await collectNativeModeEvidence(record);
 
     commandPaletteOpen.value = true;
     await nextTick();
@@ -2642,6 +2636,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       title: document.title,
       mode: store.mode,
       sidebar: store.sidebar,
+      modeEvidence,
       editorSnippet: smokeSnippetAround(active.value.text, "weight_kg = 72"),
       previewSnippet: text("#live-preview").slice(0, 800),
       themeAccessibility,
@@ -2667,6 +2662,28 @@ async function runDesktopWorkflowSmokeIfEnabled() {
 
 async function writeDesktopWorkflowSmokeReport(payload: Record<string, unknown>) {
   await invoke("write_desktop_workflow_smoke_report", { payload }).catch(() => undefined);
+}
+
+async function collectNativeModeEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const modes: Array<typeof store.mode> = ["split", "source", "preview", "focus", "export", "review", "presentation"];
+  const expectedSidebar: Partial<Record<typeof store.mode, string>> = {
+    export: "exports",
+    review: "review",
+    presentation: "outline",
+  };
+  const evidence = [];
+  for (const mode of modes) {
+    store.mode = mode;
+    await nextTick();
+    const workspaceClass = document.querySelector("#document-workspace")?.className || "";
+    const sidebar = store.sidebar;
+    const passed = workspaceClass.includes(`mode-${mode}`) && (!expectedSidebar[mode] || sidebar === expectedSidebar[mode]);
+    record(`native workflow switched ${mode} mode`, passed, JSON.stringify({ workspaceClass, sidebar }));
+    evidence.push({ mode, workspaceClass, sidebar });
+  }
+  store.mode = "split";
+  await nextTick();
+  return evidence;
 }
 
 async function collectNativeThemeAccessibilityEvidence(record: (name: string, passed: boolean, detail?: string) => void) {

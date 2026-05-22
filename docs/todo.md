@@ -892,9 +892,10 @@ Needed desktop smoke coverage:
 - Native webview performs real in-app workflows. Covered on this macOS host by
   the same launch smoke, which now writes
   `.tmp/desktop-smoke/native-workflow-report.json` through guarded Tauri IPC
-  and validates native mode switching, command-palette opening, Science `calc`
-  template insertion into source, rendered preview output, dirty title mutation,
-  and HTML export readiness progress evidence.
+  and validates split/source/preview/focus/export/review/presentation mode
+  switching, export/review/presentation sidebar routing, command-palette
+  opening, Science `calc` template insertion into source, rendered preview
+  output, dirty title mutation, and HTML export readiness progress evidence.
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
   script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native

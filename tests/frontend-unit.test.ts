@@ -502,6 +502,8 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("write_desktop_workflow_smoke_report"));
   ok(app.includes("native workflow inserted calc template into source"));
   ok(app.includes("native workflow prepared html export readiness"));
+  ok(app.includes("collectNativeModeEvidence"));
+  ok(app.includes("[\"split\", \"source\", \"preview\", \"focus\", \"export\", \"review\", \"presentation\"]"));
   ok(app.includes("collectNativeThemeAccessibilityEvidence"));
   ok(app.includes("native workflow applied high contrast attributes and colors"));
   ok(app.includes("native workflow applied preview theme and typography"));
@@ -520,6 +522,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("validateNativeWorkflowReport"));
   ok(smoke.includes("native UI report did not include command button"));
   ok(smoke.includes("native workflow report did not include passing assertion"));
+  ok(smoke.includes("native workflow report did not include mode evidence"));
   ok(smoke.includes("native workflow report did not include theme/accessibility evidence"));
   ok(smoke.includes("native UI report did not include rendered preview identity or content"));
   ok(smoke.includes("status = \"limited\""));

@@ -362,7 +362,6 @@ function validateNativeWorkflowReport(launchReport) {
   const assertionNames = new Set((payload.assertions || []).filter((assertion) => assertion?.passed === true).map((assertion) => assertion.name));
   for (const assertion of [
     "native workflow starts with NEditor title",
-    "native workflow switched preview mode",
     "native workflow opened command palette",
     "native workflow found dose template",
     "native workflow inserted calc template into source",
@@ -377,6 +376,29 @@ function validateNativeWorkflowReport(launchReport) {
   ]) {
     if (!assertionNames.has(assertion)) {
       issues.push(`native workflow report did not include passing assertion: ${assertion}`);
+    }
+  }
+  for (const mode of ["split", "source", "preview", "focus", "export", "review", "presentation"]) {
+    const assertion = `native workflow switched ${mode} mode`;
+    if (!assertionNames.has(assertion)) {
+      issues.push(`native workflow report did not include passing assertion: ${assertion}`);
+    }
+  }
+  const modeEvidence = Array.isArray(payload.modeEvidence) ? payload.modeEvidence : [];
+  const modeSet = new Set(modeEvidence.map((entry) => entry?.mode));
+  for (const mode of ["split", "source", "preview", "focus", "export", "review", "presentation"]) {
+    if (!modeSet.has(mode)) {
+      issues.push(`native workflow report did not include mode evidence for ${mode}`);
+    }
+  }
+  for (const [mode, sidebar] of [
+    ["export", "exports"],
+    ["review", "review"],
+    ["presentation", "outline"],
+  ]) {
+    const entry = modeEvidence.find((candidate) => candidate?.mode === mode);
+    if (entry?.sidebar !== sidebar) {
+      issues.push(`native workflow report did not route ${mode} mode to ${sidebar} sidebar: ${JSON.stringify(entry)}`);
     }
   }
   if (!String(payload.editorSnippet || "").includes("weight_kg = 72")) {
