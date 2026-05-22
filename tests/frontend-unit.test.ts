@@ -505,6 +505,8 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow saved document to real file"));
   ok(app.includes("native workflow opened saved real file"));
   ok(app.includes("native workflow reverted saved real file"));
+  ok(app.includes("native workflow blocked stale save with external conflict"));
+  ok(app.includes("native workflow accepted external conflict changes"));
   ok(app.includes("native workflow inserted calc template into source"));
   ok(app.includes("native workflow prepared html export readiness"));
   ok(app.includes("native workflow wrote html export artifact"));

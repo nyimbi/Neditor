@@ -372,6 +372,9 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow opened saved real file",
     "native workflow dirtied opened real file",
     "native workflow reverted saved real file",
+    "native workflow blocked stale save with external conflict",
+    "native workflow accepted external conflict changes",
+    "native workflow restored real file after conflict proof",
     "native workflow opened command palette",
     "native workflow found dose template",
     "native workflow inserted calc template into source",
@@ -421,7 +424,12 @@ function validateNativeWorkflowReport(launchReport) {
     issues.push(`native workflow saved Markdown file was not written: ${relative(nativeWorkflowFilePath)}`);
   } else {
     const markdown = readFileSync(nativeWorkflowFilePath, "utf8");
-    if (!markdown.includes("Market Entry Report") || markdown.includes("Native smoke revert marker")) {
+    if (
+      !markdown.includes("Market Entry Report") ||
+      markdown.includes("Native smoke revert marker") ||
+      markdown.includes("External native conflict edit") ||
+      markdown.includes("Local unsaved native conflict edit")
+    ) {
       issues.push("native workflow saved Markdown file did not preserve reverted document content");
     }
   }

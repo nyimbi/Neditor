@@ -2725,13 +2725,57 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
 
   store.updateText(`${active.value.text}\n\nNative smoke revert marker.`);
   await nextTick();
+  previewTextCommit.cancel();
   record("native workflow dirtied opened real file", active.value.dirty, active.value.title);
   await store.revertActive();
   await nextTick();
+  previewTextCommit.cancel();
   record(
     "native workflow reverted saved real file",
     active.value.path === filePath && active.value.text === savedText && !active.value.dirty,
     JSON.stringify({ filePath: active.value.path, title: active.value.title, dirty: active.value.dirty }),
+  );
+
+  const externalText = `${savedText}\n\nExternal native conflict edit.`;
+  const localText = `${savedText}\n\nLocal unsaved native conflict edit.`;
+  await invoke("save_file", { request: { path: filePath, text: externalText, expected_hash: null } });
+  store.updateText(localText);
+  await nextTick();
+  previewTextCommit.cancel();
+  await store.saveActive();
+  await nextTick();
+  record(
+    "native workflow blocked stale save with external conflict",
+    Boolean(
+      store.externalConflict?.reason === "root" &&
+        store.externalConflict.path === filePath &&
+        Boolean(store.externalConflict.externalText?.includes("External native conflict edit")) &&
+        active.value.text.includes("Local unsaved native conflict edit"),
+    ),
+    JSON.stringify({
+      conflictPath: store.externalConflict?.path,
+      reason: store.externalConflict?.reason,
+      statusMessage: store.statusMessage,
+    }),
+  );
+
+  await store.acceptExternalChanges();
+  await nextTick();
+  record(
+    "native workflow accepted external conflict changes",
+    active.value.path === filePath && active.value.text.includes("External native conflict edit") && !active.value.dirty && !store.externalConflict,
+    JSON.stringify({ title: active.value.title, dirty: active.value.dirty, statusMessage: store.statusMessage }),
+  );
+
+  store.updateText(savedText);
+  await nextTick();
+  previewTextCommit.cancel();
+  await store.saveActive(filePath);
+  await nextTick();
+  record(
+    "native workflow restored real file after conflict proof",
+    active.value.path === filePath && active.value.text === savedText && !active.value.dirty && !store.externalConflict,
+    JSON.stringify({ title: active.value.title, dirty: active.value.dirty, statusMessage: store.statusMessage }),
   );
 
   return {

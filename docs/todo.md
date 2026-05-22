@@ -1249,7 +1249,11 @@ Finish:
   before save. The local Playwright harness lists the stale-save conflict path
   through compare, save-copy preservation, merge-back recovery with explicit
   line composition controls, keep-local, and accept-external; current-host
-  execution remains blocked by the missing Playwright Chromium binary.
+  browser execution is now available through the system-Chrome fallback, and
+  the launched native smoke now covers stale-save blocking plus accept-external
+  recovery against a real Markdown file. Remaining work is native watcher-event
+  delivery and manual/modal coverage for save-copy, keep-local, and merge
+  composition in a desktop window.
 - Multi-tab watcher switching beyond the current tab-activation proof.
 - Stale watcher cleanup when tabs close or paths move beyond current
   recent-path cleanup coverage.
