@@ -2402,6 +2402,16 @@ Desktop WebDriver harness verification:
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the WebDriver HTML export evidence notes; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the desktop WebDriver HTML export harness update. |
 
+Rendered export manual sign-off verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/check-rendered-export-audit.mjs` | Pass | Rendered export audit verifier syntax remains valid after adding the structured manual sign-off template and completed-signoff validator. |
+| `pnpm run test:unit` | Pass | 20 frontend unit tests passed, including the static guard that the rendered export audit exposes `visual-review-signoff.template.json`, `NEDITOR_RENDERED_EXPORT_SIGNOFF`, pending/human-reviewed states, and acceptance flags. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit passed and now writes `.tmp/rendered-export-audit/visual-review-signoff.template.json`; `viewer-proof.json` records passing `manual-signoff-template` evidence and a skipped `human-signoff` row until a completed reviewer file is supplied; `visual-review-summary.json` links the template and keeps `humanSignoff.status` at `pending-human-review` on this host. |
+| `rg -n "visual-review-signoff\|humanSignoff\|human-signoff\|manual-signoff-template\|NEDITOR_RENDERED_EXPORT_SIGNOFF" .tmp/rendered-export-audit/visual-review-summary.json .tmp/rendered-export-audit/viewer-proof.json .tmp/rendered-export-audit/manual-review.html .tmp/rendered-export-audit/visual-review-signoff.template.json` | Pass | Generated audit artifacts include the sign-off template, manual dashboard instructions, summary sign-off link, passing template proof, and skipped completed-signoff proof. |
+| `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the rendered export manual sign-off workflow; all local links resolved. |
+
 Live Google Docs import attempt:
 
 | Command | Result | Evidence |

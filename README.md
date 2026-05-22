@@ -238,8 +238,10 @@ metadata checks, LaTeX source checks, Google Docs import workflow checks, and
 nested Google Docs DOCX checks. It also writes
 `visual-review-summary.json`, which maps export targets and review cases to
 browser screenshots, PDF raster thumbnails, native tool proof, skipped
-host-limitation records, and a deliberately pending human sign-off state. On
-macOS it also extracts DOCX text through
+host-limitation records, and human sign-off state. The audit also writes
+`visual-review-signoff.template.json`; fill a copy and rerun with
+`NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json` to validate completed
+manual native-viewer review. On macOS it also extracts DOCX text through
 `textutil` and attempts a bounded Quick Look PDF thumbnail proof, recording
 either the thumbnail assertion or the host sandbox limitation in
 `viewer-proof.json`. When `pdflatex` is installed, it also compiles the

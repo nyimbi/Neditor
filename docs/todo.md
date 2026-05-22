@@ -1010,9 +1010,14 @@ Current evidence:
   package assertions. It now also writes `visual-review-summary.json`, mapping
   primary targets and review cases to browser screenshot proof, Poppler raster
   proof, macOS native-tool proof, skipped host-limitations, and an explicit
-  `pending-human-review` sign-off state. When Poppler tools are installed, it also verifies PDF
-  metadata and extracted text through `pdfinfo` and `pdftotext`, and renders
-  PNG PDF review thumbnails through `pdftoppm` under
+  `pending-human-review` sign-off state. It also writes
+  `visual-review-signoff.template.json`; completed manual native-viewer review
+  can be validated by rerunning the audit with
+  `NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json`, which checks reviewer
+  metadata, every primary artifact, every review-case target, checklist status,
+  and unresolved blockers before marking the summary `human-reviewed`. When
+  Poppler tools are installed, it also verifies PDF metadata and extracted text
+  through `pdfinfo` and `pdftotext`, and renders PNG PDF review thumbnails through `pdftoppm` under
   `.tmp/rendered-export-audit/raster-proof/` with links in `manual-review.html`.
   When Chromium can launch, it captures visual screenshots for the primary HTML
   export, `manual-review.html`, and the rich-block/option-heavy HTML review

@@ -9,6 +9,9 @@ import { resolvePlaywrightBrowserEnv } from "./playwright-browser-env.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const auditDir = resolve(process.env.NEDITOR_RENDERED_EXPORT_AUDIT_DIR || join(root, ".tmp", "rendered-export-audit"));
+const completedSignoffPath = process.env.NEDITOR_RENDERED_EXPORT_SIGNOFF
+  ? resolve(process.env.NEDITOR_RENDERED_EXPORT_SIGNOFF)
+  : null;
 const requiredFiles = [
   ["rendered-export-audit.html", 1000],
   ["rendered-export-audit.pdf", 1000],
@@ -176,11 +179,14 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
+writeManualSignoffTemplate(auditReport, viewerProof);
+const humanSignoff = collectHumanSignoffEvidence(issues, viewerProof, auditReport);
+
 writeFileSync(
   join(auditDir, "viewer-proof.json"),
   `${JSON.stringify({ generatedAt: new Date().toISOString(), assertions: viewerProof }, null, 2)}\n`,
 );
-writeVisualReviewSummary(auditReport, viewerProof);
+writeVisualReviewSummary(auditReport, viewerProof, humanSignoff);
 writeManualReviewDashboard(auditReport, viewerProof);
 verifyManualReviewDashboard(issues, viewerProof);
 verifyVisualReviewSummary(issues, auditReport, viewerProof);
@@ -871,6 +877,227 @@ function assertMacTextutilDocx(issues, assertions, scope, path, needles) {
   );
 }
 
+function writeManualSignoffTemplate(report, assertions) {
+  const primaryArtifacts = (report.targets || []).map((target) => signoffArtifact(target));
+  const reviewCases = (report.reviewCases || []).map((reviewCase) => ({
+    slug: reviewCase.slug,
+    title: reviewCase.title,
+    requiredEvidence: reviewCase.requiredEvidence || [],
+    targets: (reviewCase.targets || []).map((target) => signoffArtifact(target)),
+    status: "pending",
+    reviewerNotes: "",
+  }));
+  const checklist = (report.manualChecklist || []).map((item, index) => ({
+    id: `check-${String(index + 1).padStart(2, "0")}`,
+    item,
+    status: "pending",
+    reviewerNotes: "",
+  }));
+  const template = {
+    generatedAt: new Date().toISOString(),
+    status: "pending-human-review",
+    instructions: [
+      "Copy this template before editing it.",
+      "Open every primary artifact and review-case target in the relevant native or browser viewer.",
+      "Set each artifact, review case, and checklist status to passed, failed, or skipped-with-reason.",
+      "Set top-level status to human-reviewed only when every non-skipped required item has been reviewed.",
+      "Run NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/completed-signoff.json pnpm run test:rendered-exports to validate the completed sign-off.",
+    ],
+    reviewer: {
+      name: "",
+      role: "",
+      reviewedAt: "",
+      platform: process.platform,
+      nativeViewers: [],
+    },
+    primaryArtifacts,
+    reviewCases,
+    checklist,
+    acceptance: {
+      allPrimaryArtifactsReviewed: false,
+      allReviewCasesReviewed: false,
+      allChecklistItemsReviewed: false,
+      blockers: [],
+      notes: "",
+    },
+  };
+  writeFileSync(join(auditDir, "visual-review-signoff.template.json"), `${JSON.stringify(template, null, 2)}\n`);
+  assertions.push({
+    scope: "manual-signoff-template",
+    assertion: "writes structured manual visual-review sign-off template",
+    passed:
+      primaryArtifacts.length >= 9 &&
+      reviewCases.length >= 2 &&
+      checklist.length >= 7 &&
+      existsSync(join(auditDir, "visual-review-signoff.template.json")),
+    path: "visual-review-signoff.template.json",
+  });
+}
+
+function collectHumanSignoffEvidence(issues, assertions, report) {
+  if (!completedSignoffPath) {
+    const reason =
+      "No completed sign-off supplied; set NEDITOR_RENDERED_EXPORT_SIGNOFF to validate manual native-viewer review.";
+    assertions.push({
+      scope: "human-signoff",
+      assertion: "completed manual visual-review sign-off supplied",
+      passed: false,
+      skipped: true,
+      reason,
+    });
+    return {
+      status: "pending-human-review",
+      reason,
+    };
+  }
+
+  if (!existsSync(completedSignoffPath)) {
+    issues.push(`completed visual review sign-off file does not exist: ${completedSignoffPath}`);
+    assertions.push({
+      scope: "human-signoff",
+      assertion: "completed manual visual-review sign-off supplied",
+      passed: false,
+      reason: "Configured sign-off path does not exist.",
+    });
+    return {
+      status: "pending-human-review",
+      path: completedSignoffPath,
+      reason: "Configured sign-off path does not exist.",
+    };
+  }
+
+  let signoff = null;
+  try {
+    signoff = JSON.parse(readFileSync(completedSignoffPath, "utf8"));
+  } catch (error) {
+    issues.push(`completed visual review sign-off is not valid JSON: ${String(error)}`);
+    assertions.push({
+      scope: "human-signoff",
+      assertion: "completed manual visual-review sign-off is valid JSON",
+      passed: false,
+      reason: String(error),
+    });
+    return {
+      status: "pending-human-review",
+      path: completedSignoffPath,
+      reason: "Configured sign-off file is not valid JSON.",
+    };
+  }
+
+  const validationIssues = validateCompletedSignoff(signoff, report);
+  const passed = validationIssues.length === 0;
+  assertions.push({
+    scope: "human-signoff",
+    assertion: "completed manual visual-review sign-off validates required artifacts, cases, checklist, and reviewer metadata",
+    passed,
+    path: completedSignoffPath,
+    reviewer: signoff.reviewer?.name || "",
+    reviewedAt: signoff.reviewer?.reviewedAt || "",
+    validationIssues,
+  });
+  if (!passed) {
+    for (const issue of validationIssues) issues.push(issue);
+    return {
+      status: "pending-human-review",
+      path: completedSignoffPath,
+      reason: "Completed sign-off was supplied but did not satisfy the audit contract.",
+    };
+  }
+
+  return {
+    status: "human-reviewed",
+    path: completedSignoffPath,
+    reviewer: signoff.reviewer?.name || "",
+    reviewedAt: signoff.reviewer?.reviewedAt || "",
+    reason: "Completed manual native-viewer review sign-off was supplied and validated.",
+  };
+}
+
+function signoffArtifact(target) {
+  return {
+    target: target.target,
+    path: target.path,
+    bytes: target.bytes,
+    sha256: target.sha256,
+    status: "pending",
+    viewer: "",
+    reviewerNotes: "",
+  };
+}
+
+function validateCompletedSignoff(signoff, report) {
+  const validationIssues = [];
+  if (signoff.status !== "human-reviewed") {
+    validationIssues.push("completed sign-off status must be human-reviewed");
+  }
+  if (!signoff.reviewer?.name || !signoff.reviewer?.reviewedAt) {
+    validationIssues.push("completed sign-off must include reviewer.name and reviewer.reviewedAt");
+  }
+  if (Array.isArray(signoff.acceptance?.blockers) && signoff.acceptance.blockers.length > 0) {
+    validationIssues.push("completed sign-off must not contain unresolved blockers");
+  }
+  if (signoff.acceptance?.allPrimaryArtifactsReviewed !== true) {
+    validationIssues.push("completed sign-off must set acceptance.allPrimaryArtifactsReviewed to true");
+  }
+  if (signoff.acceptance?.allReviewCasesReviewed !== true) {
+    validationIssues.push("completed sign-off must set acceptance.allReviewCasesReviewed to true");
+  }
+  if (signoff.acceptance?.allChecklistItemsReviewed !== true) {
+    validationIssues.push("completed sign-off must set acceptance.allChecklistItemsReviewed to true");
+  }
+
+  const requiredTargetKeys = new Set((report.targets || []).map((target) => `${target.target}:${target.path}`));
+  const signedTargetKeys = new Set((signoff.primaryArtifacts || []).map((target) => `${target.target}:${target.path}`));
+  for (const key of requiredTargetKeys) {
+    if (!signedTargetKeys.has(key)) validationIssues.push(`completed sign-off is missing primary artifact ${key}`);
+  }
+  for (const artifact of signoff.primaryArtifacts || []) {
+    validateReviewedStatus(validationIssues, `primary artifact ${artifact.target}:${artifact.path}`, artifact);
+  }
+
+  const requiredReviewCases = new Map((report.reviewCases || []).map((reviewCase) => [reviewCase.slug, reviewCase]));
+  const signedReviewCases = new Map((signoff.reviewCases || []).map((reviewCase) => [reviewCase.slug, reviewCase]));
+  for (const [slug, reviewCase] of requiredReviewCases) {
+    const signedCase = signedReviewCases.get(slug);
+    if (!signedCase) {
+      validationIssues.push(`completed sign-off is missing review case ${slug}`);
+      continue;
+    }
+    validateReviewedStatus(validationIssues, `review case ${slug}`, signedCase);
+    const requiredCaseTargets = new Set((reviewCase.targets || []).map((target) => `${target.target}:${target.path}`));
+    const signedCaseTargets = new Set((signedCase.targets || []).map((target) => `${target.target}:${target.path}`));
+    for (const key of requiredCaseTargets) {
+      if (!signedCaseTargets.has(key)) validationIssues.push(`completed sign-off is missing review case target ${slug}:${key}`);
+    }
+    for (const artifact of signedCase.targets || []) {
+      validateReviewedStatus(validationIssues, `review case target ${slug}:${artifact.target}:${artifact.path}`, artifact);
+    }
+  }
+
+  const requiredChecklistIds = new Set((report.manualChecklist || []).map((_, index) => `check-${String(index + 1).padStart(2, "0")}`));
+  const signedChecklistIds = new Set((signoff.checklist || []).map((item) => item.id));
+  for (const id of requiredChecklistIds) {
+    if (!signedChecklistIds.has(id)) validationIssues.push(`completed sign-off is missing checklist item ${id}`);
+  }
+  for (const item of signoff.checklist || []) {
+    validateReviewedStatus(validationIssues, `checklist item ${item.id}`, item);
+  }
+  return validationIssues;
+}
+
+function validateReviewedStatus(validationIssues, label, item) {
+  const status = item?.status || "";
+  if (!["passed", "failed", "skipped-with-reason"].includes(status)) {
+    validationIssues.push(`${label} must have status passed, failed, or skipped-with-reason`);
+  }
+  if (status === "failed") {
+    validationIssues.push(`${label} is marked failed`);
+  }
+  if (status === "skipped-with-reason" && !item?.reviewerNotes) {
+    validationIssues.push(`${label} is skipped but has no reviewerNotes`);
+  }
+}
+
 function writeManualReviewDashboard(report, assertions) {
   const generatedAt = new Date().toISOString();
   const primaryTargets = (report.targets || [])
@@ -943,6 +1170,7 @@ function writeManualReviewDashboard(report, assertions) {
   <h1>Rendered Export Manual Review</h1>
   <p>Generated ${escapeHtml(generatedAt)} by <code>pnpm run test:rendered-exports</code>.</p>
   <p>This dashboard is a human-review entry point for the generated export package. Open each linked artifact in the relevant native viewer, then use the checklist and proof table below to record manual QA results outside this file if needed.</p>
+  <p>Structured sign-off template: <a href="visual-review-signoff.template.json"><code>visual-review-signoff.template.json</code></a>. To validate a completed review, fill a copy with <code>status: "human-reviewed"</code> and run <code>NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json pnpm run test:rendered-exports</code>.</p>
 
   <h2>Primary Artifacts</h2>
   <table>
@@ -990,6 +1218,8 @@ function verifyManualReviewDashboard(issues, assertions) {
     "review-cases/option-heavy/option-heavy.html",
     "Executable Viewer And Package Proof",
     "Visual Review Thumbnails",
+    "visual-review-signoff.template.json",
+    "NEDITOR_RENDERED_EXPORT_SIGNOFF",
     "macos-quicklook-pdf",
   ];
   for (const scope of ["pdfinfo-primary", "pdftotext-primary", "pdftoppm-primary-page-1"]) {
@@ -1005,7 +1235,7 @@ function verifyManualReviewDashboard(issues, assertions) {
   }
 }
 
-function writeVisualReviewSummary(report, assertions) {
+function writeVisualReviewSummary(report, assertions, humanSignoff) {
   const generatedAt = new Date().toISOString();
   const assertionList = Array.isArray(assertions) ? assertions : [];
   const primaryTargets = (report.targets || []).map((target) => ({
@@ -1050,9 +1280,12 @@ function writeVisualReviewSummary(report, assertions) {
     manualReviewDashboard: "manual-review.html",
     viewerProof: "viewer-proof.json",
     humanSignoff: {
-      status: "pending-human-review",
-      reason:
-        "This automated summary records executable visual/package evidence and host limitations; it does not replace manual review in native viewers.",
+      status: humanSignoff.status,
+      template: "visual-review-signoff.template.json",
+      completedSignoff: humanSignoff.path || null,
+      reviewer: humanSignoff.reviewer || null,
+      reviewedAt: humanSignoff.reviewedAt || null,
+      reason: humanSignoff.reason,
     },
     primaryTargets,
     reviewCases,
@@ -1084,8 +1317,11 @@ function verifyVisualReviewSummary(issues, report, assertions) {
   for (const target of ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"]) {
     if (!targetSet.has(target)) issues.push(`visual-review-summary.json is missing primary target ${target}`);
   }
-  if (summary.humanSignoff?.status !== "pending-human-review") {
-    issues.push("visual-review-summary.json must keep human sign-off marked pending");
+  if (!["pending-human-review", "human-reviewed"].includes(summary.humanSignoff?.status)) {
+    issues.push("visual-review-summary.json has an invalid human sign-off status");
+  }
+  if (summary.humanSignoff?.template !== "visual-review-signoff.template.json") {
+    issues.push("visual-review-summary.json does not link the structured human sign-off template");
   }
   if (summary.manualReviewDashboard !== "manual-review.html" || summary.viewerProof !== "viewer-proof.json") {
     issues.push("visual-review-summary.json does not link the manual dashboard and viewer proof");

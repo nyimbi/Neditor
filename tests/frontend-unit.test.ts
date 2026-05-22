@@ -498,6 +498,20 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
 });
 
+test("rendered export audit exposes structured manual sign-off workflow", () => {
+  const script = readFileSync("scripts/check-rendered-export-audit.mjs", "utf8");
+
+  ok(script.includes("visual-review-signoff.template.json"));
+  ok(script.includes("NEDITOR_RENDERED_EXPORT_SIGNOFF"));
+  ok(script.includes("collectHumanSignoffEvidence"));
+  ok(script.includes("validateCompletedSignoff"));
+  ok(script.includes('"pending-human-review"'));
+  ok(script.includes('"human-reviewed"'));
+  ok(script.includes("allPrimaryArtifactsReviewed"));
+  ok(script.includes("allReviewCasesReviewed"));
+  ok(script.includes("allChecklistItemsReviewed"));
+});
+
 test("desktop WebDriver harness covers native restart and export workflows", () => {
   const script = readFileSync("scripts/run-tauri-webdriver.mjs", "utf8");
 
