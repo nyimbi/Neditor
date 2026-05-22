@@ -374,6 +374,8 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow opened saved real file",
     "native workflow dirtied opened real file",
     "native workflow reverted saved real file",
+    "native workflow reloaded clean external watcher change",
+    "native workflow restored clean watcher reload",
     "native workflow blocked stale save with external conflict",
     "native workflow kept local conflict changes",
     "native workflow saved kept-local conflict changes",
@@ -437,6 +439,7 @@ function validateNativeWorkflowReport(launchReport) {
     if (
       !markdown.includes("Market Entry Report") ||
       markdown.includes("Native smoke revert marker") ||
+      markdown.includes("Native clean watcher reload marker") ||
       markdown.includes("External native conflict edit") ||
       markdown.includes("Local unsaved native conflict edit") ||
       markdown.includes("Keep-local native conflict edit") ||

@@ -920,8 +920,9 @@ Needed desktop smoke coverage:
 - External conflict flow with real file changes. Covered for deterministic
   stale-save mutations in the app-authored native workflow smoke, including
   keep-local plus save, save-copy, merge, accept-external, and restoration.
-  Native watcher-event delivery inside a long-running desktop session remains
-  open.
+  Clean root-file watcher delivery is now covered in the same launched desktop
+  smoke with `watchDriver: native`; included-file native watcher delivery
+  remains open.
 - Export readiness and one real export invocation. Export readiness is covered
   by the app-authored native workflow smoke and the supported-platform WebDriver
   harness; real export invocation is covered by the native command smoke and by
@@ -1252,8 +1253,10 @@ in archived browser workflow run `26145509141`.
 
 Finish:
 
-- Clean external reload for unchanged local documents. Browser archived workflow run
-  `26140882880` covers this for root-file changes.
+- Clean external reload for unchanged local documents. Browser archived
+  workflow run `26140882880` covers this for root-file changes, and the
+  launched native workflow smoke now proves clean root-file reload through
+  `watchDriver: native`.
 - Dirty root-file conflict through UI. Browser archived workflow run `26140882880` covers this
   for watcher-originated root-file changes.
 - Dirty included-file conflict and master recompilation through UI. Browser CI
@@ -1264,10 +1267,11 @@ Finish:
   through compare, save-copy preservation, merge-back recovery with explicit
   line composition controls, keep-local, and accept-external; current-host
   browser execution is now available through the system-Chrome fallback, and
-  the launched native smoke now covers stale-save blocking plus accept-external
-  recovery against a real Markdown file. Remaining work is native watcher-event
-  delivery and manual/modal coverage for save-copy, keep-local, and merge
-  composition in a desktop window.
+  the launched native smoke now covers clean root watcher reload, stale-save
+  blocking, keep-local plus save, save-copy, merge, accept-external, and file
+  restoration against a real Markdown file. Remaining work is included-file
+  native watcher delivery and manual/modal coverage for conflict composition in
+  a desktop window.
 - Multi-tab watcher switching beyond the current tab-activation proof.
 - Stale watcher cleanup when tabs close or paths move beyond current
   recent-path cleanup coverage.

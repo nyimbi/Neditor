@@ -2871,6 +2871,35 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
     JSON.stringify({ filePath: active.value.path, title: active.value.title, dirty: active.value.dirty }),
   );
 
+  const watcherReloadText = `${savedText}\n\nNative clean watcher reload marker.`;
+  await invoke("save_file", { request: { path: filePath, text: watcherReloadText, expected_hash: null } });
+  await waitForNativeWorkflowCondition(
+    () => active.value.path === filePath && active.value.text === watcherReloadText && !active.value.dirty && !store.externalConflict,
+    2000,
+  );
+  record(
+    "native workflow reloaded clean external watcher change",
+    active.value.path === filePath && active.value.text === watcherReloadText && !active.value.dirty && !store.externalConflict,
+    JSON.stringify({
+      title: active.value.title,
+      dirty: active.value.dirty,
+      statusMessage: store.statusMessage,
+      watchDriver: store.watchDriver,
+    }),
+  );
+  await setNativeWorkflowText(savedText);
+  await store.saveActive(filePath);
+  await nextTick();
+  await waitForNativeWorkflowCondition(
+    () => active.value.path === filePath && active.value.text === savedText && !active.value.dirty && !store.externalConflict,
+    800,
+  );
+  record(
+    "native workflow restored clean watcher reload",
+    active.value.path === filePath && active.value.text === savedText && !active.value.dirty && !store.externalConflict,
+    JSON.stringify({ title: active.value.title, dirty: active.value.dirty, statusMessage: store.statusMessage }),
+  );
+
   const externalText = `${savedText}\n\nExternal native conflict edit.`;
   const localText = `${savedText}\n\nLocal unsaved native conflict edit.`;
   await invoke("save_file", { request: { path: filePath, text: externalText, expected_hash: null } });
