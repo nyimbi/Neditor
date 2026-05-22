@@ -376,6 +376,9 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow opened saved real file",
     "native workflow dirtied opened real file",
     "native workflow reverted saved real file",
+    "native workflow created and listed app-data snapshot",
+    "native workflow dirtied document before snapshot restore",
+    "native workflow restored app-data snapshot",
     "native workflow reloaded clean external watcher change",
     "native workflow restored clean watcher reload",
     "native workflow watched included file with native driver",
@@ -488,6 +491,17 @@ function validateNativeWorkflowReport(launchReport) {
   }
   if (!String(payload.previewSnippet || "").includes("Total dose")) {
     issues.push("native workflow report did not include rendered calc preview");
+  }
+  const snapshotEvidence = payload.snapshotEvidence || {};
+  if (
+    snapshotEvidence.created?.storage !== "app-data" ||
+    snapshotEvidence.created?.listed !== true ||
+    snapshotEvidence.created?.label !== "native-smoke" ||
+    !String(snapshotEvidence.created?.snapshotPath || "").endsWith(".md") ||
+    snapshotEvidence.restored?.containsMutation !== false ||
+    !String(snapshotEvidence.restored?.restoredText || "").includes("Market Entry Report")
+  ) {
+    issues.push(`native workflow report did not include app-data snapshot restore evidence: ${JSON.stringify(snapshotEvidence)}`);
   }
   const exportProfileEvidence = payload.exportProfileEvidence || {};
   if (

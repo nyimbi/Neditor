@@ -630,6 +630,9 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow saved document to real file"));
   ok(app.includes("native workflow opened saved real file"));
   ok(app.includes("native workflow reverted saved real file"));
+  ok(app.includes("collectNativeSnapshotEvidence"));
+  ok(app.includes("native workflow created and listed app-data snapshot"));
+  ok(app.includes("native workflow restored app-data snapshot"));
   ok(app.includes("native workflow reloaded clean external watcher change"));
   ok(app.includes("native workflow restored clean watcher reload"));
   ok(app.includes("native workflow watched included file with native driver"));
@@ -675,6 +678,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native UI report did not include command button"));
   ok(smoke.includes("native workflow report did not include passing assertion"));
   ok(smoke.includes("native workflow report did not include mode evidence"));
+  ok(smoke.includes("native workflow report did not include app-data snapshot restore evidence"));
   ok(smoke.includes("native workflow report did not include export profile persistence evidence"));
   ok(smoke.includes("native workflow saved Markdown file was not written"));
   ok(smoke.includes("native workflow included watcher file was not written"));

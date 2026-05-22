@@ -2875,6 +2875,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     record("native workflow starts with NEditor title", document.title.includes("NEditor"), document.title);
 
     const fileWorkflow = await collectNativeFileWorkflowEvidence(record);
+    const snapshotEvidence = await collectNativeSnapshotEvidence(record);
     const modeEvidence = await collectNativeModeEvidence(record);
 
     commandPaletteOpen.value = true;
@@ -2988,6 +2989,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       assertions,
       title: document.title,
       fileWorkflow,
+      snapshotEvidence,
       mode: store.mode,
       sidebar: store.sidebar,
       modeEvidence,
@@ -3007,6 +3009,55 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       title: document.title,
     });
   }
+}
+
+async function collectNativeSnapshotEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const filePath = active.value.path;
+  const originalText = active.value.text;
+  const originalStorage = store.snapshotStorage;
+  if (!filePath) {
+    record("native workflow resolved snapshot source file", false);
+    return null;
+  }
+  store.snapshotStorage = "app-data";
+  await store.persistWorkspace();
+  const created = await store.createSnapshot("native-smoke");
+  await store.listSnapshots();
+  const listedSnapshot = store.snapshots.find((snapshot) => snapshot.snapshot_path === created.snapshot_path);
+  const createdEvidence = {
+    storage: store.snapshotStorage,
+    snapshotPath: created.snapshot_path,
+    listed: Boolean(listedSnapshot),
+    label: listedSnapshot?.label || "",
+    sourcePath: filePath,
+    hash: listedSnapshot?.hash || "",
+  };
+  record(
+    "native workflow created and listed app-data snapshot",
+    Boolean(created.snapshot_path && listedSnapshot?.label === "native-smoke" && listedSnapshot.hash),
+    JSON.stringify(createdEvidence),
+  );
+
+  const mutatedText = `${originalText}\n\nNative snapshot mutation.`;
+  await setNativeWorkflowText(mutatedText);
+  record("native workflow dirtied document before snapshot restore", active.value.text.includes("Native snapshot mutation"), active.value.title);
+  await store.restoreSnapshot(created.snapshot_path);
+  await nextTick();
+  const restoreEvidence = {
+    restoredText: active.value.text.slice(0, 120),
+    containsMutation: active.value.text.includes("Native snapshot mutation"),
+    statusMessage: store.statusMessage,
+    snapshotCount: store.snapshots.length,
+  };
+  record(
+    "native workflow restored app-data snapshot",
+    active.value.text === originalText && !active.value.text.includes("Native snapshot mutation"),
+    JSON.stringify(restoreEvidence),
+  );
+  await store.saveActive(filePath);
+  store.snapshotStorage = originalStorage;
+  await store.persistWorkspace();
+  return { created: createdEvidence, restored: restoreEvidence };
 }
 
 async function collectNativeExportProfileEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
