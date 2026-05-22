@@ -106,6 +106,10 @@ if (issues.length === 0) {
 }
 
 if (issues.length === 0) {
+  collectPdfToolProof(issues, viewerProof, auditReport);
+}
+
+if (issues.length === 0) {
   collectReviewCaseProof(issues, viewerProof, auditReport);
 }
 
@@ -400,6 +404,87 @@ function collectReviewCaseProof(issues, assertions, report) {
   }
 }
 
+function collectPdfToolProof(issues, assertions, report) {
+  const pdfinfo = commandResult("pdfinfo", ["-v"]);
+  const pdftotext = commandResult("pdftotext", ["-v"]);
+  if (pdfinfo.error || pdftotext.error) {
+    assertions.push({
+      scope: "poppler-pdf-tools",
+      assertion: "pdfinfo and pdftotext available",
+      passed: false,
+      skipped: true,
+      reason: "Poppler pdfinfo/pdftotext is not installed on this host",
+    });
+    return;
+  }
+
+  const primaryPdf = join(auditDir, "rendered-export-audit.pdf");
+  assertPdfInfo(issues, assertions, "pdfinfo-primary", primaryPdf, [
+    "Title:           Rendered Export Audit",
+    "Author:          Release QA",
+    "Producer:        NEditor",
+    "Pages:           6",
+    "Page size:",
+    "PDF version:",
+  ]);
+  assertPdfText(issues, assertions, "pdftotext-primary", primaryPdf, [
+    "Rendered Export Audit",
+    "Control summary",
+    "Watermark: APPROVED",
+    "Review Comments",
+    "AI Provenance",
+    "Legal Disclaimer",
+  ]);
+
+  for (const reviewCase of report.reviewCases || []) {
+    const pdfTarget = (reviewCase.targets || []).find((target) => target.target === "pdf");
+    if (!pdfTarget?.path) {
+      issues.push(`rendered review case ${reviewCase.slug} is missing PDF target for Poppler proof`);
+      continue;
+    }
+    const scope = `pdftotext-review-${reviewCase.slug}`;
+    assertPdfText(issues, assertions, scope, join(auditDir, pdfTarget.path), [
+      ...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || []).slice(0, 4)].filter(Boolean)),
+    ]);
+  }
+}
+
+function assertPdfInfo(issues, assertions, scope, path, needles) {
+  const result = spawnSync("pdfinfo", [path], {
+    encoding: "utf8",
+    timeout: 15_000,
+  });
+  if (result.status !== 0) {
+    assertions.push({
+      scope,
+      assertion: "reads PDF metadata through pdfinfo",
+      passed: false,
+      stderr: result.stderr?.trim() || "",
+    });
+    issues.push(`pdfinfo failed to read ${relativeToAudit(path)}`);
+    return;
+  }
+  assertContains(assertions, issues, scope, result.stdout ?? "", needles);
+}
+
+function assertPdfText(issues, assertions, scope, path, needles) {
+  const result = spawnSync("pdftotext", [path, "-"], {
+    encoding: "utf8",
+    timeout: 15_000,
+  });
+  if (result.status !== 0) {
+    assertions.push({
+      scope,
+      assertion: "extracts PDF text through pdftotext",
+      passed: false,
+      stderr: result.stderr?.trim() || "",
+    });
+    issues.push(`pdftotext failed to extract ${relativeToAudit(path)}`);
+    return;
+  }
+  assertContains(assertions, issues, scope, result.stdout ?? "", needles);
+}
+
 function collectMacQuickLookProof(issues, assertions) {
   if (process.platform !== "darwin") return;
   const qlmanage = spawnSync("qlmanage", ["-h"], { stdio: "ignore" });
@@ -636,6 +721,8 @@ function verifyManualReviewDashboard(issues) {
     "review-cases/rich-blocks/rich-blocks.html",
     "review-cases/option-heavy/option-heavy.html",
     "Executable Viewer And Package Proof",
+    "pdfinfo-primary",
+    "pdftotext-primary",
     "macos-quicklook-pdf",
   ]) {
     if (!html.includes(expected)) {
@@ -662,6 +749,14 @@ function assertContains(assertions, issues, scope, text, needles) {
     assertions.push({ scope, assertion: `contains ${needle}`, passed });
     if (!passed) issues.push(`${scope} is missing expected text: ${needle}`);
   }
+}
+
+function commandResult(command, args) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return result;
 }
 
 function assertEntries(assertions, issues, scope, entries, expectedEntries) {
