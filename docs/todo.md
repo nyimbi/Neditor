@@ -905,7 +905,9 @@ Needed desktop smoke coverage:
   `.tmp/desktop-webdriver/report.json` with dependency/assertion evidence. On
   macOS it records an explicit official-platform skip plus the bounded launch
   smoke fallback.
-- New/open/save/save-as with real local files.
+- New/open/save/save-as with real local files. Covered in the app-authored
+  launched-webview smoke for deterministic local file paths; native picker
+  dialog/WebDriver execution remains open.
 - Dirty title/status behavior. Covered on macOS by the app-authored native
   workflow smoke and in the supported-platform WebDriver harness; still needs
   WebDriver execution on Windows/Linux.

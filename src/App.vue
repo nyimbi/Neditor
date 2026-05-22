@@ -2593,6 +2593,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
   try {
     record("native workflow starts with NEditor title", document.title.includes("NEditor"), document.title);
 
+    const fileWorkflow = await collectNativeFileWorkflowEvidence(record);
     const modeEvidence = await collectNativeModeEvidence(record);
 
     commandPaletteOpen.value = true;
@@ -2656,11 +2657,12 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       status: passed ? "passed" : "failed",
       assertions,
       title: document.title,
+      fileWorkflow,
       mode: store.mode,
       sidebar: store.sidebar,
       modeEvidence,
       editorSnippet: smokeSnippetAround(active.value.text, "weight_kg = 72"),
-      previewSnippet: text("#live-preview").slice(0, 800),
+      previewSnippet: text("#live-preview").slice(0, 2000),
       themeAccessibility,
       exportResult,
       exportReadiness: store.exportReadiness
@@ -2685,6 +2687,59 @@ async function runDesktopWorkflowSmokeIfEnabled() {
 
 async function writeDesktopWorkflowSmokeReport(payload: Record<string, unknown>) {
   await invoke("write_desktop_workflow_smoke_report", { payload }).catch(() => undefined);
+}
+
+async function collectNativeFileWorkflowEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const filePath = await invoke<string | null>("desktop_workflow_smoke_file_path", { extension: "md" }).catch(() => null);
+  if (!filePath) {
+    record("native workflow resolved real file path", false);
+    return null;
+  }
+  await store.saveActive(filePath);
+  await nextTick();
+  const savedDocumentId = active.value.id;
+  const savedText = active.value.text;
+  record(
+    "native workflow saved document to real file",
+    active.value.path === filePath && !active.value.dirty && active.value.savedHash.length > 0,
+    JSON.stringify({ filePath, title: active.value.title, dirty: active.value.dirty }),
+  );
+
+  store.newDocument();
+  await nextTick();
+  record(
+    "native workflow created new document",
+    active.value.title === "Untitled" && active.value.dirty && active.value.text.includes("Market Entry Report"),
+    JSON.stringify({ title: active.value.title, dirty: active.value.dirty }),
+  );
+
+  store.closeDocument(savedDocumentId);
+  await nextTick();
+  await store.openPath(filePath);
+  await nextTick();
+  record(
+    "native workflow opened saved real file",
+    active.value.path === filePath && active.value.text === savedText && !active.value.dirty,
+    JSON.stringify({ filePath: active.value.path, title: active.value.title, dirty: active.value.dirty }),
+  );
+
+  store.updateText(`${active.value.text}\n\nNative smoke revert marker.`);
+  await nextTick();
+  record("native workflow dirtied opened real file", active.value.dirty, active.value.title);
+  await store.revertActive();
+  await nextTick();
+  record(
+    "native workflow reverted saved real file",
+    active.value.path === filePath && active.value.text === savedText && !active.value.dirty,
+    JSON.stringify({ filePath: active.value.path, title: active.value.title, dirty: active.value.dirty }),
+  );
+
+  return {
+    filePath,
+    title: active.value.title,
+    recentFiles: store.recentFiles.slice(0, 5),
+    recentlyClosed: store.recentlyClosed.slice(0, 5),
+  };
 }
 
 async function collectNativeModeEvidence(record: (name: string, passed: boolean, detail?: string) => void) {

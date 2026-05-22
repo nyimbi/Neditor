@@ -500,7 +500,11 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("write_desktop_ui_smoke_report"));
   ok(app.includes("desktop_workflow_smoke_enabled"));
   ok(app.includes("write_desktop_workflow_smoke_report"));
+  ok(app.includes("desktop_workflow_smoke_file_path"));
   ok(app.includes("desktop_workflow_smoke_export_path"));
+  ok(app.includes("native workflow saved document to real file"));
+  ok(app.includes("native workflow opened saved real file"));
+  ok(app.includes("native workflow reverted saved real file"));
   ok(app.includes("native workflow inserted calc template into source"));
   ok(app.includes("native workflow prepared html export readiness"));
   ok(app.includes("native workflow wrote html export artifact"));
@@ -525,6 +529,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native UI report did not include command button"));
   ok(smoke.includes("native workflow report did not include passing assertion"));
   ok(smoke.includes("native workflow report did not include mode evidence"));
+  ok(smoke.includes("native workflow saved Markdown file was not written"));
   ok(smoke.includes("native workflow HTML export artifact was not written"));
   ok(smoke.includes("native workflow report did not include theme/accessibility evidence"));
   ok(smoke.includes("native UI report did not include rendered preview identity or content"));

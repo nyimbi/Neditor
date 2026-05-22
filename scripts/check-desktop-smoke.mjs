@@ -11,6 +11,7 @@ const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 6
 const nativeWindowReportPath = join(root, ".tmp", "desktop-smoke", "native-window-report.json");
 const nativeUiReportPath = join(root, ".tmp", "desktop-smoke", "native-ui-report.json");
 const nativeWorkflowReportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-report.json");
+const nativeWorkflowFilePath = join(root, ".tmp", "desktop-smoke", "native-workflow-file.md");
 const nativeWorkflowExportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.html");
 const issues = [];
 
@@ -165,6 +166,7 @@ async function launchDesktop(path) {
     rmSync(nativeWindowReportPath, { force: true });
     rmSync(nativeUiReportPath, { force: true });
     rmSync(nativeWorkflowReportPath, { force: true });
+    rmSync(nativeWorkflowFilePath, { force: true });
     rmSync(nativeWorkflowExportPath, { force: true });
     rmSync(`${nativeWorkflowExportPath}.manifest.json`, { force: true });
     const child = spawn(path, [], {
@@ -365,6 +367,11 @@ function validateNativeWorkflowReport(launchReport) {
   const assertionNames = new Set((payload.assertions || []).filter((assertion) => assertion?.passed === true).map((assertion) => assertion.name));
   for (const assertion of [
     "native workflow starts with NEditor title",
+    "native workflow saved document to real file",
+    "native workflow created new document",
+    "native workflow opened saved real file",
+    "native workflow dirtied opened real file",
+    "native workflow reverted saved real file",
     "native workflow opened command palette",
     "native workflow found dose template",
     "native workflow inserted calc template into source",
@@ -403,6 +410,19 @@ function validateNativeWorkflowReport(launchReport) {
     const entry = modeEvidence.find((candidate) => candidate?.mode === mode);
     if (entry?.sidebar !== sidebar) {
       issues.push(`native workflow report did not route ${mode} mode to ${sidebar} sidebar: ${JSON.stringify(entry)}`);
+    }
+  }
+  const fileWorkflow = payload.fileWorkflow || {};
+  const expectedFilePath = nativeWorkflowFilePath.replaceAll("\\", "/");
+  if (String(fileWorkflow.filePath || "").replaceAll("\\", "/") !== expectedFilePath) {
+    issues.push(`native workflow report did not include real file workflow path: ${JSON.stringify(fileWorkflow)}`);
+  }
+  if (!existsSync(nativeWorkflowFilePath)) {
+    issues.push(`native workflow saved Markdown file was not written: ${relative(nativeWorkflowFilePath)}`);
+  } else {
+    const markdown = readFileSync(nativeWorkflowFilePath, "utf8");
+    if (!markdown.includes("Market Entry Report") || markdown.includes("Native smoke revert marker")) {
+      issues.push("native workflow saved Markdown file did not preserve reverted document content");
     }
   }
   if (!String(payload.editorSnippet || "").includes("weight_kg = 72")) {
