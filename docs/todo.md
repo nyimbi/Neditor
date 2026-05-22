@@ -921,8 +921,8 @@ Needed desktop smoke coverage:
   stale-save mutations in the app-authored native workflow smoke, including
   keep-local plus save, save-copy, merge, accept-external, and restoration.
   Clean root-file watcher delivery is now covered in the same launched desktop
-  smoke with `watchDriver: native`; included-file native watcher delivery
-  remains open.
+  smoke with `watchDriver: native`; included-file native watcher delivery and
+  recompile are also covered in that launched desktop smoke.
 - Export readiness and one real export invocation. Export readiness is covered
   by the app-authored native workflow smoke and the supported-platform WebDriver
   harness; real export invocation is covered by the native command smoke and by
@@ -1261,7 +1261,9 @@ Finish:
   for watcher-originated root-file changes.
 - Dirty included-file conflict and master recompilation through UI. Browser CI
   run `26145509141` covers clean included-file recompile and dirty
-  included-file conflict handling.
+  included-file conflict handling; the launched native workflow smoke now
+  proves clean included-file watcher delivery and master recompilation through
+  `watchDriver: native`.
 - Save-race conflict when a file changes after the last watcher event but
   before save. The local Playwright harness lists the stale-save conflict path
   through compare, save-copy preservation, merge-back recovery with explicit
@@ -1269,9 +1271,8 @@ Finish:
   browser execution is now available through the system-Chrome fallback, and
   the launched native smoke now covers clean root watcher reload, stale-save
   blocking, keep-local plus save, save-copy, merge, accept-external, and file
-  restoration against a real Markdown file. Remaining work is included-file
-  native watcher delivery and manual/modal coverage for conflict composition in
-  a desktop window.
+  restoration against a real Markdown file. Remaining work is manual/modal
+  coverage for conflict composition in a desktop window.
 - Multi-tab watcher switching beyond the current tab-activation proof.
 - Stale watcher cleanup when tabs close or paths move beyond current
   recent-path cleanup coverage.

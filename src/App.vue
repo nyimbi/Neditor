@@ -2900,6 +2900,70 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
     JSON.stringify({ title: active.value.title, dirty: active.value.dirty, statusMessage: store.statusMessage }),
   );
 
+  const includePath = await invoke<string | null>("desktop_workflow_smoke_file_path", { extension: "include" }).catch(() => null);
+  if (includePath) {
+    const includeInitialText = "## Native Include\n\nNative include watcher initial.";
+    const includeUpdatedText = "## Native Include\n\nNative include watcher updated.";
+    const rootWithInclude = `${savedText}\n\n!include ${includePath}\n`;
+    await invoke("save_file", { request: { path: includePath, text: includeInitialText, expected_hash: null } });
+    await setNativeWorkflowText(rootWithInclude);
+    await store.saveActive(filePath);
+    await nextTick();
+    await store.compileActive();
+    await waitForNativeWorkflowCondition(
+      () =>
+        active.value.path === filePath &&
+        !active.value.dirty &&
+        store.watchDriver === "native" &&
+        store.watchedPaths.some((path) => path === includePath) &&
+        Boolean(active.value.compile?.html.includes("Native include watcher initial")),
+      2000,
+    );
+    record(
+      "native workflow watched included file with native driver",
+      active.value.path === filePath &&
+        !active.value.dirty &&
+        store.watchDriver === "native" &&
+        store.watchedPaths.some((path) => path === includePath) &&
+        Boolean(active.value.compile?.html.includes("Native include watcher initial")),
+      JSON.stringify({
+        includePath,
+        watchDriver: store.watchDriver,
+        watchedPaths: store.watchedPaths,
+      }),
+    );
+    await invoke("save_file", { request: { path: includePath, text: includeUpdatedText, expected_hash: null } });
+    await waitForNativeWorkflowCondition(
+      () => Boolean(active.value.compile?.html.includes("Native include watcher updated")) && !active.value.dirty && !store.externalConflict,
+      2000,
+    );
+    record(
+      "native workflow recompiled clean included watcher change",
+      Boolean(active.value.compile?.html.includes("Native include watcher updated")) && !active.value.dirty && !store.externalConflict,
+      JSON.stringify({
+        title: active.value.title,
+        dirty: active.value.dirty,
+        statusMessage: store.statusMessage,
+        watchDriver: store.watchDriver,
+      }),
+    );
+    await setNativeWorkflowText(savedText);
+    await store.saveActive(filePath);
+    await nextTick();
+    await store.compileActive();
+    await waitForNativeWorkflowCondition(
+      () => active.value.path === filePath && active.value.text === savedText && !active.value.dirty && !store.externalConflict,
+      800,
+    );
+    record(
+      "native workflow restored included watcher root",
+      active.value.path === filePath && active.value.text === savedText && !active.value.dirty && !store.externalConflict,
+      JSON.stringify({ title: active.value.title, dirty: active.value.dirty, statusMessage: store.statusMessage }),
+    );
+  } else {
+    record("native workflow resolved included watcher path", false);
+  }
+
   const externalText = `${savedText}\n\nExternal native conflict edit.`;
   const localText = `${savedText}\n\nLocal unsaved native conflict edit.`;
   await invoke("save_file", { request: { path: filePath, text: externalText, expected_hash: null } });
@@ -3002,6 +3066,7 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
   return {
     filePath,
     copyPath,
+    includePath,
     title: active.value.title,
     recentFiles: store.recentFiles.slice(0, 5),
     recentlyClosed: store.recentlyClosed.slice(0, 5),

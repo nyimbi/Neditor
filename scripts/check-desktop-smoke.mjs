@@ -12,6 +12,7 @@ const nativeWindowReportPath = join(root, ".tmp", "desktop-smoke", "native-windo
 const nativeUiReportPath = join(root, ".tmp", "desktop-smoke", "native-ui-report.json");
 const nativeWorkflowReportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-report.json");
 const nativeWorkflowFilePath = join(root, ".tmp", "desktop-smoke", "native-workflow-file.md");
+const nativeWorkflowIncludePath = join(root, ".tmp", "desktop-smoke", "native-workflow-file.include");
 const nativeWorkflowExportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.html");
 const nativeWorkflowCopyPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.md");
 const issues = [];
@@ -168,6 +169,7 @@ async function launchDesktop(path) {
     rmSync(nativeUiReportPath, { force: true });
     rmSync(nativeWorkflowReportPath, { force: true });
     rmSync(nativeWorkflowFilePath, { force: true });
+    rmSync(nativeWorkflowIncludePath, { force: true });
     rmSync(nativeWorkflowExportPath, { force: true });
     rmSync(nativeWorkflowCopyPath, { force: true });
     rmSync(`${nativeWorkflowExportPath}.manifest.json`, { force: true });
@@ -376,6 +378,9 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow reverted saved real file",
     "native workflow reloaded clean external watcher change",
     "native workflow restored clean watcher reload",
+    "native workflow watched included file with native driver",
+    "native workflow recompiled clean included watcher change",
+    "native workflow restored included watcher root",
     "native workflow blocked stale save with external conflict",
     "native workflow kept local conflict changes",
     "native workflow saved kept-local conflict changes",
@@ -432,6 +437,10 @@ function validateNativeWorkflowReport(launchReport) {
   if (String(fileWorkflow.copyPath || "").replaceAll("\\", "/") !== expectedCopyPath) {
     issues.push(`native workflow report did not include local conflict copy path: ${JSON.stringify(fileWorkflow)}`);
   }
+  const expectedIncludePath = nativeWorkflowIncludePath.replaceAll("\\", "/");
+  if (String(fileWorkflow.includePath || "").replaceAll("\\", "/") !== expectedIncludePath) {
+    issues.push(`native workflow report did not include included watcher path: ${JSON.stringify(fileWorkflow)}`);
+  }
   if (!existsSync(nativeWorkflowFilePath)) {
     issues.push(`native workflow saved Markdown file was not written: ${relative(nativeWorkflowFilePath)}`);
   } else {
@@ -440,6 +449,8 @@ function validateNativeWorkflowReport(launchReport) {
       !markdown.includes("Market Entry Report") ||
       markdown.includes("Native smoke revert marker") ||
       markdown.includes("Native clean watcher reload marker") ||
+      markdown.includes("Native include watcher") ||
+      markdown.includes("!include") ||
       markdown.includes("External native conflict edit") ||
       markdown.includes("Local unsaved native conflict edit") ||
       markdown.includes("Keep-local native conflict edit") ||
@@ -447,6 +458,14 @@ function validateNativeWorkflowReport(launchReport) {
       markdown.includes("Merged native conflict edit")
     ) {
       issues.push("native workflow saved Markdown file did not preserve reverted document content");
+    }
+  }
+  if (!existsSync(nativeWorkflowIncludePath)) {
+    issues.push(`native workflow included watcher file was not written: ${relative(nativeWorkflowIncludePath)}`);
+  } else {
+    const included = readFileSync(nativeWorkflowIncludePath, "utf8");
+    if (!included.includes("Native include watcher updated")) {
+      issues.push("native workflow included watcher file did not preserve updated include text");
     }
   }
   if (!existsSync(nativeWorkflowCopyPath)) {
