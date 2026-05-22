@@ -137,10 +137,12 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 47 Chromium browser workbench workflows
+- `pnpm run test:e2e`: passed all 48 Chromium browser workbench workflows
   locally on 2026-05-22 through the system-Chrome fallback because bundled
   Playwright Chromium is missing on this host, including HTML, blog/Substack,
-  LaTeX, and Google Docs export-target handoffs.
+  LaTeX, Google Docs export-target handoffs, and deep keyboard-only operation
+  through tabs, command palette, diagnostics, table editor, conflict merge, and
+  preview focus paths.
 - `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture`:
   passed and proves no-bibliography citation readiness emits a broad source
   warning plus precise per-key missing citation diagnostics that are copied
@@ -736,14 +738,14 @@ wrapper from a terminal/session that permits Chromium launch.
 
 Current host evidence:
 
-- 2026-05-22: `pnpm exec playwright test --list` lists 47 Chromium workflow
+- 2026-05-22: `pnpm exec playwright test --list` lists 48 Chromium workflow
   tests in `e2e/app-workflows.spec.ts`.
 - 2026-05-22: `pnpm run check:e2e-env` passes the focused workbench boot
   workflow through the system-Chrome fallback because bundled Playwright
   Chromium is missing on this host.
-- 2026-05-22: `pnpm run test:e2e` passed all 47 Chromium browser workflows,
+- 2026-05-22: `pnpm run test:e2e` passed all 48 Chromium browser workflows,
   including the HTML, blog/Substack, LaTeX, and Google Docs export-target
-  handoff tests.
+  handoff tests plus deep keyboard-only workbench operation.
 
 Current browser coverage in `e2e/app-workflows.spec.ts`:
 
@@ -1581,13 +1583,20 @@ Current evidence:
   semantics: CodeMirror content is a named multiline textbox, and the rendered
   preview article is a focusable named document. The static accessibility guard
   checks those contracts, and the boot workflow harness asserts them.
+- The browser workflow `supports keyboard-only operation for deep workbench
+  controls` now exercises keyboard activation/focus across document tabs, the
+  command palette result list, diagnostics source jumps, focusable preview
+  documents, table-editor cells/actions, stale-save conflict compare entry,
+  conflict modal Tab wrapping, merge-line add/reorder/remove controls, Escape
+  close, and focus restoration.
 
 Finish:
 
-- Complete keyboard-only navigation through tabs, modals, command palette,
-  table editor, conflict UI, and deeper editor/preview interactions.
+- Complete remaining manual keyboard-only and screen-reader review beyond the
+  executable browser coverage, especially native desktop and assistive
+  technology traversal.
 - Keep modal focus workflows in the full local browser suite and broaden
-  coverage for nested conflict/table-editor controls.
+  coverage for additional nested conflict/table-editor permutations.
 - ARIA labels and roles for custom controls.
 - Broader keyboard and screen-reader testing for deeper editor/preview
   interactions.

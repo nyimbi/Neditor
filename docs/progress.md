@@ -81,6 +81,12 @@ Recent pushed checkpoints visible in current git history:
   version, source-hash, author/approval metadata, description fallback, and
   canonical links when present; focused Rust export tests and the rendered
   export audit cover the contract.
+- This update deepens accessibility proof with a focused keyboard-only browser
+  workflow. The workflow covers document-tab switching, command-palette result
+  selection, diagnostics source jumps, preview document focus, table-editor
+  cells/actions, stale-save conflict compare, conflict-modal Tab wrapping,
+  merge-line add/reorder/remove controls, Escape close, and focus restoration
+  through the system-Chrome Playwright fallback.
 - This update fixes the native keep-local conflict path. Choosing keep-local for
   a root-file conflict now acknowledges the exact external hash that was
   reviewed, so the next save deliberately overwrites that known revision instead
@@ -166,12 +172,13 @@ Recent pushed checkpoints visible in current git history:
   the evidence under `.tmp/rendered-export-audit/office-preview/`, and maps it
   into `viewer-proof.json`, `manual-review.html`, and `visual-review-summary.json`.
 - This update makes browser workflow execution current-host evidence instead
-  of stale archived evidence. `pnpm run test:e2e` now passes all 47 Chromium
+  of stale archived evidence. `pnpm run test:e2e` now passes all 48 Chromium
   workbench workflows locally through the system-Chrome fallback when bundled
   Playwright Chromium is missing, including editor/preview typing, settings persistence, command
   palette navigation, responsive desktop/narrow layout proof, fold/unfold controls, file/save/rename/reveal flows, snapshots, workspace
   restore, stale-save conflicts, include watchers, AI governance, and export
-  readiness/success/failure, transform template management, plus browser UI handoff coverage for blog,
+  readiness/success/failure, transform template management, deep keyboard-only
+  workbench operation, plus browser UI handoff coverage for blog,
   Substack, LaTeX, and Google Docs package targets.
 - This update fixes workflow bugs found by that browser run: command-palette
   editor commands now regain editor focus after the modal closes, CodeMirror
@@ -672,7 +679,7 @@ P0 gaps:
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in that retired workflow.
-- Browser-level workflow tests now pass locally with 47 Chromium tests through
+- Browser-level workflow tests now pass locally with 48 Chromium tests through
   `pnpm run test:e2e`. The current macOS proof used the system-Chrome fallback
   because bundled Playwright Chromium is missing on this host, and
   `.tmp/e2e-browser/report.json` records `source: system-chromium`, the Chrome
@@ -742,9 +749,9 @@ Current verification recorded on 2026-05-21 and 2026-05-22:
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
-| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 47 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 48 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host by falling back from the missing Playwright bundled Chromium path to `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; `.tmp/e2e-environment/report.json` records `source: system-chromium`, the expected bundled path, and the passing command tail. |
-| `pnpm run test:e2e` | Pass | 47 Chromium browser workbench workflows passed locally on this host, including responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, and blog/Substack/LaTeX/Google Docs target handoffs. |
+| `pnpm run test:e2e` | Pass | 48 Chromium browser workbench workflows passed locally on this host, including responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |

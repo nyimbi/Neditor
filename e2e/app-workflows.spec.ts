@@ -1328,6 +1328,117 @@ test("manages modal focus and Escape return paths", async ({ page }) => {
   await expect(commandsButton).toBeFocused();
 });
 
+test("supports keyboard-only operation for deep workbench controls", async ({ page }) => {
+  const newButton = page.getByRole("button", { name: "New", exact: true });
+  await newButton.focus();
+  await expect(newButton).toBeFocused();
+  await newButton.press("Space");
+  await expect(page.locator(".document-tabs .tab")).toHaveCount(2);
+  await expect(page.locator(".document-tabs .tab.active").getByRole("button", { name: "Unsaved Market Entry Report" })).toBeVisible();
+
+  const marketTab = page.locator(".document-tabs .tab").first().getByRole("button", { name: "Market Entry Report" });
+  await marketTab.focus();
+  await expect(marketTab).toBeFocused();
+  await marketTab.press("Space");
+  await expect(page.locator(".document-tabs .tab").first()).toHaveClass(/active/);
+
+  const commandsButton = page.getByRole("button", { name: "Commands" });
+  await commandsButton.focus();
+  await expect(commandsButton).toBeFocused();
+  await commandsButton.press("Space");
+  const commandDialog = page.getByRole("dialog", { name: "Command palette" });
+  await expect(commandDialog).toBeVisible();
+  await expect(page.getByLabel("Search commands, headings, citations, glossary, and index terms")).toBeFocused();
+  await page.keyboard.type("Show document outline");
+  await page.keyboard.press("Tab");
+  await expect(commandDialog.getByRole("button", { name: /Show document outline Navigate/ })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(commandDialog).toBeHidden();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("outline");
+
+  const diagnosticDocument = [
+    "---",
+    "title: Keyboard Diagnostics",
+    "status: draft",
+    "---",
+    "",
+    "# Keyboard Diagnostics",
+    "",
+    "This line contains DIAGNOSTIC_TARGET for keyboard navigation.",
+  ].join("\n");
+  await setMockFileText(page, "/workspace/keyboard-diagnostics.md", diagnosticDocument);
+  await queueDialogSelection(page, "/workspace/keyboard-diagnostics.md");
+  await page.getByRole("button", { name: "Open", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await page.getByLabel("Sidebar panel").selectOption("diagnostics");
+
+  const diagnosticsList = page.getByRole("list", { name: "Compiler diagnostics" });
+  const diagnostic = diagnosticsList.getByRole("listitem", { name: /warning diagnostic: Mock diagnostic target needs review/ });
+  const diagnosticJump = diagnostic.getByRole("button", { name: "Go to source" });
+  await diagnosticJump.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".cm-line").filter({ hasText: "DIAGNOSTIC_TARGET" })).toBeVisible();
+
+  await page.getByRole("document", { name: /Rendered preview for Keyboard Diagnostics, draft/ }).focus();
+  await expect(page.getByRole("document", { name: /Rendered preview for Keyboard Diagnostics, draft/ })).toBeFocused();
+
+  await page.getByLabel("Sidebar panel").selectOption("tables");
+  const newTableButton = page.getByRole("button", { name: "New table" });
+  await newTableButton.focus();
+  await page.keyboard.press("Enter");
+  await page.getByLabel("Caption").fill("Keyboard budget");
+  await page.getByLabel("Item, row 1, column A").focus();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.keyboard.type("Travel");
+  await page.getByLabel("Value, row 1, column B").focus();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.keyboard.type("450");
+  const totalsButton = page.getByRole("button", { name: "Add totals row" });
+  await totalsButton.focus();
+  await page.keyboard.press("Enter");
+  const insertTableButton = page.getByRole("button", { name: "Insert table" });
+  await insertTableButton.focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => editorText(page)).toContain("Table: Keyboard budget");
+  await expect.poll(() => editorText(page)).toContain("Travel");
+
+  await queueDialogSelection(page, "/workspace/keyboard-diagnostics.md");
+  await page.getByRole("button", { name: "Open", exact: true }).focus();
+  await page.keyboard.press("Space");
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
+  await setMockFileText(page, "/workspace/keyboard-diagnostics.md", externalApprovedDocument());
+  await page.getByRole("button", { name: "Save", exact: true }).focus();
+  await page.keyboard.press("Space");
+
+  const compareButton = page.locator(".status-bar .conflict-actions").getByRole("button", { name: "Compare" });
+  await compareButton.focus();
+  await page.keyboard.press("Space");
+  const conflictDialog = page.getByRole("dialog", { name: "External file conflict" });
+  await expect(conflictDialog).toBeVisible();
+  await expect(conflictDialog.getByLabel("Close external file conflict")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(conflictDialog.getByRole("button", { name: "Accept external" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(conflictDialog.getByLabel("Close external file conflict")).toBeFocused();
+
+  await conflictDialog.getByRole("button", { name: "Add external line 3 to merge" }).focus();
+  await page.keyboard.press("Space");
+  await conflictDialog.getByRole("button", { name: "Add external line 8 to merge" }).focus();
+  await page.keyboard.press("Space");
+  await expect(conflictDialog.getByLabel("Merged result")).toHaveValue("status: approved\nExternal disk edit.");
+  await conflictDialog.getByRole("button", { name: "Move external line 8 up" }).focus();
+  await page.keyboard.press("Space");
+  await expect(conflictDialog.getByLabel("Merged result")).toHaveValue("External disk edit.\nstatus: approved");
+  await conflictDialog.getByRole("button", { name: "Remove external line 8" }).focus();
+  await page.keyboard.press("Space");
+  await expect(conflictDialog.getByLabel("Merged result")).toHaveValue("status: approved");
+  await conflictDialog.getByLabel("Close external file conflict").focus();
+  await page.keyboard.press("Escape");
+  await expect(conflictDialog).toBeHidden();
+  await expect(compareButton).toBeFocused();
+});
+
 test("exposes status and progress messages as live regions", async ({ page }) => {
   const statusBar = page.locator("#document-status");
   await expect(statusBar).toHaveAttribute("aria-label", "Document status and progress");
