@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,9 @@ const required = process.argv.includes("--strict") || process.env.NEDITOR_TAURI_
 const timeoutMs = Number(process.env.NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS || 30_000);
 const application = desktopBinaryPath();
 const reportPath = join(root, ".tmp", "desktop-webdriver", "report.json");
+const workflowReportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-report.json");
+const workflowExportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-export.html");
+const workflowExportManifestPath = `${workflowExportPath}.manifest.json`;
 const macosUnsupportedMessage =
   "Official Tauri WebDriver currently supports desktop automation on Windows and Linux only; macOS has no WKWebView driver in that stack.";
 const webdriverWorkflowPlan = [
@@ -19,6 +22,7 @@ const webdriverWorkflowPlan = [
   "native title exposes dirty document state",
   "desktop template insertion reaches editor and preview",
   "desktop export readiness returns manifest progress evidence",
+  "desktop WebDriver writes HTML export through dialog-free smoke path",
   "desktop preferences persist across WebDriver restart",
 ];
 const report = {
@@ -32,8 +36,10 @@ const report = {
   status: "pending",
   supportedDesktopPlatforms: ["linux", "win32"],
   workflowPlan: webdriverWorkflowPlan,
+  workflowSmokeReport: relative(workflowReportPath),
   dependencies: [],
   assertions: [],
+  exportArtifacts: null,
   skippedReason: null,
   fallback: null,
 };
@@ -102,9 +108,16 @@ try {
 }
 
 async function runWebDriverSmoke() {
+  rmSync(workflowExportPath, { force: true });
+  rmSync(workflowExportManifestPath, { force: true });
+  rmSync(workflowReportPath, { force: true });
+
   tauriDriver = spawn("tauri-driver", [], {
     cwd: root,
-    env: process.env,
+    env: {
+      ...process.env,
+      NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT: workflowReportPath,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -132,6 +145,7 @@ async function runWebDriverSmoke() {
     await assertDirtyTitleWorkflow(session);
     await assertTransformTemplateWorkflow(session);
     await assertExportReadinessWorkflow(session);
+    await assertHtmlExportWriteWorkflow(session);
     originalPreferences = await readDesktopPreferences(session);
     session = await assertPreferenceRestartWorkflow(session, originalPreferences);
   } finally {
@@ -304,6 +318,66 @@ async function assertExportReadinessWorkflow(session) {
     throw new Error(`export readiness manifest did not include progress evidence: ${JSON.stringify(readiness)}`);
   }
   recordAssertion("desktop export readiness returns manifest progress evidence");
+}
+
+async function assertHtmlExportWriteWorkflow(session) {
+  await showSidebar(session, "exports", "Target");
+  await execute(session, `
+    const controlByLabel = ${controlByLabelScript};
+    const target = controlByLabel('Target', 'select');
+    target.value = 'html';
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
+    const exportButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Export HTML');
+    if (!exportButton) throw new Error('Export HTML button was not visible in the desktop export panel');
+    exportButton.click();
+    return true;
+  `);
+  const expectedOutput = workflowExportPath.replaceAll("\\", "/");
+  const expectedManifest = workflowExportManifestPath.replaceAll("\\", "/");
+  const result = await waitForValue(
+    session,
+    `
+      return {
+        output: document.querySelector('.export-result')?.textContent || '',
+        status: document.querySelector('.status-bar')?.textContent || '',
+        progress: [...document.querySelectorAll('[aria-label="Last export progress"] li')].map((item) => item.textContent.trim()),
+        diagnostics: [...document.querySelectorAll('.export-result .diagnostic')].map((item) => item.textContent.trim()),
+      };
+    `,
+    (value) =>
+      String(value?.output || "").replaceAll("\\", "/").includes(expectedOutput) &&
+      String(value?.output || "").replaceAll("\\", "/").includes(expectedManifest) &&
+      Array.isArray(value?.progress) &&
+      value.progress.some((step) => step.includes("Render") && step.includes("complete")) &&
+      !String(value?.output || "").includes("error"),
+    "written HTML export result",
+  );
+
+  if (!existsSync(workflowExportPath)) {
+    throw new Error(`desktop WebDriver HTML export artifact was not written: ${relative(workflowExportPath)}`);
+  }
+  if (!existsSync(workflowExportManifestPath)) {
+    throw new Error(`desktop WebDriver HTML export manifest was not written: ${relative(workflowExportManifestPath)}`);
+  }
+  const html = readFileSync(workflowExportPath, "utf8");
+  if (!html.includes("Market Entry Report") || !html.includes("Total dose")) {
+    throw new Error(`desktop WebDriver HTML export did not include expected document/template content: ${relative(workflowExportPath)}`);
+  }
+  const manifest = JSON.parse(readFileSync(workflowExportManifestPath, "utf8"));
+  if (manifest.export_target !== "html" || !manifest.output_hash) {
+    throw new Error(`desktop WebDriver HTML export manifest did not include target/hash evidence: ${JSON.stringify(manifest)}`);
+  }
+  report.exportArtifacts = {
+    outputPath: relative(workflowExportPath),
+    manifestPath: relative(workflowExportManifestPath),
+    outputBytes: statSync(workflowExportPath).size,
+    manifestBytes: statSync(workflowExportManifestPath).size,
+    target: manifest.export_target,
+    outputHash: manifest.output_hash,
+    progressEvidence: result.progress,
+  };
+  recordAssertion("desktop WebDriver writes HTML export through dialog-free smoke path");
 }
 
 async function assertPreferenceRestartWorkflow(session, originalPreferences) {

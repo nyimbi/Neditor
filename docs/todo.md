@@ -909,11 +909,13 @@ Needed desktop smoke coverage:
   script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native
   title/shell commands, switches view mode, opens the command palette, checks a
-  dirty native title, runs export readiness, and verifies selected preferences
-  persist across a desktop session restart before restoring them. It writes
-  `.tmp/desktop-webdriver/report.json` with dependency/assertion evidence. On
-  macOS it records an explicit official-platform skip plus the bounded launch
-  smoke fallback.
+  dirty native title, inserts a Science calc template to source/preview, runs
+  export readiness, writes a real HTML export through the guarded dialog-free
+  smoke path, validates the sidecar manifest/output hash, and verifies selected
+  preferences persist across a desktop session restart before restoring them. It
+  writes `.tmp/desktop-webdriver/report.json` with dependency/assertion/export
+  artifact evidence. On macOS it records an explicit official-platform skip plus
+  the bounded launch smoke fallback.
 - New/open/save/save-as with real local files. Covered in the app-authored
   launched-webview smoke for deterministic local file paths; native picker
   dialog/WebDriver execution remains open.
