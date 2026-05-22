@@ -372,10 +372,13 @@ function validateNativeWorkflowReport(launchReport) {
   for (const assertion of [
     "native workflow starts with NEditor title",
     "native workflow saved document to real file",
+    "native workflow save cleared native title",
     "native workflow created new document",
     "native workflow opened saved real file",
     "native workflow dirtied opened real file",
+    "native workflow dirtied native title for opened real file",
     "native workflow reverted saved real file",
+    "native workflow revert cleared native title",
     "native workflow created and listed app-data snapshot",
     "native workflow dirtied document before snapshot restore",
     "native workflow restored app-data snapshot",

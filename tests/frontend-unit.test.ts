@@ -628,8 +628,11 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("desktop_workflow_smoke_export_path"));
   ok(app.includes("emit_desktop_workflow_smoke_menu_command"));
   ok(app.includes("native workflow saved document to real file"));
+  ok(app.includes("native workflow save cleared native title"));
   ok(app.includes("native workflow opened saved real file"));
+  ok(app.includes("native workflow dirtied native title for opened real file"));
   ok(app.includes("native workflow reverted saved real file"));
+  ok(app.includes("native workflow revert cleared native title"));
   ok(app.includes("collectNativeSnapshotEvidence"));
   ok(app.includes("native workflow created and listed app-data snapshot"));
   ok(app.includes("native workflow restored app-data snapshot"));

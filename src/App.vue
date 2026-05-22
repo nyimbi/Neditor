@@ -3203,12 +3203,18 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
   }
   await store.saveActive(filePath);
   await nextTick();
+  await waitForNativeWorkflowCondition(() => !document.title.startsWith("* ") && document.title.includes(active.value.title), 800);
   const savedDocumentId = active.value.id;
   const savedText = active.value.text;
   record(
     "native workflow saved document to real file",
     active.value.path === filePath && !active.value.dirty && active.value.savedHash.length > 0,
     JSON.stringify({ filePath, title: active.value.title, dirty: active.value.dirty }),
+  );
+  record(
+    "native workflow save cleared native title",
+    !document.title.startsWith("* ") && document.title.includes(active.value.title),
+    JSON.stringify({ documentTitle: document.title, activeTitle: active.value.title, dirty: active.value.dirty }),
   );
 
   store.newDocument();
@@ -3231,17 +3237,28 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
 
   await setNativeWorkflowText(`${active.value.text}\n\nNative smoke revert marker.`);
   record("native workflow dirtied opened real file", active.value.dirty, active.value.title);
+  await waitForNativeWorkflowCondition(() => document.title.startsWith("* "), 800);
+  record(
+    "native workflow dirtied native title for opened real file",
+    document.title.startsWith("* ") && document.title.includes(active.value.title),
+    JSON.stringify({ documentTitle: document.title, activeTitle: active.value.title, dirty: active.value.dirty }),
+  );
   await store.revertActive();
   await nextTick();
   previewTextCommit.cancel();
   await waitForNativeWorkflowCondition(
-    () => active.value.path === filePath && active.value.text === savedText && !active.value.dirty,
+    () => active.value.path === filePath && active.value.text === savedText && !active.value.dirty && !document.title.startsWith("* "),
     800,
   );
   record(
     "native workflow reverted saved real file",
     active.value.path === filePath && active.value.text === savedText && !active.value.dirty,
     JSON.stringify({ filePath: active.value.path, title: active.value.title, dirty: active.value.dirty }),
+  );
+  record(
+    "native workflow revert cleared native title",
+    !document.title.startsWith("* ") && document.title.includes(active.value.title),
+    JSON.stringify({ documentTitle: document.title, activeTitle: active.value.title, dirty: active.value.dirty }),
   );
 
   const watcherReloadText = `${savedText}\n\nNative clean watcher reload marker.`;

@@ -2473,6 +2473,13 @@ Native project-local snapshot verification:
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Launched native smoke validates both app-data and project-local snapshot create/list/restore flows, including `.neditor/snapshots` path evidence for the project-local snapshot and mutation removal after restore. |
 | `rg -n "native workflow created and listed project-local snapshot\|native workflow restored project-local snapshot\|native-project-smoke\|/.neditor/snapshots" .tmp/desktop-smoke/native-workflow-report.json .tmp/desktop-smoke/launch-report.json` | Pass | Native desktop workflow evidence records project-local snapshot creation/listing with label `native-project-smoke`, `.neditor/snapshots` storage, and restoration after a mutation. |
 
+Native title-state verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Launched native smoke validates title state across real file save, dirty edit, revert, and later template insertion, so save/revert clear the native dirty marker while edit/template mutations add it. |
+| `rg -n "native workflow save cleared native title\|native workflow dirtied native title for opened real file\|native workflow revert cleared native title\|native workflow exposed dirty title" .tmp/desktop-smoke/native-workflow-report.json .tmp/desktop-smoke/launch-report.json` | Pass | Native workflow reports include clean-title evidence after save, dirty-title evidence after editing an opened real file, clean-title evidence after revert, and dirty-title evidence after inserting a calc template. |
+
 Live Google Docs import attempt:
 
 | Command | Result | Evidence |
