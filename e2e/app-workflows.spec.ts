@@ -60,6 +60,13 @@ async function installTauriMock(page: Page, stateKey: string) {
     const revealedPaths: string[] = [];
     let callbackId = 1;
     let storeId = 1;
+    let compileDelayMs = 0;
+
+    function delay(ms: number) {
+      return new Promise((resolve) => {
+        window.setTimeout(resolve, ms);
+      });
+    }
 
     function persistE2eState() {
       try {
@@ -751,6 +758,7 @@ async function installTauriMock(page: Page, stateKey: string) {
       }
       if (cmd === "compile_document_with_options") {
         const request = args.request as { text: string; file_path?: string | null };
+        if (compileDelayMs > 0) await delay(compileDelayMs);
         return compileMarkdown(request.text, request.file_path || "/workspace/market.md");
       }
       if (cmd === "list_transform_engines") return mockTransformEngines();
@@ -1057,6 +1065,9 @@ async function installTauriMock(page: Page, stateKey: string) {
       queueConfirmResponse(value: boolean) {
         confirmResponses.push(value);
       },
+      setCompileDelay(value: number) {
+        compileDelayMs = Math.max(0, Number(value) || 0);
+      },
       getFile(path: string) {
         return readMockFile(path).text;
       },
@@ -1127,6 +1138,10 @@ async function queueDialogSelection(page: Page, path: string | null) {
 
 async function queueConfirmResponse(page: Page, value: boolean) {
   await page.evaluate((response) => window.__NEDITOR_E2E__.queueConfirmResponse(response), value);
+}
+
+async function setCompileDelay(page: Page, value: number) {
+  await page.evaluate((delayMs) => window.__NEDITOR_E2E__.setCompileDelay(delayMs), value);
 }
 
 async function mockFileText(page: Page, path: string) {
@@ -1268,6 +1283,27 @@ test("exposes status and progress messages as live regions", async ({ page }) =>
   await expect(statusBar.locator(".status-message")).toHaveAttribute("aria-live", "polite");
   await expect(statusBar.locator(".status-message")).toHaveAttribute("aria-atomic", "true");
   await expect(statusBar.locator(".word-stats")).toHaveAttribute("aria-label", /Document statistics:/);
+});
+
+test("cancels a pending preview compile and resumes editing", async ({ page }) => {
+  await setCompileDelay(page, 1200);
+
+  const editorContent = page.locator(".cm-content");
+  await editorContent.click();
+  await moveEditorCursorToEnd(page);
+  await page.keyboard.type("\n\n## Cancelled Compile Target\nThis preview update should be cancelled.");
+
+  const compileStatus = page.getByRole("status", { name: /Compile progress: Compiling preview/ });
+  await expect(compileStatus).toBeVisible();
+  await compileStatus.getByRole("button", { name: "Cancel compile" }).click();
+  await expect(page.locator(".status-bar")).toContainText("Cancelled preview compile");
+  await expect(page.getByRole("button", { name: "Cancel compile" })).toBeHidden();
+
+  await setCompileDelay(page, 0);
+  await editorContent.click();
+  await moveEditorCursorToEnd(page);
+  await page.keyboard.type("\n\nCompile resumes after cancellation.");
+  await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Compile resumes after cancellation.");
 });
 
 test("syncs editor and preview scrolling and jumps preview headings to source", async ({ page }) => {
