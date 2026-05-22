@@ -435,6 +435,8 @@ test("transform template library covers reusable calculations and custom templat
 
 test("workbench command bar exposes icon display controls and workflow groups", () => {
   const app = readFileSync("src/App.vue", "utf8");
+  const store = readFileSync("src/stores/documents.ts", "utf8");
+  const types = readFileSync("src/types.ts", "utf8");
 
   ok(app.includes(':data-toolbar-display="store.toolbarDisplay"'));
   ok(app.includes('aria-label="Toolbar button display"'));
@@ -448,6 +450,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
     ok(app.includes(`${icon}: [`), `missing ${icon} icon path`);
   }
   ok(app.includes('store.sidebar === \'templates\''));
+  ok(types.includes("savedText?: string"));
+  ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
+  ok(store.includes("doc.savedText = response.text"));
 });
 
 test("local verification scripts expose local baseline checks", () => {

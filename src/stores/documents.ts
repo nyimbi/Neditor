@@ -305,6 +305,7 @@ export const useDocumentsStore = defineStore("documents", {
         title: "Untitled",
         text: starterDocument,
         savedHash: fallbackHash(starterDocument),
+        savedText: starterDocument,
         dirty: true,
       },
     ] as OpenDocument[],
@@ -591,6 +592,7 @@ export const useDocumentsStore = defineStore("documents", {
             title: titleFromPath(response.path),
             text: response.text,
             savedHash: response.hash,
+            savedText: response.text,
             dirty: false,
             pinned: pinnedFiles.includes(response.path),
             modified: response.modified,
@@ -622,6 +624,7 @@ export const useDocumentsStore = defineStore("documents", {
         title: "Untitled",
         text: starterDocument,
         savedHash: fallbackHash(starterDocument),
+        savedText: starterDocument,
         dirty: true,
       };
       this.documents.push(document);
@@ -643,6 +646,7 @@ export const useDocumentsStore = defineStore("documents", {
         title: titleFromPath(response.path),
         text: response.text,
         savedHash: response.hash,
+        savedText: response.text,
         dirty: false,
         modified: response.modified,
       };
@@ -757,6 +761,7 @@ export const useDocumentsStore = defineStore("documents", {
       doc.path = response.path;
       doc.title = titleFromPath(response.path);
       doc.savedHash = response.hash;
+      doc.savedText = response.text;
       doc.modified = response.modified;
       doc.dirty = false;
       this.clearIgnoredConflicts();
@@ -772,6 +777,7 @@ export const useDocumentsStore = defineStore("documents", {
       if (!doc.path) {
         doc.text = starterDocument;
         doc.savedHash = fallbackHash(starterDocument);
+        doc.savedText = starterDocument;
         doc.dirty = true;
         await this.compileActive();
         this.statusMessage = "Reverted untitled document to starter content";
@@ -782,6 +788,7 @@ export const useDocumentsStore = defineStore("documents", {
       });
       doc.text = response.text;
       doc.savedHash = response.hash;
+      doc.savedText = response.text;
       doc.modified = response.modified;
       doc.dirty = false;
       this.statusMessage = `Reverted ${doc.title} to saved content`;
@@ -820,6 +827,7 @@ export const useDocumentsStore = defineStore("documents", {
         title: titleFromPath(response.path),
         text: response.text,
         savedHash: response.hash,
+        savedText: response.text,
         dirty: false,
         modified: response.modified,
       };
@@ -839,7 +847,7 @@ export const useDocumentsStore = defineStore("documents", {
     updateText(text: string) {
       const doc = this.activeDocument;
       doc.text = text;
-      doc.dirty = fallbackHash(text) !== doc.savedHash;
+      doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash;
       void this.compileActive();
     },
     async compileActive() {
@@ -1079,6 +1087,7 @@ export const useDocumentsStore = defineStore("documents", {
         const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path: targetDoc.path });
         targetDoc.text = response.text;
         targetDoc.savedHash = response.hash;
+        targetDoc.savedText = response.text;
         targetDoc.modified = response.modified;
         targetDoc.dirty = false;
         this.externalConflict = null;
@@ -1104,6 +1113,7 @@ export const useDocumentsStore = defineStore("documents", {
         });
         doc.text = response.text;
         doc.savedHash = response.hash;
+        doc.savedText = response.text;
         doc.modified = response.modified;
         doc.dirty = false;
         this.statusMessage = "Accepted external file changes";
@@ -1141,6 +1151,7 @@ export const useDocumentsStore = defineStore("documents", {
       await this.snapshotBeforeDestructiveAction("pre-conflict-merge");
       doc.text = text;
       doc.savedHash = conflict.externalHash;
+      doc.savedText = conflict.externalText || "";
       doc.dirty = text !== (conflict.externalText || "");
       this.externalHash = conflict.externalHash;
       this.externalConflict = null;
@@ -1554,6 +1565,7 @@ export const useDocumentsStore = defineStore("documents", {
       const doc = this.activeDocument;
       doc.text = response.text;
       doc.savedHash = response.hash;
+      doc.savedText = undefined;
       doc.dirty = true;
       this.statusMessage = `Restored revision ${revision.slice(0, 12)}`;
       await this.compileActive();

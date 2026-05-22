@@ -374,6 +374,7 @@ export interface OpenDocument {
   title: string;
   text: string;
   savedHash: string;
+  savedText?: string;
   dirty: boolean;
   pinned?: boolean;
   modified?: string | null;

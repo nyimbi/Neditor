@@ -2723,13 +2723,15 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
     JSON.stringify({ filePath: active.value.path, title: active.value.title, dirty: active.value.dirty }),
   );
 
-  store.updateText(`${active.value.text}\n\nNative smoke revert marker.`);
-  await nextTick();
-  previewTextCommit.cancel();
+  await setNativeWorkflowText(`${active.value.text}\n\nNative smoke revert marker.`);
   record("native workflow dirtied opened real file", active.value.dirty, active.value.title);
   await store.revertActive();
   await nextTick();
   previewTextCommit.cancel();
+  await waitForNativeWorkflowCondition(
+    () => active.value.path === filePath && active.value.text === savedText && !active.value.dirty,
+    800,
+  );
   record(
     "native workflow reverted saved real file",
     active.value.path === filePath && active.value.text === savedText && !active.value.dirty,
@@ -2739,9 +2741,7 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
   const externalText = `${savedText}\n\nExternal native conflict edit.`;
   const localText = `${savedText}\n\nLocal unsaved native conflict edit.`;
   await invoke("save_file", { request: { path: filePath, text: externalText, expected_hash: null } });
-  store.updateText(localText);
-  await nextTick();
-  previewTextCommit.cancel();
+  await setNativeWorkflowText(localText);
   await store.saveActive();
   await nextTick();
   record(
@@ -2761,15 +2761,17 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
 
   await store.acceptExternalChanges();
   await nextTick();
+  await waitForNativeWorkflowCondition(
+    () => active.value.path === filePath && active.value.text.includes("External native conflict edit") && !active.value.dirty && !store.externalConflict,
+    800,
+  );
   record(
     "native workflow accepted external conflict changes",
     active.value.path === filePath && active.value.text.includes("External native conflict edit") && !active.value.dirty && !store.externalConflict,
     JSON.stringify({ title: active.value.title, dirty: active.value.dirty, statusMessage: store.statusMessage }),
   );
 
-  store.updateText(savedText);
-  await nextTick();
-  previewTextCommit.cancel();
+  await setNativeWorkflowText(savedText);
   await store.saveActive(filePath);
   await nextTick();
   record(
@@ -2784,6 +2786,23 @@ async function collectNativeFileWorkflowEvidence(record: (name: string, passed: 
     recentFiles: store.recentFiles.slice(0, 5),
     recentlyClosed: store.recentlyClosed.slice(0, 5),
   };
+}
+
+async function setNativeWorkflowText(text: string) {
+  previewTextCommit.cancel();
+  store.updateText(text);
+  await nextTick();
+  previewTextCommit.cancel();
+}
+
+async function waitForNativeWorkflowCondition(check: () => boolean, timeoutMs: number) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => window.setTimeout(resolve, 120));
+    await nextTick();
+    if (check()) return true;
+  }
+  return check();
 }
 
 async function collectNativeModeEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
