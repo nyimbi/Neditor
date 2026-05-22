@@ -399,6 +399,9 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow prepared html export readiness",
     "native workflow wrote html export artifact",
     "native workflow exported html from native menu command",
+    "native workflow saved export profile",
+    "native workflow applied export profile",
+    "native workflow reloaded export profile from settings store",
     "native workflow applied dark theme attribute",
     "native workflow applied high contrast attributes and colors",
     "native workflow applied reduced motion",
@@ -485,6 +488,21 @@ function validateNativeWorkflowReport(launchReport) {
   }
   if (!String(payload.previewSnippet || "").includes("Total dose")) {
     issues.push("native workflow report did not include rendered calc preview");
+  }
+  const exportProfileEvidence = payload.exportProfileEvidence || {};
+  if (
+    exportProfileEvidence.saved?.exportTarget !== "pdf" ||
+    exportProfileEvidence.saved?.brandProfileDefaults?.name !== "Native Board" ||
+    exportProfileEvidence.applied?.target !== "pdf" ||
+    exportProfileEvidence.applied?.layoutPreset !== "compact" ||
+    exportProfileEvidence.applied?.includeManifest !== false ||
+    exportProfileEvidence.applied?.citationStyle !== "ieee" ||
+    exportProfileEvidence.reloaded?.activeExportProfileId !== exportProfileEvidence.saved?.id ||
+    exportProfileEvidence.reloaded?.target !== "pdf" ||
+    exportProfileEvidence.reloaded?.layoutPreset !== "compact" ||
+    exportProfileEvidence.reloaded?.brandName !== "Native Board"
+  ) {
+    issues.push(`native workflow report did not include export profile persistence evidence: ${JSON.stringify(exportProfileEvidence)}`);
   }
   if (payload.exportReadiness?.target !== "html" || !Array.isArray(payload.exportReadiness?.progressSteps)) {
     issues.push(`native workflow report did not include HTML export readiness evidence: ${JSON.stringify(payload.exportReadiness)}`);

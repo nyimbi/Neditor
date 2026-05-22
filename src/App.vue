@@ -2904,7 +2904,9 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     record("native workflow rendered calc template preview", text("#live-preview").includes("Total dose"));
     record("native workflow exposed dirty title", document.title.startsWith("* "), document.title);
 
+    store.activeExportProfileId = "";
     store.exportTarget = "html";
+    store.exportDefaults.includeManifest = true;
     await store.prepareForExport();
     await nextTick();
     const readinessTarget = store.exportReadiness?.manifest?.export_target;
@@ -2966,6 +2968,18 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       ),
       JSON.stringify(nativeMenuExportResult),
     );
+    const editorSnippet = smokeSnippetAround(active.value.text, "weight_kg = 72");
+    const previewSnippet = text("#live-preview").slice(0, 2000);
+    const exportReadinessEvidence = store.exportReadiness
+      ? {
+          ready: store.exportReadiness.ready,
+          errors: store.exportReadiness.error_count,
+          warnings: store.exportReadiness.warning_count,
+          target: store.exportReadiness.manifest?.export_target,
+          progressSteps: store.exportReadiness.progress_steps.map((step) => step.id),
+        }
+      : null;
+    const exportProfileEvidence = await collectNativeExportProfileEvidence(record);
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
 
     const passed = assertions.every((assertion) => assertion.passed);
@@ -2977,20 +2991,13 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       mode: store.mode,
       sidebar: store.sidebar,
       modeEvidence,
-      editorSnippet: smokeSnippetAround(active.value.text, "weight_kg = 72"),
-      previewSnippet: text("#live-preview").slice(0, 2000),
+      editorSnippet,
+      previewSnippet,
       themeAccessibility,
+      exportProfileEvidence,
       exportResult,
       nativeMenuExportResult,
-      exportReadiness: store.exportReadiness
-        ? {
-            ready: store.exportReadiness.ready,
-            errors: store.exportReadiness.error_count,
-            warnings: store.exportReadiness.warning_count,
-            target: store.exportReadiness.manifest?.export_target,
-            progressSteps: store.exportReadiness.progress_steps.map((step) => step.id),
-          }
-        : null,
+      exportReadiness: exportReadinessEvidence,
     });
   } catch (error) {
     await writeDesktopWorkflowSmokeReport({
@@ -3000,6 +3007,86 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       title: document.title,
     });
   }
+}
+
+async function collectNativeExportProfileEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  store.sidebar = "exports";
+  store.exportTarget = "pdf";
+  store.exportDefaults.includeManifest = false;
+  store.exportDefaults.coverPage = false;
+  store.exportDefaults.pageNumbers = false;
+  store.exportDefaults.layoutPreset = "compact";
+  store.bibliographyDefaults.citationStyle = "ieee";
+  store.brandProfileDefaults.name = "Native Board";
+  store.brandProfileDefaults.color = "#006699";
+  store.brandProfileDefaults.footer = "Native confidential";
+  await nextTick();
+  const profile = store.saveCurrentExportProfile("Native client PDF");
+  await store.persistWorkspace();
+  record(
+    "native workflow saved export profile",
+    Boolean(profile.id && profile.exportTarget === "pdf" && profile.brandProfileDefaults.name === "Native Board"),
+    JSON.stringify({ id: profile.id, target: profile.exportTarget, brand: profile.brandProfileDefaults.name }),
+  );
+
+  store.exportTarget = "html";
+  store.exportDefaults.includeManifest = true;
+  store.exportDefaults.coverPage = true;
+  store.exportDefaults.pageNumbers = true;
+  store.exportDefaults.layoutPreset = "presentation";
+  store.bibliographyDefaults.citationStyle = "title";
+  store.brandProfileDefaults.name = "";
+  store.brandProfileDefaults.footer = "";
+  await store.applyExportProfile(profile.id);
+  const applied = {
+    id: store.activeExportProfileId,
+    target: String(store.exportTarget),
+    layoutPreset: String(store.exportDefaults.layoutPreset),
+    includeManifest: store.exportDefaults.includeManifest,
+    coverPage: store.exportDefaults.coverPage,
+    pageNumbers: store.exportDefaults.pageNumbers,
+    citationStyle: String(store.bibliographyDefaults.citationStyle),
+    brandName: store.brandProfileDefaults.name,
+    footer: store.brandProfileDefaults.footer,
+  };
+  record(
+    "native workflow applied export profile",
+    applied.id === profile.id &&
+      applied.target === "pdf" &&
+      applied.layoutPreset === "compact" &&
+      applied.includeManifest === false &&
+      applied.coverPage === false &&
+      applied.pageNumbers === false &&
+      applied.citationStyle === "ieee" &&
+      applied.brandName === "Native Board",
+    JSON.stringify(applied),
+  );
+  await store.persistWorkspace();
+
+  store.exportProfiles = [];
+  store.activeExportProfileId = "";
+  await store.loadPreferences();
+  const reloadedProfile = store.exportProfiles.find((item) => item.id === profile.id);
+  const reloaded = {
+    profileCount: store.exportProfiles.length,
+    id: reloadedProfile?.id || "",
+    activeExportProfileId: store.activeExportProfileId,
+    target: String(store.exportTarget),
+    layoutPreset: String(store.exportDefaults.layoutPreset),
+    brandName: reloadedProfile?.brandProfileDefaults.name || "",
+  };
+  record(
+    "native workflow reloaded export profile from settings store",
+    Boolean(
+      reloadedProfile &&
+        store.activeExportProfileId === profile.id &&
+        reloaded.target === "pdf" &&
+        reloaded.layoutPreset === "compact" &&
+        reloadedProfile.brandProfileDefaults.name === "Native Board",
+    ),
+    JSON.stringify(reloaded),
+  );
+  return { saved: profile, applied, reloaded };
 }
 
 async function writeDesktopWorkflowSmokeReport(payload: Record<string, unknown>) {

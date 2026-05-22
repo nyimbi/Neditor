@@ -648,6 +648,10 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow prepared html export readiness"));
   ok(app.includes("native workflow wrote html export artifact"));
   ok(app.includes("native workflow exported html from native menu command"));
+  ok(app.includes("collectNativeExportProfileEvidence"));
+  ok(app.includes("native workflow saved export profile"));
+  ok(app.includes("native workflow applied export profile"));
+  ok(app.includes("native workflow reloaded export profile from settings store"));
   ok(app.includes("collectNativeModeEvidence"));
   ok(app.includes("[\"split\", \"source\", \"preview\", \"focus\", \"export\", \"review\", \"presentation\"]"));
   ok(app.includes("collectNativeThemeAccessibilityEvidence"));
@@ -671,6 +675,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native UI report did not include command button"));
   ok(smoke.includes("native workflow report did not include passing assertion"));
   ok(smoke.includes("native workflow report did not include mode evidence"));
+  ok(smoke.includes("native workflow report did not include export profile persistence evidence"));
   ok(smoke.includes("native workflow saved Markdown file was not written"));
   ok(smoke.includes("native workflow included watcher file was not written"));
   ok(smoke.includes("native workflow local conflict copy was not written"));

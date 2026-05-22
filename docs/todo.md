@@ -1897,8 +1897,9 @@ Completion criteria:
 4. Audit export artifacts and add conformance fixtures.
 5. Harden cross-platform external transform evidence.
 6. Run an independent security review against `docs/security-threat-model.md`.
-7. Prove native settings/snapshot storage and sidecar workflows in a real
-   desktop run.
+7. Prove remaining native snapshot storage and broader sidecar workflows in
+   real desktop runs; native export-profile settings persistence is now covered
+   by the launched desktop smoke.
 8. Modularize frontend/store/backend code after behavior is locked.
 9. Complete packaging evidence, user docs, and example projects.
 10. Run a final requirement-by-requirement audit and fresh verification baseline.
