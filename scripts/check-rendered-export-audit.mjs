@@ -10,6 +10,7 @@ import { resolvePlaywrightBrowserEnv } from "./playwright-browser-env.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const currentSourceCommit = gitCommit();
+const sourceTreeClean = gitTreeClean();
 const auditDir = resolve(process.env.NEDITOR_RENDERED_EXPORT_AUDIT_DIR || join(root, ".tmp", "rendered-export-audit"));
 const completedSignoffPath = process.env.NEDITOR_RENDERED_EXPORT_SIGNOFF
   ? resolve(process.env.NEDITOR_RENDERED_EXPORT_SIGNOFF)
@@ -1269,7 +1270,7 @@ function writeManualSignoffTemplate(report, assertions) {
     status: "pending-human-review",
     appVersion: packageJson.version,
     sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
-    sourceTreeClean: true,
+    sourceTreeClean,
     instructions: [
       "Copy this template before editing it.",
       "Open every primary artifact and review-case target in the relevant native or browser viewer.",
@@ -2051,6 +2052,14 @@ function decodeXml(value) {
     .replaceAll("&quot;", '"')
     .replaceAll("&apos;", "'")
     .replaceAll("&amp;", "&");
+}
+
+function gitTreeClean() {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0 && result.stdout.trim() === "";
 }
 
 function unzipEntryData(method, data, name) {

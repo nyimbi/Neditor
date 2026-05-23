@@ -793,6 +793,9 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("rendered-export-native-viewer-human-signoff"));
   ok(evidenceKitCollector.includes("accessibility-assistive-technology-human-signoff"));
   ok(evidenceKitCollector.includes("sourceTreeClean"));
+  ok(evidenceKitCollector.includes("staleTemplates"));
+  ok(evidenceKitCollector.includes("inspectTemplateFreshness"));
+  ok(evidenceKitCollector.includes("sourceCommit"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
 });
@@ -827,6 +830,7 @@ test("manual accessibility signoff validates screen-reader review evidence", () 
   ok(script.includes("appVersion"));
   ok(script.includes("sourceCommit"));
   ok(script.includes("sourceTreeClean"));
+  ok(script.includes("sourceTreeClean = gitTreeClean()"));
   ok(script.includes("completed sign-off appVersion must match package.json version"));
   ok(script.includes("completed sign-off sourceCommit must match current git commit"));
   ok(script.includes("completed sign-off sourceTreeClean must be true"));
@@ -947,6 +951,7 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
   ok(script.includes("appVersion"));
   ok(script.includes("sourceCommit"));
   ok(script.includes("sourceTreeClean"));
+  ok(script.includes("sourceTreeClean = gitTreeClean()"));
   ok(script.includes("completed sign-off appVersion must match package.json version"));
   ok(script.includes("completed sign-off sourceCommit must match current git commit"));
   ok(script.includes("completed sign-off sourceTreeClean must be true"));

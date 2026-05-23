@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const currentSourceCommit = gitCommit();
+const sourceTreeClean = gitTreeClean();
 const outputDir = join(root, ".tmp", "accessibility");
 const staticReportPath = join(outputDir, "report.json");
 const runtimeReportPath = join(outputDir, "runtime-report.json");
@@ -126,7 +127,7 @@ function createTemplate(prerequisiteReports) {
     schema: "neditor.accessibility.manual-signoff.v1",
     appVersion: packageJson.version,
     sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
-    sourceTreeClean: true,
+    sourceTreeClean,
     reviewer: {
       name: "",
       role: "",
@@ -391,4 +392,12 @@ function gitCommit() {
   });
   if (result.status !== 0) return "";
   return result.stdout.trim();
+}
+
+function gitTreeClean() {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0 && result.stdout.trim() === "";
 }

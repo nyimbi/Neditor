@@ -125,6 +125,7 @@ rmSync(outputDir, { recursive: true, force: true });
 mkdirSync(outputDir, { recursive: true });
 
 const copiedTemplates = copyTemplates();
+const staleTemplates = copiedTemplates.filter((template) => template.copied && template.freshness.status === "stale");
 const manifest = {
   schema: "neditor.release-evidence-kit.v1",
   generatedAt: new Date().toISOString(),
@@ -140,6 +141,7 @@ const manifest = {
   })),
   copiedTemplates,
   missingTemplates: copiedTemplates.filter((template) => !template.copied),
+  staleTemplates,
   runbooks: runbooks.map((runbook) => ({
     title: runbook.title,
     path: runbook.file,
@@ -159,12 +161,16 @@ if (!sourceTreeClean) {
 if (manifest.missingTemplates.length > 0) {
   console.log(`Missing ${manifest.missingTemplates.length} template(s); run the listed prerequisite checks and regenerate the kit.`);
 }
+if (manifest.staleTemplates.length > 0) {
+  console.log(`Stale ${manifest.staleTemplates.length} template(s); rerun prerequisite checks from the current clean source and regenerate the kit.`);
+}
 
 function copyTemplates() {
   return templateCopies.map(([from, to]) => {
     const source = join(root, from);
     const destination = join(outputDir, to);
     const copied = existsSync(source);
+    const freshness = copied ? inspectTemplateFreshness(source) : { status: "missing", issues: ["template file is missing"] };
     if (copied) {
       mkdirSync(dirname(destination), { recursive: true });
       cpSync(source, destination);
@@ -173,8 +179,45 @@ function copyTemplates() {
       source: from,
       path: to,
       copied,
+      freshness,
     };
   });
+}
+
+function inspectTemplateFreshness(path) {
+  let template;
+  try {
+    template = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    return {
+      status: "stale",
+      issues: [`template is not valid JSON: ${String(error)}`],
+    };
+  }
+
+  const issues = [];
+  if (template.appVersion && template.appVersion !== packageJson.version) {
+    issues.push(`appVersion ${template.appVersion} does not match ${packageJson.version}`);
+  }
+  if (template.releaseVersion && template.releaseVersion !== packageJson.version) {
+    issues.push(`releaseVersion ${template.releaseVersion} does not match ${packageJson.version}`);
+  }
+  if (template.sourceCommit && template.sourceCommit !== sourceCommit) {
+    issues.push(`sourceCommit ${template.sourceCommit} does not match ${sourceCommit || "<unknown>"}`);
+  }
+  if (template.sourceTreeClean !== undefined && template.sourceTreeClean !== true) {
+    issues.push("sourceTreeClean is not true");
+  }
+
+  return {
+    status: issues.length > 0 ? "stale" : "current",
+    schema: template.schema || null,
+    generatedAt: template.generatedAt || null,
+    appVersion: template.appVersion || template.releaseVersion || null,
+    sourceCommit: template.sourceCommit || null,
+    sourceTreeClean: template.sourceTreeClean ?? null,
+    issues,
+  };
 }
 
 function writeRunbooks() {
@@ -210,6 +253,9 @@ function readme(manifest) {
   const missingLines = manifest.missingTemplates.length
     ? manifest.missingTemplates.map((template) => `- \`${template.source}\``).join("\n")
     : "- None.";
+  const staleLines = manifest.staleTemplates.length
+    ? manifest.staleTemplates.map((template) => `- \`${template.source}\`: ${template.freshness.issues.join("; ")}`).join("\n")
+    : "- None.";
   return `${[
     "# NEditor Release Evidence Kit",
     "",
@@ -230,6 +276,10 @@ function readme(manifest) {
     "## Missing Templates",
     "",
     missingLines,
+    "",
+    "## Stale Templates",
+    "",
+    staleLines,
     "",
     "Completed evidence must match the current app version, source commit, and clean source-tree requirements enforced by the validators.",
     "",
