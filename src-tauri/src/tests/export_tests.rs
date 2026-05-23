@@ -110,12 +110,19 @@ Ship this as a standalone HTML review copy.
     let metadata_language_html = render_full_html(&response, &json!({}));
     assert!(metadata_language_html.contains(r#"<html lang="en-GB">"#));
 
-    let html = render_full_html(&response, &json!({ "htmlLanguage": "fr-CA" }));
+    let html = render_full_html(
+        &response,
+        &json!({
+            "htmlLanguage": "fr-CA",
+            "htmlDescription": "Option-level web description",
+            "canonicalUrl": "https://example.com/option-brief"
+        }),
+    );
     assert!(html.contains(r#"<html lang="fr-CA">"#));
-    assert!(html.contains(r#"<meta name="description" content="Market entry update">"#));
+    assert!(html.contains(r#"<meta name="description" content="Option-level web description">"#));
     assert!(html.contains(r#"<meta name="author" content="Strategy Office">"#));
     assert!(html.contains(r#"<meta name="neditor-status" content="published">"#));
-    assert!(html.contains(r#"<link rel="canonical" href="https://example.com/public-brief">"#));
+    assert!(html.contains(r#"<link rel="canonical" href="https://example.com/option-brief">"#));
 }
 
 #[test]

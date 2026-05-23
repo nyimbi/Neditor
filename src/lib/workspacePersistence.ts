@@ -50,6 +50,9 @@ export interface ExportDefaults {
   includeManifest: boolean;
   includeStyles: boolean;
   includeSyntaxHighlighting: boolean;
+  htmlLanguage: string;
+  htmlDescription: string;
+  canonicalUrl: string;
   coverPage: boolean;
   pageNumbers: boolean;
   layoutPreset: LayoutPreset;
@@ -199,6 +202,10 @@ function enumValue<T extends string>(value: unknown, allowed: readonly T[]) {
   return typeof value === "string" && allowed.includes(value as T) ? (value as T) : undefined;
 }
 
+function normalizedString(value: unknown, limit: number) {
+  return typeof value === "string" ? value.trim().slice(0, limit) : "";
+}
+
 export function clampLineHeight(value: number) {
   return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
 }
@@ -249,6 +256,9 @@ export function normalizeExportDefaults(
     includeStyles: typeof defaults.includeStyles === "boolean" ? defaults.includeStyles : true,
     includeSyntaxHighlighting:
       typeof defaults.includeSyntaxHighlighting === "boolean" ? defaults.includeSyntaxHighlighting : true,
+    htmlLanguage: normalizedString(defaults.htmlLanguage, 35),
+    htmlDescription: normalizedString(defaults.htmlDescription, 280),
+    canonicalUrl: normalizedString(defaults.canonicalUrl, 2048),
     coverPage:
       typeof defaults.coverPage === "boolean"
         ? defaults.coverPage

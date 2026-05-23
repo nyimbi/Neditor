@@ -160,10 +160,11 @@ Export panel target.
 | LaTeX | Academic or technical handoff | `.tex` source with metadata, headings, tables, figures, equations, links, and labels |
 | Google Docs package | Google Docs import handoff | DOCX, HTML, Markdown, text, import workflow metadata, assets, and manifest |
 
-Export defaults include manifests, styles, syntax highlighting, cover page, page
-numbers, layout preset, comments appendix, AI provenance appendix, glossary
-appendix, PPTX agenda, citation style, brand profile, dirty-Git warnings,
-transform engine settings, and draft watermark behavior.
+Export defaults include manifests, styles, syntax highlighting, HTML language,
+HTML description, canonical URL, cover page, page numbers, layout preset,
+comments appendix, AI provenance appendix, glossary appendix, PPTX agenda,
+citation style, brand profile, dirty-Git warnings, transform engine settings,
+and draft watermark behavior.
 
 ## Example Projects
 

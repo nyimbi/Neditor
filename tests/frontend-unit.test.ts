@@ -299,6 +299,9 @@ test("workspace persistence migration versions and normalizes saved settings", (
       includeManifest: false,
       includeCoverPage: false,
       includePageNumbers: false,
+      htmlLanguage: " en-US ",
+      htmlDescription: " Board-ready HTML summary ",
+      canonicalUrl: " https://example.com/board-ready ",
       layoutPreset: "compact",
     },
     bibliographyDefaults: { citationStyle: "APA" },
@@ -371,6 +374,9 @@ test("workspace persistence migration versions and normalizes saved settings", (
     includeManifest: false,
     includeStyles: true,
     includeSyntaxHighlighting: true,
+    htmlLanguage: "en-US",
+    htmlDescription: "Board-ready HTML summary",
+    canonicalUrl: "https://example.com/board-ready",
     coverPage: false,
     pageNumbers: false,
     layoutPreset: "compact",
@@ -395,6 +401,9 @@ test("workspace persistence migration versions and normalizes saved settings", (
       includeManifest: false,
       includeStyles: true,
       includeSyntaxHighlighting: true,
+      htmlLanguage: "",
+      htmlDescription: "",
+      canonicalUrl: "",
       coverPage: true,
       pageNumbers: false,
       layoutPreset: "compact",
@@ -497,6 +506,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Toolbar button display"'));
   ok(app.includes('aria-label="Toolbar text size"'));
   ok(app.includes("Export HTML"));
+  ok(app.includes('aria-label="HTML export options"'));
+  ok(app.includes("HTML delivery"));
+  ok(app.includes("store.exportDefaults.htmlLanguage"));
+  ok(app.includes("store.exportDefaults.canonicalUrl"));
   ok(app.includes("exportDocumentAs(\"html\")"));
   ok(app.includes('aria-label="Export profiles"'));
   ok(app.includes("saveCurrentExportProfile"));

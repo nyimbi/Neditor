@@ -811,6 +811,21 @@
               <option value="google-docs">Google Docs package</option>
             </select>
           </label>
+          <section v-if="store.exportTarget === 'html'" class="export-target-options" aria-label="HTML export options">
+            <h3>HTML delivery</h3>
+            <label>
+              Language
+              <input v-model="store.exportDefaults.htmlLanguage" type="text" placeholder="en" />
+            </label>
+            <label>
+              Description
+              <input v-model="store.exportDefaults.htmlDescription" type="text" />
+            </label>
+            <label>
+              Canonical URL
+              <input v-model="store.exportDefaults.canonicalUrl" type="url" />
+            </label>
+          </section>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Include styles</label>
           <label><input v-model="store.exportDefaults.includeSyntaxHighlighting" type="checkbox" /> Syntax highlighting</label>
@@ -1086,6 +1101,20 @@
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Manifest next to export</label>
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Styles</label>
           <label><input v-model="store.exportDefaults.includeSyntaxHighlighting" type="checkbox" /> Syntax highlighting</label>
+          <h3>HTML delivery</h3>
+          <label>
+            Language
+            <input v-model="store.exportDefaults.htmlLanguage" type="text" placeholder="en" />
+          </label>
+          <label>
+            Description
+            <input v-model="store.exportDefaults.htmlDescription" type="text" />
+          </label>
+          <label>
+            Canonical URL
+            <input v-model="store.exportDefaults.canonicalUrl" type="url" />
+          </label>
+          <h3>Document layout</h3>
           <label><input v-model="store.exportDefaults.coverPage" type="checkbox" /> Cover page</label>
           <label><input v-model="store.exportDefaults.pageNumbers" type="checkbox" /> Page numbers</label>
           <label>
@@ -1969,6 +1998,8 @@ const exportPreviewSummary = computed(() => {
     store.exportDefaults.includeComments ? "Comments" : "No comments",
     store.exportDefaults.includeProvenance ? "AI provenance" : "No AI provenance",
     store.exportDefaults.includeGlossary ? "Glossary" : "No glossary",
+    ...(store.exportTarget === "html" && store.exportDefaults.htmlLanguage ? [`HTML ${store.exportDefaults.htmlLanguage}`] : []),
+    ...(store.exportTarget === "html" && store.exportDefaults.canonicalUrl ? ["Canonical URL"] : []),
     store.exportDefaults.layoutPreset,
   ];
   return {
@@ -2749,6 +2780,9 @@ watch(
     store.exportDefaults.includeManifest,
     store.exportDefaults.includeStyles,
     store.exportDefaults.includeSyntaxHighlighting,
+    store.exportDefaults.htmlLanguage,
+    store.exportDefaults.htmlDescription,
+    store.exportDefaults.canonicalUrl,
     store.exportDefaults.coverPage,
     store.exportDefaults.pageNumbers,
     store.exportDefaults.layoutPreset,
@@ -6842,6 +6876,24 @@ select:hover {
 
 .export-profile-manager h3 {
   margin: 0 0 8px;
+}
+
+.export-target-options {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding: 10px;
+  border: 1px solid #d8e0e8;
+  border-left: 3px solid #2f6f7e;
+  background: #ffffff;
+}
+
+.export-target-options h3 {
+  margin: 0;
+}
+
+.export-target-options label {
+  margin-bottom: 0;
 }
 
 .template-action-primary {

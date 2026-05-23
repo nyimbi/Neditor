@@ -45,6 +45,7 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
     let language = html_document_language(&response.metadata, options);
     let head_metadata = html_head_metadata(
         response,
+        options,
         &subtitle,
         &author,
         &date,
@@ -150,6 +151,7 @@ fn normalize_html_language(value: &str) -> Option<String> {
 
 fn html_head_metadata(
     response: &CompileResponse,
+    options: &Value,
     subtitle: &Option<String>,
     author: &Option<String>,
     date: &Option<String>,
@@ -162,7 +164,13 @@ fn html_head_metadata(
         html_meta_tag("neditor-status", &response.semantic.status),
         html_meta_tag("neditor-source-hash", &response.export_manifest.source_hash),
     ];
-    if let Some(description) = metadata_string(&response.metadata, "description")
+    if let Some(description) = options
+        .get("htmlDescription")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .or_else(|| metadata_string(&response.metadata, "description"))
         .or_else(|| metadata_string(&response.metadata, "summary"))
         .or_else(|| subtitle.clone())
         .filter(|value| !value.trim().is_empty())
@@ -185,7 +193,13 @@ fn html_head_metadata(
             tags.push(html_meta_tag(name, value));
         }
     }
-    if let Some(canonical) = metadata_string(&response.metadata, "canonicalUrl")
+    if let Some(canonical) = options
+        .get("canonicalUrl")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .or_else(|| metadata_string(&response.metadata, "canonicalUrl"))
         .or_else(|| metadata_string(&response.metadata, "canonical_url"))
         .filter(|value| !value.trim().is_empty())
     {
