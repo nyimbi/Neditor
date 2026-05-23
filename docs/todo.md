@@ -613,6 +613,12 @@ green before claiming a slice is complete:
   evidence templates, accepts valid copied package/WebDriver reports from
   supported hosts, and fails malformed supplied evidence while preserving
   missing-host proof as explicit release gaps.
+- `pnpm run verify:local:full` now also runs
+  `pnpm run check:release-signing`, which writes
+  `.tmp/release-signing/report.json`, emits macOS/Windows/Linux signing
+  evidence templates, accepts valid credentialed release proof, and fails
+  malformed supplied signing/notarization reports while preserving missing
+  release credentials as explicit release gaps.
 - On macOS, `pnpm run verify:local:full` also includes
   `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` before the
   WebDriver step. `pnpm run test:tauri-webdriver` still reports the official

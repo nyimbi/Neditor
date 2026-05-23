@@ -340,6 +340,12 @@ evidence. Missing supported-host evidence remains a release gap, but malformed
 evidence copied back from another host fails the check instead of being silently
 accepted.
 
+`pnpm run check:release-signing` writes `.tmp/release-signing/report.json` and
+creates JSON templates under `.tmp/release-signing/templates/` for macOS
+codesign/notarization, Windows Authenticode/timestamp, and Linux package
+signature/checksum evidence. Missing credentialed signing proof remains a
+release gap; malformed supplied evidence fails the check.
+
 `pnpm run check:release-readiness` aggregates the current local proof set into
 `.tmp/release-readiness/report.json`. It fails if required current-host reports
 are missing or failed, and otherwise records remaining external evidence gaps

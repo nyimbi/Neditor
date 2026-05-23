@@ -43,6 +43,7 @@ const fullCommands = [
   command("Rendered export audit", "pnpm", ["run", "test:rendered-exports"]),
   command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"]),
   command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"]),
+  command("Release signing evidence contract", "pnpm", ["run", "check:release-signing"]),
   command(
     "Desktop release compile",
     "./node_modules/.bin/tauri",

@@ -18,6 +18,7 @@ const requiredReports = [
   ]),
   requiredReport("platform-package-config", ".tmp/desktop-bundle/platform-package-config-report.json", ["passed"]),
   requiredReport("external-platform-evidence", ".tmp/platform-evidence/report.json", [], platformEvidenceAccepted),
+  requiredReport("release-signing-evidence", ".tmp/release-signing/report.json", [], releaseSigningAccepted),
   requiredReport("desktop-command-smoke", ".tmp/desktop-smoke/native-command-report.json", [], desktopCommandPassed),
   requiredReport("rendered-export-audit", ".tmp/rendered-export-audit/rendered-export-audit-report.json", [], reportExists),
   requiredReport("rendered-export-visual-summary", ".tmp/rendered-export-audit/visual-review-summary.json", [], visualSummaryPassed),
@@ -127,14 +128,19 @@ function collectEvidenceGaps(checks) {
   const reports = Object.fromEntries(checks.map((check) => [check.id, readOptionalJson(check.path)]));
   const gaps = [];
 
+  const releaseSigning = reports["release-signing-evidence"];
+  const missingSigningPlatforms = missingReleaseSigningEvidence(releaseSigning);
   const platformConfig = reports["platform-package-config"];
   const signing = platformConfig?.signing || {};
-  if (signing.status === "unsigned-local-builds") {
+  if (missingSigningPlatforms.length > 0 || signing.status === "unsigned-local-builds") {
     gaps.push({
       id: "release-signing-and-notarization",
       status: "pending-release-credentials",
-      evidence: ".tmp/desktop-bundle/platform-package-config-report.json",
-      detail: "Local artifacts are intentionally unsigned; distribution signing, notarization, and installer attestation require release credentials.",
+      evidence: releaseSigning ? ".tmp/release-signing/report.json" : ".tmp/desktop-bundle/platform-package-config-report.json",
+      detail:
+        missingSigningPlatforms.length > 0
+          ? `Credentialed release signing/notarization evidence is missing for: ${missingSigningPlatforms.join(", ")}.`
+          : "Local artifacts are intentionally unsigned; distribution signing, notarization, and installer attestation require release credentials.",
     });
   }
 
@@ -253,6 +259,18 @@ function platformEvidenceAccepted(report) {
   };
 }
 
+function releaseSigningAccepted(report) {
+  const invalid = Number(report.summary?.invalidEvidence || 0);
+  return {
+    accepted: invalid === 0,
+    status: report.status || "unknown",
+    detail:
+      invalid === 0
+        ? `releaseSigningEvidence=${report.status || "unknown"}`
+        : `invalid release signing evidence count=${invalid}`,
+  };
+}
+
 function missingPlatformEvidence(report, key) {
   if (!report || !Array.isArray(report.platforms)) {
     return ["win32", "linux"];
@@ -261,6 +279,16 @@ function missingPlatformEvidence(report, key) {
     .filter((platform) => platform?.[key]?.status !== "accepted")
     .map((platform) => platform.platform)
     .filter((platform) => platform === "win32" || platform === "linux");
+}
+
+function missingReleaseSigningEvidence(report) {
+  if (!report || !Array.isArray(report.platforms)) {
+    return ["darwin", "win32", "linux"];
+  }
+  return report.platforms
+    .filter((platform) => platform?.status !== "accepted")
+    .map((platform) => platform.platform)
+    .filter((platform) => ["darwin", "win32", "linux"].includes(platform));
 }
 
 function macosLaunchPassed(report) {

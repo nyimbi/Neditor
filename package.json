@@ -18,6 +18,7 @@
     "check:e2e-env": "node scripts/check-e2e-environment.mjs",
     "check:platform-evidence": "node scripts/check-platform-evidence.mjs",
     "check:platform-packaging": "node scripts/check-platform-packaging.mjs",
+    "check:release-signing": "node scripts/check-release-signing.mjs",
     "check:release-readiness": "node scripts/check-release-readiness.mjs",
     "check:structure": "node scripts/check-project-structure.mjs",
     "verify:local": "node scripts/run-local-verification.mjs",
