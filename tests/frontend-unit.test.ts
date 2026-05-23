@@ -770,6 +770,10 @@ test("manual accessibility signoff validates screen-reader review evidence", () 
 test("release readiness aggregation records external evidence gaps", () => {
   const script = readFileSync("scripts/check-release-readiness.mjs", "utf8");
   ok(script.includes("current-host-ready-with-external-gaps"));
+  ok(script.includes("browserWorkflowAccepted"));
+  ok(script.includes("neditor.e2e-browser-workflow.v1"));
+  ok(script.includes("missing-docs-live-workflow-proof"));
+  ok(script.includes("freshForSources"));
   ok(script.includes("windows-linux-tauri-webdriver-execution"));
   ok(script.includes("external-platform-evidence"));
   ok(script.includes("missingPlatformEvidence"));
@@ -789,6 +793,18 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("runtime-report.json"));
   ok(script.includes("platform-package-config-report.json"));
   ok(script.includes("fresh native fallback proof"));
+});
+
+test("browser e2e runner emits structured workflow evidence for release readiness", () => {
+  const script = readFileSync("scripts/run-e2e.mjs", "utf8");
+
+  ok(script.includes("neditor.e2e-browser-workflow.v1"));
+  ok(script.includes("summarizePlaywrightOutput"));
+  ok(script.includes("workflowEvidence"));
+  ok(script.includes("docsLiveDraft"));
+  ok(script.includes("generates a Docs Live draft from outline, context, and placeholders"));
+  ok(script.includes("stdoutTail"));
+  ok(script.includes("stderrTail"));
 });
 
 test("external engine probe records render smoke artifacts", () => {

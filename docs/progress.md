@@ -92,6 +92,13 @@ Recent pushed checkpoints visible in current git history:
   SpeechRecognition-compatible harness, and the bounded native launch smoke
   records `nativeMenuCommandEvidence.docsLive.open: true` from the desktop
   Writing Tools menu.
+- The browser workflow runner now emits structured release evidence instead of
+  relying on exit status alone. `.tmp/e2e-browser/report.json` records schema
+  `neditor.e2e-browser-workflow.v1`, parsed Playwright test totals, stdout and
+  stderr tails, browser source, command, and workflow flags for Docs Live,
+  outline planning, outline CRUD, and export workflows. Release readiness now
+  rejects stale browser reports, missing test counts, failed/timed-out tests,
+  or reports that do not prove the Docs Live drafting workflow.
 - The release-grade local baseline now runs both
   `pnpm run check:a11y:runtime` and `pnpm run check:a11y:manual` after the full
   browser workflow suite. This keeps the focused runtime accessibility report
@@ -359,7 +366,7 @@ Recent pushed checkpoints visible in current git history:
   the evidence under `.tmp/rendered-export-audit/office-preview/`, and maps it
   into `viewer-proof.json`, `manual-review.html`, and `visual-review-summary.json`.
 - This update makes browser workflow execution current-host evidence instead
-  of stale archived evidence. `pnpm run test:e2e` now passes all 52 Chromium
+  of stale archived evidence. `pnpm run test:e2e` now passes all 53 Chromium
   workbench workflows locally, including first-class outline mode CRUD,
   editor/preview typing, settings persistence, command palette navigation,
   collapsible toolbars, responsive desktop/narrow layout proof, fold/unfold
@@ -367,7 +374,9 @@ Recent pushed checkpoints visible in current git history:
   stale-save conflicts, include watchers, AI governance, and export
   readiness/success/failure, transform template management, deep keyboard-only
   workbench operation, plus browser UI handoff coverage for blog,
-  Substack, LaTeX, and Google Docs package targets.
+  Substack, LaTeX, and Google Docs package targets. The browser report now
+  includes structured schema, test totals, output tails, and workflow flags so
+  release readiness cannot accept a stale exit-status-only artifact.
 - The checked-in browser harness now includes a Docs Live workflow in addition
   to the prior 52-test baseline. The focused
   `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "Docs Live" --project chromium`
@@ -874,12 +883,15 @@ P0 gaps:
   The prior Windows path-sensitive Rust-test failures, Ubuntu installed Pikchr
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in that retired workflow.
-- Browser-level workflow tests now pass locally with 49 Chromium tests through
+- Browser-level workflow tests now pass locally with 53 Chromium tests through
   `pnpm run test:e2e`. The current macOS proof used the workspace-local
   Playwright Chromium cache at `.tmp/ms-playwright`, and
   `.tmp/e2e-browser/report.json` records `source: playwright-bundled`, the
-  cache executable path, and exit status 0. This closes the prior local browser
-  launch blocker and covers mocked file
+  cache executable path, schema `neditor.e2e-browser-workflow.v1`, 53 tests
+  run, 53 passed, zero failures/timeouts, and explicit workflow evidence for
+  Docs Live, editable outline planning, outline mode CRUD, and export
+  workflows. This closes the prior local browser launch blocker and covers
+  mocked file
   lifecycle, save-as/recently-closed flows, stale-save conflict copy/merge/
   keep-local/accept-external recovery, clean watcher reload, watcher-originated
   dirty root-file conflicts, included-file recompilation/conflicts, restart
@@ -956,13 +968,13 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Release signing evidence contract: pnpm run check:release-signing` before desktop release compile and host bundle checks. |
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Accessibility runtime audit: pnpm run check:a11y:runtime` and `Accessibility manual review contract: pnpm run check:a11y:manual` after the browser workflow suite. |
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now ends with `Release readiness aggregation: pnpm run check:release-readiness`. |
-| `pnpm run check:release-readiness` | Pass with external gaps | Aggregates 18 accepted reports into `.tmp/release-readiness/report.json`, including the Google Docs import, external platform, and release signing evidence contracts, with zero failed required checks and eight explicit external evidence gaps: signing/notarization, Windows/Linux WebDriver execution, Windows package artifacts, Linux package artifacts, Google Docs live import/readback, rendered export native-viewer sign-off, accessibility assistive-technology sign-off, and missing optional Pikchr. |
+| `pnpm run check:release-readiness` | Pass with external gaps | Aggregates 18 accepted reports into `.tmp/release-readiness/report.json`, including structured browser workflow proof, the Google Docs import, external platform, and release signing evidence contracts, with zero failed required checks and seven explicit external evidence gaps: signing/notarization, Windows/Linux WebDriver execution, Windows package artifacts, Linux package artifacts, Google Docs live import/readback, rendered export native-viewer sign-off, and accessibility assistive-technology sign-off. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 53 Chromium workflow tests in `e2e/app-workflows.spec.ts`, including first-class outline mode CRUD and the Docs Live draft workflow. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host through the workspace-local Playwright Chromium cache at `.tmp/ms-playwright`; `.tmp/e2e-environment/report.json` records `source: playwright-bundled`, the cache executable path, and the passing command tail. |
 | `pnpm run check:a11y:runtime` | Pass | Focused runtime accessibility audit passed 6 Chromium workflows on this host with browser-launch permission, covering skip links, primary regions across desktop/narrow viewports, modal focus/Escape return, keyboard-only deep controls, status/progress live regions, and editor settings/search/heading commands; `.tmp/accessibility/runtime-report.json` records the expected workflows, command, browser output tail, and zero issues. |
 | `pnpm run check:a11y:manual` | Pass | Wrote `.tmp/accessibility/manual-review-template.json` and `.tmp/accessibility/manual-review-summary.json` with `pending-human-review` status for the required manual screen-reader/native assistive-technology checklist. |
 | `NEDITOR_ACCESSIBILITY_SIGNOFF=.tmp/accessibility/completed-review-smoke.json pnpm run check:a11y:manual` | Pass | Validated the completed-signoff path against a local smoke reviewer file, requiring static/runtime accessibility reports, reviewer metadata, platform, assistive technology, passing checklist notes, and zero unresolved blockers before marking the summary `human-reviewed`. This proves the validator contract, not a completed real manual review. |
-| `pnpm run test:e2e` | Pass | The previous full baseline passed 52 Chromium browser workbench workflows locally on this host, including editable outline-first document planning, first-class outline mode CRUD, collapsible toolbars, responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
+| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed 53 Chromium browser workbench workflows locally on this host through the workspace-local Playwright Chromium cache. `.tmp/e2e-browser/report.json` now records schema `neditor.e2e-browser-workflow.v1`, `tests: 53`, `passed: 53`, zero failures/timeouts, and workflow evidence for Docs Live, editable outline planning, outline mode CRUD, and export workflows. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "Docs Live" --project chromium` | Pass | Focused Docs Live browser workflow passed on this host, covering Writing-toolbar launch, document type, outline, mocked Web Speech dictation into spoken direction, context, placeholder values, generated Markdown preview, draft application, and rendered review-preparation output. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
@@ -970,7 +982,7 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, `processAlive: true`, app-authored native window evidence, and app-authored native UI evidence. `.tmp/desktop-smoke/native-ui-report.json` records command labels including New/Open/Save/Templates/Commands, source/sidebar/preview/status surface presence, active document `Market Entry Report`, preview label `Rendered preview for Market Entry Report, draft`, and viewport dimensions; System Events process evidence is recorded as `limited` on this host because it exposed the process but not a window. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages external transform engine trust" --project chromium` | Pass | Focused system-Chrome fallback workflow passed after keeping transform trust diagnostics visible when a configured path is untrusted. |
-| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed all 52 Chromium workflows through the workspace-local Playwright Chromium cache after adding dedicated outline mode CRUD. |
+| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed all 53 Chromium workflows through the workspace-local Playwright Chromium cache and wrote structured browser evidence with Docs Live, outline planning, outline CRUD, and export workflow flags. |
 | `pnpm run verify:local -- --list` | Pass | Quick local verification now lists the browser workflow environment preflight, so Chromium launch readiness is part of routine completed-slice verification. |
 | `pnpm run verify:local:full -- --list` | Pass | Full local verification now lists the full browser workflow suite after the production frontend build, making browser workflow execution part of the release-grade local baseline. |
 | `pnpm run verify:local` | Pass | Quick local verification passed with the new browser workflow environment gate included; the gate used the workspace-local Playwright Chromium cache and would retry transient browser-launch failures before failing the baseline. |

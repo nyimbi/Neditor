@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -9,7 +9,7 @@ const failures = [];
 
 const requiredReports = [
   requiredReport("browser-environment", ".tmp/e2e-environment/report.json", ["passed"]),
-  requiredReport("browser-workflows", ".tmp/e2e-browser/report.json", ["passed"]),
+  requiredReport("browser-workflows", ".tmp/e2e-browser/report.json", [], browserWorkflowAccepted),
   requiredReport("static-accessibility", ".tmp/accessibility/report.json", ["pass", "passed"]),
   requiredReport("runtime-accessibility", ".tmp/accessibility/runtime-report.json", ["passed"]),
   requiredReport("manual-accessibility-contract", ".tmp/accessibility/manual-review-summary.json", [
@@ -231,6 +231,34 @@ function reportExists() {
   };
 }
 
+function browserWorkflowAccepted(report) {
+  const issues = [];
+  const command = Array.isArray(report.command) ? report.command.map(String) : [];
+  const summary = report.summary || {};
+  const workflowEvidence = report.workflowEvidence || {};
+
+  if (report.schema !== "neditor.e2e-browser-workflow.v1") issues.push("missing-schema");
+  if (report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
+  if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
+  if (!command.some((part) => part.includes("playwright")) || !command.includes("test")) issues.push("missing-playwright-command");
+  if (Number(summary.tests || 0) < 1) issues.push("missing-test-count");
+  if (Number(summary.passed || 0) < Number(summary.tests || 0)) issues.push("incomplete-pass-count");
+  if (Number(summary.failed || 0) > 0 || Number(summary.timedOut || 0) > 0) issues.push("failed-or-timed-out-tests");
+  if (workflowEvidence.docsLiveDraft !== true) issues.push("missing-docs-live-workflow-proof");
+  if (!freshForSources(report.generatedAt, ["scripts/run-e2e.mjs", "e2e/app-workflows.spec.ts", "playwright.config.ts"])) {
+    issues.push("stale-for-browser-workflow-sources");
+  }
+
+  return {
+    accepted: issues.length === 0,
+    status: issues.length === 0 ? "passed" : "incomplete",
+    detail:
+      issues.length === 0
+        ? `tests=${summary.tests} passed=${summary.passed} docsLiveDraft=${workflowEvidence.docsLiveDraft}`
+        : issues.join(","),
+  };
+}
+
 function desktopCommandPassed(report) {
   const passed = report.nativeCommandWorkflow?.status === 0;
   return {
@@ -366,6 +394,22 @@ function webdriverOrFallbackPassed(report) {
     status: report.status || "unknown",
     detail: fallbackPassed ? "macOS unsupported WebDriver skip has fresh native fallback proof" : "WebDriver did not pass and no accepted fallback proof was found",
   };
+}
+
+function validIsoDate(value) {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function freshForSources(generatedAt, relativePaths) {
+  const generatedMs = Date.parse(generatedAt || "");
+  if (!Number.isFinite(generatedMs)) return false;
+  return relativePaths.every((relativePath) => {
+    try {
+      return generatedMs >= statSync(join(root, relativePath)).mtimeMs;
+    } catch {
+      return false;
+    }
+  });
 }
 
 function readOptionalJson(relativePath) {
