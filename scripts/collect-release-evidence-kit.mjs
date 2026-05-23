@@ -281,6 +281,11 @@ function readme(manifest) {
     "",
     staleLines,
     "",
+    "## Ingest Returned Evidence",
+    "",
+    "Place returned proof files under a return directory using any path listed in the runbooks, then run `pnpm run ingest:evidence -- --source /path/to/return-dir`.",
+    "Use `pnpm run ingest:evidence -- --list` to print every recognized return path.",
+    "",
     "Completed evidence must match the current app version, source commit, and clean source-tree requirements enforced by the validators.",
     "",
   ].join("\n")}\n`;

@@ -679,6 +679,7 @@ test("local verification scripts expose local baseline checks", () => {
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
   const evidenceKitCollector = readFileSync("scripts/collect-release-evidence-kit.mjs", "utf8");
   const evidenceKitChecker = readFileSync("scripts/check-release-evidence-kit.mjs", "utf8");
+  const evidenceIngest = readFileSync("scripts/ingest-release-evidence.mjs", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
   const platformEvidence = readFileSync("scripts/check-platform-evidence.mjs", "utf8");
   const signingCollector = readFileSync("scripts/collect-release-signing-evidence.mjs", "utf8");
@@ -703,6 +704,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["collect:platform-evidence"], "node scripts/collect-platform-evidence.mjs");
   equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
+  equal(scripts["ingest:evidence"], "node scripts/ingest-release-evidence.mjs");
   equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
   equal(scripts.build, "vue-tsc --noEmit && vite build");
@@ -802,6 +804,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("sourceCommit"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
+  ok(evidenceKitCollector.includes("pnpm run ingest:evidence"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit.v1"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit-report.v1"));
   ok(evidenceKitChecker.includes("report.json"));
@@ -811,6 +814,14 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("staleTemplates must be empty"));
   ok(evidenceKitChecker.includes("missingTemplates must be empty"));
   ok(evidenceKitChecker.includes("manifest gaps must mirror the release readiness report"));
+  ok(evidenceIngest.includes("neditor.release-evidence-ingest.v1"));
+  ok(evidenceIngest.includes("NEDITOR_RELEASE_EVIDENCE_RETURN_DIR"));
+  ok(evidenceIngest.includes("platform/win32-package-artifacts.json"));
+  ok(evidenceIngest.includes("NEDITOR_RENDERED_EXPORT_SIGNOFF"));
+  ok(evidenceIngest.includes("NEDITOR_ACCESSIBILITY_SIGNOFF"));
+  ok(evidenceIngest.includes("pnpm"));
+  ok(evidenceIngest.includes("check:release-signing"));
+  ok(evidenceIngest.includes("check:google-docs-import"));
 });
 
 test("runtime accessibility audit executes focused browser workflows", () => {
