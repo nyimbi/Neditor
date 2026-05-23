@@ -76,8 +76,10 @@ Recent pushed checkpoints visible in current git history:
   sign-off state in `.tmp/accessibility/manual-review-summary.json`, requires
   the static and runtime accessibility reports before accepting a completed
   reviewer file, and validates reviewer metadata, platform, assistive
-  technology, checklist notes, and unresolved blockers through
-  `NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/signoff.json`.
+  technology, checklist notes, unresolved blockers, and prerequisite report
+  SHA-256 identity through `NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/signoff.json`.
+  Stale sign-off files from older static/runtime accessibility reports fail
+  validation instead of closing the assistive-technology readiness gap.
 - The release-grade local baseline now runs both
   `pnpm run check:a11y:runtime` and `pnpm run check:a11y:manual` after the full
   browser workflow suite. This keeps the focused runtime accessibility report

@@ -1660,8 +1660,9 @@ Current evidence:
   `NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/signoff.json` is supplied, it accepts
   only a completed `neditor.accessibility.manual-signoff.v1` file with reviewer
   metadata, platform, assistive-technology details, passing checklist notes for
-  all required review areas, no unresolved blockers, and passing static/runtime
-  accessibility reports.
+  all required review areas, no unresolved blockers, passing static/runtime
+  accessibility reports, and matching prerequisite report SHA-256 hashes from
+  the generated template.
 - Modal close buttons, command-palette search, and conflict merge-line controls
   now have explicit labels exposed to assistive technology.
 - The workbench now exposes visible-on-focus skip links to the command bar,
@@ -1704,7 +1705,8 @@ Finish:
 - Complete the real manual screen-reader/native assistive-technology review by
   filling a copy of `.tmp/accessibility/manual-review-template.json` and
   validating it with `NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/signoff.json pnpm
-  run check:a11y:manual`.
+  run check:a11y:manual` against the current static/runtime accessibility report
+  hashes.
 - Keep modal focus workflows in the full local browser suite and broaden
   coverage for additional nested conflict/table-editor permutations.
 - ARIA labels and roles for custom controls.

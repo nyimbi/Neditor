@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
@@ -49,13 +50,13 @@ const checklist = [
 ];
 
 mkdirSync(outputDir, { recursive: true });
-writeFileSync(templatePath, `${JSON.stringify(createTemplate(), null, 2)}\n`);
 
 const issues = [];
 const prerequisiteReports = {
   static: readReport(staticReportPath, ["pass", "passed"]),
   runtime: readReport(runtimeReportPath, "passed"),
 };
+writeFileSync(templatePath, `${JSON.stringify(createTemplate(prerequisiteReports), null, 2)}\n`);
 let humanSignoff = {
   status: "pending-human-review",
   path: completedSignoffPath,
@@ -99,7 +100,7 @@ if (completedSignoffPath) {
   console.log(`No NEDITOR_ACCESSIBILITY_SIGNOFF supplied; summary remains pending at ${relativePath(summaryPath)}.`);
 }
 
-function createTemplate() {
+function createTemplate(prerequisiteReports) {
   return {
     schema: "neditor.accessibility.manual-signoff.v1",
     reviewer: {
@@ -121,6 +122,7 @@ function createTemplate() {
       name: "",
       version: "",
     },
+    prerequisiteReports,
     checklist: checklist.map((item) => ({
       id: item.id,
       label: item.label,
@@ -136,20 +138,24 @@ function readReport(path, expectedStatus) {
     return {
       path: relativePath(path),
       status: "missing",
+      sha256: null,
     };
   }
   try {
-    const report = JSON.parse(readFileSync(path, "utf8"));
+    const raw = readFileSync(path, "utf8");
+    const report = JSON.parse(raw);
     const expected = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
     return {
       path: relativePath(path),
       status: expected.includes(report.status) ? "passed" : report.status || "unknown",
       generatedAt: report.generatedAt || null,
+      sha256: sha256Text(raw),
     };
   } catch (error) {
     return {
       path: relativePath(path),
       status: "invalid-json",
+      sha256: null,
       error: String(error),
     };
   }
@@ -184,6 +190,7 @@ function validateCompletedSignoff(path, issues) {
   if (!signoff.assistiveTechnology?.name?.trim()) {
     issues.push("completed sign-off must include assistiveTechnology.name");
   }
+  validatePrerequisiteIdentity(signoff.prerequisiteReports, issues);
 
   const submittedItems = new Map((signoff.checklist || []).map((item) => [item.id, item]));
   for (const expected of checklist) {
@@ -215,10 +222,41 @@ function validateCompletedSignoff(path, issues) {
   };
 }
 
+function validatePrerequisiteIdentity(submittedReports, issues) {
+  if (!submittedReports || typeof submittedReports !== "object") {
+    issues.push("completed sign-off must include prerequisiteReports from the generated template");
+    return;
+  }
+  for (const key of ["static", "runtime"]) {
+    const current = prerequisiteReports[key];
+    const submitted = submittedReports[key];
+    if (!submitted) {
+      issues.push(`completed sign-off is missing prerequisiteReports.${key}`);
+      continue;
+    }
+    if (submitted.path !== current.path) {
+      issues.push(`completed sign-off prerequisiteReports.${key}.path must match the current report`);
+    }
+    if (submitted.status !== current.status) {
+      issues.push(`completed sign-off prerequisiteReports.${key}.status must match the current report`);
+    }
+    if (submitted.generatedAt !== current.generatedAt) {
+      issues.push(`completed sign-off prerequisiteReports.${key}.generatedAt must match the current report`);
+    }
+    if (submitted.sha256 !== current.sha256) {
+      issues.push(`completed sign-off prerequisiteReports.${key}.sha256 must match the current report`);
+    }
+  }
+}
+
 function isIsoDate(value) {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
 function relativePath(path) {
   return path.startsWith(root) ? path.replace(`${root}/`, "") : path;
+}
+
+function sha256Text(text) {
+  return createHash("sha256").update(text).digest("hex");
 }

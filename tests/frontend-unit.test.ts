@@ -692,6 +692,10 @@ test("manual accessibility signoff validates screen-reader review evidence", () 
   ok(script.includes("keyboard-only-core-workflows"));
   ok(script.includes("native-desktop-traversal"));
   ok(script.includes("assistiveTechnology"));
+  ok(script.includes("prerequisiteReports"));
+  ok(script.includes("validatePrerequisiteIdentity"));
+  ok(script.includes("sha256 must match the current report"));
+  ok(script.includes("sha256Text"));
   ok(script.includes("unresolvedBlockers"));
   ok(script.includes("pending-human-review"));
   ok(script.includes("human-reviewed"));
