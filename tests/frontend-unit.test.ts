@@ -803,7 +803,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit.v1"));
+  ok(evidenceKitChecker.includes("neditor.release-evidence-kit-report.v1"));
+  ok(evidenceKitChecker.includes("report.json"));
   ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
+  ok(evidenceKitChecker.includes("current source tree must be clean"));
+  ok(evidenceKitChecker.includes("currentSourceTreeClean"));
   ok(evidenceKitChecker.includes("staleTemplates must be empty"));
   ok(evidenceKitChecker.includes("missingTemplates must be empty"));
   ok(evidenceKitChecker.includes("manifest gaps must mirror the release readiness report"));
@@ -886,6 +890,10 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("external-platform-evidence"));
   ok(script.includes("missingPlatformEvidence"));
   ok(script.includes("release-signing-evidence"));
+  ok(script.includes("release-evidence-kit"));
+  ok(script.includes("releaseEvidenceKitAccepted"));
+  ok(script.includes("neditor.release-evidence-kit-report.v1"));
+  ok(script.includes("current-source-tree-not-clean"));
   ok(script.includes("missingReleaseSigningEvidence"));
   ok(script.includes("google-docs-import-evidence"));
   ok(script.includes("google-docs-live-import-readback"));

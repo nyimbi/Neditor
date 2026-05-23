@@ -19,6 +19,7 @@ const requiredReports = [
   requiredReport("platform-package-config", ".tmp/desktop-bundle/platform-package-config-report.json", ["passed"]),
   requiredReport("external-platform-evidence", ".tmp/platform-evidence/report.json", [], platformEvidenceAccepted),
   requiredReport("release-signing-evidence", ".tmp/release-signing/report.json", [], releaseSigningAccepted),
+  requiredReport("release-evidence-kit", ".tmp/release-evidence-kit/report.json", [], releaseEvidenceKitAccepted),
   requiredReport("desktop-command-smoke", ".tmp/desktop-smoke/native-command-report.json", [], desktopCommandPassed),
   requiredReport("rendered-export-audit", ".tmp/rendered-export-audit/rendered-export-audit-report.json", [], renderedExportAuditAccepted),
   requiredReport("rendered-export-visual-summary", ".tmp/rendered-export-audit/visual-review-summary.json", [], visualSummaryPassed),
@@ -460,6 +461,32 @@ function releaseSigningAccepted(report) {
       invalid === 0
         ? `releaseSigningEvidence=${report.status || "unknown"}`
         : `invalid release signing evidence count=${invalid}`,
+  };
+}
+
+function releaseEvidenceKitAccepted(report) {
+  const issues = [];
+  if (report.schema !== "neditor.release-evidence-kit-report.v1") issues.push("missing-schema");
+  if (report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
+  if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
+  if (report.sourceCommit !== report.currentSourceCommit) issues.push("source-commit-mismatch");
+  if (report.sourceTreeClean !== true) issues.push("source-tree-not-clean");
+  if (report.currentSourceTreeClean !== true) issues.push("current-source-tree-not-clean");
+  if (report.appVersion !== report.currentAppVersion) issues.push("app-version-mismatch");
+  if (report.readinessStatus !== report.currentReadinessStatus) issues.push("readiness-status-mismatch");
+  if (Number(report.summary?.missingTemplates || 0) !== 0) issues.push("missing-templates");
+  if (Number(report.summary?.staleTemplates || 0) !== 0) issues.push("stale-templates");
+  if (Number(report.summary?.copiedTemplates || 0) < 10) issues.push("incomplete-template-set");
+  if (Number(report.summary?.runbooks || 0) < 6) issues.push("incomplete-runbook-set");
+  if (Number(report.summary?.issues || 0) !== 0) issues.push("reported-issues");
+
+  return {
+    accepted: issues.length === 0,
+    status: issues.length === 0 ? "passed" : "incomplete",
+    detail:
+      issues.length === 0
+        ? `gaps=${report.summary?.gaps} templates=${report.summary?.copiedTemplates} runbooks=${report.summary?.runbooks}`
+        : issues.join(","),
   };
 }
 

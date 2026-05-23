@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
@@ -8,8 +8,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const kitDir = resolve(process.env.NEDITOR_RELEASE_EVIDENCE_KIT_DIR || join(root, ".tmp", "release-evidence-kit"));
 const manifestPath = join(kitDir, "manifest.json");
+const reportPath = join(kitDir, "report.json");
 const readinessPath = join(root, ".tmp", "release-readiness", "report.json");
 const currentSourceCommit = gitCommit();
+const currentSourceTreeClean = gitTreeClean();
 const expectedTemplateCount = 10;
 const expectedRunbooks = [
   "runbooks/windows-platform.md",
@@ -28,6 +30,8 @@ if (manifest && readiness) {
   validateManifest(manifest, readiness);
 }
 
+writeReport(manifest, readiness);
+
 if (issues.length > 0) {
   console.error("Release evidence kit failed validation:");
   for (const issue of issues) console.error(`- ${issue}`);
@@ -41,6 +45,7 @@ function validateManifest(manifest, readiness) {
   requireValue(manifest.appVersion === packageJson.version, `appVersion must match package.json version ${packageJson.version}`);
   requireValue(manifest.sourceCommit === currentSourceCommit, `sourceCommit must match current git commit ${currentSourceCommit}`);
   requireValue(manifest.sourceTreeClean === true, "sourceTreeClean must be true");
+  requireValue(currentSourceTreeClean === true, "current source tree must be clean");
   requireValue(isIsoDate(manifest.generatedAt), "generatedAt must be an ISO timestamp");
   requireValue(manifest.releaseReadinessReport === relative(readinessPath), "releaseReadinessReport must point to the current readiness report");
   requireValue(manifest.readinessStatus === readiness.status, "readinessStatus must match the current release readiness report");
@@ -70,6 +75,42 @@ function validateManifest(manifest, readiness) {
     requireValue(runbookPaths.has(runbook), `manifest is missing runbook ${runbook}`);
     requireFile(join(kitDir, runbook), `runbook ${runbook}`, 100);
   }
+}
+
+function writeReport(manifest, readiness) {
+  mkdirSync(dirname(reportPath), { recursive: true });
+  writeFileSync(
+    reportPath,
+    `${JSON.stringify(
+      {
+        schema: "neditor.release-evidence-kit-report.v1",
+        generatedAt: new Date().toISOString(),
+        status: issues.length === 0 ? "passed" : "failed",
+        manifestPath: relative(manifestPath),
+        releaseReadinessReport: relative(readinessPath),
+        sourceCommit: manifest?.sourceCommit || null,
+        currentSourceCommit,
+        sourceTreeClean: manifest?.sourceTreeClean ?? null,
+        currentSourceTreeClean,
+        appVersion: manifest?.appVersion || null,
+        currentAppVersion: packageJson.version,
+        readinessStatus: manifest?.readinessStatus || null,
+        currentReadinessStatus: readiness?.status || null,
+        summary: {
+          gaps: Array.isArray(manifest?.gaps) ? manifest.gaps.length : 0,
+          copiedTemplates: Array.isArray(manifest?.copiedTemplates) ? manifest.copiedTemplates.length : 0,
+          missingTemplates: Array.isArray(manifest?.missingTemplates) ? manifest.missingTemplates.length : 0,
+          staleTemplates: Array.isArray(manifest?.staleTemplates) ? manifest.staleTemplates.length : 0,
+          runbooks: Array.isArray(manifest?.runbooks) ? manifest.runbooks.length : 0,
+          issues: issues.length,
+        },
+        gapIds: Array.isArray(manifest?.gaps) ? manifest.gaps.map((gap) => gap.id) : [],
+        issues,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 function gaps(readiness) {
@@ -120,6 +161,14 @@ function gitCommit() {
   });
   if (result.status !== 0) return "";
   return result.stdout.trim();
+}
+
+function gitTreeClean() {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0 && result.stdout.trim() === "";
 }
 
 function relative(path) {
