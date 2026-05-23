@@ -24,6 +24,8 @@ const fullCommands = [
   ...quickCommands,
   command("Frontend production build", "pnpm", ["run", "build"]),
   command("Browser workflow suite", "node", ["scripts/run-e2e.mjs"]),
+  command("Accessibility runtime audit", "pnpm", ["run", "check:a11y:runtime"]),
+  command("Accessibility manual review contract", "pnpm", ["run", "check:a11y:manual"]),
   command("Optional engine probe", "pnpm", ["run", "check:engines"]),
   command(
     "Rust native-watch check",

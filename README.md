@@ -280,7 +280,8 @@ pnpm run verify:local:full
 NEditor uses local verification rather than GitHub Actions. Run
 `pnpm run verify:local` before publishing a normal slice. Run
 `pnpm run verify:local:full` for a release-grade baseline; it extends the quick
-checks with the production build, the full browser workflow suite, optional
+checks with the production build, the full browser workflow suite, the focused
+runtime accessibility audit, the manual accessibility review contract, optional
 engine probe, native-watch check, clippy, full Rust tests, rendered export audit,
 platform package configuration audit, Tauri no-bundle release compile, macOS
 `.app` bundle build/smoke and DMG classification on macOS, desktop artifact

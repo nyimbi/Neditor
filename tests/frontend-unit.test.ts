@@ -621,6 +621,8 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
   ok(verification.includes('command("Browser workflow environment", "node", ["scripts/check-e2e-environment.mjs"])'));
   ok(verification.includes('command("Browser workflow suite", "node", ["scripts/run-e2e.mjs"])'));
+  ok(verification.includes('command("Accessibility runtime audit", "pnpm", ["run", "check:a11y:runtime"])'));
+  ok(verification.includes('command("Accessibility manual review contract", "pnpm", ["run", "check:a11y:manual"])'));
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
   ok(verification.includes("Desktop macOS GUI launch smoke"));
   ok(verification.includes('NEDITOR_DESKTOP_SMOKE_LAUNCH: "1"'));

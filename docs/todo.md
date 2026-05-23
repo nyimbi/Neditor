@@ -597,6 +597,11 @@ green before claiming a slice is complete:
   preflight. `pnpm run verify:local:full` also includes the full browser
   workflow suite, so browser launch regressions are part of the ordinary local
   gates instead of a separate optional check.
+- `pnpm run verify:local:full` now also runs the focused runtime accessibility
+  audit and manual accessibility review contract, so release-grade local
+  verification refreshes `.tmp/accessibility/runtime-report.json`,
+  `.tmp/accessibility/manual-review-template.json`, and
+  `.tmp/accessibility/manual-review-summary.json`.
 - On macOS, `pnpm run verify:local:full` also includes
   `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` before the
   WebDriver step. `pnpm run test:tauri-webdriver` still reports the official

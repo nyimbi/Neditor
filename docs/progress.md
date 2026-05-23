@@ -78,6 +78,11 @@ Recent pushed checkpoints visible in current git history:
   reviewer file, and validates reviewer metadata, platform, assistive
   technology, checklist notes, and unresolved blockers through
   `NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/signoff.json`.
+- The release-grade local baseline now runs both
+  `pnpm run check:a11y:runtime` and `pnpm run check:a11y:manual` after the full
+  browser workflow suite. This keeps the focused runtime accessibility report
+  and manual review template/summary current whenever `pnpm run
+  verify:local:full` is used for release evidence.
 - This update moves bounded macOS GUI launch proof into
   `pnpm run verify:local:full` after desktop artifact smoke. On macOS the full
   baseline now runs `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`
@@ -867,6 +872,7 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
 | `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration audit passed and wrote `.tmp/desktop-bundle/platform-package-config-report.json` with synchronized npm/Cargo/Tauri metadata, `bundle.targets: "all"`, macOS/Windows/Linux icon coverage, production window dimensions, CSP guardrails, MIT license linkage, and `unsigned-local-builds` signing stance. |
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Platform package configuration: pnpm run check:platform-packaging` before the desktop release compile and host bundle checks. |
+| `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Accessibility runtime audit: pnpm run check:a11y:runtime` and `Accessibility manual review contract: pnpm run check:a11y:manual` after the browser workflow suite. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 52 Chromium workflow tests in `e2e/app-workflows.spec.ts`, including first-class outline mode CRUD. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host through the workspace-local Playwright Chromium cache at `.tmp/ms-playwright`; `.tmp/e2e-environment/report.json` records `source: playwright-bundled`, the cache executable path, and the passing command tail. |
 | `pnpm run check:a11y:runtime` | Pass | Focused runtime accessibility audit passed 6 Chromium workflows on this host with browser-launch permission, covering skip links, primary regions across desktop/narrow viewports, modal focus/Escape return, keyboard-only deep controls, status/progress live regions, and editor settings/search/heading commands; `.tmp/accessibility/runtime-report.json` records the expected workflows, command, browser output tail, and zero issues. |
