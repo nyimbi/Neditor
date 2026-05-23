@@ -229,6 +229,9 @@
             <h2>Outline</h2>
             <p>{{ outlineModeHeadings.length }} chapters, sections, subsections, and subsubsections.</p>
           </div>
+          <button type="button" :disabled="!outlineModeHeadings.length" @click="openDocsLiveFromDocumentOutline">
+            Flesh out with Docs Live
+          </button>
           <div class="outline-mode-create">
             <label>
               Title
@@ -278,6 +281,7 @@
           <h3>No outline yet</h3>
           <p>Create a chapter to start structuring the document before drafting the body.</p>
           <button type="button" @click="createOutlineHeading()">Create first chapter</button>
+          <button type="button" :disabled="!outlineDraftItems.length" @click="openDocsLiveFromOutline">Use planner outline in Docs Live</button>
         </section>
       </section>
 
@@ -1691,6 +1695,13 @@
               <strong>{{ section.title }}</strong>
               <span>{{ section.qaFocus }}</span>
               <p>{{ section.draftingBrief }}</p>
+              <ol class="docs-live-section-stage-list" :aria-label="`${section.title} drafting stages`">
+                <li v-for="stage in section.stagePlan" :key="`${section.title}-${stage.id}`" :data-status="stage.status">
+                  <strong>{{ stage.label }}</strong>
+                  <small>{{ stage.status }}</small>
+                  <span>{{ stage.detail }}</span>
+                </li>
+              </ol>
             </article>
           </div>
         </section>
@@ -5455,6 +5466,12 @@ function openDocsLiveFromOutline() {
   openDocsLive();
 }
 
+function openDocsLiveFromDocumentOutline() {
+  docsLiveOutlineText.value = outlinePlanFromMarkdown(active.value.text) || outlineDraftText.value;
+  docsLiveTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
+  openDocsLive();
+}
+
 function outlineHeadingKind(level: number) {
   if (level === 1) return "Chapter";
   if (level === 2) return "Section";
@@ -9197,7 +9214,7 @@ select:hover {
   font-size: 12px;
 }
 
-.docs-live-workflow ol {
+.docs-live-workflow > ol {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
@@ -9206,7 +9223,7 @@ select:hover {
   list-style: none;
 }
 
-.docs-live-workflow li,
+.docs-live-workflow > ol > li,
 .docs-live-section-cards article {
   display: grid;
   gap: 4px;
@@ -9217,7 +9234,7 @@ select:hover {
   background: #f7f9fb;
 }
 
-.docs-live-workflow li[data-status="needs-input"] {
+.docs-live-workflow > ol > li[data-status="needs-input"] {
   border-color: #c58a18;
   background: #fff8e8;
 }
@@ -9240,6 +9257,25 @@ select:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
+}
+
+.docs-live-section-stage-list {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-live-section-stage-list li {
+  display: grid;
+  gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid #d7dee7;
+}
+
+.docs-live-section-stage-list li[data-status="needs-review"] strong {
+  color: #7a5308;
 }
 
 .docs-live-preview {

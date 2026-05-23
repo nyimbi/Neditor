@@ -59,9 +59,21 @@ export interface DocsLiveSectionDraft {
   level: number;
   qaFocus: string;
   draftingBrief: string;
+  stagePlan: DocsLiveSectionStage[];
+  contextBridge: string;
   qaChecks: string[];
+  qaSummary: string;
   humanizationNotes: string[];
+  humanizedAngle: string;
   reviewQuestions: string[];
+  reviewHandoff: string;
+}
+
+export interface DocsLiveSectionStage {
+  id: "draft" | "qa" | "humanize" | "review";
+  label: string;
+  status: "complete" | "needs-review";
+  detail: string;
 }
 
 interface DocsLiveBlueprint {
@@ -231,7 +243,7 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
   const contextSentences = extractContextSentences(contextInput);
   const issues = buildDraftIssues(request, placeholders, sections);
   const draftingDepth = normalizeDraftingDepth(request.draftingDepth);
-  const sectionDrafts = sections.map((section, index) => buildSectionDraft(section, index, blueprint, placeholders));
+  const sectionDrafts = sections.map((section, index) => buildSectionDraft(section, index, blueprint, placeholders, contextSentences));
   const workflow = buildDocsLiveWorkflow(sectionDrafts, placeholders, contextSentences, issues);
   const markdown = humanizeDraftText(
     [
@@ -386,6 +398,12 @@ function buildDocsLiveWorkflow(
       status: "complete",
       detail: "Draft text is stripped of common AI phrasing and marked for human review.",
     },
+    {
+      id: "review",
+      label: "Review handoff",
+      status: "complete",
+      detail: "Each section carries reviewer questions, unresolved assumptions, and sign-off prompts.",
+    },
   ];
 }
 
@@ -449,30 +467,65 @@ function buildSectionDraft(
   index: number,
   blueprint: DocsLiveBlueprint,
   placeholders: Record<string, string>,
+  contextSentences: string[],
 ): DocsLiveSectionDraft {
   const focus = blueprint.sectionFocus[index % blueprint.sectionFocus.length];
   const owner = placeholders.owner || placeholders.reviewer || "the named owner";
   const evidence = placeholders.evidence || placeholders.source || "the strongest available evidence";
   const draftingBrief = `Frame the ${focus} for ${placeholders.audience || "the intended reader"} and connect it to the next decision.`;
+  const contextBridge = contextSentences[index % Math.max(1, contextSentences.length)] || "Use the outline intent and keep unresolved facts visibly marked.";
+  const qaSummary = `${section.title} must tie ${focus} claims to ${evidence}, name ownership, and avoid unsupported certainty.`;
+  const humanizedAngle = `Make ${section.title} sound like a responsible subject-matter owner wrote it: specific nouns, concrete verbs, and no generic AI filler.`;
+  const reviewHandoff = `${owner} should verify the ${focus}, fill missing facts, and decide whether this section can be marked human-reviewed.`;
   return {
     title: section.title,
     level: section.level,
     qaFocus: focus,
     draftingBrief,
+    contextBridge,
+    stagePlan: [
+      {
+        id: "draft",
+        label: "Draft body",
+        status: "complete",
+        detail: `${draftingBrief} Context used: ${contextBridge}`,
+      },
+      {
+        id: "qa",
+        label: "QA pass",
+        status: "needs-review",
+        detail: qaSummary,
+      },
+      {
+        id: "humanize",
+        label: "Humanize prose",
+        status: "needs-review",
+        detail: humanizedAngle,
+      },
+      {
+        id: "review",
+        label: "Prepare review",
+        status: "needs-review",
+        detail: reviewHandoff,
+      },
+    ],
     qaChecks: [
       `${section.title} makes one clear point before adding detail.`,
       `Claims are tied to ${evidence}, a named owner, a date, or a citation.`,
       `The section explains what ${owner} should do next.`,
     ],
+    qaSummary,
     humanizationNotes: [
       "Replace generic claims with named facts, numbers, teams, customers, dates, or examples.",
       "Cut filler phrases, repeated framing, and any sentence that sounds like a prompt response.",
       "Keep the cadence natural: short setup, specific evidence, then a concrete implication.",
     ],
+    humanizedAngle,
     reviewQuestions: [
       `Does ${section.title} answer the reader's likely first question?`,
       "What is still unverified and should remain marked before approval?",
     ],
+    reviewHandoff,
   };
 }
 
@@ -503,14 +556,20 @@ function draftSection(
     ...body.flatMap((paragraph) => [paragraph, ""]),
     `${"#".repeat(childLevel)} Section QA`,
     "",
+    `${section.qaSummary}`,
+    "",
     ...section.qaChecks.map((check) => `- [ ] ${check}`),
     `- [ ] Owner and timing are explicit: ${owner}; ${deadline}.`,
     "",
     `${"#".repeat(childLevel)} Humanization Pass`,
     "",
+    `${section.humanizedAngle}`,
+    "",
     ...section.humanizationNotes.map((note) => `- [ ] ${note}`),
     "",
     `${"#".repeat(childLevel)} Review Handoff`,
+    "",
+    `${section.reviewHandoff}`,
     "",
     ...section.reviewQuestions.map((question) => `- ${question}`),
     "",

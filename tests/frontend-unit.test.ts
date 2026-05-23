@@ -303,8 +303,16 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   equal(draft.sections.length, 3);
   equal(draft.workflow[2].id, "draft");
   equal(draft.workflow[4].id, "humanize");
+  equal(draft.workflow[5].id, "review");
   equal(draft.sections[0].qaChecks.length, 3);
   equal(draft.sections[0].humanizationNotes.length, 3);
+  deepEqual(
+    draft.sections[0].stagePlan.map((stage) => stage.id),
+    ["draft", "qa", "humanize", "review"],
+  );
+  ok(draft.sections[0].qaSummary.includes("Executive Summary must tie"));
+  ok(draft.sections[0].humanizedAngle.includes("responsible subject-matter owner"));
+  ok(draft.sections[0].reviewHandoff.includes("Commercial team should verify"));
   equal(draft.placeholders.client, "Acme");
   ok(draft.markdown.includes("provider: NEditor Docs Live"));
   ok(draft.markdown.includes("model: local-guided-drafting"));
@@ -318,6 +326,8 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.markdown.includes("## Review Preparation"));
   ok(draft.markdown.includes("### Quality Assurance"));
   ok(draft.markdown.includes("### Humanization Pass"));
+  ok(draft.markdown.includes("responsible subject-matter owner"));
+  ok(draft.markdown.includes("Commercial team should verify"));
   ok(draft.markdown.includes("The reader should approve renewal"));
   ok(draft.markdown.includes("Commercial team"));
 });
@@ -593,6 +603,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("toggleToolbarRow"));
   ok(app.includes("Docs Live"));
   ok(app.includes("openDocsLiveFromOutline"));
+  ok(app.includes("openDocsLiveFromDocumentOutline"));
+  ok(app.includes("docs-live-section-stage-list"));
   ok(app.includes("SpeechRecognition"));
   ok(app.includes("buildDocsLiveDraft"));
   ok(app.includes("docsLiveQuestionnaireAnswerText"));
