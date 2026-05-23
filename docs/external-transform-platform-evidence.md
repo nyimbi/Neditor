@@ -1,6 +1,6 @@
 # External Transform Platform Evidence
 
-Updated: 2026-05-22
+Updated: 2026-05-23
 
 NEditor keeps external transform engines optional. This page records current
 platform evidence for configured local engines and the repeatable command used
@@ -15,7 +15,19 @@ pnpm run check:engines
 The probe reports installed/missing optional engines without failing solely
 because an optional engine is absent. For installed engines, it also renders a
 small SVG smoke artifact through the same adapter shape NEditor uses and writes
-those artifacts under `.tmp/external-engines/artifacts/`. Use:
+those artifacts under `.tmp/external-engines/artifacts/`.
+
+The same command now writes external evidence templates under
+`.tmp/external-engines/templates/`. Copy a completed evidence file into
+`.tmp/external-engines/external/<engine>.json`, or point
+`NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR` at another directory, when a supported
+host has an optional engine that is not installed locally. Supplied evidence is
+validated for schema, engine key, status, timestamp, platform, command, version,
+SVG smoke bytes, smoke hash, required text markers, and zero unresolved
+blockers. Malformed supplied evidence fails the probe; absent optional engines
+without copied proof remain explicit release-readiness gaps.
+
+Use:
 
 ```sh
 pnpm run check:engines -- --require-installed
@@ -111,13 +123,17 @@ Interpretation:
 - The standalone probe now produces inspectable SVG smoke artifacts for every
   installed engine and fails if an installed engine cannot render the expected
   smoke output.
+- External evidence templates now make copied Linux, Windows, or alternate
+  macOS optional-engine proof auditable instead of relying on prose notes.
 - PlantUML file-mode execution is verified locally and Java is available.
 - Pikchr remains a macOS evidence gap on this host because neither `pikchr` nor
-  `pikchr-cli` is installed.
+  `pikchr-cli` is installed and no accepted copied Pikchr evidence has been
+  supplied.
 
 ## Remaining Platform Evidence Gaps
 
-- Install and verify Pikchr on macOS.
+- Install and verify Pikchr on macOS, or supply accepted
+  `pikchr.json` external evidence from a supported host.
 - Refresh Linux installed-engine evidence locally when those engines are
   available outside retired remote workflows.
 - Add Windows evidence for Graphviz, D2, PlantUML, Java, and Pikchr executable

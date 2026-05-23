@@ -710,6 +710,8 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("release-signing-and-notarization"));
   ok(script.includes("accessibility-assistive-technology-human-signoff"));
   ok(script.includes("rendered-export-native-viewer-human-signoff"));
+  ok(script.includes("invalidExternalEvidence"));
+  ok(script.includes("engine.externalEvidence?.status !== \"accepted\""));
   ok(script.includes('"release-readiness"'));
   ok(script.includes("runtime-report.json"));
   ok(script.includes("platform-package-config-report.json"));
@@ -725,6 +727,13 @@ test("external engine probe records render smoke artifacts", () => {
   ok(script.includes("plantuml-file"));
   ok(script.includes("pikchr-cli"));
   ok(script.includes("missingNeedles"));
+  ok(script.includes("neditor.external-engine-evidence.v1"));
+  ok(script.includes("NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR"));
+  ok(script.includes("externalEvidence"));
+  ok(script.includes("invalidExternalEvidence"));
+  ok(script.includes("missingEvidence"));
+  ok(script.includes("writeEvidenceTemplates"));
+  ok(script.includes("replace-with-64-character-sha256"));
 });
 
 test("rendered export audit exposes structured manual sign-off workflow", () => {

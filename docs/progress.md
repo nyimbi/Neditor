@@ -273,7 +273,12 @@ Recent pushed checkpoints visible in current git history:
   installed Graphviz/DOT variants, D2, PlantUML, missing optional engines, and
   SVG smoke artifacts under `.tmp/external-engines/artifacts/` for every
   installed engine. Installed engines now have to pass the adapter-shaped smoke
-  render before the probe reports them compatible.
+  render before the probe reports them compatible. The probe also writes
+  external evidence templates under `.tmp/external-engines/templates/`, accepts
+  validated copied `neditor.external-engine-evidence.v1` reports from
+  `NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR` or `.tmp/external-engines/external/`,
+  fails malformed supplied evidence, and lets release readiness close missing
+  optional engines only when accepted external proof exists.
 - This update adds native command workflow timing evidence to the desktop
   smoke. `pnpm run test:desktop-smoke` now writes
   `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata,

@@ -210,14 +210,14 @@ function collectEvidenceGaps(checks) {
 
   const externalEngines = reports["external-engine-probe"];
   const missingEngines = (externalEngines?.engines || [])
-    .filter((engine) => engine.status === "missing")
+    .filter((engine) => engine.status === "missing" && engine.externalEvidence?.status !== "accepted")
     .map((engine) => engine.name);
   if (missingEngines.length > 0) {
     gaps.push({
       id: "optional-external-engines",
       status: "partially-installed",
       evidence: ".tmp/external-engines/probe-report.json",
-      detail: `Missing optional engines on this host: ${missingEngines.join(", ")}.`,
+      detail: `Missing optional engines without accepted external evidence: ${missingEngines.join(", ")}.`,
     });
   }
 
@@ -251,10 +251,14 @@ function visualSummaryPassed(report) {
 
 function externalEngineProbePassed(report) {
   const incompatible = (report.engines || []).filter((engine) => engine.status === "incompatible");
+  const invalidEvidence = Number(report.summary?.invalidExternalEvidence || 0);
   return {
-    accepted: incompatible.length === 0,
-    status: incompatible.length === 0 ? "passed" : "failed",
-    detail: incompatible.length === 0 ? "installed engines smoke-compatible" : `incompatible=${incompatible.map((engine) => engine.name).join(", ")}`,
+    accepted: incompatible.length === 0 && invalidEvidence === 0,
+    status: incompatible.length === 0 && invalidEvidence === 0 ? "passed" : "failed",
+    detail:
+      incompatible.length === 0 && invalidEvidence === 0
+        ? "installed engines smoke-compatible"
+        : `incompatible=${incompatible.map((engine) => engine.name).join(", ")} invalidExternalEvidence=${invalidEvidence}`,
   };
 }
 

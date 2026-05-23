@@ -1301,7 +1301,11 @@ Finish:
   the engine probe writes `.tmp/external-engines/probe-report.json` plus
   inspectable SVG smoke artifacts under `.tmp/external-engines/artifacts/` for
   every installed engine and fails if an installed engine cannot render the
-  expected adapter-shaped smoke output; Pikchr remains missing on this host.
+  expected adapter-shaped smoke output; it also emits
+  `.tmp/external-engines/templates/` evidence templates and validates copied
+  external `neditor.external-engine-evidence.v1` proof for engines such as
+  Pikchr that are missing locally. Pikchr remains missing on this host until it
+  is installed locally or accepted external evidence is supplied.
 - Native Pikchr fallback now handles compact semicolon-separated statements,
   connector labels, and common business shapes (`box`, `circle`/`ellipse`,
   `diamond`, `cylinder`, and `file`) so useful previews still render before an
@@ -1311,7 +1315,8 @@ Finish:
 - PlantUML now supports fence-level PNG output selection through `format=png`,
   `output=png`, or the `png` flag, with `compiler_uses_plantuml_png_fence_output_format`
   proving the trusted file-mode sidecar path and PNG data URL artifact.
-- Add Windows manual evidence for all optional engines.
+- Add Windows manual evidence for all optional engines using the external
+  evidence template contract.
 - Confirm Windows `.exe` paths and package-manager shims.
 - Confirm PlantUML SVG and PNG file mode on all platforms.
 - Confirm Pikchr stdin/file/argument mode for each supported executable shape.

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -8,8 +9,11 @@ const requireInstalled = process.argv.includes("--require-installed");
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const reportPath = join(root, ".tmp", "external-engines", "probe-report.json");
 const artifactDir = join(root, ".tmp", "external-engines", "artifacts");
+const evidenceDir = resolve(process.env.NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR || join(root, ".tmp", "external-engines", "external"));
+const templateDir = join(root, ".tmp", "external-engines", "templates");
 const engines = [
   {
+    key: "graphviz-dot",
     name: "Graphviz / DOT",
     command: "dot",
     env: "NEDITOR_TEST_DOT",
@@ -23,6 +27,7 @@ const engines = [
     },
   },
   {
+    key: "graphviz-circo",
     name: "Graphviz / circo",
     command: "circo",
     env: "NEDITOR_TEST_CIRCO",
@@ -36,6 +41,7 @@ const engines = [
     },
   },
   {
+    key: "graphviz-neato",
     name: "Graphviz / neato",
     command: "neato",
     env: "NEDITOR_TEST_NEATO",
@@ -49,6 +55,7 @@ const engines = [
     },
   },
   {
+    key: "graphviz-fdp",
     name: "Graphviz / fdp",
     command: "fdp",
     env: "NEDITOR_TEST_FDP",
@@ -62,6 +69,7 @@ const engines = [
     },
   },
   {
+    key: "graphviz-osage",
     name: "Graphviz / osage",
     command: "osage",
     env: "NEDITOR_TEST_OSAGE",
@@ -75,6 +83,7 @@ const engines = [
     },
   },
   {
+    key: "graphviz-twopi",
     name: "Graphviz / twopi",
     command: "twopi",
     env: "NEDITOR_TEST_TWOPI",
@@ -88,6 +97,7 @@ const engines = [
     },
   },
   {
+    key: "d2",
     name: "D2",
     command: "d2",
     env: "NEDITOR_TEST_D2",
@@ -101,6 +111,7 @@ const engines = [
     },
   },
   {
+    key: "plantuml",
     name: "PlantUML",
     command: "plantuml",
     env: "NEDITOR_TEST_PLANTUML",
@@ -114,6 +125,7 @@ const engines = [
     },
   },
   {
+    key: "pikchr",
     name: "Pikchr",
     command: "pikchr",
     alternateCommands: ["pikchr-cli"],
@@ -130,11 +142,16 @@ const engines = [
 
 rmSync(artifactDir, { recursive: true, force: true });
 mkdirSync(artifactDir, { recursive: true });
+mkdirSync(templateDir, { recursive: true });
+writeEvidenceTemplates();
 
 const rows = engines.map(probeEngine);
 const missing = rows.filter((row) => row.status === "missing");
 const incompatible = rows.filter((row) => row.status === "incompatible");
-writeReport(rows, missing);
+const invalidExternalEvidence = rows
+  .map((row) => row.externalEvidence)
+  .filter((evidence) => evidence?.status === "invalid");
+writeReport(rows, missing, invalidExternalEvidence);
 
 console.log(`NEditor external transform engine probe`);
 console.log(`Platform: ${process.platform} ${process.arch}`);
@@ -160,6 +177,15 @@ for (const row of rows) {
   if (row.note) {
     console.log(`  note: ${row.note}`);
   }
+  if (row.externalEvidence) {
+    console.log(`  external evidence: ${row.externalEvidence.status}`);
+    if (row.externalEvidence.path) {
+      console.log(`  evidence path: ${row.externalEvidence.path}`);
+    }
+    if (row.externalEvidence.detail) {
+      console.log(`  evidence detail: ${row.externalEvidence.detail}`);
+    }
+  }
 }
 
 if (missing.length > 0) {
@@ -170,6 +196,14 @@ if (missing.length > 0) {
   if (requireInstalled) {
     process.exit(1);
   }
+}
+
+if (invalidExternalEvidence.length > 0) {
+  console.log("");
+  console.log(
+    `Invalid external engine evidence: ${invalidExternalEvidence.map((evidence) => evidence.path).join(", ")}`,
+  );
+  process.exit(1);
 }
 
 if (incompatible.length > 0) {
@@ -184,15 +218,18 @@ console.log("");
 console.log(`Wrote external transform engine probe report to ${relative(reportPath)}`);
 
 function probeEngine(engine) {
+  const externalEvidence = evaluateExternalEvidence(engine);
   const command = process.env[engine.env] || findFirstCommand([
     engine.command,
     ...(engine.alternateCommands || []),
   ]);
   if (!command) {
     return {
+      key: engine.key,
       name: engine.name,
       command: [engine.command, ...(engine.alternateCommands || [])].join(" or "),
       status: "missing",
+      externalEvidence,
       note: `Set ${engine.env} to an absolute executable path to force a probe.`,
     };
   }
@@ -202,11 +239,13 @@ function probeEngine(engine) {
   const smoke = runSmoke(engine, path || command);
   if (!smoke.passed) {
     return {
+      key: engine.key,
       name: engine.name,
       command,
       path: path || command,
       status: "incompatible",
       version: version || "version probe did not return output",
+      externalEvidence,
       smoke: {
         status: "failed",
         ...smoke,
@@ -215,15 +254,82 @@ function probeEngine(engine) {
     };
   }
   return {
+    key: engine.key,
     name: engine.name,
     command,
     path: path || command,
     status: "installed",
     version: version || "version probe did not return output",
+    externalEvidence,
     smoke: {
       status: "passed",
       ...smoke,
     },
+  };
+}
+
+function evaluateExternalEvidence(engine) {
+  const path = join(evidenceDir, `${engine.key}.json`);
+  if (!existsSync(path)) {
+    return {
+      status: "missing",
+      path: relative(path),
+      detail: `No copied external evidence supplied for ${engine.name}.`,
+    };
+  }
+
+  let evidence;
+  try {
+    evidence = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    return {
+      status: "invalid",
+      path: relative(path),
+      detail: `Evidence JSON could not be parsed: ${error.message}`,
+    };
+  }
+
+  const problems = [];
+  requireValue(evidence.schema === "neditor.external-engine-evidence.v1", problems, "schema must be neditor.external-engine-evidence.v1");
+  requireValue(evidence.engine === engine.key, problems, `engine must be ${engine.key}`);
+  requireValue(evidence.status === "passed", problems, "status must be passed");
+  requireValue(isIsoDate(evidence.generatedAt), problems, "generatedAt must be an ISO timestamp");
+  requireValue(Boolean(String(evidence.platform || "").trim()), problems, "platform is required");
+  requireValue(Boolean(String(evidence.arch || "").trim()), problems, "arch is required");
+  requireValue(Boolean(String(evidence.command || "").trim()), problems, "command is required");
+  requireValue(Boolean(String(evidence.path || "").trim()), problems, "path is required");
+  requireValue(Boolean(String(evidence.version || "").trim()), problems, "version is required");
+  requireValue(evidence.smoke?.status === "passed", problems, "smoke.status must be passed");
+  requireValue(Number(evidence.smoke?.bytes) > 200, problems, "smoke.bytes must be > 200");
+  requireValue(isSha256(evidence.smoke?.sha256), problems, "smoke.sha256 must be a sha256");
+  const needles = Array.isArray(evidence.smoke?.needles) ? evidence.smoke.needles : [];
+  for (const needle of engine.smoke?.needles || []) {
+    requireValue(needles.includes(needle), problems, `smoke.needles must include ${needle}`);
+  }
+  requireValue(Array.isArray(evidence.unresolvedBlockers) && evidence.unresolvedBlockers.length === 0, problems, "unresolvedBlockers must be an empty array");
+
+  if (problems.length > 0) {
+    return {
+      status: "invalid",
+      path: relative(path),
+      detail: problems.join("; "),
+    };
+  }
+
+  return {
+    status: "accepted",
+    path: relative(path),
+    generatedAt: evidence.generatedAt,
+    platform: evidence.platform,
+    arch: evidence.arch,
+    command: evidence.command,
+    version: evidence.version,
+    smoke: {
+      bytes: evidence.smoke.bytes,
+      sha256: evidence.smoke.sha256,
+      artifact: evidence.smoke.artifact || "",
+    },
+    detail: `${engine.name} evidence accepted from ${evidence.platform}/${evidence.arch}.`,
   };
 }
 
@@ -318,6 +424,7 @@ function runSmoke(engine, commandPath) {
     passed,
     artifact: output ? relative(artifactPath) : "",
     bytes: output ? statSync(artifactPath).size : 0,
+    sha256: output ? sha256File(artifactPath) : "",
     exitStatus: result.status,
     missingNeedles,
     stderr,
@@ -331,8 +438,9 @@ function firstLine(text) {
     .find(Boolean);
 }
 
-function writeReport(rows, missing) {
+function writeReport(rows, missing, invalidExternalEvidence) {
   mkdirSync(dirname(reportPath), { recursive: true });
+  const externalEvidence = rows.map((row) => row.externalEvidence).filter(Boolean);
   writeFileSync(
     reportPath,
     `${JSON.stringify(
@@ -342,16 +450,91 @@ function writeReport(rows, missing) {
         arch: process.arch,
         requireInstalled,
         artifactDir: relative(artifactDir),
+        evidenceDir: relative(evidenceDir),
+        templateDir: relative(templateDir),
+        status:
+          incompatible.length > 0 || invalidExternalEvidence.length > 0
+            ? "failed"
+            : missing.some((row) => row.externalEvidence?.status !== "accepted")
+              ? "partial"
+              : "complete",
+        summary: {
+          installed: rows.filter((row) => row.status === "installed").length,
+          missingLocal: missing.length,
+          incompatible: incompatible.length,
+          acceptedExternalEvidence: externalEvidence.filter((evidence) => evidence.status === "accepted").length,
+          invalidExternalEvidence: invalidExternalEvidence.length,
+          unresolvedMissingEvidence: missing.filter((row) => row.externalEvidence?.status !== "accepted").length,
+        },
         engines: rows,
         missing: missing.map((row) => row.command),
+        missingEvidence: missing
+          .filter((row) => row.externalEvidence?.status !== "accepted")
+          .map((row) => row.command),
         incompatible: rows
           .filter((row) => row.status === "incompatible")
           .map((row) => row.command),
+        externalEvidence,
+        invalidExternalEvidence,
       },
       null,
       2,
     )}\n`,
   );
+}
+
+function writeEvidenceTemplates() {
+  for (const engine of engines) {
+    const templatePath = join(templateDir, `${engine.key}.template.json`);
+    writeFileSync(
+      templatePath,
+      `${JSON.stringify(
+        {
+          schema: "neditor.external-engine-evidence.v1",
+          engine: engine.key,
+          status: "passed",
+          generatedAt: new Date().toISOString(),
+          platform: process.platform,
+          arch: process.arch,
+          command: engine.command,
+          path: "/absolute/path/to/executable",
+          version: "paste version output",
+          adapter: {
+            smokeKind: engine.smoke?.kind || "none",
+            versionArgs: engine.versionArgs || [],
+          },
+          smoke: {
+            status: "passed",
+            artifact: `.tmp/external-engines/artifacts/${engine.smoke?.artifact || `${engine.key}.svg`}`,
+            bytes: 12345,
+            sha256: "replace-with-64-character-sha256",
+            needles: engine.smoke?.needles || [],
+          },
+          unresolvedBlockers: [],
+          notes:
+            "Copy the real evidence from a host where this optional engine is installed after running pnpm run check:engines.",
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  }
+}
+
+function requireValue(condition, problems, message) {
+  if (!condition) problems.push(message);
+}
+
+function isIsoDate(value) {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function isSha256(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+}
+
+function sha256File(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
 function relative(path) {

@@ -352,7 +352,12 @@ Pikchr paths without failing just because an optional engine is absent. For each
 installed engine it also renders a small SVG smoke artifact through the adapter
 shape NEditor uses, writes those files under `.tmp/external-engines/artifacts/`,
 and records paths, versions, byte counts, and compatibility status in
-`.tmp/external-engines/probe-report.json` for local platform evidence.
+`.tmp/external-engines/probe-report.json` for local platform evidence. It also
+writes JSON templates under `.tmp/external-engines/templates/` and accepts
+validated copied proof from `NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR` or
+`.tmp/external-engines/external/`, so a missing local optional engine such as
+Pikchr can be closed by real evidence from a host where that engine is
+installed.
 
 `pnpm run check:deps` verifies that every JavaScript and Rust dependency in the
 project manifests has an entry in the dependency admission record and that
