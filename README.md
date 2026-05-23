@@ -16,67 +16,102 @@ Markdown bundle, blog, Substack, LaTeX, or Google Docs package outputs.
 
 ## Start Here If You Just Want To Use NEditor
 
-NEditor is meant to feel like a document app, not a developer tool. A normal
-business user should be able to open the desktop app, create or open a document,
-write in plain text, preview the formatted result, and export a polished file
-without touching a terminal.
+This section is for business users, managers, analysts, consultants, writers,
+and reviewers who want to download NEditor and get work done. You do not need
+to know Git, Node, Rust, Tauri, Markdown tooling, or command-line commands to
+use the finished desktop app.
 
-### Download And Install
+NEditor is meant to feel like a document app, not a developer tool. Open it,
+create or open a document, write in readable plain text, review the formatted
+preview, and export a polished file for the people who need it.
 
-Use the installer or app package supplied by your organization, project team, or
-release manager.
+### What To Download
 
-| Platform | What to use | What happens |
+Use the NEditor package supplied by your organization, project team, or release
+manager. If your team publishes release files, choose the one that matches your
+computer:
+
+| Your computer | Download this kind of file | Plain-language install step |
 | --- | --- | --- |
-| macOS | `NEditor.app`, usually delivered in a `.dmg` or `.zip` | Drag the app to Applications, then open it like any other Mac app. |
-| Windows | Windows installer or packaged `NEditor` app | Install it, then launch NEditor from the Start menu. |
-| Linux | AppImage, Debian package, RPM package, or packaged desktop app | Mark it executable or install the package, then launch NEditor from your app menu. |
+| Mac | `.dmg`, `.zip`, or `NEditor.app` | Open the download, drag NEditor to Applications if prompted, then launch it like any other Mac app. |
+| Windows | `.msi`, `.exe`, or a packaged `NEditor` app | Run the installer, then open NEditor from the Start menu or desktop shortcut. |
+| Linux | `.AppImage`, `.deb`, `.rpm`, or a packaged desktop app | Install the package or mark the AppImage executable, then launch NEditor from your app menu. |
 
-If you are reading this README from a source-code checkout and do not see a
-ready-made installer, ask a technical teammate to build or provide the desktop
-package for your platform. The developer build commands are later in this file.
+If you are reading this README in a source-code folder and do not see an
+installer, you probably have the developer copy rather than the ready-to-use
+desktop app. Ask IT or a technical teammate for the packaged NEditor download
+for your operating system.
 
-### Your First Document
+### Before You Install
+
+Use this short checklist when NEditor is distributed inside a company:
+
+- Download NEditor from the company-approved location, not from a forwarded
+  attachment.
+- Confirm the file name says NEditor and matches your operating system.
+- Keep the installer somewhere ordinary, such as Downloads, until the app opens
+  successfully.
+- If your computer warns that the app is from an internal or unidentified
+  developer, follow your organization's software approval process.
+- Ask IT whether your company has a standard template folder, brand profile, or
+  export settings to use with NEditor.
+
+### First Run
 
 1. Open NEditor.
-2. Choose **New** for a blank document, or **Open** to work on an existing
-   Markdown file.
-3. Use the **Outline** mode or Outline panel to sketch chapters, sections,
-   subsections, and subsubsections before writing the full text.
-4. Write in the source editor. The preview shows how the document will read.
-5. Use **Save** or **Save As** so the document lives in a normal folder you
-   control.
-6. Use **Export** or **HTML Export** when you need a polished handoff.
+2. Choose **New** for a blank document, or **Open** for an existing Markdown
+   document.
+3. Choose **Save** or **Save As** and put the file in a folder you control,
+   such as a project folder, team drive, or client folder.
+4. Use **Outline** mode when you want to plan the document first. Add chapters,
+   sections, subsections, and subsubsections, then fill in the content.
+5. Write in the editor. The preview shows how the final document will read.
+6. Use **Export** when you need to share a polished copy.
 
-NEditor documents are plain Markdown files. That means your work is not locked
-inside a cloud account or proprietary database. You can store the files in a
-normal project folder, a shared drive, or a Git repository if your team uses one.
+NEditor documents are plain Markdown files. In practical terms, that means your
+work lives in normal files and folders instead of being locked inside a cloud
+account or proprietary database. Your team can store those files on a shared
+drive, in a document-management folder, or in Git if your organization already
+uses it.
 
-### Common Business Workflows
+### Everyday Business Workflows
 
-| I need to... | Use this in NEditor |
+| I need to... | What to do in NEditor |
 | --- | --- |
-| Draft a board paper, proposal, report, or briefing note | Start with Outline mode, then fill in the generated sections. |
-| Reuse a standard company structure | Keep a Markdown template or example project and duplicate it for new work. |
-| Send a web-ready review copy | Use **HTML Export**. |
-| Send a client-facing document | Export to PDF or DOCX. |
-| Prepare a presentation handoff | Export to PPTX or use presentation mode to review the structure. |
-| Publish to a blog or Substack | Export the Blog or Substack package and copy the prepared content into the publishing tool. |
-| Hand off to Google Docs | Export the Google Docs package and import the included DOCX into Google Docs. |
-| Keep an audit trail | Turn on export manifests and use snapshots or Git tagging if your team needs formal release evidence. |
-| Add calculations, charts, or diagrams | Use the built-in transform templates, then fill in the values. |
+| Draft a board paper, proposal, report, or briefing note | Start in **Outline** mode, create the structure, then fill in each section. |
+| Reuse a company format | Start from an approved Markdown template or example document, then save a copy for the new engagement. |
+| Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
+| Send a client-facing document | Export to PDF or DOCX, depending on what the recipient expects. |
+| Prepare slides or an executive handoff | Export to PPTX or use presentation mode to review the section flow. |
+| Publish to a blog or Substack | Export the Blog or Substack package, then copy the prepared content into the publishing tool. |
+| Continue editing in Google Docs | Export the Google Docs package, then import the included DOCX into Google Docs. |
+| Keep formal evidence for approvals | Use export manifests, review status, approval metadata, snapshots, and release tags when your team needs an audit trail. |
+| Add calculations, charts, or diagrams | Insert a built-in transform template, replace the sample values, and preview the result. |
 
-### What To Ask IT Or A Technical Teammate For
+### What NEditor Helps With
 
-Most writing, review, file, and export workflows work inside the NEditor app.
-Some optional capabilities may need setup by a technical teammate:
+- Long reports, proposals, business cases, strategy papers, research briefs, and
+  technical documents.
+- Documents that need structured outlines before the body text is written.
+- Repeatable exports where the same source can become HTML, PDF, DOCX, PPTX,
+  Markdown bundle, blog, Substack, LaTeX, or Google Docs handoff files.
+- Review-heavy work where comments, approval metadata, release status, AI
+  provenance, and export evidence matter.
+- Local-first writing where files stay on your computer or in the folder system
+  your organization already uses.
+
+### When To Ask For Help
+
+Most writing, review, file, and export workflows work directly inside NEditor.
+Ask IT, a release manager, or a technical teammate when you need:
 
 - A ready-made app package for your operating system.
+- Help with a security warning during first launch.
+- Company templates, brand profiles, export defaults, or approved cover-page
+  settings.
 - Optional diagram engines such as Graphviz, D2, PlantUML, or Pikchr.
-- Company brand profiles, export defaults, and approved document templates.
-- A shared folder, Git repository, or backup location for important documents.
-- Release signing or notarization if your organization distributes NEditor
-  internally.
+- A shared folder, backup location, or Git repository for important documents.
+- Signed or notarized installers for internal company distribution.
 
 ### Where To Learn More
 
