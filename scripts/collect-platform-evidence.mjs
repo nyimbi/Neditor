@@ -17,6 +17,7 @@ const buildCommand =
   process.env.NEDITOR_PLATFORM_BUILD_COMMAND ||
   "pnpm run build && ./node_modules/.bin/tauri build --bundles all";
 const sourceCommit = String(args["source-commit"] || process.env.NEDITOR_SOURCE_COMMIT || gitCommit()).trim();
+const sourceTreeClean = gitTreeClean();
 
 const platformSpecs = {
   win32: {
@@ -51,6 +52,10 @@ if (!sourceCommit) {
   console.error("Source commit is required. Run from a Git checkout or pass --source-commit / NEDITOR_SOURCE_COMMIT.");
   process.exit(1);
 }
+if (!sourceTreeClean) {
+  console.error("Platform evidence must be collected from a clean Git tree. Commit or discard local changes before collecting release proof.");
+  process.exit(1);
+}
 
 const outputs = [];
 if (!args["webdriver-only"]) {
@@ -81,6 +86,7 @@ function writePackageEvidence(spec) {
         status: "passed",
         appVersion: packageJson.version,
         sourceCommit,
+        sourceTreeClean,
         generatedAt: new Date().toISOString(),
         command: buildCommand,
         artifacts,
@@ -109,6 +115,9 @@ function writeWebdriverEvidence(spec) {
   }
   if (report.sourceCommit !== sourceCommit) {
     throw new Error(`Desktop WebDriver report sourceCommit ${report.sourceCommit || "(missing)"} does not match ${sourceCommit}.`);
+  }
+  if (report.sourceTreeClean !== true) {
+    throw new Error("Desktop WebDriver report sourceTreeClean must be true.");
   }
   const reportPath = join(evidenceDir, spec.webdriverPath);
   mkdirSync(dirname(reportPath), { recursive: true });
@@ -184,4 +193,12 @@ function gitCommit() {
   });
   if (result.status !== 0) return "";
   return result.stdout.trim();
+}
+
+function gitTreeClean() {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0 && result.stdout.trim() === "";
 }

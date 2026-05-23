@@ -40,6 +40,7 @@ const report = {
   arch: process.arch,
   appVersion: packageJson.version,
   sourceCommit: gitCommit(),
+  sourceTreeClean: gitTreeClean(),
   application: relative(application),
   serverUrl,
   timeoutMs,
@@ -1005,6 +1006,14 @@ function gitCommit() {
   });
   if (result.status !== 0) return "";
   return result.stdout.trim();
+}
+
+function gitTreeClean() {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0 && result.stdout.trim() === "";
 }
 
 function collectMacosNativeProof() {

@@ -727,6 +727,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(googleDocsImport.includes("neditor.google-docs-import-evidence.v1"));
   ok(googleDocsImport.includes("appVersion must match package.json version"));
   ok(googleDocsImport.includes("sourceCommit must match current git commit"));
+  ok(googleDocsImport.includes("sourceTreeClean must be true"));
   ok(googleDocsImport.includes("NEDITOR_GOOGLE_DOCS_IMPORT_EVIDENCE"));
   ok(googleDocsImport.includes("pending-google-drive-authorization"));
   ok(googleDocsImport.includes("rendered-export-audit.google-docs.zip"));
@@ -738,6 +739,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformEvidence.includes("neditor.platform-package-artifacts.v1"));
   ok(platformEvidence.includes("appVersion must match package.json version"));
   ok(platformEvidence.includes("sourceCommit must match current git commit"));
+  ok(platformEvidence.includes("sourceTreeClean must be true"));
   ok(platformEvidence.includes("win32/tauri-webdriver-report.json"));
   ok(platformEvidence.includes("linux/package-artifacts.json"));
   ok(platformEvidence.includes("pending-external-evidence"));
@@ -752,11 +754,14 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformCollector.includes("NEDITOR_SOURCE_COMMIT"));
   ok(platformCollector.includes("neditor.platform-package-artifacts.v1"));
   ok(platformCollector.includes("Desktop WebDriver report sourceCommit"));
+  ok(platformCollector.includes("Desktop WebDriver report sourceTreeClean must be true"));
+  ok(platformCollector.includes("Platform evidence must be collected from a clean Git tree"));
   ok(platformCollector.includes("Run pnpm run test:tauri-webdriver first"));
   ok(platformCollector.includes("Desktop WebDriver report status must be passed"));
   ok(releaseSigning.includes("neditor.release-signing-evidence.v1"));
   ok(releaseSigning.includes("releaseVersion must match package.json version"));
   ok(releaseSigning.includes("sourceCommit must match current git commit"));
+  ok(releaseSigning.includes("sourceTreeClean must be true"));
   ok(releaseSigning.includes("darwin/signing-evidence.json"));
   ok(releaseSigning.includes("win32/signing-evidence.json"));
   ok(releaseSigning.includes("linux/signing-evidence.json"));
@@ -767,6 +772,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(signingCollector.includes("NEDITOR_SOURCE_COMMIT"));
   ok(signingCollector.includes("neditor.release-signing-evidence.v1"));
   ok(signingCollector.includes("Release version must match package.json version"));
+  ok(signingCollector.includes("Release signing evidence must be collected from a clean Git tree"));
   ok(signingCollector.includes("Missing required"));
   ok(signingCollector.includes("Release signing proof command failed"));
 });
@@ -800,8 +806,10 @@ test("manual accessibility signoff validates screen-reader review evidence", () 
   ok(script.includes("assistiveTechnology"));
   ok(script.includes("appVersion"));
   ok(script.includes("sourceCommit"));
+  ok(script.includes("sourceTreeClean"));
   ok(script.includes("completed sign-off appVersion must match package.json version"));
   ok(script.includes("completed sign-off sourceCommit must match current git commit"));
+  ok(script.includes("completed sign-off sourceTreeClean must be true"));
   ok(script.includes("requiredReviewSessions"));
   ok(script.includes("screen-reader-navigation"));
   ok(script.includes("native-desktop-shell"));
@@ -918,8 +926,10 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
   ok(script.includes("neditor.rendered-export.visual-signoff.v1"));
   ok(script.includes("appVersion"));
   ok(script.includes("sourceCommit"));
+  ok(script.includes("sourceTreeClean"));
   ok(script.includes("completed sign-off appVersion must match package.json version"));
   ok(script.includes("completed sign-off sourceCommit must match current git commit"));
+  ok(script.includes("completed sign-off sourceTreeClean must be true"));
   ok(script.includes("collectHumanSignoffEvidence"));
   ok(script.includes("collectAutomatedVisualReviewEvidence"));
   ok(script.includes("validateCompletedSignoff"));
@@ -980,6 +990,7 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("workflowPlan: webdriverWorkflowPlan"));
   ok(script.includes("appVersion: packageJson.version"));
   ok(script.includes("sourceCommit: gitCommit()"));
+  ok(script.includes("sourceTreeClean: gitTreeClean()"));
   ok(script.includes("persisted desktop preferences after restart"));
   ok(script.includes("Official Tauri WebDriver currently supports desktop automation on Windows and Linux only"));
   ok(script.includes("collectMacosNativeProof"));

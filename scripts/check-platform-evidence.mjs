@@ -122,6 +122,7 @@ function evaluatePackageArtifacts(spec) {
   requireValue(isIsoDate(report.generatedAt), problems, "generatedAt must be an ISO timestamp");
   requireValue(report.appVersion === packageJson.version, problems, `appVersion must match package.json version ${packageJson.version}`);
   requireValue(report.sourceCommit === currentSourceCommit, problems, `sourceCommit must match current git commit ${currentSourceCommit}`);
+  requireValue(report.sourceTreeClean === true, problems, "sourceTreeClean must be true");
   requireValue(String(report.command || "").includes("tauri build"), problems, "command must identify the Tauri package build");
   const artifacts = Array.isArray(report.artifacts) ? report.artifacts : [];
   requireValue(artifacts.length > 0, problems, "artifacts must include at least one package artifact");
@@ -144,6 +145,7 @@ function evaluatePackageArtifacts(spec) {
     generatedAt: report.generatedAt,
     appVersion: report.appVersion,
     sourceCommit: report.sourceCommit,
+    sourceTreeClean: report.sourceTreeClean,
     command: report.command,
     artifacts: artifacts.map((artifact) => ({
       kind: artifact.kind,
@@ -170,6 +172,7 @@ function evaluateWebdriverReport(spec) {
   requireValue(isIsoDate(report.generatedAt), problems, "generatedAt must be an ISO timestamp");
   requireValue(report.appVersion === packageJson.version, problems, `appVersion must match package.json version ${packageJson.version}`);
   requireValue(report.sourceCommit === currentSourceCommit, problems, `sourceCommit must match current git commit ${currentSourceCommit}`);
+  requireValue(report.sourceTreeClean === true, problems, "sourceTreeClean must be true");
   const workflowPlan = Array.isArray(report.workflowPlan) ? report.workflowPlan : [];
   const assertions = Array.isArray(report.assertions) ? report.assertions : [];
   requireValue(assertions.length >= requiredWebdriverAssertions.length, problems, "assertions must include the full desktop workflow proof");
@@ -213,6 +216,7 @@ function evaluateWebdriverReport(spec) {
     generatedAt: report.generatedAt,
     appVersion: report.appVersion,
     sourceCommit: report.sourceCommit,
+    sourceTreeClean: report.sourceTreeClean,
     assertions: report.assertions.length,
     outputHash: report.exportArtifacts.outputHash,
   };
@@ -270,6 +274,7 @@ function writeTemplates() {
           status: "passed",
           appVersion: packageJson.version,
           sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
+          sourceTreeClean: true,
           generatedAt: new Date().toISOString(),
           command: "pnpm run build && ./node_modules/.bin/tauri build --bundles all",
           artifacts: [
@@ -295,6 +300,7 @@ function writeTemplates() {
           status: "passed",
           appVersion: packageJson.version,
           sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
+          sourceTreeClean: true,
           workflowPlan: requiredWebdriverAssertions,
           assertions: requiredWebdriverAssertions.map((name) => ({ name, status: "passed" })),
           outlineArtifacts: {

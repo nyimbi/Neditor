@@ -1269,6 +1269,7 @@ function writeManualSignoffTemplate(report, assertions) {
     status: "pending-human-review",
     appVersion: packageJson.version,
     sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
+    sourceTreeClean: true,
     instructions: [
       "Copy this template before editing it.",
       "Open every primary artifact and review-case target in the relevant native or browser viewer.",
@@ -1519,6 +1520,9 @@ function validateCompletedSignoff(signoff, report) {
   }
   if (signoff.sourceCommit !== currentSourceCommit) {
     validationIssues.push(`completed sign-off sourceCommit must match current git commit ${currentSourceCommit}`);
+  }
+  if (signoff.sourceTreeClean !== true) {
+    validationIssues.push("completed sign-off sourceTreeClean must be true");
   }
   if (signoff.status !== "human-reviewed") {
     validationIssues.push("completed sign-off status must be human-reviewed");

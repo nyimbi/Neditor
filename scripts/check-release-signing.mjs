@@ -104,6 +104,7 @@ function evaluateSigningEvidence(spec) {
   requireValue(isIsoDate(evidence.generatedAt), problems, "generatedAt must be an ISO timestamp");
   requireValue(evidence.releaseVersion === packageJson.version, problems, `releaseVersion must match package.json version ${packageJson.version}`);
   requireValue(evidence.sourceCommit === currentSourceCommit, problems, `sourceCommit must match current git commit ${currentSourceCommit}`);
+  requireValue(evidence.sourceTreeClean === true, problems, "sourceTreeClean must be true");
   const artifacts = Array.isArray(evidence.artifacts) ? evidence.artifacts : [];
   requireValue(artifacts.length > 0, problems, "artifacts must include at least one signed release artifact");
   for (const artifact of artifacts) {
@@ -136,6 +137,7 @@ function evaluateSigningEvidence(spec) {
     generatedAt: evidence.generatedAt,
     releaseVersion: evidence.releaseVersion,
     sourceCommit: evidence.sourceCommit,
+    sourceTreeClean: evidence.sourceTreeClean,
     artifacts: artifacts.map((artifact) => ({
       kind: artifact.kind,
       path: artifact.path,
@@ -186,6 +188,7 @@ function writeTemplates() {
           generatedAt: new Date().toISOString(),
           releaseVersion: packageJson.version,
           sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
+          sourceTreeClean: true,
           artifacts: [
             {
               kind: spec.artifactKinds[0],

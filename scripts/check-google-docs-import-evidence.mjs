@@ -105,6 +105,7 @@ function validateImportEvidence(localArtifacts) {
   requireValue(isIsoDate(evidence.generatedAt), "generatedAt must be an ISO timestamp");
   requireValue(evidence.appVersion === packageJson.version, `appVersion must match package.json version ${packageJson.version}`);
   requireValue(evidence.sourceCommit === currentSourceCommit, `sourceCommit must match current git commit ${currentSourceCommit}`);
+  requireValue(evidence.sourceTreeClean === true, "sourceTreeClean must be true");
   requireValue(evidence.importMethod === "google-drive-import-document", "importMethod must be google-drive-import-document");
   requireValue(Boolean(String(evidence.importedDocument?.id || "").trim()), "importedDocument.id is required");
   requireValue(Boolean(String(evidence.importedDocument?.title || "").trim()), "importedDocument.title is required");
@@ -137,6 +138,7 @@ function validateImportEvidence(localArtifacts) {
     generatedAt: evidence.generatedAt,
     appVersion: evidence.appVersion,
     sourceCommit: evidence.sourceCommit,
+    sourceTreeClean: evidence.sourceTreeClean,
     importedDocument: evidence.importedDocument,
     readback: {
       paragraphCount: evidence.readback.paragraphCount,
@@ -182,6 +184,7 @@ function writeTemplate(localArtifacts) {
         generatedAt: new Date().toISOString(),
         appVersion: packageJson.version,
         sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
+        sourceTreeClean: true,
         importMethod: "google-drive-import-document",
         sourceArtifacts: {
           docxPath: localArtifacts.docx.path,

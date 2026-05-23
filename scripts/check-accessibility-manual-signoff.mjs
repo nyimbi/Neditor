@@ -126,6 +126,7 @@ function createTemplate(prerequisiteReports) {
     schema: "neditor.accessibility.manual-signoff.v1",
     appVersion: packageJson.version,
     sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
+    sourceTreeClean: true,
     reviewer: {
       name: "",
       role: "",
@@ -229,6 +230,9 @@ function validateCompletedSignoff(path, issues) {
   }
   if (signoff.sourceCommit !== currentSourceCommit) {
     issues.push(`completed sign-off sourceCommit must match current git commit ${currentSourceCommit}`);
+  }
+  if (signoff.sourceTreeClean !== true) {
+    issues.push("completed sign-off sourceTreeClean must be true");
   }
   if (!signoff.reviewer?.name?.trim()) {
     issues.push("completed sign-off must include reviewer.name");
