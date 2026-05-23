@@ -520,6 +520,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('"neditor-export-html": "html"'));
   ok(app.includes("collectNativeMenuCommandEvidence"));
   ok(app.includes("native workflow inserted table from native writing tools menu"));
+  ok(app.includes("collectNativeWorkspaceTabEvidence"));
+  ok(app.includes("native workflow restored workspace tabs with active pinned and scroll state"));
   ok(app.includes("flushEditorTextToStore();"));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Export")'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Edit")'));

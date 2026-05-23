@@ -904,7 +904,8 @@ Needed desktop smoke coverage:
   output, dirty title mutation, HTML export readiness progress evidence, a
   real app-initiated HTML export with sidecar manifest/output-hash evidence,
   guarded native menu-event routing for `File` -> `Export` -> `HTML Export`
-  through the same readiness-backed HTML export path,
+  through the same readiness-backed HTML export path, workspace/tab
+  organization with real `.tmp/desktop-smoke/native-workspace-*` Markdown files,
   and stale-save conflict recovery through keep-local plus save, save-copy,
   merge, accept-external, and final file restoration assertions.
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
@@ -1309,19 +1310,30 @@ Finish:
 ### 9. Workspace, Tabs, And Document Sets
 
 Status: tabs, pinned tabs, recents, recently closed items, workspace browsing,
-and restore logic exist; spec-level proof is incomplete.
+document-set grouping, and restore logic exist; native proof now covers the
+main deterministic workspace/tab organization path, while pointer-level edge
+cases and broader platform proof remain incomplete.
 
 Finish:
 
 - Folder/workspace/project grouping behavior. The browser harness now covers
   folder grouping for open documents and document-set grouping from front
   matter metadata.
-- Remaining document-set edge cases: native execution proof, saved workspace
-  package evidence, and deeper drag/reorder behavior beyond moving a loose tab
-  into an existing set.
+- Remaining document-set edge cases: saved workspace package evidence and
+  deeper pointer drag/reorder behavior beyond moving a loose tab into an
+  existing set.
+- Native execution proof: `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run
+  test:desktop-smoke` now creates real `.tmp/desktop-smoke/native-workspace-*`
+  Markdown files and records `workspaceTabEvidence` for document-set grouping,
+  pinned-tab grouping, production drop-handler assignment of a loose note into
+  `Native Board Pack`, close-group behavior, recently closed reopening, and
+  restore of active/pinned/editor-scroll/preview-scroll state.
 - Restart restore of previous workspace, active tab, mode/sidebar state, and
-  pinned state. Browser archived workflow run `26147556750` covers this workflow.
-- Scroll position restore. Browser archived workflow run `26148828614` covers this workflow.
+  pinned state. Browser archived workflow run `26147556750` covers this workflow,
+  and launched native smoke now covers deterministic active/pinned restore.
+- Scroll position restore. Browser archived workflow run `26148828614` covers this workflow,
+  and launched native smoke now covers editor/preview scroll-ratio restore for
+  a pinned real file.
 - Recently closed behavior for renamed and deleted files, plus dirty unsaved
   close confirmation. Browser archived workflow run `26151184228` covers this workflow.
 - Recent folder reopening and stale recent-folder pruning, plus externally

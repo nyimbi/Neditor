@@ -472,6 +472,12 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow inserted table from native writing tools menu",
     "native workflow opened templates from native writing tools menu",
     "native workflow opened AI paste from native writing tools menu",
+    "native workflow grouped document-set tabs",
+    "native workflow pinned tab into pinned group",
+    "native workflow assigned loose tab to document set",
+    "native workflow closed document-set tab group",
+    "native workflow reopened recently closed tab",
+    "native workflow restored workspace tabs with active pinned and scroll state",
     "native workflow saved export profile",
     "native workflow applied export profile",
     "native workflow reloaded export profile from settings store",
@@ -615,6 +621,31 @@ function validateNativeWorkflowReport(launchReport) {
     nativeMenuCommandEvidence.aiPaste?.open !== true
   ) {
     issues.push(`native workflow report did not include native menu command evidence: ${JSON.stringify(nativeMenuCommandEvidence)}`);
+  }
+  const workspaceTabEvidence = payload.workspaceTabEvidence || {};
+  const workspacePaths = {
+    boardOne: String(workspaceTabEvidence.boardOnePath || "").replaceAll("\\", "/"),
+    boardTwo: String(workspaceTabEvidence.boardTwoPath || "").replaceAll("\\", "/"),
+    loose: String(workspaceTabEvidence.loosePath || "").replaceAll("\\", "/"),
+  };
+  if (
+    workspaceTabEvidence.initialBoardGroup?.key !== "set:Native Board Pack" ||
+    workspaceTabEvidence.initialBoardGroup?.count < 2 ||
+    !Array.isArray(workspaceTabEvidence.pinnedGroup?.paths) ||
+    !workspaceTabEvidence.pinnedGroup.paths.map((path) => String(path).replaceAll("\\", "/")).includes(workspacePaths.boardOne) ||
+    workspaceTabEvidence.looseAssigned?.textHasDocumentSet !== true ||
+    workspaceTabEvidence.looseAssigned?.saved !== true ||
+    !Array.isArray(workspaceTabEvidence.closeGroup?.closedPaths) ||
+    workspaceTabEvidence.closeGroup.closedPaths.length < 2 ||
+    workspaceTabEvidence.closeGroup.closedPaths.map((path) => String(path).replaceAll("\\", "/")).some((path) => !path.includes("native-workspace-")) ||
+    String(workspaceTabEvidence.recentReopen?.activePath || "").replaceAll("\\", "/") !== workspacePaths.boardTwo ||
+    String(workspaceTabEvidence.restore?.activePath || "").replaceAll("\\", "/") !== workspacePaths.boardTwo ||
+    String(workspaceTabEvidence.restore?.pinnedPath || "").replaceAll("\\", "/") !== workspacePaths.boardOne ||
+    workspaceTabEvidence.restore?.pinned !== true ||
+    Math.abs(Number(workspaceTabEvidence.restore?.editorScrollRatio || 0) - 0.42) > 0.001 ||
+    Math.abs(Number(workspaceTabEvidence.restore?.previewScrollRatio || 0) - 0.58) > 0.001
+  ) {
+    issues.push(`native workflow report did not include workspace tab evidence: ${JSON.stringify(workspaceTabEvidence)}`);
   }
   if (payload.exportReadiness?.target !== "html" || !Array.isArray(payload.exportReadiness?.progressSteps)) {
     issues.push(`native workflow report did not include HTML export readiness evidence: ${JSON.stringify(payload.exportReadiness)}`);

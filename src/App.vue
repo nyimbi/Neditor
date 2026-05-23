@@ -2985,7 +2985,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     store.lastExportManifestPath = "";
     store.lastExportProgressSteps = [];
     store.lastExportDiagnostics = [];
-    await invoke("emit_desktop_workflow_smoke_menu_command", { command: "neditor-export-html" }).catch(() => undefined);
+    await emitNativeWorkflowMenuCommand("neditor-export-html", 500);
     await waitForNativeWorkflowCondition(
       () =>
         Boolean(
@@ -3048,27 +3048,15 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       themeAccessibility,
     });
     smokePhase = "native-menu-commands-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, {
-      fileWorkflow,
-      snapshotEvidence,
-      modeEvidence,
-      exportResult,
-      nativeMenuExportResult,
-      exportProfileEvidence,
-      themeAccessibility,
-    });
+    await writeNativeWorkflowCheckpoint(smokePhase, assertions);
     const nativeMenuCommandEvidence = await collectNativeMenuCommandEvidence(record);
     smokePhase = "native-menu-commands";
-    await writeNativeWorkflowProgress(smokePhase, assertions, {
-      fileWorkflow,
-      snapshotEvidence,
-      modeEvidence,
-      exportResult,
-      nativeMenuExportResult,
-      exportProfileEvidence,
-      themeAccessibility,
-      nativeMenuCommandEvidence,
-    });
+    await writeNativeWorkflowCheckpoint(smokePhase, assertions);
+    smokePhase = "workspace-tabs-start";
+    await writeNativeWorkflowCheckpoint(smokePhase, assertions);
+    const workspaceTabEvidence = await collectNativeWorkspaceTabEvidence(record);
+    smokePhase = "workspace-tabs";
+    await writeNativeWorkflowCheckpoint(smokePhase, assertions);
 
     const passed = assertions.every((assertion) => assertion.passed);
     smokePhase = "final";
@@ -3089,6 +3077,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       exportResult,
       nativeMenuExportResult,
       nativeMenuCommandEvidence,
+      workspaceTabEvidence,
       exportReadiness: exportReadinessEvidence,
     });
   } catch (error) {
@@ -3218,6 +3207,20 @@ async function writeNativeWorkflowProgress(
   });
 }
 
+async function writeNativeWorkflowCheckpoint(
+  phase: string,
+  assertions: Array<{ name: string; passed: boolean; detail?: string }>,
+) {
+  await writeDesktopWorkflowSmokeReport({
+    status: "running",
+    phase,
+    assertionCount: assertions.length,
+    title: document.title,
+    mode: store.mode,
+    sidebar: store.sidebar,
+  });
+}
+
 async function collectNativeExportProfileEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
   store.sidebar = "exports";
   store.exportTarget = "pdf";
@@ -3301,7 +3304,7 @@ async function collectNativeExportProfileEvidence(record: (name: string, passed:
 async function collectNativeMenuCommandEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
   const evidence: Record<string, unknown> = {};
   const runMenuCommand = async (command: string) => {
-    await invoke("emit_desktop_workflow_smoke_menu_command", { command }).catch(() => undefined);
+    await emitNativeWorkflowMenuCommand(command, 500);
     await nextTick();
   };
   const textCount = (needle: string) => active.value.text.split(needle).length - 1;
@@ -3353,8 +3356,195 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
   return evidence;
 }
 
+async function emitNativeWorkflowMenuCommand(command: string, timeoutMs: number) {
+  const emitted = invoke("emit_desktop_workflow_smoke_menu_command", { command }).catch(() => undefined);
+  await Promise.race([
+    emitted,
+    nativeWorkflowDelay(timeoutMs),
+  ]);
+  await nextTick();
+}
+
+async function collectNativeWorkspaceTabEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const boardOnePath = await invoke<string | null>("desktop_workflow_smoke_named_path", { fileStem: "native-workspace-board-one", extension: "md" }).catch(() => null);
+  const boardTwoPath = await invoke<string | null>("desktop_workflow_smoke_named_path", { fileStem: "native-workspace-board-two", extension: "md" }).catch(() => null);
+  const loosePath = await invoke<string | null>("desktop_workflow_smoke_named_path", { fileStem: "native-workspace-loose-note", extension: "md" }).catch(() => null);
+  const boardSet = "Native Board Pack";
+  const evidence: Record<string, unknown> = {
+    boardOnePath,
+    boardTwoPath,
+    loosePath,
+    boardSet,
+  };
+  if (!boardOnePath || !boardTwoPath || !loosePath) {
+    record("native workflow resolved workspace tab proof paths", false, JSON.stringify(evidence));
+    return evidence;
+  }
+
+  const boardOneText = `---
+title: Native Board One
+documentSet: ${boardSet}
+status: draft
+---
+
+# Native Board One
+
+Native board one body.
+`;
+  const boardTwoText = `---
+title: Native Board Two
+documentSet: ${boardSet}
+status: draft
+---
+
+# Native Board Two
+
+Native board two body.
+`;
+  const looseText = `---
+title: Native Loose Note
+status: draft
+---
+
+# Native Loose Note
+
+Native loose note body.
+`;
+  await invoke("save_file", { request: { path: boardOnePath, text: boardOneText, expected_hash: null } });
+  await invoke("save_file", { request: { path: boardTwoPath, text: boardTwoText, expected_hash: null } });
+  await invoke("save_file", { request: { path: loosePath, text: looseText, expected_hash: null } });
+
+  await store.openPath(boardOnePath);
+  await store.openPath(boardTwoPath);
+  await store.openPath(loosePath);
+  await nextTick();
+  const initialBoardGroup = groupedDocuments.value.find((group) => group.key === `set:${boardSet}`);
+  evidence.initialBoardGroup = initialBoardGroup
+    ? { key: initialBoardGroup.key, label: initialBoardGroup.label, count: initialBoardGroup.documents.length }
+    : null;
+  record(
+    "native workflow grouped document-set tabs",
+    Boolean(initialBoardGroup && initialBoardGroup.documents.length >= 2),
+    JSON.stringify(evidence.initialBoardGroup),
+  );
+
+  const boardOne = store.documents.find((document) => document.path === boardOnePath);
+  if (boardOne) {
+    store.setPinned(boardOne.id, true);
+    await waitForNativeWorkflowCondition(() => groupedDocuments.value.some((group) => group.key === "pinned" && group.documents.some((document) => document.path === boardOnePath)), 800);
+  }
+  const pinnedGroup = groupedDocuments.value.find((group) => group.key === "pinned");
+  evidence.pinnedGroup = pinnedGroup ? { count: pinnedGroup.documents.length, paths: pinnedGroup.documents.map((document) => document.path) } : null;
+  record(
+    "native workflow pinned tab into pinned group",
+    Boolean(pinnedGroup?.documents.some((document) => document.path === boardOnePath)),
+    JSON.stringify(evidence.pinnedGroup),
+  );
+
+  const looseDocument = store.documents.find((document) => document.path === loosePath);
+  const boardGroupForDrop = groupedDocuments.value.find((group) => group.key === `set:${boardSet}`);
+  if (looseDocument && boardGroupForDrop) {
+    draggedTabId.value = looseDocument.id;
+    dropTabOnGroup(boardGroupForDrop);
+    await waitForNativeWorkflowCondition(() => active.value.path === loosePath && active.value.text.includes(`documentSet: ${boardSet}`), 1000);
+    await store.saveActive(loosePath);
+    await nextTick();
+    await store.compileActive();
+  }
+  const looseAssigned = {
+    activePath: active.value.path,
+    textHasDocumentSet: active.value.text.includes(`documentSet: ${boardSet}`),
+    saved: !active.value.dirty,
+  };
+  evidence.looseAssigned = looseAssigned;
+  record(
+    "native workflow assigned loose tab to document set",
+    active.value.path === loosePath && looseAssigned.textHasDocumentSet && looseAssigned.saved,
+    JSON.stringify(looseAssigned),
+  );
+
+  const boardGroupAfterDrop = groupedDocuments.value.find((group) => group.key === `set:${boardSet}`);
+  const closeGroupPaths = boardGroupAfterDrop?.documents.map((document) => document.path).filter(Boolean) || [];
+  if (boardGroupAfterDrop) {
+    closeTabGroup(boardGroupAfterDrop);
+    await waitForNativeWorkflowCondition(() => closeGroupPaths.every((path) => !store.documents.some((document) => document.path === path)), 1000);
+  }
+  const closeGroupEvidence = {
+    closedPaths: closeGroupPaths,
+    openPaths: store.documents.map((document) => document.path).filter(Boolean),
+    recentlyClosed: store.recentlyClosed.slice(0, 6),
+  };
+  evidence.closeGroup = closeGroupEvidence;
+  record(
+    "native workflow closed document-set tab group",
+    closeGroupPaths.length >= 2 && closeGroupPaths.every((path) => !store.documents.some((document) => document.path === path)),
+    JSON.stringify(closeGroupEvidence),
+  );
+
+  await store.openRecentPath(boardTwoPath);
+  await nextTick();
+  const recentReopen = {
+    activePath: active.value.path,
+    recentlyClosed: store.recentlyClosed.slice(0, 6),
+  };
+  evidence.recentReopen = recentReopen;
+  record(
+    "native workflow reopened recently closed tab",
+    active.value.path === boardTwoPath && !store.recentlyClosed.includes(boardTwoPath),
+    JSON.stringify(recentReopen),
+  );
+
+  await store.openPath(boardOnePath);
+  await nextTick();
+  const restoredBoardOne = store.documents.find((document) => document.path === boardOnePath);
+  if (restoredBoardOne) {
+    store.setPinned(restoredBoardOne.id, true);
+    store.setDocumentScroll(restoredBoardOne.id, { editor: 0.42, preview: 0.58 }, true);
+  }
+  store.mode = "review";
+  store.sidebar = "review";
+  await store.persistWorkspace();
+  await store.restoreWorkspace(
+    [boardOnePath, boardTwoPath],
+    boardTwoPath,
+    [boardOnePath],
+    {
+      [boardOnePath]: { editor: 0.42, preview: 0.58 },
+      [boardTwoPath]: { editor: 0.12, preview: 0.34 },
+    },
+  );
+  await nextTick();
+  await store.compileActive();
+  const restoredPinned = store.documents.find((document) => document.path === boardOnePath);
+  const restoredActive = active.value;
+  const restoreEvidence = {
+    paths: store.documents.map((document) => document.path).filter(Boolean),
+    activePath: restoredActive.path,
+    pinnedPath: restoredPinned?.path || "",
+    pinned: restoredPinned?.pinned === true,
+    editorScrollRatio: restoredPinned?.editorScrollRatio,
+    previewScrollRatio: restoredPinned?.previewScrollRatio,
+  };
+  evidence.restore = restoreEvidence;
+  record(
+    "native workflow restored workspace tabs with active pinned and scroll state",
+    restoreEvidence.activePath === boardTwoPath &&
+      restoredPinned?.pinned === true &&
+      Math.abs((restoredPinned.editorScrollRatio || 0) - 0.42) < 0.001 &&
+      Math.abs((restoredPinned.previewScrollRatio || 0) - 0.58) < 0.001,
+    JSON.stringify(restoreEvidence),
+  );
+
+  return evidence;
+}
+
 async function writeDesktopWorkflowSmokeReport(payload: Record<string, unknown>) {
-  await invoke("write_desktop_workflow_smoke_report", { payload }).catch(() => undefined);
+  const written = invoke("write_desktop_workflow_smoke_report", { payload }).catch(() => undefined);
+  await Promise.race([written, nativeWorkflowDelay(750)]);
+}
+
+function nativeWorkflowDelay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 async function collectNativeFileWorkflowEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
