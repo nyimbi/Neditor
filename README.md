@@ -14,6 +14,79 @@ Markdown bundle, blog, Substack, LaTeX, or Google Docs package outputs.
 
 ![NEditor workbench showing Markdown source, live preview, outline, diagnostics, and status](docs/screenshots/workbench.svg)
 
+## Start Here If You Just Want To Use NEditor
+
+NEditor is meant to feel like a document app, not a developer tool. A normal
+business user should be able to open the desktop app, create or open a document,
+write in plain text, preview the formatted result, and export a polished file
+without touching a terminal.
+
+### Download And Install
+
+Use the installer or app package supplied by your organization, project team, or
+release manager.
+
+| Platform | What to use | What happens |
+| --- | --- | --- |
+| macOS | `NEditor.app`, usually delivered in a `.dmg` or `.zip` | Drag the app to Applications, then open it like any other Mac app. |
+| Windows | Windows installer or packaged `NEditor` app | Install it, then launch NEditor from the Start menu. |
+| Linux | AppImage, Debian package, RPM package, or packaged desktop app | Mark it executable or install the package, then launch NEditor from your app menu. |
+
+If you are reading this README from a source-code checkout and do not see a
+ready-made installer, ask a technical teammate to build or provide the desktop
+package for your platform. The developer build commands are later in this file.
+
+### Your First Document
+
+1. Open NEditor.
+2. Choose **New** for a blank document, or **Open** to work on an existing
+   Markdown file.
+3. Use the **Outline** mode or Outline panel to sketch chapters, sections,
+   subsections, and subsubsections before writing the full text.
+4. Write in the source editor. The preview shows how the document will read.
+5. Use **Save** or **Save As** so the document lives in a normal folder you
+   control.
+6. Use **Export** or **HTML Export** when you need a polished handoff.
+
+NEditor documents are plain Markdown files. That means your work is not locked
+inside a cloud account or proprietary database. You can store the files in a
+normal project folder, a shared drive, or a Git repository if your team uses one.
+
+### Common Business Workflows
+
+| I need to... | Use this in NEditor |
+| --- | --- |
+| Draft a board paper, proposal, report, or briefing note | Start with Outline mode, then fill in the generated sections. |
+| Reuse a standard company structure | Keep a Markdown template or example project and duplicate it for new work. |
+| Send a web-ready review copy | Use **HTML Export**. |
+| Send a client-facing document | Export to PDF or DOCX. |
+| Prepare a presentation handoff | Export to PPTX or use presentation mode to review the structure. |
+| Publish to a blog or Substack | Export the Blog or Substack package and copy the prepared content into the publishing tool. |
+| Hand off to Google Docs | Export the Google Docs package and import the included DOCX into Google Docs. |
+| Keep an audit trail | Turn on export manifests and use snapshots or Git tagging if your team needs formal release evidence. |
+| Add calculations, charts, or diagrams | Use the built-in transform templates, then fill in the values. |
+
+### What To Ask IT Or A Technical Teammate For
+
+Most writing, review, file, and export workflows work inside the NEditor app.
+Some optional capabilities may need setup by a technical teammate:
+
+- A ready-made app package for your operating system.
+- Optional diagram engines such as Graphviz, D2, PlantUML, or Pikchr.
+- Company brand profiles, export defaults, and approved document templates.
+- A shared folder, Git repository, or backup location for important documents.
+- Release signing or notarization if your organization distributes NEditor
+  internally.
+
+### Where To Learn More
+
+- [User guide](docs/user-guide.md): practical writing, file, export, review,
+  and troubleshooting guidance.
+- [Markdown extensions](docs/markdown-extensions.md): the extra document
+  features NEditor understands.
+- [External transform setup](docs/external-transforms.md): optional diagram and
+  data engine setup for technical users.
+
 ## Why NEditor
 
 Most Markdown editors are great for notes and weak for deliverables. Most office
@@ -186,7 +259,7 @@ of becoming stale marketing samples. The tests also keep the README links in
 sync and prove each example's audience metadata and representative features
 survive HTML, PDF, DOCX, PPTX, and Markdown bundle exports.
 
-## Quick Start
+## Developer Quick Start
 
 ```sh
 pnpm install
