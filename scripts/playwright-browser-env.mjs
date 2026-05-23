@@ -121,7 +121,7 @@ function expectedBundledChromiumPath(env = process.env) {
   return findChromiumExecutable(env.PLAYWRIGHT_BROWSERS_PATH || projectBrowserCache);
 }
 
-function findSystemChromium() {
+export function findSystemChromium() {
   const candidates = systemChromiumCandidates[process.platform] || [];
   return candidates.map((candidate) => resolve(candidate)).find((candidate) => existsSync(candidate)) || "";
 }

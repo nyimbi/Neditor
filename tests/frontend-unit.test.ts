@@ -601,6 +601,7 @@ test("local verification scripts expose local baseline checks", () => {
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:a11y"], "node scripts/check-accessibility.mjs");
+  equal(scripts["check:a11y:runtime"], "node scripts/check-accessibility-runtime.mjs");
   equal(scripts["check:deps"], "node scripts/check-dependency-admission.mjs");
   equal(scripts["check:docs"], "node scripts/check-markdown-links.mjs");
   equal(scripts["check:engines"], "node scripts/check-external-engines.mjs");
@@ -632,6 +633,23 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformPackaging.includes("unsigned-local-builds"));
   ok(platformPackaging.includes("windowsTilePng"));
   ok(platformPackaging.includes("Tauri bundle targets must remain all-platform"));
+});
+
+test("runtime accessibility audit executes focused browser workflows", () => {
+  const script = readFileSync("scripts/check-accessibility-runtime.mjs", "utf8");
+  ok(script.includes("exposes keyboard skip links to primary workbench regions"));
+  ok(script.includes("keeps primary workbench regions accessible across desktop and narrow viewports"));
+  ok(script.includes("manages modal focus and Escape return paths"));
+  ok(script.includes("supports keyboard-only operation for deep workbench controls"));
+  ok(script.includes("exposes status and progress messages as live regions"));
+  ok(script.includes("persists editor settings and runs search plus heading commands"));
+  ok(script.includes(".tmp"));
+  ok(script.includes("accessibility"));
+  ok(script.includes("runtime-report.json"));
+  ok(script.includes("scripts/run-e2e.mjs"));
+  ok(script.includes("--grep"));
+  ok(script.includes("findSystemChromium"));
+  ok(script.includes("system-chromium-fallback"));
 });
 
 test("external engine probe records render smoke artifacts", () => {

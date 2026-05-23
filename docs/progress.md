@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `6202aeb Prove
-  rendered exports in a browser`
+- Latest inspected committed baseline before this update: `c5c7ea3 Prove
+  outline editing in the desktop WebDriver harness`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean
 
@@ -61,6 +61,14 @@ Recent pushed checkpoints visible in current git history:
   verifies source/preview are hidden, renames, adds, re-levels, and deletes
   headings through the desktop DOM, switches back to source, and records
   `outlineArtifacts` in `.tmp/desktop-webdriver/report.json`.
+- This update adds `pnpm run check:a11y:runtime` as a focused runtime
+  accessibility audit. It validates that the expected keyboard, landmark,
+  modal-focus, live-region, high-contrast/reduced-motion, search, and heading
+  workflows exist in `e2e/app-workflows.spec.ts`, executes those six Chromium
+  workflows through `scripts/run-e2e.mjs`, writes
+  `.tmp/accessibility/runtime-report.json`, and can retry through an installed
+  system Chromium-compatible browser if the bundled cache aborts before any app
+  assertion runs.
 - This update moves bounded macOS GUI launch proof into
   `pnpm run verify:local:full` after desktop artifact smoke. On macOS the full
   baseline now runs `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`
@@ -852,6 +860,7 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Platform package configuration: pnpm run check:platform-packaging` before the desktop release compile and host bundle checks. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 52 Chromium workflow tests in `e2e/app-workflows.spec.ts`, including first-class outline mode CRUD. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host through the workspace-local Playwright Chromium cache at `.tmp/ms-playwright`; `.tmp/e2e-environment/report.json` records `source: playwright-bundled`, the cache executable path, and the passing command tail. |
+| `pnpm run check:a11y:runtime` | Pass | Focused runtime accessibility audit passed 6 Chromium workflows on this host with browser-launch permission, covering skip links, primary regions across desktop/narrow viewports, modal focus/Escape return, keyboard-only deep controls, status/progress live regions, and editor settings/search/heading commands; `.tmp/accessibility/runtime-report.json` records the expected workflows, command, browser output tail, and zero issues. |
 | `pnpm run test:e2e` | Pass | 52 Chromium browser workbench workflows passed locally on this host, including editable outline-first document planning, first-class outline mode CRUD, collapsible toolbars, responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |

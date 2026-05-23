@@ -1601,7 +1601,8 @@ Finish:
 
 ### 16. Accessibility
 
-Status: partial automated guard exists; full accessibility audit remains open.
+Status: static and runtime browser automation exists; manual assistive-technology
+audit remains open.
 
 Current evidence:
 
@@ -1611,6 +1612,12 @@ Current evidence:
   diagnostic list labels, conflict diff cell group labels, table editor labels,
   contrast/motion CSS contracts, and editor/preview surface semantics. It now
   writes `.tmp/accessibility/report.json` with 10 named pass/fail checks.
+- `pnpm run check:a11y:runtime` verifies that the expected browser workflows
+  exist, runs the focused Chromium set for skip links, primary regions at
+  desktop/narrow viewports, modal focus/Escape return, keyboard-only deep
+  controls, status/progress live regions, and editor settings/search/heading
+  commands, and writes `.tmp/accessibility/runtime-report.json` with the command
+  tail, expected workflows, attempts, and issue list.
 - Modal close buttons, command-palette search, and conflict merge-line controls
   now have explicit labels exposed to assistive technology.
 - The workbench now exposes visible-on-focus skip links to the command bar,
@@ -1650,9 +1657,9 @@ Current evidence:
 
 Finish:
 
-- Complete remaining manual keyboard-only and screen-reader review beyond the
-  executable browser coverage, especially native desktop and assistive
-  technology traversal.
+- Complete remaining manual screen-reader review beyond the executable browser
+  coverage, especially native desktop and assistive-technology traversal on
+  supported platforms.
 - Keep modal focus workflows in the full local browser suite and broaden
   coverage for additional nested conflict/table-editor permutations.
 - ARIA labels and roles for custom controls.
