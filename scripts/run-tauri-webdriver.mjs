@@ -24,6 +24,7 @@ const webdriverWorkflowPlan = [
   "initial native title includes NEditor",
   "desktop shell renders primary commands",
   "native WebDriver switches modes and opens command palette",
+  "desktop WebDriver edits document structure in outline mode",
   "native title exposes dirty document state",
   "desktop template insertion reaches editor and preview",
   "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
@@ -47,6 +48,7 @@ const report = {
   workflowFilePath: relative(workflowFilePath),
   dependencies: [],
   assertions: [],
+  outlineArtifacts: null,
   fileArtifacts: null,
   exportArtifacts: null,
   skippedReason: null,
@@ -74,6 +76,24 @@ const readPreferenceScript = `function readPreferences() {
     reducedMotion: controlByLabel('Reduced motion', 'input').checked,
   };
 }`;
+
+const outlineModeEvidenceScript = `
+  const visible = (element) => Boolean(element && element.offsetParent !== null);
+  const workspace = document.querySelector('.workspace');
+  const outline = document.querySelector('#outline-mode');
+  const rows = [...document.querySelectorAll('#outline-mode .outline-mode-row')];
+  const titles = rows.map((row) => row.querySelector('input')?.value || '').filter(Boolean);
+  const levels = Object.fromEntries(rows.map((row) => [row.querySelector('input')?.value || '', row.querySelector('select')?.value || '']).filter(([title]) => title));
+  return {
+    mode: [...(workspace?.classList || [])].find((name) => name.startsWith('mode-')) || '',
+    outlineVisible: visible(outline),
+    sourceVisible: visible(document.querySelector('#markdown-source')),
+    previewVisible: visible(document.querySelector('#live-preview')),
+    outlineText: outline?.textContent?.replace(/\\s+/g, ' ').trim() || '',
+    titles,
+    levels,
+  };
+`;
 
 if (!existsSync(application) || !statSync(application).isFile()) {
   fail(`desktop binary is missing: ${relative(application)}. Run ./node_modules/.bin/tauri build --no-bundle first.`);
@@ -161,6 +181,7 @@ async function runWebDriverSmoke() {
   try {
     await assertInitialShell(session);
     await assertModeSwitchAndCommandPalette(session);
+    await assertOutlineModeWorkflow(session);
     await assertDirtyTitleWorkflow(session);
     await assertTransformTemplateWorkflow(session);
     await assertFileSaveOpenWorkflow(session);
@@ -238,6 +259,105 @@ async function assertModeSwitchAndCommandPalette(session) {
   recordAssertion("native WebDriver switches modes and opens command palette");
 }
 
+async function assertOutlineModeWorkflow(session) {
+  await execute(session, `
+    const select = document.querySelector('[aria-label="View mode"]');
+    if (!select) throw new Error('View mode select was not visible');
+    select.value = 'outline';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  `);
+  const initial = await waitForValue(
+    session,
+    outlineModeEvidenceScript,
+    (value) =>
+      value?.mode === "mode-outline" &&
+      value?.outlineVisible === true &&
+      value?.sourceVisible === false &&
+      value?.previewVisible === false &&
+      Array.isArray(value?.titles) &&
+      value.titles.includes("Market Entry Report") &&
+      value.titles.includes("Executive Summary") &&
+      !String(value?.outlineText || "").includes("Prepared for"),
+    "desktop outline mode shell",
+  );
+
+  await changeOutlineTitle(session, "Executive Summary", "Executive Findings");
+  await waitForOutlineTitle(session, "Executive Findings");
+  await clickOutlineAction(session, "Executive Findings", "Add child");
+  await waitForOutlineTitle(session, "New subsection");
+  await changeOutlineTitle(session, "New subsection", "Evidence Review");
+  await waitForOutlineTitle(session, "Evidence Review");
+  await clickOutlineAction(session, "Source Governance", "Delete");
+  await waitForOutlineMissing(session, "Source Governance");
+  await changeOutlineLevel(session, "Data Table", "3");
+  await waitForOutlineLevel(session, "Data Table", "3");
+  await execute(session, `
+    const title = document.querySelector('[aria-label="New outline heading title"]');
+    const level = document.querySelector('[aria-label="New outline heading level"]');
+    if (!title || !level) throw new Error('Top-level outline create controls were not visible');
+    title.value = 'Appendix';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    level.value = '1';
+    level.dispatchEvent(new Event('change', { bubbles: true }));
+    const add = [...document.querySelectorAll('#outline-mode button')].find((button) => button.textContent.trim() === 'Add heading');
+    if (!add) throw new Error('Add heading button was not visible in outline mode');
+    add.click();
+    return true;
+  `);
+  await waitForOutlineTitle(session, "Appendix");
+
+  const finalOutline = await waitForValue(
+    session,
+    outlineModeEvidenceScript,
+    (value) =>
+      Array.isArray(value?.titles) &&
+      value.titles.includes("Executive Findings") &&
+      value.titles.includes("Evidence Review") &&
+      value.titles.includes("Appendix") &&
+      !value.titles.includes("Source Governance") &&
+      value.levels?.["Data Table"] === "3" &&
+      !String(value?.outlineText || "").includes("Prepared for"),
+    "desktop outline mode CRUD evidence",
+  );
+  await execute(session, `
+    const select = document.querySelector('[aria-label="View mode"]');
+    select.value = 'source';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  `);
+  const source = await waitForValue(
+    session,
+    `
+      return {
+        mode: document.querySelector('.workspace')?.className || '',
+        editor: document.querySelector('.cm-content')?.textContent || '',
+      };
+    `,
+    (value) =>
+      String(value?.mode || "").includes("mode-source") &&
+      String(value?.editor || "").includes("## Executive Findings") &&
+      String(value?.editor || "").includes("### Evidence Review") &&
+      String(value?.editor || "").includes("### Data Table") &&
+      String(value?.editor || "").includes("# Appendix") &&
+      !String(value?.editor || "").includes("## Source Governance"),
+    "desktop outline edits reflected in source",
+  );
+  report.outlineArtifacts = {
+    initialTitles: initial.titles,
+    finalTitles: finalOutline.titles,
+    finalLevels: finalOutline.levels,
+    sourceEvidence: {
+      executiveFindings: String(source.editor || "").includes("## Executive Findings"),
+      evidenceReview: String(source.editor || "").includes("### Evidence Review"),
+      dataTableLevel: String(source.editor || "").includes("### Data Table"),
+      appendix: String(source.editor || "").includes("# Appendix"),
+      sourceGovernanceRemoved: !String(source.editor || "").includes("## Source Governance"),
+    },
+  };
+  recordAssertion("desktop WebDriver edits document structure in outline mode");
+}
+
 async function assertDirtyTitleWorkflow(session) {
   const dirtyTitle = await waitForValue(
     session,
@@ -261,6 +381,72 @@ async function assertDirtyTitleWorkflow(session) {
     throw new Error(`native title did not expose dirty state: ${JSON.stringify(nativeTitle.value)}`);
   }
   recordAssertion("native title exposes dirty document state");
+}
+
+async function changeOutlineTitle(session, fromTitle, toTitle) {
+  await execute(session, `
+    const fromTitle = ${JSON.stringify(fromTitle)};
+    const toTitle = ${JSON.stringify(toTitle)};
+    const row = [...document.querySelectorAll('#outline-mode .outline-mode-row')].find((item) => item.querySelector('input')?.value === fromTitle);
+    if (!row) throw new Error('Missing outline row for ' + fromTitle);
+    const input = row.querySelector('input');
+    input.value = toTitle;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  `);
+}
+
+async function changeOutlineLevel(session, title, level) {
+  await execute(session, `
+    const title = ${JSON.stringify(title)};
+    const level = ${JSON.stringify(level)};
+    const row = [...document.querySelectorAll('#outline-mode .outline-mode-row')].find((item) => item.querySelector('input')?.value === title);
+    if (!row) throw new Error('Missing outline row for ' + title);
+    const select = row.querySelector('select');
+    select.value = level;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  `);
+}
+
+async function clickOutlineAction(session, title, action) {
+  await execute(session, `
+    const title = ${JSON.stringify(title)};
+    const action = ${JSON.stringify(action)};
+    const row = [...document.querySelectorAll('#outline-mode .outline-mode-row')].find((item) => item.querySelector('input')?.value === title);
+    if (!row) throw new Error('Missing outline row for ' + title);
+    const button = [...row.querySelectorAll('button')].find((item) => item.textContent.trim() === action);
+    if (!button) throw new Error('Missing outline action ' + action + ' for ' + title);
+    button.click();
+    return true;
+  `);
+}
+
+async function waitForOutlineTitle(session, title) {
+  return waitForValue(
+    session,
+    outlineModeEvidenceScript,
+    (value) => Array.isArray(value?.titles) && value.titles.includes(title),
+    `outline title ${title}`,
+  );
+}
+
+async function waitForOutlineMissing(session, title) {
+  return waitForValue(
+    session,
+    outlineModeEvidenceScript,
+    (value) => Array.isArray(value?.titles) && !value.titles.includes(title),
+    `removed outline title ${title}`,
+  );
+}
+
+async function waitForOutlineLevel(session, title, level) {
+  return waitForValue(
+    session,
+    outlineModeEvidenceScript,
+    (value) => value?.levels?.[title] === level,
+    `outline level ${title}=${level}`,
+  );
 }
 
 async function assertTransformTemplateWorkflow(session) {
@@ -861,6 +1047,8 @@ function collectMacosNativeProof() {
     "native workflow opened saved real file",
     "native workflow wrote html export artifact",
     "native workflow exported html from native menu command",
+    "native workflow rendered outline mode structure only",
+    "native workflow navigated outline heading to source",
     "native workflow restored workspace tabs with active pinned and scroll state",
     "native workflow restored project-local snapshot",
   ]) {
@@ -871,6 +1059,25 @@ function collectMacosNativeProof() {
   const exportManifest = readJsonIfPresent(workflow.exportResult?.manifestPath);
   if (workflow.exportResult?.target !== "html" || exportManifest?.export_target !== "html" || !exportManifest?.output_hash) {
     issues.push("native workflow did not record HTML export target/hash evidence");
+  }
+  const outlineMode = Array.isArray(workflow.modeEvidence) ? workflow.modeEvidence.find((entry) => entry?.mode === "outline") : null;
+  const outlineTitles = Array.isArray(outlineMode?.outlineTitles) ? outlineMode.outlineTitles : [];
+  if (outlineMode?.outlineVisible !== true || outlineMode?.sourceVisible !== false || outlineMode?.previewVisible !== false) {
+    issues.push("native workflow did not record outline mode with source and preview hidden");
+  }
+  if (!outlineTitles.includes("Market Entry Report") || !outlineTitles.includes("Executive Summary")) {
+    issues.push("native workflow did not record expected outline mode title values");
+  }
+  const outlineNavigation = workflow.outlineNavigationEvidence?.outline || {};
+  if (
+    outlineNavigation.sidebar !== "outline" ||
+    outlineNavigation.mode !== "split" ||
+    outlineNavigation.buttonFound !== true ||
+    outlineNavigation.editorFocused !== true ||
+    outlineNavigation.selectedLine !== outlineNavigation.targetLine ||
+    !String(outlineNavigation.selectedText || "").includes("## Native Outline Target")
+  ) {
+    issues.push("native workflow did not record outline sidebar navigation to CodeMirror source");
   }
   return {
     status: issues.length === 0 ? "passed" : "incomplete",
@@ -892,6 +1099,9 @@ function collectMacosNativeProof() {
     exportManifestPath: workflow.exportResult?.manifestPath || "",
     outputHash: exportManifest?.output_hash || "",
     filePath: workflow.fileWorkflow?.filePath || "",
+    outlineModeTitles: outlineTitles,
+    outlineNavigationSelectedLine: outlineNavigation.selectedLine || 0,
+    outlineNavigationTargetLine: outlineNavigation.targetLine || 0,
     issues,
   };
 }

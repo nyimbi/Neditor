@@ -270,13 +270,13 @@ Current major verification gaps:
   harness exists for supported Windows/Linux hosts; macOS records the official
   unsupported skip because the Tauri WebDriver stack has no WKWebView driver
   there. The supported-platform harness now reaches beyond shell smoke by
-  checking dirty native titles, Templates-panel calc insertion to source and
-  preview, real Markdown save/open/rename/duplicate/reveal, export readiness, real
-  HTML export writing through the guarded dialog-free smoke path, and preference
-  persistence across a desktop restart.
+  checking dirty native titles, outline-mode structural editing, Templates-panel
+  calc insertion to source and preview, real Markdown save/open/rename/duplicate/reveal,
+  export readiness, real HTML export writing through the guarded dialog-free
+  smoke path, and preference persistence across a desktop restart.
   `pnpm run test:tauri-webdriver` writes
   `.tmp/desktop-webdriver/report.json` with the supported workflow plan plus
-  export artifact and pass/skip evidence.
+  outline, export artifact, and pass/skip evidence.
 - Export tests now include package/text assertions plus a representative
   rendered export audit that inspects HTML, PDF object structure, DOCX/PPTX
   package anatomy, custom/core properties, comments/provenance appendices,

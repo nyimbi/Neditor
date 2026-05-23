@@ -940,15 +940,17 @@ Needed desktop smoke coverage:
 - Tauri-driver/WebDriver harness for supported platforms. Covered as a project
   script by `pnpm run test:tauri-webdriver`; on Windows/Linux it starts
   `tauri-driver`, opens the built NEditor desktop binary, asserts the native
-  title/shell commands, switches view mode, opens the command palette, checks a
-  dirty native title, inserts a Science calc template to source/preview, saves
-  and reopens a real Markdown file through the guarded dialog-free smoke path,
-  renames, duplicates, and reveals deterministic Markdown files, runs export
-  readiness, writes a real HTML export, validates the sidecar manifest/output
-  hash, and verifies selected preferences persist across a desktop session
-  restart before restoring them. It writes `.tmp/desktop-webdriver/report.json`
-  with dependency/assertion/file/export artifact evidence. On macOS it records an explicit official-platform skip plus
-  the bounded launch smoke fallback.
+  title/shell commands, switches view mode, opens the command palette, edits
+  H1-H4 document structure in Outline mode, checks a dirty native title, inserts
+  a Science calc template to source/preview, saves and reopens a real Markdown
+  file through the guarded dialog-free smoke path, renames, duplicates, and
+  reveals deterministic Markdown files, runs export readiness, writes a real
+  HTML export, validates the sidecar manifest/output hash, and verifies selected
+  preferences persist across a desktop session restart before restoring them.
+  It writes `.tmp/desktop-webdriver/report.json` with
+  dependency/assertion/outline/file/export artifact evidence. On macOS it
+  records an explicit official-platform skip plus the bounded launch smoke
+  fallback.
 - New/open/save/save-as with real local files. Covered in the app-authored
   launched-webview smoke for deterministic local file paths; the supported
   WebDriver harness now also saves, reopens, renames, duplicates, and reveals

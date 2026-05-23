@@ -56,6 +56,11 @@ Recent pushed checkpoints visible in current git history:
   hides the source, preview, and sidebar panes, shows only chapter, section,
   subsection, and subsubsection rows, and lets users add, rename, re-level,
   navigate to, and delete document sections before or during drafting.
+- The supported-platform Tauri WebDriver harness now includes outline-mode
+  structural editing. On Windows/Linux the workflow switches to Outline mode,
+  verifies source/preview are hidden, renames, adds, re-levels, and deletes
+  headings through the desktop DOM, switches back to source, and records
+  `outlineArtifacts` in `.tmp/desktop-webdriver/report.json`.
 - This update moves bounded macOS GUI launch proof into
   `pnpm run verify:local:full` after desktop artifact smoke. On macOS the full
   baseline now runs `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`
@@ -862,7 +867,7 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed from the updated source; 61 modules transformed. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary rebuilt from the updated frontend bundle at `src-tauri/target/release/neditor`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Re-run on 2026-05-23 validated desktop build artifacts, native command workflow smoke, bounded launch smoke, mode pane visibility, rendered outline/HTML export/review/presentation content, guarded native `File` -> `Export` -> `HTML Export` routing, native editor ergonomics evidence for word stats, spellcheck attributes, line numbers, word wrap, folding gutter, search/replace, list continuation, bracket pairing, multi-cursor editing, and native Outline sidebar click-to-source navigation. The workflow report recorded `status: passed`, zero failed assertions, and outline-mode titles while hiding source and preview panes. |
-| `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, Templates-panel calc insertion to source/preview, real Markdown save/open/rename/duplicate/reveal, export readiness, real HTML export writing through the guarded dialog-free smoke path with sidecar manifest/output-hash validation, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip plus the supported workflow plan in `.tmp/desktop-webdriver/report.json`. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS with native proof | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, outline-mode structural editing, dirty-title state, Templates-panel calc insertion to source/preview, real Markdown save/open/rename/duplicate/reveal, export readiness, real HTML export writing through the guarded dialog-free smoke path with sidecar manifest/output-hash validation, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip, the supported workflow plan, and `fallbackProof.status: "passed"` with outline mode titles plus outline navigation line evidence in `.tmp/desktop-webdriver/report.json`. |
 
 Fresh baseline recorded on 2026-05-20:
 
@@ -2531,10 +2536,10 @@ Desktop WebDriver harness verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `node --check scripts/run-tauri-webdriver.mjs` | Pass | Desktop WebDriver harness syntax remains valid after adding guarded dialog-free Markdown save/open/rename/duplicate/reveal and HTML export write workflows. |
+| `node --check scripts/run-tauri-webdriver.mjs` | Pass | Desktop WebDriver harness syntax remains valid after adding outline-mode structural editing plus guarded dialog-free Markdown save/open/rename/duplicate/reveal and HTML export write workflows. |
 | `pnpm run check` | Pass | Vue typecheck passed after extending the desktop smoke path used by the WebDriver harness. |
-| `pnpm run test:unit` | Pass | 20 frontend unit tests passed, including static guards that the desktop WebDriver harness covers dirty title, transform-template insertion, real Markdown save/open/rename/duplicate/reveal, export readiness, real HTML export writing, manifest hash validation, preference restart persistence, and the supported workflow plan. |
-| `pnpm run test:tauri-webdriver` | Skipped on macOS with fresh native fallback proof | This host still records the official unsupported WKWebView-driver skip, but `.tmp/desktop-webdriver/report.json` now includes the supported Windows/Linux workflow plan and `fallbackProof.status: "passed"` from `.tmp/desktop-smoke/native-command-report.json`. The fallback records `freshForBinary: true`, `launchStatus: "survived-until-timeout"`, `processAlive: true`, 72/72 passed native workflow assertions, and HTML export output/manifest/hash evidence. |
+| `pnpm run test:unit` | Pass | 22 frontend unit tests passed, including static guards that the desktop WebDriver harness covers outline-mode structural editing, dirty title, transform-template insertion, real Markdown save/open/rename/duplicate/reveal, export readiness, real HTML export writing, manifest hash validation, preference restart persistence, and the supported workflow plan. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS with fresh native fallback proof | This host still records the official unsupported WKWebView-driver skip, but `.tmp/desktop-webdriver/report.json` now includes the supported Windows/Linux workflow plan with outline-mode structural editing and `fallbackProof.status: "passed"` from `.tmp/desktop-smoke/native-command-report.json`. The fallback records `freshForBinary: true`, `launchStatus: "survived-until-timeout"`, `processAlive: true`, outline title/navigation evidence, and HTML export output/manifest/hash evidence. |
 | `rg -n "freshForBinary\|binaryMtime\|launchStatus\|processAlive" .tmp/desktop-webdriver/report.json` | Pass | The WebDriver skip report records desktop-binary, native-smoke, and launch-report freshness fields so stale `.tmp` native proof cannot silently satisfy the macOS fallback evidence contract. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after updating the WebDriver file/export evidence notes; all local links resolved. |
 | `git diff --check` | Pass | No whitespace errors after the desktop WebDriver file/export harness update. |
