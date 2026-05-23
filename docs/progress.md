@@ -184,8 +184,9 @@ Recent pushed checkpoints visible in current git history:
   `status: passed` evidence for native View/Writing Tools menu routing. The
   launched workflow now proves export-preview, outline, and exports sidebar
   routing, CodeMirror search opening, TOC/equation/code-fence/table insertion,
-  Templates panel opening, AI Paste modal opening, and guarded native
-  `File` -> `Export` -> `HTML Export` execution in the Tauri webview.
+  Templates panel opening, Docs Live section-draft generation and application
+  for review, AI Paste modal opening, and guarded native `File` -> `Export` ->
+  `HTML Export` execution in the Tauri webview.
 - This update repairs the reveal-path file operation slice after the
   in-progress `filesystem.rs` change left the Rust crate uncompilable. The
   command builder now has focused regression coverage for existing paths,
@@ -969,9 +970,9 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run verify:local:full -- --list` | Pass | Full local verification now lists the full browser workflow suite after the production frontend build, making browser workflow execution part of the release-grade local baseline. |
 | `pnpm run verify:local` | Pass | Quick local verification passed with the new browser workflow environment gate included; the gate used the workspace-local Playwright Chromium cache and would retry transient browser-launch failures before failing the baseline. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "collapses and restores command toolbars" --project chromium` | Pass | Focused Chromium workflow proved individual toolbar collapse/expand, Collapse all, recovery through the compact View expander, and command-bar height reduction. |
-| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed from the updated source; 61 modules transformed. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed from the updated source; 62 modules transformed. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary rebuilt from the updated frontend bundle at `src-tauri/target/release/neditor`. |
-| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Re-run on 2026-05-23 validated desktop build artifacts, native command workflow smoke, bounded launch smoke, mode pane visibility, rendered outline/HTML export/review/presentation content, guarded native `File` -> `Export` -> `HTML Export` routing, native editor ergonomics evidence for word stats, spellcheck attributes, line numbers, word wrap, folding gutter, search/replace, list continuation, bracket pairing, multi-cursor editing, and native Outline sidebar click-to-source navigation. The workflow report recorded `status: passed`, zero failed assertions, and outline-mode titles while hiding source and preview panes. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Re-run on 2026-05-23 validated desktop build artifacts, native command workflow smoke, bounded launch smoke, mode pane visibility, rendered outline/HTML export/review/presentation content, guarded native `File` -> `Export` -> `HTML Export` routing, native editor ergonomics evidence for word stats, spellcheck attributes, line numbers, word wrap, folding gutter, search/replace, list continuation, bracket pairing, multi-cursor editing, native Outline sidebar click-to-source navigation, and native Writing Tools -> Docs Live draft generation/application. The workflow report recorded `status: passed`, 86 passing assertions, `nativeMenuCommandEvidence.docsLive.generated.workflow: true`, `sections: 3`, and `applied.sidebar: "review"` with drafting-plan, Section QA, Review Preparation, and humanization workflow markers present. |
 | `pnpm run test:tauri-webdriver` | Skipped on macOS with native proof | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, outline-mode structural editing, dirty-title state, Templates-panel calc insertion to source/preview, real Markdown save/open/rename/duplicate/reveal, export readiness, real HTML export writing through the guarded dialog-free smoke path with sidecar manifest/output-hash validation, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip, the supported workflow plan, and `fallbackProof.status: "passed"` with outline mode titles plus outline navigation line evidence in `.tmp/desktop-webdriver/report.json`. |
 
 Fresh baseline recorded on 2026-05-20:

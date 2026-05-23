@@ -484,6 +484,8 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow inserted code fence from native writing tools menu",
     "native workflow inserted table from native writing tools menu",
     "native workflow opened templates from native writing tools menu",
+    "native workflow generated Docs Live section draft from native writing tools menu",
+    "native workflow applied Docs Live section draft for review",
     "native workflow opened AI paste from native writing tools menu",
     "native workflow grouped document-set tabs",
     "native workflow pinned tab into pinned group",
@@ -714,6 +716,12 @@ function validateNativeWorkflowReport(launchReport) {
     nativeMenuCommandEvidence.table?.inserted !== true ||
     nativeMenuCommandEvidence.templates?.sidebar !== "templates" ||
     nativeMenuCommandEvidence.docsLive?.open !== true ||
+    nativeMenuCommandEvidence.docsLive?.generated?.workflow !== true ||
+    nativeMenuCommandEvidence.docsLive?.generated?.sections !== 3 ||
+    nativeMenuCommandEvidence.docsLive?.applied?.sidebar !== "review" ||
+    nativeMenuCommandEvidence.docsLive?.applied?.hasDraftingPlan !== true ||
+    nativeMenuCommandEvidence.docsLive?.applied?.hasSectionQa !== true ||
+    nativeMenuCommandEvidence.docsLive?.applied?.hasHumanizeWorkflow !== true ||
     nativeMenuCommandEvidence.aiPaste?.open !== true
   ) {
     issues.push(`native workflow report did not include native menu command evidence: ${JSON.stringify(nativeMenuCommandEvidence)}`);

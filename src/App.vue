@@ -3687,6 +3687,7 @@ async function collectNativeExportProfileEvidence(record: (name: string, passed:
 
 async function collectNativeMenuCommandEvidence(record: (name: string, passed: boolean, detail?: string) => void, checkpoint?: (phase: string) => Promise<void>) {
   const evidence: Record<string, unknown> = {};
+  const visibleText = (selector: string) => document.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim() || "";
   const runMenuCommand = async (command: string, phase: string) => {
     await checkpoint?.(`${phase}-start`);
     await emitNativeWorkflowMenuCommand(command, 500);
@@ -3741,10 +3742,58 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
 
   await runMenuCommand("neditor-open-docs-live", "native-menu-command-docs-live");
   await waitForNativeWorkflowCondition(() => docsLiveOpen.value, 1000);
-  evidence.docsLive = { open: docsLiveOpen.value, speechStatus: docsLiveSpeechStatus.value, title: docsLiveTitle.value };
-  record("native workflow opened Docs Live from native writing tools menu", docsLiveOpen.value, JSON.stringify(evidence.docsLive));
+  const docsLiveOpened = docsLiveOpen.value;
+  docsLiveDocumentType.value = "proposal";
+  docsLiveTitle.value = "Native Docs Live Proposal";
+  docsLiveDraftingDepth.value = "detailed";
+  docsLiveOutlineText.value = "- Executive Summary\n- Recommendation\n- Review Plan";
+  docsLiveTranscript.value = "Create a native desktop proposal draft from the outline and prepare it for review.";
+  docsLiveContext.value = "The document should renew an enterprise contract, name the executive audience, and include QA and humanization steps.";
+  docsLivePlaceholderText.value = "client: Native Acme\naudience: executive team\nowner: Desktop workflow\ndeadline: June 1";
+  generateDocsLiveDraft();
+  await nextTick();
+  const generated = {
+    markdown: docsLiveGeneratedMarkdown.value.includes("## Drafting Plan"),
+    workflow: Boolean(docsLiveDraft.value?.workflow.some((step) => step.id === "humanize")),
+    sections: docsLiveDraft.value?.sections.length || 0,
+    previewVisible: Boolean(document.querySelector('[aria-label="Docs Live section drafting workflow"]')),
+  };
+  record(
+    "native workflow generated Docs Live section draft from native writing tools menu",
+    generated.markdown && generated.workflow && generated.sections === 3 && generated.previewVisible,
+    JSON.stringify(generated),
+  );
+  applyDocsLiveDraft();
+  await store.compileActive();
+  await nextTick();
+  const applied = {
+    sidebar: store.sidebar,
+    title: active.value.compile?.semantic.title || "",
+    hasDraftingPlan: active.value.text.includes("## Drafting Plan"),
+    hasSectionQa: active.value.text.includes("### Section QA"),
+    hasReviewPreparation: active.value.text.includes("## Review Preparation"),
+    hasHumanizeWorkflow: active.value.text.includes("workflow: outline-to-section-draft-qa-humanize-review"),
+    previewText: visibleText("#live-preview").slice(0, 240),
+  };
+  evidence.docsLive = {
+    open: docsLiveOpened,
+    speechStatus: docsLiveSpeechStatus.value,
+    title: docsLiveTitle.value,
+    generated,
+    applied,
+  };
+  record("native workflow opened Docs Live from native writing tools menu", docsLiveOpened, JSON.stringify(evidence.docsLive));
+  record(
+    "native workflow applied Docs Live section draft for review",
+    applied.sidebar === "review" &&
+      applied.title === "Native Docs Live Proposal" &&
+      applied.hasDraftingPlan &&
+      applied.hasSectionQa &&
+      applied.hasReviewPreparation &&
+      applied.hasHumanizeWorkflow,
+    JSON.stringify(applied),
+  );
   await checkpoint?.("native-menu-command-docs-live-recorded");
-  docsLiveOpen.value = false;
 
   await runMenuCommand("neditor-clean-ai-paste", "native-menu-command-ai-paste");
   await waitForNativeWorkflowCondition(() => aiPasteOpen.value, 1000);
