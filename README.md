@@ -395,6 +395,11 @@ creates JSON templates under `.tmp/release-signing/templates/` for macOS
 codesign/notarization, Windows Authenticode/timestamp, and Linux package
 signature/checksum evidence. Missing credentialed signing proof remains a
 release gap; malformed supplied evidence fails the check.
+On credentialed release hosts, `pnpm run collect:release-signing -- --artifact
+kind=/path/to/artifact --proof kind='verification command'` hashes signed
+artifacts, runs verifier commands, and writes
+`.tmp/release-signing/external/<platform>/signing-evidence.json` for
+`pnpm run check:release-signing`.
 
 `pnpm run check:google-docs-import` writes
 `.tmp/google-docs-import/report.json`, verifies the local rendered Google Docs

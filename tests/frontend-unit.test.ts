@@ -642,6 +642,7 @@ test("local verification scripts expose local baseline checks", () => {
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
   const platformEvidence = readFileSync("scripts/check-platform-evidence.mjs", "utf8");
+  const signingCollector = readFileSync("scripts/collect-release-signing-evidence.mjs", "utf8");
   const releaseSigning = readFileSync("scripts/check-release-signing.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
@@ -659,6 +660,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
   equal(scripts["collect:platform-evidence"], "node scripts/collect-platform-evidence.mjs");
+  equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
   equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
   equal(scripts.build, "vue-tsc --noEmit && vite build");
@@ -711,6 +713,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseSigning.includes("linux/signing-evidence.json"));
   ok(releaseSigning.includes("pending-release-credentials"));
   ok(releaseSigning.includes("codesign --verify"));
+  ok(signingCollector.includes("NEDITOR_RELEASE_SIGNING_PLATFORM"));
+  ok(signingCollector.includes("NEDITOR_RELEASE_VERSION"));
+  ok(signingCollector.includes("neditor.release-signing-evidence.v1"));
+  ok(signingCollector.includes("Missing required"));
+  ok(signingCollector.includes("Release signing proof command failed"));
 });
 
 test("runtime accessibility audit executes focused browser workflows", () => {

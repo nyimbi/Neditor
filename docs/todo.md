@@ -624,6 +624,9 @@ green before claiming a slice is complete:
   evidence templates, accepts valid credentialed release proof, and fails
   malformed supplied signing/notarization reports while preserving missing
   release credentials as explicit release gaps.
+- Credentialed release hosts can now run `pnpm run collect:release-signing`
+  with signed artifacts and platform verifier commands to generate the exact
+  `signing-evidence.json` consumed by `pnpm run check:release-signing`.
 - `pnpm run verify:local:full` now also runs
   `pnpm run check:google-docs-import` after rendered export audit. That check
   writes `.tmp/google-docs-import/report.json`, verifies the local Google Docs
@@ -1926,7 +1929,8 @@ Finish:
   local artifacts.
 - Add Windows package evidence for the chosen `.msi`/`.exe` target.
 - Add Linux package evidence for AppImage/deb/rpm or the chosen bundle target.
-- Confirm updater stance and credentialed release signing/notarization evidence.
+- Confirm updater stance and run credentialed release signing/notarization
+  collection on macOS, Windows, and Linux release hosts.
 
 ### 24. User Documentation
 

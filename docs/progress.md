@@ -118,6 +118,11 @@ Recent pushed checkpoints visible in current git history:
   macOS/Windows/Linux signing templates, treats absent signing/notarization
   reports as pending release credentials, and fails malformed supplied evidence
   so release readiness cannot accept unsigned distribution claims.
+- This update adds `pnpm run collect:release-signing` for credentialed release
+  hosts. It records signed artifact bytes and SHA-256 hashes, runs required
+  verifier commands for the target platform, captures proof summaries, and
+  writes the exact `neditor.release-signing-evidence.v1` JSON accepted by
+  `pnpm run check:release-signing`.
 - This update adds `pnpm run check:google-docs-import` as the live Google Docs
   import/readback evidence contract. It writes
   `.tmp/google-docs-import/report.json`, verifies local rendered Google Docs
@@ -940,6 +945,7 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `node scripts/collect-platform-evidence.mjs --platform linux/win32 ...` plus `NEDITOR_PLATFORM_EVIDENCE_DIR=.tmp/platform-collector-fixture/evidence pnpm run check:platform-evidence` | Pass | Synthetic supported-host fixtures proved the collector writes validator-compatible `package-artifacts.json` and `tauri-webdriver-report.json` files for both Linux and Windows. The default `pnpm run check:platform-evidence` was then rerun to restore the real current-host `pending-external-evidence` report. |
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `External platform evidence contract: pnpm run check:platform-evidence` before desktop release compile and host bundle checks. |
 | `pnpm run check:release-signing` | Pass with pending release credentials | Wrote `.tmp/release-signing/report.json` and templates under `.tmp/release-signing/templates/`. The report records `pending-release-credentials` with three missing signing evidence items: macOS codesign/notarization/spctl, Windows Authenticode/timestamp, and Linux package signature/checksum, and zero invalid supplied reports. |
+| `node scripts/collect-release-signing-evidence.mjs --platform darwin/win32/linux ...` plus `NEDITOR_RELEASE_SIGNING_DIR=.tmp/release-signing-collector-fixture/evidence pnpm run check:release-signing` | Pass | Synthetic credentialed-host fixtures proved the collector writes validator-compatible macOS, Windows, and Linux `signing-evidence.json` files with artifact hashes and required proof summaries. The default `pnpm run check:release-signing` was then rerun to restore the real current-host `pending-release-credentials` report. |
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Release signing evidence contract: pnpm run check:release-signing` before desktop release compile and host bundle checks. |
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Accessibility runtime audit: pnpm run check:a11y:runtime` and `Accessibility manual review contract: pnpm run check:a11y:manual` after the browser workflow suite. |
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now ends with `Release readiness aggregation: pnpm run check:release-readiness`. |
