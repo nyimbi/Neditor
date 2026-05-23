@@ -19,6 +19,7 @@
     "check:google-docs-import": "node scripts/check-google-docs-import-evidence.mjs",
     "check:platform-evidence": "node scripts/check-platform-evidence.mjs",
     "check:platform-packaging": "node scripts/check-platform-packaging.mjs",
+    "check:evidence-kit": "node scripts/check-release-evidence-kit.mjs",
     "check:release-signing": "node scripts/check-release-signing.mjs",
     "check:release-readiness": "node scripts/check-release-readiness.mjs",
     "check:structure": "node scripts/check-project-structure.mjs",

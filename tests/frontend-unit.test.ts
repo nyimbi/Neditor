@@ -678,6 +678,7 @@ test("local verification scripts expose local baseline checks", () => {
   const googleDocsCollector = readFileSync("scripts/collect-google-docs-import-evidence.mjs", "utf8");
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
   const evidenceKitCollector = readFileSync("scripts/collect-release-evidence-kit.mjs", "utf8");
+  const evidenceKitChecker = readFileSync("scripts/check-release-evidence-kit.mjs", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
   const platformEvidence = readFileSync("scripts/check-platform-evidence.mjs", "utf8");
   const signingCollector = readFileSync("scripts/collect-release-signing-evidence.mjs", "utf8");
@@ -694,6 +695,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:google-docs-import"], "node scripts/check-google-docs-import-evidence.mjs");
   equal(scripts["check:platform-evidence"], "node scripts/check-platform-evidence.mjs");
   equal(scripts["check:platform-packaging"], "node scripts/check-platform-packaging.mjs");
+  equal(scripts["check:evidence-kit"], "node scripts/check-release-evidence-kit.mjs");
   equal(scripts["check:release-signing"], "node scripts/check-release-signing.mjs");
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
@@ -719,6 +721,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
   ok(verification.includes('command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"])'));
   ok(verification.includes('command("Release signing evidence contract", "pnpm", ["run", "check:release-signing"])'));
+  ok(verification.includes('command("Release evidence kit generation", "pnpm", ["run", "collect:evidence-kit"])'));
+  ok(verification.includes('command("Release evidence kit contract", "pnpm", ["run", "check:evidence-kit"])'));
   ok(verification.includes('command("Release readiness aggregation", "pnpm", ["run", "check:release-readiness"])'));
   ok(verification.includes("Desktop macOS GUI launch smoke"));
   ok(verification.includes('NEDITOR_DESKTOP_SMOKE_LAUNCH: "1"'));
@@ -798,6 +802,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("sourceCommit"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
+  ok(evidenceKitChecker.includes("neditor.release-evidence-kit.v1"));
+  ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
+  ok(evidenceKitChecker.includes("staleTemplates must be empty"));
+  ok(evidenceKitChecker.includes("missingTemplates must be empty"));
+  ok(evidenceKitChecker.includes("manifest gaps must mirror the release readiness report"));
 });
 
 test("runtime accessibility audit executes focused browser workflows", () => {
