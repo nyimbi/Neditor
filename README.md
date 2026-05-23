@@ -79,7 +79,7 @@ uses it.
 | I need to... | What to do in NEditor |
 | --- | --- |
 | Draft a board paper, proposal, report, or briefing note | Start in **Outline** mode, create the structure, then fill in each section. |
-| Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, dictate the intent, add placeholder values, generate a questionnaire if helpful, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
+| Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, dictate the intent, add placeholder values, generate an outline-aware questionnaire if helpful, answer it in the dialog, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
 | Reuse a company format | Start from an approved Markdown template or example document, then save a copy for the new engagement. |
 | Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
 | Send a client-facing document | Export to PDF or DOCX, depending on what the recipient expects. |
@@ -183,9 +183,10 @@ web app.
 - First-class outline planning in the Outline panel: draft a document structure
   with indented bullets, numbers, or Markdown headings, then create or append a
   Markdown document skeleton before writing the body text.
-- Docs Live can take that outline plus freeform context, questionnaire answers,
-  dictated direction, and placeholder values, then work section by section
-  through drafting, QA gates, humanization cleanup, and review handoff notes.
+- Docs Live can take that outline plus freeform context, outline-aware
+  questionnaire answers, dictated direction, and placeholder values, then work
+  section by section through drafting, QA gates, humanization cleanup, and
+  review handoff notes.
 - Separate preferences for theme, preview theme, typography, editor behavior,
   autosave, snapshots, export defaults, bibliography defaults, brand defaults,
   Git integration, AI cleanup, and transform engines.

@@ -1649,8 +1649,16 @@
             <textarea v-model="docsLivePlaceholderText" rows="8" placeholder="client: Acme&#10;audience: executive team&#10;deadline: June 1&#10;owner: Finance"></textarea>
           </label>
           <label>
-            Questionnaire
+            AI-created questionnaire
             <textarea v-model="docsLiveQuestionnaireText" rows="7" readonly></textarea>
+          </label>
+          <label>
+            Questionnaire answers
+            <textarea
+              v-model="docsLiveQuestionnaireAnswerText"
+              rows="7"
+              placeholder="1. The reader should approve renewal.&#10;2. Include usage growth, budget, risks, and named owner.&#10;3. Leave financial assumptions marked for review."
+            ></textarea>
           </label>
           <label>
             Apply result
@@ -1960,6 +1968,7 @@ const docsLiveInterimTranscript = ref("");
 const docsLiveContext = ref("");
 const docsLivePlaceholderText = ref("");
 const docsLiveQuestionnaireText = ref(buildDocsLiveQuestionnaire("business-brief"));
+const docsLiveQuestionnaireAnswerText = ref("");
 const docsLiveGeneratedMarkdown = ref("");
 const docsLiveDraft = ref<DocsLiveDraft | null>(null);
 const docsLiveDraftingDepth = ref<DocsLiveDraftDepth>("standard");
@@ -3750,6 +3759,8 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
   docsLiveTranscript.value = "Create a native desktop proposal draft from the outline and prepare it for review.";
   docsLiveContext.value = "The document should renew an enterprise contract, name the executive audience, and include QA and humanization steps.";
   docsLivePlaceholderText.value = "client: Native Acme\naudience: executive team\nowner: Desktop workflow\ndeadline: June 1";
+  docsLiveQuestionnaireAnswerText.value =
+    "1. The reader should approve the renewal path.\n2. Include commercial evidence, timeline risk, and a named reviewer.\n3. Keep pricing assumptions marked for review.";
   generateDocsLiveDraft();
   await nextTick();
   const generated = {
@@ -6280,7 +6291,13 @@ function closeDocsLive() {
 }
 
 function refreshDocsLiveQuestionnaire() {
-  docsLiveQuestionnaireText.value = buildDocsLiveQuestionnaire(docsLiveDocumentType.value);
+  docsLiveQuestionnaireText.value = buildDocsLiveQuestionnaire(docsLiveDocumentType.value, {
+    title: docsLiveTitle.value,
+    outline: docsLiveOutlineText.value,
+    context: docsLiveContext.value,
+    transcript: docsLiveTranscript.value,
+    placeholders: docsLivePlaceholderText.value,
+  });
 }
 
 function loadDocsLiveOutlineFromDocument() {
@@ -6296,6 +6313,7 @@ function generateDocsLiveDraft() {
     outline: docsLiveOutlineText.value,
     transcript: docsLiveTranscript.value,
     context: docsLiveContext.value,
+    questionnaireAnswers: docsLiveQuestionnaireAnswerText.value,
     placeholders: docsLivePlaceholderText.value,
     draftingDepth: docsLiveDraftingDepth.value,
   });

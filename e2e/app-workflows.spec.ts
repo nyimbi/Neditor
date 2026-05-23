@@ -1892,11 +1892,16 @@ test("generates a Docs Live draft from outline, context, and placeholders", asyn
   await dialog.getByLabel("Document type").selectOption("proposal");
   await dialog.getByLabel("Document title").fill("Acme Renewal Proposal");
   await dialog.getByLabel("Outline").fill("- Executive Summary\n- Proposed Approach\n- Investment");
+  await dialog.getByRole("button", { name: "Build questionnaire" }).click();
+  await expect(dialog.getByLabel("AI-created questionnaire")).toHaveValue(/For "Executive Summary"/);
   await dialog.getByRole("button", { name: "Start dictation" }).click();
   await expect(dialog.getByLabel("Spoken direction")).toHaveValue(/Create a client proposal for Acme/);
   await dialog
     .getByLabel("Context and answers")
     .fill("The goal is to renew the platform contract. Include a clear recommendation and review notes.");
+  await dialog
+    .getByLabel("Questionnaire answers")
+    .fill("The reader should approve renewal. Keep pricing assumptions visible for human review.");
   await dialog.getByLabel("Placeholder values").fill("client: Acme\nowner: Commercial team\ndeadline: June 1");
 
   await dialog.getByRole("button", { name: "Generate draft" }).click();

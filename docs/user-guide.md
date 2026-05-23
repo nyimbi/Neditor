@@ -204,10 +204,10 @@ NEditor is built for drafts that need evidence before publication.
   text.
 - Use AI paste cleanup to normalize chat output, add citation TODOs, insert
   into a selected section, append as an appendix, or replace selected content.
-- Use Docs Live after creating an outline to turn dictated direction,
-  questionnaire answers, freeform context, and placeholder values into a
-  section-by-section draft with a drafting plan, QA checks, humanization tasks,
-  and reviewer handoff prompts.
+- Use Docs Live after creating an outline to build an outline-aware
+  questionnaire, combine the answers with dictated direction, freeform context,
+  and placeholder values, then generate a section-by-section draft with a
+  drafting plan, QA checks, humanization tasks, and reviewer handoff prompts.
 - Use `ai-source` blocks and AI-assisted section metadata so generated content
   can be marked as needing review or human-reviewed.
 

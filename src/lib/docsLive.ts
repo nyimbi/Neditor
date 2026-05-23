@@ -18,10 +18,19 @@ export interface DocsLiveDraftRequest {
   title?: string;
   outline?: string;
   context?: string;
+  questionnaireAnswers?: string;
   transcript?: string;
   placeholders?: string;
   draftingDepth?: DocsLiveDraftDepth;
   generatedAt?: string;
+}
+
+export interface DocsLiveQuestionnaireRequest {
+  title?: string;
+  outline?: string;
+  context?: string;
+  transcript?: string;
+  placeholders?: string;
 }
 
 export type DocsLiveDraftDepth = "concise" | "standard" | "detailed";
@@ -191,21 +200,35 @@ export function normalizeDocsLiveDocumentType(input = ""): DocsLiveDocumentType 
   return signaled?.[0] || "business-brief";
 }
 
-export function buildDocsLiveQuestionnaire(documentType: string) {
+export function buildDocsLiveQuestionnaire(documentType: string, request: DocsLiveQuestionnaireRequest = {}) {
   const type = normalizeDocsLiveDocumentType(documentType);
-  return blueprints[type].questions.map((question, index) => `${index + 1}. ${question}`).join("\n");
+  const outlineItems = parseOutlinePlan(request.outline || "");
+  const placeholders = extractDocsLivePlaceholders([request.placeholders, request.context, request.transcript].filter(Boolean).join("\n"));
+  const questions = [...blueprints[type].questions];
+  const title = (request.title || "").trim();
+  if (title) questions.unshift(`What should "${title}" help the reader decide, approve, or do?`);
+  for (const section of outlineItems.slice(0, 8)) {
+    questions.push(`For "${section.title}", what facts, examples, calculations, decisions, or caveats must be included?`);
+  }
+  const missing = ["audience", "owner", "deadline", "evidence", "tone", "reviewer"].filter((key) => !placeholders[key]);
+  if (missing.length) {
+    questions.push(`Which ${missing.map(titleCase).join(", ")} values should Docs Live use as placeholders or review prompts?`);
+  }
+  questions.push("What must remain visibly marked for human review before export or publication?");
+  return Array.from(new Set(questions)).map((question, index) => `${index + 1}. ${question}`).join("\n");
 }
 
 export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft {
   const documentType = inferDocumentType(request);
   const blueprint = blueprints[documentType];
-  const placeholders = extractDocsLivePlaceholders([request.placeholders, request.context, request.transcript].filter(Boolean).join("\n"));
+  const contextInput = [request.transcript, request.context, request.questionnaireAnswers].filter(Boolean).join("\n");
+  const placeholders = extractDocsLivePlaceholders([request.placeholders, request.context, request.questionnaireAnswers, request.transcript].filter(Boolean).join("\n"));
   const title = resolveTitle(request, blueprint, placeholders);
   const outlineText = resolveOutlineText(request, blueprint);
   const outlineItems = parseOutlinePlan(outlineText);
   const sections = outlineItems.length ? outlineItems : blueprint.defaultOutline.map((section) => ({ level: 1, title: section }));
   const generatedAt = request.generatedAt || new Date().toISOString();
-  const contextSentences = extractContextSentences([request.transcript, request.context].filter(Boolean).join("\n"));
+  const contextSentences = extractContextSentences(contextInput);
   const issues = buildDraftIssues(request, placeholders, sections);
   const draftingDepth = normalizeDraftingDepth(request.draftingDepth);
   const sectionDrafts = sections.map((section, index) => buildSectionDraft(section, index, blueprint, placeholders));
@@ -227,6 +250,8 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
       "",
       placeholdersTable(placeholders),
       "",
+      docsLiveContextSummary(contextSentences),
+      "",
       docsLiveReviewMarker("Docs Live systematic outline-to-draft workflow"),
       "",
       draftingPlanTable(workflow, sectionDrafts, draftingDepth),
@@ -234,6 +259,10 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
       ...sectionDrafts.flatMap((section, index) =>
         draftSection(section, index, sectionDrafts.length, blueprint, placeholders, contextSentences, draftingDepth),
       ),
+      "## Review Handoff",
+      "",
+      "This draft is ready for human review once each section owner checks facts, numbers, citations, tone, and unresolved assumptions.",
+      "",
       "## Review Preparation",
       "",
       "### Quality Assurance",
@@ -258,7 +287,13 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
     title,
     documentType,
     outlineText,
-    questionnaire: buildDocsLiveQuestionnaire(documentType),
+    questionnaire: buildDocsLiveQuestionnaire(documentType, {
+      title,
+      outline: outlineText,
+      context: request.context,
+      transcript: request.transcript,
+      placeholders: request.placeholders,
+    }),
     markdown,
     placeholders,
     workflow,
@@ -306,7 +341,9 @@ function buildDraftIssues(request: DocsLiveDraftRequest, placeholders: Record<st
   const issues: string[] = [];
   if (!Object.keys(placeholders).length) issues.push("No placeholder values were detected; draft includes review prompts for missing specifics.");
   if (!sections.length) issues.push("No usable outline was supplied; Docs Live used a document-type outline.");
-  if (![request.context, request.transcript].some((value) => value?.trim())) issues.push("No document context was supplied; section drafts are scaffolded for human completion.");
+  if (![request.context, request.transcript, request.questionnaireAnswers].some((value) => value?.trim())) {
+    issues.push("No document context was supplied; section drafts are scaffolded for human completion.");
+  }
   return issues;
 }
 
@@ -395,6 +432,15 @@ function placeholdersTable(placeholders: Record<string, string>) {
     "| Placeholder | Value |",
     "| --- | --- |",
     ...entries.map(([key, value]) => `| ${titleCase(key)} | ${escapeTableCell(value)} |`),
+  ].join("\n");
+}
+
+function docsLiveContextSummary(contextSentences: string[]) {
+  if (!contextSentences.length) return "<!-- Docs Live context: add freeform notes, questionnaire answers, or dictated direction before review. -->";
+  return [
+    "## Draft Context",
+    "",
+    ...contextSentences.slice(0, 8).map((sentence) => `- ${sentence}`),
   ].join("\n");
 }
 
@@ -519,12 +565,18 @@ function qualityChecklist(sections: OutlinePlanItem[], placeholders: Record<stri
 }
 
 function extractContextSentences(input: string) {
-  return input
-    .replace(/\s+/g, " ")
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
+  const normalizedLines = input
+    .split(/\r?\n/)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+/))
+    .map((sentence) =>
+      sentence
+        .replace(/^\s*(?:\d+[.)]\s*)?(?:q\d*[:.)]\s*)?/i, "")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
     .filter((sentence) => sentence.length > 16)
     .slice(0, 12);
+  return normalizedLines;
 }
 
 function humanizeDraftText(markdown: string) {

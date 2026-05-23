@@ -277,8 +277,14 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
     deadline: "June 1",
   });
 
-  const questionnaire = buildDocsLiveQuestionnaire("proposal");
+  const questionnaire = buildDocsLiveQuestionnaire("proposal", {
+    title: "Acme Renewal Proposal",
+    outline: "- Executive Summary\n- Proposed Approach\n- Investment",
+    placeholders: "client: Acme\nowner: Commercial team",
+  });
   ok(questionnaire.includes("Who is the client or sponsor?"));
+  ok(questionnaire.includes('What should "Acme Renewal Proposal" help the reader decide'));
+  ok(questionnaire.includes('For "Executive Summary", what facts'));
 
   const draft = buildDocsLiveDraft({
     documentType: "proposal",
@@ -286,6 +292,7 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
     outline: "- Executive Summary\n- Proposed Approach\n- Investment",
     transcript: "Create a client proposal for Acme. The audience is the executive team. Focus on a fast first draft.",
     context: "The goal is to renew the platform contract. Include a clear recommendation and review notes.",
+    questionnaireAnswers: "The reader should approve renewal. Keep pricing assumptions marked for human review.",
     placeholders: "client: Acme\nowner: Commercial team\ndeadline: June 1",
     draftingDepth: "detailed",
     generatedAt: "2026-05-23T09:00:00.000Z",
@@ -303,12 +310,15 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.markdown.includes("model: local-guided-drafting"));
   ok(draft.markdown.includes("workflow: outline-to-section-draft-qa-humanize-review"));
   ok(draft.markdown.includes("<!-- ai-assisted: status=needs-review"));
+  ok(draft.markdown.includes("## Draft Context"));
   ok(draft.markdown.includes("## Drafting Plan"));
   ok(draft.markdown.includes("### Section QA"));
   ok(draft.markdown.includes("### Review Handoff"));
+  ok(draft.markdown.includes("## Review Handoff"));
   ok(draft.markdown.includes("## Review Preparation"));
   ok(draft.markdown.includes("### Quality Assurance"));
   ok(draft.markdown.includes("### Humanization Pass"));
+  ok(draft.markdown.includes("The reader should approve renewal"));
   ok(draft.markdown.includes("Commercial team"));
 });
 
@@ -585,6 +595,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("openDocsLiveFromOutline"));
   ok(app.includes("SpeechRecognition"));
   ok(app.includes("buildDocsLiveDraft"));
+  ok(app.includes("docsLiveQuestionnaireAnswerText"));
+  ok(app.includes("AI-created questionnaire"));
+  ok(app.includes("Questionnaire answers"));
   ok(app.includes("Generate draft"));
   ok(app.includes("native workflow opened Docs Live from native writing tools menu"));
   ok(app.includes("native workflow generated Docs Live section draft from native writing tools menu"));
