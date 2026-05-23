@@ -601,7 +601,8 @@ green before claiming a slice is complete:
   `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` before the
   WebDriver step. `pnpm run test:tauri-webdriver` still reports the official
   macOS WebDriver skip, but now attaches fallback proof from the bounded native
-  launch smoke when that report is current.
+  launch smoke only when the native smoke and launch reports are fresh for the
+  built desktop binary.
 - `pnpm run verify:local -- --list` or
   `pnpm run verify:local:full -- --list` to inspect the exact local command
   plan before running it.

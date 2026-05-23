@@ -830,9 +830,26 @@ function collectMacosNativeProof() {
     };
   }
   const workflow = smoke.nativeWorkflow?.payload || smoke.nativeWorkflow || {};
+  const launch = readJsonIfPresent(macosFallbackLaunchReportPath);
+  const smokeStats = statSync(macosFallbackSmokeReportPath);
+  const applicationStats = statSync(application);
+  const launchStats = existsSync(macosFallbackLaunchReportPath) ? statSync(macosFallbackLaunchReportPath) : null;
   const assertions = Array.isArray(workflow.assertions) ? workflow.assertions : [];
   const passedAssertions = assertions.filter((assertion) => assertion?.passed === true);
   const issues = [];
+  if (smokeStats.mtimeMs + 1000 < applicationStats.mtimeMs) {
+    issues.push("native smoke report is older than the desktop binary");
+  }
+  if (!launch) {
+    issues.push("native launch report is missing or invalid");
+  } else if (launch.platform !== "darwin") {
+    issues.push(`native launch report platform is ${JSON.stringify(launch.platform)}`);
+  } else if (launch.processAlive !== true || launch.status !== "survived-until-timeout") {
+    issues.push(`native launch did not survive the bounded smoke window: ${JSON.stringify(launch.status)}`);
+  }
+  if (launchStats && launchStats.mtimeMs + 1000 < applicationStats.mtimeMs) {
+    issues.push("native launch report is older than the desktop binary");
+  }
   if (smoke.platform !== "darwin") issues.push(`native smoke report platform is ${JSON.stringify(smoke.platform)}`);
   if (smoke.nativeWindow?.window?.visible !== true) issues.push("native smoke did not record a visible window");
   if (smoke.nativeUi?.payload?.surfaces?.source !== true || smoke.nativeUi?.payload?.surfaces?.preview !== true) {
@@ -859,6 +876,14 @@ function collectMacosNativeProof() {
     status: issues.length === 0 ? "passed" : "incomplete",
     reportPath: relative(macosFallbackSmokeReportPath),
     launchReportPath: relative(macosFallbackLaunchReportPath),
+    binaryMtime: applicationStats.mtime.toISOString(),
+    reportMtime: smokeStats.mtime.toISOString(),
+    launchReportMtime: launchStats?.mtime.toISOString() || "",
+    launchStatus: launch?.status || "",
+    processAlive: launch?.processAlive === true,
+    freshForBinary:
+      smokeStats.mtimeMs + 1000 >= applicationStats.mtimeMs &&
+      Boolean(launchStats && launchStats.mtimeMs + 1000 >= applicationStats.mtimeMs),
     assertionCount: assertions.length,
     passedAssertionCount: passedAssertions.length,
     windowTitle: smoke.nativeWindow?.window?.title || "",

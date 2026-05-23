@@ -323,6 +323,9 @@ bounded desktop launch smoke there. When the bounded launch smoke has already
 run on macOS, the WebDriver report also records `fallbackProof` from
 `.tmp/desktop-smoke/native-command-report.json` so the skip still points to
 current app-authored native file, export, workspace, snapshot, and UI evidence.
+The fallback proof is freshness-checked against the built desktop binary and
+the bounded launch report so stale `.tmp` native reports cannot satisfy the
+WebDriver evidence contract.
 
 `cargo check` and `cargo test` require crates.io access the first time Rust
 dependencies are resolved. After dependencies are present, the project is

@@ -677,6 +677,9 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("collectMacosNativeProof"));
   ok(script.includes("fallbackProof"));
   ok(script.includes("native-command-report.json"));
+  ok(script.includes("native smoke report is older than the desktop binary"));
+  ok(script.includes("freshForBinary"));
+  ok(script.includes("native launch did not survive the bounded smoke window"));
   ok(script.includes("native workflow exported html from native menu command"));
   ok(script.includes("native workflow restored workspace tabs with active pinned and scroll state"));
 });
