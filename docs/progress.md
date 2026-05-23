@@ -31,6 +31,17 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- This update deepens native primary-layout proof for the launched Tauri smoke.
+  Mode evidence now records source/preview pane visibility and rendered sidebar
+  or preview text, and the smoke validator requires concrete content proof for
+  export-preview, review-governance, and presentation-outline modes rather than
+  accepting only a workspace CSS class and sidebar route. The bounded launch
+  window is now 60 seconds by default so the expanded end-to-end workflow can
+  reach the final report instead of being cut off at an intermediate checkpoint.
+- This update keeps external transform trust diagnostics synchronized with the
+  effective trust state. A configured but untrusted executable path now shows
+  the trust-cleared warning directly in the settings row, even if an older probe
+  result was restored before the path field changed again.
 - This update makes the already-wired direct HTML exporter unmistakable in the
   primary File toolbar by labeling the command `HTML Export` and preserving the
   existing Export sidebar, command-palette, native `File` -> `Export` ->
@@ -763,7 +774,7 @@ P2/P3 gaps:
 
 ## Verification Status
 
-Current verification recorded on 2026-05-21 and 2026-05-22:
+Current verification recorded on 2026-05-21 through 2026-05-23:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
@@ -782,6 +793,11 @@ Current verification recorded on 2026-05-21 and 2026-05-22:
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, `processAlive: true`, app-authored native window evidence, and app-authored native UI evidence. `.tmp/desktop-smoke/native-ui-report.json` records command labels including New/Open/Save/Templates/Commands, source/sidebar/preview/status surface presence, active document `Market Entry Report`, preview label `Rendered preview for Market Entry Report, draft`, and viewport dimensions; System Events process evidence is recorded as `limited` on this host because it exposed the process but not a window. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages external transform engine trust" --project chromium` | Pass | Focused system-Chrome fallback workflow passed after keeping transform trust diagnostics visible when a configured path is untrusted. |
+| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed all 49 Chromium workflows through the system-Chrome fallback after the transform trust diagnostics fix. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed from the updated source; 60 modules transformed. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary rebuilt from the updated frontend bundle at `src-tauri/target/release/neditor`. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Re-run on 2026-05-23 validated desktop build artifacts, native command workflow smoke, bounded launch smoke, mode pane visibility, rendered HTML export/review/presentation content, and guarded native `File` -> `Export` -> `HTML Export` routing. |
 | `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, Templates-panel calc insertion to source/preview, real Markdown save/open/rename/duplicate/reveal, export readiness, real HTML export writing through the guarded dialog-free smoke path with sidecar manifest/output-hash validation, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip plus the supported workflow plan in `.tmp/desktop-webdriver/report.json`. |
 
 Fresh baseline recorded on 2026-05-20:

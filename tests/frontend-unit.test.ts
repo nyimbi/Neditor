@@ -682,6 +682,12 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow reloaded export profile from settings store"));
   ok(app.includes("collectNativeModeEvidence"));
   ok(app.includes("[\"split\", \"source\", \"preview\", \"focus\", \"export\", \"review\", \"presentation\"]"));
+  ok(app.includes("native workflow rendered export mode preview content"));
+  ok(app.includes("native workflow rendered review mode governance content"));
+  ok(app.includes("native workflow rendered presentation outline content"));
+  ok(smoke.includes("native workflow report did not include rendered export-mode content"));
+  ok(smoke.includes("native workflow report did not include rendered review-mode governance content"));
+  ok(smoke.includes("native workflow report did not include rendered presentation outline content"));
   ok(app.includes("collectNativeThemeAccessibilityEvidence"));
   ok(app.includes("native workflow applied high contrast attributes and colors"));
   ok(app.includes("native workflow applied preview theme and typography"));

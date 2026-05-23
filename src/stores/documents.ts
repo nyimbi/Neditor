@@ -1433,21 +1433,21 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async setTransformEnginePath(name: string, path: string) {
       const previousPath = this.transformEnginePaths[name] || "";
+      const trustedAfterPathChange = previousPath === path ? Boolean(this.trustedTransformEngines[name]) : false;
+      const trustRequiresReview = Boolean(path) && !trustedAfterPathChange;
       this.transformEnginePaths = { ...this.transformEnginePaths, [name]: path };
+      this.trustedTransformEngines = { ...this.trustedTransformEngines, [name]: trustedAfterPathChange };
       this.transformProbeResults = {
         ...this.transformProbeResults,
         [name]: {
           ok: false,
           message: "Probe required after engine path change.",
-          diagnostics:
-            previousPath !== path
-              ? ["Trust was cleared because the executable path changed."]
-              : ["Run a probe to verify the configured engine path."],
+          diagnostics: [
+            ...(trustRequiresReview ? ["Trust was cleared because the executable path changed."] : []),
+            "Run a probe to verify the configured engine path.",
+          ],
         },
       };
-      if (previousPath !== path) {
-        this.trustedTransformEngines = { ...this.trustedTransformEngines, [name]: false };
-      }
       await this.persistWorkspace();
     },
     async setTransformTrust(name: string, trusted: boolean) {

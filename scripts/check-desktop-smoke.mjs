@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const launchRequested =
   process.argv.includes("--launch") || process.env.NEDITOR_DESKTOP_SMOKE_LAUNCH === "1";
-const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 30000);
+const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 60000);
 const launchAttempts = Math.max(1, Number(process.env.NEDITOR_DESKTOP_SMOKE_ATTEMPTS || 3));
 const nativeWindowReportPath = join(root, ".tmp", "desktop-smoke", "native-window-report.json");
 const nativeUiReportPath = join(root, ".tmp", "desktop-smoke", "native-ui-report.json");
@@ -462,6 +462,9 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow prepared html export readiness",
     "native workflow wrote html export artifact",
     "native workflow exported html from native menu command",
+    "native workflow rendered export mode preview content",
+    "native workflow rendered review mode governance content",
+    "native workflow rendered presentation outline content",
     "native workflow routed export preview from native view menu",
     "native workflow routed outline from native view menu",
     "native workflow routed exports from native view menu",
@@ -513,6 +516,42 @@ function validateNativeWorkflowReport(launchReport) {
     if (entry?.sidebar !== sidebar) {
       issues.push(`native workflow report did not route ${mode} mode to ${sidebar} sidebar: ${JSON.stringify(entry)}`);
     }
+  }
+  const modeEntry = (mode) => modeEvidence.find((candidate) => candidate?.mode === mode) || {};
+  const expectedModeVisibility = {
+    split: { sourceVisible: true, previewVisible: true },
+    source: { sourceVisible: true, previewVisible: false },
+    preview: { sourceVisible: false, previewVisible: true },
+    focus: { sourceVisible: true, previewVisible: false },
+    export: { sourceVisible: false, previewVisible: true },
+    review: { sourceVisible: true, previewVisible: true },
+    presentation: { sourceVisible: false, previewVisible: true },
+  };
+  for (const [mode, expected] of Object.entries(expectedModeVisibility)) {
+    const entry = modeEntry(mode);
+    if (entry.sourceVisible !== expected.sourceVisible || entry.previewVisible !== expected.previewVisible) {
+      issues.push(`native workflow report did not include correct pane visibility for ${mode}: ${JSON.stringify(entry)}`);
+    }
+  }
+  const exportModeEntry = modeEntry("export");
+  if (
+    !String(exportModeEntry.previewText || "").includes("HTML export preview") ||
+    !String(exportModeEntry.previewText || "").includes("Market Entry Report") ||
+    !String(exportModeEntry.sidebarText || "").includes("HTML delivery")
+  ) {
+    issues.push(`native workflow report did not include rendered export-mode content: ${JSON.stringify(exportModeEntry)}`);
+  }
+  const reviewModeEntry = modeEntry("review");
+  if (
+    !String(reviewModeEntry.sidebarText || "").includes("Review") ||
+    !String(reviewModeEntry.sidebarText || "").includes("Summary") ||
+    !String(reviewModeEntry.sidebarText || "").includes("Approved by")
+  ) {
+    issues.push(`native workflow report did not include rendered review-mode governance content: ${JSON.stringify(reviewModeEntry)}`);
+  }
+  const presentationModeEntry = modeEntry("presentation");
+  if (!String(presentationModeEntry.sidebarText || "").includes("Outline") || !String(presentationModeEntry.previewText || "").includes("Market Entry Report")) {
+    issues.push(`native workflow report did not include rendered presentation outline content: ${JSON.stringify(presentationModeEntry)}`);
   }
   const fileWorkflow = payload.fileWorkflow || {};
   const expectedFilePath = nativeWorkflowFilePath.replaceAll("\\", "/");

@@ -1261,6 +1261,9 @@
               </span>
             </label>
             <label><input :checked="Boolean(store.trustedTransformEngines[engine.name])" type="checkbox" @change="toggleTransformTrust(engine.name, $event)" /> Trusted</label>
+            <small v-if="store.transformEnginePaths[engine.name] && !store.trustedTransformEngines[engine.name]" class="engine-trust-note">
+              Trust was cleared because the executable path changed.
+            </small>
             <label><input :checked="Boolean(store.disabledTransformEngines[engine.name])" type="checkbox" @change="store.setTransformDisabled(engine.name, eventChecked($event))" /> Disable external engine</label>
             <label>
               Input
@@ -1701,6 +1704,7 @@ const aiConvertNumberedLists = ref(true);
 const aiConvertTables = ref(true);
 const aiPreviewBusy = ref(false);
 const aiPreviewSignature = ref("");
+const desktopWorkflowSmokeActive = ref(false);
 const commandPaletteOpen = ref(false);
 const conflictOpen = ref(false);
 const mergedConflictText = ref("");
@@ -2902,6 +2906,7 @@ async function reportDesktopUiSmoke() {
 async function runDesktopWorkflowSmokeIfEnabled() {
   const enabled = await invoke<boolean>("desktop_workflow_smoke_enabled").catch(() => false);
   if (!enabled) return;
+  desktopWorkflowSmokeActive.value = true;
 
   const assertions: Array<{ name: string; passed: boolean; detail?: string }> = [];
   const record = (name: string, passed: boolean, detail?: string) => {
@@ -3049,7 +3054,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     });
     smokePhase = "native-menu-commands-start";
     await writeNativeWorkflowCheckpoint(smokePhase, assertions);
-    const nativeMenuCommandEvidence = await collectNativeMenuCommandEvidence(record);
+    const nativeMenuCommandEvidence = await collectNativeMenuCommandEvidence(record, (phase) => writeNativeWorkflowCheckpoint(phase, assertions));
     smokePhase = "native-menu-commands";
     await writeNativeWorkflowCheckpoint(smokePhase, assertions);
     smokePhase = "workspace-tabs-start";
@@ -3301,67 +3306,73 @@ async function collectNativeExportProfileEvidence(record: (name: string, passed:
   return { saved: profile, applied, reloaded };
 }
 
-async function collectNativeMenuCommandEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+async function collectNativeMenuCommandEvidence(record: (name: string, passed: boolean, detail?: string) => void, checkpoint?: (phase: string) => Promise<void>) {
   const evidence: Record<string, unknown> = {};
-  const runMenuCommand = async (command: string) => {
+  const runMenuCommand = async (command: string, phase: string) => {
+    await checkpoint?.(`${phase}-start`);
     await emitNativeWorkflowMenuCommand(command, 500);
     await nextTick();
+    await checkpoint?.(`${phase}-emitted`);
   };
   const textCount = (needle: string) => active.value.text.split(needle).length - 1;
   const recordInsertion = async (command: string, key: string, assertion: string, needle: string) => {
     const before = textCount(needle);
-    await runMenuCommand(command);
+    await runMenuCommand(command, `native-menu-command-${key}`);
     await waitForNativeWorkflowCondition(() => textCount(needle) > before, 1000);
     const inserted = textCount(needle) > before;
     evidence[key] = { inserted };
     record(assertion, inserted, JSON.stringify(evidence[key]));
+    await checkpoint?.(`native-menu-command-${key}-recorded`);
   };
 
-  await runMenuCommand("neditor-mode-export");
+  await runMenuCommand("neditor-mode-export", "native-menu-command-export-mode");
   await waitForNativeWorkflowCondition(() => store.mode === "export" && store.sidebar === "exports", 1000);
   evidence.exportMode = { mode: store.mode, sidebar: store.sidebar };
   record("native workflow routed export preview from native view menu", store.mode === "export" && store.sidebar === "exports", JSON.stringify(evidence.exportMode));
+  await checkpoint?.("native-menu-command-export-mode-recorded");
 
-  await runMenuCommand("neditor-show-outline");
+  await runMenuCommand("neditor-show-outline", "native-menu-command-outline");
   await waitForNativeWorkflowCondition(() => store.sidebar === "outline", 1000);
   evidence.outline = { sidebar: store.sidebar };
   record("native workflow routed outline from native view menu", store.sidebar === "outline", JSON.stringify(evidence.outline));
+  await checkpoint?.("native-menu-command-outline-recorded");
 
-  await runMenuCommand("neditor-show-exports");
+  await runMenuCommand("neditor-show-exports", "native-menu-command-exports");
   await waitForNativeWorkflowCondition(() => store.sidebar === "exports", 1000);
   evidence.exports = { sidebar: store.sidebar };
   record("native workflow routed exports from native view menu", store.sidebar === "exports", JSON.stringify(evidence.exports));
+  await checkpoint?.("native-menu-command-exports-recorded");
 
-  await runMenuCommand("neditor-open-search");
+  await runMenuCommand("neditor-open-search", "native-menu-command-search");
   await waitForNativeWorkflowCondition(() => Boolean(document.querySelector(".cm-search")), 1000);
   evidence.search = { open: Boolean(document.querySelector(".cm-search")) };
   record("native workflow opened search from native menu command", Boolean(document.querySelector(".cm-search")), JSON.stringify(evidence.search));
+  await checkpoint?.("native-menu-command-search-recorded");
 
   await recordInsertion("neditor-insert-toc", "toc", "native workflow inserted toc from native writing tools menu", "[TOC]");
   await recordInsertion("neditor-insert-equation", "equation", "native workflow inserted equation from native writing tools menu", "E = mc^2");
   await recordInsertion("neditor-insert-code-fence", "codeFence", "native workflow inserted code fence from native writing tools menu", "```markdown");
   await recordInsertion("neditor-insert-table", "table", "native workflow inserted table from native writing tools menu", "| Revenue | 125000 |");
 
-  await runMenuCommand("neditor-open-templates");
+  await runMenuCommand("neditor-open-templates", "native-menu-command-templates");
   await waitForNativeWorkflowCondition(() => store.sidebar === "templates", 1000);
   evidence.templates = { sidebar: store.sidebar };
   record("native workflow opened templates from native writing tools menu", store.sidebar === "templates", JSON.stringify(evidence.templates));
+  await checkpoint?.("native-menu-command-templates-recorded");
 
-  await runMenuCommand("neditor-clean-ai-paste");
+  await runMenuCommand("neditor-clean-ai-paste", "native-menu-command-ai-paste");
   await waitForNativeWorkflowCondition(() => aiPasteOpen.value, 1000);
   evidence.aiPaste = { open: aiPasteOpen.value, statusMessage: store.statusMessage };
   record("native workflow opened AI paste from native writing tools menu", aiPasteOpen.value, JSON.stringify(evidence.aiPaste));
+  await checkpoint?.("native-menu-command-ai-paste-recorded");
   aiPasteOpen.value = false;
 
   return evidence;
 }
 
 async function emitNativeWorkflowMenuCommand(command: string, timeoutMs: number) {
-  const emitted = invoke("emit_desktop_workflow_smoke_menu_command", { command }).catch(() => undefined);
-  await Promise.race([
-    emitted,
-    nativeWorkflowDelay(timeoutMs),
-  ]);
+  void invoke("emit_desktop_workflow_smoke_menu_command", { command }).catch(() => undefined);
+  await nativeWorkflowDelay(timeoutMs);
   await nextTick();
 }
 
@@ -3903,24 +3914,92 @@ async function clickNativeWorkflowButton(label: string, root: ParentNode | null 
 
 async function collectNativeModeEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
   const modes: Array<typeof store.mode> = ["split", "source", "preview", "focus", "export", "review", "presentation"];
+  type NativeModeEvidence = {
+    mode: typeof store.mode;
+    workspaceClass: string;
+    sidebar: string;
+    sourceVisible: boolean;
+    previewVisible: boolean;
+    sidebarText: string;
+    previewText: string;
+  };
   const expectedSidebar: Partial<Record<typeof store.mode, string>> = {
     export: "exports",
     review: "review",
     presentation: "outline",
   };
-  const evidence = [];
-  for (const mode of modes) {
-    store.mode = mode;
-    await nextTick();
-    const workspaceClass = document.querySelector("#document-workspace")?.className || "";
-    const sidebar = store.sidebar;
-    const passed = workspaceClass.includes(`mode-${mode}`) && (!expectedSidebar[mode] || sidebar === expectedSidebar[mode]);
-    record(`native workflow switched ${mode} mode`, passed, JSON.stringify({ workspaceClass, sidebar }));
-    evidence.push({ mode, workspaceClass, sidebar });
-  }
-  store.mode = "split";
+  const originalTarget = store.exportTarget;
+  const originalManifestDefault = store.exportDefaults.includeManifest;
+  store.exportTarget = "html";
+  store.exportDefaults.includeManifest = true;
+  await store.compileActive();
   await nextTick();
-  return evidence;
+  const surfaceText = (selector: string) => document.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim() || "";
+  const surfaceVisible = (selector: string) => {
+    const element = document.querySelector(selector) as HTMLElement | null;
+    if (!element) return false;
+    const style = window.getComputedStyle(element);
+    return style.display !== "none" && style.visibility !== "hidden";
+  };
+  try {
+    const evidence: NativeModeEvidence[] = [];
+    for (const mode of modes) {
+      store.mode = mode;
+      await nextTick();
+      const workspaceClass = document.querySelector("#document-workspace")?.className || "";
+      const sidebar = store.sidebar;
+      const sourceVisible = surfaceVisible("#markdown-source");
+      const previewVisible = surfaceVisible("#live-preview");
+      const sidebarText = surfaceText("#document-sidebar").slice(0, 900);
+      const previewText = surfaceText("#live-preview").slice(0, 1400);
+      const entry = { mode, workspaceClass, sidebar, sourceVisible, previewVisible, sidebarText, previewText };
+      const passed = workspaceClass.includes(`mode-${mode}`) && (!expectedSidebar[mode] || sidebar === expectedSidebar[mode]);
+      record(`native workflow switched ${mode} mode`, passed, JSON.stringify(entry));
+      evidence.push(entry);
+    }
+    const byMode = (mode: typeof store.mode) => evidence.find((entry) => entry.mode === mode);
+    const exportMode = byMode("export");
+    const reviewMode = byMode("review");
+    const presentationMode = byMode("presentation");
+    record(
+      "native workflow rendered export mode preview content",
+      Boolean(
+        exportMode?.previewVisible &&
+          !exportMode.sourceVisible &&
+          exportMode.previewText.includes("HTML export preview") &&
+          exportMode.previewText.includes("Market Entry Report") &&
+          exportMode.sidebarText.includes("HTML delivery"),
+      ),
+      JSON.stringify(exportMode),
+    );
+    record(
+      "native workflow rendered review mode governance content",
+      Boolean(
+        reviewMode?.sourceVisible &&
+          reviewMode.previewVisible &&
+          reviewMode.sidebarText.includes("Review") &&
+          reviewMode.sidebarText.includes("Summary") &&
+          reviewMode.sidebarText.includes("Approved by"),
+      ),
+      JSON.stringify(reviewMode),
+    );
+    record(
+      "native workflow rendered presentation outline content",
+      Boolean(
+        presentationMode?.previewVisible &&
+          !presentationMode.sourceVisible &&
+          presentationMode.sidebarText.includes("Outline") &&
+          presentationMode.previewText.includes("Market Entry Report"),
+      ),
+      JSON.stringify(presentationMode),
+    );
+    return evidence;
+  } finally {
+    store.exportTarget = originalTarget;
+    store.exportDefaults.includeManifest = originalManifestDefault;
+    store.mode = "split";
+    await nextTick();
+  }
 }
 
 async function collectNativeThemeAccessibilityEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
@@ -5327,7 +5406,8 @@ async function readClipboardText(): Promise<ClipboardTextRead | null> {
 
   if (clipboard.read) {
     try {
-      const items = await clipboard.read();
+      const items = await boundedClipboardRead(clipboard.read());
+      if (!items) return null;
       for (const item of items) {
         const preferredType = ["text/html", "text/plain"].find((type) => item.types.includes(type));
         if (!preferredType) continue;
@@ -5343,16 +5423,25 @@ async function readClipboardText(): Promise<ClipboardTextRead | null> {
 
   if (!clipboard.readText) return null;
   try {
-    const text = await clipboard.readText();
+    const text = await boundedClipboardRead(clipboard.readText());
+    if (!text) return null;
     return text.trim() ? { text, kind: "plain" } : null;
   } catch {
     return null;
   }
 }
 
+async function boundedClipboardRead<T>(read: Promise<T>) {
+  return Promise.race<T | null>([read, new Promise((resolve) => window.setTimeout(() => resolve(null), 350))]);
+}
+
 async function openAiPaste() {
   applyAiPasteDefaults();
   aiPasteOpen.value = true;
+  if (desktopWorkflowSmokeActive.value) {
+    store.statusMessage = "Paste AI chat text to preview cleanup";
+    return;
+  }
   if (aiPasteText.value.trim()) return;
   const clipboardText = await readClipboardText();
   if (clipboardText) {
