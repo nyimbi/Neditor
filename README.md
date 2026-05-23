@@ -69,6 +69,9 @@ web app.
 - Command palette for app actions plus document-aware navigation across
   headings, citations, glossary terms, index terms, open documents, and
   workspace files.
+- First-class outline planning in the Outline panel: draft a document structure
+  with indented bullets, numbers, or Markdown headings, then create or append a
+  Markdown document skeleton before writing the body text.
 - Separate preferences for theme, preview theme, typography, editor behavior,
   autosave, snapshots, export defaults, bibliography defaults, brand defaults,
   Git integration, AI cleanup, and transform engines.

@@ -208,7 +208,30 @@
 
         <template v-else-if="store.sidebar === 'outline'">
           <h2>Outline <small>{{ outlineHeadings.length }}</small></h2>
-          <p v-if="!outlineHeadings.length" class="sidebar-hint">Add Markdown headings to build a document outline.</p>
+          <section class="outline-planner" aria-label="Outline planner">
+            <h3>Plan</h3>
+            <label>
+              Document title
+              <input v-model="outlineDraftTitle" placeholder="Board Brief" />
+            </label>
+            <label>
+              Outline draft
+              <textarea
+                v-model="outlineDraftText"
+                rows="9"
+                aria-label="Editable document outline"
+                placeholder="- Executive Summary&#10;  - Decision Needed&#10;  - Key Risks&#10;- Financial Case"
+              ></textarea>
+            </label>
+            <label><input v-model="outlineDraftIncludeToc" type="checkbox" /> Include table of contents</label>
+            <div class="outline-planner-actions">
+              <button type="button" @click="loadOutlineDraftFromDocument">Load from document</button>
+              <button type="button" :disabled="!outlineDraftItems.length" @click="createDocumentFromOutline">Create document from outline</button>
+              <button type="button" :disabled="!outlineDraftItems.length" @click="appendOutlineToDocument">Append outline</button>
+            </div>
+            <p class="sidebar-hint">{{ outlineDraftItems.length }} planned sections. Use indentation, bullets, numbers, or Markdown heading marks.</p>
+          </section>
+          <p v-if="!outlineHeadings.length" class="sidebar-hint">Add headings directly or create a document from an outline plan.</p>
           <button
             v-for="heading in outlineHeadings"
             :key="`${heading.line}-${heading.anchor}`"
@@ -1615,6 +1638,7 @@ import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnost
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
+import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
 import { markdownListContinuation } from "./lib/markdownEditing";
 import {
   blankCustomTransformTemplate,
@@ -1713,6 +1737,9 @@ const commandQuery = ref("");
 const reviewCommentText = ref("");
 const changeNoteText = ref("");
 const selectedTableIndex = ref(0);
+const outlineDraftText = ref("- Executive Summary\n  - Decision Needed\n  - Key Risks\n- Financial Case\n- Next Steps");
+const outlineDraftTitle = ref("");
+const outlineDraftIncludeToc = ref(true);
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const isNewTableDraft = ref(false);
@@ -2133,6 +2160,7 @@ const outlineHeadings = computed(() =>
     ];
   }),
 );
+const outlineDraftItems = computed(() => parseOutlinePlan(outlineDraftText.value));
 const figureBlocks = computed<FigureListItem[]>(() =>
   (active.value.compile?.document_ast.blocks || []).flatMap((block: DocumentBlock) => {
     if (block.kind !== "figure") return [];
@@ -2358,6 +2386,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "find-previous", label: "Prev", title: "Find previous match", icon: "previous", run: () => runEditorCommand(findPrevious) },
       { id: "find-next", label: "Next", title: "Find next match", icon: "next", run: () => runEditorCommand(findNext) },
       { id: "outline", label: "Outline", title: "Show document outline", icon: "outline", run: () => showOutline() },
+      { id: "plan-outline", label: "Plan", title: "Plan document from outline", icon: "outline", run: () => planDocumentOutline() },
       { id: "fold-all", label: "Fold", title: "Fold all Markdown sections", icon: "fold", run: () => runEditorCommand(foldAll) },
       { id: "unfold-all", label: "Unfold", title: "Unfold all Markdown sections", icon: "unfold", run: () => runEditorCommand(unfoldAll) },
     ],
@@ -2429,6 +2458,7 @@ const commands = computed(() => [
   { name: "Add cursor above", group: "Edit", run: () => runEditorCommand(addCursorAbove) },
   { name: "Add cursor below", group: "Edit", run: () => runEditorCommand(addCursorBelow) },
   { name: "Show document outline", group: "Navigate", run: () => showOutline() },
+  { name: "Plan document from outline", group: "Navigate", run: () => planDocumentOutline() },
   { name: "Fold all sections", group: "Navigate", run: () => runEditorCommand(foldAll) },
   { name: "Unfold all sections", group: "Navigate", run: () => runEditorCommand(unfoldAll) },
   { name: "Show toolbar icons and text", group: "View", run: () => (store.toolbarDisplay = "both") },
@@ -4707,6 +4737,44 @@ function showOutline() {
   });
 }
 
+function planDocumentOutline() {
+  store.sidebar = "outline";
+  if (!outlineDraftTitle.value.trim()) outlineDraftTitle.value = active.value.title.replace(/\.[^.]+$/, "");
+  void nextTick(() => {
+    document.querySelector<HTMLTextAreaElement>('[aria-label="Editable document outline"]')?.focus();
+  });
+}
+
+function loadOutlineDraftFromDocument() {
+  const draft = outlinePlanFromMarkdown(active.value.text);
+  outlineDraftText.value = draft || outlineDraftText.value;
+  outlineDraftTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
+  store.statusMessage = draft ? "Loaded outline from document headings" : "No headings found to load into outline planner";
+}
+
+function createDocumentFromOutline() {
+  const markdown = outlinePlanToMarkdown(outlineDraftText.value, {
+    title: outlineDraftTitle.value,
+    includeToc: outlineDraftIncludeToc.value,
+  });
+  if (!markdown) return;
+  store.updateText(markdown);
+  store.sidebar = "outline";
+  store.statusMessage = "Created document skeleton from outline";
+}
+
+function appendOutlineToDocument() {
+  const markdown = outlinePlanToMarkdown(outlineDraftText.value, {
+    title: outlineDraftTitle.value || active.value.title.replace(/\.[^.]+$/, ""),
+    includeToc: false,
+  });
+  if (!markdown) return;
+  const body = markdown.replace(/^---[\s\S]*?---\n+#[^\n]+\n+/, "").trim();
+  store.updateText(`${active.value.text.trimEnd()}\n\n${body}\n`);
+  store.sidebar = "outline";
+  store.statusMessage = "Appended outline skeleton to document";
+}
+
 function openTransformTemplates() {
   store.sidebar = "templates";
   void nextTick(() => {
@@ -6850,6 +6918,26 @@ select:hover {
   display: grid;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.outline-planner {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #d7dee7;
+}
+
+.outline-planner textarea {
+  resize: vertical;
+  min-height: 136px;
+  font-family: var(--editor-font, "SFMono-Regular", Consolas, monospace);
+}
+
+.outline-planner-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
 }
 
 .outline-row {

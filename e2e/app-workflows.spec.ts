@@ -1791,6 +1791,26 @@ test("navigates source from the outline sidebar", async ({ page }) => {
   await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
 });
 
+test("creates a document skeleton from an editable outline plan", async ({ page }) => {
+  await page.getByLabel("Sidebar panel").selectOption("outline");
+  const sidebar = page.locator(".sidebar");
+  await expect(sidebar.getByRole("heading", { name: "Plan" })).toBeVisible();
+
+  await sidebar.getByLabel("Document title").fill("Board Decision Memo");
+  await sidebar
+    .getByLabel("Editable document outline")
+    .fill("- Executive Summary\n  - Decision Needed\n  - Key Risks\n- Financial Case\n- Next Steps");
+  await sidebar.getByRole("button", { name: "Create document from outline" }).click();
+
+  await expect(page.locator(".cm-line").filter({ hasText: "# Board Decision Memo" })).toBeVisible();
+  await expect(page.locator(".cm-line").filter({ hasText: "## Executive Summary" })).toBeVisible();
+  await expect(page.locator(".cm-line").filter({ hasText: "### Decision Needed" })).toBeVisible();
+  await expect(page.locator(".cm-line").filter({ hasText: "## Financial Case" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Board Decision Memo");
+  await expect(sidebar.getByRole("button", { name: /Decision Needed/ })).toBeVisible();
+  expect(await editorText(page)).toContain("<!-- Draft this section. -->");
+});
+
 test("folds and unfolds Markdown sections from toolbar and commands", async ({ page }) => {
   await setMockFileText(
     page,

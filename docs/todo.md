@@ -137,7 +137,7 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 49 Chromium browser workbench workflows
+- `pnpm run test:e2e`: passed all 50 Chromium browser workbench workflows
   locally on 2026-05-23 through the workspace-local Playwright Chromium cache
   at `.tmp/ms-playwright`, including HTML, blog/Substack,
   LaTeX, Google Docs export-target handoffs, and deep keyboard-only operation
@@ -630,6 +630,10 @@ Current local verification evidence:
   full baseline. The current host passed both through the workspace-local
   Playwright Chromium cache at `.tmp/ms-playwright` with all 49 Chromium
   workflows.
+- 2026-05-23: editable outline planning is browser-proven. The Outline panel
+  accepts an outline draft before body content exists and creates a Markdown
+  document skeleton with front matter, `[TOC]`, heading hierarchy, and draft
+  placeholders.
 - 2026-05-21: `pnpm run verify:local` passed after hardening the `reveal_path`
   command builder. The run covered frontend typecheck, frontend unit tests,
   project structure, accessibility, dependency admission, Markdown links, Rust
@@ -750,12 +754,12 @@ wrapper from a terminal/session that permits Chromium launch.
 
 Current host evidence:
 
-- 2026-05-22: `pnpm exec playwright test --list` lists 49 Chromium workflow
+- 2026-05-23: `pnpm exec playwright test --list` lists 50 Chromium workflow
   tests in `e2e/app-workflows.spec.ts`.
 - 2026-05-23: `pnpm run check:e2e-env` passes the focused workbench boot
   workflow through the workspace-local Playwright Chromium cache at
   `.tmp/ms-playwright`.
-- 2026-05-23: `pnpm run test:e2e` passed all 49 Chromium browser workflows,
+- 2026-05-23: `pnpm run test:e2e` passed all 50 Chromium browser workflows,
   including the HTML, blog/Substack, LaTeX, and Google Docs export-target
   handoff tests plus deep keyboard-only workbench operation.
 - 2026-05-23: `pnpm run verify:local -- --list` shows the browser workflow

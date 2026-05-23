@@ -16,6 +16,7 @@ import {
 } from "../src/lib/bibliographyManager.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
+import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
 import {
   builtinTransformTemplates,
@@ -241,6 +242,31 @@ test("markdown list continuation handles tasks numbers and blockquotes", () => {
   deepEqual(markdownListContinuation("  - "), { kind: "exit", fromColumn: 0, replacement: "  " });
   deepEqual(markdownListContinuation("> - [ ] "), { kind: "exit", fromColumn: 2, replacement: "" });
   equal(markdownListContinuation("plain paragraph"), null);
+});
+
+test("editable outline planner creates document skeletons before drafting content", () => {
+  const plan = "- Executive Summary\n  - Decision Needed\n  - Key Risks\n2. Financial Case\n  - Launch Plan";
+  deepEqual(parseOutlinePlan(plan), [
+    { level: 1, title: "Executive Summary" },
+    { level: 2, title: "Decision Needed" },
+    { level: 2, title: "Key Risks" },
+    { level: 1, title: "Financial Case" },
+    { level: 2, title: "Launch Plan" },
+  ]);
+
+  const markdown = outlinePlanToMarkdown(plan, { title: "Board Brief", includeToc: true });
+  ok(markdown.includes("title: Board Brief"));
+  ok(markdown.includes("toc: true"));
+  ok(markdown.includes("# Board Brief"));
+  ok(markdown.includes("[TOC]"));
+  ok(markdown.includes("## Executive Summary"));
+  ok(markdown.includes("### Decision Needed"));
+  ok(markdown.includes("### Key Risks"));
+  ok(markdown.includes("## Financial Case"));
+  ok(markdown.includes("### Launch Plan"));
+  ok(markdown.includes("<!-- Draft this section. -->"));
+
+  equal(outlinePlanFromMarkdown(markdown), "- Board Brief\n  - Executive Summary\n    - Decision Needed\n    - Key Risks\n  - Financial Case\n    - Launch Plan");
 });
 
 test("preview debounce coalesces edits inside the spec timing budget", () => {

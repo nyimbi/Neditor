@@ -31,6 +31,12 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- The Outline panel is now an editable planning surface, not only a generated
+  heading navigator. Users can draft an outline with indented bullets, numbered
+  lines, or Markdown heading marks, then create a document skeleton with front
+  matter, optional `[TOC]`, heading hierarchy, and draft placeholders before
+  writing body content. The command bar and palette expose `Plan document from
+  outline`, and the browser workflow now proves the outline-first creation path.
 - This update moves bounded macOS GUI launch proof into
   `pnpm run verify:local:full` after desktop artifact smoke. On macOS the full
   baseline now runs `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`
@@ -228,7 +234,7 @@ Recent pushed checkpoints visible in current git history:
   the evidence under `.tmp/rendered-export-audit/office-preview/`, and maps it
   into `viewer-proof.json`, `manual-review.html`, and `visual-review-summary.json`.
 - This update makes browser workflow execution current-host evidence instead
-  of stale archived evidence. `pnpm run test:e2e` now passes all 49 Chromium
+  of stale archived evidence. `pnpm run test:e2e` now passes all 50 Chromium
   workbench workflows locally through the system-Chrome fallback when bundled
   Playwright Chromium is missing, including editor/preview typing, settings persistence, command
   palette navigation, responsive desktop/narrow layout proof, fold/unfold controls, file/save/rename/reveal flows, snapshots, workspace
@@ -805,16 +811,16 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
-| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 49 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 50 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host through the workspace-local Playwright Chromium cache at `.tmp/ms-playwright`; `.tmp/e2e-environment/report.json` records `source: playwright-bundled`, the cache executable path, and the passing command tail. |
-| `pnpm run test:e2e` | Pass | 49 Chromium browser workbench workflows passed locally on this host, including responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
+| `pnpm run test:e2e` | Pass | 50 Chromium browser workbench workflows passed locally on this host, including editable outline-first document planning, responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, `processAlive: true`, app-authored native window evidence, and app-authored native UI evidence. `.tmp/desktop-smoke/native-ui-report.json` records command labels including New/Open/Save/Templates/Commands, source/sidebar/preview/status surface presence, active document `Market Entry Report`, preview label `Rendered preview for Market Entry Report, draft`, and viewport dimensions; System Events process evidence is recorded as `limited` on this host because it exposed the process but not a window. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages external transform engine trust" --project chromium` | Pass | Focused system-Chrome fallback workflow passed after keeping transform trust diagnostics visible when a configured path is untrusted. |
-| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed all 49 Chromium workflows through the workspace-local Playwright Chromium cache after the transform trust diagnostics fix. |
+| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed all 50 Chromium workflows through the workspace-local Playwright Chromium cache after the editable outline planner update. |
 | `pnpm run verify:local -- --list` | Pass | Quick local verification now lists the browser workflow environment preflight, so Chromium launch readiness is part of routine completed-slice verification. |
 | `pnpm run verify:local:full -- --list` | Pass | Full local verification now lists the full browser workflow suite after the production frontend build, making browser workflow execution part of the release-grade local baseline. |
 | `pnpm run verify:local` | Pass | Quick local verification passed with the new browser workflow environment gate included; the gate used the workspace-local Playwright Chromium cache and would retry transient browser-launch failures before failing the baseline. |
@@ -2553,6 +2559,8 @@ Native title-state verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `pnpm run test:unit` | Pass | 22 frontend unit tests passed, including `src/lib/documentOutline.ts` coverage for parsing indented/numbered/bulleted outline drafts and rendering a document skeleton before body content exists. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "creates a document skeleton" --project chromium` | Pass | Focused browser workflow passed through the workspace-local Playwright Chromium cache, proving the Outline panel can accept an editable plan, generate front matter, `[TOC]`, nested headings, draft placeholders, and update source/preview/sidebar outline evidence. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Launched native smoke validates title state across real file save, dirty edit, revert, and later template insertion, so save/revert clear the native dirty marker while edit/template mutations add it. |
 | `rg -n "native workflow save cleared native title\|native workflow dirtied native title for opened real file\|native workflow revert cleared native title\|native workflow exposed dirty title" .tmp/desktop-smoke/native-workflow-report.json .tmp/desktop-smoke/launch-report.json` | Pass | Native workflow reports include clean-title evidence after save, dirty-title evidence after editing an opened real file, clean-title evidence after revert, and dirty-title evidence after inserting a calc template. |
 | `pnpm run test:tauri-webdriver` | Skipped on macOS with native proof | Official Tauri WebDriver remains unavailable for macOS WKWebView, but `.tmp/desktop-webdriver/report.json` now records `fallbackProof.status: "passed"` from `.tmp/desktop-smoke/native-command-report.json`, including 72/72 native workflow assertions, visible NEditor window evidence, the real Markdown workflow file path, HTML export output/manifest paths, and the sidecar output hash. |
