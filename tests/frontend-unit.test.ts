@@ -675,6 +675,7 @@ test("local verification scripts expose local baseline checks", () => {
   const e2eEnvironment = readFileSync("scripts/check-e2e-environment.mjs", "utf8");
   const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
+  const googleDocsCollector = readFileSync("scripts/collect-google-docs-import-evidence.mjs", "utf8");
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
   const evidenceKitCollector = readFileSync("scripts/collect-release-evidence-kit.mjs", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
@@ -696,6 +697,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:release-signing"], "node scripts/check-release-signing.mjs");
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
+  equal(scripts["collect:google-docs-import"], "node scripts/collect-google-docs-import-evidence.mjs");
   equal(scripts["collect:platform-evidence"], "node scripts/collect-platform-evidence.mjs");
   equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
@@ -734,6 +736,13 @@ test("local verification scripts expose local baseline checks", () => {
   ok(googleDocsImport.includes("pending-google-drive-authorization"));
   ok(googleDocsImport.includes("rendered-export-audit.google-docs.zip"));
   ok(googleDocsImport.includes("Rendered Export Audit"));
+  ok(googleDocsCollector.includes("neditor.google-docs-import-evidence.v1"));
+  ok(googleDocsCollector.includes("NEDITOR_GOOGLE_DOCS_EXPORTED_DOCX"));
+  ok(googleDocsCollector.includes("NEDITOR_GOOGLE_DOCS_READBACK_TEXT_FILE"));
+  ok(googleDocsCollector.includes("Google Docs import evidence must be collected from a clean Git tree"));
+  ok(googleDocsCollector.includes("importMethod: \"google-drive-import-document\""));
+  ok(googleDocsCollector.includes("Control summary"));
+  ok(googleDocsCollector.includes("AI Provenance"));
   ok(platformPackaging.includes("platform-package-config-report.json"));
   ok(platformPackaging.includes("unsigned-local-builds"));
   ok(platformPackaging.includes("windowsTilePng"));
