@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import process from "node:process";
@@ -6,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = parseArgs(process.argv.slice(2));
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const platform = String(args.platform || process.env.NEDITOR_PLATFORM_EVIDENCE_PLATFORM || process.platform);
 const evidenceDir = resolve(args["evidence-dir"] || process.env.NEDITOR_PLATFORM_EVIDENCE_DIR || join(root, ".tmp", "platform-evidence", "external"));
 const bundleRoot = resolve(args["bundle-root"] || join(root, "src-tauri", "target", "release", "bundle"));
@@ -14,6 +16,7 @@ const buildCommand =
   args["build-command"] ||
   process.env.NEDITOR_PLATFORM_BUILD_COMMAND ||
   "pnpm run build && ./node_modules/.bin/tauri build --bundles all";
+const sourceCommit = String(args["source-commit"] || process.env.NEDITOR_SOURCE_COMMIT || gitCommit()).trim();
 
 const platformSpecs = {
   win32: {
@@ -44,6 +47,10 @@ if (!spec) {
   );
   process.exit(1);
 }
+if (!sourceCommit) {
+  console.error("Source commit is required. Run from a Git checkout or pass --source-commit / NEDITOR_SOURCE_COMMIT.");
+  process.exit(1);
+}
 
 const outputs = [];
 if (!args["webdriver-only"]) {
@@ -72,6 +79,8 @@ function writePackageEvidence(spec) {
         schema: "neditor.platform-package-artifacts.v1",
         platform,
         status: "passed",
+        appVersion: packageJson.version,
+        sourceCommit,
         generatedAt: new Date().toISOString(),
         command: buildCommand,
         artifacts,
@@ -94,6 +103,12 @@ function writeWebdriverEvidence(spec) {
   }
   if (report.status !== "passed") {
     throw new Error(`Desktop WebDriver report status must be passed, found ${report.status || "(missing)"}.`);
+  }
+  if (report.appVersion !== packageJson.version) {
+    throw new Error(`Desktop WebDriver report appVersion ${report.appVersion || "(missing)"} does not match ${packageJson.version}.`);
+  }
+  if (report.sourceCommit !== sourceCommit) {
+    throw new Error(`Desktop WebDriver report sourceCommit ${report.sourceCommit || "(missing)"} does not match ${sourceCommit}.`);
   }
   const reportPath = join(evidenceDir, spec.webdriverPath);
   mkdirSync(dirname(reportPath), { recursive: true });
@@ -160,4 +175,13 @@ function parseArgs(argv) {
 
 function relative(path) {
   return path.startsWith(root) ? path.slice(root.length + 1) : path;
+}
+
+function gitCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return "";
+  return result.stdout.trim();
 }

@@ -1,9 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const currentSourceCommit = gitCommit();
 const evidenceDir = resolve(process.env.NEDITOR_PLATFORM_EVIDENCE_DIR || join(root, ".tmp", "platform-evidence", "external"));
 const reportPath = join(root, ".tmp", "platform-evidence", "report.json");
 const templateDir = join(root, ".tmp", "platform-evidence", "templates");
@@ -117,6 +120,8 @@ function evaluatePackageArtifacts(spec) {
   requireValue(report.platform === spec.platform, problems, `platform must be ${spec.platform}`);
   requireValue(report.status === "passed", problems, "status must be passed");
   requireValue(isIsoDate(report.generatedAt), problems, "generatedAt must be an ISO timestamp");
+  requireValue(report.appVersion === packageJson.version, problems, `appVersion must match package.json version ${packageJson.version}`);
+  requireValue(report.sourceCommit === currentSourceCommit, problems, `sourceCommit must match current git commit ${currentSourceCommit}`);
   requireValue(String(report.command || "").includes("tauri build"), problems, "command must identify the Tauri package build");
   const artifacts = Array.isArray(report.artifacts) ? report.artifacts : [];
   requireValue(artifacts.length > 0, problems, "artifacts must include at least one package artifact");
@@ -137,6 +142,8 @@ function evaluatePackageArtifacts(spec) {
     status: "accepted",
     detail: `${spec.name} package artifact evidence supplied for ${artifacts.map((artifact) => artifact.kind).join(", ")}.`,
     generatedAt: report.generatedAt,
+    appVersion: report.appVersion,
+    sourceCommit: report.sourceCommit,
     command: report.command,
     artifacts: artifacts.map((artifact) => ({
       kind: artifact.kind,
@@ -161,6 +168,8 @@ function evaluateWebdriverReport(spec) {
   requireValue(report.platform === spec.platform, problems, `platform must be ${spec.platform}`);
   requireValue(report.status === "passed", problems, "status must be passed");
   requireValue(isIsoDate(report.generatedAt), problems, "generatedAt must be an ISO timestamp");
+  requireValue(report.appVersion === packageJson.version, problems, `appVersion must match package.json version ${packageJson.version}`);
+  requireValue(report.sourceCommit === currentSourceCommit, problems, `sourceCommit must match current git commit ${currentSourceCommit}`);
   const workflowPlan = Array.isArray(report.workflowPlan) ? report.workflowPlan : [];
   const assertions = Array.isArray(report.assertions) ? report.assertions : [];
   requireValue(assertions.length >= requiredWebdriverAssertions.length, problems, "assertions must include the full desktop workflow proof");
@@ -202,6 +211,8 @@ function evaluateWebdriverReport(spec) {
     status: "accepted",
     detail: `${spec.name} Tauri WebDriver report supplied with ${report.assertions.length} assertions.`,
     generatedAt: report.generatedAt,
+    appVersion: report.appVersion,
+    sourceCommit: report.sourceCommit,
     assertions: report.assertions.length,
     outputHash: report.exportArtifacts.outputHash,
   };
@@ -257,6 +268,8 @@ function writeTemplates() {
           schema: "neditor.platform-package-artifacts.v1",
           platform: spec.platform,
           status: "passed",
+          appVersion: packageJson.version,
+          sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
           generatedAt: new Date().toISOString(),
           command: "pnpm run build && ./node_modules/.bin/tauri build --bundles all",
           artifacts: [
@@ -280,6 +293,8 @@ function writeTemplates() {
           generatedAt: new Date().toISOString(),
           platform: spec.platform,
           status: "passed",
+          appVersion: packageJson.version,
+          sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
           workflowPlan: requiredWebdriverAssertions,
           assertions: requiredWebdriverAssertions.map((name) => ({ name, status: "passed" })),
           outlineArtifacts: {
@@ -320,4 +335,13 @@ function writeReport(report) {
 
 function relative(path) {
   return path.startsWith(root) ? path.slice(root.length + 1) : path;
+}
+
+function gitCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return "";
+  return result.stdout.trim();
 }

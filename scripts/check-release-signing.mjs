@@ -1,9 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const currentSourceCommit = gitCommit();
 const evidenceDir = resolve(process.env.NEDITOR_RELEASE_SIGNING_DIR || join(root, ".tmp", "release-signing", "external"));
 const reportPath = join(root, ".tmp", "release-signing", "report.json");
 const templateDir = join(root, ".tmp", "release-signing", "templates");
@@ -99,7 +102,8 @@ function evaluateSigningEvidence(spec) {
   requireValue(evidence.platform === spec.platform, problems, `platform must be ${spec.platform}`);
   requireValue(evidence.status === "passed", problems, "status must be passed");
   requireValue(isIsoDate(evidence.generatedAt), problems, "generatedAt must be an ISO timestamp");
-  requireValue(Boolean(String(evidence.releaseVersion || "").trim()), problems, "releaseVersion is required");
+  requireValue(evidence.releaseVersion === packageJson.version, problems, `releaseVersion must match package.json version ${packageJson.version}`);
+  requireValue(evidence.sourceCommit === currentSourceCommit, problems, `sourceCommit must match current git commit ${currentSourceCommit}`);
   const artifacts = Array.isArray(evidence.artifacts) ? evidence.artifacts : [];
   requireValue(artifacts.length > 0, problems, "artifacts must include at least one signed release artifact");
   for (const artifact of artifacts) {
@@ -131,6 +135,7 @@ function evaluateSigningEvidence(spec) {
     detail: `${spec.name} release signing evidence supplied with ${proof.length} proof checks.`,
     generatedAt: evidence.generatedAt,
     releaseVersion: evidence.releaseVersion,
+    sourceCommit: evidence.sourceCommit,
     artifacts: artifacts.map((artifact) => ({
       kind: artifact.kind,
       path: artifact.path,
@@ -179,7 +184,8 @@ function writeTemplates() {
           platform: spec.platform,
           status: "passed",
           generatedAt: new Date().toISOString(),
-          releaseVersion: "0.1.0",
+          releaseVersion: packageJson.version,
+          sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
           artifacts: [
             {
               kind: spec.artifactKinds[0],
@@ -223,4 +229,13 @@ function writeReport(report) {
 
 function relative(path) {
   return path.startsWith(root) ? path.slice(root.length + 1) : path;
+}
+
+function gitCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return "";
+  return result.stdout.trim();
 }

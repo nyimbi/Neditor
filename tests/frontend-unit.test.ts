@@ -734,6 +734,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformPackaging.includes("windowsTilePng"));
   ok(platformPackaging.includes("Tauri bundle targets must remain all-platform"));
   ok(platformEvidence.includes("neditor.platform-package-artifacts.v1"));
+  ok(platformEvidence.includes("appVersion must match package.json version"));
+  ok(platformEvidence.includes("sourceCommit must match current git commit"));
   ok(platformEvidence.includes("win32/tauri-webdriver-report.json"));
   ok(platformEvidence.includes("linux/package-artifacts.json"));
   ok(platformEvidence.includes("pending-external-evidence"));
@@ -745,10 +747,14 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformEvidence.includes("exportArtifacts.progressEvidence must include a completed render step"));
   ok(platformCollector.includes("NEDITOR_PLATFORM_EVIDENCE_PLATFORM"));
   ok(platformCollector.includes("NEDITOR_PLATFORM_BUILD_COMMAND"));
+  ok(platformCollector.includes("NEDITOR_SOURCE_COMMIT"));
   ok(platformCollector.includes("neditor.platform-package-artifacts.v1"));
+  ok(platformCollector.includes("Desktop WebDriver report sourceCommit"));
   ok(platformCollector.includes("Run pnpm run test:tauri-webdriver first"));
   ok(platformCollector.includes("Desktop WebDriver report status must be passed"));
   ok(releaseSigning.includes("neditor.release-signing-evidence.v1"));
+  ok(releaseSigning.includes("releaseVersion must match package.json version"));
+  ok(releaseSigning.includes("sourceCommit must match current git commit"));
   ok(releaseSigning.includes("darwin/signing-evidence.json"));
   ok(releaseSigning.includes("win32/signing-evidence.json"));
   ok(releaseSigning.includes("linux/signing-evidence.json"));
@@ -756,7 +762,9 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseSigning.includes("codesign --verify"));
   ok(signingCollector.includes("NEDITOR_RELEASE_SIGNING_PLATFORM"));
   ok(signingCollector.includes("NEDITOR_RELEASE_VERSION"));
+  ok(signingCollector.includes("NEDITOR_SOURCE_COMMIT"));
   ok(signingCollector.includes("neditor.release-signing-evidence.v1"));
+  ok(signingCollector.includes("Release version must match package.json version"));
   ok(signingCollector.includes("Missing required"));
   ok(signingCollector.includes("Release signing proof command failed"));
 });
@@ -960,6 +968,8 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes('"export_target": "html"'));
   ok(script.includes("manifest.output_hash"));
   ok(script.includes("workflowPlan: webdriverWorkflowPlan"));
+  ok(script.includes("appVersion: packageJson.version"));
+  ok(script.includes("sourceCommit: gitCommit()"));
   ok(script.includes("persisted desktop preferences after restart"));
   ok(script.includes("Official Tauri WebDriver currently supports desktop automation on Windows and Linux only"));
   ok(script.includes("collectMacosNativeProof"));
