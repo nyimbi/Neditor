@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const launchRequested =
   process.argv.includes("--launch") || process.env.NEDITOR_DESKTOP_SMOKE_LAUNCH === "1";
-const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 8000);
+const launchTimeoutMs = Number(process.env.NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS || 30000);
+const launchAttempts = Math.max(1, Number(process.env.NEDITOR_DESKTOP_SMOKE_ATTEMPTS || 3));
 const nativeWindowReportPath = join(root, ".tmp", "desktop-smoke", "native-window-report.json");
 const nativeUiReportPath = join(root, ".tmp", "desktop-smoke", "native-ui-report.json");
 const nativeWorkflowReportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-report.json");
@@ -15,6 +16,7 @@ const nativeWorkflowFilePath = join(root, ".tmp", "desktop-smoke", "native-workf
 const nativeWorkflowIncludePath = join(root, ".tmp", "desktop-smoke", "native-workflow-file.include");
 const nativeWorkflowExportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.html");
 const nativeWorkflowCopyPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.md");
+const nativeSmokeHomePath = join(root, ".tmp", "desktop-smoke", "home");
 const issues = [];
 
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
@@ -163,7 +165,22 @@ function writeSmokeReport() {
 }
 
 async function launchDesktop(path) {
-  await new Promise((resolveLaunch) => {
+  for (let attempt = 1; attempt <= launchAttempts; attempt += 1) {
+    const issueStart = issues.length;
+    const report = await launchDesktopAttempt(path, attempt);
+    const newIssues = issues.slice(issueStart);
+    if (newIssues.length === 0) return;
+    if (attempt < launchAttempts && shouldRetryLaunchAttempt(report)) {
+      issues.splice(issueStart);
+      await sleep(750);
+      continue;
+    }
+    return;
+  }
+}
+
+async function launchDesktopAttempt(path, attempt) {
+  return new Promise((resolveLaunch) => {
     const startedAt = Date.now();
     rmSync(nativeWindowReportPath, { force: true });
     rmSync(nativeUiReportPath, { force: true });
@@ -173,10 +190,16 @@ async function launchDesktop(path) {
     rmSync(nativeWorkflowExportPath, { force: true });
     rmSync(nativeWorkflowCopyPath, { force: true });
     rmSync(`${nativeWorkflowExportPath}.manifest.json`, { force: true });
+    rmSync(nativeSmokeHomePath, { recursive: true, force: true });
+    mkdirSync(nativeSmokeHomePath, { recursive: true });
     const child = spawn(path, [], {
       cwd: root,
       env: {
         ...process.env,
+        HOME: nativeSmokeHomePath,
+        XDG_CONFIG_HOME: join(nativeSmokeHomePath, ".config"),
+        XDG_DATA_HOME: join(nativeSmokeHomePath, ".local", "share"),
+        XDG_CACHE_HOME: join(nativeSmokeHomePath, ".cache"),
         RUST_BACKTRACE: "1",
         NEDITOR_DESKTOP_SMOKE_REPORT: nativeWindowReportPath,
         NEDITOR_DESKTOP_UI_SMOKE_REPORT: nativeUiReportPath,
@@ -187,6 +210,8 @@ async function launchDesktop(path) {
     const report = {
       platform: process.platform,
       binary: relative(path),
+      attempt,
+      maxAttempts: launchAttempts,
       pid: child.pid,
       timeoutMs: launchTimeoutMs,
       status: "started",
@@ -198,7 +223,7 @@ async function launchDesktop(path) {
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(async () => {
       if (settled) return;
       settled = true;
       report.observedMs = Date.now() - startedAt;
@@ -216,8 +241,8 @@ async function launchDesktop(path) {
         collectNativeAutomationReport(report, child.pid);
       }
       writeLaunchReport(report);
-      child.kill("SIGTERM");
-      resolveLaunch();
+      await terminateLaunchedProcess(child);
+      resolveLaunch(report);
     }, launchTimeoutMs);
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
@@ -234,7 +259,7 @@ async function launchDesktop(path) {
       report.stderr = error.message;
       writeLaunchReport(report);
       issues.push(`desktop launch failed: ${error.message}`);
-      resolveLaunch();
+      resolveLaunch(report);
     });
     child.on("exit", (code, signal) => {
       if (settled) return;
@@ -252,9 +277,38 @@ async function launchDesktop(path) {
           code ?? "none"
         } signal ${signal ?? "none"}${detail ? `: ${detail}` : ""}`,
       );
-      resolveLaunch();
+      resolveLaunch(report);
     });
   });
+}
+
+async function terminateLaunchedProcess(child) {
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return;
+  child.kill("SIGTERM");
+  await new Promise((resolve) => {
+    const fallback = setTimeout(() => {
+      if (isProcessAlive(child.pid)) child.kill("SIGKILL");
+      resolve();
+    }, 2000);
+    child.once("exit", () => {
+      clearTimeout(fallback);
+      resolve();
+    });
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shouldRetryLaunchAttempt(report) {
+  if (report?.status !== "survived-until-timeout") return false;
+  if (existsSync(nativeWindowReportPath) || existsSync(nativeUiReportPath) || existsSync(nativeWorkflowReportPath)) {
+    return false;
+  }
+  return /Connection invalid|hiservices-xpcservice|scheduleApplicationNotification|-10827/i.test(
+    `${report.stderr || ""}\n${report.nativeAutomation?.reason || ""}`,
+  );
 }
 
 function isProcessAlive(pid) {
@@ -408,6 +462,16 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow prepared html export readiness",
     "native workflow wrote html export artifact",
     "native workflow exported html from native menu command",
+    "native workflow routed export preview from native view menu",
+    "native workflow routed outline from native view menu",
+    "native workflow routed exports from native view menu",
+    "native workflow opened search from native menu command",
+    "native workflow inserted toc from native writing tools menu",
+    "native workflow inserted equation from native writing tools menu",
+    "native workflow inserted code fence from native writing tools menu",
+    "native workflow inserted table from native writing tools menu",
+    "native workflow opened templates from native writing tools menu",
+    "native workflow opened AI paste from native writing tools menu",
     "native workflow saved export profile",
     "native workflow applied export profile",
     "native workflow reloaded export profile from settings store",
@@ -535,6 +599,22 @@ function validateNativeWorkflowReport(launchReport) {
     exportProfileEvidence.reloaded?.brandName !== "Native Board"
   ) {
     issues.push(`native workflow report did not include export profile persistence evidence: ${JSON.stringify(exportProfileEvidence)}`);
+  }
+  const nativeMenuCommandEvidence = payload.nativeMenuCommandEvidence || {};
+  if (
+    nativeMenuCommandEvidence.exportMode?.mode !== "export" ||
+    nativeMenuCommandEvidence.exportMode?.sidebar !== "exports" ||
+    nativeMenuCommandEvidence.outline?.sidebar !== "outline" ||
+    nativeMenuCommandEvidence.exports?.sidebar !== "exports" ||
+    nativeMenuCommandEvidence.search?.open !== true ||
+    nativeMenuCommandEvidence.toc?.inserted !== true ||
+    nativeMenuCommandEvidence.equation?.inserted !== true ||
+    nativeMenuCommandEvidence.codeFence?.inserted !== true ||
+    nativeMenuCommandEvidence.table?.inserted !== true ||
+    nativeMenuCommandEvidence.templates?.sidebar !== "templates" ||
+    nativeMenuCommandEvidence.aiPaste?.open !== true
+  ) {
+    issues.push(`native workflow report did not include native menu command evidence: ${JSON.stringify(nativeMenuCommandEvidence)}`);
   }
   if (payload.exportReadiness?.target !== "html" || !Array.isArray(payload.exportReadiness?.progressSteps)) {
     issues.push(`native workflow report did not include HTML export readiness evidence: ${JSON.stringify(payload.exportReadiness)}`);

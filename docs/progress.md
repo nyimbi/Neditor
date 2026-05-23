@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-22
+Updated: 2026-05-23
 
 ## Active Goal
 
@@ -31,6 +31,15 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- This update broadens native menu-command proof in the launched Tauri smoke.
+  The desktop smoke now retries only transient no-report macOS launch failures,
+  isolates the launch home/config/cache directories, records strict progress
+  phases while the app-authored workflow is running, and requires final
+  `status: passed` evidence for native View/Writing Tools menu routing. The
+  launched workflow now proves export-preview, outline, and exports sidebar
+  routing, CodeMirror search opening, TOC/equation/code-fence/table insertion,
+  Templates panel opening, AI Paste modal opening, and guarded native
+  `File` -> `Export` -> `HTML Export` execution in the Tauri webview.
 - This update repairs the reveal-path file operation slice after the
   in-progress `filesystem.rs` change left the Rust crate uncompilable. The
   command builder now has focused regression coverage for existing paths,
@@ -2394,8 +2403,9 @@ Desktop app-authored workflow smoke verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `pnpm run check` | Pass | Vue typecheck passed after adding the guarded desktop workflow smoke path. |
-| `pnpm run test:unit` | Pass | 19 frontend unit tests passed, including static coverage that the native workflow smoke gate, writer command, report validator, and expected workflow assertions remain wired. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding native menu-command evidence and strict progress reports to the guarded desktop workflow smoke path. |
+| `pnpm run test:unit` | Pass | 21 frontend unit tests passed, including static coverage that the native workflow smoke gate, native menu-command evidence collector, report validator, and expected workflow assertions remain wired. |
+| `pnpm run test:e2e` | Pass | 49 Chromium browser workflows passed locally through the system-Chrome fallback after the native menu insertion path changes, covering editor commands, search, transforms/templates, file workflows, conflicts, tables, AI paste, export readiness, export profiles, and extended export targets. |
 | `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke verifier syntax remained valid after adding native workflow report validation. |
 | `cargo fmt --check` in `src-tauri` | Pass | Rust formatting remained clean after registering the guarded workflow smoke commands. |
 | `cargo check --locked` in `src-tauri` | Pass | Tauri command registration for the workflow smoke gate/report compiled cleanly. |
@@ -2405,6 +2415,8 @@ Desktop app-authored workflow smoke verification:
 | `pnpm run test:desktop-smoke` | Pass | Desktop artifact and native command workflow smoke passed without GUI launch enabled after adding the conflict-branch validator checks. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Launch smoke validated `.tmp/desktop-smoke/native-workflow-report.json` with passing assertions for real-file save/new/open/revert, clean native root-file watcher reload/restoration, native included-file watcher tracking/recompile/restoration, stale-save conflict blocking, rendered native conflict modal controls, local/external merge-base seeding in the modal, keep-local plus save, save-copy, merge-back recovery, accept-external recovery, split/source/preview/focus/export/review/presentation native mode switching, export/review/presentation sidebar routing, command palette, calc-template source insertion, rendered preview, dirty title, HTML export readiness, real HTML export writing, dark theme, high contrast, reduced motion, editor typography, and preview typography. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Rebuilt launch smoke now also validates native export-profile settings persistence: the launched Tauri webview saves a branded PDF profile, reapplies it after option drift, reloads it from the Tauri settings store, records `exportProfileEvidence`, and keeps the HTML sidecar manifest proof deterministic by clearing the active profile before direct HTML export. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Rebuilt launch smoke now also validates native View/Writing Tools menu command execution in the launched Tauri webview: export-preview, outline, and exports sidebar routing, CodeMirror search opening, TOC/equation/code-fence/table insertion, Templates panel opening, AI Paste modal opening, and guarded native `File` -> `Export` -> `HTML Export` execution. The smoke writes strict progress phases while running but the verifier still requires final `status: passed` evidence. |
+| `node -e 'const r=require("./.tmp/desktop-smoke/native-workflow-report.json").payload; ... nativeMenuCommandEvidence ...'` | Pass | The native workflow report records `status: passed`, `phase: final`, and `nativeMenuCommandEvidence` with `exportMode`, `outline`, `exports`, `search`, `toc`, `equation`, `codeFence`, `table`, `templates`, and `aiPaste` proof. |
 | `node -e 'const r=require("./.tmp/desktop-smoke/native-workflow-report.json"); ...'` | Pass | The native workflow report records `status: passed`, `watchDriver: native` for clean root-file reload and included-file recompile assertions, `fileWorkflow.includePath` at `.tmp/desktop-smoke/native-workflow-file.include`, `fileWorkflow.copyPath` at `.tmp/desktop-smoke/native-workflow-export.md`, HTML `exportResult` progress steps `compile/transforms/readiness/render/manifest`, and passing assertions for blocked stale save, keep-local, saved kept-local conflict changes, saved local conflict copy, merged external conflict changes, accepted external conflict changes, and restored file content. |
 | `rg -n "native workflow created and listed app-data snapshot\|native workflow restored app-data snapshot\|snapshotEvidence\|native-smoke\|snapshotPath\|containsMutation" .tmp/desktop-smoke/native-workflow-report.json .tmp/desktop-smoke/launch-report.json` | Pass | Native desktop workflow evidence records app-data snapshot creation/listing with label `native-smoke`, snapshot path, source hash, and restoration after a mutation, with `containsMutation: false` in the restored evidence. |
 | `rg -n "native workflow saved export profile\|native workflow applied export profile\|native workflow reloaded export profile\|exportProfileEvidence\|Native Board\|activeExportProfileId" .tmp/desktop-smoke/native-workflow-report.json .tmp/desktop-smoke/launch-report.json` | Pass | Native desktop workflow evidence records the saved, applied, and reloaded profile assertions plus `exportProfileEvidence` with target `pdf`, compact layout, disabled manifest/cover/page-number flags, IEEE citation style, and the `Native Board` brand profile restored from settings. |

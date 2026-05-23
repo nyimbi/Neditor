@@ -2610,15 +2610,19 @@ async function runNativeMenuCommand(command: string) {
       break;
     case "neditor-insert-table":
       insertBlock(tableSnippet);
+      flushEditorTextToStore();
       break;
     case "neditor-insert-code-fence":
       insertBlock(codeFenceSnippet);
+      flushEditorTextToStore();
       break;
     case "neditor-insert-equation":
       insertBlock(equationSnippet);
+      flushEditorTextToStore();
       break;
     case "neditor-insert-toc":
       insertBlock(tocSnippet);
+      flushEditorTextToStore();
       break;
     case "neditor-open-templates":
       store.sidebar = "templates";
@@ -2904,13 +2908,22 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     assertions.push({ name, passed, ...(detail ? { detail } : {}) });
   };
   const text = (selector: string) => document.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim() || "";
+  let smokePhase = "starting";
 
   try {
+    smokePhase = "started";
+    await writeNativeWorkflowProgress(smokePhase, assertions);
     record("native workflow starts with NEditor title", document.title.includes("NEditor"), document.title);
 
     const fileWorkflow = await collectNativeFileWorkflowEvidence(record);
+    smokePhase = "file-workflow";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow });
     const snapshotEvidence = await collectNativeSnapshotEvidence(record);
+    smokePhase = "snapshots";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence });
     const modeEvidence = await collectNativeModeEvidence(record);
+    smokePhase = "modes";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence });
 
     commandPaletteOpen.value = true;
     await nextTick();
@@ -3003,6 +3016,8 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       ),
       JSON.stringify(nativeMenuExportResult),
     );
+    smokePhase = "html-export";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, exportResult, nativeMenuExportResult });
     const editorSnippet = smokeSnippetAround(active.value.text, "weight_kg = 72");
     const previewSnippet = text("#live-preview").slice(0, 2000);
     const exportReadinessEvidence = store.exportReadiness
@@ -3014,12 +3029,52 @@ async function runDesktopWorkflowSmokeIfEnabled() {
           progressSteps: store.exportReadiness.progress_steps.map((step) => step.id),
         }
       : null;
+    smokePhase = "export-profile-start";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, exportResult, nativeMenuExportResult });
     const exportProfileEvidence = await collectNativeExportProfileEvidence(record);
+    smokePhase = "export-profile";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    smokePhase = "theme-accessibility-start";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
+    smokePhase = "theme-accessibility";
+    await writeNativeWorkflowProgress(smokePhase, assertions, {
+      fileWorkflow,
+      snapshotEvidence,
+      modeEvidence,
+      exportResult,
+      nativeMenuExportResult,
+      exportProfileEvidence,
+      themeAccessibility,
+    });
+    smokePhase = "native-menu-commands-start";
+    await writeNativeWorkflowProgress(smokePhase, assertions, {
+      fileWorkflow,
+      snapshotEvidence,
+      modeEvidence,
+      exportResult,
+      nativeMenuExportResult,
+      exportProfileEvidence,
+      themeAccessibility,
+    });
+    const nativeMenuCommandEvidence = await collectNativeMenuCommandEvidence(record);
+    smokePhase = "native-menu-commands";
+    await writeNativeWorkflowProgress(smokePhase, assertions, {
+      fileWorkflow,
+      snapshotEvidence,
+      modeEvidence,
+      exportResult,
+      nativeMenuExportResult,
+      exportProfileEvidence,
+      themeAccessibility,
+      nativeMenuCommandEvidence,
+    });
 
     const passed = assertions.every((assertion) => assertion.passed);
+    smokePhase = "final";
     await writeDesktopWorkflowSmokeReport({
       status: passed ? "passed" : "failed",
+      phase: smokePhase,
       assertions,
       title: document.title,
       fileWorkflow,
@@ -3033,11 +3088,13 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       exportProfileEvidence,
       exportResult,
       nativeMenuExportResult,
+      nativeMenuCommandEvidence,
       exportReadiness: exportReadinessEvidence,
     });
   } catch (error) {
     await writeDesktopWorkflowSmokeReport({
       status: "failed",
+      phase: smokePhase,
       assertions,
       error: error instanceof Error ? error.message : String(error),
       title: document.title,
@@ -3145,6 +3202,22 @@ async function collectNativeSnapshotEvidence(record: (name: string, passed: bool
   };
 }
 
+async function writeNativeWorkflowProgress(
+  phase: string,
+  assertions: Array<{ name: string; passed: boolean; detail?: string }>,
+  extra: Record<string, unknown> = {},
+) {
+  await writeDesktopWorkflowSmokeReport({
+    status: "running",
+    phase,
+    assertions,
+    title: document.title,
+    mode: store.mode,
+    sidebar: store.sidebar,
+    ...extra,
+  });
+}
+
 async function collectNativeExportProfileEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
   store.sidebar = "exports";
   store.exportTarget = "pdf";
@@ -3223,6 +3296,61 @@ async function collectNativeExportProfileEvidence(record: (name: string, passed:
     JSON.stringify(reloaded),
   );
   return { saved: profile, applied, reloaded };
+}
+
+async function collectNativeMenuCommandEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const evidence: Record<string, unknown> = {};
+  const runMenuCommand = async (command: string) => {
+    await invoke("emit_desktop_workflow_smoke_menu_command", { command }).catch(() => undefined);
+    await nextTick();
+  };
+  const textCount = (needle: string) => active.value.text.split(needle).length - 1;
+  const recordInsertion = async (command: string, key: string, assertion: string, needle: string) => {
+    const before = textCount(needle);
+    await runMenuCommand(command);
+    await waitForNativeWorkflowCondition(() => textCount(needle) > before, 1000);
+    const inserted = textCount(needle) > before;
+    evidence[key] = { inserted };
+    record(assertion, inserted, JSON.stringify(evidence[key]));
+  };
+
+  await runMenuCommand("neditor-mode-export");
+  await waitForNativeWorkflowCondition(() => store.mode === "export" && store.sidebar === "exports", 1000);
+  evidence.exportMode = { mode: store.mode, sidebar: store.sidebar };
+  record("native workflow routed export preview from native view menu", store.mode === "export" && store.sidebar === "exports", JSON.stringify(evidence.exportMode));
+
+  await runMenuCommand("neditor-show-outline");
+  await waitForNativeWorkflowCondition(() => store.sidebar === "outline", 1000);
+  evidence.outline = { sidebar: store.sidebar };
+  record("native workflow routed outline from native view menu", store.sidebar === "outline", JSON.stringify(evidence.outline));
+
+  await runMenuCommand("neditor-show-exports");
+  await waitForNativeWorkflowCondition(() => store.sidebar === "exports", 1000);
+  evidence.exports = { sidebar: store.sidebar };
+  record("native workflow routed exports from native view menu", store.sidebar === "exports", JSON.stringify(evidence.exports));
+
+  await runMenuCommand("neditor-open-search");
+  await waitForNativeWorkflowCondition(() => Boolean(document.querySelector(".cm-search")), 1000);
+  evidence.search = { open: Boolean(document.querySelector(".cm-search")) };
+  record("native workflow opened search from native menu command", Boolean(document.querySelector(".cm-search")), JSON.stringify(evidence.search));
+
+  await recordInsertion("neditor-insert-toc", "toc", "native workflow inserted toc from native writing tools menu", "[TOC]");
+  await recordInsertion("neditor-insert-equation", "equation", "native workflow inserted equation from native writing tools menu", "E = mc^2");
+  await recordInsertion("neditor-insert-code-fence", "codeFence", "native workflow inserted code fence from native writing tools menu", "```markdown");
+  await recordInsertion("neditor-insert-table", "table", "native workflow inserted table from native writing tools menu", "| Revenue | 125000 |");
+
+  await runMenuCommand("neditor-open-templates");
+  await waitForNativeWorkflowCondition(() => store.sidebar === "templates", 1000);
+  evidence.templates = { sidebar: store.sidebar };
+  record("native workflow opened templates from native writing tools menu", store.sidebar === "templates", JSON.stringify(evidence.templates));
+
+  await runMenuCommand("neditor-clean-ai-paste");
+  await waitForNativeWorkflowCondition(() => aiPasteOpen.value, 1000);
+  evidence.aiPaste = { open: aiPasteOpen.value, statusMessage: store.statusMessage };
+  record("native workflow opened AI paste from native writing tools menu", aiPasteOpen.value, JSON.stringify(evidence.aiPaste));
+  aiPasteOpen.value = false;
+
+  return evidence;
 }
 
 async function writeDesktopWorkflowSmokeReport(payload: Record<string, unknown>) {
