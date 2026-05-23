@@ -1482,8 +1482,10 @@ Finish:
 
 ### 12. AI Paste Cleanup And Governance
 
-Status: backend cleanup, Docs Live drafting UI, and governance workflows exist;
-runtime microphone/clipboard proof and richer rendered QA remain.
+Status: backend cleanup, Docs Live drafting UI, native menu proof, browser
+dictation harness proof, and governance workflows exist; real microphone
+permission proof, runtime clipboard proof, model-provider integration, and
+richer rendered QA remain.
 
 Finish:
 
@@ -1492,8 +1494,11 @@ Finish:
   Speech dictation where available, freeform context, generated questionnaire
   prompts, placeholder values, and an outline, then drafts section-by-section
   Markdown with AI provenance, needs-review markers, QA checks, humanization
-  tasks, and reviewer notes. Remaining work is browser/native microphone
-  permission proof and deeper model-provider integration.
+  tasks, and reviewer notes. The focused browser harness now drives the Web
+  Speech path with a deterministic mock, and the bounded native launch smoke
+  records `docsLive.open: true` from the Writing Tools menu. Remaining work is
+  real browser/native microphone permission proof and deeper model-provider
+  integration.
 - Browser tests for clipboard/rich paste and provenance toggles. Insert, quote,
   appendix, replace document, merge into section, replace selection, citation
   TODO, draft marker, and provenance block workflows are now covered in the

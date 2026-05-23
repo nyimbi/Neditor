@@ -577,6 +577,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("SpeechRecognition"));
   ok(app.includes("buildDocsLiveDraft"));
   ok(app.includes("Generate draft"));
+  ok(app.includes("native workflow opened Docs Live from native writing tools menu"));
   ok(app.includes("Export HTML"));
   ok(app.includes('id: "export-html", label: "HTML Export", title: "Export standalone HTML"'));
   ok(app.includes('aria-label="HTML export options"'));
@@ -923,6 +924,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow rendered line numbers word wrap and folding gutter"));
   ok(app.includes("native workflow opened editor search panel"));
   ok(app.includes("native workflow replaced editor search target"));
+  ok(app.includes("native workflow opened Docs Live from native writing tools menu"));
   ok(app.includes("native workflow continued markdown list in editor"));
   ok(app.includes("native workflow inserted paired bracket in editor"));
   ok(app.includes("native workflow edited multiple cursors in editor"));
@@ -934,6 +936,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native workflow report did not include rendered export-mode content"));
   ok(smoke.includes("native workflow report did not include rendered review-mode governance content"));
   ok(smoke.includes("native workflow report did not include rendered presentation outline content"));
+  ok(smoke.includes("nativeMenuCommandEvidence.docsLive?.open !== true"));
   ok(app.includes("collectNativeThemeAccessibilityEvidence"));
   ok(app.includes("native workflow applied high contrast attributes and colors"));
   ok(app.includes("native workflow applied preview theme and typography"));

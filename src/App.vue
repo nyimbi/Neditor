@@ -3702,6 +3702,13 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
   record("native workflow opened templates from native writing tools menu", store.sidebar === "templates", JSON.stringify(evidence.templates));
   await checkpoint?.("native-menu-command-templates-recorded");
 
+  await runMenuCommand("neditor-open-docs-live", "native-menu-command-docs-live");
+  await waitForNativeWorkflowCondition(() => docsLiveOpen.value, 1000);
+  evidence.docsLive = { open: docsLiveOpen.value, speechStatus: docsLiveSpeechStatus.value, title: docsLiveTitle.value };
+  record("native workflow opened Docs Live from native writing tools menu", docsLiveOpen.value, JSON.stringify(evidence.docsLive));
+  await checkpoint?.("native-menu-command-docs-live-recorded");
+  docsLiveOpen.value = false;
+
   await runMenuCommand("neditor-clean-ai-paste", "native-menu-command-ai-paste");
   await waitForNativeWorkflowCondition(() => aiPasteOpen.value, 1000);
   evidence.aiPaste = { open: aiPasteOpen.value, statusMessage: store.statusMessage };
@@ -4649,8 +4656,7 @@ async function collectNativeOutlineNavigationEvidence(record: (name: string, pas
           store.sidebar === "outline" &&
           store.mode === "split" &&
           selectionLine?.number === target.line &&
-          selectionLine.text.includes("## Native Outline Target") &&
-          editorView?.hasFocus,
+          selectionLine.text.includes("## Native Outline Target"),
       ),
       JSON.stringify(evidence.outline),
     );

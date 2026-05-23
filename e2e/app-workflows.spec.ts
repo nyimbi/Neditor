@@ -1131,6 +1131,46 @@ async function installTauriMock(page: Page, stateKey: string) {
     window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
       unregisterListener() {},
     };
+    class MockSpeechRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = "";
+      onresult: ((event: Event) => void) | null = null;
+      onerror: ((event: Event) => void) | null = null;
+      onend: (() => void) | null = null;
+
+      start() {
+        window.setTimeout(() => {
+          const result = {
+            isFinal: true,
+            length: 1,
+            0: {
+              transcript:
+                "Create a client proposal for Acme. The audience is the executive team. Focus on a fast first draft.",
+            },
+          };
+          this.onresult?.({
+            resultIndex: 0,
+            results: { length: 1, 0: result },
+          } as unknown as Event);
+          this.onend?.();
+        }, 10);
+      }
+
+      stop() {
+        this.onend?.();
+      }
+
+      abort() {
+        this.onend?.();
+      }
+    }
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: typeof MockSpeechRecognition;
+      webkitSpeechRecognition?: typeof MockSpeechRecognition;
+    };
+    speechWindow.SpeechRecognition = MockSpeechRecognition;
+    speechWindow.webkitSpeechRecognition = MockSpeechRecognition;
     window.isTauri = true;
   });
 }
@@ -1852,9 +1892,8 @@ test("generates a Docs Live draft from outline, context, and placeholders", asyn
   await dialog.getByLabel("Document type").selectOption("proposal");
   await dialog.getByLabel("Document title").fill("Acme Renewal Proposal");
   await dialog.getByLabel("Outline").fill("- Executive Summary\n- Proposed Approach\n- Investment");
-  await dialog
-    .getByLabel("Spoken direction")
-    .fill("Create a client proposal for Acme. The audience is the executive team. Focus on a fast first draft.");
+  await dialog.getByRole("button", { name: "Start dictation" }).click();
+  await expect(dialog.getByLabel("Spoken direction")).toHaveValue(/Create a client proposal for Acme/);
   await dialog
     .getByLabel("Context and answers")
     .fill("The goal is to renew the platform contract. Include a clear recommendation and review notes.");

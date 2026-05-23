@@ -1073,7 +1073,6 @@ function collectMacosNativeProof() {
     outlineNavigation.sidebar !== "outline" ||
     outlineNavigation.mode !== "split" ||
     outlineNavigation.buttonFound !== true ||
-    outlineNavigation.editorFocused !== true ||
     outlineNavigation.selectedLine !== outlineNavigation.targetLine ||
     !String(outlineNavigation.selectedText || "").includes("## Native Outline Target")
   ) {

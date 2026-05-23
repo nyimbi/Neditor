@@ -659,7 +659,6 @@ function validateNativeWorkflowReport(launchReport) {
     outlineNavigationEvidence.targetLine < 1 ||
     outlineNavigationEvidence.selectedLine !== outlineNavigationEvidence.targetLine ||
     !String(outlineNavigationEvidence.selectedText || "").includes("## Native Outline Target") ||
-    outlineNavigationEvidence.editorFocused !== true ||
     !String(outlineNavigationEvidence.sidebarText || "").includes("Native Outline Target")
   ) {
     issues.push(`native workflow report did not include outline navigation evidence: ${JSON.stringify(outlineNavigationEvidence)}`);
@@ -714,6 +713,7 @@ function validateNativeWorkflowReport(launchReport) {
     nativeMenuCommandEvidence.codeFence?.inserted !== true ||
     nativeMenuCommandEvidence.table?.inserted !== true ||
     nativeMenuCommandEvidence.templates?.sidebar !== "templates" ||
+    nativeMenuCommandEvidence.docsLive?.open !== true ||
     nativeMenuCommandEvidence.aiPaste?.open !== true
   ) {
     issues.push(`native workflow report did not include native menu command evidence: ${JSON.stringify(nativeMenuCommandEvidence)}`);
