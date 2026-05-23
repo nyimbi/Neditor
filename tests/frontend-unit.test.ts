@@ -576,6 +576,9 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
   ok(verification.includes('command("Browser workflow environment", "node", ["scripts/check-e2e-environment.mjs"])'));
   ok(verification.includes('command("Browser workflow suite", "node", ["scripts/run-e2e.mjs"])'));
+  ok(verification.includes("Desktop macOS GUI launch smoke"));
+  ok(verification.includes('NEDITOR_DESKTOP_SMOKE_LAUNCH: "1"'));
+  ok(verification.includes("env: { ...process.env, ...item.env }"));
   ok(e2eEnvironment.includes("NEDITOR_E2E_ENV_ATTEMPTS"));
   ok(e2eEnvironment.includes("NEDITOR_E2E_ENV_RETRY_BACKOFF_MS"));
   ok(e2eEnvironment.includes("isTransientBrowserLaunchFailure"));
@@ -641,6 +644,11 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("workflowPlan: webdriverWorkflowPlan"));
   ok(script.includes("persisted desktop preferences after restart"));
   ok(script.includes("Official Tauri WebDriver currently supports desktop automation on Windows and Linux only"));
+  ok(script.includes("collectMacosNativeProof"));
+  ok(script.includes("fallbackProof"));
+  ok(script.includes("native-command-report.json"));
+  ok(script.includes("native workflow exported html from native menu command"));
+  ok(script.includes("native workflow restored workspace tabs with active pinned and scroll state"));
 });
 
 test("desktop launch smoke records native UI workbench surfaces", () => {

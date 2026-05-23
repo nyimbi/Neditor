@@ -31,6 +31,16 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- This update moves bounded macOS GUI launch proof into
+  `pnpm run verify:local:full` after desktop artifact smoke. On macOS the full
+  baseline now runs `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`
+  before the WebDriver step, so release-grade local verification collects
+  app-authored Tauri window, UI, and native workflow reports.
+- The Tauri WebDriver harness now records macOS fallback proof from
+  `.tmp/desktop-smoke/native-command-report.json` when official WebDriver is
+  unavailable for WKWebView. The skip remains explicit, but the report now
+  carries assertion counts plus HTML export, real-file, workspace restore, and
+  project-local snapshot evidence from the bounded native launch smoke.
 - This update promotes browser workflow execution into the ordinary local gates.
   `pnpm run verify:local` now runs `node scripts/check-e2e-environment.mjs`, and
   `pnpm run verify:local:full` now runs the full `node scripts/run-e2e.mjs` browser
@@ -2545,6 +2555,8 @@ Native title-state verification:
 | --- | --- | --- |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Launched native smoke validates title state across real file save, dirty edit, revert, and later template insertion, so save/revert clear the native dirty marker while edit/template mutations add it. |
 | `rg -n "native workflow save cleared native title\|native workflow dirtied native title for opened real file\|native workflow revert cleared native title\|native workflow exposed dirty title" .tmp/desktop-smoke/native-workflow-report.json .tmp/desktop-smoke/launch-report.json` | Pass | Native workflow reports include clean-title evidence after save, dirty-title evidence after editing an opened real file, clean-title evidence after revert, and dirty-title evidence after inserting a calc template. |
+| `pnpm run test:tauri-webdriver` | Skipped on macOS with native proof | Official Tauri WebDriver remains unavailable for macOS WKWebView, but `.tmp/desktop-webdriver/report.json` now records `fallbackProof.status: "passed"` from `.tmp/desktop-smoke/native-command-report.json`, including 72/72 native workflow assertions, visible NEditor window evidence, the real Markdown workflow file path, HTML export output/manifest paths, and the sidecar output hash. |
+| `pnpm run verify:local:full -- --list` | Pass | Full local verification now lists `Desktop macOS GUI launch smoke: NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` before the desktop WebDriver step on macOS. |
 
 Live Google Docs import attempt:
 
@@ -2556,8 +2568,9 @@ Live Google Docs import attempt:
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
    then re-run live Google Docs import proof for the rendered export package.
-2. Execute the Windows/Linux Tauri-driver workflow harness on supported hosts
-   and keep using the macOS app-authored launch report where WebDriver is
+2. Execute the Windows/Linux Tauri-driver workflow harness on supported hosts.
+   The macOS full baseline now runs the app-authored launch smoke first, and
+   the WebDriver report attaches that native fallback proof where WebDriver is
    officially unavailable.
 3. Use failures from workflow tests to drive implementation fixes.
 4. Continue expanding browser coverage for remaining preview modes, broader

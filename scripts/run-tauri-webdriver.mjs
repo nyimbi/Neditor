@@ -16,6 +16,8 @@ const workflowRenamedPath = join(root, ".tmp", "desktop-webdriver", "native-work
 const workflowDuplicatePath = join(root, ".tmp", "desktop-webdriver", "native-workflow-duplicate.md");
 const workflowExportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-export.html");
 const workflowExportManifestPath = `${workflowExportPath}.manifest.json`;
+const macosFallbackSmokeReportPath = join(root, ".tmp", "desktop-smoke", "native-command-report.json");
+const macosFallbackLaunchReportPath = join(root, ".tmp", "desktop-smoke", "launch-report.json");
 const macosUnsupportedMessage =
   "Official Tauri WebDriver currently supports desktop automation on Windows and Linux only; macOS has no WKWebView driver in that stack.";
 const webdriverWorkflowPlan = [
@@ -49,6 +51,7 @@ const report = {
   exportArtifacts: null,
   skippedReason: null,
   fallback: null,
+  fallbackProof: null,
 };
 let tauriDriver = null;
 
@@ -78,12 +81,18 @@ if (!existsSync(application) || !statSync(application).isFile()) {
 
 if (process.platform === "darwin") {
   const message = `${macosUnsupportedMessage} Use NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke for the bounded macOS GUI launch smoke.`;
+  const fallbackProof = collectMacosNativeProof();
   report.status = required ? "failed" : "skipped";
   report.skippedReason = macosUnsupportedMessage;
   report.fallback = "NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke";
+  report.fallbackProof = fallbackProof;
   writeReport();
   if (required) fail(message);
-  console.log(`Skipped Tauri WebDriver smoke on macOS. ${message}`);
+  console.log(
+    fallbackProof.status === "passed"
+      ? `Skipped Tauri WebDriver smoke on macOS. Native launch fallback proof is current in ${relative(macosFallbackSmokeReportPath)}.`
+      : `Skipped Tauri WebDriver smoke on macOS. ${message}`,
+  );
   process.exit(0);
 }
 
@@ -798,6 +807,77 @@ function recordAssertion(name) {
 function writeReport() {
   mkdirSync(dirname(reportPath), { recursive: true });
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+}
+
+function collectMacosNativeProof() {
+  if (!existsSync(macosFallbackSmokeReportPath)) {
+    return {
+      status: "missing",
+      reportPath: relative(macosFallbackSmokeReportPath),
+      launchReportPath: relative(macosFallbackLaunchReportPath),
+      reason: "Run NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke before collecting macOS fallback proof.",
+    };
+  }
+  let smoke = null;
+  try {
+    smoke = JSON.parse(readFileSync(macosFallbackSmokeReportPath, "utf8"));
+  } catch (error) {
+    return {
+      status: "invalid",
+      reportPath: relative(macosFallbackSmokeReportPath),
+      launchReportPath: relative(macosFallbackLaunchReportPath),
+      reason: `native smoke report is not valid JSON: ${error.message}`,
+    };
+  }
+  const workflow = smoke.nativeWorkflow?.payload || smoke.nativeWorkflow || {};
+  const assertions = Array.isArray(workflow.assertions) ? workflow.assertions : [];
+  const passedAssertions = assertions.filter((assertion) => assertion?.passed === true);
+  const issues = [];
+  if (smoke.platform !== "darwin") issues.push(`native smoke report platform is ${JSON.stringify(smoke.platform)}`);
+  if (smoke.nativeWindow?.window?.visible !== true) issues.push("native smoke did not record a visible window");
+  if (smoke.nativeUi?.payload?.surfaces?.source !== true || smoke.nativeUi?.payload?.surfaces?.preview !== true) {
+    issues.push("native smoke did not record source and preview surfaces");
+  }
+  if (workflow.status !== "passed") issues.push(`native workflow status is ${JSON.stringify(workflow.status)}`);
+  for (const requiredAssertion of [
+    "native workflow saved document to real file",
+    "native workflow opened saved real file",
+    "native workflow wrote html export artifact",
+    "native workflow exported html from native menu command",
+    "native workflow restored workspace tabs with active pinned and scroll state",
+    "native workflow restored project-local snapshot",
+  ]) {
+    if (!passedAssertions.some((assertion) => assertion.name === requiredAssertion)) {
+      issues.push(`native workflow is missing assertion: ${requiredAssertion}`);
+    }
+  }
+  const exportManifest = readJsonIfPresent(workflow.exportResult?.manifestPath);
+  if (workflow.exportResult?.target !== "html" || exportManifest?.export_target !== "html" || !exportManifest?.output_hash) {
+    issues.push("native workflow did not record HTML export target/hash evidence");
+  }
+  return {
+    status: issues.length === 0 ? "passed" : "incomplete",
+    reportPath: relative(macosFallbackSmokeReportPath),
+    launchReportPath: relative(macosFallbackLaunchReportPath),
+    assertionCount: assertions.length,
+    passedAssertionCount: passedAssertions.length,
+    windowTitle: smoke.nativeWindow?.window?.title || "",
+    exportTarget: workflow.exportResult?.target || "",
+    exportPath: workflow.exportResult?.outputPath || "",
+    exportManifestPath: workflow.exportResult?.manifestPath || "",
+    outputHash: exportManifest?.output_hash || "",
+    filePath: workflow.fileWorkflow?.filePath || "",
+    issues,
+  };
+}
+
+function readJsonIfPresent(path) {
+  if (!path || !existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 function firstLine(text) {

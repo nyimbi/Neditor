@@ -207,7 +207,8 @@ NEditor uses local verification rather than GitHub Actions. Run
 checks with the production build, the full browser workflow suite, optional
 engine probe, native-watch check, clippy, full Rust tests, rendered export audit,
 Tauri no-bundle release compile, macOS `.app` bundle build/smoke and DMG
-classification on macOS, and desktop artifact smoke.
+classification on macOS, desktop artifact smoke, bounded macOS GUI launch smoke
+on macOS, and the desktop WebDriver smoke or platform skip evidence.
 
 Use `pnpm run verify:local -- --list` or
 `pnpm run verify:local:full -- --list` to print the exact command sequence
@@ -275,7 +276,10 @@ and reveals real local files through the Rust command surface. The command write
 `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and
 native command workflow duration. On machines that allow GUI app startup, run
 `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` for a bounded
-native launch smoke. The launch smoke writes
+native launch smoke. This launch smoke is part of the full local baseline on
+macOS, so release-grade verification proves the app-authored Tauri window and
+workflow reports instead of relying only on artifact inspection. The launch
+smoke writes
 `.tmp/desktop-smoke/launch-report.json` with the binary path, PID, elapsed
 window, captured output, and `processAlive: true` evidence when the app remains
 running until the timeout, plus `.tmp/desktop-smoke/native-window-report.json`
@@ -308,7 +312,10 @@ preferences survive a desktop session restart before restoring them. It writes
 `.tmp/desktop-webdriver/report.json` with dependency, assertion, file artifact,
 export artifact, pass, or skip evidence. On macOS, official Tauri WebDriver is
 skipped because the supported stack does not provide a WKWebView driver; use the
-bounded desktop launch smoke there.
+bounded desktop launch smoke there. When the bounded launch smoke has already
+run on macOS, the WebDriver report also records `fallbackProof` from
+`.tmp/desktop-smoke/native-command-report.json` so the skip still points to
+current app-authored native file, export, workspace, snapshot, and UI evidence.
 
 `cargo check` and `cargo test` require crates.io access the first time Rust
 dependencies are resolved. After dependencies are present, the project is

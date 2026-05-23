@@ -46,6 +46,7 @@ const fullCommands = [
   ),
   ...platformBundleCommands(),
   command("Desktop artifact smoke", "pnpm", ["run", "test:desktop-smoke"]),
+  ...desktopLaunchSmokeCommands(),
   command("Desktop WebDriver smoke", "pnpm", ["run", "test:tauri-webdriver"]),
 ];
 
@@ -65,7 +66,7 @@ for (const item of commands) {
   console.log(`$ ${formatCommand(item)}`);
   const result = spawnSync(item.cmd, item.args, {
     cwd: item.cwd,
-    env: process.env,
+    env: { ...process.env, ...item.env },
     shell: process.platform === "win32",
     stdio: "inherit",
   });
@@ -78,12 +79,13 @@ for (const item of commands) {
 
 console.log(`\nNEditor local verification (${mode}) passed.`);
 
-function command(label, cmd, args, cwd = ".") {
+function command(label, cmd, args, cwd = ".", env = {}) {
   return {
     label,
     cmd,
     args,
     cwd: join(root, cwd),
+    env,
   };
 }
 
@@ -96,8 +98,20 @@ function platformBundleCommands() {
   ];
 }
 
+function desktopLaunchSmokeCommands() {
+  if (process.platform !== "darwin") return [];
+  return [
+    command("Desktop macOS GUI launch smoke", "pnpm", ["run", "test:desktop-smoke"], ".", {
+      NEDITOR_DESKTOP_SMOKE_LAUNCH: "1",
+    }),
+  ];
+}
+
 function formatCommand(item) {
   const relativeCwd = item.cwd === root ? "." : item.cwd.slice(root.length + 1);
-  const rendered = [item.cmd, ...item.args].join(" ");
+  const envPrefix = Object.entries(item.env || {})
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ");
+  const rendered = [envPrefix, item.cmd, ...item.args].filter(Boolean).join(" ");
   return relativeCwd === "." ? rendered : `(cd ${relativeCwd} && ${rendered})`;
 }
