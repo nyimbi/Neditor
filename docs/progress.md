@@ -37,6 +37,17 @@ Recent pushed checkpoints visible in current git history:
   matter, optional `[TOC]`, heading hierarchy, and draft placeholders before
   writing body content. The command bar and palette expose `Plan document from
   outline`, and the browser workflow now proves the outline-first creation path.
+- This update deepens native editor-ergonomics proof in the launched Tauri
+  smoke. The app-authored workflow now records structured evidence for
+  CodeMirror word statistics, spellcheck/autocapitalize/role attributes, line
+  numbers, word wrap, the folding gutter, search-panel opening, replacement
+  mutation, Markdown list continuation, bracket-pair insertion, and a
+  multi-cursor edit in the native webview.
+- Toolbar rows can now be collapsed individually to recover vertical writing
+  space. The File, Writing, Review & Navigate, and View toolbars keep compact
+  expander buttons when collapsed, the View toolbar exposes Collapse all/Expand
+  all, and the collapsed row state persists with the existing toolbar display
+  and text-size preferences.
 - This update moves bounded macOS GUI launch proof into
   `pnpm run verify:local:full` after desktop artifact smoke. On macOS the full
   baseline now runs `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`
@@ -246,10 +257,10 @@ Recent pushed checkpoints visible in current git history:
   the evidence under `.tmp/rendered-export-audit/office-preview/`, and maps it
   into `viewer-proof.json`, `manual-review.html`, and `visual-review-summary.json`.
 - This update makes browser workflow execution current-host evidence instead
-  of stale archived evidence. `pnpm run test:e2e` now passes all 50 Chromium
+  of stale archived evidence. `pnpm run test:e2e` now passes all 51 Chromium
   workbench workflows locally through the system-Chrome fallback when bundled
   Playwright Chromium is missing, including editor/preview typing, settings persistence, command
-  palette navigation, responsive desktop/narrow layout proof, fold/unfold controls, file/save/rename/reveal flows, snapshots, workspace
+  palette navigation, collapsible toolbars, responsive desktop/narrow layout proof, fold/unfold controls, file/save/rename/reveal flows, snapshots, workspace
   restore, stale-save conflicts, include watchers, AI governance, and export
   readiness/success/failure, transform template management, deep keyboard-only
   workbench operation, plus browser UI handoff coverage for blog,
@@ -825,22 +836,23 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
 | `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration audit passed and wrote `.tmp/desktop-bundle/platform-package-config-report.json` with synchronized npm/Cargo/Tauri metadata, `bundle.targets: "all"`, macOS/Windows/Linux icon coverage, production window dimensions, CSP guardrails, MIT license linkage, and `unsigned-local-builds` signing stance. |
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Platform package configuration: pnpm run check:platform-packaging` before the desktop release compile and host bundle checks. |
-| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 50 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 51 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host through the workspace-local Playwright Chromium cache at `.tmp/ms-playwright`; `.tmp/e2e-environment/report.json` records `source: playwright-bundled`, the cache executable path, and the passing command tail. |
-| `pnpm run test:e2e` | Pass | 50 Chromium browser workbench workflows passed locally on this host, including editable outline-first document planning, responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
+| `pnpm run test:e2e` | Pass | 51 Chromium browser workbench workflows passed locally on this host, including editable outline-first document planning, collapsible toolbars, responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, `processAlive: true`, app-authored native window evidence, and app-authored native UI evidence. `.tmp/desktop-smoke/native-ui-report.json` records command labels including New/Open/Save/Templates/Commands, source/sidebar/preview/status surface presence, active document `Market Entry Report`, preview label `Rendered preview for Market Entry Report, draft`, and viewport dimensions; System Events process evidence is recorded as `limited` on this host because it exposed the process but not a window. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages external transform engine trust" --project chromium` | Pass | Focused system-Chrome fallback workflow passed after keeping transform trust diagnostics visible when a configured path is untrusted. |
-| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed all 50 Chromium workflows through the workspace-local Playwright Chromium cache after the editable outline planner update. |
+| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed all 51 Chromium workflows through the workspace-local Playwright Chromium cache after the editable outline planner and collapsible toolbar updates. |
 | `pnpm run verify:local -- --list` | Pass | Quick local verification now lists the browser workflow environment preflight, so Chromium launch readiness is part of routine completed-slice verification. |
 | `pnpm run verify:local:full -- --list` | Pass | Full local verification now lists the full browser workflow suite after the production frontend build, making browser workflow execution part of the release-grade local baseline. |
 | `pnpm run verify:local` | Pass | Quick local verification passed with the new browser workflow environment gate included; the gate used the workspace-local Playwright Chromium cache and would retry transient browser-launch failures before failing the baseline. |
-| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed from the updated source; 60 modules transformed. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "collapses and restores command toolbars" --project chromium` | Pass | Focused Chromium workflow proved individual toolbar collapse/expand, Collapse all, recovery through the compact View expander, and command-bar height reduction. |
+| `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed from the updated source; 61 modules transformed. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary rebuilt from the updated frontend bundle at `src-tauri/target/release/neditor`. |
-| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Re-run on 2026-05-23 validated desktop build artifacts, native command workflow smoke, bounded launch smoke, mode pane visibility, rendered HTML export/review/presentation content, and guarded native `File` -> `Export` -> `HTML Export` routing. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Re-run on 2026-05-23 validated desktop build artifacts, native command workflow smoke, bounded launch smoke, mode pane visibility, rendered HTML export/review/presentation content, guarded native `File` -> `Export` -> `HTML Export` routing, and native editor ergonomics evidence for word stats, spellcheck attributes, line numbers, word wrap, folding gutter, search/replace, list continuation, bracket pairing, and multi-cursor editing. |
 | `pnpm run test:tauri-webdriver` | Skipped on macOS | The Tauri WebDriver harness is present and runs on Windows/Linux with `tauri-driver`; it now covers native title/shell, mode switching, command palette, dirty-title state, Templates-panel calc insertion to source/preview, real Markdown save/open/rename/duplicate/reveal, export readiness, real HTML export writing through the guarded dialog-free smoke path with sidecar manifest/output-hash validation, and preference restart persistence. This macOS host records the official unsupported WKWebView-driver platform skip plus the supported workflow plan in `.tmp/desktop-webdriver/report.json`. |
 
 Fresh baseline recorded on 2026-05-20:

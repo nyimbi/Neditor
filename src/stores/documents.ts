@@ -341,6 +341,7 @@ export const useDocumentsStore = defineStore("documents", {
     previewTheme: "match" as PreviewTheme,
     toolbarDisplay: "both" as ToolbarDisplay,
     toolbarTextSize: 10,
+    toolbarCollapsedRows: [] as string[],
     editorPaneRatio: 0.5,
     wordWrap: true,
     lineNumbers: true,
@@ -472,6 +473,7 @@ export const useDocumentsStore = defineStore("documents", {
           this.toolbarDisplay = persisted.toolbarDisplay;
         }
         if (typeof persisted.toolbarTextSize === "number") this.toolbarTextSize = clampToolbarTextSize(persisted.toolbarTextSize);
+        if (Array.isArray(persisted.toolbarCollapsedRows)) this.toolbarCollapsedRows = persisted.toolbarCollapsedRows;
         if (typeof persisted.editorPaneRatio === "number") this.editorPaneRatio = clampPaneRatio(persisted.editorPaneRatio);
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
@@ -535,6 +537,7 @@ export const useDocumentsStore = defineStore("documents", {
         previewTheme: this.previewTheme,
         toolbarDisplay: this.toolbarDisplay,
         toolbarTextSize: this.toolbarTextSize,
+        toolbarCollapsedRows: this.toolbarCollapsedRows,
         editorPaneRatio: this.editorPaneRatio,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,

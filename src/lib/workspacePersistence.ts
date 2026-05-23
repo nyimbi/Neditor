@@ -2,6 +2,7 @@ import type { AiCleanupOptions } from "../types.js";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "./transformTemplates.js";
 
 export const WORKSPACE_SCHEMA_VERSION = 2;
+const TOOLBAR_COLLAPSE_ROW_IDS = ["file", "writing", "review-navigation", "view"];
 
 export const SUPPORTED_CITATION_STYLES = [
   "title",
@@ -102,6 +103,7 @@ export interface PersistedWorkspace {
   previewTheme?: PreviewTheme;
   toolbarDisplay?: ToolbarDisplay;
   toolbarTextSize?: number;
+  toolbarCollapsedRows?: string[];
   editorPaneRatio?: number;
   wordWrap?: boolean;
   lineNumbers?: boolean;
@@ -376,6 +378,11 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (toolbarDisplay) migrated.toolbarDisplay = toolbarDisplay;
   const toolbarTextSize = numberValue(raw.toolbarTextSize);
   if (toolbarTextSize !== undefined) migrated.toolbarTextSize = clampToolbarTextSize(toolbarTextSize);
+  if (Array.isArray(raw.toolbarCollapsedRows)) {
+    migrated.toolbarCollapsedRows = Array.from(
+      new Set(raw.toolbarCollapsedRows.filter((item): item is string => typeof item === "string" && TOOLBAR_COLLAPSE_ROW_IDS.includes(item))),
+    );
+  }
   const editorPaneRatio = numberValue(raw.editorPaneRatio);
   if (editorPaneRatio !== undefined) migrated.editorPaneRatio = clampPaneRatio(editorPaneRatio);
   for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot"] as const) {

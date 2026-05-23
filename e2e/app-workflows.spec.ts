@@ -1308,6 +1308,33 @@ test("keeps primary workbench regions accessible across desktop and narrow viewp
   }
 });
 
+test("collapses and restores command toolbars to recover writing space", async ({ page }) => {
+  const commandBar = page.locator("#main-commands");
+  const initialBox = await commandBar.boundingBox();
+  expect(initialBox).not.toBeNull();
+
+  await commandBar.getByRole("button", { name: "Collapse File toolbar" }).click();
+  await expect(commandBar.getByRole("button", { name: "Expand File toolbar" })).toBeVisible();
+  await expect(commandBar.getByRole("button", { name: "New" })).toBeHidden();
+
+  await commandBar.getByRole("button", { name: "Expand File toolbar" }).click();
+  await expect(commandBar.getByRole("button", { name: "New" })).toBeVisible();
+
+  await commandBar.getByRole("button", { name: "Collapse all" }).click();
+  await expect(commandBar.getByRole("button", { name: "Expand File toolbar" })).toBeVisible();
+  await expect(commandBar.getByRole("button", { name: "Expand View toolbar" })).toBeVisible();
+  await expect(page.getByLabel("View mode")).toBeHidden();
+  const collapsedBox = await commandBar.boundingBox();
+  expect(collapsedBox).not.toBeNull();
+  expect(collapsedBox!.height).toBeLessThan(initialBox!.height);
+
+  await commandBar.getByRole("button", { name: "Expand View toolbar" }).click();
+  await commandBar.getByRole("button", { name: "Expand all" }).click();
+  await expect(commandBar.getByRole("button", { name: "Collapse File toolbar" })).toBeVisible();
+  await expect(commandBar.getByRole("button", { name: "New" })).toBeVisible();
+  await expect(page.getByLabel("View mode")).toBeVisible();
+});
+
 test("manages modal focus and Escape return paths", async ({ page }) => {
   const aiPasteButton = page.getByRole("button", { name: "AI Paste" });
   await aiPasteButton.click();

@@ -314,6 +314,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     previewTheme: "dark",
     toolbarDisplay: "icons",
     toolbarTextSize: 20,
+    toolbarCollapsedRows: ["file", "view", "file", "", 42],
     codeFolding: false,
     editorPaneRatio: 0.95,
     editorFontSize: 99,
@@ -389,6 +390,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.previewTheme, "dark");
   equal(migrated.toolbarDisplay, "icons");
   equal(migrated.toolbarTextSize, 15);
+  deepEqual(migrated.toolbarCollapsedRows, ["file", "view"]);
   equal(migrated.codeFolding, false);
   equal(migrated.editorPaneRatio, 0.75);
   equal(migrated.editorFontSize, 22);
@@ -531,6 +533,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes(':style="appShellStyle"'));
   ok(app.includes('aria-label="Toolbar button display"'));
   ok(app.includes('aria-label="Toolbar text size"'));
+  ok(app.includes("toolbarCollapsedRows"));
+  ok(app.includes("command-toolbar-heading"));
+  ok(app.includes("Collapse all toolbars"));
+  ok(app.includes("Expand all toolbars"));
+  ok(app.includes("toggleToolbarRow"));
   ok(app.includes("Export HTML"));
   ok(app.includes('id: "export-html", label: "HTML Export", title: "Export standalone HTML"'));
   ok(app.includes('aria-label="HTML export options"'));
@@ -564,11 +571,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   for (const label of ["Document", "Manage", "Write", "Navigate", "Insert", "Review"]) {
     ok(app.includes(`label: "${label}"`), `missing ${label} command group`);
   }
-  for (const icon of ["saveAs", "snapshot", "templates", "equation", "outline", "fold", "unfold", "comment", "html"]) {
+  for (const icon of ["saveAs", "snapshot", "templates", "equation", "outline", "fold", "unfold", "comment", "html", "collapse", "expand"]) {
     ok(app.includes(`${icon}: [`), `missing ${icon} icon path`);
   }
   ok(app.includes('store.sidebar === \'templates\''));
   ok(store.includes("toolbarTextSize: 10"));
+  ok(store.includes("toolbarCollapsedRows: []"));
   ok(types.includes("savedText?: string"));
   ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
   ok(store.includes("doc.savedText = response.text"));
@@ -743,6 +751,16 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow rendered export mode preview content"));
   ok(app.includes("native workflow rendered review mode governance content"));
   ok(app.includes("native workflow rendered presentation outline content"));
+  ok(app.includes("collectNativeEditorErgonomicsEvidence"));
+  ok(app.includes("native workflow reported editor word statistics"));
+  ok(app.includes("native workflow exposed spellcheck editor attributes"));
+  ok(app.includes("native workflow rendered line numbers word wrap and folding gutter"));
+  ok(app.includes("native workflow opened editor search panel"));
+  ok(app.includes("native workflow replaced editor search target"));
+  ok(app.includes("native workflow continued markdown list in editor"));
+  ok(app.includes("native workflow inserted paired bracket in editor"));
+  ok(app.includes("native workflow edited multiple cursors in editor"));
+  ok(smoke.includes("native workflow report did not include editor ergonomics evidence"));
   ok(smoke.includes("native workflow report did not include rendered export-mode content"));
   ok(smoke.includes("native workflow report did not include rendered review-mode governance content"));
   ok(smoke.includes("native workflow report did not include rendered presentation outline content"));

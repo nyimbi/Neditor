@@ -40,10 +40,10 @@ Status vocabulary:
 NEditor is no longer a basic scaffold. The repository currently contains:
 
 - Tauri 2, Vue 3, Pinia, Vite, CodeMirror 6, vanilla CSS, and Rust IPC.
-- A large frontend workbench with toolbar, status bar, document tabs, sidebars,
-  editor, live preview, export/review/versioning/settings panels, command
-  palette, table editor, AI paste cleanup modal, transform settings, and
-  external conflict UI.
+- A large frontend workbench with collapsible toolbar rows, status bar,
+  document tabs, sidebars, editor, live preview, export/review/versioning/
+  settings panels, command palette, table editor, AI paste cleanup modal,
+  transform settings, and external conflict UI.
 - A centralized document/workspace store covering local files, open tabs,
   recents, pinned tabs, workspace folders, compile state, exports, readiness,
   Git/snapshots, external watcher state, transform settings, AI cleanup, and
@@ -137,9 +137,9 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 50 Chromium browser workbench workflows
+- `pnpm run test:e2e`: passed all 51 Chromium browser workbench workflows
   locally on 2026-05-23 through the workspace-local Playwright Chromium cache
-  at `.tmp/ms-playwright`, including HTML, blog/Substack,
+  at `.tmp/ms-playwright`, including collapsible toolbars, HTML, blog/Substack,
   LaTeX, Google Docs export-target handoffs, and deep keyboard-only operation
   through tabs, command palette, diagnostics, table editor, conflict merge, and
   preview focus paths.
@@ -755,14 +755,14 @@ wrapper from a terminal/session that permits Chromium launch.
 
 Current host evidence:
 
-- 2026-05-23: `pnpm exec playwright test --list` lists 50 Chromium workflow
+- 2026-05-23: `pnpm exec playwright test --list` lists 51 Chromium workflow
   tests in `e2e/app-workflows.spec.ts`.
 - 2026-05-23: `pnpm run check:e2e-env` passes the focused workbench boot
   workflow through the workspace-local Playwright Chromium cache at
   `.tmp/ms-playwright`.
-- 2026-05-23: `pnpm run test:e2e` passed all 50 Chromium browser workflows,
-  including the HTML, blog/Substack, LaTeX, and Google Docs export-target
-  handoff tests plus deep keyboard-only workbench operation.
+- 2026-05-23: `pnpm run test:e2e` passed all 51 Chromium browser workflows,
+  including collapsible toolbars, the HTML, blog/Substack, LaTeX, and Google
+  Docs export-target handoff tests plus deep keyboard-only workbench operation.
 - 2026-05-23: `pnpm run verify:local -- --list` shows the browser workflow
   environment preflight in the quick baseline, and
   `pnpm run verify:local:full -- --list` shows the full browser workflow suite
@@ -1378,7 +1378,11 @@ Finish:
 ### 10. Editor Ergonomics
 
 Status: CodeMirror is integrated; browser proof now covers the first
-interaction slice in archived workflow run `26154535588`.
+interaction slice in archived workflow run `26154535588`, and the app-authored
+native workflow smoke now requires launched-webview evidence for editor
+statistics, spellcheck attributes, line numbers, word wrap, folding gutter,
+search/replace mutation, Markdown list continuation, bracket-pair insertion,
+and multi-cursor editing.
 
 Covered:
 
@@ -1398,17 +1402,16 @@ Covered:
 - Explicit multi-cursor command palette actions for add-cursor-above,
   add-cursor-below, and select-next-occurrence, with a browser harness workflow
   that edits matching lines through multiple cursors.
+- Launched Tauri webview evidence for word statistics, spellcheck attributes,
+  line numbers, word wrap, folding gutter rendering, search/replace mutation,
+  Markdown list continuation, bracket-pair insertion, and multi-cursor editing.
 
 Finish:
 
 - Markdown syntax highlighting.
 - Diagnostics gutter/range visual-state local browser/native execution proof.
 - Broader Markdown shortcut edge cases.
-- Markdown shortcut local browser/native execution proof.
-- Spellcheck behavior local browser/native execution proof.
-- Word/character/reading-time local browser/native execution proof.
 - Outline navigation local browser/native execution proof.
-- Multi-cursor support local browser/native execution proof.
 - Vim/emacs keybindings classification: deferred unless intentionally added.
 
 ### 11. Preview Ergonomics

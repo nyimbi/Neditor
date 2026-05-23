@@ -454,6 +454,14 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow merged external conflict changes",
     "native workflow accepted external conflict changes",
     "native workflow restored real file after conflict proof",
+    "native workflow reported editor word statistics",
+    "native workflow exposed spellcheck editor attributes",
+    "native workflow rendered line numbers word wrap and folding gutter",
+    "native workflow opened editor search panel",
+    "native workflow replaced editor search target",
+    "native workflow continued markdown list in editor",
+    "native workflow inserted paired bracket in editor",
+    "native workflow edited multiple cursors in editor",
     "native workflow opened command palette",
     "native workflow found dose template",
     "native workflow inserted calc template into source",
@@ -606,6 +614,26 @@ function validateNativeWorkflowReport(launchReport) {
   }
   if (!String(payload.previewSnippet || "").includes("Total dose")) {
     issues.push("native workflow report did not include rendered calc preview");
+  }
+  const editorErgonomicsEvidence = payload.editorErgonomicsEvidence || {};
+  if (
+    editorErgonomicsEvidence.settings?.wordWrapEnabled !== true ||
+    editorErgonomicsEvidence.settings?.lineNumbersVisible !== true ||
+    editorErgonomicsEvidence.settings?.foldGutterVisible !== true ||
+    editorErgonomicsEvidence.settings?.spellcheck !== "true" ||
+    editorErgonomicsEvidence.settings?.autocapitalize !== "sentences" ||
+    editorErgonomicsEvidence.settings?.role !== "textbox" ||
+    !String(editorErgonomicsEvidence.settings?.ariaLabel || "").includes("Markdown") ||
+    !String(editorErgonomicsEvidence.settings?.wordStats || "").includes("words") ||
+    !String(editorErgonomicsEvidence.settings?.wordStats || "").includes("characters") ||
+    editorErgonomicsEvidence.searchReplace?.searchPanelOpen !== true ||
+    editorErgonomicsEvidence.searchReplace?.containsReplacement !== true ||
+    editorErgonomicsEvidence.searchReplace?.containsOriginal !== false ||
+    !String(editorErgonomicsEvidence.listContinuation?.text || "").includes("- First item\n- Second item") ||
+    !String(editorErgonomicsEvidence.pairing?.text || "").includes("()") ||
+    editorErgonomicsEvidence.multiCursor?.inserted !== true
+  ) {
+    issues.push(`native workflow report did not include editor ergonomics evidence: ${JSON.stringify(editorErgonomicsEvidence)}`);
   }
   const snapshotEvidence = payload.snapshotEvidence || {};
   if (

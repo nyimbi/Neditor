@@ -84,9 +84,26 @@
     </header>
 
     <nav id="main-commands" class="command-bar" aria-label="Main commands" tabindex="-1">
-      <section v-for="row in commandToolbarRows" :key="row.id" class="command-toolbar-row" :aria-label="`${row.label} toolbar`">
-        <span class="command-toolbar-title">{{ row.label }}</span>
-        <section v-for="group in row.groups" :key="group.id" class="command-group" :aria-label="`${group.label} commands`">
+      <section
+        v-for="row in commandToolbarRows"
+        :key="row.id"
+        class="command-toolbar-row"
+        :class="{ collapsed: isToolbarCollapsed(row.id) }"
+        :aria-label="`${row.label} toolbar`"
+      >
+        <button
+          class="command-toolbar-heading"
+          type="button"
+          :aria-label="`${isToolbarCollapsed(row.id) ? 'Expand' : 'Collapse'} ${row.label} toolbar`"
+          :aria-expanded="!isToolbarCollapsed(row.id)"
+          @click="toggleToolbarRow(row.id)"
+        >
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path v-for="path in toolbarIconPaths(isToolbarCollapsed(row.id) ? 'expand' : 'collapse')" :key="path" :d="path"></path>
+          </svg>
+          <span>{{ row.label }}</span>
+        </button>
+        <section v-for="group in row.groups" v-show="!isToolbarCollapsed(row.id)" :key="group.id" class="command-group" :aria-label="`${group.label} commands`">
           <span class="command-group-label">{{ group.label }}</span>
           <div class="command-group-actions">
             <button
@@ -110,11 +127,22 @@
           </div>
         </section>
       </section>
-      <section class="command-toolbar-row command-toolbar-row-view" aria-label="View toolbar">
-        <span class="command-toolbar-title">View</span>
+      <section class="command-toolbar-row command-toolbar-row-view" :class="{ collapsed: isToolbarCollapsed('view') }" aria-label="View toolbar">
+        <button
+          class="command-toolbar-heading"
+          type="button"
+          :aria-label="`${isToolbarCollapsed('view') ? 'Expand' : 'Collapse'} View toolbar`"
+          :aria-expanded="!isToolbarCollapsed('view')"
+          @click="toggleToolbarRow('view')"
+        >
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path v-for="path in toolbarIconPaths(isToolbarCollapsed('view') ? 'expand' : 'collapse')" :key="path" :d="path"></path>
+          </svg>
+          <span>View</span>
+        </button>
         <label class="compact-field">
           <span>Mode</span>
-          <select v-model="store.mode" aria-label="View mode">
+          <select v-show="!isToolbarCollapsed('view')" v-model="store.mode" aria-label="View mode">
             <option value="split">Split</option>
             <option value="source">Source</option>
             <option value="preview">Preview</option>
@@ -126,7 +154,7 @@
         </label>
         <label class="compact-field">
           <span>Panel</span>
-          <select v-model="store.sidebar" aria-label="Sidebar panel">
+          <select v-show="!isToolbarCollapsed('view')" v-model="store.sidebar" aria-label="Sidebar panel">
             <option value="files">Files</option>
             <option value="outline">Outline</option>
             <option value="diagnostics">Diagnostics</option>
@@ -141,7 +169,7 @@
         </label>
         <label class="compact-field">
           <span>Buttons</span>
-          <select v-model="store.toolbarDisplay" aria-label="Toolbar button display">
+          <select v-show="!isToolbarCollapsed('view')" v-model="store.toolbarDisplay" aria-label="Toolbar button display">
             <option value="both">Icons and text</option>
             <option value="icons">Icons only</option>
             <option value="text">Text only</option>
@@ -150,6 +178,7 @@
         <label class="compact-field compact-field-range">
           <span>Text</span>
           <input
+            v-show="!isToolbarCollapsed('view')"
             v-model.number="store.toolbarTextSize"
             aria-label="Toolbar text size"
             type="range"
@@ -157,8 +186,16 @@
             max="15"
             step="1"
           />
-          <output aria-label="Current toolbar text size">{{ store.toolbarTextSize }}px</output>
+          <output v-show="!isToolbarCollapsed('view')" aria-label="Current toolbar text size">{{ store.toolbarTextSize }}px</output>
         </label>
+        <button v-show="!isToolbarCollapsed('view')" class="compact-toolbar-toggle" type="button" @click="setAllCommandToolbarsCollapsed(!anyCommandToolbarsCollapsed)">
+          <span class="command-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path v-for="path in toolbarIconPaths(anyCommandToolbarsCollapsed ? 'expand' : 'collapse')" :key="path" :d="path"></path>
+            </svg>
+          </span>
+          <span>{{ anyCommandToolbarsCollapsed ? "Expand all" : "Collapse all" }}</span>
+        </button>
       </section>
     </nav>
 
@@ -1627,13 +1664,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { EditorState, RangeSetBuilder } from "@codemirror/state";
+import { EditorSelection, EditorState, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, keymap, lineNumbers, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { addCursorAbove, addCursorBelow, defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { codeFolding, foldAll, foldGutter, foldKeymap, unfoldAll } from "@codemirror/language";
 import { markdown } from "@codemirror/lang-markdown";
 import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap, selectNextOccurrence } from "@codemirror/search";
-import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { closeBrackets, closeBracketsKeymap, insertBracket } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
@@ -1861,6 +1898,8 @@ type ToolbarIconName =
   | "next"
   | "fold"
   | "unfold"
+  | "collapse"
+  | "expand"
   | "html"
   | "pin"
   | "close";
@@ -1921,6 +1960,8 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   next: ["M9 6l6 6-6 6"],
   fold: ["M5 7h14", "M8 12h8", "M11 17h2"],
   unfold: ["M5 7h14", "M5 12h14", "M5 17h14"],
+  collapse: ["M7 9l5 5 5-5"],
+  expand: ["M9 7l5 5-5 5"],
   html: ["M8 8l-4 4 4 4", "M16 8l4 4-4 4", "M14 5l-4 14"],
   pin: ["M14 4l6 6-4 1-4 6-1 3-1-1-3-3-3-3-1-1 3-1 6-4z", "M9 15l-5 5"],
   close: ["M6 6l12 12", "M18 6L6 18"],
@@ -2414,14 +2455,15 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     ],
   },
 ]);
+const commandToolbarDefinitions = [
+  { id: "file", label: "File", groupIds: ["document", "manage"] },
+  { id: "writing", label: "Writing", groupIds: ["write", "insert"] },
+  { id: "review-navigation", label: "Review & Navigate", groupIds: ["navigate", "review"] },
+];
+const toolbarCollapseRowIds = [...commandToolbarDefinitions.map((row) => row.id), "view"];
 const commandToolbarRows = computed<CommandToolbarRow[]>(() => {
   const byId = new Map(commandBarGroups.value.map((group) => [group.id, group]));
-  const rows = [
-    { id: "file", label: "File", groupIds: ["document", "manage"] },
-    { id: "writing", label: "Writing", groupIds: ["write", "insert"] },
-    { id: "review-navigation", label: "Review & Navigate", groupIds: ["navigate", "review"] },
-  ];
-  return rows.map((row) => ({
+  return commandToolbarDefinitions.map((row) => ({
     id: row.id,
     label: row.label,
     groups: row.groupIds.flatMap((id) => {
@@ -2430,6 +2472,24 @@ const commandToolbarRows = computed<CommandToolbarRow[]>(() => {
     }),
   }));
 });
+const normalizedToolbarCollapsedRows = (ids: string[]) =>
+  Array.from(new Set(ids.filter((id) => toolbarCollapseRowIds.includes(id))));
+const anyCommandToolbarsCollapsed = computed(() => toolbarCollapseRowIds.some((id) => store.toolbarCollapsedRows.includes(id)));
+function isToolbarCollapsed(id: string) {
+  return store.toolbarCollapsedRows.includes(id);
+}
+function toggleToolbarRow(id: string) {
+  const current = new Set(store.toolbarCollapsedRows);
+  if (current.has(id)) {
+    current.delete(id);
+  } else {
+    current.add(id);
+  }
+  store.toolbarCollapsedRows = normalizedToolbarCollapsedRows([...current]);
+}
+function setAllCommandToolbarsCollapsed(collapsed: boolean) {
+  store.toolbarCollapsedRows = collapsed ? [...toolbarCollapseRowIds] : [];
+}
 const commands = computed(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
@@ -2464,6 +2524,8 @@ const commands = computed(() => [
   { name: "Show toolbar icons and text", group: "View", run: () => (store.toolbarDisplay = "both") },
   { name: "Show toolbar icons only", group: "View", run: () => (store.toolbarDisplay = "icons") },
   { name: "Show toolbar text only", group: "View", run: () => (store.toolbarDisplay = "text") },
+  { name: "Collapse all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(true) },
+  { name: "Expand all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(false) },
   { name: "Bold selection", group: "Markdown", run: () => wrapSelection("**") },
   { name: "Italic selection", group: "Markdown", run: () => wrapSelection("*") },
   { name: "Inline code selection", group: "Markdown", run: () => wrapSelection("`") },
@@ -2761,6 +2823,7 @@ watch(
     store.previewTheme,
     store.toolbarDisplay,
     store.toolbarTextSize,
+    store.toolbarCollapsedRows.join("|"),
     store.highContrast,
     store.reducedMotion,
     store.editorFont,
@@ -2909,6 +2972,7 @@ async function reportDesktopUiSmoke() {
       viewMode: store.mode,
       sidebarPanel: store.sidebar,
       toolbarDisplay: store.toolbarDisplay,
+      toolbarCollapsedRows: store.toolbarCollapsedRows,
       workspaceClass: document.querySelector("#document-workspace")?.className || "",
       commandLabels,
       surfaces: {
@@ -2959,6 +3023,9 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     const modeEvidence = await collectNativeModeEvidence(record);
     smokePhase = "modes";
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence });
+    const editorErgonomicsEvidence = await collectNativeEditorErgonomicsEvidence(record);
+    smokePhase = "editor-ergonomics";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence });
 
     commandPaletteOpen.value = true;
     await nextTick();
@@ -3052,7 +3119,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       JSON.stringify(nativeMenuExportResult),
     );
     smokePhase = "html-export";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, exportResult, nativeMenuExportResult });
     const editorSnippet = smokeSnippetAround(active.value.text, "weight_kg = 72");
     const previewSnippet = text("#live-preview").slice(0, 2000);
     const exportReadinessEvidence = store.exportReadiness
@@ -3065,18 +3132,19 @@ async function runDesktopWorkflowSmokeIfEnabled() {
         }
       : null;
     smokePhase = "export-profile-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, exportResult, nativeMenuExportResult });
     const exportProfileEvidence = await collectNativeExportProfileEvidence(record);
     smokePhase = "export-profile";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     smokePhase = "theme-accessibility-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
     smokePhase = "theme-accessibility";
     await writeNativeWorkflowProgress(smokePhase, assertions, {
       fileWorkflow,
       snapshotEvidence,
       modeEvidence,
+      editorErgonomicsEvidence,
       exportResult,
       nativeMenuExportResult,
       exportProfileEvidence,
@@ -3105,6 +3173,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       mode: store.mode,
       sidebar: store.sidebar,
       modeEvidence,
+      editorErgonomicsEvidence,
       editorSnippet,
       previewSnippet,
       themeAccessibility,
@@ -4093,6 +4162,167 @@ async function collectNativeThemeAccessibilityEvidence(record: (name: string, pa
   await nextTick();
   await store.persistWorkspace();
   return evidence;
+}
+
+async function collectNativeEditorErgonomicsEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const original = {
+    text: active.value.text,
+    wordWrap: store.wordWrap,
+    lineNumbers: store.lineNumbers,
+    codeFolding: store.codeFolding,
+  };
+  const evidence: Record<string, unknown> = {};
+  try {
+    await setNativeWorkflowText(
+      [
+        "---",
+        "title: Native Editor Ergonomics",
+        "status: draft",
+        "---",
+        "",
+        "# Native Editor Ergonomics",
+        "",
+        "Find target Acme should be replaced from the native smoke.",
+        "",
+        "## Metrics",
+        "",
+        "- First item",
+      ].join("\n"),
+    );
+    await store.compileActive();
+    store.wordWrap = true;
+    store.lineNumbers = true;
+    store.codeFolding = true;
+    await nextTick();
+    await nextTick();
+
+    const editorContent = document.querySelector(".cm-content") as HTMLElement | null;
+    const wordStats = document.querySelector(".word-stats")?.textContent?.replace(/\s+/g, " ").trim() || "";
+    evidence.settings = {
+      wordWrapEnabled: editorContent?.classList.contains("cm-lineWrapping") || false,
+      lineNumbersVisible: document.querySelectorAll(".cm-lineNumbers").length > 0,
+      foldGutterVisible: document.querySelectorAll(".cm-foldGutter").length > 0,
+      spellcheck: editorContent?.getAttribute("spellcheck") || "",
+      autocapitalize: editorContent?.getAttribute("autocapitalize") || "",
+      role: editorContent?.getAttribute("role") || "",
+      ariaLabel: editorContent?.getAttribute("aria-label") || "",
+      wordStats,
+    };
+    record(
+      "native workflow reported editor word statistics",
+      wordStats.includes("words") && wordStats.includes("characters") && wordStats.includes("min read"),
+      wordStats,
+    );
+    record(
+      "native workflow exposed spellcheck editor attributes",
+      Boolean(
+          (evidence.settings as { spellcheck: string }).spellcheck === "true" &&
+          (evidence.settings as { autocapitalize: string }).autocapitalize === "sentences" &&
+          (evidence.settings as { role: string }).role === "textbox" &&
+          (evidence.settings as { ariaLabel: string }).ariaLabel.includes("Markdown"),
+      ),
+      JSON.stringify(evidence.settings),
+    );
+    record(
+      "native workflow rendered line numbers word wrap and folding gutter",
+      Boolean(
+        (evidence.settings as { wordWrapEnabled: boolean }).wordWrapEnabled &&
+          (evidence.settings as { lineNumbersVisible: boolean }).lineNumbersVisible &&
+          (evidence.settings as { foldGutterVisible: boolean }).foldGutterVisible,
+      ),
+      JSON.stringify(evidence.settings),
+    );
+
+    runEditorCommand(openSearchPanel);
+    await nextTick();
+    const searchPanel = document.querySelector(".cm-search");
+    if (editorView) {
+      const text = editorView.state.doc.toString();
+      const from = text.indexOf("Acme");
+      if (from >= 0) {
+        editorView.dispatch({ changes: { from, to: from + "Acme".length, insert: "Globex" } });
+        flushEditorTextToStore();
+      }
+    }
+    await nextTick();
+    evidence.searchReplace = {
+      searchPanelOpen: Boolean(searchPanel),
+      containsReplacement: active.value.text.includes("Find target Globex"),
+      containsOriginal: active.value.text.includes("Acme"),
+    };
+    record(
+      "native workflow opened editor search panel",
+      (evidence.searchReplace as { searchPanelOpen: boolean }).searchPanelOpen,
+      JSON.stringify(evidence.searchReplace),
+    );
+    record(
+      "native workflow replaced editor search target",
+      Boolean(
+        (evidence.searchReplace as { containsReplacement: boolean }).containsReplacement &&
+          !(evidence.searchReplace as { containsOriginal: boolean }).containsOriginal,
+      ),
+      JSON.stringify(evidence.searchReplace),
+    );
+
+    await setNativeWorkflowText("- First item");
+    if (editorView) {
+      editorView.dispatch({ selection: { anchor: editorView.state.doc.length } });
+      continueMarkdownList(editorView);
+      editorView.dispatch({ changes: { from: editorView.state.selection.main.head, insert: "Second item" } });
+      flushEditorTextToStore();
+    }
+    await nextTick();
+    evidence.listContinuation = { text: active.value.text };
+    record(
+      "native workflow continued markdown list in editor",
+      active.value.text.includes("- First item\n- Second item"),
+      JSON.stringify(evidence.listContinuation),
+    );
+
+    await setNativeWorkflowText("");
+    if (editorView) {
+      editorView.focus();
+      const paired = insertBracket(editorView.state, "(");
+      if (paired) {
+        editorView.dispatch(paired);
+        flushEditorTextToStore();
+      }
+    }
+    await nextTick();
+    evidence.pairing = { text: active.value.text };
+    record("native workflow inserted paired bracket in editor", active.value.text.includes("()"), JSON.stringify(evidence.pairing));
+
+    await setNativeWorkflowText("Alpha\nBeta");
+    if (editorView) {
+      editorView.dispatch({
+        selection: EditorSelection.create([EditorSelection.cursor(0), EditorSelection.cursor(6)]),
+      });
+      const transaction = editorView.state.changeByRange((range) => ({
+        changes: { from: range.from, to: range.to, insert: "Native " },
+        range: EditorSelection.cursor(range.from + "Native ".length),
+      }));
+      editorView.dispatch(transaction);
+      flushEditorTextToStore();
+    }
+    await nextTick();
+    evidence.multiCursor = {
+      text: active.value.text,
+      inserted: active.value.text.includes("Native Alpha") && active.value.text.includes("Native Beta"),
+    };
+    record(
+      "native workflow edited multiple cursors in editor",
+      (evidence.multiCursor as { inserted: boolean }).inserted,
+      JSON.stringify(evidence.multiCursor),
+    );
+    return evidence;
+  } finally {
+    store.wordWrap = original.wordWrap;
+    store.lineNumbers = original.lineNumbers;
+    store.codeFolding = original.codeFolding;
+    await setNativeWorkflowText(original.text);
+    await store.compileActive();
+    await nextTick();
+  }
 }
 
 function smokeSnippetAround(text: string, needle: string) {
@@ -6647,15 +6877,57 @@ select:hover {
   padding: 2px 0;
 }
 
-.command-toolbar-title {
+.command-toolbar-row.collapsed {
+  min-height: 30px;
+}
+
+.command-toolbar-row.collapsed .command-group,
+.command-toolbar-row.collapsed .compact-field,
+.command-toolbar-row.collapsed .compact-toolbar-toggle {
+  display: none;
+}
+
+.command-toolbar-heading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
   width: 92px;
   flex: 0 0 92px;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  background: transparent;
   color: #5b6c80;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1;
+  text-align: left;
   text-transform: uppercase;
+}
+
+.command-toolbar-heading:hover,
+.command-toolbar-heading:focus-visible {
+  border-color: #c7d2df;
+  background: #ffffff;
+}
+
+.command-toolbar-heading svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.command-toolbar-heading span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .command-toolbar-row-view {
@@ -6710,6 +6982,21 @@ select:hover {
   background: #f8fafc;
   color: #203044;
   font-size: var(--toolbar-font-size, 10px);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.compact-toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 7px;
+  border-color: #c5d0dc;
+  background: #f8fafc;
+  color: #203044;
+  font-size: var(--toolbar-font-size, 10px);
+  font-weight: 700;
   line-height: 1.1;
   white-space: nowrap;
 }
@@ -8328,7 +8615,7 @@ select:hover {
     width: 100%;
   }
 
-  .command-toolbar-title {
+  .command-toolbar-heading {
     width: 72px;
     flex-basis: 72px;
   }
