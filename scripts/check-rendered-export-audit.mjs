@@ -12,6 +12,8 @@ const auditDir = resolve(process.env.NEDITOR_RENDERED_EXPORT_AUDIT_DIR || join(r
 const completedSignoffPath = process.env.NEDITOR_RENDERED_EXPORT_SIGNOFF
   ? resolve(process.env.NEDITOR_RENDERED_EXPORT_SIGNOFF)
   : null;
+const validateExistingSignoffOnly =
+  process.argv.includes("--validate-signoff-only") || process.env.NEDITOR_RENDERED_EXPORT_VALIDATE_EXISTING === "1";
 const requiredFiles = [
   ["rendered-export-audit.html", 1000],
   ["rendered-export-audit.pdf", 1000],
@@ -27,6 +29,11 @@ const requiredFiles = [
 ];
 const viewerProof = [];
 let auditReport = null;
+
+if (validateExistingSignoffOnly) {
+  validateExistingSignoff();
+  process.exit(0);
+}
 
 if (auditDir.includes(`${root}/.tmp/`)) {
   rmSync(auditDir, { recursive: true, force: true });
@@ -201,6 +208,55 @@ if (issues.length > 0) {
   process.exit(1);
 }
 console.log(`Rendered export audit artifacts verified in ${auditDir}`);
+
+function validateExistingSignoff() {
+  const issues = [];
+  if (!completedSignoffPath) {
+    issues.push("NEDITOR_RENDERED_EXPORT_SIGNOFF is required when validating an existing rendered export sign-off.");
+  }
+
+  const reportPath = join(auditDir, "rendered-export-audit-report.json");
+  if (!existsSync(reportPath)) {
+    issues.push(`existing rendered export audit report is missing: ${reportPath}`);
+  } else {
+    try {
+      auditReport = JSON.parse(readFileSync(reportPath, "utf8"));
+    } catch (error) {
+      issues.push(`existing rendered export audit report is not valid JSON: ${String(error)}`);
+    }
+  }
+
+  let assertions = [];
+  const viewerProofPath = join(auditDir, "viewer-proof.json");
+  if (!existsSync(viewerProofPath)) {
+    issues.push(`existing viewer proof is missing: ${viewerProofPath}`);
+  } else {
+    try {
+      const proof = JSON.parse(readFileSync(viewerProofPath, "utf8"));
+      assertions = Array.isArray(proof.assertions) ? proof.assertions : [];
+    } catch (error) {
+      issues.push(`existing viewer proof is not valid JSON: ${String(error)}`);
+    }
+  }
+
+  if (issues.length === 0) {
+    writeManualSignoffTemplate(auditReport, assertions);
+    const humanSignoff = collectHumanSignoffEvidence(issues, assertions, auditReport);
+    const automatedVisualReview = collectAutomatedVisualReviewEvidence(issues, assertions, auditReport);
+    writeVisualReviewSummary(auditReport, assertions, humanSignoff, automatedVisualReview);
+    writeManualReviewDashboard(auditReport, assertions);
+    verifyManualReviewDashboard(issues, assertions);
+    verifyVisualReviewSummary(issues, auditReport, assertions);
+  }
+
+  if (issues.length > 0) {
+    console.error("Rendered export sign-off validation failed:");
+    for (const issue of issues) console.error(`- ${issue}`);
+    process.exit(1);
+  }
+
+  console.log(`Rendered export sign-off validated against existing artifacts in ${auditDir}`);
+}
 
 function collectViewerProof(issues, assertions) {
   const html = readTextArtifact("rendered-export-audit.html");
@@ -1206,6 +1262,7 @@ function writeManualSignoffTemplate(report, assertions) {
     reviewerNotes: "",
   }));
   const template = {
+    schema: "neditor.rendered-export.visual-signoff.v1",
     generatedAt: new Date().toISOString(),
     status: "pending-human-review",
     instructions: [
@@ -1213,7 +1270,7 @@ function writeManualSignoffTemplate(report, assertions) {
       "Open every primary artifact and review-case target in the relevant native or browser viewer.",
       "Set each artifact, review case, and checklist status to passed, failed, or skipped-with-reason.",
       "Set top-level status to human-reviewed only when every non-skipped required item has been reviewed.",
-      "Run NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/completed-signoff.json pnpm run test:rendered-exports to validate the completed sign-off.",
+      "Run NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/completed-signoff.json pnpm run test:rendered-exports -- --validate-signoff-only to validate the completed sign-off against this existing audit bundle.",
     ],
     reviewer: {
       name: "",
@@ -1249,7 +1306,7 @@ function writeManualSignoffTemplate(report, assertions) {
 function collectHumanSignoffEvidence(issues, assertions, report) {
   if (!completedSignoffPath) {
     const reason =
-      "No completed sign-off supplied; set NEDITOR_RENDERED_EXPORT_SIGNOFF to validate manual native-viewer review.";
+      "No completed sign-off supplied; set NEDITOR_RENDERED_EXPORT_SIGNOFF and run with --validate-signoff-only to validate manual native-viewer review.";
     assertions.push({
       scope: "human-signoff",
       assertion: "completed manual visual-review sign-off supplied",
@@ -1450,11 +1507,20 @@ function signoffArtifact(target) {
 
 function validateCompletedSignoff(signoff, report) {
   const validationIssues = [];
+  if (signoff.schema !== "neditor.rendered-export.visual-signoff.v1") {
+    validationIssues.push("completed sign-off schema must be neditor.rendered-export.visual-signoff.v1");
+  }
   if (signoff.status !== "human-reviewed") {
     validationIssues.push("completed sign-off status must be human-reviewed");
   }
   if (!signoff.reviewer?.name || !signoff.reviewer?.reviewedAt) {
     validationIssues.push("completed sign-off must include reviewer.name and reviewer.reviewedAt");
+  }
+  if (signoff.reviewer?.reviewedAt && !isIsoDate(signoff.reviewer.reviewedAt)) {
+    validationIssues.push("completed sign-off reviewer.reviewedAt must be an ISO timestamp");
+  }
+  if (!Array.isArray(signoff.reviewer?.nativeViewers) || signoff.reviewer.nativeViewers.length === 0) {
+    validationIssues.push("completed sign-off must include at least one reviewer.nativeViewers entry");
   }
   if (Array.isArray(signoff.acceptance?.blockers) && signoff.acceptance.blockers.length > 0) {
     validationIssues.push("completed sign-off must not contain unresolved blockers");
@@ -1469,13 +1535,16 @@ function validateCompletedSignoff(signoff, report) {
     validationIssues.push("completed sign-off must set acceptance.allChecklistItemsReviewed to true");
   }
 
-  const requiredTargetKeys = new Set((report.targets || []).map((target) => `${target.target}:${target.path}`));
+  const requiredTargets = new Map((report.targets || []).map((target) => [`${target.target}:${target.path}`, target]));
+  const requiredTargetKeys = new Set(requiredTargets.keys());
   const signedTargetKeys = new Set((signoff.primaryArtifacts || []).map((target) => `${target.target}:${target.path}`));
   for (const key of requiredTargetKeys) {
     if (!signedTargetKeys.has(key)) validationIssues.push(`completed sign-off is missing primary artifact ${key}`);
   }
   for (const artifact of signoff.primaryArtifacts || []) {
-    validateReviewedStatus(validationIssues, `primary artifact ${artifact.target}:${artifact.path}`, artifact);
+    const label = `primary artifact ${artifact.target}:${artifact.path}`;
+    validateReviewedStatus(validationIssues, label, artifact);
+    validateSignedArtifactIdentity(validationIssues, label, artifact, requiredTargets.get(`${artifact.target}:${artifact.path}`));
   }
 
   const requiredReviewCases = new Map((report.reviewCases || []).map((reviewCase) => [reviewCase.slug, reviewCase]));
@@ -1492,8 +1561,11 @@ function validateCompletedSignoff(signoff, report) {
     for (const key of requiredCaseTargets) {
       if (!signedCaseTargets.has(key)) validationIssues.push(`completed sign-off is missing review case target ${slug}:${key}`);
     }
+    const requiredCaseTargetMap = new Map((reviewCase.targets || []).map((target) => [`${target.target}:${target.path}`, target]));
     for (const artifact of signedCase.targets || []) {
-      validateReviewedStatus(validationIssues, `review case target ${slug}:${artifact.target}:${artifact.path}`, artifact);
+      const label = `review case target ${slug}:${artifact.target}:${artifact.path}`;
+      validateReviewedStatus(validationIssues, label, artifact);
+      validateSignedArtifactIdentity(validationIssues, label, artifact, requiredCaseTargetMap.get(`${artifact.target}:${artifact.path}`));
     }
   }
 
@@ -1508,6 +1580,19 @@ function validateCompletedSignoff(signoff, report) {
   return validationIssues;
 }
 
+function validateSignedArtifactIdentity(validationIssues, label, signedArtifact, requiredArtifact) {
+  if (!requiredArtifact) {
+    validationIssues.push(`${label} does not match a current audit artifact`);
+    return;
+  }
+  if (Number(signedArtifact.bytes) !== Number(requiredArtifact.bytes)) {
+    validationIssues.push(`${label} bytes must match current audit artifact`);
+  }
+  if (signedArtifact.sha256 !== requiredArtifact.sha256) {
+    validationIssues.push(`${label} sha256 must match current audit artifact`);
+  }
+}
+
 function validateReviewedStatus(validationIssues, label, item) {
   const status = item?.status || "";
   if (!["passed", "failed", "skipped-with-reason"].includes(status)) {
@@ -1519,6 +1604,10 @@ function validateReviewedStatus(validationIssues, label, item) {
   if (status === "skipped-with-reason" && !item?.reviewerNotes) {
     validationIssues.push(`${label} is skipped but has no reviewerNotes`);
   }
+}
+
+function isIsoDate(value) {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
 function writeManualReviewDashboard(report, assertions) {
@@ -1593,7 +1682,7 @@ function writeManualReviewDashboard(report, assertions) {
   <h1>Rendered Export Manual Review</h1>
   <p>Generated ${escapeHtml(generatedAt)} by <code>pnpm run test:rendered-exports</code>.</p>
   <p>This dashboard is a human-review entry point for the generated export package. Open each linked artifact in the relevant native viewer, then use the checklist and proof table below to record manual QA results outside this file if needed.</p>
-  <p>Structured sign-off template: <a href="visual-review-signoff.template.json"><code>visual-review-signoff.template.json</code></a>. To validate a completed review, fill a copy with <code>status: "human-reviewed"</code> and run <code>NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json pnpm run test:rendered-exports</code>.</p>
+  <p>Structured sign-off template: <a href="visual-review-signoff.template.json"><code>visual-review-signoff.template.json</code></a>. To validate a completed review against this existing audit bundle, fill a copy with <code>status: "human-reviewed"</code> and run <code>NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json pnpm run test:rendered-exports -- --validate-signoff-only</code>.</p>
 
   <h2>Primary Artifacts</h2>
   <table>

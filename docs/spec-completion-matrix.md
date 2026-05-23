@@ -290,7 +290,7 @@ Current major verification gaps:
   `manual-review.html`, `visual-review-summary.json`, `visual-review-signoff.template.json`, a manual checklist, and executable viewer/package proof under
   `.tmp/rendered-export-audit`; that proof now includes publishing/import
   workflow metadata checks, LaTeX source checks, nested Google Docs DOCX package
-  checks, visual-summary mapping from targets/review cases to screenshot/raster/native-tool evidence with explicit pending or validated human sign-off, a structured `NEDITOR_RENDERED_EXPORT_SIGNOFF` validation path for completed manual native-viewer review, and macOS `textutil` extraction for the primary DOCX, nested Google
+  checks, visual-summary mapping from targets/review cases to screenshot/raster/native-tool evidence with explicit pending or validated human sign-off, a structured `NEDITOR_RENDERED_EXPORT_SIGNOFF` plus `--validate-signoff-only` validation path for completed manual native-viewer review against an existing audit bundle that requires the `neditor.rendered-export.visual-signoff.v1` schema, reviewer/native-viewer metadata, ISO review timestamp, and artifact byte/SHA-256 matches against the current audit outputs, and macOS `textutil` extraction for the primary DOCX, nested Google
   Docs DOCX, and rendered review-case DOCX files. On macOS it also attempts
   Quick Look thumbnails for primary PDF/DOCX/PPTX artifacts and records either
   thumbnail evidence or host limitations. When Chromium can launch, it captures

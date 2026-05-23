@@ -417,9 +417,13 @@ PDF raster proof, Office XML preview extraction, Office preview screenshots, and
 mapped proof for every primary and review-case target before marking the audit
 `automated-reviewed`. The audit also writes
 `visual-review-signoff.template.json`; fill a copy and rerun with
-`NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json` to validate completed
-manual native-viewer review. On macOS it also extracts DOCX text through
-`textutil` and attempts bounded Quick Look PDF/DOCX/PPTX thumbnail proof,
+`NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json pnpm run test:rendered-exports -- --validate-signoff-only`
+to validate completed manual native-viewer review against the existing audit
+bundle. Completed sign-off must use the
+`neditor.rendered-export.visual-signoff.v1` schema, include reviewer metadata
+and native viewer names, and preserve the byte counts plus SHA-256 hashes for
+the exact generated artifacts under review. On macOS it also extracts DOCX text
+through `textutil` and attempts bounded Quick Look PDF/DOCX/PPTX thumbnail proof,
 recording either thumbnail assertions or host sandbox limitations in
 `viewer-proof.json`. When `pdflatex` is installed, it also compiles the
 generated `.tex` file into `.tmp/rendered-export-audit/latex-compile/`.

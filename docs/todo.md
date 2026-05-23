@@ -1082,9 +1082,11 @@ Current evidence:
   mapped proof for every primary and review-case export target. It also writes
   `visual-review-signoff.template.json`; completed manual native-viewer review
   can be validated by rerunning the audit with
-  `NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json`, which checks reviewer
-  metadata, every primary artifact, every review-case target, checklist status,
-  and unresolved blockers before marking the summary `human-reviewed`. When
+  `NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json pnpm run test:rendered-exports -- --validate-signoff-only`,
+  which checks reviewer metadata, native-viewer names, an ISO review timestamp,
+  every primary artifact, every review-case target, artifact byte/SHA-256
+  identity, checklist status, and unresolved blockers against the existing audit
+  bundle before marking the summary `human-reviewed`. When
   Poppler tools are installed, it also verifies PDF metadata and extracted text
   through `pdfinfo` and `pdftotext`, and renders PNG PDF review thumbnails through `pdftoppm` under
   `.tmp/rendered-export-audit/raster-proof/` with links in `manual-review.html`.

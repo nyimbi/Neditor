@@ -192,6 +192,15 @@ Recent pushed checkpoints visible in current git history:
 - This update also writes `.tmp/rendered-export-audit/manual-review.html`, a
   linked manual QA dashboard for the primary artifacts, review cases, checklist,
   hashes, and executable viewer/package proof.
+- Completed rendered-export native-viewer sign-off now has to use the
+  `neditor.rendered-export.visual-signoff.v1` schema, include reviewer and
+  native-viewer metadata, use an ISO review timestamp, and preserve the exact
+  byte counts plus SHA-256 hashes for every primary and review-case artifact in
+  the current rendered export audit. Use
+  `NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json pnpm run test:rendered-exports -- --validate-signoff-only`
+  to validate a completed review against an existing audit bundle without
+  regenerating artifacts. Stale sign-off files from older artifacts fail
+  validation instead of closing the readiness gap.
 - This update adds `.tmp/rendered-export-audit/automated-visual-review.json`.
   The report marks the current host `automated-reviewed` only when browser
   screenshots, PDF raster thumbnails, DOCX/PPTX Office preview extraction,

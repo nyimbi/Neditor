@@ -741,9 +741,19 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
 
   ok(script.includes("visual-review-signoff.template.json"));
   ok(script.includes("NEDITOR_RENDERED_EXPORT_SIGNOFF"));
+  ok(script.includes("--validate-signoff-only"));
+  ok(script.includes("NEDITOR_RENDERED_EXPORT_VALIDATE_EXISTING"));
+  ok(script.includes("validateExistingSignoff"));
+  ok(script.includes("Rendered export sign-off validated against existing artifacts"));
+  ok(script.includes("neditor.rendered-export.visual-signoff.v1"));
   ok(script.includes("collectHumanSignoffEvidence"));
   ok(script.includes("collectAutomatedVisualReviewEvidence"));
   ok(script.includes("validateCompletedSignoff"));
+  ok(script.includes("validateSignedArtifactIdentity"));
+  ok(script.includes("reviewer.reviewedAt must be an ISO timestamp"));
+  ok(script.includes("reviewer.nativeViewers"));
+  ok(script.includes("sha256 must match current audit artifact"));
+  ok(script.includes("bytes must match current audit artifact"));
   ok(script.includes("collectOfficePreviewProof"));
   ok(script.includes('page.locator("body").screenshot'));
   ok(script.includes("automated-visual-review.json"));
