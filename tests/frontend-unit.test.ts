@@ -777,6 +777,11 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("macosAppBundleAccepted"));
   ok(script.includes("macosDmgAccepted"));
   ok(script.includes("artifactMatchesReport"));
+  ok(script.includes("reportFileFreshForArtifact"));
+  ok(script.includes("native-command-report-stale-for-binary"));
+  ok(script.includes("launch-report-stale-for-binary"));
+  ok(script.includes("webdriver-report-stale-for-binary"));
+  ok(script.includes("fallback-smoke-report-stale-for-binary"));
   ok(script.includes("neditor.e2e-browser-workflow.v1"));
   ok(script.includes("scope !== \"full-suite\""));
   ok(script.includes("missing-docs-live-workflow-proof"));

@@ -313,11 +313,19 @@ function browserWorkflowAccepted(report) {
 }
 
 function desktopCommandPassed(report) {
-  const passed = report.nativeCommandWorkflow?.status === 0;
+  const issues = [];
+  if (!artifactMatchesReport(report.binary, report.binarySize, true)) issues.push("invalid-desktop-binary-artifact");
+  if (!reportFileFreshForArtifact(".tmp/desktop-smoke/native-command-report.json", report.binary)) {
+    issues.push("native-command-report-stale-for-binary");
+  }
+  if (report.nativeCommandWorkflow?.status !== 0) issues.push("native-command-workflow-failed");
   return {
-    accepted: passed,
-    status: passed ? "passed" : "failed",
-    detail: passed ? `durationMs=${report.nativeCommandWorkflow.durationMs}` : "native command workflow did not pass",
+    accepted: issues.length === 0,
+    status: issues.length === 0 ? "passed" : "failed",
+    detail:
+      issues.length === 0
+        ? `durationMs=${report.nativeCommandWorkflow.durationMs} binaryBytes=${report.binarySize}`
+        : issues.join(","),
   };
 }
 
@@ -377,17 +385,36 @@ function focusedPlaywrightReportAccepted(report, minimumTests) {
 function artifactMatchesReport(relativePath, expectedSize, requireExecutable) {
   if (typeof relativePath !== "string" || !relativePath) return false;
   const absolutePath = join(root, relativePath);
-  if (!existsSync(absolutePath)) return false;
-  let stat;
-  try {
-    stat = statSync(absolutePath);
-  } catch {
-    return false;
-  }
+  const stat = statFile(absolutePath);
+  if (!stat) return false;
   if (!stat.isFile()) return false;
   if (Number(expectedSize || 0) < 1 || stat.size !== Number(expectedSize)) return false;
   if (requireExecutable && (stat.mode & 0o111) === 0) return false;
   return true;
+}
+
+function artifactExists(relativePath, requireExecutable) {
+  if (typeof relativePath !== "string" || !relativePath) return false;
+  const stat = statFile(join(root, relativePath));
+  if (!stat?.isFile()) return false;
+  return !requireExecutable || (stat.mode & 0o111) !== 0;
+}
+
+function reportFileFreshForArtifact(reportRelativePath, artifactRelativePath) {
+  if (typeof reportRelativePath !== "string" || typeof artifactRelativePath !== "string") return false;
+  const reportStat = statFile(join(root, reportRelativePath));
+  const artifactStat = statFile(join(root, artifactRelativePath));
+  if (!reportStat?.isFile() || !artifactStat?.isFile()) return false;
+  return reportStat.mtimeMs + 1000 >= artifactStat.mtimeMs;
+}
+
+function statFile(path) {
+  if (!existsSync(path)) return null;
+  try {
+    return statSync(path);
+  } catch {
+    return null;
+  }
 }
 
 function visualSummaryPassed(report) {
@@ -494,11 +521,21 @@ function missingReleaseSigningEvidence(report) {
 }
 
 function macosLaunchPassed(report) {
-  const passed = report.launch?.status === "survived-until-timeout" || report.status === "survived-until-timeout";
+  const issues = [];
+  const status = report.launch?.status || report.status;
+  if (status !== "survived-until-timeout") issues.push(`status=${status || "missing"}`);
+  if (!artifactExists(report.binary, true)) issues.push("missing-launch-binary");
+  if (!reportFileFreshForArtifact(".tmp/desktop-smoke/launch-report.json", report.binary)) {
+    issues.push("launch-report-stale-for-binary");
+  }
+  if (report.processAlive !== true && report.launch?.processAlive !== true) issues.push("process-not-alive");
+  if (report.nativeWindow?.window?.visible !== true && report.launch?.nativeWindow?.window?.visible !== true) {
+    issues.push("missing-native-window-proof");
+  }
   return {
-    accepted: passed,
-    status: passed ? "passed" : report.launch?.status || report.status || "unknown",
-    detail: passed ? "bounded GUI launch survived until timeout" : "",
+    accepted: issues.length === 0,
+    status: issues.length === 0 ? "passed" : status || "unknown",
+    detail: issues.length === 0 ? "bounded GUI launch survived until timeout with current binary proof" : issues.join(","),
   };
 }
 
@@ -510,11 +547,33 @@ function webdriverOrFallbackPassed(report) {
       detail: "WebDriver workflow passed",
     };
   }
-  const fallbackPassed = report.status === "skipped" && report.fallbackProof?.status === "passed" && report.fallbackProof?.freshForBinary;
+  const fallbackIssues = [];
+  const proof = report.fallbackProof || {};
+  if (report.status !== "skipped") fallbackIssues.push(`status=${report.status || "missing"}`);
+  if (proof.status !== "passed") fallbackIssues.push(`fallbackStatus=${proof.status || "missing"}`);
+  if (!artifactExists(report.application, true)) fallbackIssues.push("missing-application-binary");
+  if (!reportFileFreshForArtifact(".tmp/desktop-webdriver/report.json", report.application)) {
+    fallbackIssues.push("webdriver-report-stale-for-binary");
+  }
+  if (!reportFileFreshForArtifact(proof.reportPath, report.application)) {
+    fallbackIssues.push("fallback-smoke-report-stale-for-binary");
+  }
+  if (!reportFileFreshForArtifact(proof.launchReportPath, report.application)) {
+    fallbackIssues.push("fallback-launch-report-stale-for-binary");
+  }
+  if (proof.freshForBinary !== true) fallbackIssues.push("fallback-did-not-self-report-freshness");
+  if (proof.launchStatus !== "survived-until-timeout") fallbackIssues.push("fallback-launch-not-bounded-survival");
+  if (proof.processAlive !== true) fallbackIssues.push("fallback-process-not-alive");
+  if (Number(proof.passedAssertionCount || 0) < 1 || proof.passedAssertionCount !== proof.assertionCount) {
+    fallbackIssues.push("fallback-assertions-not-all-passing");
+  }
+  const fallbackPassed = fallbackIssues.length === 0;
   return {
     accepted: fallbackPassed,
     status: report.status || "unknown",
-    detail: fallbackPassed ? "macOS unsupported WebDriver skip has fresh native fallback proof" : "WebDriver did not pass and no accepted fallback proof was found",
+    detail: fallbackPassed
+      ? "macOS unsupported WebDriver skip has fresh native fallback proof for current binary"
+      : fallbackIssues.join(","),
   };
 }
 
