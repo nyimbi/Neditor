@@ -138,8 +138,8 @@ Most recent local verification evidence:
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
 - `pnpm run test:e2e`: passed all 49 Chromium browser workbench workflows
-  locally on 2026-05-22 through the system-Chrome fallback because bundled
-  Playwright Chromium is missing on this host, including HTML, blog/Substack,
+  locally on 2026-05-23 through the workspace-local Playwright Chromium cache
+  at `.tmp/ms-playwright`, including HTML, blog/Substack,
   LaTeX, Google Docs export-target handoffs, and deep keyboard-only operation
   through tabs, command palette, diagnostics, table editor, conflict merge, and
   preview focus paths.
@@ -593,8 +593,10 @@ green before claiming a slice is complete:
 
 - `pnpm run verify:local` for routine completed slices.
 - `pnpm run verify:local:full` for a release-grade local baseline.
-- `pnpm run check:e2e-env` and `pnpm run test:e2e` for the browser workflow
-  lane on hosts where Chromium can launch.
+- `pnpm run verify:local` now includes the browser workflow environment
+  preflight. `pnpm run verify:local:full` also includes the full browser
+  workflow suite, so browser launch regressions are part of the ordinary local
+  gates instead of a separate optional check.
 - `pnpm run verify:local -- --list` or
   `pnpm run verify:local:full -- --list` to inspect the exact local command
   plan before running it.
@@ -618,6 +620,11 @@ Current local verification evidence:
   Docs package export, and native command workflow smoke.
 - 2026-05-21: `pnpm run check:e2e-env` and `pnpm run test:e2e` passed locally;
   the browser run covered all 42 Chromium workbench workflows.
+- 2026-05-23: the local verification runner now includes
+  `node scripts/check-e2e-environment.mjs` in the quick baseline and `node scripts/run-e2e.mjs` in the
+  full baseline. The current host passed both through the workspace-local
+  Playwright Chromium cache at `.tmp/ms-playwright` with all 49 Chromium
+  workflows.
 - 2026-05-21: `pnpm run verify:local` passed after hardening the `reveal_path`
   command builder. The run covered frontend typecheck, frontend unit tests,
   project structure, accessibility, dependency admission, Markdown links, Rust
@@ -740,12 +747,20 @@ Current host evidence:
 
 - 2026-05-22: `pnpm exec playwright test --list` lists 49 Chromium workflow
   tests in `e2e/app-workflows.spec.ts`.
-- 2026-05-22: `pnpm run check:e2e-env` passes the focused workbench boot
-  workflow through the system-Chrome fallback because bundled Playwright
-  Chromium is missing on this host.
-- 2026-05-22: `pnpm run test:e2e` passed all 49 Chromium browser workflows,
+- 2026-05-23: `pnpm run check:e2e-env` passes the focused workbench boot
+  workflow through the workspace-local Playwright Chromium cache at
+  `.tmp/ms-playwright`.
+- 2026-05-23: `pnpm run test:e2e` passed all 49 Chromium browser workflows,
   including the HTML, blog/Substack, LaTeX, and Google Docs export-target
   handoff tests plus deep keyboard-only workbench operation.
+- 2026-05-23: `pnpm run verify:local -- --list` shows the browser workflow
+  environment preflight in the quick baseline, and
+  `pnpm run verify:local:full -- --list` shows the full browser workflow suite
+  in the release-grade baseline.
+- 2026-05-23: `pnpm run check:e2e-env` now defaults to `.tmp/ms-playwright`, records
+  per-attempt output, and retries transient browser-launch failures such as
+  headless Chrome closing before app assertions, without retrying ordinary
+  workflow assertion failures.
 
 Current browser coverage in `e2e/app-workflows.spec.ts`:
 
@@ -1295,7 +1310,8 @@ Finish:
   before save. The local Playwright harness lists the stale-save conflict path
   through compare, save-copy preservation, merge-back recovery with explicit
   line composition controls, keep-local, and accept-external; current-host
-  browser execution is now available through the system-Chrome fallback, and
+  browser execution is now available through the workspace-local Playwright
+  Chromium cache at `.tmp/ms-playwright`, and
   the launched native smoke now covers clean root watcher reload, stale-save
   blocking, keep-local plus save, save-copy, merge, accept-external, and file
   restoration against a real Markdown file, plus rendered native conflict modal

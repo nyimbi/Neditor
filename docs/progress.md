@@ -31,6 +31,16 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- This update promotes browser workflow execution into the ordinary local gates.
+  `pnpm run verify:local` now runs `node scripts/check-e2e-environment.mjs`, and
+  `pnpm run verify:local:full` now runs the full `node scripts/run-e2e.mjs` browser
+  workflow suite after the production frontend build. The runner now defaults to the workspace-local Playwright cache under
+  `.tmp/ms-playwright` before falling back to a system Chrome-compatible
+  browser when that cache is missing.
+- The browser environment preflight now records per-attempt output and retries
+  transient Chromium launch failures, such as macOS headless Chrome closing
+  before app assertions, while preserving immediate failures for real workflow
+  assertion errors.
 - This update deepens native primary-layout proof for the launched Tauri smoke.
   Mode evidence now records source/preview pane visibility and rendered sidebar
   or preview text, and the smoke validator requires concrete content proof for
@@ -716,10 +726,10 @@ P0 gaps:
   conformance failure, and Ubuntu fake-`d2` stdin fixture failure are resolved
   in that retired workflow.
 - Browser-level workflow tests now pass locally with 49 Chromium tests through
-  `pnpm run test:e2e`. The current macOS proof used the system-Chrome fallback
-  because bundled Playwright Chromium is missing on this host, and
-  `.tmp/e2e-browser/report.json` records `source: system-chromium`, the Chrome
-  executable path, and exit status 0. This closes the prior local browser
+  `pnpm run test:e2e`. The current macOS proof used the workspace-local
+  Playwright Chromium cache at `.tmp/ms-playwright`, and
+  `.tmp/e2e-browser/report.json` records `source: playwright-bundled`, the
+  cache executable path, and exit status 0. This closes the prior local browser
   launch blocker and covers mocked file
   lifecycle, save-as/recently-closed flows, stale-save conflict copy/merge/
   keep-local/accept-external recovery, clean watcher reload, watcher-originated
@@ -786,7 +796,7 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 49 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
-| `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host by falling back from the missing Playwright bundled Chromium path to `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; `.tmp/e2e-environment/report.json` records `source: system-chromium`, the expected bundled path, and the passing command tail. |
+| `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host through the workspace-local Playwright Chromium cache at `.tmp/ms-playwright`; `.tmp/e2e-environment/report.json` records `source: playwright-bundled`, the cache executable path, and the passing command tail. |
 | `pnpm run test:e2e` | Pass | 49 Chromium browser workbench workflows passed locally on this host, including responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
@@ -794,7 +804,10 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run test:desktop-dmg` | Pass | Classified this sandboxed macOS host's DMG limitation: `hdiutil create` cannot start `hdiejectd` because the process is sandboxed and returns `Device not configured`; wrote `.tmp/desktop-bundle/macos-dmg-report.json`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts, native command workflow smoke, and bounded native GUI launch on this macOS host; the run writes `.tmp/desktop-smoke/launch-report.json` with PID, elapsed window, captured output, `processAlive: true`, app-authored native window evidence, and app-authored native UI evidence. `.tmp/desktop-smoke/native-ui-report.json` records command labels including New/Open/Save/Templates/Commands, source/sidebar/preview/status surface presence, active document `Market Entry Report`, preview label `Rendered preview for Market Entry Report, draft`, and viewport dimensions; System Events process evidence is recorded as `limited` on this host because it exposed the process but not a window. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages external transform engine trust" --project chromium` | Pass | Focused system-Chrome fallback workflow passed after keeping transform trust diagnostics visible when a configured path is untrusted. |
-| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed all 49 Chromium workflows through the system-Chrome fallback after the transform trust diagnostics fix. |
+| `pnpm run test:e2e` | Pass | Re-run on 2026-05-23 passed all 49 Chromium workflows through the workspace-local Playwright Chromium cache after the transform trust diagnostics fix. |
+| `pnpm run verify:local -- --list` | Pass | Quick local verification now lists the browser workflow environment preflight, so Chromium launch readiness is part of routine completed-slice verification. |
+| `pnpm run verify:local:full -- --list` | Pass | Full local verification now lists the full browser workflow suite after the production frontend build, making browser workflow execution part of the release-grade local baseline. |
+| `pnpm run verify:local` | Pass | Quick local verification passed with the new browser workflow environment gate included; the gate used the workspace-local Playwright Chromium cache and would retry transient browser-launch failures before failing the baseline. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build completed from the updated source; 60 modules transformed. |
 | `./node_modules/.bin/tauri build --no-bundle` | Pass | Release desktop binary rebuilt from the updated frontend bundle at `src-tauri/target/release/neditor`. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Re-run on 2026-05-23 validated desktop build artifacts, native command workflow smoke, bounded launch smoke, mode pane visibility, rendered HTML export/review/presentation content, and guarded native `File` -> `Export` -> `HTML Export` routing. |
@@ -928,7 +941,7 @@ Additional browser workflow harness verification:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm exec playwright --version` | Pass | Playwright reported `Version 1.60.0`. |
-| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright install chromium` | Pass | Chromium, FFmpeg, and Chromium headless shell downloaded into Playwright's workspace-local browser cache. |
+| `PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install chromium` | Pass | Chromium, FFmpeg, and Chromium headless shell downloaded into Playwright's workspace-local browser cache. |
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright test --list` | Pass | Listed 4 Chromium tests in `e2e/app-workflows.spec.ts`. |
 | `PLAYWRIGHT_BROWSERS_PATH=0 pnpm run test:e2e` | Blocked by sandbox | Chromium launch failed before app assertions with `bootstrap_check_in ... Permission denied (1100)`. |
 
@@ -2039,7 +2052,7 @@ Browser workflow environment preflight verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright install chromium` | Pass | Installed/confirmed project-local Playwright Chromium without touching tracked files. |
+| `PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install chromium` | Pass | Installed/confirmed workspace-local Playwright Chromium without touching tracked files. |
 | `pnpm run check:e2e-env` | Pass | Project-local Playwright Chromium launch preflight passed on this host. |
 | `pnpm run test:e2e` | Pass | Full browser workflow execution passed all 41 Chromium tests locally. |
 | `node --check scripts/check-e2e-environment.mjs` | Pass | The E2E environment preflight script parses successfully. |
@@ -2353,7 +2366,7 @@ Browser workflow fallback verification:
 | --- | --- | --- |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host by falling back from the missing Playwright bundled Chromium path to `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; `.tmp/e2e-environment/report.json` records the browser source and command tail. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "modal focus\|syncs editor\|persists editor settings" --project chromium` | Pass | Escalated macOS run proved the default system-Chrome fallback can run the editor/modal/search workflow subset after restoring explicit command labels. |
-| `node scripts/run-e2e.mjs` | Pass | Current macOS run passed all 47 Chromium browser workflows with the default system-Chrome fallback; `.tmp/e2e-browser/report.json` records `source: system-chromium`, the Chrome executable path, and exit status 0. |
+| `node scripts/run-e2e.mjs` | Pass | That macOS run passed all 47 Chromium browser workflows with the default system-Chrome fallback; `.tmp/e2e-browser/report.json` recorded `source: system-chromium`, the Chrome executable path, and exit status 0. |
 | `pnpm run check`, `pnpm run test:unit`, `pnpm run check:a11y` | Pass | Typecheck, 18 frontend unit tests, and static accessibility guardrails passed after restoring explicit Find, Open Folder, and Save Workspace command labels. |
 
 Preview compile cancellation workflow verification:

@@ -553,6 +553,9 @@ test("local verification scripts expose local baseline checks", () => {
     scripts: Record<string, string>;
   };
   const { scripts } = packageJson;
+  const verification = readFileSync("scripts/run-local-verification.mjs", "utf8");
+  const e2eEnvironment = readFileSync("scripts/check-e2e-environment.mjs", "utf8");
+  const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:a11y"], "node scripts/check-accessibility.mjs");
@@ -571,6 +574,13 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["test:rendered-exports"], "node scripts/check-rendered-export-audit.mjs");
   equal(scripts["test:unit"], "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js");
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
+  ok(verification.includes('command("Browser workflow environment", "node", ["scripts/check-e2e-environment.mjs"])'));
+  ok(verification.includes('command("Browser workflow suite", "node", ["scripts/run-e2e.mjs"])'));
+  ok(e2eEnvironment.includes("NEDITOR_E2E_ENV_ATTEMPTS"));
+  ok(e2eEnvironment.includes("NEDITOR_E2E_ENV_RETRY_BACKOFF_MS"));
+  ok(e2eEnvironment.includes("isTransientBrowserLaunchFailure"));
+  ok(browserEnv.includes('join(root, ".tmp", "ms-playwright")'));
+  ok(browserEnv.includes("PLAYWRIGHT_BROWSERS_PATH: baseEnv.PLAYWRIGHT_BROWSERS_PATH ?? projectBrowserCache"));
 });
 
 test("external engine probe records render smoke artifacts", () => {

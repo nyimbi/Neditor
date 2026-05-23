@@ -204,22 +204,33 @@ pnpm run verify:local:full
 NEditor uses local verification rather than GitHub Actions. Run
 `pnpm run verify:local` before publishing a normal slice. Run
 `pnpm run verify:local:full` for a release-grade baseline; it extends the quick
-checks with the production build, optional engine probe, native-watch check,
-clippy, full Rust tests, rendered export audit, Tauri no-bundle release compile,
-macOS `.app` bundle build/smoke and DMG classification on macOS, and desktop
-artifact smoke.
+checks with the production build, the full browser workflow suite, optional
+engine probe, native-watch check, clippy, full Rust tests, rendered export audit,
+Tauri no-bundle release compile, macOS `.app` bundle build/smoke and DMG
+classification on macOS, and desktop artifact smoke.
 
 Use `pnpm run verify:local -- --list` or
 `pnpm run verify:local:full -- --list` to print the exact command sequence
-without running it. Browser workflow tests are available through
-`pnpm run test:e2e` directly when the host allows Chromium to launch. The runner
-prefers Playwright's project-local browser cache and falls back to an installed
-Chrome-compatible browser when that cache is missing.
+without running it. Quick verification now includes the same browser environment
+preflight exposed by `pnpm run check:e2e-env`,
+which proves the current host can launch Chromium through NEditor's Playwright
+wrapper. The full baseline runs the same browser suite exposed by
+`pnpm run test:e2e`; the runner prefers
+Playwright's workspace-local browser cache at `.tmp/ms-playwright` and falls
+back to an installed Chrome-compatible browser when that cache is missing. To
+refresh that local browser cache, run:
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install chromium
+```
 
 Use `pnpm run check:e2e-env` before browser workflow runs. It defaults to the
 project-local Playwright browser cache, records the browser source under
 `.tmp/e2e-environment/report.json`, and runs the focused workbench boot workflow
-through the same Playwright CLI path as the full browser suite.
+through the same Playwright CLI path as the full browser suite. The check retries
+transient browser launch failures, such as macOS headless Chrome closing before
+app assertions, while still failing immediately for real workflow assertion
+failures.
 
 `pnpm run check:engines` probes optional external transform engines and reports
 installed/missing Graphviz/DOT variants, D2, PlantUML, Java-backed PlantUML, and

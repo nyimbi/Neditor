@@ -1,7 +1,10 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
-import { chromium } from "@playwright/test";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const projectBrowserCache = join(root, ".tmp", "ms-playwright");
 
 const systemChromiumCandidates = {
   darwin: [
@@ -27,7 +30,7 @@ const systemChromiumCandidates = {
 export function resolvePlaywrightBrowserEnv(baseEnv = process.env) {
   const env = {
     ...baseEnv,
-    PLAYWRIGHT_BROWSERS_PATH: baseEnv.PLAYWRIGHT_BROWSERS_PATH ?? "0",
+    PLAYWRIGHT_BROWSERS_PATH: baseEnv.PLAYWRIGHT_BROWSERS_PATH ?? projectBrowserCache,
   };
   const explicitPath = env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?.trim();
   if (explicitPath) {
@@ -53,6 +56,8 @@ export function resolvePlaywrightBrowserEnv(baseEnv = process.env) {
 
   const expectedBundledPath = expectedBundledChromiumPath(env);
   if (expectedBundledPath && existsSync(expectedBundledPath)) {
+    env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = expectedBundledPath;
+    env.NEDITOR_E2E_BROWSER_SOURCE = "playwright-bundled";
     return {
       ok: true,
       env,
@@ -86,7 +91,7 @@ export function resolvePlaywrightBrowserEnv(baseEnv = process.env) {
     message: [
       "No Chromium executable is available for browser workflows.",
       expectedBundledPath ? `Expected Playwright bundled Chromium at ${expectedBundledPath}.` : "",
-      "Run PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright install chromium,",
+      `Run PLAYWRIGHT_BROWSERS_PATH=${projectBrowserCache} pnpm exec playwright install chromium,`,
       "or install Google Chrome/Chromium,",
       "or set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH to a compatible browser executable.",
     ]
@@ -113,22 +118,47 @@ export function writePlaywrightBrowserReport(reportPath, resolution, status, ext
 }
 
 function expectedBundledChromiumPath(env = process.env) {
-  const original = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  if (env.PLAYWRIGHT_BROWSERS_PATH !== undefined) {
-    process.env.PLAYWRIGHT_BROWSERS_PATH = env.PLAYWRIGHT_BROWSERS_PATH;
-  }
-  try {
-    return chromium.executablePath();
-  } finally {
-    if (original === undefined) {
-      delete process.env.PLAYWRIGHT_BROWSERS_PATH;
-    } else {
-      process.env.PLAYWRIGHT_BROWSERS_PATH = original;
-    }
-  }
+  return findChromiumExecutable(env.PLAYWRIGHT_BROWSERS_PATH || projectBrowserCache);
 }
 
 function findSystemChromium() {
   const candidates = systemChromiumCandidates[process.platform] || [];
   return candidates.map((candidate) => resolve(candidate)).find((candidate) => existsSync(candidate)) || "";
+}
+
+function findChromiumExecutable(cachePath) {
+  const rootPath = resolve(cachePath || projectBrowserCache);
+  if (!existsSync(rootPath)) return "";
+  const executableNames = new Set(
+    process.platform === "win32"
+      ? ["chrome.exe", "msedge.exe"]
+      : process.platform === "darwin"
+        ? ["Google Chrome for Testing", "Chromium", "chrome", "headless_shell"]
+        : ["chrome", "chromium", "chrome-linux", "headless_shell"],
+  );
+  const stack = [rootPath];
+  while (stack.length) {
+    const current = stack.pop();
+    let entries = [];
+    try {
+      entries = readdirSync(current);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const fullPath = join(current, entry);
+      let stat;
+      try {
+        stat = statSync(fullPath);
+      } catch {
+        continue;
+      }
+      if (stat.isDirectory()) {
+        stack.push(fullPath);
+      } else if (stat.isFile() && executableNames.has(entry)) {
+        return fullPath;
+      }
+    }
+  }
+  return "";
 }

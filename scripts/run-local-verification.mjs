@@ -8,6 +8,7 @@ const mode = process.argv.includes("--full") ? "full" : "quick";
 const listOnly = process.argv.includes("--list");
 
 const quickCommands = [
+  command("Browser workflow environment", "node", ["scripts/check-e2e-environment.mjs"]),
   command("Frontend typecheck", "pnpm", ["run", "check"]),
   command("Frontend unit tests", "pnpm", ["run", "test:unit"]),
   command("Project structure guard", "pnpm", ["run", "check:structure"]),
@@ -22,6 +23,7 @@ const quickCommands = [
 const fullCommands = [
   ...quickCommands,
   command("Frontend production build", "pnpm", ["run", "build"]),
+  command("Browser workflow suite", "node", ["scripts/run-e2e.mjs"]),
   command("Optional engine probe", "pnpm", ["run", "check:engines"]),
   command(
     "Rust native-watch check",
