@@ -1235,6 +1235,12 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Live preview" })).toBeHidden();
 
+  await page.getByLabel("View mode").selectOption("outline");
+  await expect(page.locator("#outline-mode")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Markdown source" })).toBeHidden();
+  await expect(page.getByRole("region", { name: "Live preview" })).toBeHidden();
+  await expect(page.getByLabel("Outline title Market Entry Report")).toBeVisible();
+
   await page.getByLabel("View mode").selectOption("export");
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeHidden();
@@ -1836,6 +1842,83 @@ test("creates a document skeleton from an editable outline plan", async ({ page 
   await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Board Decision Memo");
   await expect(sidebar.getByRole("button", { name: /Decision Needed/ })).toBeVisible();
   expect(await editorText(page)).toContain("<!-- Draft this section. -->");
+});
+
+test("edits document structure from outline mode", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/outline-crud.md",
+    [
+      "---",
+      "title: Outline CRUD",
+      "status: draft",
+      "---",
+      "",
+      "# Outline CRUD",
+      "",
+      "Confidential body text should not be shown as an outline row.",
+      "",
+      "## Market Analysis",
+      "",
+      "Market body.",
+      "",
+      "### Risks",
+      "",
+      "Risk body.",
+      "",
+      "#### Operational Detail",
+      "",
+      "Detail body.",
+      "",
+      "##### Implementation Note",
+      "",
+      "Deep body.",
+      "",
+      "## Methods",
+      "",
+      "Methods body.",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/outline-crud.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByLabel("View mode").selectOption("outline");
+
+  const outlineMode = page.locator("#outline-mode");
+  await expect(outlineMode).toBeVisible();
+  await expect(outlineMode).toContainText("Chapter");
+  await expect(outlineMode).toContainText("Section");
+  await expect(outlineMode).toContainText("Subsection");
+  await expect(outlineMode).toContainText("Subsubsection");
+  await expect(outlineMode).not.toContainText("Confidential body text");
+  await expect(page.getByLabel("Outline title Implementation Note")).toHaveCount(0);
+
+  const marketTitle = page.getByLabel("Outline title Market Analysis");
+  await marketTitle.fill("Market Findings");
+  await marketTitle.press("Enter");
+  await expect(page.getByLabel("Outline title Market Findings")).toBeVisible();
+  await page.getByLabel("Outline level Risks").selectOption("2");
+
+  const marketRow = page.locator(".outline-mode-row").filter({ has: page.getByLabel("Outline title Market Findings") });
+  await marketRow.getByRole("button", { name: "Add child" }).click();
+  await expect(page.getByLabel("Outline title New subsection")).toBeVisible();
+
+  await page.getByLabel("New outline heading title").fill("Appendix");
+  await page.getByLabel("New outline heading level").selectOption("1");
+  await page.getByRole("button", { name: "Add heading" }).click();
+  await expect(page.getByLabel("Outline title Appendix")).toBeVisible();
+
+  const methodsRow = page.locator(".outline-mode-row").filter({ has: page.getByLabel("Outline title Methods") });
+  await methodsRow.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByLabel("Outline title Methods")).toHaveCount(0);
+
+  await page.getByLabel("View mode").selectOption("source");
+  const source = await editorText(page);
+  expect(source).toContain("## Market Findings");
+  expect(source).toContain("## Risks");
+  expect(source).toContain("### New subsection");
+  expect(source).toContain("##### Implementation Note");
+  expect(source).toContain("# Appendix");
+  expect(source).not.toContain("## Methods");
 });
 
 test("folds and unfolds Markdown sections from toolbar and commands", async ({ page }) => {

@@ -147,6 +147,7 @@
             <option value="source">Source</option>
             <option value="preview">Preview</option>
             <option value="focus">Focus</option>
+            <option value="outline">Outline</option>
             <option value="export">Export</option>
             <option value="review">Review</option>
             <option value="presentation">Presentation</option>
@@ -222,7 +223,65 @@
     </section>
 
     <main id="document-workspace" ref="workspacePane" class="workspace" :class="`mode-${store.mode}`" :style="workspaceStyle" tabindex="-1">
-      <aside id="document-sidebar" class="sidebar" aria-label="Document workspace" tabindex="-1">
+      <section v-if="store.mode === 'outline'" id="outline-mode" class="outline-mode-pane" aria-label="Document outline mode" tabindex="-1">
+        <header class="outline-mode-header">
+          <div>
+            <h2>Outline</h2>
+            <p>{{ outlineModeHeadings.length }} chapters, sections, subsections, and subsubsections.</p>
+          </div>
+          <div class="outline-mode-create">
+            <label>
+              Title
+              <input v-model="outlineModeNewTitle" aria-label="New outline heading title" />
+            </label>
+            <label>
+              Level
+              <select v-model.number="outlineModeNewLevel" aria-label="New outline heading level">
+                <option :value="1">Chapter</option>
+                <option :value="2">Section</option>
+                <option :value="3">Subsection</option>
+                <option :value="4">Subsubsection</option>
+              </select>
+            </label>
+            <button type="button" @click="createOutlineHeading()">Add heading</button>
+          </div>
+        </header>
+        <section v-if="outlineModeHeadings.length" class="outline-mode-list" aria-label="Editable document outline">
+          <article
+            v-for="heading in outlineModeHeadings"
+            :key="`${heading.line}-${heading.anchor}`"
+            class="outline-mode-row"
+            :style="{ '--outline-depth': String(heading.level - 1) }"
+          >
+            <span class="outline-mode-kind">{{ outlineHeadingKind(heading.level) }}</span>
+            <input
+              :value="heading.text"
+              :aria-label="`Outline title ${heading.text}`"
+              @change="renameOutlineHeading(heading, eventValue($event))"
+              @keydown.enter.prevent="renameOutlineHeading(heading, eventValue($event))"
+            />
+            <select :value="heading.level" :aria-label="`Outline level ${heading.text}`" @change="setOutlineHeadingLevel(heading, Number(eventValue($event)))">
+              <option :value="1">Chapter</option>
+              <option :value="2">Section</option>
+              <option :value="3">Subsection</option>
+              <option :value="4">Subsubsection</option>
+            </select>
+            <div class="outline-mode-actions">
+              <button type="button" @click="createOutlineHeading(heading, Math.min(4, heading.level + 1))">Add child</button>
+              <button type="button" @click="createOutlineHeading(heading, heading.level)">Add sibling</button>
+              <button type="button" @click="goToSourceTarget(heading)">Go</button>
+              <button type="button" @click="deleteOutlineHeading(heading)">Delete</button>
+            </div>
+          </article>
+        </section>
+        <section v-else class="outline-mode-empty" aria-label="Empty outline">
+          <h3>No outline yet</h3>
+          <p>Create a chapter to start structuring the document before drafting the body.</p>
+          <button type="button" @click="createOutlineHeading()">Create first chapter</button>
+        </section>
+      </section>
+
+      <aside v-show="store.mode !== 'outline'" id="document-sidebar" class="sidebar" aria-label="Document workspace" tabindex="-1">
         <template v-if="store.sidebar === 'files'">
           <h2>Workspace</h2>
           <button type="button" @click="openFolder">Open folder</button>
@@ -1350,7 +1409,7 @@
         </template>
       </aside>
 
-      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation'" class="editor-pane" aria-label="Markdown source" tabindex="-1">
+      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" aria-label="Markdown source" tabindex="-1">
         <div ref="editorHost" class="editor-host"></div>
       </section>
 
@@ -1371,7 +1430,7 @@
       <section
         ref="previewPane"
         id="live-preview"
-        v-show="store.mode !== 'source' && store.mode !== 'focus'"
+        v-show="store.mode !== 'source' && store.mode !== 'focus' && store.mode !== 'outline'"
         class="preview-pane"
         :data-preview-theme="store.previewTheme"
         aria-label="Live preview"
@@ -1777,6 +1836,8 @@ const selectedTableIndex = ref(0);
 const outlineDraftText = ref("- Executive Summary\n  - Decision Needed\n  - Key Risks\n- Financial Case\n- Next Steps");
 const outlineDraftTitle = ref("");
 const outlineDraftIncludeToc = ref(true);
+const outlineModeNewTitle = ref("New chapter");
+const outlineModeNewLevel = ref(1);
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const isNewTableDraft = ref(false);
@@ -1924,6 +1985,15 @@ interface CommandToolbarRow {
   id: string;
   label: string;
   groups: CommandBarGroup[];
+}
+
+interface OutlineModeHeading {
+  text: string;
+  anchor: string;
+  level: number;
+  line: number;
+  end_line?: number | null;
+  source_file?: string | null;
 }
 
 const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
@@ -2102,7 +2172,7 @@ const transformPreviewItems = computed<TransformPreviewItem[]>(() =>
   }),
 );
 const workspaceStyle = computed(() => ({ "--editor-ratio": String(store.editorPaneRatio) }));
-const paneSplitterVisible = computed(() => !["source", "focus", "preview", "export"].includes(store.mode));
+const paneSplitterVisible = computed(() => !["source", "focus", "preview", "export", "outline"].includes(store.mode));
 const wordStats = computed(() => {
   const text = active.value?.text || "";
   const words = text.trim().split(/\s+/).filter(Boolean).length;
@@ -2200,6 +2270,9 @@ const outlineHeadings = computed(() =>
       },
     ];
   }),
+);
+const outlineModeHeadings = computed<OutlineModeHeading[]>(() =>
+  outlineHeadings.value.filter((heading) => heading.level <= 4 && (!heading.source_file || !active.value.path || heading.source_file === active.value.path)),
 );
 const outlineDraftItems = computed(() => parseOutlinePlan(outlineDraftText.value));
 const figureBlocks = computed<FigureListItem[]>(() =>
@@ -2518,6 +2591,7 @@ const commands = computed(() => [
   { name: "Add cursor above", group: "Edit", run: () => runEditorCommand(addCursorAbove) },
   { name: "Add cursor below", group: "Edit", run: () => runEditorCommand(addCursorBelow) },
   { name: "Show document outline", group: "Navigate", run: () => showOutline() },
+  { name: "Open outline mode", group: "Navigate", run: () => (store.mode = "outline") },
   { name: "Plan document from outline", group: "Navigate", run: () => planDocumentOutline() },
   { name: "Fold all sections", group: "Navigate", run: () => runEditorCommand(foldAll) },
   { name: "Unfold all sections", group: "Navigate", run: () => runEditorCommand(unfoldAll) },
@@ -2694,6 +2768,10 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-mode-focus":
       store.mode = "focus";
       break;
+    case "neditor-mode-outline":
+      store.mode = "outline";
+      store.sidebar = "outline";
+      break;
     case "neditor-mode-export":
       store.mode = "export";
       store.sidebar = "exports";
@@ -2863,6 +2941,8 @@ watch(
       store.sidebar = "exports";
     } else if (mode === "review") {
       store.sidebar = "review";
+    } else if (mode === "outline") {
+      store.sidebar = "outline";
     } else if (mode === "presentation") {
       store.sidebar = "outline";
     }
@@ -3026,6 +3106,9 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     const editorErgonomicsEvidence = await collectNativeEditorErgonomicsEvidence(record);
     smokePhase = "editor-ergonomics";
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence });
+    const outlineNavigationEvidence = await collectNativeOutlineNavigationEvidence(record);
+    smokePhase = "outline-navigation";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence });
 
     commandPaletteOpen.value = true;
     await nextTick();
@@ -3119,7 +3202,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       JSON.stringify(nativeMenuExportResult),
     );
     smokePhase = "html-export";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult });
     const editorSnippet = smokeSnippetAround(active.value.text, "weight_kg = 72");
     const previewSnippet = text("#live-preview").slice(0, 2000);
     const exportReadinessEvidence = store.exportReadiness
@@ -3132,12 +3215,12 @@ async function runDesktopWorkflowSmokeIfEnabled() {
         }
       : null;
     smokePhase = "export-profile-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult });
     const exportProfileEvidence = await collectNativeExportProfileEvidence(record);
     smokePhase = "export-profile";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     smokePhase = "theme-accessibility-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
     smokePhase = "theme-accessibility";
     await writeNativeWorkflowProgress(smokePhase, assertions, {
@@ -3145,6 +3228,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       snapshotEvidence,
       modeEvidence,
       editorErgonomicsEvidence,
+      outlineNavigationEvidence,
       exportResult,
       nativeMenuExportResult,
       exportProfileEvidence,
@@ -3174,6 +3258,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       sidebar: store.sidebar,
       modeEvidence,
       editorErgonomicsEvidence,
+      outlineNavigationEvidence,
       editorSnippet,
       previewSnippet,
       themeAccessibility,
@@ -4012,7 +4097,7 @@ async function clickNativeWorkflowButton(label: string, root: ParentNode | null 
 }
 
 async function collectNativeModeEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
-  const modes: Array<typeof store.mode> = ["split", "source", "preview", "focus", "export", "review", "presentation"];
+  const modes: Array<typeof store.mode> = ["split", "source", "preview", "focus", "outline", "export", "review", "presentation"];
   type NativeModeEvidence = {
     mode: typeof store.mode;
     workspaceClass: string;
@@ -4021,8 +4106,12 @@ async function collectNativeModeEvidence(record: (name: string, passed: boolean,
     previewVisible: boolean;
     sidebarText: string;
     previewText: string;
+    outlineVisible: boolean;
+    outlineText: string;
+    outlineTitles: string[];
   };
   const expectedSidebar: Partial<Record<typeof store.mode, string>> = {
+    outline: "outline",
     export: "exports",
     review: "review",
     presentation: "outline",
@@ -4051,7 +4140,10 @@ async function collectNativeModeEvidence(record: (name: string, passed: boolean,
       const previewVisible = surfaceVisible("#live-preview");
       const sidebarText = surfaceText("#document-sidebar").slice(0, 900);
       const previewText = surfaceText("#live-preview").slice(0, 1400);
-      const entry = { mode, workspaceClass, sidebar, sourceVisible, previewVisible, sidebarText, previewText };
+      const outlineText = surfaceText("#outline-mode").slice(0, 1400);
+      const outlineVisible = surfaceVisible("#outline-mode");
+      const outlineTitles = Array.from(document.querySelectorAll<HTMLInputElement>("#outline-mode .outline-mode-row input")).map((input) => input.value);
+      const entry = { mode, workspaceClass, sidebar, sourceVisible, previewVisible, sidebarText, previewText, outlineVisible, outlineText, outlineTitles };
       const passed = workspaceClass.includes(`mode-${mode}`) && (!expectedSidebar[mode] || sidebar === expectedSidebar[mode]);
       record(`native workflow switched ${mode} mode`, passed, JSON.stringify(entry));
       evidence.push(entry);
@@ -4059,6 +4151,7 @@ async function collectNativeModeEvidence(record: (name: string, passed: boolean,
     const byMode = (mode: typeof store.mode) => evidence.find((entry) => entry.mode === mode);
     const exportMode = byMode("export");
     const reviewMode = byMode("review");
+    const outlineMode = byMode("outline");
     const presentationMode = byMode("presentation");
     record(
       "native workflow rendered export mode preview content",
@@ -4081,6 +4174,18 @@ async function collectNativeModeEvidence(record: (name: string, passed: boolean,
           reviewMode.sidebarText.includes("Approved by"),
       ),
       JSON.stringify(reviewMode),
+    );
+    record(
+      "native workflow rendered outline mode structure only",
+      Boolean(
+        outlineMode?.outlineVisible &&
+          !outlineMode.sourceVisible &&
+          !outlineMode.previewVisible &&
+          outlineMode.outlineTitles.includes("Market Entry Report") &&
+          outlineMode.outlineTitles.includes("Executive Summary") &&
+          outlineMode.outlineText.includes("Add heading"),
+      ),
+      JSON.stringify(outlineMode),
     );
     record(
       "native workflow rendered presentation outline content",
@@ -4319,6 +4424,82 @@ async function collectNativeEditorErgonomicsEvidence(record: (name: string, pass
     store.wordWrap = original.wordWrap;
     store.lineNumbers = original.lineNumbers;
     store.codeFolding = original.codeFolding;
+    await setNativeWorkflowText(original.text);
+    await store.compileActive();
+    await nextTick();
+  }
+}
+
+async function collectNativeOutlineNavigationEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const original = {
+    text: active.value.text,
+    mode: store.mode,
+    sidebar: store.sidebar,
+  };
+  const evidence: Record<string, unknown> = {};
+  try {
+    await setNativeWorkflowText(
+      [
+        "---",
+        "title: Native Outline Navigation",
+        "status: draft",
+        "---",
+        "",
+        "# Native Outline Navigation",
+        "",
+        "Introductory section.",
+        "",
+        "## Native Outline Target",
+        "",
+        "This heading should be selected from the launched Tauri outline panel.",
+        "",
+        "## Native Outline Follow-up",
+        "",
+        "Follow-up text.",
+      ].join("\n"),
+    );
+    await store.compileActive();
+    store.mode = "split";
+    store.sidebar = "outline";
+    await nextTick();
+    await nextTick();
+
+    const target = outlineHeadings.value.find((heading) => heading.text === "Native Outline Target");
+    const outlineButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("#document-sidebar .outline-row"));
+    const targetButton = outlineButtons.find((button) => button.textContent?.replace(/\s+/g, " ").includes("Native Outline Target"));
+    targetButton?.click();
+    await nextTick();
+    await nextTick();
+
+    const selectionLine = editorView ? editorView.state.doc.lineAt(editorView.state.selection.main.from) : null;
+    evidence.outline = {
+      sidebar: store.sidebar,
+      mode: store.mode,
+      buttonFound: Boolean(targetButton),
+      buttonLabel: targetButton?.textContent?.replace(/\s+/g, " ").trim() || "",
+      targetLine: target?.line || 0,
+      selectedLine: selectionLine?.number || 0,
+      selectedText: selectionLine?.text || "",
+      editorFocused: editorView?.hasFocus || false,
+      sidebarText: document.querySelector("#document-sidebar")?.textContent?.replace(/\s+/g, " ").trim().slice(0, 600) || "",
+    };
+    record(
+      "native workflow navigated outline heading to source",
+      Boolean(
+        target &&
+          targetButton &&
+          store.sidebar === "outline" &&
+          store.mode === "split" &&
+          selectionLine?.number === target.line &&
+          selectionLine.text.includes("## Native Outline Target") &&
+          editorView?.hasFocus,
+      ),
+      JSON.stringify(evidence.outline),
+    );
+    return evidence;
+  } finally {
+    store.mode = original.mode;
+    store.sidebar = original.sidebar;
     await setNativeWorkflowText(original.text);
     await store.compileActive();
     await nextTick();
@@ -5003,6 +5184,70 @@ function appendOutlineToDocument() {
   store.updateText(`${active.value.text.trimEnd()}\n\n${body}\n`);
   store.sidebar = "outline";
   store.statusMessage = "Appended outline skeleton to document";
+}
+
+function outlineHeadingKind(level: number) {
+  if (level === 1) return "Chapter";
+  if (level === 2) return "Section";
+  if (level === 3) return "Subsection";
+  return "Subsubsection";
+}
+
+function outlineHeadingMarker(level: number) {
+  return "#".repeat(Math.max(1, Math.min(4, Math.trunc(level) || 1)));
+}
+
+function activeDocumentLines() {
+  return active.value.text.split("\n");
+}
+
+function sectionEndLineIndex(heading: OutlineModeHeading, lines: string[]) {
+  const next = outlineModeHeadings.value.find((candidate) => candidate.line > heading.line && candidate.level <= heading.level);
+  return next ? Math.max(heading.line - 1, next.line - 2) : lines.length - 1;
+}
+
+function applyOutlineModeText(lines: string[], statusMessage: string) {
+  store.updateText(lines.join("\n").replace(/\n{4,}/g, "\n\n\n"));
+  store.statusMessage = statusMessage;
+}
+
+function renameOutlineHeading(heading: OutlineModeHeading, title: string) {
+  const cleanTitle = title.trim() || "Untitled section";
+  const lines = activeDocumentLines();
+  const index = heading.line - 1;
+  if (!lines[index]) return;
+  lines[index] = `${outlineHeadingMarker(heading.level)} ${cleanTitle}`;
+  applyOutlineModeText(lines, `Renamed outline heading to ${cleanTitle}`);
+}
+
+function setOutlineHeadingLevel(heading: OutlineModeHeading, level: number) {
+  const nextLevel = Math.max(1, Math.min(4, Math.trunc(level) || heading.level));
+  const lines = activeDocumentLines();
+  const index = heading.line - 1;
+  if (!lines[index]) return;
+  lines[index] = `${outlineHeadingMarker(nextLevel)} ${heading.text || "Untitled section"}`;
+  applyOutlineModeText(lines, `Changed ${heading.text} to ${outlineHeadingKind(nextLevel).toLowerCase()}`);
+}
+
+function createOutlineHeading(after?: OutlineModeHeading, level = outlineModeNewLevel.value) {
+  const nextLevel = Math.max(1, Math.min(4, Math.trunc(level) || 1));
+  const title = (after ? `New ${outlineHeadingKind(nextLevel).toLowerCase()}` : outlineModeNewTitle.value).trim() || `New ${outlineHeadingKind(nextLevel).toLowerCase()}`;
+  const lines = activeDocumentLines();
+  const insertAt = after ? sectionEndLineIndex(after, lines) + 1 : lines.length;
+  const block = ["", `${outlineHeadingMarker(nextLevel)} ${title}`, "", "<!-- Draft this section. -->"];
+  lines.splice(insertAt, 0, ...block);
+  applyOutlineModeText(lines, `Added ${outlineHeadingKind(nextLevel).toLowerCase()} ${title}`);
+  outlineModeNewTitle.value = nextLevel === 1 ? "New chapter" : `New ${outlineHeadingKind(nextLevel).toLowerCase()}`;
+}
+
+function deleteOutlineHeading(heading: OutlineModeHeading) {
+  const lines = activeDocumentLines();
+  const start = heading.line - 1;
+  if (start < 0 || start >= lines.length) return;
+  let end = sectionEndLineIndex(heading, lines);
+  while (end + 1 < lines.length && lines[end + 1] === "") end += 1;
+  lines.splice(start, Math.max(1, end - start + 1));
+  applyOutlineModeText(lines, `Deleted outline section ${heading.text}`);
 }
 
 function openTransformTemplates() {
@@ -6274,7 +6519,7 @@ async function goToSourceTarget(target: {
     await store.openPath(target.source_file);
     await nextTick();
   }
-  if (["preview", "export", "presentation"].includes(store.mode)) {
+  if (["preview", "export", "presentation", "outline"].includes(store.mode)) {
     store.mode = "split";
     await nextTick();
   }
@@ -7159,12 +7404,116 @@ select:hover {
   grid-template-columns: 260px minmax(0, 1fr);
 }
 
+.workspace.mode-outline {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sidebar,
 .editor-pane,
-.preview-pane {
+.preview-pane,
+.outline-mode-pane {
   min-height: 0;
   overflow: auto;
   border-right: 1px solid #c9d2dc;
+}
+
+.outline-mode-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  background: #f7f9fc;
+}
+
+.outline-mode-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #d8e1eb;
+}
+
+.outline-mode-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.outline-mode-header p {
+  margin: 0;
+  color: #526171;
+}
+
+.outline-mode-create {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.outline-mode-create label {
+  display: grid;
+  gap: 4px;
+  color: #526171;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.outline-mode-create input {
+  min-width: 220px;
+}
+
+.outline-mode-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+}
+
+.outline-mode-row {
+  display: grid;
+  grid-template-columns: 112px minmax(180px, 1fr) 150px auto;
+  align-items: center;
+  gap: 8px;
+  margin-left: calc(var(--outline-depth, 0) * 22px);
+  padding: 8px;
+  border: 1px solid #d9e1ea;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.outline-mode-kind {
+  color: #5b6c80;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.outline-mode-row input,
+.outline-mode-row select {
+  width: 100%;
+}
+
+.outline-mode-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.outline-mode-empty {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  min-height: 280px;
+  text-align: center;
+}
+
+.outline-mode-empty h3,
+.outline-mode-empty p {
+  margin: 0;
 }
 
 .pane-splitter {
@@ -8574,8 +8923,27 @@ select:hover {
   .workspace.mode-focus,
   .workspace.mode-preview,
   .workspace.mode-export,
+  .workspace.mode-outline,
   .workspace.mode-presentation {
     grid-template-columns: 1fr;
+  }
+
+  .outline-mode-header,
+  .outline-mode-row {
+    grid-template-columns: 1fr;
+  }
+
+  .outline-mode-header {
+    display: grid;
+  }
+
+  .outline-mode-row {
+    margin-left: 0;
+  }
+
+  .outline-mode-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .sidebar {

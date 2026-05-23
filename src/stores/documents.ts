@@ -325,7 +325,7 @@ export const useDocumentsStore = defineStore("documents", {
       },
     ] as OpenDocument[],
     activeId: "",
-    mode: "split" as "split" | "source" | "preview" | "focus" | "export" | "review" | "presentation",
+    mode: "split" as "split" | "source" | "preview" | "focus" | "outline" | "export" | "review" | "presentation",
     sidebar: "outline" as
       | "files"
       | "outline"
@@ -506,7 +506,7 @@ export const useDocumentsStore = defineStore("documents", {
         this.recentFolders = persisted.recentFolders || [];
         this.recentlyClosed = persisted.recentlyClosed || [];
         this.workspaceRoot = persisted.workspaceRoot || null;
-        if (persisted.mode && ["split", "source", "preview", "focus", "export", "review", "presentation"].includes(persisted.mode)) {
+        if (persisted.mode && ["split", "source", "preview", "focus", "outline", "export", "review", "presentation"].includes(persisted.mode)) {
           this.mode = persisted.mode;
         }
         if (

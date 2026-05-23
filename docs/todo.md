@@ -137,12 +137,12 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 51 Chromium browser workbench workflows
+- `pnpm run test:e2e`: passed all 52 Chromium browser workbench workflows
   locally on 2026-05-23 through the workspace-local Playwright Chromium cache
   at `.tmp/ms-playwright`, including collapsible toolbars, HTML, blog/Substack,
   LaTeX, Google Docs export-target handoffs, and deep keyboard-only operation
   through tabs, command palette, diagnostics, table editor, conflict merge, and
-  preview focus paths.
+  preview focus paths, plus dedicated outline-mode CRUD.
 - `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture`:
   passed and proves no-bibliography citation readiness emits a broad source
   warning plus precise per-key missing citation diagnostics that are copied
@@ -635,6 +635,9 @@ Current local verification evidence:
   accepts an outline draft before body content exists and creates a Markdown
   document skeleton with front matter, `[TOC]`, heading hierarchy, and draft
   placeholders.
+- 2026-05-23: first-class outline mode is browser-proven for structural editing.
+  The mode shows only chapter, section, subsection, and subsubsection rows, and
+  supports heading add, rename, re-level, navigation, and delete operations.
 - 2026-05-21: `pnpm run verify:local` passed after hardening the `reveal_path`
   command builder. The run covered frontend typecheck, frontend unit tests,
   project structure, accessibility, dependency admission, Markdown links, Rust
@@ -755,14 +758,15 @@ wrapper from a terminal/session that permits Chromium launch.
 
 Current host evidence:
 
-- 2026-05-23: `pnpm exec playwright test --list` lists 51 Chromium workflow
+- 2026-05-23: `pnpm exec playwright test --list` lists 52 Chromium workflow
   tests in `e2e/app-workflows.spec.ts`.
 - 2026-05-23: `pnpm run check:e2e-env` passes the focused workbench boot
   workflow through the workspace-local Playwright Chromium cache at
   `.tmp/ms-playwright`.
-- 2026-05-23: `pnpm run test:e2e` passed all 51 Chromium browser workflows,
+- 2026-05-23: `pnpm run test:e2e` passed all 52 Chromium browser workflows,
   including collapsible toolbars, the HTML, blog/Substack, LaTeX, and Google
-  Docs export-target handoff tests plus deep keyboard-only workbench operation.
+  Docs export-target handoff tests, deep keyboard-only workbench operation, and
+  outline-mode CRUD.
 - 2026-05-23: `pnpm run verify:local -- --list` shows the browser workflow
   environment preflight in the quick baseline, and
   `pnpm run verify:local:full -- --list` shows the full browser workflow suite
@@ -1398,6 +1402,10 @@ Covered:
 - Word count, character count, and reading-time status-bar metrics.
 - Command-palette heading navigation.
 - Outline sidebar heading navigation to source.
+- Launched Tauri webview evidence that clicking an Outline sidebar heading
+  selects the matching CodeMirror source heading.
+- Dedicated outline mode for chapter, section, subsection, and subsubsection
+  CRUD without showing body text.
 - Diagnostics-panel source navigation with line/column metadata.
 - Explicit multi-cursor command palette actions for add-cursor-above,
   add-cursor-below, and select-next-occurrence, with a browser harness workflow
@@ -1411,7 +1419,6 @@ Finish:
 - Markdown syntax highlighting.
 - Diagnostics gutter/range visual-state local browser/native execution proof.
 - Broader Markdown shortcut edge cases.
-- Outline navigation local browser/native execution proof.
 - Vim/emacs keybindings classification: deferred unless intentionally added.
 
 ### 11. Preview Ergonomics

@@ -364,7 +364,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       "/a.md": { editor: 2, preview: -1 },
       "/ignored.md": "not-a-position",
     },
-    mode: "presentation",
+    mode: "outline",
     sidebar: "settings",
     transformEnginePaths: { dot: "/usr/bin/dot", bad: 10 },
     trustedTransformEngines: { dot: true, bad: "yes" },
@@ -467,7 +467,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.workspaceRoot, "/legacy/workspace");
   equal(migrated.activePath, "/b.md");
   deepEqual(migrated.scrollPositions, { "/a.md": { editor: 1, preview: 0 } });
-  equal(migrated.mode, "presentation");
+  equal(migrated.mode, "outline");
   equal(migrated.sidebar, "settings");
   deepEqual(migrated.transformEnginePaths, { dot: "/usr/bin/dot" });
   deepEqual(migrated.trustedTransformEngines, { dot: true });
@@ -561,10 +561,17 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Edit")'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "View")'));
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
+  ok(tauriLib.includes('"neditor-mode-outline", "Outline Mode"'));
   ok(app.includes('case "neditor-mode-export"'));
+  ok(app.includes('case "neditor-mode-outline"'));
   ok(tauriLib.includes('app.emit("neditor-menu-command", id)'));
   ok(app.includes("commandToolbarRows"));
   ok(app.includes("command-toolbar-row"));
+  ok(app.includes('value="outline"'));
+  ok(app.includes('id="outline-mode"'));
+  ok(app.includes("createOutlineHeading"));
+  ok(app.includes("renameOutlineHeading"));
+  ok(app.includes("deleteOutlineHeading"));
   ok(app.includes('foldGutter()'));
   ok(app.includes('codeFolding({ placeholderText: " folded " })'));
   ok(app.includes('class="icon-command"'));
@@ -747,7 +754,9 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow applied export profile"));
   ok(app.includes("native workflow reloaded export profile from settings store"));
   ok(app.includes("collectNativeModeEvidence"));
-  ok(app.includes("[\"split\", \"source\", \"preview\", \"focus\", \"export\", \"review\", \"presentation\"]"));
+  ok(app.includes("[\"split\", \"source\", \"preview\", \"focus\", \"outline\", \"export\", \"review\", \"presentation\"]"));
+  ok(app.includes("native workflow rendered outline mode structure only"));
+  ok(app.includes("outlineTitles"));
   ok(app.includes("native workflow rendered export mode preview content"));
   ok(app.includes("native workflow rendered review mode governance content"));
   ok(app.includes("native workflow rendered presentation outline content"));
@@ -760,7 +769,11 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow continued markdown list in editor"));
   ok(app.includes("native workflow inserted paired bracket in editor"));
   ok(app.includes("native workflow edited multiple cursors in editor"));
+  ok(app.includes("collectNativeOutlineNavigationEvidence"));
+  ok(app.includes("native workflow navigated outline heading to source"));
   ok(smoke.includes("native workflow report did not include editor ergonomics evidence"));
+  ok(smoke.includes("native workflow report did not include outline navigation evidence"));
+  ok(smoke.includes("native workflow report did not include rendered outline-mode structure"));
   ok(smoke.includes("native workflow report did not include rendered export-mode content"));
   ok(smoke.includes("native workflow report did not include rendered review-mode governance content"));
   ok(smoke.includes("native workflow report did not include rendered presentation outline content"));

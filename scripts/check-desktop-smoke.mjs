@@ -462,6 +462,7 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow continued markdown list in editor",
     "native workflow inserted paired bracket in editor",
     "native workflow edited multiple cursors in editor",
+    "native workflow navigated outline heading to source",
     "native workflow opened command palette",
     "native workflow found dose template",
     "native workflow inserted calc template into source",
@@ -470,6 +471,7 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow prepared html export readiness",
     "native workflow wrote html export artifact",
     "native workflow exported html from native menu command",
+    "native workflow rendered outline mode structure only",
     "native workflow rendered export mode preview content",
     "native workflow rendered review mode governance content",
     "native workflow rendered presentation outline content",
@@ -502,7 +504,7 @@ function validateNativeWorkflowReport(launchReport) {
       issues.push(`native workflow report did not include passing assertion: ${assertion}`);
     }
   }
-  for (const mode of ["split", "source", "preview", "focus", "export", "review", "presentation"]) {
+  for (const mode of ["split", "source", "preview", "focus", "outline", "export", "review", "presentation"]) {
     const assertion = `native workflow switched ${mode} mode`;
     if (!assertionNames.has(assertion)) {
       issues.push(`native workflow report did not include passing assertion: ${assertion}`);
@@ -510,12 +512,13 @@ function validateNativeWorkflowReport(launchReport) {
   }
   const modeEvidence = Array.isArray(payload.modeEvidence) ? payload.modeEvidence : [];
   const modeSet = new Set(modeEvidence.map((entry) => entry?.mode));
-  for (const mode of ["split", "source", "preview", "focus", "export", "review", "presentation"]) {
+  for (const mode of ["split", "source", "preview", "focus", "outline", "export", "review", "presentation"]) {
     if (!modeSet.has(mode)) {
       issues.push(`native workflow report did not include mode evidence for ${mode}`);
     }
   }
   for (const [mode, sidebar] of [
+    ["outline", "outline"],
     ["export", "exports"],
     ["review", "review"],
     ["presentation", "outline"],
@@ -531,6 +534,7 @@ function validateNativeWorkflowReport(launchReport) {
     source: { sourceVisible: true, previewVisible: false },
     preview: { sourceVisible: false, previewVisible: true },
     focus: { sourceVisible: true, previewVisible: false },
+    outline: { sourceVisible: false, previewVisible: false },
     export: { sourceVisible: false, previewVisible: true },
     review: { sourceVisible: true, previewVisible: true },
     presentation: { sourceVisible: false, previewVisible: true },
@@ -540,6 +544,16 @@ function validateNativeWorkflowReport(launchReport) {
     if (entry.sourceVisible !== expected.sourceVisible || entry.previewVisible !== expected.previewVisible) {
       issues.push(`native workflow report did not include correct pane visibility for ${mode}: ${JSON.stringify(entry)}`);
     }
+  }
+  const outlineModeEntry = modeEntry("outline");
+  const outlineModeTitles = Array.isArray(outlineModeEntry.outlineTitles) ? outlineModeEntry.outlineTitles : [];
+  if (
+    outlineModeEntry.outlineVisible !== true ||
+    !outlineModeTitles.includes("Market Entry Report") ||
+    !outlineModeTitles.includes("Executive Summary") ||
+    !String(outlineModeEntry.outlineText || "").includes("Add heading")
+  ) {
+    issues.push(`native workflow report did not include rendered outline-mode structure: ${JSON.stringify(outlineModeEntry)}`);
   }
   const exportModeEntry = modeEntry("export");
   if (
@@ -634,6 +648,21 @@ function validateNativeWorkflowReport(launchReport) {
     editorErgonomicsEvidence.multiCursor?.inserted !== true
   ) {
     issues.push(`native workflow report did not include editor ergonomics evidence: ${JSON.stringify(editorErgonomicsEvidence)}`);
+  }
+  const outlineNavigationEvidence = payload.outlineNavigationEvidence?.outline || {};
+  if (
+    outlineNavigationEvidence.sidebar !== "outline" ||
+    outlineNavigationEvidence.mode !== "split" ||
+    outlineNavigationEvidence.buttonFound !== true ||
+    !String(outlineNavigationEvidence.buttonLabel || "").includes("Native Outline Target") ||
+    !Number.isFinite(outlineNavigationEvidence.targetLine) ||
+    outlineNavigationEvidence.targetLine < 1 ||
+    outlineNavigationEvidence.selectedLine !== outlineNavigationEvidence.targetLine ||
+    !String(outlineNavigationEvidence.selectedText || "").includes("## Native Outline Target") ||
+    outlineNavigationEvidence.editorFocused !== true ||
+    !String(outlineNavigationEvidence.sidebarText || "").includes("Native Outline Target")
+  ) {
+    issues.push(`native workflow report did not include outline navigation evidence: ${JSON.stringify(outlineNavigationEvidence)}`);
   }
   const snapshotEvidence = payload.snapshotEvidence || {};
   if (

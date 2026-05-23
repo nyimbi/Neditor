@@ -247,6 +247,7 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .item(&menu_item(app, "neditor-mode-source", "Source Only")?)
         .item(&menu_item(app, "neditor-mode-preview", "Preview Only")?)
         .item(&menu_item(app, "neditor-mode-focus", "Focus Mode")?)
+        .item(&menu_item(app, "neditor-mode-outline", "Outline Mode")?)
         .item(&menu_item(app, "neditor-mode-export", "Export Preview")?)
         .separator()
         .item(&menu_item(app, "neditor-show-outline", "Document Outline")?)

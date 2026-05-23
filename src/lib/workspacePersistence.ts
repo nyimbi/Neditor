@@ -41,7 +41,7 @@ export type ExportTarget =
   | "substack"
   | "latex"
   | "google-docs";
-export type WorkbenchMode = "split" | "source" | "preview" | "focus" | "export" | "review" | "presentation";
+export type WorkbenchMode = "split" | "source" | "preview" | "focus" | "outline" | "export" | "review" | "presentation";
 export type SidebarPanel = "files" | "outline" | "diagnostics" | "tables" | "templates" | "references" | "exports" | "versioning" | "review" | "settings";
 export type ThemePreference = "system" | "light" | "dark";
 export type ToolbarDisplay = "both" | "icons" | "text";
@@ -443,7 +443,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (activePath !== undefined) migrated.activePath = activePath || null;
   const scrollPositions = normalizeScrollPositions(raw.scrollPositions);
   if (scrollPositions) migrated.scrollPositions = scrollPositions;
-  const mode = enumValue(raw.mode, ["split", "source", "preview", "focus", "export", "review", "presentation"] as const);
+  const mode = enumValue(raw.mode, ["split", "source", "preview", "focus", "outline", "export", "review", "presentation"] as const);
   if (mode) migrated.mode = mode;
   const sidebar = enumValue(
     raw.sidebar,
