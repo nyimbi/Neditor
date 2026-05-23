@@ -17,6 +17,7 @@ const requiredReports = [
     "human-reviewed",
   ]),
   requiredReport("platform-package-config", ".tmp/desktop-bundle/platform-package-config-report.json", ["passed"]),
+  requiredReport("external-platform-evidence", ".tmp/platform-evidence/report.json", [], platformEvidenceAccepted),
   requiredReport("desktop-command-smoke", ".tmp/desktop-smoke/native-command-report.json", [], desktopCommandPassed),
   requiredReport("rendered-export-audit", ".tmp/rendered-export-audit/rendered-export-audit-report.json", [], reportExists),
   requiredReport("rendered-export-visual-summary", ".tmp/rendered-export-audit/visual-review-summary.json", [], visualSummaryPassed),
@@ -137,29 +138,35 @@ function collectEvidenceGaps(checks) {
     });
   }
 
+  const platformEvidence = reports["external-platform-evidence"];
+  const missingWebdriverPlatforms = missingPlatformEvidence(platformEvidence, "webdriver");
   const webdriver = reports["macos-webdriver-fallback"];
-  if (process.platform === "darwin" && webdriver?.status === "skipped") {
+  if (missingWebdriverPlatforms.length > 0 || (process.platform === "darwin" && webdriver?.status === "skipped")) {
     gaps.push({
       id: "windows-linux-tauri-webdriver-execution",
       status: "pending-supported-hosts",
-      evidence: ".tmp/desktop-webdriver/report.json",
-      detail: "macOS records fresh native fallback proof; official Tauri WebDriver execution still needs Windows/Linux hosts.",
+      evidence: platformEvidence ? ".tmp/platform-evidence/report.json" : ".tmp/desktop-webdriver/report.json",
+      detail:
+        missingWebdriverPlatforms.length > 0
+          ? `Official Tauri WebDriver execution still needs supported-host reports for: ${missingWebdriverPlatforms.join(", ")}.`
+          : "macOS records fresh native fallback proof; official Tauri WebDriver execution still needs Windows/Linux hosts.",
     });
   }
 
-  if (process.platform !== "win32") {
+  const missingPackagePlatforms = missingPlatformEvidence(platformEvidence, "packageArtifacts");
+  if (process.platform !== "win32" && missingPackagePlatforms.includes("win32")) {
     gaps.push({
       id: "windows-package-artifact-proof",
       status: "pending-windows-host",
-      evidence: ".tmp/desktop-bundle/platform-package-config-report.json",
+      evidence: platformEvidence ? ".tmp/platform-evidence/report.json" : ".tmp/desktop-bundle/platform-package-config-report.json",
       detail: "Configuration proves Windows bundle targets and icons, but installer artifact execution needs a Windows host.",
     });
   }
-  if (process.platform !== "linux") {
+  if (process.platform !== "linux" && missingPackagePlatforms.includes("linux")) {
     gaps.push({
       id: "linux-package-artifact-proof",
       status: "pending-linux-host",
-      evidence: ".tmp/desktop-bundle/platform-package-config-report.json",
+      evidence: platformEvidence ? ".tmp/platform-evidence/report.json" : ".tmp/desktop-bundle/platform-package-config-report.json",
       detail: "Configuration proves Linux bundle targets, but AppImage/deb/rpm artifact execution needs a Linux host.",
     });
   }
@@ -232,6 +239,28 @@ function externalEngineProbePassed(report) {
     status: incompatible.length === 0 ? "passed" : "failed",
     detail: incompatible.length === 0 ? "installed engines smoke-compatible" : `incompatible=${incompatible.map((engine) => engine.name).join(", ")}`,
   };
+}
+
+function platformEvidenceAccepted(report) {
+  const invalid = Number(report.summary?.invalidEvidence || 0);
+  return {
+    accepted: invalid === 0,
+    status: report.status || "unknown",
+    detail:
+      invalid === 0
+        ? `externalPlatformEvidence=${report.status || "unknown"}`
+        : `invalid external platform evidence count=${invalid}`,
+  };
+}
+
+function missingPlatformEvidence(report, key) {
+  if (!report || !Array.isArray(report.platforms)) {
+    return ["win32", "linux"];
+  }
+  return report.platforms
+    .filter((platform) => platform?.[key]?.status !== "accepted")
+    .map((platform) => platform.platform)
+    .filter((platform) => platform === "win32" || platform === "linux");
 }
 
 function macosLaunchPassed(report) {

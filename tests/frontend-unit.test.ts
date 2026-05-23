@@ -598,6 +598,7 @@ test("local verification scripts expose local baseline checks", () => {
   const e2eEnvironment = readFileSync("scripts/check-e2e-environment.mjs", "utf8");
   const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
+  const platformEvidence = readFileSync("scripts/check-platform-evidence.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:a11y"], "node scripts/check-accessibility.mjs");
@@ -607,6 +608,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:docs"], "node scripts/check-markdown-links.mjs");
   equal(scripts["check:engines"], "node scripts/check-external-engines.mjs");
   equal(scripts["check:e2e-env"], "node scripts/check-e2e-environment.mjs");
+  equal(scripts["check:platform-evidence"], "node scripts/check-platform-evidence.mjs");
   equal(scripts["check:platform-packaging"], "node scripts/check-platform-packaging.mjs");
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
@@ -625,6 +627,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Accessibility runtime audit", "pnpm", ["run", "check:a11y:runtime"])'));
   ok(verification.includes('command("Accessibility manual review contract", "pnpm", ["run", "check:a11y:manual"])'));
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
+  ok(verification.includes('command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"])'));
   ok(verification.includes('command("Release readiness aggregation", "pnpm", ["run", "check:release-readiness"])'));
   ok(verification.includes("Desktop macOS GUI launch smoke"));
   ok(verification.includes('NEDITOR_DESKTOP_SMOKE_LAUNCH: "1"'));
@@ -638,6 +641,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformPackaging.includes("unsigned-local-builds"));
   ok(platformPackaging.includes("windowsTilePng"));
   ok(platformPackaging.includes("Tauri bundle targets must remain all-platform"));
+  ok(platformEvidence.includes("neditor.platform-package-artifacts.v1"));
+  ok(platformEvidence.includes("win32/tauri-webdriver-report.json"));
+  ok(platformEvidence.includes("linux/package-artifacts.json"));
+  ok(platformEvidence.includes("pending-external-evidence"));
+  ok(platformEvidence.includes("replace-with-64-character-sha256"));
 });
 
 test("runtime accessibility audit executes focused browser workflows", () => {
@@ -676,6 +684,8 @@ test("release readiness aggregation records external evidence gaps", () => {
   const script = readFileSync("scripts/check-release-readiness.mjs", "utf8");
   ok(script.includes("current-host-ready-with-external-gaps"));
   ok(script.includes("windows-linux-tauri-webdriver-execution"));
+  ok(script.includes("external-platform-evidence"));
+  ok(script.includes("missingPlatformEvidence"));
   ok(script.includes("release-signing-and-notarization"));
   ok(script.includes("accessibility-assistive-technology-human-signoff"));
   ok(script.includes("rendered-export-native-viewer-human-signoff"));

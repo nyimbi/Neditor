@@ -333,6 +333,13 @@ guardrails, root MIT license linkage, and writes
 notarization, and installer attestation remain credentialed release steps outside
 local verification.
 
+`pnpm run check:platform-evidence` writes
+`.tmp/platform-evidence/report.json` and creates JSON templates under
+`.tmp/platform-evidence/templates/` for Windows and Linux package/WebDriver
+evidence. Missing supported-host evidence remains a release gap, but malformed
+evidence copied back from another host fails the check instead of being silently
+accepted.
+
 `pnpm run check:release-readiness` aggregates the current local proof set into
 `.tmp/release-readiness/report.json`. It fails if required current-host reports
 are missing or failed, and otherwise records remaining external evidence gaps

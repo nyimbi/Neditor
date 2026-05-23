@@ -607,6 +607,12 @@ green before claiming a slice is complete:
   `.tmp/release-readiness/report.json` and aggregates current-host proof plus
   host-bound gaps for Windows/Linux packages, WebDriver execution, signing,
   optional engines, and human sign-off.
+- `pnpm run verify:local:full` now also runs
+  `pnpm run check:platform-evidence` before release compile/package smoke. That
+  check writes `.tmp/platform-evidence/report.json`, emits Windows/Linux
+  evidence templates, accepts valid copied package/WebDriver reports from
+  supported hosts, and fails malformed supplied evidence while preserving
+  missing-host proof as explicit release gaps.
 - On macOS, `pnpm run verify:local:full` also includes
   `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` before the
   WebDriver step. `pnpm run test:tauri-webdriver` still reports the official
