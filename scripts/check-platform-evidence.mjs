@@ -23,6 +23,19 @@ const platformSpecs = [
     artifactKinds: ["appimage", "deb", "rpm"],
   },
 ];
+const requiredWebdriverAssertions = [
+  "initial native title includes NEditor",
+  "desktop shell renders primary commands",
+  "native WebDriver switches modes and opens command palette",
+  "desktop WebDriver edits document structure in outline mode",
+  "native title exposes dirty document state",
+  "desktop template insertion reaches editor and preview",
+  "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
+  "desktop WebDriver renames, duplicates, and reveals real Markdown files",
+  "desktop export readiness returns manifest progress evidence",
+  "desktop WebDriver writes HTML export through dialog-free smoke path",
+  "desktop preferences persist across WebDriver restart",
+];
 
 mkdirSync(templateDir, { recursive: true });
 writeTemplates();
@@ -148,20 +161,36 @@ function evaluateWebdriverReport(spec) {
   requireValue(report.platform === spec.platform, problems, `platform must be ${spec.platform}`);
   requireValue(report.status === "passed", problems, "status must be passed");
   requireValue(isIsoDate(report.generatedAt), problems, "generatedAt must be an ISO timestamp");
-  requireValue(Array.isArray(report.assertions) && report.assertions.length >= 8, problems, "assertions must include the desktop workflow proof");
-  const assertionNames = new Set((report.assertions || []).map((assertion) => assertion.name));
-  for (const requiredAssertion of [
-    "initial native title includes NEditor",
-    "desktop shell renders primary commands",
-    "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
-    "desktop WebDriver writes HTML export through dialog-free smoke path",
-    "desktop preferences persist across WebDriver restart",
-  ]) {
-    requireValue(assertionNames.has(requiredAssertion), problems, `missing assertion: ${requiredAssertion}`);
+  const workflowPlan = Array.isArray(report.workflowPlan) ? report.workflowPlan : [];
+  const assertions = Array.isArray(report.assertions) ? report.assertions : [];
+  requireValue(assertions.length >= requiredWebdriverAssertions.length, problems, "assertions must include the full desktop workflow proof");
+  const assertionByName = new Map(assertions.map((assertion) => [assertion.name, assertion]));
+  for (const requiredAssertion of requiredWebdriverAssertions) {
+    requireValue(workflowPlan.includes(requiredAssertion), problems, `workflowPlan missing assertion: ${requiredAssertion}`);
+    const assertion = assertionByName.get(requiredAssertion);
+    requireValue(Boolean(assertion), problems, `missing assertion: ${requiredAssertion}`);
+    requireValue(assertion?.status === "passed", problems, `assertion did not pass: ${requiredAssertion}`);
   }
-  requireValue(Number(report.fileArtifacts?.savedBytes) > 0, problems, "fileArtifacts.savedBytes must be present");
+  const outlineEvidence = report.outlineArtifacts?.sourceEvidence || {};
+  requireValue(outlineEvidence.executiveFindings === true, problems, "outlineArtifacts.sourceEvidence.executiveFindings must be true");
+  requireValue(outlineEvidence.evidenceReview === true, problems, "outlineArtifacts.sourceEvidence.evidenceReview must be true");
+  requireValue(outlineEvidence.dataTableLevel === true, problems, "outlineArtifacts.sourceEvidence.dataTableLevel must be true");
+  requireValue(outlineEvidence.appendix === true, problems, "outlineArtifacts.sourceEvidence.appendix must be true");
+  requireValue(outlineEvidence.sourceGovernanceRemoved === true, problems, "outlineArtifacts.sourceEvidence.sourceGovernanceRemoved must be true");
+  requireValue(Number(report.fileArtifacts?.bytes) > 0, problems, "fileArtifacts.bytes must be present");
+  requireValue(Number(report.fileArtifacts?.renamedBytes) > 0, problems, "fileArtifacts.renamedBytes must be present");
+  requireValue(Number(report.fileArtifacts?.duplicateBytes) > 0, problems, "fileArtifacts.duplicateBytes must be present");
+  requireValue(String(report.fileArtifacts?.revealStatus || "").includes("Revealed"), problems, "fileArtifacts.revealStatus must prove reveal workflow");
   requireValue(Number(report.exportArtifacts?.outputBytes) > 1000, problems, "exportArtifacts.outputBytes must be > 1000");
+  requireValue(Number(report.exportArtifacts?.manifestBytes) > 100, problems, "exportArtifacts.manifestBytes must be > 100");
+  requireValue(report.exportArtifacts?.target === "html", problems, "exportArtifacts.target must be html");
   requireValue(isSha256(report.exportArtifacts?.outputHash), problems, "exportArtifacts.outputHash must be a sha256");
+  requireValue(
+    Array.isArray(report.exportArtifacts?.progressEvidence) &&
+      report.exportArtifacts.progressEvidence.some((step) => String(step).includes("Render") && String(step).includes("complete")),
+    problems,
+    "exportArtifacts.progressEvidence must include a completed render step",
+  );
 
   if (problems.length > 0) {
     return invalid("tauri-webdriver", spec.webdriverPath, `${spec.name} Tauri WebDriver evidence is invalid: ${problems.join("; ")}`);
@@ -214,7 +243,7 @@ function isIsoDate(value) {
 }
 
 function isSha256(value) {
-  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+  return typeof value === "string" && /^(?:sha256:)?[a-f0-9]{64}$/i.test(value);
 }
 
 function writeTemplates() {
@@ -251,17 +280,29 @@ function writeTemplates() {
           generatedAt: new Date().toISOString(),
           platform: spec.platform,
           status: "passed",
-          assertions: [
-            { name: "initial native title includes NEditor", status: "passed" },
-            { name: "desktop shell renders primary commands", status: "passed" },
-            { name: "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path", status: "passed" },
-            { name: "desktop WebDriver writes HTML export through dialog-free smoke path", status: "passed" },
-            { name: "desktop preferences persist across WebDriver restart", status: "passed" },
-          ],
-          fileArtifacts: { savedBytes: 1234 },
+          workflowPlan: requiredWebdriverAssertions,
+          assertions: requiredWebdriverAssertions.map((name) => ({ name, status: "passed" })),
+          outlineArtifacts: {
+            sourceEvidence: {
+              executiveFindings: true,
+              evidenceReview: true,
+              dataTableLevel: true,
+              appendix: true,
+              sourceGovernanceRemoved: true,
+            },
+          },
+          fileArtifacts: {
+            bytes: 1234,
+            renamedBytes: 1234,
+            duplicateBytes: 1234,
+            revealStatus: "Revealed native-workflow-duplicate.md",
+          },
           exportArtifacts: {
             outputBytes: 12345,
+            manifestBytes: 1234,
+            target: "html",
             outputHash: "replace-with-64-character-sha256",
+            progressEvidence: ["Render complete"],
           },
           notes: "Use the real .tmp/desktop-webdriver/report.json from the supported platform host instead of this template.",
         },
