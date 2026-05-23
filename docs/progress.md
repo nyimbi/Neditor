@@ -2438,6 +2438,13 @@ Rendered export manual sign-off verification:
 | `rg -n "visual-review-signoff\|humanSignoff\|human-signoff\|manual-signoff-template\|NEDITOR_RENDERED_EXPORT_SIGNOFF" .tmp/rendered-export-audit/visual-review-summary.json .tmp/rendered-export-audit/viewer-proof.json .tmp/rendered-export-audit/manual-review.html .tmp/rendered-export-audit/visual-review-signoff.template.json` | Pass | Generated audit artifacts include the sign-off template, manual dashboard instructions, summary sign-off link, passing template proof, and skipped completed-signoff proof. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the rendered export manual sign-off workflow; all local links resolved. |
 
+Rendered export browser visual-proof verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit now captures the rendered `body` element for primary HTML, manual dashboard, and review-case screenshots, avoiding browser-page compositor artifacts while keeping DOM evidence, dimensions, and required text checks. |
+| Visual inspection of `.tmp/rendered-export-audit/browser-visual-proof/*.png` | Pass | Representative screenshots show the expected NEditor export pages: primary HTML with cover/table/chart/comments/provenance/legal sections, manual review dashboard with proof tables, rich-block review, and option-heavy review. |
+
 Rendered export Office preview verification:
 
 | Command | Result | Evidence |

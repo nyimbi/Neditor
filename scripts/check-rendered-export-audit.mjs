@@ -782,8 +782,12 @@ async function collectBrowserVisualProof(issues, assertions, report) {
       }
 
       await page.goto(pathToFileURL(artifactPath).href, { waitUntil: "load" });
+      await page.evaluate(() => {
+        document.documentElement.style.background = "#fff";
+        document.body.style.background = "#fff";
+      });
       const screenshotPath = join(visualDir, target.screenshot);
-      await page.screenshot({ path: screenshotPath, fullPage: true });
+      await page.locator("body").screenshot({ path: screenshotPath });
       const dimensions = pngDimensions(screenshotPath);
       const bytes = statSync(screenshotPath).size;
       const metrics = await page.evaluate(({ needles, selectors }) => {

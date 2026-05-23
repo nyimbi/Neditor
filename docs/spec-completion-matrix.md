@@ -290,7 +290,7 @@ Current major verification gaps:
   Docs DOCX, and rendered review-case DOCX files. On macOS it also attempts
   Quick Look thumbnails for primary PDF/DOCX/PPTX artifacts and records either
   thumbnail evidence or host limitations. When Chromium can launch, it captures
-  browser-rendered screenshot proof for the primary HTML export,
+  body-scoped browser-rendered screenshot proof for the primary HTML export,
   `manual-review.html`, and the rich-block/option-heavy HTML review cases.
   Broader cross-platform native viewer/platform manual QA remains under-proven.
 - Optional external transform engine evidence now includes current macOS

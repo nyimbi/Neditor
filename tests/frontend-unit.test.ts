@@ -573,6 +573,7 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
   ok(script.includes("collectHumanSignoffEvidence"));
   ok(script.includes("validateCompletedSignoff"));
   ok(script.includes("collectOfficePreviewProof"));
+  ok(script.includes('page.locator("body").screenshot'));
   ok(script.includes("office-preview-docx"));
   ok(script.includes("office-preview-pptx"));
   ok(script.includes("Office preview screenshots"));
