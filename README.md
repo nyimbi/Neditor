@@ -383,6 +383,13 @@ evidence. Missing supported-host evidence remains a release gap, but malformed
 evidence copied back from another host fails the check instead of being silently
 accepted.
 
+On the Windows or Linux host that produced the package and WebDriver evidence,
+run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`
+and the Tauri package build. It scans real installer/package artifacts, copies
+the passing WebDriver report, and writes the supported-host evidence JSON under
+`.tmp/platform-evidence/external/<platform>/` so the files can be copied back
+and validated with `pnpm run check:platform-evidence`.
+
 `pnpm run check:release-signing` writes `.tmp/release-signing/report.json` and
 creates JSON templates under `.tmp/release-signing/templates/` for macOS
 codesign/notarization, Windows Authenticode/timestamp, and Linux package

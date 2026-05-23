@@ -639,6 +639,7 @@ test("local verification scripts expose local baseline checks", () => {
   const e2eEnvironment = readFileSync("scripts/check-e2e-environment.mjs", "utf8");
   const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
+  const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
   const platformEvidence = readFileSync("scripts/check-platform-evidence.mjs", "utf8");
   const releaseSigning = readFileSync("scripts/check-release-signing.mjs", "utf8");
@@ -657,6 +658,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:release-signing"], "node scripts/check-release-signing.mjs");
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
+  equal(scripts["collect:platform-evidence"], "node scripts/collect-platform-evidence.mjs");
   equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
   equal(scripts.build, "vue-tsc --noEmit && vite build");
@@ -698,6 +700,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformEvidence.includes("linux/package-artifacts.json"));
   ok(platformEvidence.includes("pending-external-evidence"));
   ok(platformEvidence.includes("replace-with-64-character-sha256"));
+  ok(platformCollector.includes("NEDITOR_PLATFORM_EVIDENCE_PLATFORM"));
+  ok(platformCollector.includes("NEDITOR_PLATFORM_BUILD_COMMAND"));
+  ok(platformCollector.includes("neditor.platform-package-artifacts.v1"));
+  ok(platformCollector.includes("Run pnpm run test:tauri-webdriver first"));
+  ok(platformCollector.includes("Desktop WebDriver report status must be passed"));
   ok(releaseSigning.includes("neditor.release-signing-evidence.v1"));
   ok(releaseSigning.includes("darwin/signing-evidence.json"));
   ok(releaseSigning.includes("win32/signing-evidence.json"));

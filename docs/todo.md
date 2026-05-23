@@ -613,6 +613,11 @@ green before claiming a slice is complete:
   evidence templates, accepts valid copied package/WebDriver reports from
   supported hosts, and fails malformed supplied evidence while preserving
   missing-host proof as explicit release gaps.
+- Supported-host platform collection is now scripted: after running the Tauri
+  package build and `pnpm run test:tauri-webdriver` on Windows or Linux,
+  `pnpm run collect:platform-evidence` writes the package artifact hashes and
+  passing WebDriver report into `.tmp/platform-evidence/external/<platform>/`
+  for copy-back validation by `pnpm run check:platform-evidence`.
 - `pnpm run verify:local:full` now also runs
   `pnpm run check:release-signing`, which writes
   `.tmp/release-signing/report.json`, emits macOS/Windows/Linux signing
