@@ -676,6 +676,7 @@ test("local verification scripts expose local baseline checks", () => {
   const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
+  const evidenceKitCollector = readFileSync("scripts/collect-release-evidence-kit.mjs", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
   const platformEvidence = readFileSync("scripts/check-platform-evidence.mjs", "utf8");
   const signingCollector = readFileSync("scripts/collect-release-signing-evidence.mjs", "utf8");
@@ -696,6 +697,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
   equal(scripts["collect:platform-evidence"], "node scripts/collect-platform-evidence.mjs");
+  equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
   equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
@@ -775,6 +777,15 @@ test("local verification scripts expose local baseline checks", () => {
   ok(signingCollector.includes("Release signing evidence must be collected from a clean Git tree"));
   ok(signingCollector.includes("Missing required"));
   ok(signingCollector.includes("Release signing proof command failed"));
+  ok(evidenceKitCollector.includes("neditor.release-evidence-kit.v1"));
+  ok(evidenceKitCollector.includes("windows-package-artifact-proof"));
+  ok(evidenceKitCollector.includes("linux-package-artifact-proof"));
+  ok(evidenceKitCollector.includes("google-docs-live-import-readback"));
+  ok(evidenceKitCollector.includes("rendered-export-native-viewer-human-signoff"));
+  ok(evidenceKitCollector.includes("accessibility-assistive-technology-human-signoff"));
+  ok(evidenceKitCollector.includes("sourceTreeClean"));
+  ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
+  ok(evidenceKitCollector.includes("manual-review-template.json"));
 });
 
 test("runtime accessibility audit executes focused browser workflows", () => {
