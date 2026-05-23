@@ -506,6 +506,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Toolbar button display"'));
   ok(app.includes('aria-label="Toolbar text size"'));
   ok(app.includes("Export HTML"));
+  ok(app.includes('id: "export-html", label: "HTML Export", title: "Export standalone HTML"'));
   ok(app.includes('aria-label="HTML export options"'));
   ok(app.includes("HTML delivery"));
   ok(app.includes("store.exportDefaults.htmlLanguage"));

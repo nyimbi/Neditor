@@ -2317,7 +2317,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "open", label: "Open", title: "Open document", icon: "open", run: () => openDocument() },
       { id: "save", label: "Save", title: "Save document", icon: "save", primary: true, run: () => saveDocument() },
       { id: "save-as", label: "Save As", title: "Save document as", icon: "saveAs", run: () => saveDocumentAs() },
-      { id: "export-html", label: "HTML", title: "Export HTML", icon: "html", run: () => exportDocumentAs("html") },
+      { id: "export-html", label: "HTML Export", title: "Export standalone HTML", icon: "html", run: () => exportDocumentAs("html") },
       { id: "export", label: "Export", title: "Export document", icon: "export", disabled: store.exportBusy, run: () => exportDocument() },
     ],
   },

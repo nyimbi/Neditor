@@ -31,6 +31,10 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- This update makes the already-wired direct HTML exporter unmistakable in the
+  primary File toolbar by labeling the command `HTML Export` and preserving the
+  existing Export sidebar, command-palette, native `File` -> `Export` ->
+  `HTML Export`, rendered artifact, and sidecar manifest paths.
 - This update broadens native workspace/tab proof in the launched Tauri smoke.
   The app-authored workflow now creates deterministic real Markdown files under
   `.tmp/desktop-smoke/native-workspace-*`, proves document-set grouping,
