@@ -322,6 +322,7 @@
             <label><input v-model="outlineDraftIncludeToc" type="checkbox" /> Include table of contents</label>
             <div class="outline-planner-actions">
               <button type="button" @click="loadOutlineDraftFromDocument">Load from document</button>
+              <button type="button" :disabled="!outlineDraftItems.length" @click="openDocsLiveFromOutline">Flesh out with Docs Live</button>
               <button type="button" :disabled="!outlineDraftItems.length" @click="createDocumentFromOutline">Create document from outline</button>
               <button type="button" :disabled="!outlineDraftItems.length" @click="appendOutlineToDocument">Append outline</button>
             </div>
@@ -1588,6 +1589,94 @@
     </section>
 
     <section
+      v-if="docsLiveOpen"
+      ref="docsLiveDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Docs Live voice drafting"
+      tabindex="-1"
+      @keydown="handleModalKeydown('docs-live', $event)"
+    >
+      <form class="modal docs-live-modal" @submit.prevent="generateDocsLiveDraft">
+        <header>
+          <h2>Docs Live</h2>
+          <button type="button" aria-label="Close Docs Live" @click="closeDocsLive">x</button>
+        </header>
+
+        <section class="docs-live-grid">
+          <label>
+            Document type
+            <select v-model="docsLiveDocumentType" data-initial-focus @change="refreshDocsLiveQuestionnaire">
+              <option v-for="type in docsLiveDocumentTypes" :key="type.id" :value="type.id">{{ type.label }}</option>
+            </select>
+          </label>
+          <label>
+            Document title
+            <input v-model="docsLiveTitle" placeholder="Board brief, proposal, report" />
+          </label>
+          <label class="docs-live-wide">
+            Outline
+            <textarea v-model="docsLiveOutlineText" rows="7" placeholder="- Executive Summary&#10;- Recommendation&#10;- Next Steps"></textarea>
+          </label>
+          <section class="docs-live-voice docs-live-wide" aria-label="Voice dictation">
+            <div class="docs-live-voice-actions">
+              <button type="button" :disabled="!docsLiveSpeechAvailable" @click="toggleDocsLiveDictation">
+                {{ docsLiveListening ? "Stop dictation" : "Start dictation" }}
+              </button>
+              <span role="status">{{ docsLiveSpeechStatus }}</span>
+            </div>
+            <label>
+              Spoken direction
+              <textarea v-model="docsLiveTranscript" rows="6" placeholder="Dictate what should change, who it is for, and the outcome you need."></textarea>
+            </label>
+            <p v-if="docsLiveInterimTranscript" class="sidebar-hint">{{ docsLiveInterimTranscript }}</p>
+          </section>
+          <label>
+            Context and answers
+            <textarea v-model="docsLiveContext" rows="8" placeholder="Answer the questionnaire or add freeform context, constraints, examples, evidence, tone, and review expectations."></textarea>
+          </label>
+          <label>
+            Placeholder values
+            <textarea v-model="docsLivePlaceholderText" rows="8" placeholder="client: Acme&#10;audience: executive team&#10;deadline: June 1&#10;owner: Finance"></textarea>
+          </label>
+          <label>
+            Questionnaire
+            <textarea v-model="docsLiveQuestionnaireText" rows="7" readonly></textarea>
+          </label>
+          <label>
+            Apply result
+            <select v-model="docsLiveInsertMode">
+              <option value="replace">Replace document</option>
+              <option value="append">Append to document</option>
+              <option value="selection">Replace selection</option>
+            </select>
+          </label>
+        </section>
+
+        <section v-if="docsLiveDraft?.issues.length" class="issue-list">
+          <p v-for="issue in docsLiveDraft.issues" :key="issue">{{ issue }}</p>
+        </section>
+
+        <section v-if="docsLiveGeneratedMarkdown" class="docs-live-preview" aria-label="Docs Live generated draft">
+          <header>
+            <strong>{{ docsLiveDraft?.sections.length || 0 }} drafted sections</strong>
+            <span>{{ docsLiveDraft?.title }}</span>
+          </header>
+          <textarea :value="docsLiveGeneratedMarkdown" rows="12" readonly aria-label="Docs Live generated Markdown"></textarea>
+        </section>
+
+        <footer>
+          <button type="button" @click="closeDocsLive">Cancel</button>
+          <button type="button" @click="refreshDocsLiveQuestionnaire">Build questionnaire</button>
+          <button type="button" @click="loadDocsLiveOutlineFromDocument">Use document outline</button>
+          <button type="submit">Generate draft</button>
+          <button type="button" :disabled="!docsLiveGeneratedMarkdown" @click="applyDocsLiveDraft">Apply draft</button>
+        </footer>
+      </form>
+    </section>
+
+    <section
       v-if="commandPaletteOpen"
       ref="commandPaletteDialog"
       class="modal-backdrop"
@@ -1734,6 +1823,7 @@ import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnost
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
+import { buildDocsLiveDraft, buildDocsLiveQuestionnaire, docsLiveDocumentTypes, type DocsLiveDocumentType, type DocsLiveDraft } from "./lib/docsLive";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
 import { markdownListContinuation } from "./lib/markdownEditing";
 import {
@@ -1799,6 +1889,7 @@ const editorHost = ref<HTMLElement | null>(null);
 const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
 const aiPasteDialog = ref<HTMLElement | null>(null);
+const docsLiveDialog = ref<HTMLElement | null>(null);
 const commandPaletteDialog = ref<HTMLElement | null>(null);
 const conflictDialog = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
@@ -1824,6 +1915,20 @@ const aiConvertNumberedLists = ref(true);
 const aiConvertTables = ref(true);
 const aiPreviewBusy = ref(false);
 const aiPreviewSignature = ref("");
+const docsLiveOpen = ref(false);
+const docsLiveDocumentType = ref<DocsLiveDocumentType>("business-brief");
+const docsLiveTitle = ref("");
+const docsLiveOutlineText = ref("");
+const docsLiveTranscript = ref("");
+const docsLiveInterimTranscript = ref("");
+const docsLiveContext = ref("");
+const docsLivePlaceholderText = ref("");
+const docsLiveQuestionnaireText = ref(buildDocsLiveQuestionnaire("business-brief"));
+const docsLiveGeneratedMarkdown = ref("");
+const docsLiveDraft = ref<DocsLiveDraft | null>(null);
+const docsLiveInsertMode = ref<"replace" | "append" | "selection">("replace");
+const docsLiveListening = ref(false);
+const docsLiveSpeechStatus = ref("Voice ready");
 const desktopWorkflowSmokeActive = ref(false);
 const commandPaletteOpen = ref(false);
 const conflictOpen = ref(false);
@@ -1873,6 +1978,48 @@ interface ClipboardTextRead {
   text: string;
   kind: "rich" | "plain";
 }
+
+interface SpeechRecognitionAlternativeLike {
+  transcript?: string;
+}
+
+interface SpeechRecognitionResultLike {
+  isFinal?: boolean;
+  length: number;
+  [index: number]: SpeechRecognitionAlternativeLike;
+}
+
+interface SpeechRecognitionResultListLike {
+  length: number;
+  [index: number]: SpeechRecognitionResultLike;
+}
+
+interface SpeechRecognitionEventLike extends Event {
+  resultIndex?: number;
+  results?: SpeechRecognitionResultListLike;
+}
+
+interface SpeechRecognitionErrorEventLike extends Event {
+  error?: string;
+}
+
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort?: () => void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+type SpeechRecognitionWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
+};
 
 interface DocumentTabGroup {
   key: string;
@@ -1939,6 +2086,7 @@ type ToolbarIconName =
   | "snapshot"
   | "export"
   | "ai"
+  | "mic"
   | "commands"
   | "bold"
   | "italic"
@@ -2010,6 +2158,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   snapshot: ["M4 7h3l2-2h6l2 2h3v12H4z", "M12 10a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"],
   export: ["M12 3v12", "M7 8l5-5 5 5", "M5 15v4h14v-4"],
   ai: ["M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z", "M5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8z"],
+  mic: ["M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z", "M5 11a7 7 0 0 0 14 0", "M12 18v3", "M8 21h8"],
   commands: ["M4 7h16", "M4 12h16", "M4 17h10", "M17 15l3 2-3 2"],
   bold: ["M8 5h5a3 3 0 0 1 0 6H8z", "M8 11h6a3 3 0 0 1 0 6H8z", "M8 5v12"],
   italic: ["M10 5h8", "M6 19h8", "M14 5l-4 14"],
@@ -2089,6 +2238,7 @@ const nativeMenuExportTargets: Record<string, ExportTarget> = {
   "neditor-export-google-docs": "google-docs",
 };
 let unlistenNativeMenuCommand: UnlistenFn | null = null;
+let docsLiveRecognition: SpeechRecognitionLike | null = null;
 
 const active = computed(() => store.activeDocument);
 const activeExportProfile = computed(() => store.exportProfiles.find((profile) => profile.id === store.activeExportProfileId) || null);
@@ -2114,6 +2264,7 @@ const previewDocumentStyle = computed(() => ({
 const appShellStyle = computed(() => ({
   "--toolbar-font-size": `${clampToolbarTextSize(store.toolbarTextSize)}px`,
 }));
+const docsLiveSpeechAvailable = computed(() => Boolean(speechRecognitionConstructor()));
 const previewDocumentLabel = computed(() => {
   const title = active.value.compile?.semantic.title || active.value.title || "Untitled document";
   const status = active.value.compile?.semantic.status || "draft";
@@ -2484,6 +2635,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     id: "write",
     label: "Write",
     actions: [
+      { id: "docs-live", label: "Docs Live", title: "Open voice-guided document drafting", icon: "mic", primary: true, run: () => openDocsLive() },
       { id: "bold", label: "Bold", title: "Bold selection", icon: "bold", run: () => wrapSelection("**") },
       { id: "italic", label: "Italic", title: "Italic selection", icon: "italic", run: () => wrapSelection("*") },
       { id: "code", label: "Code", title: "Inline code selection", icon: "code", run: () => wrapSelection("`") },
@@ -2580,6 +2732,7 @@ const commands = computed(() => [
   { name: "Refresh Git diff", group: "Versioning", run: () => void store.refreshGitDiff() },
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
+  { name: "Open Docs Live", group: "AI", run: () => openDocsLive() },
   { name: "Paste from AI chat", group: "AI", run: () => openAiPaste() },
   { name: "Run transforms", group: "Transforms", run: () => void store.compileActive() },
   { name: "Find and replace", group: "Edit", run: () => runEditorCommand(openSearchPanel) },
@@ -2801,6 +2954,9 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-open-templates":
       store.sidebar = "templates";
       break;
+    case "neditor-open-docs-live":
+      openDocsLive();
+      break;
     case "neditor-clean-ai-paste":
       openAiPaste();
       break;
@@ -2832,10 +2988,12 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleShortcut);
   unlistenNativeMenuCommand?.();
   unlistenNativeMenuCommand = null;
+  stopDocsLiveDictation();
   stopPaneResize();
 });
 
 watch(aiPasteOpen, (open) => handleModalStateChange(open, aiPasteDialog));
+watch(docsLiveOpen, (open) => handleModalStateChange(open, docsLiveDialog));
 watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteDialog));
 watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
 
@@ -5090,7 +5248,7 @@ function restoreModalFocus() {
   }
 }
 
-function handleModalKeydown(kind: "ai-paste" | "command-palette" | "conflict", event: KeyboardEvent) {
+function handleModalKeydown(kind: "ai-paste" | "docs-live" | "command-palette" | "conflict", event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.preventDefault();
     closeModal(kind);
@@ -5116,9 +5274,11 @@ function handleModalKeydown(kind: "ai-paste" | "command-palette" | "conflict", e
   }
 }
 
-function closeModal(kind: "ai-paste" | "command-palette" | "conflict") {
+function closeModal(kind: "ai-paste" | "docs-live" | "command-palette" | "conflict") {
   if (kind === "ai-paste") {
     closeAiPaste();
+  } else if (kind === "docs-live") {
+    closeDocsLive();
   } else if (kind === "command-palette") {
     closeCommandPalette();
   } else {
@@ -5184,6 +5344,12 @@ function appendOutlineToDocument() {
   store.updateText(`${active.value.text.trimEnd()}\n\n${body}\n`);
   store.sidebar = "outline";
   store.statusMessage = "Appended outline skeleton to document";
+}
+
+function openDocsLiveFromOutline() {
+  docsLiveOutlineText.value = outlineDraftText.value;
+  docsLiveTitle.value = outlineDraftTitle.value || active.value.title.replace(/\.[^.]+$/, "");
+  openDocsLive();
 }
 
 function outlineHeadingKind(level: number) {
@@ -6002,6 +6168,149 @@ function closeAiPaste() {
   store.aiCleanupPreview = null;
   store.aiCleanupIssues = [];
   aiPasteOpen.value = false;
+}
+
+function openDocsLive() {
+  flushEditorTextToStore();
+  if (!docsLiveTitle.value.trim()) docsLiveTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
+  if (!docsLiveOutlineText.value.trim()) {
+    docsLiveOutlineText.value = outlinePlanFromMarkdown(active.value.text) || outlineDraftText.value;
+  }
+  refreshDocsLiveQuestionnaire();
+  docsLiveOpen.value = true;
+  docsLiveSpeechStatus.value = docsLiveSpeechAvailable.value ? "Voice ready" : "Voice unavailable in this WebView";
+}
+
+function closeDocsLive() {
+  stopDocsLiveDictation();
+  docsLiveOpen.value = false;
+  docsLiveInterimTranscript.value = "";
+}
+
+function refreshDocsLiveQuestionnaire() {
+  docsLiveQuestionnaireText.value = buildDocsLiveQuestionnaire(docsLiveDocumentType.value);
+}
+
+function loadDocsLiveOutlineFromDocument() {
+  docsLiveOutlineText.value = outlinePlanFromMarkdown(active.value.text) || outlineDraftText.value;
+  docsLiveTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
+  store.statusMessage = docsLiveOutlineText.value.trim() ? "Loaded document outline for Docs Live" : "No outline found for Docs Live";
+}
+
+function generateDocsLiveDraft() {
+  const draft = buildDocsLiveDraft({
+    documentType: docsLiveDocumentType.value,
+    title: docsLiveTitle.value,
+    outline: docsLiveOutlineText.value,
+    transcript: docsLiveTranscript.value,
+    context: docsLiveContext.value,
+    placeholders: docsLivePlaceholderText.value,
+  });
+  docsLiveDraft.value = draft;
+  docsLiveGeneratedMarkdown.value = draft.markdown;
+  docsLiveOutlineText.value = draft.outlineText;
+  docsLiveTitle.value = draft.title;
+  store.statusMessage = `Docs Live generated ${draft.sections.length} section draft`;
+}
+
+function applyDocsLiveDraft() {
+  if (!docsLiveGeneratedMarkdown.value.trim()) return;
+  const markdown = docsLiveGeneratedMarkdown.value;
+  if (docsLiveInsertMode.value === "selection" && editorView) {
+    const range = editorView.state.selection.main;
+    editorView.dispatch({
+      changes: { from: range.from, to: range.to, insert: markdown },
+      selection: { anchor: range.from + markdown.length },
+    });
+    store.updateText(editorView.state.doc.toString());
+    editorView.focus();
+  } else if (docsLiveInsertMode.value === "append") {
+    store.updateText(`${active.value.text.trimEnd()}\n\n${markdown}`);
+  } else {
+    store.updateText(markdown);
+  }
+  store.sidebar = "review";
+  store.statusMessage = "Applied Docs Live draft for review";
+  closeDocsLive();
+}
+
+function toggleDocsLiveDictation() {
+  if (docsLiveListening.value) {
+    stopDocsLiveDictation();
+  } else {
+    startDocsLiveDictation();
+  }
+}
+
+function startDocsLiveDictation() {
+  const Recognition = speechRecognitionConstructor();
+  if (!Recognition) {
+    docsLiveSpeechStatus.value = "Voice unavailable in this WebView";
+    return;
+  }
+  stopDocsLiveDictation();
+  const recognition = new Recognition();
+  docsLiveRecognition = recognition;
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+  recognition.onresult = (event) => {
+    const results = event.results;
+    if (!results) return;
+    let finalTranscript = "";
+    let interimTranscript = "";
+    for (let index = event.resultIndex || 0; index < results.length; index += 1) {
+      const result = results[index];
+      const transcript = result?.[0]?.transcript?.trim();
+      if (!transcript) continue;
+      if (result.isFinal) {
+        finalTranscript = `${finalTranscript} ${transcript}`.trim();
+      } else {
+        interimTranscript = `${interimTranscript} ${transcript}`.trim();
+      }
+    }
+    if (finalTranscript) docsLiveTranscript.value = `${docsLiveTranscript.value.trimEnd()} ${finalTranscript}`.trim();
+    docsLiveInterimTranscript.value = interimTranscript;
+  };
+  recognition.onerror = (event) => {
+    docsLiveSpeechStatus.value = event.error ? `Voice error: ${event.error}` : "Voice dictation stopped";
+    docsLiveListening.value = false;
+  };
+  recognition.onend = () => {
+    docsLiveListening.value = false;
+    docsLiveInterimTranscript.value = "";
+    if (docsLiveSpeechStatus.value === "Listening") docsLiveSpeechStatus.value = "Voice stopped";
+  };
+  try {
+    recognition.start();
+    docsLiveListening.value = true;
+    docsLiveSpeechStatus.value = "Listening";
+  } catch (error) {
+    docsLiveSpeechStatus.value = error instanceof Error ? error.message : "Voice dictation could not start";
+    docsLiveListening.value = false;
+  }
+}
+
+function stopDocsLiveDictation() {
+  const recognition = docsLiveRecognition;
+  docsLiveRecognition = null;
+  if (!recognition) return;
+  recognition.onend = null;
+  recognition.onerror = null;
+  recognition.onresult = null;
+  try {
+    recognition.stop();
+  } catch {
+    recognition.abort?.();
+  }
+  docsLiveListening.value = false;
+  docsLiveInterimTranscript.value = "";
+}
+
+function speechRecognitionConstructor(): SpeechRecognitionConstructor | null {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as SpeechRecognitionWindow;
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
 }
 
 function aiCleanupSignature() {
@@ -8712,8 +9021,57 @@ select:hover {
   font-size: 18px;
 }
 
+.docs-live-modal {
+  width: min(1120px, 100%);
+}
+
+.docs-live-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.docs-live-grid label,
+.docs-live-voice {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.docs-live-wide,
+.docs-live-preview {
+  grid-column: 1 / -1;
+}
+
+.docs-live-voice {
+  padding: 10px;
+  border: 1px solid #d7dee7;
+  border-radius: 8px;
+  background: #eef3f8;
+}
+
+.docs-live-voice-actions,
+.docs-live-preview header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.docs-live-voice-actions span,
+.docs-live-preview span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.docs-live-preview {
+  display: grid;
+  gap: 8px;
+}
+
 .modal textarea,
-.modal input {
+.modal input,
+.modal select {
   width: 100%;
   border: 1px solid #bac4d1;
   border-radius: 6px;
@@ -8969,6 +9327,10 @@ select:hover {
   }
 
   .compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .docs-live-grid {
     grid-template-columns: 1fr;
   }
 }

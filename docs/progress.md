@@ -80,6 +80,13 @@ Recent pushed checkpoints visible in current git history:
   SHA-256 identity through `NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/signoff.json`.
   Stale sign-off files from older static/runtime accessibility reports fail
   validation instead of closing the assistive-technology readiness gap.
+- Docs Live now gives the workbench a voice-guided first-draft path. The
+  Writing toolbar, Outline panel, command palette, and native Writing Tools menu
+  can open a Docs Live dialog that accepts dictation where Web Speech is
+  available, freeform document context, placeholder values, generated
+  questionnaire prompts, and an existing or planned outline, then creates
+  section-by-section Markdown with AI provenance, needs-review section markers,
+  quality-assurance checks, humanization tasks, and reviewer notes.
 - The release-grade local baseline now runs both
   `pnpm run check:a11y:runtime` and `pnpm run check:a11y:manual` after the full
   browser workflow suite. This keeps the focused runtime accessibility report
@@ -335,11 +342,18 @@ Recent pushed checkpoints visible in current git history:
   workbench workflows locally, including first-class outline mode CRUD,
   editor/preview typing, settings persistence, command palette navigation,
   collapsible toolbars, responsive desktop/narrow layout proof, fold/unfold
-  controls, file/save/rename/reveal flows, snapshots, workspace
-  restore, stale-save conflicts, include watchers, AI governance, and export
+  controls, file/save/rename/reveal flows, snapshots, workspace restore,
+  stale-save conflicts, include watchers, AI governance, and export
   readiness/success/failure, transform template management, deep keyboard-only
   workbench operation, plus browser UI handoff coverage for blog,
   Substack, LaTeX, and Google Docs package targets.
+- The checked-in browser harness now includes a Docs Live workflow in addition
+  to the prior 52-test baseline. The focused
+  `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "Docs Live" --project chromium`
+  run passed on 2026-05-23, proving the modal opens from the Writing toolbar,
+  accepts document type, outline, spoken direction, context, and placeholder
+  values, generates provenance-bearing Markdown, applies it to the editor, and
+  renders the review-preparation section in preview.
 - This update fixes workflow bugs found by that browser run: command-palette
   editor commands now regain editor focus after the modal closes, CodeMirror
   enables multiple selections for multi-cursor commands, prepare-for-export and
@@ -920,12 +934,13 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Accessibility runtime audit: pnpm run check:a11y:runtime` and `Accessibility manual review contract: pnpm run check:a11y:manual` after the browser workflow suite. |
 | `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now ends with `Release readiness aggregation: pnpm run check:release-readiness`. |
 | `pnpm run check:release-readiness` | Pass with external gaps | Aggregates 18 accepted reports into `.tmp/release-readiness/report.json`, including the Google Docs import, external platform, and release signing evidence contracts, with zero failed required checks and eight explicit external evidence gaps: signing/notarization, Windows/Linux WebDriver execution, Windows package artifacts, Linux package artifacts, Google Docs live import/readback, rendered export native-viewer sign-off, accessibility assistive-technology sign-off, and missing optional Pikchr. |
-| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 52 Chromium workflow tests in `e2e/app-workflows.spec.ts`, including first-class outline mode CRUD. |
+| `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 53 Chromium workflow tests in `e2e/app-workflows.spec.ts`, including first-class outline mode CRUD and the Docs Live draft workflow. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host through the workspace-local Playwright Chromium cache at `.tmp/ms-playwright`; `.tmp/e2e-environment/report.json` records `source: playwright-bundled`, the cache executable path, and the passing command tail. |
 | `pnpm run check:a11y:runtime` | Pass | Focused runtime accessibility audit passed 6 Chromium workflows on this host with browser-launch permission, covering skip links, primary regions across desktop/narrow viewports, modal focus/Escape return, keyboard-only deep controls, status/progress live regions, and editor settings/search/heading commands; `.tmp/accessibility/runtime-report.json` records the expected workflows, command, browser output tail, and zero issues. |
 | `pnpm run check:a11y:manual` | Pass | Wrote `.tmp/accessibility/manual-review-template.json` and `.tmp/accessibility/manual-review-summary.json` with `pending-human-review` status for the required manual screen-reader/native assistive-technology checklist. |
 | `NEDITOR_ACCESSIBILITY_SIGNOFF=.tmp/accessibility/completed-review-smoke.json pnpm run check:a11y:manual` | Pass | Validated the completed-signoff path against a local smoke reviewer file, requiring static/runtime accessibility reports, reviewer metadata, platform, assistive technology, passing checklist notes, and zero unresolved blockers before marking the summary `human-reviewed`. This proves the validator contract, not a completed real manual review. |
-| `pnpm run test:e2e` | Pass | 52 Chromium browser workbench workflows passed locally on this host, including editable outline-first document planning, first-class outline mode CRUD, collapsible toolbars, responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
+| `pnpm run test:e2e` | Pass | The previous full baseline passed 52 Chromium browser workbench workflows locally on this host, including editable outline-first document planning, first-class outline mode CRUD, collapsible toolbars, responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "Docs Live" --project chromium` | Pass | Focused Docs Live browser workflow passed on this host, covering Writing-toolbar launch, document type, outline, spoken direction, context, placeholder values, generated Markdown preview, draft application, and rendered review-preparation output. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
 | `pnpm run test:desktop-bundle` | Pass | Verified `NEditor.app` Info.plist metadata, bundle identifier, version, executable, icon, copyright, and high-resolution flag; wrote `.tmp/desktop-bundle/macos-app-report.json`. |

@@ -281,6 +281,7 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             "Transform Templates",
         )?)
         .separator()
+        .item(&menu_item(app, "neditor-open-docs-live", "Docs Live")?)
         .item(&menu_item(app, "neditor-clean-ai-paste", "Clean AI Paste")?)
         .build()?;
 

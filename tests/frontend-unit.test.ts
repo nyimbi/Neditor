@@ -16,6 +16,7 @@ import {
 } from "../src/lib/bibliographyManager.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
+import { buildDocsLiveDraft, buildDocsLiveQuestionnaire, extractDocsLivePlaceholders } from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
 import {
@@ -267,6 +268,39 @@ test("editable outline planner creates document skeletons before drafting conten
   ok(markdown.includes("<!-- Draft this section. -->"));
 
   equal(outlinePlanFromMarkdown(markdown), "- Board Brief\n  - Executive Summary\n    - Decision Needed\n    - Key Risks\n  - Financial Case\n    - Launch Plan");
+});
+
+test("Docs Live turns outline, voice context, and placeholders into a reviewable draft", () => {
+  deepEqual(extractDocsLivePlaceholders("client: Acme\nAudience is executive team.\ndeadline: June 1"), {
+    client: "Acme",
+    audience: "executive team",
+    deadline: "June 1",
+  });
+
+  const questionnaire = buildDocsLiveQuestionnaire("proposal");
+  ok(questionnaire.includes("Who is the client or sponsor?"));
+
+  const draft = buildDocsLiveDraft({
+    documentType: "proposal",
+    title: "Acme Renewal Proposal",
+    outline: "- Executive Summary\n- Proposed Approach\n- Investment",
+    transcript: "Create a client proposal for Acme. The audience is the executive team. Focus on a fast first draft.",
+    context: "The goal is to renew the platform contract. Include a clear recommendation and review notes.",
+    placeholders: "client: Acme\nowner: Commercial team\ndeadline: June 1",
+    generatedAt: "2026-05-23T09:00:00.000Z",
+  });
+
+  equal(draft.documentType, "proposal");
+  equal(draft.title, "Acme Renewal Proposal");
+  equal(draft.sections.length, 3);
+  equal(draft.placeholders.client, "Acme");
+  ok(draft.markdown.includes("provider: NEditor Docs Live"));
+  ok(draft.markdown.includes("model: local-guided-drafting"));
+  ok(draft.markdown.includes("<!-- ai-assisted: status=needs-review"));
+  ok(draft.markdown.includes("## Review Preparation"));
+  ok(draft.markdown.includes("### Quality Assurance"));
+  ok(draft.markdown.includes("### Humanization Pass"));
+  ok(draft.markdown.includes("Commercial team"));
 });
 
 test("preview debounce coalesces edits inside the spec timing budget", () => {
@@ -538,6 +572,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Collapse all toolbars"));
   ok(app.includes("Expand all toolbars"));
   ok(app.includes("toggleToolbarRow"));
+  ok(app.includes("Docs Live"));
+  ok(app.includes("openDocsLiveFromOutline"));
+  ok(app.includes("SpeechRecognition"));
+  ok(app.includes("buildDocsLiveDraft"));
+  ok(app.includes("Generate draft"));
   ok(app.includes("Export HTML"));
   ok(app.includes('id: "export-html", label: "HTML Export", title: "Export standalone HTML"'));
   ok(app.includes('aria-label="HTML export options"'));
@@ -561,6 +600,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Edit")'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "View")'));
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
+  ok(tauriLib.includes('"neditor-open-docs-live", "Docs Live"'));
   ok(tauriLib.includes('"neditor-mode-outline", "Outline Mode"'));
   ok(app.includes('case "neditor-mode-export"'));
   ok(app.includes('case "neditor-mode-outline"'));
@@ -578,7 +618,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   for (const label of ["Document", "Manage", "Write", "Navigate", "Insert", "Review"]) {
     ok(app.includes(`label: "${label}"`), `missing ${label} command group`);
   }
-  for (const icon of ["saveAs", "snapshot", "templates", "equation", "outline", "fold", "unfold", "comment", "html", "collapse", "expand"]) {
+  for (const icon of ["saveAs", "snapshot", "templates", "equation", "outline", "fold", "unfold", "comment", "html", "mic", "collapse", "expand"]) {
     ok(app.includes(`${icon}: [`), `missing ${icon} icon path`);
   }
   ok(app.includes('store.sidebar === \'templates\''));

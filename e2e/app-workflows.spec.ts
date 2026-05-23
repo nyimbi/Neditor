@@ -1844,6 +1844,34 @@ test("creates a document skeleton from an editable outline plan", async ({ page 
   expect(await editorText(page)).toContain("<!-- Draft this section. -->");
 });
 
+test("generates a Docs Live draft from outline, context, and placeholders", async ({ page }) => {
+  await page.getByRole("button", { name: "Docs Live", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Docs Live voice drafting" });
+  await expect(dialog).toBeVisible();
+
+  await dialog.getByLabel("Document type").selectOption("proposal");
+  await dialog.getByLabel("Document title").fill("Acme Renewal Proposal");
+  await dialog.getByLabel("Outline").fill("- Executive Summary\n- Proposed Approach\n- Investment");
+  await dialog
+    .getByLabel("Spoken direction")
+    .fill("Create a client proposal for Acme. The audience is the executive team. Focus on a fast first draft.");
+  await dialog
+    .getByLabel("Context and answers")
+    .fill("The goal is to renew the platform contract. Include a clear recommendation and review notes.");
+  await dialog.getByLabel("Placeholder values").fill("client: Acme\nowner: Commercial team\ndeadline: June 1");
+
+  await dialog.getByRole("button", { name: "Generate draft" }).click();
+  await expect(dialog.getByText("3 drafted sections")).toBeVisible();
+  await expect(dialog.getByLabel("Docs Live generated Markdown")).toHaveValue(/provider: NEditor Docs Live/);
+  await dialog.getByRole("button", { name: "Apply draft" }).click();
+
+  await expect(dialog).toBeHidden();
+  const text = await editorText(page);
+  expect(text).toContain("# Acme Renewal Proposal");
+  expect(text).toContain("<!-- ai-assisted: status=needs-review");
+  await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Review Preparation");
+});
+
 test("edits document structure from outline mode", async ({ page }) => {
   await setMockFileText(
     page,

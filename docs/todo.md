@@ -786,8 +786,9 @@ wrapper from a terminal/session that permits Chromium launch.
 
 Current host evidence:
 
-- 2026-05-23: `pnpm exec playwright test --list` lists 52 Chromium workflow
-  tests in `e2e/app-workflows.spec.ts`.
+- 2026-05-23: `pnpm exec playwright test --list` lists 53 Chromium workflow
+  tests in `e2e/app-workflows.spec.ts`, including the Docs Live browser
+  workflow.
 - 2026-05-23: `pnpm run check:e2e-env` passes the focused workbench boot
   workflow through the workspace-local Playwright Chromium cache at
   `.tmp/ms-playwright`.
@@ -795,6 +796,8 @@ Current host evidence:
   including collapsible toolbars, the HTML, blog/Substack, LaTeX, and Google
   Docs export-target handoff tests, deep keyboard-only workbench operation, and
   outline-mode CRUD.
+- 2026-05-23: `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "Docs Live" --project chromium`
+  passed after adding the Docs Live workflow to the checked-in harness.
 - 2026-05-23: `pnpm run verify:local -- --list` shows the browser workflow
   environment preflight in the quick baseline, and
   `pnpm run verify:local:full -- --list` shows the full browser workflow suite
@@ -1479,10 +1482,18 @@ Finish:
 
 ### 12. AI Paste Cleanup And Governance
 
-Status: backend cleanup and UI exist; governance workflows need proof.
+Status: backend cleanup, Docs Live drafting UI, and governance workflows exist;
+runtime microphone/clipboard proof and richer rendered QA remain.
 
 Finish:
 
+- Docs Live voice-guided drafting. The Writing toolbar, Outline panel, command
+  palette, and native Writing Tools menu now open Docs Live; it accepts Web
+  Speech dictation where available, freeform context, generated questionnaire
+  prompts, placeholder values, and an outline, then drafts section-by-section
+  Markdown with AI provenance, needs-review markers, QA checks, humanization
+  tasks, and reviewer notes. Remaining work is browser/native microphone
+  permission proof and deeper model-provider integration.
 - Browser tests for clipboard/rich paste and provenance toggles. Insert, quote,
   appendix, replace document, merge into section, replace selection, citation
   TODO, draft marker, and provenance block workflows are now covered in the

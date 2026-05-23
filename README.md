@@ -79,6 +79,7 @@ uses it.
 | I need to... | What to do in NEditor |
 | --- | --- |
 | Draft a board paper, proposal, report, or briefing note | Start in **Outline** mode, create the structure, then fill in each section. |
+| Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, dictate the intent, add placeholder values, generate a questionnaire if helpful, then apply the section-by-section draft for review. |
 | Reuse a company format | Start from an approved Markdown template or example document, then save a copy for the new engagement. |
 | Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
 | Send a client-facing document | Export to PDF or DOCX, depending on what the recipient expects. |
@@ -93,6 +94,8 @@ uses it.
 - Long reports, proposals, business cases, strategy papers, research briefs, and
   technical documents.
 - Documents that need structured outlines before the body text is written.
+- Voice-guided first drafts where an outline, context, and placeholder values
+  should become a structured reviewable document.
 - Repeatable exports where the same source can become HTML, PDF, DOCX, PPTX,
   Markdown bundle, blog, Substack, LaTeX, or Google Docs handoff files.
 - Review-heavy work where comments, approval metadata, release status, AI
