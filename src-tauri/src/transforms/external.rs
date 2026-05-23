@@ -262,7 +262,11 @@ fn external_engine_adapter(
         ("pikchr", "file") if pikchr_uses_source_file_argument(engine_path) => {
             Ok(ExternalEngineAdapter::stdout("pikchr", "file", vec![temp]))
         }
-        ("pikchr", "stdin") => Ok(ExternalEngineAdapter::stdout("pikchr", "stdin", Vec::new())),
+        ("pikchr", "stdin") => Ok(ExternalEngineAdapter::stdout(
+            "pikchr",
+            "stdin",
+            vec!["-".to_string()],
+        )),
         ("pikchr", "file") => Ok(ExternalEngineAdapter::stdout("pikchr", "file", vec![temp])),
         (_, "stdin" | "file") => Err(format!("No external adapter is registered for {name}.")),
         _ => Err("External transform input_mode must be 'stdin' or 'file'.".to_string()),
@@ -1013,7 +1017,7 @@ fn transform_adapter_profile(name: &str) -> &'static str {
         "twopi" => "Graphviz twopi adapter: invokes -Tsvg and captures SVG from stdout.",
         "d2" => "D2 adapter: invokes input-to-stdout mode with '-' as the output target.",
         "plantuml" => "PlantUML adapter: uses -tsvg/-tpng with -pipe for stdin, or reads PlantUML's SVG/PNG sidecar for file mode.",
-        "pikchr" => "Pikchr adapter: passes stdin directly, a temporary Pikchr source file, or a temporary source file path for pikchr-cli.",
+        "pikchr" => "Pikchr adapter: passes stdin with '-', a temporary Pikchr source file, or a temporary source file path for pikchr-cli.",
         _ => "No external adapter; rendered by the embedded Rust engine.",
     }
 }

@@ -2676,9 +2676,10 @@ External transform engine smoke verification:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `node --check scripts/check-external-engines.mjs` | Pass | Optional engine probe syntax remains valid after adding adapter-shaped smoke artifact generation. |
-| `pnpm run check:engines` | Partial pass | Darwin arm64 reports Graphviz `dot`, `circo`, `neato`, `fdp`, `osage`, `twopi`, D2, and PlantUML installed and smoke-compatible; `.tmp/external-engines/probe-report.json` records SVG smoke artifacts under `.tmp/external-engines/artifacts/` for each installed engine, while Pikchr remains missing as an explicit optional-engine gap. |
-| `node -e 'const r=require("./.tmp/external-engines/probe-report.json"); ... smoke ...'` | Pass | Probe report contains 8 installed engines, 8 passing smoke artifacts, zero incompatible engines, and the expected missing `pikchr or pikchr-cli` entry. |
-| `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture` in `src-tauri` | Pass | Rust conformance continues to verify installed Graphviz variants, D2, and PlantUML through NEditor's external transform execution path, with Pikchr skipped because it is not installed. |
+| `NEDITOR_TEST_PIKCHR=/Users/nyimbiodero/src/pjs/tooling/neditor/.tmp/pikchr-build/pikchr-trunk/pikchr pnpm run check:engines` | Pass | Darwin arm64 reports Graphviz `dot`, `circo`, `neato`, `fdp`, `osage`, `twopi`, D2, PlantUML, and the locally built Pikchr executable installed and smoke-compatible; `.tmp/external-engines/probe-report.json` records SVG smoke artifacts under `.tmp/external-engines/artifacts/`, including `pikchr.svg`. |
+| `node -e 'const r=require("./.tmp/external-engines/probe-report.json"); ... smoke ...'` | Pass | Probe report contains 9 installed engines, 9 passing smoke artifacts, zero incompatible engines, and zero unresolved missing optional-engine evidence on this host. |
+| `cargo test --locked external_transform_adapters_shape_engine_specific_invocations --lib` in `src-tauri` | Pass | Focused adapter coverage proves modern Pikchr stdin execution passes the `-` stdin marker and keeps the `pikchr-cli` source-file argument shape working. |
+| `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture` in `src-tauri` | Pass | Rust conformance continues to verify installed Graphviz variants, D2, PlantUML, and any configured Pikchr path through NEditor's external transform execution path. |
 | `pnpm run test:unit` | Pass | 21 frontend unit tests passed, including static guards that `check:engines` keeps smoke artifacts, incompatible-engine failure reporting, PlantUML file-mode proof, and Pikchr CLI detection wired. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the stronger external-engine platform evidence; all local links resolved. |
 
@@ -2713,6 +2714,7 @@ Live Google Docs import attempt:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | Google Drive `_import_document` with `.tmp/rendered-export-audit/rendered-export-audit.docx` | Blocked by connector authorization | The current connector call returned `token_expired` before upload/conversion; an earlier attempt reached the Drive upload-conversion endpoint and returned `403 Forbidden`. The exported DOCX/package remains locally verified, and live import proof needs a refreshed Google Drive OAuth scope or another authorized Drive session. |
+| Google Drive `_import_document` with `.tmp/rendered-export-audit/rendered-export-audit.docx` on 2026-05-23 | Blocked by connector authorization | The connector still returns `token_expired`, so no live upload/conversion/readback evidence can be generated from this session until Drive authorization is refreshed. |
 
 ## Next Execution Order
 

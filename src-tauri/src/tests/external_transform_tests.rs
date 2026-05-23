@@ -339,6 +339,37 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
         })
     }));
 
+    let pikchr_stdin = std::env::temp_dir().join(format!("pikchr-stdin-dash-{unique}.sh"));
+    fs::write(
+        &pikchr_stdin,
+        "#!/bin/sh\nif [ \"$1\" != '-' ]; then echo 'expected stdin marker' >&2; exit 2; fi\nprintf '<svg>'\ncat\nprintf '</svg>'\n",
+    )
+    .expect("write fake pikchr stdin executable");
+    let mut permissions = fs::metadata(&pikchr_stdin)
+        .expect("fake pikchr stdin metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&pikchr_stdin, permissions).expect("make fake pikchr stdin executable");
+    let pikchr_stdin_artifact = run_external_transform(ExternalTransformRequest {
+        name: "pikchr".to_string(),
+        body: pikchr_body.clone(),
+        engine_path: Some(path_to_string(&pikchr_stdin)),
+        trusted: true,
+        input_mode: Some("stdin".to_string()),
+        output_format: None,
+        timeout_ms: Some(1000),
+        max_input_bytes: Some(1024),
+        max_output_bytes: Some(2048),
+    })
+    .expect("pikchr stdin marker adapter transform");
+    assert!(pikchr_stdin_artifact.html.contains(&pikchr_body));
+    assert!(pikchr_stdin_artifact.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .related
+            .iter()
+            .any(|related| related == "adapter_args: -")
+    }));
+
     let engines = list_transform_engines();
     let graphviz = engines
         .iter()
@@ -390,6 +421,7 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
     let _ = fs::remove_file(plantuml);
     let _ = fs::remove_file(plantuml_png);
     let _ = fs::remove_file(pikchr_cli);
+    let _ = fs::remove_file(pikchr_stdin);
 }
 
 #[cfg(unix)]

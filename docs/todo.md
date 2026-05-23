@@ -1287,10 +1287,10 @@ Completion criteria:
 ### 7. External Transform Platform Evidence
 
 Status: Linux installed-engine evidence passed historically, this macOS host
-has current local Graphviz/DOT, D2, and PlantUML evidence, and the Graphviz
-adapter now exposes the requested `dot`, `graphviz`, `circo`, `neato`, `fdp`,
-`osage`, and `twopi` transform names. Pikchr on macOS and all Windows
-optional-engine evidence remain incomplete.
+has current local Graphviz/DOT, D2, PlantUML, and Pikchr evidence, and the
+Graphviz adapter now exposes the requested `dot`, `graphviz`, `circo`, `neato`,
+`fdp`, `osage`, and `twopi` transform names. Windows optional-engine evidence
+remains incomplete.
 
 Finish:
 
@@ -1308,9 +1308,11 @@ Finish:
   every installed engine and fails if an installed engine cannot render the
   expected adapter-shaped smoke output; it also emits
   `.tmp/external-engines/templates/` evidence templates and validates copied
-  external `neditor.external-engine-evidence.v1` proof for engines such as
-  Pikchr that are missing locally. Pikchr remains missing on this host until it
-  is installed locally or accepted external evidence is supplied.
+  external `neditor.external-engine-evidence.v1` proof for engines that are
+  missing locally. This host now builds Pikchr into `.tmp/pikchr-build/` for
+  evidence and runs `NEDITOR_TEST_PIKCHR=... pnpm run check:engines`, so
+  `.tmp/external-engines/probe-report.json` records Pikchr as installed with a
+  passing SVG smoke artifact.
 - Native Pikchr fallback now handles compact semicolon-separated statements,
   connector labels, and common business shapes (`box`, `circle`/`ellipse`,
   `diamond`, `cylinder`, and `file`) so useful previews still render before an
@@ -1324,7 +1326,9 @@ Finish:
   evidence template contract.
 - Confirm Windows `.exe` paths and package-manager shims.
 - Confirm PlantUML SVG and PNG file mode on all platforms.
-- Confirm Pikchr stdin/file/argument mode for each supported executable shape.
+- Confirm Pikchr stdin/file/argument mode for each supported executable shape
+  on Windows and Linux; macOS now proves the standard stdin `-` marker and the
+  `pikchr-cli` source-file argument shape.
 - Cache invalidation now includes adapter identity, executable path, executable
   file size/mtime, adapter arguments, input mode, renderer version, and source
   hash; `external_transform_cache_invalidates_when_trusted_executable_changes`

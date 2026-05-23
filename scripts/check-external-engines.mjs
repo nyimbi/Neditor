@@ -398,7 +398,7 @@ function runSmoke(engine, commandPath) {
       });
       output = result.stdout || "";
     } else {
-      const args = engine.smoke.kind === "pikchr" ? [] : engine.smoke.args;
+      const args = engine.smoke.kind === "pikchr" ? ["-"] : engine.smoke.args;
       result = spawnSync(commandPath, args, {
         input: engine.smoke.source,
         encoding: "utf8",
