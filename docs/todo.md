@@ -1039,8 +1039,12 @@ Current evidence:
   Google Docs import workflow metadata assertions, and nested Google Docs DOCX
   package assertions. It now also writes `visual-review-summary.json`, mapping
   primary targets and review cases to browser screenshot proof, Poppler raster
-  proof, macOS native-tool proof, skipped host-limitations, and an explicit
-  `pending-human-review` sign-off state. It also writes
+  proof, macOS native-tool proof, skipped host-limitations, an explicit
+  `pending-human-review` sign-off state, and `automated-visual-review.json`.
+  The automated review report marks the audit `automated-reviewed` only when
+  the current host produces complete browser visual screenshots, PDF raster
+  proof, DOCX/PPTX Office preview extraction, Office preview screenshots, and
+  mapped proof for every primary and review-case export target. It also writes
   `visual-review-signoff.template.json`; completed manual native-viewer review
   can be validated by rerunning the audit with
   `NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json`, which checks reviewer
@@ -1111,9 +1115,11 @@ Needed proof:
 
 - Package/text assertions where appropriate.
 - More target-specific option combinations beyond the current focused matrix.
-- Additional rendered/manual visual inspection of more representative PDF/PPTX
-  artifacts across native viewers and platforms, plus DOCX visual QA beyond the
-  current macOS `textutil` extraction proof.
+- Additional rendered/manual visual inspection across native viewers and
+  platforms. The current host now has automated visual review across browser
+  HTML screenshots, PDF raster proof, DOCX/PPTX Office preview extraction, and
+  Office preview screenshots; remaining proof should focus on other platforms,
+  native viewers, and optional reviewer-supplied sign-off.
 - Fixture exports tied back to matrix rows.
 
 ### 6. Export Readiness Completeness

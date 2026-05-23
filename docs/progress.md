@@ -123,6 +123,12 @@ Recent pushed checkpoints visible in current git history:
 - This update also writes `.tmp/rendered-export-audit/manual-review.html`, a
   linked manual QA dashboard for the primary artifacts, review cases, checklist,
   hashes, and executable viewer/package proof.
+- This update adds `.tmp/rendered-export-audit/automated-visual-review.json`.
+  The report marks the current host `automated-reviewed` only when browser
+  screenshots, PDF raster thumbnails, DOCX/PPTX Office preview extraction,
+  Office preview screenshots, and mapped proof for every primary and review-case
+  target are complete; human sign-off remains a separate optional reviewer
+  contract.
 - This update adds local-first blog and Substack publishing packages as export
   targets. `blog` and `substack` exports write ZIP packages containing
   compiled Markdown, standalone blog HTML, a minimal Substack copy/paste HTML
@@ -2528,6 +2534,15 @@ Rendered export Office preview verification:
 | `pnpm run test:rendered-exports` | Pass | Rendered export audit passed and now writes `.tmp/rendered-export-audit/office-preview/office-preview-docx.html`, `.tmp/rendered-export-audit/office-preview/office-preview-pptx.html`, review-case DOCX/PPTX preview dashboards, and Chromium screenshots for each preview when the browser fallback is available. |
 | `pnpm run test:unit` | Pass | 20 frontend unit tests passed, including static guards that the rendered export audit keeps the Office preview proof, screenshots, and summary mapping wired. |
 | `pnpm run check:docs` | Pass | 13 Markdown files were checked after documenting the generated Office preview export proof; all local links resolved. |
+
+Rendered export automated visual-review verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/check-rendered-export-audit.mjs` | Pass | Rendered export audit verifier syntax remains valid after adding the current-host automated visual-review report. |
+| `pnpm run test:unit` | Pass | 22 frontend unit tests passed, including the static guard that the rendered export audit writes `automated-visual-review.json`, reports `automated-reviewed`, and maps `automatedVisualReview` into the summary. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit passed and `.tmp/rendered-export-audit/automated-visual-review.json` recorded `status: "automated-reviewed"` with complete browser visual screenshots, Office preview extraction, Office preview screenshots, PDF raster proof, primary-target proof, and review-case proof on this host. |
+| `rg -n "automated-visual-review\|automatedVisualReview\|automated-reviewed" .tmp/rendered-export-audit/viewer-proof.json .tmp/rendered-export-audit/visual-review-summary.json .tmp/rendered-export-audit/manual-review.html .tmp/rendered-export-audit/automated-visual-review.json` | Pass | The generated proof set links the automated review report from `viewer-proof.json`, `visual-review-summary.json`, and `manual-review.html`, and the report contains no blockers. |
 
 External transform engine smoke verification:
 

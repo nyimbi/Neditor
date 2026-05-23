@@ -185,12 +185,13 @@ if (issues.length > 0) {
 
 writeManualSignoffTemplate(auditReport, viewerProof);
 const humanSignoff = collectHumanSignoffEvidence(issues, viewerProof, auditReport);
+const automatedVisualReview = collectAutomatedVisualReviewEvidence(issues, viewerProof, auditReport);
 
 writeFileSync(
   join(auditDir, "viewer-proof.json"),
   `${JSON.stringify({ generatedAt: new Date().toISOString(), assertions: viewerProof }, null, 2)}\n`,
 );
-writeVisualReviewSummary(auditReport, viewerProof, humanSignoff);
+writeVisualReviewSummary(auditReport, viewerProof, humanSignoff, automatedVisualReview);
 writeManualReviewDashboard(auditReport, viewerProof);
 verifyManualReviewDashboard(issues, viewerProof);
 verifyVisualReviewSummary(issues, auditReport, viewerProof);
@@ -1324,6 +1325,117 @@ function collectHumanSignoffEvidence(issues, assertions, report) {
   };
 }
 
+function collectAutomatedVisualReviewEvidence(_issues, assertions, report) {
+  const assertionList = assertions.filter((assertion) => assertion.scope !== "automated-visual-review");
+  const primaryTargets = (report.targets || []).map((target) => automatedTargetEvidence(target, targetEvidence(target.target, assertionList)));
+  const reviewCases = (report.reviewCases || []).map((reviewCase) => ({
+    slug: reviewCase.slug,
+    title: reviewCase.title,
+    targets: (reviewCase.targets || []).map((target) =>
+      automatedTargetEvidence(target, targetEvidence(`${reviewCase.slug}:${target.target}`, assertionList)),
+    ),
+  }));
+
+  const browserVisualScopes = [
+    "browser-visual-primary-html",
+    "browser-visual-manual-dashboard",
+    ...(report.reviewCases || []).map((reviewCase) => `browser-visual-review-${reviewCase.slug}`),
+  ];
+  const officePreviewScopes = [
+    "office-preview-docx",
+    "office-preview-pptx",
+    ...(report.reviewCases || []).flatMap((reviewCase) => [
+      `office-preview-review-${reviewCase.slug}-docx`,
+      `office-preview-review-${reviewCase.slug}-pptx`,
+    ]),
+  ];
+  const hardFailures = assertionList.filter((assertion) => assertion.passed === false && !assertion.skipped);
+  const browserVisualComplete = scopesPassed(assertionList, browserVisualScopes);
+  const officePreviewComplete = scopesPassed(assertionList, officePreviewScopes);
+  const pdfRasterComplete = assertionList.some((assertion) => String(assertion.scope || "").startsWith("pdftoppm") && assertion.passed);
+  const officeScreenshotsComplete = officePreviewScopes.every((scope) =>
+    assertionList.some((assertion) => assertion.scope === `${scope}-screenshot` && assertion.passed),
+  );
+  const primaryEvidenceComplete = primaryTargets.every((target) => target.passedEvidenceCount > 0);
+  const reviewEvidenceComplete = reviewCases.every((reviewCase) =>
+    reviewCase.targets.every((target) => target.passedEvidenceCount > 0),
+  );
+  const status =
+    hardFailures.length === 0 &&
+    browserVisualComplete &&
+    officePreviewComplete &&
+    pdfRasterComplete &&
+    officeScreenshotsComplete &&
+    primaryEvidenceComplete &&
+    reviewEvidenceComplete
+      ? "automated-reviewed"
+      : "needs-review";
+  const blockers = [
+    ...hardFailures.map((assertion) => `Failed proof: ${assertion.scope} - ${assertion.assertion}`),
+    ...(!browserVisualComplete ? ["Chromium visual screenshots are incomplete."] : []),
+    ...(!officePreviewComplete ? ["Office XML preview extraction is incomplete."] : []),
+    ...(!officeScreenshotsComplete ? ["Office preview screenshots are incomplete."] : []),
+    ...(!pdfRasterComplete ? ["PDF raster thumbnail proof is unavailable on this host."] : []),
+    ...(!primaryEvidenceComplete ? ["One or more primary export targets lacks mapped proof."] : []),
+    ...(!reviewEvidenceComplete ? ["One or more rendered review-case targets lacks mapped proof."] : []),
+  ];
+  const reportPath = join(auditDir, "automated-visual-review.json");
+  const automatedReport = {
+    generatedAt: new Date().toISOString(),
+    status,
+    reviewer: {
+      name: "NEditor rendered export audit",
+      role: "automated current-host visual proof",
+      platform: process.platform,
+      arch: process.arch,
+      node: process.version,
+    },
+    acceptance: {
+      browserVisualComplete,
+      officePreviewComplete,
+      officeScreenshotsComplete,
+      pdfRasterComplete,
+      primaryEvidenceComplete,
+      reviewEvidenceComplete,
+      blockers,
+    },
+    primaryTargets,
+    reviewCases,
+  };
+  writeFileSync(reportPath, `${JSON.stringify(automatedReport, null, 2)}\n`);
+  assertions.push({
+    scope: "automated-visual-review",
+    assertion: "writes current-host automated visual review sign-off",
+    passed: status === "automated-reviewed",
+    skipped: status !== "automated-reviewed",
+    path: "automated-visual-review.json",
+    status,
+    blockers,
+  });
+  return {
+    status,
+    path: "automated-visual-review.json",
+    blockers,
+  };
+}
+
+function automatedTargetEvidence(target, evidence) {
+  const passedEvidence = evidence.filter((item) => item.passed);
+  return {
+    target: target.target,
+    path: target.path,
+    bytes: target.bytes,
+    sha256: target.sha256,
+    passedEvidenceCount: passedEvidence.length,
+    skippedEvidenceCount: evidence.filter((item) => item.skipped).length,
+    evidence,
+  };
+}
+
+function scopesPassed(assertions, scopes) {
+  return scopes.every((scope) => assertions.some((assertion) => assertion.scope === scope && assertion.passed));
+}
+
 function signoffArtifact(target) {
   return {
     target: target.target,
@@ -1549,7 +1661,7 @@ function verifyManualReviewDashboard(issues, assertions) {
   }
 }
 
-function writeVisualReviewSummary(report, assertions, humanSignoff) {
+function writeVisualReviewSummary(report, assertions, humanSignoff, automatedVisualReview) {
   const generatedAt = new Date().toISOString();
   const assertionList = Array.isArray(assertions) ? assertions : [];
   const primaryTargets = (report.targets || []).map((target) => ({
@@ -1601,6 +1713,11 @@ function writeVisualReviewSummary(report, assertions, humanSignoff) {
       reviewedAt: humanSignoff.reviewedAt || null,
       reason: humanSignoff.reason,
     },
+    automatedVisualReview: {
+      status: automatedVisualReview.status,
+      report: automatedVisualReview.path,
+      blockers: automatedVisualReview.blockers || [],
+    },
     primaryTargets,
     reviewCases,
     visualEvidence: {
@@ -1637,6 +1754,15 @@ function verifyVisualReviewSummary(issues, report, assertions) {
   }
   if (summary.humanSignoff?.template !== "visual-review-signoff.template.json") {
     issues.push("visual-review-summary.json does not link the structured human sign-off template");
+  }
+  if (!["automated-reviewed", "needs-review"].includes(summary.automatedVisualReview?.status)) {
+    issues.push("visual-review-summary.json has an invalid automated visual review status");
+  }
+  if (summary.automatedVisualReview?.report !== "automated-visual-review.json") {
+    issues.push("visual-review-summary.json does not link the automated visual review report");
+  }
+  if (!existsSync(join(auditDir, "automated-visual-review.json"))) {
+    issues.push("automated-visual-review.json was not generated");
   }
   if (summary.manualReviewDashboard !== "manual-review.html" || summary.viewerProof !== "viewer-proof.json") {
     issues.push("visual-review-summary.json does not link the manual dashboard and viewer proof");
@@ -1691,7 +1817,14 @@ function targetEvidence(target, assertions) {
   };
   const [reviewSlug, reviewTarget] = String(target).includes(":") ? String(target).split(":") : ["", target];
   const prefixes = reviewSlug
-    ? [`${reviewSlug}-${reviewTarget}`, `browser-visual-review-${reviewSlug}`, `office-preview-review-${reviewSlug}-${reviewTarget}`]
+    ? [
+        `${reviewSlug}-${reviewTarget}`,
+        ...(reviewTarget === "markdown-bundle" ? [`${reviewSlug}-bundle`] : []),
+        ...(reviewTarget === "pdf" ? [`pdftotext-review-${reviewSlug}`, `pdftoppm-review-${reviewSlug}`] : []),
+        ...(reviewTarget === "docx" ? [`macos-textutil-review-${reviewSlug}`] : []),
+        `browser-visual-review-${reviewSlug}`,
+        `office-preview-review-${reviewSlug}-${reviewTarget}`,
+      ]
     : scopesByTarget[target] || [target];
   return assertions
     .filter((assertion) => prefixes.some((prefix) => String(assertion.scope || "").startsWith(prefix)))

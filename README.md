@@ -258,7 +258,11 @@ nested Google Docs DOCX checks. It also writes
 `visual-review-summary.json`, which maps export targets and review cases to
 browser screenshots, PDF raster thumbnails, generated DOCX/PPTX Office preview
 dashboards, native tool proof, skipped host-limitation records, and human
-sign-off state. The audit also writes
+sign-off state. It also writes `automated-visual-review.json`, a current-host
+automated visual review report that requires browser-rendered HTML screenshots,
+PDF raster proof, Office XML preview extraction, Office preview screenshots, and
+mapped proof for every primary and review-case target before marking the audit
+`automated-reviewed`. The audit also writes
 `visual-review-signoff.template.json`; fill a copy and rerun with
 `NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/signoff.json` to validate completed
 manual native-viewer review. On macOS it also extracts DOCX text through
