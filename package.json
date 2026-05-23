@@ -14,6 +14,7 @@
     "check:docs": "node scripts/check-markdown-links.mjs",
     "check:engines": "node scripts/check-external-engines.mjs",
     "check:e2e-env": "node scripts/check-e2e-environment.mjs",
+    "check:platform-packaging": "node scripts/check-platform-packaging.mjs",
     "check:structure": "node scripts/check-project-structure.mjs",
     "verify:local": "node scripts/run-local-verification.mjs",
     "verify:local:full": "node scripts/run-local-verification.mjs --full",

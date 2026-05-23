@@ -1810,9 +1810,10 @@ Finish:
 
 ### 23. Cross-Platform Packaging Evidence
 
-Status: desktop shell compile, current-host macOS `.app` bundle evidence, and
-current-host macOS DMG failure classification are tested; Windows/Linux package
-evidence and signing/notarization stance remain incomplete.
+Status: desktop shell compile, host-independent platform package configuration,
+current-host macOS `.app` bundle evidence, and current-host macOS DMG failure
+classification are tested; Windows/Linux package artifact evidence remains
+incomplete.
 
 Finish:
 
@@ -1825,10 +1826,16 @@ Finish:
   host's sandboxed `hdiutil create` failure, where `hdiejectd` cannot start and
   `hdiutil` returns `Device not configured`, in
   `.tmp/desktop-bundle/macos-dmg-report.json`.
+- Cross-platform package configuration evidence: `pnpm run
+  check:platform-packaging` passes and writes
+  `.tmp/desktop-bundle/platform-package-config-report.json`, proving synchronized
+  npm/Cargo/Tauri package metadata, `bundle.targets: "all"`, macOS/Windows/Linux
+  icon coverage, production desktop window dimensions, CSP guardrails, MIT
+  license linkage, and the explicit `unsigned-local-builds` signing stance for
+  local artifacts.
 - Add Windows package evidence for the chosen `.msi`/`.exe` target.
 - Add Linux package evidence for AppImage/deb/rpm or the chosen bundle target.
-- Confirm icons, bundle identifier, app metadata, signing/notarization stance,
-  and updater stance.
+- Confirm updater stance and credentialed release signing/notarization evidence.
 
 ### 24. User Documentation
 

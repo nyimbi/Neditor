@@ -582,6 +582,7 @@ test("local verification scripts expose local baseline checks", () => {
   const verification = readFileSync("scripts/run-local-verification.mjs", "utf8");
   const e2eEnvironment = readFileSync("scripts/check-e2e-environment.mjs", "utf8");
   const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
+  const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:a11y"], "node scripts/check-accessibility.mjs");
@@ -589,6 +590,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:docs"], "node scripts/check-markdown-links.mjs");
   equal(scripts["check:engines"], "node scripts/check-external-engines.mjs");
   equal(scripts["check:e2e-env"], "node scripts/check-e2e-environment.mjs");
+  equal(scripts["check:platform-packaging"], "node scripts/check-platform-packaging.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
   equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
@@ -602,6 +604,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
   ok(verification.includes('command("Browser workflow environment", "node", ["scripts/check-e2e-environment.mjs"])'));
   ok(verification.includes('command("Browser workflow suite", "node", ["scripts/run-e2e.mjs"])'));
+  ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
   ok(verification.includes("Desktop macOS GUI launch smoke"));
   ok(verification.includes('NEDITOR_DESKTOP_SMOKE_LAUNCH: "1"'));
   ok(verification.includes("env: { ...process.env, ...item.env }"));
@@ -610,6 +613,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(e2eEnvironment.includes("isTransientBrowserLaunchFailure"));
   ok(browserEnv.includes('join(root, ".tmp", "ms-playwright")'));
   ok(browserEnv.includes("PLAYWRIGHT_BROWSERS_PATH: baseEnv.PLAYWRIGHT_BROWSERS_PATH ?? projectBrowserCache"));
+  ok(platformPackaging.includes("platform-package-config-report.json"));
+  ok(platformPackaging.includes("unsigned-local-builds"));
+  ok(platformPackaging.includes("windowsTilePng"));
+  ok(platformPackaging.includes("Tauri bundle targets must remain all-platform"));
 });
 
 test("external engine probe records render smoke artifacts", () => {

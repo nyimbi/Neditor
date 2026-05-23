@@ -192,6 +192,12 @@ Recent pushed checkpoints visible in current git history:
   sandboxed-host `hdiutil create` failure as
   `.tmp/desktop-bundle/macos-dmg-report.json` without masking unrelated
   packaging errors.
+- This update adds host-independent package configuration proof. `pnpm run
+  check:platform-packaging` verifies synchronized npm/Cargo/Tauri metadata,
+  all-platform bundle targets, macOS/Windows/Linux icon coverage, production
+  desktop window sizing, CSP guardrails, MIT license linkage, and the explicit
+  `unsigned-local-builds` signing stance, then writes
+  `.tmp/desktop-bundle/platform-package-config-report.json`.
 - This update makes optional external-engine platform evidence inspectable.
   `pnpm run check:engines` now writes
   `.tmp/external-engines/probe-report.json` with platform, architecture,
@@ -817,6 +823,8 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 28 export command tests passed, including blog/Substack publish packages, LaTeX export, Google Docs package export, sidecar manifests, readiness diagnostics, progress steps, and native command workflow smoke. |
 | `pnpm run verify:local` | Pass | Quick local verification passed: frontend typecheck, frontend unit tests, project structure, accessibility, dependency admission, Markdown links, Rust formatting, Rust `cargo check --locked`, and `git diff --check`. |
 | `pnpm run verify:local:full` | Pass | Full local verification passed: quick checks, production build, optional engine probe, native-watch check, clippy, 213 Rust tests, rendered export audit, Tauri no-bundle release compile, macOS `.app` bundle build/smoke plus DMG classification on this host, desktop artifact/native-command smoke, and the desktop WebDriver harness step. Optional engine probe writes `.tmp/external-engines/probe-report.json` and still reports Pikchr missing on this host. |
+| `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration audit passed and wrote `.tmp/desktop-bundle/platform-package-config-report.json` with synchronized npm/Cargo/Tauri metadata, `bundle.targets: "all"`, macOS/Windows/Linux icon coverage, production window dimensions, CSP guardrails, MIT license linkage, and `unsigned-local-builds` signing stance. |
+| `pnpm run verify:local:full -- --list` | Pass | The full local verification plan now includes `Platform package configuration: pnpm run check:platform-packaging` before the desktop release compile and host bundle checks. |
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 50 Chromium workflow tests in `e2e/app-workflows.spec.ts`. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host through the workspace-local Playwright Chromium cache at `.tmp/ms-playwright`; `.tmp/e2e-environment/report.json` records `source: playwright-bundled`, the cache executable path, and the passing command tail. |
 | `pnpm run test:e2e` | Pass | 50 Chromium browser workbench workflows passed locally on this host, including editable outline-first document planning, responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |

@@ -209,9 +209,10 @@ NEditor uses local verification rather than GitHub Actions. Run
 `pnpm run verify:local:full` for a release-grade baseline; it extends the quick
 checks with the production build, the full browser workflow suite, optional
 engine probe, native-watch check, clippy, full Rust tests, rendered export audit,
-Tauri no-bundle release compile, macOS `.app` bundle build/smoke and DMG
-classification on macOS, desktop artifact smoke, bounded macOS GUI launch smoke
-on macOS, and the desktop WebDriver smoke or platform skip evidence.
+platform package configuration audit, Tauri no-bundle release compile, macOS
+`.app` bundle build/smoke and DMG classification on macOS, desktop artifact
+smoke, bounded macOS GUI launch smoke on macOS, and the desktop WebDriver smoke
+or platform skip evidence.
 
 Use `pnpm run verify:local -- --list` or
 `pnpm run verify:local:full -- --list` to print the exact command sequence
@@ -247,6 +248,16 @@ and records paths, versions, byte counts, and compatibility status in
 `pnpm run check:deps` verifies that every JavaScript and Rust dependency in the
 project manifests has an entry in the dependency admission record and that
 NEditor package metadata still declares MIT licensing.
+
+`pnpm run check:platform-packaging` verifies cross-platform package
+configuration without requiring a Windows or Linux host. It checks synchronized
+npm/Cargo/Tauri version and license metadata, all-platform Tauri bundle targets,
+macOS/Windows/Linux icon coverage, production desktop window dimensions, CSP
+guardrails, root MIT license linkage, and writes
+`.tmp/desktop-bundle/platform-package-config-report.json` with the current
+`unsigned-local-builds` signing stance. Release distribution signing,
+notarization, and installer attestation remain credentialed release steps outside
+local verification.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
