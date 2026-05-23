@@ -20,7 +20,7 @@ const requiredReports = [
   requiredReport("external-platform-evidence", ".tmp/platform-evidence/report.json", [], platformEvidenceAccepted),
   requiredReport("release-signing-evidence", ".tmp/release-signing/report.json", [], releaseSigningAccepted),
   requiredReport("desktop-command-smoke", ".tmp/desktop-smoke/native-command-report.json", [], desktopCommandPassed),
-  requiredReport("rendered-export-audit", ".tmp/rendered-export-audit/rendered-export-audit-report.json", [], reportExists),
+  requiredReport("rendered-export-audit", ".tmp/rendered-export-audit/rendered-export-audit-report.json", [], renderedExportAuditAccepted),
   requiredReport("rendered-export-visual-summary", ".tmp/rendered-export-audit/visual-review-summary.json", [], visualSummaryPassed),
   requiredReport("google-docs-import-evidence", ".tmp/google-docs-import/report.json", [], googleDocsImportAccepted),
   requiredReport("external-engine-probe", ".tmp/external-engines/probe-report.json", [], externalEngineProbePassed),
@@ -283,6 +283,32 @@ function releaseSigningAccepted(report) {
       invalid === 0
         ? `releaseSigningEvidence=${report.status || "unknown"}`
         : `invalid release signing evidence count=${invalid}`,
+  };
+}
+
+function renderedExportAuditAccepted(report) {
+  const targetNames = new Set((Array.isArray(report.targets) ? report.targets : []).map((target) => target?.target));
+  const requiredTargets = ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"];
+  const missingTargets = requiredTargets.filter((target) => !targetNames.has(target));
+  const reviewCases = Array.isArray(report.reviewCases) ? report.reviewCases : [];
+  const reviewCaseBySlug = new Map(reviewCases.map((reviewCase) => [reviewCase?.slug, reviewCase]));
+  const missingReviewCases = ["rich-blocks", "option-heavy"].filter((slug) => !reviewCaseBySlug.has(slug));
+  const incompleteReviewCases = [];
+  for (const slug of ["rich-blocks", "option-heavy"]) {
+    const reviewCase = reviewCaseBySlug.get(slug);
+    if (!reviewCase) continue;
+    const caseTargets = new Set((Array.isArray(reviewCase.targets) ? reviewCase.targets : []).map((target) => target?.target));
+    const missingCaseTargets = ["html", "pdf", "docx", "pptx", "markdown-bundle"].filter((target) => !caseTargets.has(target));
+    if (missingCaseTargets.length > 0) incompleteReviewCases.push(`${slug}:${missingCaseTargets.join(",")}`);
+  }
+  const checklistCount = Array.isArray(report.manualChecklist) ? report.manualChecklist.length : 0;
+  const accepted = missingTargets.length === 0 && missingReviewCases.length === 0 && incompleteReviewCases.length === 0 && checklistCount >= 7;
+  return {
+    accepted,
+    status: accepted ? "accepted" : "incomplete",
+    detail: accepted
+      ? `renderedTargets=${requiredTargets.length} reviewCases=${reviewCases.length} checklist=${checklistCount}`
+      : `missingTargets=${missingTargets.join(",") || "none"} missingReviewCases=${missingReviewCases.join(",") || "none"} incompleteReviewCases=${incompleteReviewCases.join(";") || "none"} checklist=${checklistCount}`,
   };
 }
 

@@ -780,6 +780,9 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("release-signing-and-notarization"));
   ok(script.includes("accessibility-assistive-technology-human-signoff"));
   ok(script.includes("rendered-export-native-viewer-human-signoff"));
+  ok(script.includes("renderedExportAuditAccepted"));
+  ok(script.includes('"markdown-bundle", "blog", "substack", "latex", "google-docs"'));
+  ok(script.includes('"rich-blocks", "option-heavy"'));
   ok(script.includes("invalidExternalEvidence"));
   ok(script.includes("engine.externalEvidence?.status !== \"accepted\""));
   ok(script.includes('"release-readiness"'));

@@ -232,6 +232,11 @@ Recent pushed checkpoints visible in current git history:
   Office preview screenshots, and mapped proof for every primary and review-case
   target are complete; human sign-off remains a separate optional reviewer
   contract.
+- Release readiness now validates the rendered export audit structure instead
+  of accepting the primary JSON report merely because it exists. The aggregator
+  requires all primary export targets, the rich-blocks and option-heavy review
+  cases, per-case HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts, and the manual
+  checklist before accepting the rendered export audit check.
 - This update adds local-first blog and Substack publishing packages as export
   targets. `blog` and `substack` exports write ZIP packages containing
   compiled Markdown, standalone blog HTML, a minimal Substack copy/paste HTML
