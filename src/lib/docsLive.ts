@@ -20,8 +20,11 @@ export interface DocsLiveDraftRequest {
   context?: string;
   transcript?: string;
   placeholders?: string;
+  draftingDepth?: DocsLiveDraftDepth;
   generatedAt?: string;
 }
+
+export type DocsLiveDraftDepth = "concise" | "standard" | "detailed";
 
 export interface DocsLiveDraft {
   title: string;
@@ -30,8 +33,26 @@ export interface DocsLiveDraft {
   questionnaire: string;
   markdown: string;
   placeholders: Record<string, string>;
-  sections: Array<{ title: string; level: number; qaFocus: string }>;
+  workflow: DocsLiveWorkflowStep[];
+  sections: DocsLiveSectionDraft[];
   issues: string[];
+}
+
+export interface DocsLiveWorkflowStep {
+  id: string;
+  label: string;
+  status: "ready" | "needs-input" | "complete";
+  detail: string;
+}
+
+export interface DocsLiveSectionDraft {
+  title: string;
+  level: number;
+  qaFocus: string;
+  draftingBrief: string;
+  qaChecks: string[];
+  humanizationNotes: string[];
+  reviewQuestions: string[];
 }
 
 interface DocsLiveBlueprint {
@@ -186,6 +207,9 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
   const generatedAt = request.generatedAt || new Date().toISOString();
   const contextSentences = extractContextSentences([request.transcript, request.context].filter(Boolean).join("\n"));
   const issues = buildDraftIssues(request, placeholders, sections);
+  const draftingDepth = normalizeDraftingDepth(request.draftingDepth);
+  const sectionDrafts = sections.map((section, index) => buildSectionDraft(section, index, blueprint, placeholders));
+  const workflow = buildDocsLiveWorkflow(sectionDrafts, placeholders, contextSentences, issues);
   const markdown = humanizeDraftText(
     [
       "---",
@@ -203,7 +227,13 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
       "",
       placeholdersTable(placeholders),
       "",
-      ...sections.flatMap((section, index) => draftSection(section, index, sections.length, blueprint, placeholders, contextSentences)),
+      docsLiveReviewMarker("Docs Live systematic outline-to-draft workflow"),
+      "",
+      draftingPlanTable(workflow, sectionDrafts, draftingDepth),
+      "",
+      ...sectionDrafts.flatMap((section, index) =>
+        draftSection(section, index, sectionDrafts.length, blueprint, placeholders, contextSentences, draftingDepth),
+      ),
       "## Review Preparation",
       "",
       "### Quality Assurance",
@@ -231,11 +261,8 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
     questionnaire: buildDocsLiveQuestionnaire(documentType),
     markdown,
     placeholders,
-    sections: sections.map((section, index) => ({
-      title: section.title,
-      level: section.level,
-      qaFocus: blueprint.sectionFocus[index % blueprint.sectionFocus.length],
-    })),
+    workflow,
+    sections: sectionDrafts,
     issues,
   };
 }
@@ -283,6 +310,48 @@ function buildDraftIssues(request: DocsLiveDraftRequest, placeholders: Record<st
   return issues;
 }
 
+function buildDocsLiveWorkflow(
+  sections: DocsLiveSectionDraft[],
+  placeholders: Record<string, string>,
+  contextSentences: string[],
+  issues: string[],
+): DocsLiveWorkflowStep[] {
+  return [
+    {
+      id: "outline",
+      label: "Outline locked",
+      status: sections.length ? "complete" : "needs-input",
+      detail: `${sections.length} planned section${sections.length === 1 ? "" : "s"} ready for systematic drafting.`,
+    },
+    {
+      id: "context",
+      label: "Context captured",
+      status: contextSentences.length || Object.keys(placeholders).length ? "complete" : "needs-input",
+      detail: contextSentences.length
+        ? `${Math.min(contextSentences.length, 12)} context point${contextSentences.length === 1 ? "" : "s"} available.`
+        : "Add freeform context, questionnaire answers, or placeholder values before final review.",
+    },
+    {
+      id: "draft",
+      label: "Section-by-section draft",
+      status: "complete",
+      detail: "Each outline item receives a body draft, local evidence prompts, and a review handoff.",
+    },
+    {
+      id: "qa",
+      label: "Quality assurance",
+      status: issues.length ? "needs-input" : "complete",
+      detail: issues.length ? `${issues.length} item${issues.length === 1 ? "" : "s"} need attention before review.` : "Generated QA gates are ready.",
+    },
+    {
+      id: "humanize",
+      label: "Humanization pass",
+      status: "complete",
+      detail: "Draft text is stripped of common AI phrasing and marked for human review.",
+    },
+  ];
+}
+
 function docsLiveSourceBlock(generatedAt: string, documentType: DocsLiveDocumentType, contextSentences: string[]) {
   const promptSummary = sanitizeMarkerValue(
     contextSentences[0] || `Voice-guided ${blueprints[documentType].label.toLowerCase()} draft from outline and placeholders`,
@@ -291,12 +360,29 @@ function docsLiveSourceBlock(generatedAt: string, documentType: DocsLiveDocument
     "```ai-source",
     "provider: NEditor Docs Live",
     "model: local-guided-drafting",
+    "workflow: outline-to-section-draft-qa-humanize-review",
     `date: ${generatedAt}`,
     `promptSummary: ${promptSummary}`,
     "reviewedBy: ",
     "reviewedAt: ",
     "status: needs-review",
     "```",
+  ].join("\n");
+}
+
+function draftingPlanTable(workflow: DocsLiveWorkflowStep[], sections: DocsLiveSectionDraft[], draftingDepth: DocsLiveDraftDepth) {
+  return [
+    "## Drafting Plan",
+    "",
+    `Docs Live will work through the outline section by section at ${draftingDepth} depth, then attach QA, humanization, and review handoff notes.`,
+    "",
+    "| Stage | Status | Detail |",
+    "| --- | --- | --- |",
+    ...workflow.map((step) => `| ${escapeTableCell(step.label)} | ${escapeTableCell(step.status)} | ${escapeTableCell(step.detail)} |`),
+    "",
+    "| Section | Drafting brief | QA focus |",
+    "| --- | --- | --- |",
+    ...sections.map((section) => `| ${escapeTableCell(section.title)} | ${escapeTableCell(section.draftingBrief)} | ${escapeTableCell(section.qaFocus)} |`),
   ].join("\n");
 }
 
@@ -312,37 +398,114 @@ function placeholdersTable(placeholders: Record<string, string>) {
   ].join("\n");
 }
 
-function draftSection(
+function buildSectionDraft(
   section: OutlinePlanItem,
+  index: number,
+  blueprint: DocsLiveBlueprint,
+  placeholders: Record<string, string>,
+): DocsLiveSectionDraft {
+  const focus = blueprint.sectionFocus[index % blueprint.sectionFocus.length];
+  const owner = placeholders.owner || placeholders.reviewer || "the named owner";
+  const evidence = placeholders.evidence || placeholders.source || "the strongest available evidence";
+  const draftingBrief = `Frame the ${focus} for ${placeholders.audience || "the intended reader"} and connect it to the next decision.`;
+  return {
+    title: section.title,
+    level: section.level,
+    qaFocus: focus,
+    draftingBrief,
+    qaChecks: [
+      `${section.title} makes one clear point before adding detail.`,
+      `Claims are tied to ${evidence}, a named owner, a date, or a citation.`,
+      `The section explains what ${owner} should do next.`,
+    ],
+    humanizationNotes: [
+      "Replace generic claims with named facts, numbers, teams, customers, dates, or examples.",
+      "Cut filler phrases, repeated framing, and any sentence that sounds like a prompt response.",
+      "Keep the cadence natural: short setup, specific evidence, then a concrete implication.",
+    ],
+    reviewQuestions: [
+      `Does ${section.title} answer the reader's likely first question?`,
+      "What is still unverified and should remain marked before approval?",
+    ],
+  };
+}
+
+function draftSection(
+  section: DocsLiveSectionDraft,
   index: number,
   total: number,
   blueprint: DocsLiveBlueprint,
   placeholders: Record<string, string>,
   contextSentences: string[],
+  draftingDepth: DocsLiveDraftDepth,
 ) {
   const level = Math.min(6, Math.max(2, section.level + 1));
-  const focus = blueprint.sectionFocus[index % blueprint.sectionFocus.length];
+  const childLevel = Math.min(6, level + 1);
   const audience = placeholders.audience || "the intended reader";
   const owner = placeholders.owner || placeholders.reviewer || "[owner]";
   const deadline = placeholders.deadline || placeholders.date || "[date]";
+  const subject = placeholders.client || placeholders.company || placeholders.customer || placeholders.product || placeholders.goal || blueprint.label.toLowerCase();
   const context = contextSentences[index % Math.max(1, contextSentences.length)] || "Use the provided outline and replace placeholders with verified facts.";
   const promptSummary = sanitizeMarkerValue(`Drafted ${section.title} section ${index + 1} of ${total}`);
+  const body = sectionBodyParagraphs(section, index, subject, audience, context, placeholders, contextSentences, draftingDepth);
   return [
-    `<!-- ai-assisted: status=needs-review | reviewedBy= | reviewedAt= | source=NEditor Docs Live | promptSummary=${promptSummary} -->`,
+    docsLiveReviewMarker(promptSummary),
     `${"#".repeat(level)} ${section.title}`,
     "",
-    `**Purpose.** This section should help ${audience} understand the ${focus} behind ${section.title.toLowerCase()}.`,
+    `**Drafting brief.** ${section.draftingBrief}`,
     "",
-    `**Draft.** ${context} Frame the point in plain language, name the tradeoff, and connect it to the action the reader should take.`,
+    ...body.flatMap((paragraph) => [paragraph, ""]),
+    `${"#".repeat(childLevel)} Section QA`,
     "",
-    "- Key point: [replace with the most important fact or recommendation].",
-    `- Owner: ${owner}.`,
-    `- Timing: ${deadline}.`,
-    "- Evidence: [add source, citation, table, or calculation].",
+    ...section.qaChecks.map((check) => `- [ ] ${check}`),
+    `- [ ] Owner and timing are explicit: ${owner}; ${deadline}.`,
     "",
-    "**Review focus.** Confirm the claim, remove unsupported qualifiers, and make the paragraph sound like a knowledgeable person wrote it.",
+    `${"#".repeat(childLevel)} Humanization Pass`,
+    "",
+    ...section.humanizationNotes.map((note) => `- [ ] ${note}`),
+    "",
+    `${"#".repeat(childLevel)} Review Handoff`,
+    "",
+    ...section.reviewQuestions.map((question) => `- ${question}`),
     "",
   ];
+}
+
+function docsLiveReviewMarker(promptSummary: string) {
+  return `<!-- ai-assisted: status=needs-review | reviewedBy= | reviewedAt= | source=NEditor Docs Live | promptSummary=${sanitizeMarkerValue(promptSummary)} -->`;
+}
+
+function sectionBodyParagraphs(
+  section: DocsLiveSectionDraft,
+  index: number,
+  subject: string,
+  audience: string,
+  context: string,
+  placeholders: Record<string, string>,
+  contextSentences: string[],
+  draftingDepth: DocsLiveDraftDepth,
+) {
+  const facts = factSentence(placeholders);
+  const first = `For ${subject}, ${section.title.toLowerCase()} should give ${audience} a direct read on ${section.qaFocus}. ${context}`;
+  const second = facts
+    ? `The current working facts are ${facts}. Use them to separate confirmed information from assumptions, then name the decision, risk, or action that follows.`
+    : "Replace the bracketed facts with confirmed details, then name the decision, risk, or action that follows.";
+  const third =
+    contextSentences[(index + 1) % Math.max(1, contextSentences.length)] ||
+    "Keep the prose specific enough for review while leaving unresolved claims visibly marked.";
+  const fourth = `Before this section is approved, remove unsupported certainty, add citations or calculations for factual claims, and keep only language a responsible human reviewer would stand behind.`;
+  if (draftingDepth === "concise") return [first, second];
+  if (draftingDepth === "detailed") return [first, second, third, fourth];
+  return [first, second, fourth];
+}
+
+function factSentence(placeholders: Record<string, string>) {
+  const entries = Object.entries(placeholders).filter(([key]) => !["tone", "reviewer", "approver"].includes(key));
+  if (!entries.length) return "";
+  return entries
+    .slice(0, 6)
+    .map(([key, value]) => `${titleCase(key)}: ${value}`)
+    .join("; ");
 }
 
 function qualityChecklist(sections: OutlinePlanItem[], placeholders: Record<string, string>) {
@@ -366,13 +529,25 @@ function extractContextSentences(input: string) {
 
 function humanizeDraftText(markdown: string) {
   return markdown
+    .replace(/\bas an ai(?: language model)?[:,]?\s*/gi, "")
+    .replace(/\bit is important to note that\s*/gi, "")
+    .replace(/\bin today'?s fast[- ]paced (?:world|environment),?\s*/gi, "")
+    .replace(/\bdelve into\b/gi, "examine")
+    .replace(/\bnavigate the complexities of\b/gi, "work through")
+    .replace(/\bcomprehensive\b/gi, "complete")
     .replace(/\butilize\b/gi, "use")
     .replace(/\bleverage\b/gi, "use")
     .replace(/\brobust\b/gi, "clear")
     .replace(/\bseamless\b/gi, "smooth")
+    .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trimEnd()
     .concat("\n");
+}
+
+function normalizeDraftingDepth(value?: string): DocsLiveDraftDepth {
+  if (value === "concise" || value === "standard" || value === "detailed") return value;
+  return "standard";
 }
 
 function normalizePlaceholderKey(key: string) {

@@ -85,8 +85,9 @@ Recent pushed checkpoints visible in current git history:
   can open a Docs Live dialog that accepts dictation where Web Speech is
   available, freeform document context, placeholder values, generated
   questionnaire prompts, and an existing or planned outline, then creates
-  section-by-section Markdown with AI provenance, needs-review section markers,
-  quality-assurance checks, humanization tasks, and reviewer notes.
+  section-by-section Markdown with an explicit drafting workflow table, AI
+  provenance, needs-review section markers, per-section quality-assurance
+  checks, humanization tasks, and reviewer handoff questions.
   The focused browser workflow now exercises the dictation path through a
   SpeechRecognition-compatible harness, and the bounded native launch smoke
   records `nativeMenuCommandEvidence.docsLive.open: true` from the desktop

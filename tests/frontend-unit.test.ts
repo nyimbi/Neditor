@@ -287,16 +287,25 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
     transcript: "Create a client proposal for Acme. The audience is the executive team. Focus on a fast first draft.",
     context: "The goal is to renew the platform contract. Include a clear recommendation and review notes.",
     placeholders: "client: Acme\nowner: Commercial team\ndeadline: June 1",
+    draftingDepth: "detailed",
     generatedAt: "2026-05-23T09:00:00.000Z",
   });
 
   equal(draft.documentType, "proposal");
   equal(draft.title, "Acme Renewal Proposal");
   equal(draft.sections.length, 3);
+  equal(draft.workflow[2].id, "draft");
+  equal(draft.workflow[4].id, "humanize");
+  equal(draft.sections[0].qaChecks.length, 3);
+  equal(draft.sections[0].humanizationNotes.length, 3);
   equal(draft.placeholders.client, "Acme");
   ok(draft.markdown.includes("provider: NEditor Docs Live"));
   ok(draft.markdown.includes("model: local-guided-drafting"));
+  ok(draft.markdown.includes("workflow: outline-to-section-draft-qa-humanize-review"));
   ok(draft.markdown.includes("<!-- ai-assisted: status=needs-review"));
+  ok(draft.markdown.includes("## Drafting Plan"));
+  ok(draft.markdown.includes("### Section QA"));
+  ok(draft.markdown.includes("### Review Handoff"));
   ok(draft.markdown.includes("## Review Preparation"));
   ok(draft.markdown.includes("### Quality Assurance"));
   ok(draft.markdown.includes("### Humanization Pass"));

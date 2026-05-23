@@ -1615,6 +1615,14 @@
             Document title
             <input v-model="docsLiveTitle" placeholder="Board brief, proposal, report" />
           </label>
+          <label>
+            Drafting depth
+            <select v-model="docsLiveDraftingDepth">
+              <option value="concise">Concise</option>
+              <option value="standard">Standard</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          </label>
           <label class="docs-live-wide">
             Outline
             <textarea v-model="docsLiveOutlineText" rows="7" placeholder="- Executive Summary&#10;- Recommendation&#10;- Next Steps"></textarea>
@@ -1656,6 +1664,27 @@
 
         <section v-if="docsLiveDraft?.issues.length" class="issue-list">
           <p v-for="issue in docsLiveDraft.issues" :key="issue">{{ issue }}</p>
+        </section>
+
+        <section v-if="docsLiveDraft" class="docs-live-workflow" aria-label="Docs Live section drafting workflow">
+          <header>
+            <strong>Systematic drafting workflow</strong>
+            <span>{{ docsLiveDraft.sections.length }} sections prepared for review</span>
+          </header>
+          <ol>
+            <li v-for="step in docsLiveDraft.workflow" :key="step.id" :data-status="step.status">
+              <strong>{{ step.label }}</strong>
+              <small>{{ step.status }}</small>
+              <span>{{ step.detail }}</span>
+            </li>
+          </ol>
+          <div class="docs-live-section-cards">
+            <article v-for="section in docsLiveDraft.sections" :key="section.title">
+              <strong>{{ section.title }}</strong>
+              <span>{{ section.qaFocus }}</span>
+              <p>{{ section.draftingBrief }}</p>
+            </article>
+          </div>
         </section>
 
         <section v-if="docsLiveGeneratedMarkdown" class="docs-live-preview" aria-label="Docs Live generated draft">
@@ -1823,7 +1852,14 @@ import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnost
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
-import { buildDocsLiveDraft, buildDocsLiveQuestionnaire, docsLiveDocumentTypes, type DocsLiveDocumentType, type DocsLiveDraft } from "./lib/docsLive";
+import {
+  buildDocsLiveDraft,
+  buildDocsLiveQuestionnaire,
+  docsLiveDocumentTypes,
+  type DocsLiveDocumentType,
+  type DocsLiveDraft,
+  type DocsLiveDraftDepth,
+} from "./lib/docsLive";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
 import { markdownListContinuation } from "./lib/markdownEditing";
 import {
@@ -1926,6 +1962,7 @@ const docsLivePlaceholderText = ref("");
 const docsLiveQuestionnaireText = ref(buildDocsLiveQuestionnaire("business-brief"));
 const docsLiveGeneratedMarkdown = ref("");
 const docsLiveDraft = ref<DocsLiveDraft | null>(null);
+const docsLiveDraftingDepth = ref<DocsLiveDraftDepth>("standard");
 const docsLiveInsertMode = ref<"replace" | "append" | "selection">("replace");
 const docsLiveListening = ref(false);
 const docsLiveSpeechStatus = ref("Voice ready");
@@ -6211,12 +6248,13 @@ function generateDocsLiveDraft() {
     transcript: docsLiveTranscript.value,
     context: docsLiveContext.value,
     placeholders: docsLivePlaceholderText.value,
+    draftingDepth: docsLiveDraftingDepth.value,
   });
   docsLiveDraft.value = draft;
   docsLiveGeneratedMarkdown.value = draft.markdown;
   docsLiveOutlineText.value = draft.outlineText;
   docsLiveTitle.value = draft.title;
-  store.statusMessage = `Docs Live generated ${draft.sections.length} section draft`;
+  store.statusMessage = `Docs Live generated ${draft.sections.length} section draft with QA and humanization`;
 }
 
 function applyDocsLiveDraft() {
@@ -9068,6 +9106,73 @@ select:hover {
 .docs-live-preview span {
   color: #526171;
   font-size: 12px;
+}
+
+.docs-live-workflow {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #cbd5df;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.docs-live-workflow header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.docs-live-workflow header span,
+.docs-live-section-cards span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.docs-live-workflow ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-live-workflow li,
+.docs-live-section-cards article {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #d7dee7;
+  border-radius: 6px;
+  background: #f7f9fb;
+}
+
+.docs-live-workflow li[data-status="needs-input"] {
+  border-color: #c58a18;
+  background: #fff8e8;
+}
+
+.docs-live-workflow li small {
+  color: #526171;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.docs-live-workflow li span,
+.docs-live-section-cards p {
+  margin: 0;
+  color: #2d3746;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.docs-live-section-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
 }
 
 .docs-live-preview {
