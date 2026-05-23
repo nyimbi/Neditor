@@ -601,6 +601,7 @@ test("local verification scripts expose local baseline checks", () => {
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:a11y"], "node scripts/check-accessibility.mjs");
+  equal(scripts["check:a11y:manual"], "node scripts/check-accessibility-manual-signoff.mjs");
   equal(scripts["check:a11y:runtime"], "node scripts/check-accessibility-runtime.mjs");
   equal(scripts["check:deps"], "node scripts/check-dependency-admission.mjs");
   equal(scripts["check:docs"], "node scripts/check-markdown-links.mjs");
@@ -650,6 +651,21 @@ test("runtime accessibility audit executes focused browser workflows", () => {
   ok(script.includes("--grep"));
   ok(script.includes("findSystemChromium"));
   ok(script.includes("system-chromium-fallback"));
+});
+
+test("manual accessibility signoff validates screen-reader review evidence", () => {
+  const script = readFileSync("scripts/check-accessibility-manual-signoff.mjs", "utf8");
+  ok(script.includes("neditor.accessibility.manual-signoff.v1"));
+  ok(script.includes("NEDITOR_ACCESSIBILITY_SIGNOFF"));
+  ok(script.includes("manual-review-template.json"));
+  ok(script.includes("manual-review-summary.json"));
+  ok(script.includes("screen-reader-workbench-regions"));
+  ok(script.includes("keyboard-only-core-workflows"));
+  ok(script.includes("native-desktop-traversal"));
+  ok(script.includes("assistiveTechnology"));
+  ok(script.includes("unresolvedBlockers"));
+  ok(script.includes("pending-human-review"));
+  ok(script.includes("human-reviewed"));
 });
 
 test("external engine probe records render smoke artifacts", () => {

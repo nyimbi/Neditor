@@ -1602,7 +1602,7 @@ Finish:
 ### 16. Accessibility
 
 Status: static and runtime browser automation exists; manual assistive-technology
-audit remains open.
+sign-off now has a structured verifier, but the real review remains open.
 
 Current evidence:
 
@@ -1618,6 +1618,15 @@ Current evidence:
   controls, status/progress live regions, and editor settings/search/heading
   commands, and writes `.tmp/accessibility/runtime-report.json` with the command
   tail, expected workflows, attempts, and issue list.
+- `pnpm run check:a11y:manual` writes
+  `.tmp/accessibility/manual-review-template.json` and
+  `.tmp/accessibility/manual-review-summary.json` for manual screen-reader and
+  native assistive-technology review. When
+  `NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/signoff.json` is supplied, it accepts
+  only a completed `neditor.accessibility.manual-signoff.v1` file with reviewer
+  metadata, platform, assistive-technology details, passing checklist notes for
+  all required review areas, no unresolved blockers, and passing static/runtime
+  accessibility reports.
 - Modal close buttons, command-palette search, and conflict merge-line controls
   now have explicit labels exposed to assistive technology.
 - The workbench now exposes visible-on-focus skip links to the command bar,
@@ -1657,9 +1666,10 @@ Current evidence:
 
 Finish:
 
-- Complete remaining manual screen-reader review beyond the executable browser
-  coverage, especially native desktop and assistive-technology traversal on
-  supported platforms.
+- Complete the real manual screen-reader/native assistive-technology review by
+  filling a copy of `.tmp/accessibility/manual-review-template.json` and
+  validating it with `NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/signoff.json pnpm
+  run check:a11y:manual`.
 - Keep modal focus workflows in the full local browser suite and broaden
   coverage for additional nested conflict/table-editor permutations.
 - ARIA labels and roles for custom controls.

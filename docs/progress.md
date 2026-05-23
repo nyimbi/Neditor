@@ -16,10 +16,11 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `c5c7ea3 Prove
-  outline editing in the desktop WebDriver harness`
+- Latest inspected committed baseline before this update: `b05f0d7 Make NEditor
+  approachable for business users`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: clean
+- Worktree before this log update: accessibility manual sign-off verifier in
+  progress
 
 ## Durable Planning Artifacts
 
@@ -69,6 +70,14 @@ Recent pushed checkpoints visible in current git history:
   `.tmp/accessibility/runtime-report.json`, and can retry through an installed
   system Chromium-compatible browser if the bundled cache aborts before any app
   assertion runs.
+- This update adds `pnpm run check:a11y:manual` as the manual accessibility
+  review contract. It writes
+  `.tmp/accessibility/manual-review-template.json`, records pending or accepted
+  sign-off state in `.tmp/accessibility/manual-review-summary.json`, requires
+  the static and runtime accessibility reports before accepting a completed
+  reviewer file, and validates reviewer metadata, platform, assistive
+  technology, checklist notes, and unresolved blockers through
+  `NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/signoff.json`.
 - This update moves bounded macOS GUI launch proof into
   `pnpm run verify:local:full` after desktop artifact smoke. On macOS the full
   baseline now runs `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`
@@ -861,6 +870,8 @@ Current verification recorded on 2026-05-21 through 2026-05-23:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery lists 52 Chromium workflow tests in `e2e/app-workflows.spec.ts`, including first-class outline mode CRUD. |
 | `pnpm run check:e2e-env` | Pass | Focused workbench boot workflow passed on this host through the workspace-local Playwright Chromium cache at `.tmp/ms-playwright`; `.tmp/e2e-environment/report.json` records `source: playwright-bundled`, the cache executable path, and the passing command tail. |
 | `pnpm run check:a11y:runtime` | Pass | Focused runtime accessibility audit passed 6 Chromium workflows on this host with browser-launch permission, covering skip links, primary regions across desktop/narrow viewports, modal focus/Escape return, keyboard-only deep controls, status/progress live regions, and editor settings/search/heading commands; `.tmp/accessibility/runtime-report.json` records the expected workflows, command, browser output tail, and zero issues. |
+| `pnpm run check:a11y:manual` | Pass | Wrote `.tmp/accessibility/manual-review-template.json` and `.tmp/accessibility/manual-review-summary.json` with `pending-human-review` status for the required manual screen-reader/native assistive-technology checklist. |
+| `NEDITOR_ACCESSIBILITY_SIGNOFF=.tmp/accessibility/completed-review-smoke.json pnpm run check:a11y:manual` | Pass | Validated the completed-signoff path against a local smoke reviewer file, requiring static/runtime accessibility reports, reviewer metadata, platform, assistive technology, passing checklist notes, and zero unresolved blockers before marking the summary `human-reviewed`. This proves the validator contract, not a completed real manual review. |
 | `pnpm run test:e2e` | Pass | 52 Chromium browser workbench workflows passed locally on this host, including editable outline-first document planning, first-class outline mode CRUD, collapsible toolbars, responsive desktop/narrow layout proof, Markdown fold/unfold controls, generated TOC preview/source navigation, pending preview compile cancellation/resume, transform template management, deep keyboard-only workbench operation, and blog/Substack/LaTeX/Google Docs target handoffs. |
 | `pnpm run test:desktop-smoke` | Pass | Checked NEditor desktop build artifacts and native command workflow smoke; wrote `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata and native command workflow duration. |
 | `./node_modules/.bin/tauri build --bundles app` | Pass | Built `src-tauri/target/release/bundle/macos/NEditor.app` on this macOS host. |
