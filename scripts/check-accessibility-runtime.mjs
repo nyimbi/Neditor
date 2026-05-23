@@ -7,6 +7,7 @@ import { findSystemChromium } from "./playwright-browser-env.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const reportPath = join(root, ".tmp", "accessibility", "runtime-report.json");
+const focusedE2eReportPath = join(root, ".tmp", "accessibility", "e2e-runtime-report.json");
 const specPath = join(root, "e2e", "app-workflows.spec.ts");
 const expectedWorkflows = [
   "exposes keyboard skip links to primary workbench regions",
@@ -67,7 +68,10 @@ function runWorkflowAttempt(label, env, attempts) {
   const result = spawnSync(command[0], command.slice(1), {
     cwd: root,
     encoding: "utf8",
-    env,
+    env: {
+      ...env,
+      NEDITOR_E2E_REPORT_PATH: focusedE2eReportPath,
+    },
   });
   process.stdout.write(result.stdout || "");
   process.stderr.write(result.stderr || "");
@@ -93,7 +97,7 @@ function writeReport(result, reportIssues, attempts) {
         command,
         expectedWorkflows,
         source: "e2e/app-workflows.spec.ts",
-        e2eReport: ".tmp/e2e-browser/report.json",
+        e2eReport: ".tmp/accessibility/e2e-runtime-report.json",
         exitStatus: result?.status ?? null,
         signal: result?.signal ?? null,
         attempts,

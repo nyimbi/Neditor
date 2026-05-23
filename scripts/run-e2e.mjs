@@ -11,8 +11,13 @@ const binary = join(
   ".bin",
   process.platform === "win32" ? "playwright.cmd" : "playwright",
 );
-const args = ["test", ...process.argv.slice(2)];
-const reportPath = join(root, ".tmp", "e2e-browser", "report.json");
+const cliArgs = process.argv.slice(2);
+const args = ["test", ...cliArgs];
+const scope = cliArgs.length === 0 ? "full-suite" : "focused";
+const reportPath = resolve(
+  process.env.NEDITOR_E2E_REPORT_PATH ||
+    join(root, ".tmp", "e2e-browser", scope === "full-suite" ? "report.json" : "focused-report.json"),
+);
 const browserResolution = resolvePlaywrightBrowserEnv(process.env);
 
 if (!browserResolution.ok) {
@@ -35,6 +40,7 @@ if (result.stderr) process.stderr.write(result.stderr);
 
 writePlaywrightBrowserReport(reportPath, browserResolution, result.status === 0 ? "passed" : "failed", {
   schema: "neditor.e2e-browser-workflow.v1",
+  scope,
   command: [binary, ...args],
   exitStatus: result.status,
   signal: result.signal,

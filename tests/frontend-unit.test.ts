@@ -771,8 +771,19 @@ test("release readiness aggregation records external evidence gaps", () => {
   const script = readFileSync("scripts/check-release-readiness.mjs", "utf8");
   ok(script.includes("current-host-ready-with-external-gaps"));
   ok(script.includes("browserWorkflowAccepted"));
+  ok(script.includes("runtimeAccessibilityAccepted"));
+  ok(script.includes("performanceAuditAccepted"));
+  ok(script.includes("focusedPlaywrightReportAccepted"));
+  ok(script.includes("macosAppBundleAccepted"));
+  ok(script.includes("macosDmgAccepted"));
+  ok(script.includes("artifactMatchesReport"));
   ok(script.includes("neditor.e2e-browser-workflow.v1"));
+  ok(script.includes("scope !== \"full-suite\""));
   ok(script.includes("missing-docs-live-workflow-proof"));
+  ok(script.includes("invalid-focused-e2e-report"));
+  ok(script.includes("invalid-large-document-e2e-report"));
+  ok(script.includes("older-than-app-bundle-report"));
+  ok(script.includes("hdiutil sandbox limitation classified with app bundle fallback proof"));
   ok(script.includes("freshForSources"));
   ok(script.includes("windows-linux-tauri-webdriver-execution"));
   ok(script.includes("external-platform-evidence"));
@@ -799,12 +810,26 @@ test("browser e2e runner emits structured workflow evidence for release readines
   const script = readFileSync("scripts/run-e2e.mjs", "utf8");
 
   ok(script.includes("neditor.e2e-browser-workflow.v1"));
+  ok(script.includes("NEDITOR_E2E_REPORT_PATH"));
+  ok(script.includes("full-suite"));
+  ok(script.includes("focused-report.json"));
   ok(script.includes("summarizePlaywrightOutput"));
   ok(script.includes("workflowEvidence"));
   ok(script.includes("docsLiveDraft"));
   ok(script.includes("generates a Docs Live draft from outline, context, and placeholders"));
   ok(script.includes("stdoutTail"));
   ok(script.includes("stderrTail"));
+});
+
+test("focused browser audits write dedicated reports without replacing the full-suite proof", () => {
+  const accessibility = readFileSync("scripts/check-accessibility-runtime.mjs", "utf8");
+  const performance = readFileSync("scripts/check-performance-audit.mjs", "utf8");
+
+  ok(accessibility.includes("NEDITOR_E2E_REPORT_PATH"));
+  ok(accessibility.includes("e2e-runtime-report.json"));
+  ok(performance.includes("NEDITOR_E2E_REPORT_PATH"));
+  ok(performance.includes("e2e-large-document-report.json"));
+  ok(performance.includes("evidenceReport"));
 });
 
 test("external engine probe records render smoke artifacts", () => {

@@ -9,6 +9,7 @@ const reportPath = resolve(
   process.env.NEDITOR_PERFORMANCE_AUDIT_REPORT ||
     join(root, ".tmp", "performance-audit", "report.json"),
 );
+const largeDocumentE2eReportPath = join(root, ".tmp", "performance-audit", "e2e-large-document-report.json");
 
 const commands = [
   {
@@ -33,6 +34,10 @@ const commands = [
       "--project",
       "chromium",
     ],
+    env: {
+      NEDITOR_E2E_REPORT_PATH: largeDocumentE2eReportPath,
+    },
+    evidenceReport: ".tmp/performance-audit/e2e-large-document-report.json",
   },
 ];
 
@@ -45,6 +50,10 @@ for (const spec of commands) {
     cwd: spec.cwd,
     encoding: "utf8",
     shell: process.platform === "win32",
+    env: {
+      ...process.env,
+      ...(spec.env || {}),
+    },
   });
   const elapsedMs = Date.now() - startedAt;
   const entry = {
@@ -52,6 +61,7 @@ for (const spec of commands) {
     description: spec.description,
     command: spec.displayCommand ?? [spec.command, ...spec.args].join(" "),
     cwd: relativeCwd(spec.cwd),
+    evidenceReport: spec.evidenceReport || null,
     status: result.status === 0 ? "pass" : "fail",
     exitCode: result.status,
     elapsedMs,

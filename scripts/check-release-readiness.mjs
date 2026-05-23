@@ -11,7 +11,7 @@ const requiredReports = [
   requiredReport("browser-environment", ".tmp/e2e-environment/report.json", ["passed"]),
   requiredReport("browser-workflows", ".tmp/e2e-browser/report.json", [], browserWorkflowAccepted),
   requiredReport("static-accessibility", ".tmp/accessibility/report.json", ["pass", "passed"]),
-  requiredReport("runtime-accessibility", ".tmp/accessibility/runtime-report.json", ["passed"]),
+  requiredReport("runtime-accessibility", ".tmp/accessibility/runtime-report.json", [], runtimeAccessibilityAccepted),
   requiredReport("manual-accessibility-contract", ".tmp/accessibility/manual-review-summary.json", [
     "pending-human-review",
     "human-reviewed",
@@ -24,16 +24,12 @@ const requiredReports = [
   requiredReport("rendered-export-visual-summary", ".tmp/rendered-export-audit/visual-review-summary.json", [], visualSummaryPassed),
   requiredReport("google-docs-import-evidence", ".tmp/google-docs-import/report.json", [], googleDocsImportAccepted),
   requiredReport("external-engine-probe", ".tmp/external-engines/probe-report.json", [], externalEngineProbePassed),
-  requiredReport("performance-audit", ".tmp/performance-audit/report.json", ["pass", "passed"]),
+  requiredReport("performance-audit", ".tmp/performance-audit/report.json", [], performanceAuditAccepted),
 ];
 
 if (process.platform === "darwin") {
-  requiredReports.push(requiredReport("macos-app-bundle", ".tmp/desktop-bundle/macos-app-report.json", [], reportExists));
-  requiredReports.push(requiredReport("macos-dmg-classification", ".tmp/desktop-bundle/macos-dmg-report.json", [
-    "created",
-    "created-manual-probe-dmg",
-    "classified-host-limitation",
-  ]));
+  requiredReports.push(requiredReport("macos-app-bundle", ".tmp/desktop-bundle/macos-app-report.json", [], macosAppBundleAccepted));
+  requiredReports.push(requiredReport("macos-dmg-classification", ".tmp/desktop-bundle/macos-dmg-report.json", [], macosDmgAccepted));
   requiredReports.push(requiredReport("macos-native-launch", ".tmp/desktop-smoke/launch-report.json", [], macosLaunchPassed));
   requiredReports.push(requiredReport("macos-webdriver-fallback", ".tmp/desktop-webdriver/report.json", [], webdriverOrFallbackPassed));
 }
@@ -224,10 +220,66 @@ function collectEvidenceGaps(checks) {
   return gaps;
 }
 
-function reportExists() {
+function macosAppBundleAccepted(report) {
+  const issues = [];
+  const executablePath = report.executable?.path;
+  const iconPath = report.icon?.path;
+  const plist = report.plist || {};
+
+  if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
+  if (report.appBundle !== "src-tauri/target/release/bundle/macos/NEditor.app") issues.push("unexpected-app-bundle");
+  if (!artifactMatchesReport(executablePath, report.executable?.size, true)) issues.push("invalid-executable-artifact");
+  if (!artifactMatchesReport(iconPath, report.icon?.size, false)) issues.push("invalid-icon-artifact");
+  if (plist.CFBundleDisplayName !== "NEditor") issues.push("invalid-display-name");
+  if (plist.CFBundleExecutable !== "neditor") issues.push("invalid-executable-name");
+  if (plist.CFBundleIdentifier !== "com.neditor.desktop") issues.push("invalid-bundle-identifier");
+  if (plist.CFBundleShortVersionString !== plist.CFBundleVersion) issues.push("version-mismatch");
+  if (plist.CFBundlePackageType !== "APPL") issues.push("invalid-package-type");
+  if (plist.CFBundleIconFile !== "icon.icns") issues.push("invalid-icon-reference");
+  if (plist.NSHighResolutionCapable !== true) issues.push("missing-high-resolution-flag");
+
   return {
-    accepted: true,
-    status: "present",
+    accepted: issues.length === 0,
+    status: issues.length === 0 ? "passed" : "incomplete",
+    detail:
+      issues.length === 0
+        ? `app=${report.appBundle} executableBytes=${report.executable?.size} iconBytes=${report.icon?.size}`
+        : issues.join(","),
+  };
+}
+
+function macosDmgAccepted(report) {
+  const issues = [];
+  const appReport = readOptionalJson(".tmp/desktop-bundle/macos-app-report.json");
+  const acceptedStatuses = new Set(["passed", "created", "created-manual-probe-dmg", "classified-host-limitation"]);
+
+  if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
+  if (!acceptedStatuses.has(report.status) && !acceptedStatuses.has(report.result)) {
+    issues.push(`status=${report.status || report.result || "missing"}`);
+  }
+  if (appReport?.generatedAt && Date.parse(report.generatedAt || "") < Date.parse(appReport.generatedAt)) {
+    issues.push("older-than-app-bundle-report");
+  }
+
+  if (report.status === "passed") {
+    if (!artifactMatchesReport(report.dmg?.path, report.dmg?.size, false)) issues.push("invalid-dmg-artifact");
+  } else if (report.status === "classified-host-limitation") {
+    if (report.result !== "hdiutil-sandbox-device-not-configured") issues.push("unexpected-host-limitation-result");
+    if (report.classification?.appBundleStillBuilt !== true) issues.push("missing-app-bundle-fallback-proof");
+    if (!String(report.classification?.cause || "").includes("hdiutil")) issues.push("missing-hdiutil-cause");
+    const stderr = Array.isArray(report.manualProbe?.stderrTail) ? report.manualProbe.stderrTail.join("\n") : "";
+    if (!stderr.includes("Device not configured")) issues.push("missing-manual-probe-classification");
+  }
+
+  return {
+    accepted: issues.length === 0,
+    status: issues.length === 0 ? report.status || report.result : "incomplete",
+    detail:
+      issues.length === 0
+        ? report.status === "classified-host-limitation"
+          ? "hdiutil sandbox limitation classified with app bundle fallback proof"
+          : `dmg=${report.dmg?.path || report.result}`
+        : issues.join(","),
   };
 }
 
@@ -238,6 +290,7 @@ function browserWorkflowAccepted(report) {
   const workflowEvidence = report.workflowEvidence || {};
 
   if (report.schema !== "neditor.e2e-browser-workflow.v1") issues.push("missing-schema");
+  if (report.scope !== "full-suite") issues.push(`scope=${report.scope || "missing"}`);
   if (report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
   if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
   if (!command.some((part) => part.includes("playwright")) || !command.includes("test")) issues.push("missing-playwright-command");
@@ -266,6 +319,75 @@ function desktopCommandPassed(report) {
     status: passed ? "passed" : "failed",
     detail: passed ? `durationMs=${report.nativeCommandWorkflow.durationMs}` : "native command workflow did not pass",
   };
+}
+
+function runtimeAccessibilityAccepted(report) {
+  const issues = [];
+  const expectedCount = Array.isArray(report.expectedWorkflows) ? report.expectedWorkflows.length : 0;
+  const linkedReport = readOptionalJson(report.e2eReport || "");
+
+  if (report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
+  if (expectedCount < 6) issues.push("missing-expected-workflows");
+  if (Array.isArray(report.issues) && report.issues.length > 0) issues.push(`issues=${report.issues.length}`);
+  if (!focusedPlaywrightReportAccepted(linkedReport, expectedCount)) issues.push("invalid-focused-e2e-report");
+
+  return {
+    accepted: issues.length === 0,
+    status: issues.length === 0 ? "passed" : "incomplete",
+    detail: issues.length === 0 ? `workflows=${expectedCount} focusedReport=${report.e2eReport}` : issues.join(","),
+  };
+}
+
+function performanceAuditAccepted(report) {
+  const issues = [];
+  const resultById = new Map((Array.isArray(report.results) ? report.results : []).map((result) => [result?.id, result]));
+  const rust = resultById.get("rust-performance-suite");
+  const browser = resultById.get("browser-large-document-workflow");
+  const linkedReport = readOptionalJson(browser?.evidenceReport || "");
+
+  if (report.status !== "pass" && report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
+  if (Number(report.summary?.checks || 0) < 2) issues.push("missing-check-count");
+  if (Number(report.summary?.failed || 0) > 0) issues.push("failed-checks");
+  if (rust?.status !== "pass") issues.push("missing-rust-performance-suite");
+  if (browser?.status !== "pass") issues.push("missing-browser-large-document-workflow");
+  if (!focusedPlaywrightReportAccepted(linkedReport, 1)) issues.push("invalid-large-document-e2e-report");
+
+  return {
+    accepted: issues.length === 0,
+    status: issues.length === 0 ? "passed" : "incomplete",
+    detail:
+      issues.length === 0
+        ? `checks=${report.summary?.checks} largeDocumentReport=${browser?.evidenceReport}`
+        : issues.join(","),
+  };
+}
+
+function focusedPlaywrightReportAccepted(report, minimumTests) {
+  return (
+    report?.schema === "neditor.e2e-browser-workflow.v1" &&
+    report.scope === "focused" &&
+    report.status === "passed" &&
+    Number(report.summary?.tests || 0) >= minimumTests &&
+    Number(report.summary?.passed || 0) >= Number(report.summary?.tests || 0) &&
+    Number(report.summary?.failed || 0) === 0 &&
+    Number(report.summary?.timedOut || 0) === 0
+  );
+}
+
+function artifactMatchesReport(relativePath, expectedSize, requireExecutable) {
+  if (typeof relativePath !== "string" || !relativePath) return false;
+  const absolutePath = join(root, relativePath);
+  if (!existsSync(absolutePath)) return false;
+  let stat;
+  try {
+    stat = statSync(absolutePath);
+  } catch {
+    return false;
+  }
+  if (!stat.isFile()) return false;
+  if (Number(expectedSize || 0) < 1 || stat.size !== Number(expectedSize)) return false;
+  if (requireExecutable && (stat.mode & 0o111) === 0) return false;
+  return true;
 }
 
 function visualSummaryPassed(report) {
