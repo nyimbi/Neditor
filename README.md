@@ -346,12 +346,20 @@ codesign/notarization, Windows Authenticode/timestamp, and Linux package
 signature/checksum evidence. Missing credentialed signing proof remains a
 release gap; malformed supplied evidence fails the check.
 
+`pnpm run check:google-docs-import` writes
+`.tmp/google-docs-import/report.json`, verifies the local rendered Google Docs
+handoff DOCX/package, and creates
+`.tmp/google-docs-import/import-evidence.template.json` for live Google Docs
+import/readback proof. Missing Drive authorization remains a release gap;
+malformed supplied import evidence fails the check.
+
 `pnpm run check:release-readiness` aggregates the current local proof set into
 `.tmp/release-readiness/report.json`. It fails if required current-host reports
 are missing or failed, and otherwise records remaining external evidence gaps
 such as Windows/Linux package artifacts, Windows/Linux WebDriver execution,
-release signing/notarization, optional missing engines, and human reviewer
-sign-off for accessibility or native-viewer export review.
+release signing/notarization, Google Docs live import/readback, optional missing
+engines, and human reviewer sign-off for accessibility or native-viewer export
+review.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,

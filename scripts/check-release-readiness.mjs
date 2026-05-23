@@ -22,6 +22,7 @@ const requiredReports = [
   requiredReport("desktop-command-smoke", ".tmp/desktop-smoke/native-command-report.json", [], desktopCommandPassed),
   requiredReport("rendered-export-audit", ".tmp/rendered-export-audit/rendered-export-audit-report.json", [], reportExists),
   requiredReport("rendered-export-visual-summary", ".tmp/rendered-export-audit/visual-review-summary.json", [], visualSummaryPassed),
+  requiredReport("google-docs-import-evidence", ".tmp/google-docs-import/report.json", [], googleDocsImportAccepted),
   requiredReport("external-engine-probe", ".tmp/external-engines/probe-report.json", [], externalEngineProbePassed),
   requiredReport("performance-audit", ".tmp/performance-audit/report.json", ["pass", "passed"]),
 ];
@@ -178,6 +179,16 @@ function collectEvidenceGaps(checks) {
   }
 
   const renderedSummary = reports["rendered-export-visual-summary"];
+  const googleDocsImport = reports["google-docs-import-evidence"];
+  if (googleDocsImport?.importEvidence?.status !== "accepted") {
+    gaps.push({
+      id: "google-docs-live-import-readback",
+      status: googleDocsImport?.importEvidence?.status || "pending-google-drive-authorization",
+      evidence: ".tmp/google-docs-import/report.json",
+      detail: "Local Google Docs package proof is present, but live Google Docs import/readback evidence needs an authorized Drive session.",
+    });
+  }
+
   if (renderedSummary?.humanSignoff?.status !== "human-reviewed") {
     gaps.push({
       id: "rendered-export-native-viewer-human-signoff",
@@ -268,6 +279,17 @@ function releaseSigningAccepted(report) {
       invalid === 0
         ? `releaseSigningEvidence=${report.status || "unknown"}`
         : `invalid release signing evidence count=${invalid}`,
+  };
+}
+
+function googleDocsImportAccepted(report) {
+  const invalid = Array.isArray(report.issues) && report.issues.length > 0;
+  return {
+    accepted: !invalid && report.sourceArtifacts?.status === "accepted",
+    status: report.status || "unknown",
+    detail: invalid
+      ? `googleDocsImportIssues=${report.issues.length}`
+      : `googleDocsImport=${report.importEvidence?.status || report.status || "unknown"}`,
   };
 }
 

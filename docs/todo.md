@@ -619,6 +619,12 @@ green before claiming a slice is complete:
   evidence templates, accepts valid credentialed release proof, and fails
   malformed supplied signing/notarization reports while preserving missing
   release credentials as explicit release gaps.
+- `pnpm run verify:local:full` now also runs
+  `pnpm run check:google-docs-import` after rendered export audit. That check
+  writes `.tmp/google-docs-import/report.json`, verifies the local Google Docs
+  handoff DOCX/package hashes, emits a live import/readback evidence template,
+  accepts valid Drive import proof, and fails malformed supplied evidence while
+  preserving missing Google Drive authorization as an explicit release gap.
 - On macOS, `pnpm run verify:local:full` also includes
   `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` before the
   WebDriver step. `pnpm run test:tauri-webdriver` still reports the official
