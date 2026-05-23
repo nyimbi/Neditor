@@ -608,6 +608,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:engines"], "node scripts/check-external-engines.mjs");
   equal(scripts["check:e2e-env"], "node scripts/check-e2e-environment.mjs");
   equal(scripts["check:platform-packaging"], "node scripts/check-platform-packaging.mjs");
+  equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
   equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
@@ -624,6 +625,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Accessibility runtime audit", "pnpm", ["run", "check:a11y:runtime"])'));
   ok(verification.includes('command("Accessibility manual review contract", "pnpm", ["run", "check:a11y:manual"])'));
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
+  ok(verification.includes('command("Release readiness aggregation", "pnpm", ["run", "check:release-readiness"])'));
   ok(verification.includes("Desktop macOS GUI launch smoke"));
   ok(verification.includes('NEDITOR_DESKTOP_SMOKE_LAUNCH: "1"'));
   ok(verification.includes("env: { ...process.env, ...item.env }"));
@@ -668,6 +670,19 @@ test("manual accessibility signoff validates screen-reader review evidence", () 
   ok(script.includes("unresolvedBlockers"));
   ok(script.includes("pending-human-review"));
   ok(script.includes("human-reviewed"));
+});
+
+test("release readiness aggregation records external evidence gaps", () => {
+  const script = readFileSync("scripts/check-release-readiness.mjs", "utf8");
+  ok(script.includes("current-host-ready-with-external-gaps"));
+  ok(script.includes("windows-linux-tauri-webdriver-execution"));
+  ok(script.includes("release-signing-and-notarization"));
+  ok(script.includes("accessibility-assistive-technology-human-signoff"));
+  ok(script.includes("rendered-export-native-viewer-human-signoff"));
+  ok(script.includes('"release-readiness"'));
+  ok(script.includes("runtime-report.json"));
+  ok(script.includes("platform-package-config-report.json"));
+  ok(script.includes("fresh native fallback proof"));
 });
 
 test("external engine probe records render smoke artifacts", () => {

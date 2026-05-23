@@ -51,6 +51,7 @@ const fullCommands = [
   command("Desktop artifact smoke", "pnpm", ["run", "test:desktop-smoke"]),
   ...desktopLaunchSmokeCommands(),
   command("Desktop WebDriver smoke", "pnpm", ["run", "test:tauri-webdriver"]),
+  command("Release readiness aggregation", "pnpm", ["run", "check:release-readiness"]),
 ];
 
 const commands = mode === "full" ? fullCommands : quickCommands;

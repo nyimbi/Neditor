@@ -602,6 +602,11 @@ green before claiming a slice is complete:
   verification refreshes `.tmp/accessibility/runtime-report.json`,
   `.tmp/accessibility/manual-review-template.json`, and
   `.tmp/accessibility/manual-review-summary.json`.
+- `pnpm run verify:local:full` now ends with
+  `pnpm run check:release-readiness`, which writes
+  `.tmp/release-readiness/report.json` and aggregates current-host proof plus
+  host-bound gaps for Windows/Linux packages, WebDriver execution, signing,
+  optional engines, and human sign-off.
 - On macOS, `pnpm run verify:local:full` also includes
   `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` before the
   WebDriver step. `pnpm run test:tauri-webdriver` still reports the official
