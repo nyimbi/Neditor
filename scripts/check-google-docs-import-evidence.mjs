@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const currentSourceCommit = gitCommit();
 const auditDir = resolve(process.env.NEDITOR_RENDERED_EXPORT_AUDIT_DIR || join(root, ".tmp", "rendered-export-audit"));
 const evidencePath = resolve(
   process.env.NEDITOR_GOOGLE_DOCS_IMPORT_EVIDENCE || join(root, ".tmp", "google-docs-import", "external", "import-evidence.json"),
@@ -100,6 +103,8 @@ function validateImportEvidence(localArtifacts) {
   requireValue(evidence.schema === "neditor.google-docs-import-evidence.v1", "schema must be neditor.google-docs-import-evidence.v1");
   requireValue(evidence.status === "passed", "status must be passed");
   requireValue(isIsoDate(evidence.generatedAt), "generatedAt must be an ISO timestamp");
+  requireValue(evidence.appVersion === packageJson.version, `appVersion must match package.json version ${packageJson.version}`);
+  requireValue(evidence.sourceCommit === currentSourceCommit, `sourceCommit must match current git commit ${currentSourceCommit}`);
   requireValue(evidence.importMethod === "google-drive-import-document", "importMethod must be google-drive-import-document");
   requireValue(Boolean(String(evidence.importedDocument?.id || "").trim()), "importedDocument.id is required");
   requireValue(Boolean(String(evidence.importedDocument?.title || "").trim()), "importedDocument.title is required");
@@ -130,6 +135,8 @@ function validateImportEvidence(localArtifacts) {
   return {
     status: "accepted",
     generatedAt: evidence.generatedAt,
+    appVersion: evidence.appVersion,
+    sourceCommit: evidence.sourceCommit,
     importedDocument: evidence.importedDocument,
     readback: {
       paragraphCount: evidence.readback.paragraphCount,
@@ -173,6 +180,8 @@ function writeTemplate(localArtifacts) {
         schema: "neditor.google-docs-import-evidence.v1",
         status: "passed",
         generatedAt: new Date().toISOString(),
+        appVersion: packageJson.version,
+        sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
         importMethod: "google-drive-import-document",
         sourceArtifacts: {
           docxPath: localArtifacts.docx.path,
@@ -227,4 +236,13 @@ function writeReport(report) {
 
 function relative(path) {
   return path.startsWith(root) ? path.slice(root.length + 1) : path;
+}
+
+function gitCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return "";
+  return result.stdout.trim();
 }

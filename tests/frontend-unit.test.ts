@@ -725,6 +725,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(browserEnv.includes('join(root, ".tmp", "ms-playwright")'));
   ok(browserEnv.includes("PLAYWRIGHT_BROWSERS_PATH: baseEnv.PLAYWRIGHT_BROWSERS_PATH ?? projectBrowserCache"));
   ok(googleDocsImport.includes("neditor.google-docs-import-evidence.v1"));
+  ok(googleDocsImport.includes("appVersion must match package.json version"));
+  ok(googleDocsImport.includes("sourceCommit must match current git commit"));
   ok(googleDocsImport.includes("NEDITOR_GOOGLE_DOCS_IMPORT_EVIDENCE"));
   ok(googleDocsImport.includes("pending-google-drive-authorization"));
   ok(googleDocsImport.includes("rendered-export-audit.google-docs.zip"));
@@ -796,6 +798,10 @@ test("manual accessibility signoff validates screen-reader review evidence", () 
   ok(script.includes("keyboard-only-core-workflows"));
   ok(script.includes("native-desktop-traversal"));
   ok(script.includes("assistiveTechnology"));
+  ok(script.includes("appVersion"));
+  ok(script.includes("sourceCommit"));
+  ok(script.includes("completed sign-off appVersion must match package.json version"));
+  ok(script.includes("completed sign-off sourceCommit must match current git commit"));
   ok(script.includes("requiredReviewSessions"));
   ok(script.includes("screen-reader-navigation"));
   ok(script.includes("native-desktop-shell"));
@@ -910,6 +916,10 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
   ok(script.includes("validateExistingSignoff"));
   ok(script.includes("Rendered export sign-off validated against existing artifacts"));
   ok(script.includes("neditor.rendered-export.visual-signoff.v1"));
+  ok(script.includes("appVersion"));
+  ok(script.includes("sourceCommit"));
+  ok(script.includes("completed sign-off appVersion must match package.json version"));
+  ok(script.includes("completed sign-off sourceCommit must match current git commit"));
   ok(script.includes("collectHumanSignoffEvidence"));
   ok(script.includes("collectAutomatedVisualReviewEvidence"));
   ok(script.includes("validateCompletedSignoff"));

@@ -8,6 +8,8 @@ import { chromium } from "@playwright/test";
 import { resolvePlaywrightBrowserEnv } from "./playwright-browser-env.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const currentSourceCommit = gitCommit();
 const auditDir = resolve(process.env.NEDITOR_RENDERED_EXPORT_AUDIT_DIR || join(root, ".tmp", "rendered-export-audit"));
 const completedSignoffPath = process.env.NEDITOR_RENDERED_EXPORT_SIGNOFF
   ? resolve(process.env.NEDITOR_RENDERED_EXPORT_SIGNOFF)
@@ -1265,6 +1267,8 @@ function writeManualSignoffTemplate(report, assertions) {
     schema: "neditor.rendered-export.visual-signoff.v1",
     generatedAt: new Date().toISOString(),
     status: "pending-human-review",
+    appVersion: packageJson.version,
+    sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
     instructions: [
       "Copy this template before editing it.",
       "Open every primary artifact and review-case target in the relevant native or browser viewer.",
@@ -1510,6 +1514,12 @@ function validateCompletedSignoff(signoff, report) {
   if (signoff.schema !== "neditor.rendered-export.visual-signoff.v1") {
     validationIssues.push("completed sign-off schema must be neditor.rendered-export.visual-signoff.v1");
   }
+  if (signoff.appVersion !== packageJson.version) {
+    validationIssues.push(`completed sign-off appVersion must match package.json version ${packageJson.version}`);
+  }
+  if (signoff.sourceCommit !== currentSourceCommit) {
+    validationIssues.push(`completed sign-off sourceCommit must match current git commit ${currentSourceCommit}`);
+  }
   if (signoff.status !== "human-reviewed") {
     validationIssues.push("completed sign-off status must be human-reviewed");
   }
@@ -1608,6 +1618,15 @@ function validateReviewedStatus(validationIssues, label, item) {
 
 function isIsoDate(value) {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function gitCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return "";
+  return result.stdout.trim();
 }
 
 function writeManualReviewDashboard(report, assertions) {

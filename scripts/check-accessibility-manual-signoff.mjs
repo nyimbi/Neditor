@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const currentSourceCommit = gitCommit();
 const outputDir = join(root, ".tmp", "accessibility");
 const staticReportPath = join(outputDir, "report.json");
 const runtimeReportPath = join(outputDir, "runtime-report.json");
@@ -121,6 +124,8 @@ if (completedSignoffPath) {
 function createTemplate(prerequisiteReports) {
   return {
     schema: "neditor.accessibility.manual-signoff.v1",
+    appVersion: packageJson.version,
+    sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
     reviewer: {
       name: "",
       role: "",
@@ -218,6 +223,12 @@ function validateCompletedSignoff(path, issues) {
 
   if (signoff.schema !== "neditor.accessibility.manual-signoff.v1") {
     issues.push("completed sign-off schema must be neditor.accessibility.manual-signoff.v1");
+  }
+  if (signoff.appVersion !== packageJson.version) {
+    issues.push(`completed sign-off appVersion must match package.json version ${packageJson.version}`);
+  }
+  if (signoff.sourceCommit !== currentSourceCommit) {
+    issues.push(`completed sign-off sourceCommit must match current git commit ${currentSourceCommit}`);
   }
   if (!signoff.reviewer?.name?.trim()) {
     issues.push("completed sign-off must include reviewer.name");
@@ -367,4 +378,13 @@ function relativePath(path) {
 
 function sha256Text(text) {
   return createHash("sha256").update(text).digest("hex");
+}
+
+function gitCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return "";
+  return result.stdout.trim();
 }
