@@ -304,6 +304,11 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   equal(draft.workflow[2].id, "draft");
   equal(draft.workflow[4].id, "humanize");
   equal(draft.workflow[5].id, "review");
+  ok(draft.reviewPacket.contextSources.some((source) => source.includes("AI-created questionnaire answers captured")));
+  ok(draft.reviewPacket.sectionRunbook[0].includes("draft body, run QA"));
+  ok(draft.reviewPacket.qaRegister.some((item) => item.includes("Executive Summary must tie")));
+  ok(draft.reviewPacket.humanizationChecklist.some((item) => item.includes("prompt-shaped phrasing")));
+  ok(draft.reviewPacket.reviewerHandoff.some((item) => item.includes("AI-assisted markers")));
   equal(draft.sections[0].qaChecks.length, 3);
   equal(draft.sections[0].humanizationNotes.length, 3);
   deepEqual(
@@ -320,6 +325,12 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.markdown.includes("<!-- ai-assisted: status=needs-review"));
   ok(draft.markdown.includes("## Draft Context"));
   ok(draft.markdown.includes("## Drafting Plan"));
+  ok(draft.markdown.includes("## Section-by-section Draft Runbook"));
+  ok(draft.markdown.includes("### Context Package"));
+  ok(draft.markdown.includes("### Section Work Queue"));
+  ok(draft.markdown.includes("### Assumption Register"));
+  ok(draft.markdown.includes("### Humanization Checklist"));
+  ok(draft.markdown.includes("### Review Packet"));
   ok(draft.markdown.includes("### Section QA"));
   ok(draft.markdown.includes("### Review Handoff"));
   ok(draft.markdown.includes("## Review Handoff"));
@@ -605,6 +616,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("openDocsLiveFromOutline"));
   ok(app.includes("openDocsLiveFromDocumentOutline"));
   ok(app.includes("docs-live-section-stage-list"));
+  ok(app.includes("docs-live-review-packet"));
+  ok(app.includes("Docs Live review preparation packet"));
+  ok(app.includes("Section runbook"));
+  ok(app.includes("QA register"));
+  ok(app.includes("Humanization checklist"));
+  ok(app.includes("Review packet"));
   ok(app.includes("SpeechRecognition"));
   ok(app.includes("buildDocsLiveDraft"));
   ok(app.includes("docsLiveQuestionnaireAnswerText"));

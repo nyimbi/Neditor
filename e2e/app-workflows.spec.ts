@@ -1906,13 +1906,17 @@ test("generates a Docs Live draft from outline, context, and placeholders", asyn
 
   await dialog.getByRole("button", { name: "Generate draft" }).click();
   await expect(dialog.getByText("3 drafted sections")).toBeVisible();
+  await expect(dialog.getByLabel("Docs Live review preparation packet")).toContainText("Section runbook");
+  await expect(dialog.getByLabel("Docs Live review preparation packet")).toContainText("Humanization checklist");
   await expect(dialog.getByLabel("Docs Live generated Markdown")).toHaveValue(/provider: NEditor Docs Live/);
+  await expect(dialog.getByLabel("Docs Live generated Markdown")).toHaveValue(/Section-by-section Draft Runbook/);
   await dialog.getByRole("button", { name: "Apply draft" }).click();
 
   await expect(dialog).toBeHidden();
   const text = await editorText(page);
   expect(text).toContain("# Acme Renewal Proposal");
   expect(text).toContain("<!-- ai-assisted: status=needs-review");
+  await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Section-by-section Draft Runbook");
   await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Review Preparation");
 });
 

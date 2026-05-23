@@ -43,6 +43,7 @@ export interface DocsLiveDraft {
   markdown: string;
   placeholders: Record<string, string>;
   workflow: DocsLiveWorkflowStep[];
+  reviewPacket: DocsLiveReviewPacket;
   sections: DocsLiveSectionDraft[];
   issues: string[];
 }
@@ -74,6 +75,14 @@ export interface DocsLiveSectionStage {
   label: string;
   status: "complete" | "needs-review";
   detail: string;
+}
+
+export interface DocsLiveReviewPacket {
+  contextSources: string[];
+  sectionRunbook: string[];
+  qaRegister: string[];
+  humanizationChecklist: string[];
+  reviewerHandoff: string[];
 }
 
 interface DocsLiveBlueprint {
@@ -245,6 +254,7 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
   const draftingDepth = normalizeDraftingDepth(request.draftingDepth);
   const sectionDrafts = sections.map((section, index) => buildSectionDraft(section, index, blueprint, placeholders, contextSentences));
   const workflow = buildDocsLiveWorkflow(sectionDrafts, placeholders, contextSentences, issues);
+  const reviewPacket = buildDocsLiveReviewPacket(request, sectionDrafts, placeholders, contextSentences, issues);
   const markdown = humanizeDraftText(
     [
       "---",
@@ -267,6 +277,8 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
       docsLiveReviewMarker("Docs Live systematic outline-to-draft workflow"),
       "",
       draftingPlanTable(workflow, sectionDrafts, draftingDepth),
+      "",
+      reviewPacketMarkdown(reviewPacket),
       "",
       ...sectionDrafts.flatMap((section, index) =>
         draftSection(section, index, sectionDrafts.length, blueprint, placeholders, contextSentences, draftingDepth),
@@ -309,6 +321,7 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
     markdown,
     placeholders,
     workflow,
+    reviewPacket,
     sections: sectionDrafts,
     issues,
   };
@@ -407,6 +420,58 @@ function buildDocsLiveWorkflow(
   ];
 }
 
+function buildDocsLiveReviewPacket(
+  request: DocsLiveDraftRequest,
+  sections: DocsLiveSectionDraft[],
+  placeholders: Record<string, string>,
+  contextSentences: string[],
+  issues: string[],
+): DocsLiveReviewPacket {
+  const placeholderCount = Object.keys(placeholders).length;
+  const contextSources = [
+    `${sections.length} outline section${sections.length === 1 ? "" : "s"} locked before drafting.`,
+    request.transcript?.trim() ? "Voice or dictated direction captured as drafting intent." : "Voice direction not supplied; use written context during review.",
+    request.context?.trim() ? "Freeform document context captured." : "Freeform document context missing or minimal.",
+    request.questionnaireAnswers?.trim()
+      ? "AI-created questionnaire answers captured as structured constraints."
+      : "Questionnaire answers not supplied; generated questions remain available for review.",
+    placeholderCount
+      ? `${placeholderCount} placeholder value${placeholderCount === 1 ? "" : "s"} available for names, dates, owners, amounts, or audience.`
+      : "No placeholder values detected; bracketed review prompts remain in the draft.",
+    contextSentences.length
+      ? `${Math.min(contextSentences.length, 12)} context point${contextSentences.length === 1 ? "" : "s"} available for section drafting.`
+      : "No context points extracted; each section includes visible review prompts.",
+  ];
+  const sectionRunbook = sections.map(
+    (section, index) =>
+      `${index + 1}. ${section.title}: draft body, run QA against ${section.qaFocus}, humanize the prose, then hand to reviewer.`,
+  );
+  const qaRegister = [
+    ...issues,
+    ...sections.map((section) => section.qaSummary),
+    "Final export should remain blocked until unresolved facts, figures, citations, and assumptions are checked.",
+  ];
+  const humanizationChecklist = [
+    "Replace prompt-shaped phrasing with natural subject-matter-owner language.",
+    "Cut repeated framing, unsupported certainty, filler adjectives, and generic transition sentences.",
+    "Add named people, teams, sources, dates, calculations, or examples wherever the draft sounds abstract.",
+    "Read the final draft aloud and shorten any sentence that a reviewer would not naturally say.",
+  ];
+  const reviewerHandoff = [
+    "Assign each section to an owner before approval.",
+    "Keep AI-assisted markers until the responsible reviewer marks the section human-reviewed.",
+    "Confirm document type, audience, decision, tone, and placeholders before export.",
+    "Collect missing evidence, citations, calculations, and approvals in the Review panel.",
+  ];
+  return {
+    contextSources,
+    sectionRunbook,
+    qaRegister,
+    humanizationChecklist,
+    reviewerHandoff,
+  };
+}
+
 function docsLiveSourceBlock(generatedAt: string, documentType: DocsLiveDocumentType, contextSentences: string[]) {
   const promptSummary = sanitizeMarkerValue(
     contextSentences[0] || `Voice-guided ${blueprints[documentType].label.toLowerCase()} draft from outline and placeholders`,
@@ -438,6 +503,34 @@ function draftingPlanTable(workflow: DocsLiveWorkflowStep[], sections: DocsLiveS
     "| Section | Drafting brief | QA focus |",
     "| --- | --- | --- |",
     ...sections.map((section) => `| ${escapeTableCell(section.title)} | ${escapeTableCell(section.draftingBrief)} | ${escapeTableCell(section.qaFocus)} |`),
+  ].join("\n");
+}
+
+function reviewPacketMarkdown(packet: DocsLiveReviewPacket) {
+  return [
+    "## Section-by-section Draft Runbook",
+    "",
+    "Docs Live uses the outline as the work queue. Each section is drafted, checked, humanized, and packaged for review before the next approval step.",
+    "",
+    "### Context Package",
+    "",
+    ...packet.contextSources.map((source) => `- ${source}`),
+    "",
+    "### Section Work Queue",
+    "",
+    ...packet.sectionRunbook.map((item) => `- ${item}`),
+    "",
+    "### Assumption Register",
+    "",
+    ...packet.qaRegister.map((item) => `- [ ] ${item}`),
+    "",
+    "### Humanization Checklist",
+    "",
+    ...packet.humanizationChecklist.map((item) => `- [ ] ${item}`),
+    "",
+    "### Review Packet",
+    "",
+    ...packet.reviewerHandoff.map((item) => `- [ ] ${item}`),
   ].join("\n");
 }
 

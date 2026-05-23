@@ -1704,6 +1704,38 @@
               </ol>
             </article>
           </div>
+          <div class="docs-live-review-packet" aria-label="Docs Live review preparation packet">
+            <section>
+              <strong>Context package</strong>
+              <ul>
+                <li v-for="source in docsLiveDraft.reviewPacket.contextSources" :key="source">{{ source }}</li>
+              </ul>
+            </section>
+            <section>
+              <strong>Section runbook</strong>
+              <ol>
+                <li v-for="item in docsLiveDraft.reviewPacket.sectionRunbook" :key="item">{{ item }}</li>
+              </ol>
+            </section>
+            <section>
+              <strong>QA register</strong>
+              <ul>
+                <li v-for="item in docsLiveDraft.reviewPacket.qaRegister" :key="item">{{ item }}</li>
+              </ul>
+            </section>
+            <section>
+              <strong>Humanization checklist</strong>
+              <ul>
+                <li v-for="item in docsLiveDraft.reviewPacket.humanizationChecklist" :key="item">{{ item }}</li>
+              </ul>
+            </section>
+            <section>
+              <strong>Review packet</strong>
+              <ul>
+                <li v-for="item in docsLiveDraft.reviewPacket.reviewerHandoff" :key="item">{{ item }}</li>
+              </ul>
+            </section>
+          </div>
         </section>
 
         <section v-if="docsLiveGeneratedMarkdown" class="docs-live-preview" aria-label="Docs Live generated draft">
@@ -9276,6 +9308,33 @@ select:hover {
 
 .docs-live-section-stage-list li[data-status="needs-review"] strong {
   color: #7a5308;
+}
+
+.docs-live-review-packet {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.docs-live-review-packet section {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #d7dee7;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.docs-live-review-packet ul,
+.docs-live-review-packet ol {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: #2d3746;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .docs-live-preview {
