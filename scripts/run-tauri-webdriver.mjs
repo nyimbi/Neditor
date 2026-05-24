@@ -401,20 +401,14 @@ async function assertDirtyTitleWorkflow(session) {
 }
 
 async function changeOutlineTitle(session, fromTitle, toTitle) {
-  await execute(session, `
-    const fromTitle = ${JSON.stringify(fromTitle)};
-    const toTitle = ${JSON.stringify(toTitle)};
-    const row = [...document.querySelectorAll('#outline-mode .outline-mode-row')].find((item) => item.querySelector('input')?.value === fromTitle);
-    if (!row) throw new Error('Missing outline row for ' + fromTitle);
-    const input = row.querySelector('input');
-    input.focus();
-    input.value = toTitle;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
-    input.blur();
-    return true;
-  `);
+  const input = await waitForElement(
+    session,
+    `#outline-mode input[aria-label=${cssAttributeValue(`Outline title ${fromTitle}`)}]`,
+    `outline title input ${fromTitle}`,
+  );
+  await clearElement(session, input);
+  await sendElementKeys(session, input, toTitle);
+  await sendElementKeys(session, input, "\uE007");
 }
 
 async function changeOutlineLevel(session, title, level) {
@@ -897,6 +891,10 @@ function preferencesMatch(actual, expected) {
   );
 }
 
+function cssAttributeValue(value) {
+  return `"${String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+}
+
 async function createSession() {
   const response = await webdriver("POST", "/session", {
     capabilities: {
@@ -923,6 +921,31 @@ async function findElement(session, selector) {
   const id = elementId(response.value);
   if (!id) throw new Error(`could not find element ${selector}`);
   return id;
+}
+
+async function waitForElement(session, selector, description) {
+  const started = Date.now();
+  let lastError = null;
+  while (Date.now() - started < timeoutMs) {
+    try {
+      return await findElement(session, selector);
+    } catch (error) {
+      lastError = error;
+      await delay(250);
+    }
+  }
+  throw new Error(`timed out waiting for ${description}; last error: ${lastError?.message || "none"}`);
+}
+
+async function clearElement(session, id) {
+  await webdriver("POST", `/session/${session}/element/${id}/clear`, {});
+}
+
+async function sendElementKeys(session, id, text) {
+  await webdriver("POST", `/session/${session}/element/${id}/value`, {
+    text,
+    value: Array.from(text),
+  });
 }
 
 async function elementText(session, id) {
