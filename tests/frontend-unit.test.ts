@@ -1117,6 +1117,8 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("appVersion: packageJson.version"));
   ok(script.includes("sourceCommit: gitCommit()"));
   ok(script.includes("sourceTreeClean: gitTreeClean()"));
+  ok(script.includes("allowedDesktopWorkflowDirtyEntry"));
+  ok(script.includes('["src-tauri/Cargo.lock", "src-tauri/Cargo.toml"].includes(path)'));
   ok(script.includes("desktop preferences apply in packaged WebDriver session"));
   ok(script.includes("Official Tauri WebDriver currently supports desktop automation on Windows and Linux only"));
   ok(script.includes("collectMacosNativeProof"));

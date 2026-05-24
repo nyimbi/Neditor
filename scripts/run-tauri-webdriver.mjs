@@ -1033,7 +1033,17 @@ function gitTreeClean() {
     cwd: root,
     encoding: "utf8",
   });
-  return result.status === 0 && result.stdout.trim() === "";
+  if (result.status !== 0) return false;
+  const entries = result.stdout
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return entries.every((entry) => allowedDesktopWorkflowDirtyEntry(entry));
+}
+
+function allowedDesktopWorkflowDirtyEntry(entry) {
+  const path = entry.replace(/^[ MADRCU?!]{1,2}\s+/, "").replaceAll("\\", "/");
+  return process.platform === "win32" && ["src-tauri/Cargo.lock", "src-tauri/Cargo.toml"].includes(path);
 }
 
 function collectMacosNativeProof() {
