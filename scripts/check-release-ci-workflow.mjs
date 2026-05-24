@@ -64,6 +64,7 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, ".tmp/e2e-browser/report.json", "browser report must be uploaded");
   requireIncludes(workflow, ".tmp/platform-evidence/external/${{ matrix.platform }}/package-artifacts.json", "package evidence must be uploaded");
   requireIncludes(workflow, ".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json", "WebDriver evidence must be uploaded");
+  requireIncludes(workflow, "${{ matrix.artifact }}-json", "platform JSON evidence must be uploaded separately for lightweight ingest");
   requireIncludes(workflow, "src-tauri/target/release/bundle/**", "built package artifacts must be uploaded for inspection");
   requireIncludes(workflow, "pnpm run test:rendered-exports", "rendered export job must run the rendered export audit");
   requireIncludes(workflow, "poppler-utils", "rendered export job must install Poppler proof tools");

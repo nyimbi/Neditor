@@ -154,6 +154,18 @@ jobs:
             .tmp/desktop-webdriver/report.json
             src-tauri/target/release/bundle/**
 
+      - name: Upload platform evidence JSON
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}-json
+          if-no-files-found: error
+          path: |
+            .tmp/platform-evidence/external/${{ matrix.platform }}/package-artifacts.json
+            .tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json
+            .tmp/platform-evidence/report.json
+            .tmp/desktop-webdriver/report.json
+
   rendered-export-review:
     name: Rendered export review package
     runs-on: ubuntu-latest
