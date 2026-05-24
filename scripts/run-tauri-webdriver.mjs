@@ -447,8 +447,7 @@ async function closeCommandPalette(session) {
 async function assertFileSaveOpenWorkflow(session) {
   const expectedPath = workflowFilePath.replaceAll("\\", "/");
   await execute(session, `
-    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
-    const saveButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Save');
+    const saveButton = document.querySelector('#main-commands button[aria-label="Save"]');
     if (!saveButton) throw new Error('Save button was not visible in the desktop command bar');
     saveButton.click();
     return true;
@@ -478,11 +477,10 @@ async function assertFileSaveOpenWorkflow(session) {
   }
 
   await execute(session, `
-    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
-    const newButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'New');
+    const newButton = document.querySelector('#main-commands button[aria-label="New"]');
     if (!newButton) throw new Error('New button was not visible in the desktop command bar');
     newButton.click();
-    const openButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Open');
+    const openButton = document.querySelector('#main-commands button[aria-label="Open"]');
     if (!openButton) throw new Error('Open button was not visible in the desktop command bar');
     openButton.click();
     return true;
@@ -514,8 +512,7 @@ async function assertFileSaveOpenWorkflow(session) {
 
 async function assertRenameDuplicateRevealWorkflow(session) {
   await execute(session, `
-    const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
-    const renameButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Rename');
+    const renameButton = document.querySelector('#main-commands button[aria-label="Rename"]');
     if (!renameButton) throw new Error('Rename button was not visible in the desktop command bar');
     renameButton.click();
     return true;
@@ -544,9 +541,12 @@ async function assertRenameDuplicateRevealWorkflow(session) {
     throw new Error(`desktop WebDriver rename left the old Markdown path behind: ${relative(workflowFilePath)}`);
   }
 
+  await activateDocumentTab(session, "native-workflow-renamed");
   await execute(session, `
     const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
-    const duplicateButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Duplicate');
+    const activeTab = normalized(document.querySelector('.document-tabs .tab.active')?.textContent || '');
+    if (!activeTab.includes('native-workflow-renamed')) throw new Error('Expected renamed workflow file to be active before duplicate, found ' + activeTab);
+    const duplicateButton = document.querySelector('#main-commands button[aria-label="Duplicate"]');
     if (!duplicateButton) throw new Error('Duplicate button was not visible in the desktop command bar');
     duplicateButton.click();
     return true;
@@ -578,7 +578,7 @@ async function assertRenameDuplicateRevealWorkflow(session) {
 
   const revealControl = await execute(session, `
     const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
-    const revealButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Reveal');
+    const revealButton = document.querySelector('#main-commands button[aria-label="Reveal"]');
     if (!revealButton) throw new Error('Reveal button was not visible in the desktop command bar');
     return {
       label: normalized(revealButton.textContent || ''),
@@ -804,10 +804,34 @@ async function showSidebar(session, value, labelText) {
 
 async function saveWorkspace(session) {
   await execute(session, `
-    const button = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'Save Workspace');
+    const button = document.querySelector('#main-commands button[aria-label="Save Workspace"]');
     button.click();
     return true;
   `);
+}
+
+async function activateDocumentTab(session, labelFragment) {
+  await waitForValue(
+    session,
+    `
+      const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const target = [...document.querySelectorAll('.document-tabs .tab')].find((item) => normalized(item.textContent).includes(${JSON.stringify(labelFragment)}));
+      if (!target) {
+        return {
+          found: false,
+          active: normalized(document.querySelector('.document-tabs .tab.active')?.textContent || ''),
+          tabs: [...document.querySelectorAll('.document-tabs .tab')].map((item) => normalized(item.textContent)).slice(0, 10),
+        };
+      }
+      target.querySelector('.tab-main')?.click();
+      return {
+        found: true,
+        active: normalized(document.querySelector('.document-tabs .tab.active')?.textContent || ''),
+      };
+    `,
+    (value) => value?.found === true && String(value?.active || "").includes(labelFragment),
+    `${labelFragment} document tab activation`,
+  );
 }
 
 async function waitForValue(session, script, predicate, description) {

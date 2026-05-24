@@ -196,7 +196,7 @@ function gitCommit() {
 }
 
 function gitTreeClean() {
-  const result = spawnSync("git", ["status", "--porcelain"], {
+  const result = spawnSync("git", ["status", "--porcelain", "--untracked-files=no"], {
     cwd: root,
     encoding: "utf8",
   });
