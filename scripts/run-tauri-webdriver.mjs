@@ -231,13 +231,12 @@ async function assertInitialShell(session) {
   }
   recordAssertion("initial native title includes NEditor");
 
-  const shell = await findElement(session, ".app-shell");
-  const shellText = await elementText(session, shell);
-  for (const expected of ["New", "Open", "Save", "Commands"]) {
-    if (!shellText.includes(expected)) {
-      throw new Error(`desktop shell did not render expected command ${expected}`);
-    }
-  }
+  await waitForValue(
+    session,
+    "return document.querySelector('.app-shell')?.textContent || '';",
+    (value) => ["New", "Open", "Save", "Commands"].every((expected) => String(value || "").includes(expected)),
+    "desktop shell primary commands",
+  );
   recordAssertion("desktop shell renders primary commands");
 }
 
@@ -255,14 +254,25 @@ async function assertModeSwitchAndCommandPalette(session) {
     "WebDriver mode switch to preview mode",
   );
 
-  const palette = await execute(session, `
-    const button = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'Commands');
+  await execute(session, `
+    const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+    const button = [...document.querySelectorAll('button')].find((item) =>
+      normalized(item.textContent).includes('Commands') ||
+      normalized(item.getAttribute('aria-label')).includes('Commands') ||
+      normalized(item.getAttribute('title')).includes('Commands')
+    );
+    if (!button) throw new Error('Commands button was not visible');
     button.click();
-    return document.querySelector('[role="dialog"][aria-label="Command palette"] input')?.getAttribute('aria-label') || '';
+    return true;
   `);
-  if (!String(palette.value || "").includes("Search commands")) {
-    throw new Error("command palette did not open through the native WebDriver session");
-  }
+  await waitForValue(
+    session,
+    `
+      return document.querySelector('[role="dialog"][aria-label="Command palette"] input')?.getAttribute('aria-label') || '';
+    `,
+    (value) => String(value || "").includes("Search commands"),
+    "native command palette input",
+  );
   recordAssertion("native WebDriver switches modes and opens command palette");
 }
 

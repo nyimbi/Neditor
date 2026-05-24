@@ -1,4 +1,4 @@
-import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 
 async function installTauriMock(page: Page, stateKey: string) {
   await page.addInitScript((e2eStateKey) => {
@@ -1196,6 +1196,30 @@ async function queueConfirmResponse(page: Page, value: boolean) {
   await page.evaluate((response) => window.__NEDITOR_E2E__.queueConfirmResponse(response), value);
 }
 
+async function confirmTransformTrustPrompt(page: Page, engineName: string, accepted: boolean) {
+  const prompt = page.getByRole("region", { name: "External transform trust prompts" }).filter({ hasText: `${engineName} transform` });
+  await expect(prompt).toBeVisible();
+  await queueConfirmResponse(page, accepted);
+  await prompt.getByRole("button", { name: "Trust" }).click();
+}
+
+async function commitInputValue(inputLocator: Locator, value: string) {
+  await inputLocator.evaluate(
+    (node, nextValue) => {
+      const input = node as HTMLInputElement;
+      input.value = nextValue;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    },
+    value,
+  );
+}
+
+async function setEnginePath(enginePath: Locator, path: string) {
+  await commitInputValue(enginePath, path);
+  await expect(enginePath).toHaveValue(path);
+}
+
 async function setCompileDelay(page: Page, value: number) {
   await page.evaluate((delayMs) => window.__NEDITOR_E2E__.setCompileDelay(delayMs), value);
 }
@@ -1969,8 +1993,7 @@ test("edits document structure from outline mode", async ({ page }) => {
   await expect(page.getByLabel("Outline title Implementation Note")).toHaveCount(0);
 
   const marketTitle = page.getByLabel("Outline title Market Analysis");
-  await marketTitle.fill("Market Findings");
-  await marketTitle.press("Enter");
+  await commitInputValue(marketTitle, "Market Findings");
   await expect(page.getByLabel("Outline title Market Findings")).toBeVisible();
   await page.getByLabel("Outline level Risks").selectOption("2");
 
@@ -2255,13 +2278,11 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await expect(engine).toContainText("Runs only with explicit trust");
   await expect(engine).toContainText("Version probe: d2 --version");
 
-  await enginePath.fill("/usr/local/bin/d2");
-  await enginePath.dispatchEvent("change");
+  await setEnginePath(enginePath, "/usr/local/bin/d2");
   await expect(trusted).not.toBeChecked();
   await expect(engine).toContainText("Probe required after engine path change.");
 
-  await queueConfirmResponse(page, true);
-  await trusted.check();
+  await confirmTransformTrustPrompt(page, "d2", true);
   await expect(trusted).toBeChecked();
 
   await engine.getByLabel("Input").selectOption("file");
@@ -2272,22 +2293,18 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await expect(engine).toContainText("d2 probe ok via file with timeout 7750");
   await expect(engine).toContainText("Cache: d2:/usr/local/bin/d2:file:7750");
 
-  await enginePath.fill("/missing/d2");
-  await enginePath.dispatchEvent("change");
+  await setEnginePath(enginePath, "/missing/d2");
   await expect(trusted).not.toBeChecked();
 
-  await queueConfirmResponse(page, true);
-  await trusted.check();
+  await confirmTransformTrustPrompt(page, "d2", true);
   await expect(trusted).toBeChecked();
   await engine.getByRole("button", { name: "Probe" }).click();
   await expect(engine).toContainText("Probe failed");
   await expect(engine).toContainText("d2 executable not found at /missing/d2.");
 
-  await enginePath.fill("/opt/bin/d2");
-  await enginePath.dispatchEvent("change");
+  await setEnginePath(enginePath, "/opt/bin/d2");
   await expect(trusted).not.toBeChecked();
-  await queueConfirmResponse(page, false);
-  await trusted.click();
+  await confirmTransformTrustPrompt(page, "d2", false);
   await expect(trusted).not.toBeChecked();
   await expect(engine).toContainText("Probe required after engine path change.");
 });
