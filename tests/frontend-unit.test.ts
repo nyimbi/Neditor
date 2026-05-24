@@ -697,6 +697,8 @@ test("local verification scripts expose local baseline checks", () => {
   const evidenceKitCollector = readFileSync("scripts/collect-release-evidence-kit.mjs", "utf8");
   const evidenceKitChecker = readFileSync("scripts/check-release-evidence-kit.mjs", "utf8");
   const evidenceIngest = readFileSync("scripts/ingest-release-evidence.mjs", "utf8");
+  const releaseCi = readFileSync("scripts/check-release-ci-workflow.mjs", "utf8");
+  const releaseWorkflow = readFileSync(".github/workflows/neditor-release-evidence.yml", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
   const platformEvidence = readFileSync("scripts/check-platform-evidence.mjs", "utf8");
   const signingCollector = readFileSync("scripts/collect-release-signing-evidence.mjs", "utf8");
@@ -713,6 +715,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:google-docs-import"], "node scripts/check-google-docs-import-evidence.mjs");
   equal(scripts["check:platform-evidence"], "node scripts/check-platform-evidence.mjs");
   equal(scripts["check:platform-packaging"], "node scripts/check-platform-packaging.mjs");
+  equal(scripts["check:release-ci"], "node scripts/check-release-ci-workflow.mjs");
   equal(scripts["check:evidence-kit"], "node scripts/check-release-evidence-kit.mjs");
   equal(scripts["check:release-signing"], "node scripts/check-release-signing.mjs");
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
@@ -738,6 +741,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Accessibility manual review contract", "pnpm", ["run", "check:a11y:manual"])'));
   ok(verification.includes('command("Google Docs import evidence contract", "pnpm", ["run", "check:google-docs-import"])'));
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
+  ok(verification.includes('command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"])'));
   ok(verification.includes('command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"])'));
   ok(verification.includes('command("Release signing evidence contract", "pnpm", ["run", "check:release-signing"])'));
   ok(verification.includes('command("Release evidence kit generation", "pnpm", ["run", "collect:evidence-kit"])'));
@@ -819,6 +823,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("staleTemplates"));
   ok(evidenceKitCollector.includes("inspectTemplateFreshness"));
   ok(evidenceKitCollector.includes("sourceCommit"));
+  ok(evidenceKitCollector.includes("Optional CI path: gh workflow run neditor-release-evidence.yml"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
   ok(evidenceKitCollector.includes("pnpm run ingest:evidence"));
@@ -839,6 +844,25 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceIngest.includes("pnpm"));
   ok(evidenceIngest.includes("check:release-signing"));
   ok(evidenceIngest.includes("check:google-docs-import"));
+  ok(releaseCi.includes("neditor.release-ci-workflow-report.v1"));
+  ok(releaseCi.includes("browser-workflows:"));
+  ok(releaseCi.includes("platform-proof:"));
+  ok(releaseCi.includes("xvfb-run -a pnpm run test:tauri-webdriver -- --strict"));
+  ok(releaseCi.includes(".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json"));
+  ok(releaseWorkflow.includes("name: NEditor Release Evidence"));
+  ok(releaseWorkflow.includes("workflow_dispatch:"));
+  ok(releaseWorkflow.includes("Browser workflow proof"));
+  ok(releaseWorkflow.includes("PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install --with-deps chromium"));
+  ok(releaseWorkflow.includes("pnpm run check:e2e-env"));
+  ok(releaseWorkflow.includes("pnpm run test:e2e"));
+  ok(releaseWorkflow.includes("platform: win32"));
+  ok(releaseWorkflow.includes("platform: linux"));
+  ok(releaseWorkflow.includes("cargo install tauri-driver --locked"));
+  ok(releaseWorkflow.includes("webkit2gtk-driver"));
+  ok(releaseWorkflow.includes("choco install selenium-chromium-edge-driver"));
+  ok(releaseWorkflow.includes("MSEDGEDRIVER_TELEMETRY_OPTOUT"));
+  ok(releaseWorkflow.includes("pnpm run collect:platform-evidence"));
+  ok(releaseWorkflow.includes("pnpm run check:platform-evidence"));
 });
 
 test("runtime accessibility audit executes focused browser workflows", () => {

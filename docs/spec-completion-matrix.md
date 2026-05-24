@@ -15,10 +15,11 @@ Status vocabulary:
 This matrix is intentionally conservative. If evidence is indirect, the status
 is not "Complete".
 
-GitHub Actions is not an active verification surface for this project. Any
-older run IDs in this matrix are historical context only; current completion
-requires local command evidence, committed artifacts, rendered/manual QA, or
-explicit platform checks.
+GitHub Actions is an active external evidence surface only for the manually
+dispatched `NEditor Release Evidence` workflow. Current completion still
+requires local command evidence, committed artifacts, rendered/manual QA,
+downloaded workflow artifacts, or explicit platform checks that match the
+current app version, Git commit, and clean source tree.
 
 ## Core Product Scope
 

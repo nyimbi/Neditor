@@ -321,7 +321,9 @@ pnpm run verify:local
 pnpm run verify:local:full
 ```
 
-NEditor uses local verification rather than GitHub Actions. Run
+NEditor uses local verification as the normal development gate, with a
+manually dispatched GitHub Actions workflow for browser, Windows, and Linux
+release evidence that cannot be collected from every workstation. Run
 `pnpm run verify:local` before publishing a normal slice. Run
 `pnpm run verify:local:full` for a release-grade baseline; it extends the quick
 checks with the production build, the full browser workflow suite, the focused
@@ -388,6 +390,14 @@ local verification.
 evidence. Missing supported-host evidence remains a release gap, but malformed
 evidence copied back from another host fails the check instead of being silently
 accepted.
+
+`pnpm run check:release-ci` verifies that
+`.github/workflows/neditor-release-evidence.yml` remains wired to run the
+browser workflow suite on Ubuntu plus strict Windows/Linux Tauri WebDriver and
+package evidence collection. Trigger that workflow manually when release
+readiness needs supported-host proof, then download the uploaded evidence
+artifacts and import them locally with `pnpm run ingest:evidence -- --source
+/path/to/unpacked-artifacts`.
 
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`

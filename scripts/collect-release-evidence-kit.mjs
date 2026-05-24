@@ -31,6 +31,7 @@ const runbooks = [
     title: "Windows Package And WebDriver Proof",
     gaps: ["windows-linux-tauri-webdriver-execution", "windows-package-artifact-proof"],
     commands: [
+      "Optional CI path: gh workflow run neditor-release-evidence.yml",
       "git fetch --all --tags",
       `git checkout ${sourceCommit || "<source-commit>"}`,
       "git status --porcelain",
@@ -48,6 +49,7 @@ const runbooks = [
     title: "Linux Package And WebDriver Proof",
     gaps: ["windows-linux-tauri-webdriver-execution", "linux-package-artifact-proof"],
     commands: [
+      "Optional CI path: gh workflow run neditor-release-evidence.yml",
       "git fetch --all --tags",
       `git checkout ${sourceCommit || "<source-commit>"}`,
       "git status --porcelain",

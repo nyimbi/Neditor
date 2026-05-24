@@ -1,0 +1,149 @@
+name: NEditor Release Evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neditor-release-evidence-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  browser-workflows:
+    name: Browser workflow proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium with host dependencies
+        run: PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install --with-deps chromium
+
+      - name: Check browser workflow environment
+        run: pnpm run check:e2e-env
+
+      - name: Run browser workflow suite
+        run: pnpm run test:e2e
+
+      - name: Upload browser workflow evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neditor-browser-workflow-evidence
+          if-no-files-found: error
+          path: |
+            .tmp/e2e-environment/report.json
+            .tmp/e2e-browser/report.json
+
+  platform-proof:
+    name: ${{ matrix.label }} package and WebDriver proof
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows
+            os: windows-latest
+            platform: win32
+            artifact: neditor-platform-evidence-win32
+          - label: Linux
+            os: ubuntu-latest
+            platform: linux
+            artifact: neditor-platform-evidence-linux
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            webkit2gtk-driver \
+            xvfb
+
+      - name: Install Windows WebDriver
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install selenium-chromium-edge-driver -y --no-progress
+
+      - name: Install Tauri WebDriver
+        run: cargo install tauri-driver --locked
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm run build
+
+      - name: Build Tauri packages
+        run: pnpm tauri build --bundles all
+
+      - name: Run Linux Tauri WebDriver workflow
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm run test:tauri-webdriver -- --strict
+
+      - name: Run Windows Tauri WebDriver workflow
+        if: runner.os == 'Windows'
+        env:
+          MSEDGEDRIVER_TELEMETRY_OPTOUT: "1"
+        run: pnpm run test:tauri-webdriver -- --strict
+
+      - name: Collect platform evidence
+        env:
+          NEDITOR_PLATFORM_EVIDENCE_PLATFORM: ${{ matrix.platform }}
+          NEDITOR_PLATFORM_BUILD_COMMAND: pnpm run build && pnpm tauri build --bundles all
+        run: pnpm run collect:platform-evidence
+
+      - name: Validate platform evidence contract
+        run: pnpm run check:platform-evidence
+
+      - name: Upload platform evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            .tmp/platform-evidence/external/${{ matrix.platform }}/package-artifacts.json
+            .tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json
+            .tmp/platform-evidence/report.json
+            .tmp/desktop-webdriver/report.json
+            src-tauri/target/release/bundle/**
