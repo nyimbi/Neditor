@@ -123,17 +123,11 @@ pub(crate) fn duplicate_file(request: DuplicateFileRequest) -> Result<FileRespon
 #[tauri::command]
 pub(crate) fn reveal_path(path: String) -> Result<(), String> {
     let command_spec = reveal_command_for_path(&path)?;
-    let status = Command::new(&command_spec.program)
+    Command::new(&command_spec.program)
         .args(&command_spec.args)
-        .status()
+        .spawn()
         .map_err(|err| err.to_string())?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "Unable to reveal path; command exited with {status}"
-        ))
-    }
+    Ok(())
 }
 
 pub(crate) fn reveal_command_for_path(path: &str) -> Result<RevealCommand, String> {
