@@ -241,18 +241,7 @@ async function assertInitialShell(session) {
 }
 
 async function assertModeSwitchAndCommandPalette(session) {
-  await execute(session, `
-    const select = document.querySelector('[aria-label="View mode"]');
-    select.value = 'preview';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  `);
-  await waitForValue(
-    session,
-    "return document.querySelector('.workspace')?.className || '';",
-    (value) => String(value || "").includes("mode-preview"),
-    "WebDriver mode switch to preview mode",
-  );
+  await setViewMode(session, "preview", "WebDriver mode switch to preview mode");
 
   await execute(session, `
     const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
@@ -273,27 +262,12 @@ async function assertModeSwitchAndCommandPalette(session) {
     (value) => String(value || "").includes("Search commands"),
     "native command palette input",
   );
-  await execute(session, `
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    return true;
-  `);
-  await waitForValue(
-    session,
-    "return Boolean(document.querySelector('[role=\"dialog\"][aria-label=\"Command palette\"]'));",
-    (value) => value === false,
-    "native command palette closed",
-  );
+  await closeCommandPalette(session);
   recordAssertion("native WebDriver switches modes and opens command palette");
 }
 
 async function assertOutlineModeWorkflow(session) {
-  await execute(session, `
-    const select = document.querySelector('[aria-label="View mode"]');
-    if (!select) throw new Error('View mode select was not visible');
-    select.value = 'outline';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  `);
+  await setViewMode(session, "outline", "desktop outline mode selection");
   const initial = await waitForValue(
     session,
     outlineModeEvidenceScript,
@@ -324,12 +298,7 @@ async function assertOutlineModeWorkflow(session) {
       !String(value?.outlineText || "").includes("Prepared for"),
     "desktop outline mode structure evidence",
   );
-  await execute(session, `
-    const select = document.querySelector('[aria-label="View mode"]');
-    select.value = 'source';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  `);
+  await setViewMode(session, "source", "desktop source mode selection after outline edits");
   const source = await waitForValue(
     session,
     `
@@ -426,6 +395,53 @@ async function waitForOutlineTitle(session, title) {
     outlineModeEvidenceScript,
     (value) => Array.isArray(value?.titles) && value.titles.includes(title),
     `outline title ${title}`,
+  );
+}
+
+async function setViewMode(session, mode, description) {
+  await waitForValue(
+    session,
+    `
+      const mode = ${JSON.stringify(mode)};
+      const select = document.querySelector('[aria-label="View mode"]');
+      if (!select) {
+        return { changed: false, reason: 'missing-select' };
+      }
+      select.value = mode;
+      select.dispatchEvent(new Event('input', { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return {
+        changed: true,
+        selected: select.value,
+        workspace: document.querySelector('.workspace')?.className || '',
+      };
+    `,
+    (value) => value?.changed === true && value?.selected === mode,
+    `${description} control update`,
+  );
+  await waitForValue(
+    session,
+    "return document.querySelector('.workspace')?.className || '';",
+    (value) => String(value || "").includes(`mode-${mode}`),
+    description,
+  );
+}
+
+async function closeCommandPalette(session) {
+  await waitForValue(
+    session,
+    `
+      const dialog = document.querySelector('[role="dialog"][aria-label="Command palette"]');
+      if (!dialog) return { open: false };
+      const close = dialog.querySelector('[aria-label="Close command palette"]');
+      close?.click();
+      dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      return { open: Boolean(document.querySelector('[role="dialog"][aria-label="Command palette"]')) };
+    `,
+    (value) => value?.open === false,
+    "native command palette closed",
   );
 }
 
