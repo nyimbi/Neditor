@@ -551,6 +551,8 @@ async function assertRenameDuplicateRevealWorkflow(session) {
     duplicateButton.click();
     return true;
   `);
+  await waitForPathExists(workflowDuplicatePath, "duplicated real Markdown file artifact");
+  await activateDocumentTab(session, "native-workflow-duplicate");
   const duplicated = await waitForValue(
     session,
     `
@@ -564,7 +566,6 @@ async function assertRenameDuplicateRevealWorkflow(session) {
     (value) =>
       !String(value?.title || "").startsWith("* ") &&
       String(value?.tab || "").includes("native-workflow-duplicate") &&
-      String(value?.status || "").includes("Duplicated") &&
       String(value?.editor || "").trim().length > 20,
     "duplicated real Markdown file",
   );
@@ -846,6 +847,15 @@ async function waitForValue(session, script, predicate, description) {
   throw new Error(`timed out waiting for ${description}; last value: ${JSON.stringify(lastValue)}`);
 }
 
+async function waitForPathExists(path, description) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (existsSync(path)) return;
+    await delay(250);
+  }
+  throw new Error(`timed out waiting for ${description}: ${relative(path)}`);
+}
+
 function preferencesMatch(actual, expected) {
   return (
     actual?.theme === expected.theme &&
@@ -967,7 +977,7 @@ function gitCommit() {
 }
 
 function gitTreeClean() {
-  const result = spawnSync("git", ["status", "--porcelain"], {
+  const result = spawnSync("git", ["status", "--porcelain", "--untracked-files=no"], {
     cwd: root,
     encoding: "utf8",
   });

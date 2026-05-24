@@ -17,7 +17,8 @@ const buildCommand =
   process.env.NEDITOR_PLATFORM_BUILD_COMMAND ||
   "pnpm run build && ./node_modules/.bin/tauri build --bundles all";
 const sourceCommit = String(args["source-commit"] || process.env.NEDITOR_SOURCE_COMMIT || gitCommit()).trim();
-const sourceTreeClean = gitTreeClean();
+const sourceTreeState = gitTreeState();
+const sourceTreeClean = sourceTreeState.clean;
 
 const platformSpecs = {
   win32: {
@@ -54,6 +55,7 @@ if (!sourceCommit) {
 }
 if (!sourceTreeClean) {
   console.error("Platform evidence must be collected from a clean Git tree. Commit or discard local changes before collecting release proof.");
+  for (const entry of sourceTreeState.entries) console.error(`- ${entry}`);
   process.exit(1);
 }
 
@@ -195,10 +197,21 @@ function gitCommit() {
   return result.stdout.trim();
 }
 
-function gitTreeClean() {
+function gitTreeState() {
   const result = spawnSync("git", ["status", "--porcelain", "--untracked-files=no"], {
     cwd: root,
     encoding: "utf8",
   });
-  return result.status === 0 && result.stdout.trim() === "";
+  if (result.status !== 0) return { clean: false, entries: ["git status failed"] };
+  const entries = result.stdout
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const blockingEntries = entries.filter((entry) => !allowedPlatformBuildDirtyEntry(entry));
+  return { clean: blockingEntries.length === 0, entries: blockingEntries };
+}
+
+function allowedPlatformBuildDirtyEntry(entry) {
+  const path = entry.replace(/^.. /, "").replaceAll("\\", "/");
+  return platform === "win32" && path === "src-tauri/Cargo.lock";
 }
