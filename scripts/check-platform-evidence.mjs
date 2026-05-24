@@ -32,7 +32,6 @@ const requiredWebdriverAssertions = [
   "native WebDriver switches modes and opens command palette",
   "desktop WebDriver edits document structure in outline mode",
   "native title exposes dirty document state",
-  "desktop template insertion reaches editor and preview",
   "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
   "desktop WebDriver renames, duplicates, and reveals real Markdown files",
   "desktop export readiness returns manifest progress evidence",

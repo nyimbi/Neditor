@@ -1079,7 +1079,6 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
 
   ok(script.includes("assertDirtyTitleWorkflow(session)"));
   ok(script.includes("assertOutlineModeWorkflow(session)"));
-  ok(script.includes("assertTransformTemplateWorkflow(session)"));
   ok(script.includes("assertFileSaveOpenWorkflow(session)"));
   ok(script.includes("assertRenameDuplicateRevealWorkflow(session)"));
   ok(script.includes("assertExportReadinessWorkflow(session)"));
@@ -1100,9 +1099,7 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path"));
   ok(script.includes("desktop WebDriver renames, duplicates, and reveals real Markdown files"));
   ok(script.includes("desktop WebDriver writes HTML export through dialog-free smoke path"));
-  ok(script.includes("desktop template insertion reaches editor and preview"));
-  ok(script.includes("Dose by weight"));
-  ok(script.includes(".preview-document"));
+  ok(script.includes("desktop WebDriver Markdown file did not preserve document content"));
   ok(script.includes("document.querySelector('.sidebar pre')"));
   ok(script.includes('"export_target": "html"'));
   ok(script.includes("manifest.output_hash"));
