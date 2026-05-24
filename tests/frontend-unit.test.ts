@@ -851,6 +851,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCi.includes("rendered-export-review:"));
   ok(releaseCi.includes("accessibility-review:"));
   ok(releaseCi.includes("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"));
+  ok(releaseCi.includes("NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS"));
   ok(releaseCi.includes("xvfb-run -a pnpm run test:tauri-webdriver -- --strict"));
   ok(releaseCi.includes("pnpm tauri build --bundles ${{ matrix.bundles }}"));
   ok(releaseCi.includes(".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json"));
@@ -859,6 +860,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseWorkflow.includes("name: NEditor Release Evidence"));
   ok(releaseWorkflow.includes("workflow_dispatch:"));
   ok(releaseWorkflow.includes('FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"'));
+  ok(releaseWorkflow.includes('NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS: "90000"'));
   ok(releaseWorkflow.includes("Browser workflow proof"));
   ok(releaseWorkflow.includes("PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install --with-deps chromium"));
   ok(releaseWorkflow.includes("pnpm run check:e2e-env"));

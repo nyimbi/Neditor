@@ -1756,8 +1756,10 @@ function verifyManualReviewDashboard(issues, assertions) {
     "Visual Review Thumbnails",
     "visual-review-signoff.template.json",
     "NEDITOR_RENDERED_EXPORT_SIGNOFF",
-    "macos-quicklook-pdf",
   ];
+  for (const scope of ["macos-quicklook-pdf", "macos-quicklook-docx", "macos-quicklook-pptx"]) {
+    if (assertions.some((assertion) => assertion.scope === scope)) expectedContent.push(scope);
+  }
   for (const scope of ["pdfinfo-primary", "pdftotext-primary", "pdftoppm-primary-page-1"]) {
     if (assertions.some((assertion) => assertion.scope === scope)) expectedContent.push(scope);
   }

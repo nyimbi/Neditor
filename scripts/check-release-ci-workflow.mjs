@@ -36,6 +36,7 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "permissions:", "workflow must declare permissions");
   requireIncludes(workflow, "contents: read", "workflow must use read-only repository contents permission");
   requireIncludes(workflow, "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24", "workflow must opt JavaScript actions into Node 24");
+  requireIncludes(workflow, "NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS", "workflow must allow enough time for hosted Tauri WebDriver startup");
   requireIncludes(workflow, "browser-workflows:", "workflow must include browser workflow proof job");
   requireIncludes(workflow, "platform-proof:", "workflow must include platform proof job");
   requireIncludes(workflow, "rendered-export-review:", "workflow must include rendered export review job");

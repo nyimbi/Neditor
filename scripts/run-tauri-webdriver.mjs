@@ -242,15 +242,18 @@ async function assertInitialShell(session) {
 }
 
 async function assertModeSwitchAndCommandPalette(session) {
-  const mode = await execute(session, `
+  await execute(session, `
     const select = document.querySelector('[aria-label="View mode"]');
     select.value = 'preview';
     select.dispatchEvent(new Event('change', { bubbles: true }));
-    return document.querySelector('.workspace')?.className || '';
+    return true;
   `);
-  if (!String(mode.value || "").includes("mode-preview")) {
-    throw new Error(`expected WebDriver mode switch to reach preview mode, found ${JSON.stringify(mode.value)}`);
-  }
+  await waitForValue(
+    session,
+    "return document.querySelector('.workspace')?.className || '';",
+    (value) => String(value || "").includes("mode-preview"),
+    "WebDriver mode switch to preview mode",
+  );
 
   const palette = await execute(session, `
     const button = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'Commands');

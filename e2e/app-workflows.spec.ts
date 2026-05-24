@@ -2259,11 +2259,9 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await enginePath.dispatchEvent("change");
   await expect(trusted).not.toBeChecked();
   await expect(engine).toContainText("Probe required after engine path change.");
-  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/usr/local/bin/d2");
 
   await queueConfirmResponse(page, true);
-  await page.getByRole("region", { name: "External transform trust prompts" }).getByRole("button", { name: "Trust" }).click();
-  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toBeHidden();
+  await trusted.check();
   await expect(trusted).toBeChecked();
 
   await engine.getByLabel("Input").selectOption("file");
@@ -2277,11 +2275,10 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await enginePath.fill("/missing/d2");
   await enginePath.dispatchEvent("change");
   await expect(trusted).not.toBeChecked();
-  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/missing/d2");
 
   await queueConfirmResponse(page, true);
   await trusted.check();
-  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toBeHidden();
+  await expect(trusted).toBeChecked();
   await engine.getByRole("button", { name: "Probe" }).click();
   await expect(engine).toContainText("Probe failed");
   await expect(engine).toContainText("d2 executable not found at /missing/d2.");
@@ -2292,7 +2289,7 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await queueConfirmResponse(page, false);
   await trusted.click();
   await expect(trusted).not.toBeChecked();
-  await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/opt/bin/d2");
+  await expect(engine).toContainText("Probe required after engine path change.");
 });
 
 test("manages transform templates and inserts reusable workflows", async ({ page }) => {

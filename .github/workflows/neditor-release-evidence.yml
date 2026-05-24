@@ -8,6 +8,7 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS: "90000"
 
 concurrency:
   group: neditor-release-evidence-${{ github.ref }}
