@@ -19,6 +19,7 @@ const requiredReports = [
   requiredReport("platform-package-config", ".tmp/desktop-bundle/platform-package-config-report.json", ["passed"]),
   requiredReport("external-platform-evidence", ".tmp/platform-evidence/report.json", [], platformEvidenceAccepted),
   requiredReport("release-signing-evidence", ".tmp/release-signing/report.json", [], releaseSigningAccepted),
+  requiredReport("ai-provider-evidence", ".tmp/ai-provider-evidence/report.json", [], aiProviderEvidenceAccepted),
   requiredReport("release-ci-workflow", ".tmp/release-ci/workflow-report.json", [], releaseCiWorkflowAccepted),
   requiredReport("release-evidence-kit", ".tmp/release-evidence-kit/report.json", [], releaseEvidenceKitAccepted),
   requiredReport("desktop-command-smoke", ".tmp/desktop-smoke/native-command-report.json", [], desktopCommandPassed),
@@ -180,6 +181,16 @@ function collectEvidenceGaps(checks) {
       status: googleDocsImport?.importEvidence?.status || "pending-google-drive-authorization",
       evidence: ".tmp/google-docs-import/report.json",
       detail: "Local Google Docs package proof is present, but live Google Docs import/readback evidence needs an authorized Drive session.",
+    });
+  }
+
+  const aiProvider = reports["ai-provider-evidence"];
+  if (Number(aiProvider?.summary?.acceptedEvidence || 0) < 1) {
+    gaps.push({
+      id: "ai-provider-live-endpoint-proof",
+      status: aiProvider?.status || "pending-live-provider-evidence",
+      evidence: ".tmp/ai-provider-evidence/report.json",
+      detail: "Agentic provider execution is implemented, but a live approved-provider endpoint response needs credentialed evidence without stored secrets.",
     });
   }
 
@@ -461,6 +472,18 @@ function releaseSigningAccepted(report) {
   };
 }
 
+function aiProviderEvidenceAccepted(report) {
+  const invalid = Number(report.summary?.invalidEvidence || 0);
+  return {
+    accepted: invalid === 0,
+    status: report.status || "unknown",
+    detail:
+      invalid === 0
+        ? `aiProviderEvidence=${report.status || "unknown"} accepted=${Number(report.summary?.acceptedEvidence || 0)}`
+        : `invalid AI provider evidence count=${invalid}`,
+  };
+}
+
 function releaseCiWorkflowAccepted(report) {
   const issues = [];
   if (report.schema !== "neditor.release-ci-workflow-report.v1") issues.push("missing-schema");
@@ -492,8 +515,8 @@ function releaseEvidenceKitAccepted(report) {
   if (report.readinessStatus !== report.currentReadinessStatus) issues.push("readiness-status-mismatch");
   if (Number(report.summary?.missingTemplates || 0) !== 0) issues.push("missing-templates");
   if (Number(report.summary?.staleTemplates || 0) !== 0) issues.push("stale-templates");
-  if (Number(report.summary?.copiedTemplates || 0) < 10) issues.push("incomplete-template-set");
-  if (Number(report.summary?.runbooks || 0) < 6) issues.push("incomplete-runbook-set");
+  if (Number(report.summary?.copiedTemplates || 0) < 11) issues.push("incomplete-template-set");
+  if (Number(report.summary?.runbooks || 0) < 7) issues.push("incomplete-runbook-set");
   if (Number(report.summary?.issues || 0) !== 0) issues.push("reported-issues");
 
   return {

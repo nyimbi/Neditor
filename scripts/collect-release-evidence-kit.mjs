@@ -20,6 +20,7 @@ const templateCopies = [
   [".tmp/release-signing/templates/darwin-signing-evidence.template.json", "templates/signing/darwin-signing-evidence.template.json"],
   [".tmp/release-signing/templates/win32-signing-evidence.template.json", "templates/signing/win32-signing-evidence.template.json"],
   [".tmp/release-signing/templates/linux-signing-evidence.template.json", "templates/signing/linux-signing-evidence.template.json"],
+  [".tmp/ai-provider-evidence/templates/provider-evidence.template.json", "templates/ai-provider/provider-evidence.template.json"],
   [".tmp/google-docs-import/import-evidence.template.json", "templates/google-docs/import-evidence.template.json"],
   [".tmp/rendered-export-audit/visual-review-signoff.template.json", "templates/rendered-export/visual-review-signoff.template.json"],
   [".tmp/accessibility/manual-review-template.json", "templates/accessibility/manual-review-template.json"],
@@ -96,6 +97,22 @@ const runbooks = [
     returns: [".tmp/google-docs-import/external/import-evidence.json"],
   },
   {
+    file: "runbooks/ai-provider-endpoint.md",
+    title: "Approved AI Provider Live Endpoint Proof",
+    gaps: ["ai-provider-live-endpoint-proof"],
+    commands: [
+      "git fetch --all --tags",
+      `git checkout ${sourceCommit || "<source-commit>"}`,
+      "git status --porcelain",
+      "pnpm install --frozen-lockfile",
+      "Set NEDITOR_AI_PROVIDER_PROFILE, NEDITOR_AI_PROVIDER_ENDPOINT, NEDITOR_AI_PROVIDER_MODEL, and NEDITOR_AI_PROVIDER_API_KEY_ENV.",
+      "Set the API key in the environment variable named by NEDITOR_AI_PROVIDER_API_KEY_ENV.",
+      "pnpm run collect:ai-provider",
+      "pnpm run check:ai-provider",
+    ],
+    returns: [".tmp/ai-provider-evidence/external/provider-evidence.json"],
+  },
+  {
     file: "runbooks/rendered-export-human-review.md",
     title: "Rendered Export Native-Viewer Human Signoff",
     gaps: ["rendered-export-native-viewer-human-signoff"],
@@ -123,7 +140,7 @@ const runbooks = [
   },
 ];
 
-rmSync(outputDir, { recursive: true, force: true });
+rmSync(outputDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 mkdirSync(outputDir, { recursive: true });
 
 const copiedTemplates = copyTemplates();

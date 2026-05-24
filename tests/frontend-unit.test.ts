@@ -925,6 +925,8 @@ test("local verification scripts expose local baseline checks", () => {
   const verification = readFileSync("scripts/run-local-verification.mjs", "utf8");
   const e2eEnvironment = readFileSync("scripts/check-e2e-environment.mjs", "utf8");
   const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
+  const aiProviderEvidence = readFileSync("scripts/check-ai-provider-evidence.mjs", "utf8");
+  const aiProviderCollector = readFileSync("scripts/collect-ai-provider-evidence.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
   const googleDocsCollector = readFileSync("scripts/collect-google-docs-import-evidence.mjs", "utf8");
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
@@ -939,6 +941,7 @@ test("local verification scripts expose local baseline checks", () => {
   const releaseSigning = readFileSync("scripts/check-release-signing.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
+  equal(scripts["check:ai-provider"], "node scripts/check-ai-provider-evidence.mjs");
   equal(scripts["check:a11y"], "node scripts/check-accessibility.mjs");
   equal(scripts["check:a11y:manual"], "node scripts/check-accessibility-manual-signoff.mjs");
   equal(scripts["check:a11y:runtime"], "node scripts/check-accessibility-runtime.mjs");
@@ -954,6 +957,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:release-signing"], "node scripts/check-release-signing.mjs");
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
+  equal(scripts["collect:ai-provider"], "node scripts/collect-ai-provider-evidence.mjs");
   equal(scripts["collect:google-docs-import"], "node scripts/collect-google-docs-import-evidence.mjs");
   equal(scripts["collect:platform-evidence"], "node scripts/collect-platform-evidence.mjs");
   equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
@@ -974,6 +978,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Accessibility runtime audit", "pnpm", ["run", "check:a11y:runtime"])'));
   ok(verification.includes('command("Accessibility manual review contract", "pnpm", ["run", "check:a11y:manual"])'));
   ok(verification.includes('command("Google Docs import evidence contract", "pnpm", ["run", "check:google-docs-import"])'));
+  ok(verification.includes('command("AI provider evidence contract", "pnpm", ["run", "check:ai-provider"])'));
+  ok(verification.includes('command("AI provider live endpoint evidence contract", "pnpm", ["run", "check:ai-provider"])'));
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
   ok(verification.includes('command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"])'));
   ok(verification.includes('command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"])'));
@@ -989,6 +995,22 @@ test("local verification scripts expose local baseline checks", () => {
   ok(e2eEnvironment.includes("isTransientBrowserLaunchFailure"));
   ok(browserEnv.includes('join(root, ".tmp", "ms-playwright")'));
   ok(browserEnv.includes("PLAYWRIGHT_BROWSERS_PATH: baseEnv.PLAYWRIGHT_BROWSERS_PATH ?? projectBrowserCache"));
+  ok(aiProviderEvidence.includes("neditor.ai-provider-evidence.v1"));
+  ok(aiProviderEvidence.includes("NEDITOR_AI_PROVIDER_EVIDENCE_DIR"));
+  ok(aiProviderEvidence.includes("pending-live-provider-evidence"));
+  ok(aiProviderEvidence.includes("NEDITOR_PROVIDER_EVIDENCE_OK"));
+  ok(aiProviderEvidence.includes("appVersion must match package.json version"));
+  ok(aiProviderEvidence.includes("sourceCommit must match current git commit"));
+  ok(aiProviderEvidence.includes("sourceTreeClean must be true"));
+  ok(aiProviderEvidence.includes("evidence must not contain API key-looking secrets"));
+  ok(aiProviderCollector.includes("NEDITOR_AI_PROVIDER_PROFILE"));
+  ok(aiProviderCollector.includes("NEDITOR_AI_PROVIDER_ENDPOINT"));
+  ok(aiProviderCollector.includes("NEDITOR_AI_PROVIDER_MODEL"));
+  ok(aiProviderCollector.includes("NEDITOR_AI_PROVIDER_API_KEY_ENV"));
+  ok(aiProviderCollector.includes("AI provider evidence must be collected from a clean Git tree"));
+  ok(aiProviderCollector.includes("secretMaterialStored: false"));
+  ok(aiProviderCollector.includes("anthropic-version"));
+  ok(aiProviderCollector.includes("gemini-generate-content"));
   ok(googleDocsImport.includes("neditor.google-docs-import-evidence.v1"));
   ok(googleDocsImport.includes("appVersion must match package.json version"));
   ok(googleDocsImport.includes("sourceCommit must match current git commit"));
@@ -1053,6 +1075,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("neditor.release-evidence-kit.v1"));
   ok(evidenceKitCollector.includes("windows-package-artifact-proof"));
   ok(evidenceKitCollector.includes("linux-package-artifact-proof"));
+  ok(evidenceKitCollector.includes("ai-provider-live-endpoint-proof"));
   ok(evidenceKitCollector.includes("google-docs-live-import-readback"));
   ok(evidenceKitCollector.includes("rendered-export-native-viewer-human-signoff"));
   ok(evidenceKitCollector.includes("accessibility-assistive-technology-human-signoff"));
@@ -1061,11 +1084,13 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("inspectTemplateFreshness"));
   ok(evidenceKitCollector.includes("sourceCommit"));
   ok(evidenceKitCollector.includes("Optional CI path: gh workflow run neditor-release-evidence.yml"));
+  ok(evidenceKitCollector.includes("provider-evidence.template.json"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
   ok(evidenceKitCollector.includes("pnpm run ingest:evidence"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit.v1"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit-report.v1"));
+  ok(evidenceKitChecker.includes("runbooks/ai-provider-endpoint.md"));
   ok(evidenceKitChecker.includes("report.json"));
   ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
   ok(evidenceKitChecker.includes("current source tree must be clean"));
@@ -1076,10 +1101,12 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceIngest.includes("neditor.release-evidence-ingest.v1"));
   ok(evidenceIngest.includes("NEDITOR_RELEASE_EVIDENCE_RETURN_DIR"));
   ok(evidenceIngest.includes("platform/win32-package-artifacts.json"));
+  ok(evidenceIngest.includes("ai-provider/provider-evidence.json"));
   ok(evidenceIngest.includes("NEDITOR_RENDERED_EXPORT_SIGNOFF"));
   ok(evidenceIngest.includes("NEDITOR_ACCESSIBILITY_SIGNOFF"));
   ok(evidenceIngest.includes("pnpm"));
   ok(evidenceIngest.includes("check:release-signing"));
+  ok(evidenceIngest.includes("check:ai-provider"));
   ok(evidenceIngest.includes("check:google-docs-import"));
   ok(releaseCi.includes("neditor.release-ci-workflow-report.v1"));
   ok(releaseCi.includes("browser-workflows:"));
@@ -1210,6 +1237,9 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("neditor.release-evidence-kit-report.v1"));
   ok(script.includes("current-source-tree-not-clean"));
   ok(script.includes("missingReleaseSigningEvidence"));
+  ok(script.includes("ai-provider-evidence"));
+  ok(script.includes("ai-provider-live-endpoint-proof"));
+  ok(script.includes("aiProviderEvidenceAccepted"));
   ok(script.includes("google-docs-import-evidence"));
   ok(script.includes("google-docs-live-import-readback"));
   ok(script.includes("release-signing-and-notarization"));

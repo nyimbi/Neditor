@@ -451,13 +451,26 @@ handoff DOCX/package, and creates
 import/readback proof. Missing Drive authorization remains a release gap;
 malformed supplied import evidence fails the check.
 
+`pnpm run check:ai-provider` writes `.tmp/ai-provider-evidence/report.json`
+and creates `.tmp/ai-provider-evidence/templates/provider-evidence.template.json`
+for live approved-provider endpoint proof. Missing credentials remain a release
+gap, but malformed supplied evidence, stale source commits, dirty source-tree
+claims, missing response hashes, missing `NEDITOR_PROVIDER_EVIDENCE_OK` markers,
+or API-key-looking secrets fail validation. On a credentialed host, run
+`pnpm run collect:ai-provider` with `NEDITOR_AI_PROVIDER_PROFILE`,
+`NEDITOR_AI_PROVIDER_ENDPOINT`, `NEDITOR_AI_PROVIDER_MODEL`, and
+`NEDITOR_AI_PROVIDER_API_KEY_ENV` set. The collector sends a bounded readiness
+prompt, stores only hashes, endpoint host/path, model, status, and a short
+secret-free response preview, then writes
+`.tmp/ai-provider-evidence/external/provider-evidence.json`.
+
 `pnpm run check:release-readiness` aggregates the current local proof set into
 `.tmp/release-readiness/report.json`. It fails if required current-host reports
 are missing or failed, and otherwise records remaining external evidence gaps
 such as Windows/Linux package artifacts, Windows/Linux WebDriver execution,
-release signing/notarization, Google Docs live import/readback, optional missing
-engines, and human reviewer sign-off for accessibility or native-viewer export
-review.
+release signing/notarization, live approved-provider endpoint proof, Google Docs
+live import/readback, optional missing engines, and human reviewer sign-off for
+accessibility or native-viewer export review.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,

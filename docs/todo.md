@@ -633,6 +633,12 @@ green before claiming a slice is complete:
   handoff DOCX/package hashes, emits a live import/readback evidence template,
   accepts valid Drive import proof, and fails malformed supplied evidence while
   preserving missing Google Drive authorization as an explicit release gap.
+- `pnpm run verify:local` and `pnpm run verify:local:full` now run
+  `pnpm run check:ai-provider`. That check writes
+  `.tmp/ai-provider-evidence/report.json`, emits a live provider evidence
+  template, accepts valid credentialed provider proof, and fails malformed,
+  stale, marker-missing, or secret-bearing evidence while preserving missing
+  provider credentials as an explicit release gap.
 - On macOS, `pnpm run verify:local:full` also includes
   `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` before the
   WebDriver step. `pnpm run test:tauri-webdriver` still reports the official
@@ -1495,9 +1501,10 @@ Finish:
 ### 12. AI Paste Cleanup And Governance
 
 Status: backend cleanup, Docs Live drafting UI, native menu proof, browser
-dictation harness proof, and governance workflows exist; real microphone
-permission proof, runtime clipboard proof, model-provider integration, and
-richer rendered QA remain.
+dictation harness proof, provider execution, provider evidence contracts, and
+governance workflows exist; real microphone permission proof, live provider
+evidence from a credentialed host, broader runtime clipboard proof, and richer
+rendered QA remain.
 
 Finish:
 
@@ -1509,8 +1516,15 @@ Finish:
   tasks, and reviewer notes. The focused browser harness now drives the Web
   Speech path with a deterministic mock, and the bounded native launch smoke
   records `docsLive.open: true` from the Writing Tools menu. Remaining work is
-  real browser/native microphone permission proof and deeper model-provider
-  integration.
+  real browser/native microphone permission proof and accepted provider evidence
+  from a credentialed host.
+- Live AI provider evidence. `pnpm run check:ai-provider` now validates
+  accepted provider proof for current app version, current source commit, clean
+  source tree, response hashes, 2xx status, the
+  `NEDITOR_PROVIDER_EVIDENCE_OK` marker, and absence of API-key-looking
+  secrets. `pnpm run collect:ai-provider` can collect validator-ready proof from
+  approved OpenAI-compatible, Anthropic-compatible, Gemini-compatible, or local
+  HTTP endpoints without storing the API key.
 - Browser tests for clipboard/rich paste and provenance toggles. Insert, quote,
   appendix, replace document, merge into section, replace selection, citation
   TODO, draft marker, and provenance block workflows are now covered in the
