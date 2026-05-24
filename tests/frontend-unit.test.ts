@@ -8,6 +8,7 @@ import {
   isLatestDocumentTaskCurrent,
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
+import { inspectAiRuntimeReadiness } from "../src/lib/aiRuntimeReadiness.js";
 import { buildAiProviderRequestPackage, executeAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
 import { buildAgenticWorkflowPlan, buildAgenticWorkflowRun } from "../src/lib/agenticWorkflows.js";
 import {
@@ -344,6 +345,53 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.markdown.includes("Commercial team should verify"));
   ok(draft.markdown.includes("The reader should approve renewal"));
   ok(draft.markdown.includes("Commercial team"));
+});
+
+test("AI runtime readiness reports voice and clipboard capability without storing clipboard content", async () => {
+  const report = await inspectAiRuntimeReadiness({
+    now: () => "2026-05-25T10:00:00.000Z",
+    secureContext: true,
+    hasSpeechRecognition: true,
+    queryPermission: async (name) => (name === "microphone" ? "granted" : "prompt"),
+    readClipboard: async () => ({ kind: "rich", length: 123 }),
+    canWriteClipboard: true,
+  });
+
+  equal(report.generatedAt, "2026-05-25T10:00:00.000Z");
+  equal(report.secureContext, true);
+  equal(report.speechRecognition.supported, true);
+  equal(report.microphonePermission.state, "granted");
+  equal(report.clipboardRead.supported, true);
+  equal(report.clipboardRead.state, "granted");
+  equal(report.clipboardWrite.supported, true);
+  deepEqual(report.issues, []);
+  ok(report.markdown.includes("| Speech recognition | yes | available |"));
+  ok(report.markdown.includes("Clipboard rich read succeeded (123 characters detected, content not stored)."));
+  ok(report.markdown.includes("- No blocking runtime issues detected."));
+  ok(!report.markdown.includes("Runtime clipboard proof"));
+});
+
+test("AI runtime readiness flags missing secure voice and clipboard capabilities", async () => {
+  const report = await inspectAiRuntimeReadiness({
+    now: () => "2026-05-25T10:00:00.000Z",
+    secureContext: false,
+    hasSpeechRecognition: false,
+    queryPermission: async (name) => (name === "microphone" ? "denied" : "denied"),
+    readClipboard: async () => null,
+    canWriteClipboard: false,
+  });
+
+  equal(report.secureContext, false);
+  equal(report.speechRecognition.supported, false);
+  equal(report.microphonePermission.state, "denied");
+  equal(report.clipboardRead.supported, false);
+  equal(report.clipboardWrite.supported, false);
+  ok(report.issues.some((issue) => issue.includes("secure runtime context")));
+  ok(report.issues.some((issue) => issue.includes("SpeechRecognition API is unavailable")));
+  ok(report.issues.some((issue) => issue.includes("microphone permission is denied")));
+  ok(report.issues.some((issue) => issue.includes("clipboard-read permission is denied")));
+  ok(report.issues.some((issue) => issue.includes("Clipboard write API is unavailable")));
+  ok(report.markdown.includes("| Clipboard read | no | denied |"));
 });
 
 test("agentic workflow planner coordinates creation revision review and distribution", () => {
@@ -773,6 +821,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="AI provider response"'));
   ok(app.includes('aria-label="AI provider handoff"'));
   ok(app.includes("buildAiProviderRequestPackage"));
+  ok(app.includes("inspectAiRuntimeReadiness"));
+  ok(app.includes("Check AI runtime"));
+  ok(app.includes('aria-label="AI runtime readiness"'));
+  ok(app.includes('aria-label="AI runtime readiness report"'));
   ok(app.includes("AI-first document creation"));
   ok(app.includes("startAiDocumentCreation"));
   ok(app.includes('id: "ai-create", label: "AI Create"'));

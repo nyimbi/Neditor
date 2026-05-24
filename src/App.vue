@@ -1705,8 +1705,24 @@
               <button type="button" :disabled="!docsLiveSpeechAvailable" @click="toggleDocsLiveDictation">
                 {{ docsLiveListening ? "Stop dictation" : "Start dictation" }}
               </button>
+              <button type="button" :disabled="docsLiveRuntimeChecking" @click="checkDocsLiveRuntime">
+                {{ docsLiveRuntimeChecking ? "Checking runtime..." : "Check AI runtime" }}
+              </button>
               <span role="status">{{ docsLiveSpeechStatus }}</span>
             </div>
+            <section v-if="docsLiveRuntimeReport" class="docs-live-runtime" aria-label="AI runtime readiness">
+              <header>
+                <strong>Runtime readiness</strong>
+                <span>{{ docsLiveRuntimeReport.issues.length }} issues</span>
+              </header>
+              <ul>
+                <li>Speech: {{ docsLiveRuntimeReport.speechRecognition.state }} - {{ docsLiveRuntimeReport.speechRecognition.detail }}</li>
+                <li>Microphone: {{ docsLiveRuntimeReport.microphonePermission.state }} - {{ docsLiveRuntimeReport.microphonePermission.detail }}</li>
+                <li>Clipboard read: {{ docsLiveRuntimeReport.clipboardRead.state }} - {{ docsLiveRuntimeReport.clipboardRead.detail }}</li>
+                <li>Clipboard write: {{ docsLiveRuntimeReport.clipboardWrite.state }} - {{ docsLiveRuntimeReport.clipboardWrite.detail }}</li>
+              </ul>
+              <textarea :value="docsLiveRuntimeReport.markdown" rows="7" readonly aria-label="AI runtime readiness report"></textarea>
+            </section>
             <label>
               Spoken direction
               <textarea v-model="docsLiveTranscript" rows="6" placeholder="Dictate what should change, who it is for, and the outcome you need."></textarea>
@@ -2193,6 +2209,7 @@ import {
   type AiProviderProfileId,
   type AiProviderRequestPackage,
 } from "./lib/aiProviderPackages";
+import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
   buildAgenticWorkflowPlan,
@@ -2347,6 +2364,8 @@ const docsLiveDraftingDepth = ref<DocsLiveDraftDepth>("standard");
 const docsLiveInsertMode = ref<"replace" | "append" | "selection">("replace");
 const docsLiveListening = ref(false);
 const docsLiveSpeechStatus = ref("Voice ready");
+const docsLiveRuntimeChecking = ref(false);
+const docsLiveRuntimeReport = ref<AiRuntimeReadinessReport | null>(null);
 const desktopWorkflowSmokeActive = ref(false);
 const commandPaletteOpen = ref(false);
 const conflictOpen = ref(false);
@@ -7503,6 +7522,24 @@ function closeDocsLive() {
   docsLiveInterimTranscript.value = "";
 }
 
+async function checkDocsLiveRuntime() {
+  docsLiveRuntimeChecking.value = true;
+  try {
+    docsLiveRuntimeReport.value = await inspectAiRuntimeReadiness({
+      readClipboard: async () => {
+        const clipboardText = await readClipboardText();
+        return clipboardText ? { kind: clipboardText.kind, length: clipboardText.text.length } : null;
+      },
+    });
+    docsLiveSpeechStatus.value = docsLiveRuntimeReport.value.issues.length
+      ? `Runtime check found ${docsLiveRuntimeReport.value.issues.length} issue(s)`
+      : "AI runtime ready";
+    store.statusMessage = "Checked AI runtime readiness";
+  } finally {
+    docsLiveRuntimeChecking.value = false;
+  }
+}
+
 function refreshDocsLiveQuestionnaire() {
   docsLiveQuestionnaireText.value = buildDocsLiveQuestionnaire(docsLiveDocumentType.value, {
     title: docsLiveTitle.value,
@@ -8400,6 +8437,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-run-columns article,
 .app-shell[data-theme="dark"] .agent-provider-panel,
 .app-shell[data-theme="dark"] .agent-provider-output,
+.app-shell[data-theme="dark"] .docs-live-runtime,
+.app-shell[data-theme="dark"] .docs-live-workflow,
 .app-shell[data-theme="dark"] .status-message,
 .app-shell[data-theme="dark"] .word-stats,
 .app-shell[data-theme="dark"] .watch-status,
@@ -8427,6 +8466,10 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-provider-panel header span,
 .app-shell[data-theme="dark"] .agent-provider-output header span,
 .app-shell[data-theme="dark"] .agent-provider-output ul,
+.app-shell[data-theme="dark"] .docs-live-runtime header span,
+.app-shell[data-theme="dark"] .docs-live-runtime li,
+.app-shell[data-theme="dark"] .docs-live-workflow header span,
+.app-shell[data-theme="dark"] .docs-live-section-cards span,
 .app-shell[data-theme="dark"] .sidebar-hint {
   color: #aebdcc;
 }
@@ -8488,6 +8531,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-run-columns article,
   .app-shell[data-theme="system"] .agent-provider-panel,
   .app-shell[data-theme="system"] .agent-provider-output,
+  .app-shell[data-theme="system"] .docs-live-runtime,
+  .app-shell[data-theme="system"] .docs-live-workflow,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
   .app-shell[data-theme="system"] .watch-status,
@@ -8515,6 +8560,10 @@ select:hover {
   .app-shell[data-theme="system"] .agent-provider-panel header span,
   .app-shell[data-theme="system"] .agent-provider-output header span,
   .app-shell[data-theme="system"] .agent-provider-output ul,
+  .app-shell[data-theme="system"] .docs-live-runtime header span,
+  .app-shell[data-theme="system"] .docs-live-runtime li,
+  .app-shell[data-theme="system"] .docs-live-workflow header span,
+  .app-shell[data-theme="system"] .docs-live-section-cards span,
   .app-shell[data-theme="system"] .sidebar-hint {
     color: #aebdcc;
   }
@@ -8561,6 +8610,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-run-columns article,
 .app-shell[data-high-contrast="true"] .agent-provider-panel,
 .app-shell[data-high-contrast="true"] .agent-provider-output,
+.app-shell[data-high-contrast="true"] .docs-live-runtime,
+.app-shell[data-high-contrast="true"] .docs-live-workflow,
 .app-shell[data-high-contrast="true"] .status-message,
 .app-shell[data-high-contrast="true"] .word-stats,
 .app-shell[data-high-contrast="true"] .watch-status,
@@ -10919,6 +10970,36 @@ select:hover {
 .docs-live-preview span {
   color: #526171;
   font-size: 12px;
+}
+
+.docs-live-runtime {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #d7dee7;
+  border-left: 3px solid #4f7f55;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.docs-live-runtime header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.docs-live-runtime header span,
+.docs-live-runtime li {
+  color: #526171;
+  font-size: 12px;
+}
+
+.docs-live-runtime ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
 }
 
 .docs-live-workflow {

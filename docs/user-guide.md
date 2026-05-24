@@ -104,6 +104,12 @@ opens Docs Live with an intent-first workflow: document type, outline, spoken or
 typed context, placeholder values, AI-created questionnaire, section-by-section
 drafting, QA, humanization, and review handoff.
 
+Before relying on dictation or clipboard-assisted cleanup, use **Check AI
+runtime** in Docs Live. The report checks secure runtime context, Web Speech,
+microphone permission, and clipboard read/write support, and records only
+capability status plus clipboard character counts rather than clipboard
+content.
+
 Use **AI Paste** when text came from a chat tool and needs cleanup before it
 enters the source document. Keep provenance enabled when the document needs an
 audit trail.

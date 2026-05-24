@@ -81,7 +81,7 @@ uses it.
 | Ask the app to plan and run the whole document workflow | Use **Agent** or **AI Agent Workspace**, describe the outcome in plain language, generate an agent packet, then apply the governed creation, revision, QA, and distribution output for human review. |
 | Draft a board paper, proposal, report, or briefing note | Start in **Outline** mode, create the structure, then fill in each section. |
 | Start from an AI-first document brief | Use **AI Create** to open Docs Live with an intent-first workflow for document type, outline, context, placeholders, QA, humanization, and review handoff. |
-| Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, dictate the intent, add placeholder values, generate an outline-aware questionnaire if helpful, answer it in the dialog, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
+| Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, run **Check AI runtime** when you want proof that voice and clipboard capabilities are available, dictate the intent, add placeholder values, generate an outline-aware questionnaire if helpful, answer it in the dialog, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
 | Reuse a company format | Start from an approved Markdown template or example document, then save a copy for the new engagement. |
 | Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
 | Send a client-facing document | Export to PDF or DOCX, depending on what the recipient expects. |
@@ -209,7 +209,11 @@ web app.
   section by section through drafting, QA gates, humanization cleanup, and
   review handoff notes. Its review packet shows the context sources, section
   work queue, assumption register, humanization checklist, and reviewer handoff
-  before the draft is applied.
+  before the draft is applied. **Check AI runtime** produces a content-free
+  readiness report for secure context, Web Speech availability, microphone
+  permission, and clipboard read/write support so business users can confirm
+  that dictation and clipboard-assisted AI workflows are usable on the current
+  machine without storing clipboard text.
 - Separate preferences for theme, preview theme, typography, editor behavior,
   autosave, snapshots, export defaults, bibliography defaults, brand defaults,
   Git integration, AI cleanup, and transform engines.

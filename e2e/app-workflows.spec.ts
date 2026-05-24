@@ -58,6 +58,8 @@ async function installTauriMock(page: Page, stateKey: string) {
     const dialogSelections: Array<string | null> = [];
     const confirmResponses: boolean[] = [];
     const revealedPaths: string[] = [];
+    let clipboardText = "";
+    let clipboardMime = "text/plain";
     let callbackId = 1;
     let storeId = 1;
     let compileDelayMs = 0;
@@ -1107,6 +1109,10 @@ async function installTauriMock(page: Page, stateKey: string) {
       revealedPaths() {
         return [...revealedPaths];
       },
+      setClipboardText(text: string, mime = "text/plain") {
+        clipboardText = text;
+        clipboardMime = mime;
+      },
     };
 
     window.__TAURI_INTERNALS__ = {
@@ -1171,6 +1177,40 @@ async function installTauriMock(page: Page, stateKey: string) {
     };
     speechWindow.SpeechRecognition = MockSpeechRecognition;
     speechWindow.webkitSpeechRecognition = MockSpeechRecognition;
+    Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
+    Object.defineProperty(navigator, "permissions", {
+      value: {
+        query: async () => ({
+          state: "granted",
+          onchange: null,
+          addEventListener() {},
+          removeEventListener() {},
+          dispatchEvent() {
+            return true;
+          },
+        }),
+      },
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        read: async () =>
+          clipboardText
+            ? [
+                {
+                  types: clipboardMime === "text/html" ? ["text/html", "text/plain"] : ["text/plain"],
+                  getType: async (type: string) => new Blob([type === "text/html" ? clipboardText : clipboardText.replace(/<[^>]+>/g, "")], { type }),
+                },
+              ]
+            : [],
+        readText: async () => clipboardText.replace(/<[^>]+>/g, ""),
+        writeText: async (text: string) => {
+          clipboardText = text;
+          clipboardMime = "text/plain";
+        },
+      },
+      configurable: true,
+    });
     window.isTauri = true;
   });
 }
@@ -1242,6 +1282,10 @@ async function emitMockFileWatch(page: Page, path: string, kind = "modify") {
 
 async function revealedPaths(page: Page) {
   return page.evaluate(() => window.__NEDITOR_E2E__.revealedPaths());
+}
+
+async function setMockClipboardText(page: Page, text: string, mime = "text/plain") {
+  await page.evaluate(({ value, type }) => window.__NEDITOR_E2E__.setClipboardText(value, type), { value: text, type: mime });
 }
 
 async function activeFileRowText(page: Page) {
@@ -1972,6 +2016,11 @@ test("generates a Docs Live draft from outline, context, and placeholders", asyn
   await dialog.getByLabel("Outline").fill("- Executive Summary\n- Proposed Approach\n- Investment");
   await dialog.getByRole("button", { name: "Build questionnaire" }).click();
   await expect(dialog.getByLabel("AI-created questionnaire")).toHaveValue(/For "Executive Summary"/);
+  await setMockClipboardText(page, "<p>Runtime clipboard proof</p>", "text/html");
+  await dialog.getByRole("button", { name: "Check AI runtime" }).click();
+  await expect(dialog.getByRole("region", { name: "AI runtime readiness" })).toContainText("Runtime readiness");
+  await expect(dialog.getByLabel("AI runtime readiness report")).toHaveValue(/Speech recognition/);
+  await expect(dialog.getByLabel("AI runtime readiness report")).toHaveValue(/Clipboard rich read succeeded/);
   await dialog.getByRole("button", { name: "Start dictation" }).click();
   await expect(dialog.getByLabel("Spoken direction")).toHaveValue(/Create a client proposal for Acme/);
   await dialog
