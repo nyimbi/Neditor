@@ -927,6 +927,7 @@ test("local verification scripts expose local baseline checks", () => {
   const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
   const aiProviderEvidence = readFileSync("scripts/check-ai-provider-evidence.mjs", "utf8");
   const aiProviderCollector = readFileSync("scripts/collect-ai-provider-evidence.mjs", "utf8");
+  const aiRuntimeEvidence = readFileSync("scripts/check-ai-runtime-evidence.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
   const googleDocsCollector = readFileSync("scripts/collect-google-docs-import-evidence.mjs", "utf8");
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
@@ -942,6 +943,7 @@ test("local verification scripts expose local baseline checks", () => {
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:ai-provider"], "node scripts/check-ai-provider-evidence.mjs");
+  equal(scripts["check:ai-runtime"], "node scripts/check-ai-runtime-evidence.mjs");
   equal(scripts["check:a11y"], "node scripts/check-accessibility.mjs");
   equal(scripts["check:a11y:manual"], "node scripts/check-accessibility-manual-signoff.mjs");
   equal(scripts["check:a11y:runtime"], "node scripts/check-accessibility-runtime.mjs");
@@ -979,6 +981,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Accessibility manual review contract", "pnpm", ["run", "check:a11y:manual"])'));
   ok(verification.includes('command("Google Docs import evidence contract", "pnpm", ["run", "check:google-docs-import"])'));
   ok(verification.includes('command("AI provider evidence contract", "pnpm", ["run", "check:ai-provider"])'));
+  ok(verification.includes('command("AI runtime evidence contract", "pnpm", ["run", "check:ai-runtime"])'));
   ok(verification.includes('command("AI provider live endpoint evidence contract", "pnpm", ["run", "check:ai-provider"])'));
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
   ok(verification.includes('command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"])'));
@@ -1011,6 +1014,21 @@ test("local verification scripts expose local baseline checks", () => {
   ok(aiProviderCollector.includes("secretMaterialStored: false"));
   ok(aiProviderCollector.includes("anthropic-version"));
   ok(aiProviderCollector.includes("gemini-generate-content"));
+  ok(aiRuntimeEvidence.includes("neditor.ai-runtime-evidence.v1"));
+  ok(aiRuntimeEvidence.includes("NEDITOR_AI_RUNTIME_EVIDENCE_DIR"));
+  ok(aiRuntimeEvidence.includes("NEDITOR_AI_RUNTIME_EVIDENCE"));
+  ok(aiRuntimeEvidence.includes("pending-real-runtime-evidence"));
+  ok(aiRuntimeEvidence.includes("appVersion must match package.json version"));
+  ok(aiRuntimeEvidence.includes("sourceCommit must match current git commit"));
+  ok(aiRuntimeEvidence.includes("sourceTreeClean must be true"));
+  ok(aiRuntimeEvidence.includes("speechRecognition.state must be available"));
+  ok(aiRuntimeEvidence.includes("microphonePermission.state must be granted"));
+  ok(aiRuntimeEvidence.includes("microphoneProbe.audioStored must be false"));
+  ok(aiRuntimeEvidence.includes("clipboardRead.contentStored must be false"));
+  ok(aiRuntimeEvidence.includes("clipboardWrite.writeSucceeded must be true"));
+  ok(aiRuntimeEvidence.includes("forbiddenEvidenceKeys"));
+  ok(aiRuntimeEvidence.includes("clipboardText"));
+  ok(aiRuntimeEvidence.includes("audioSample"));
   ok(googleDocsImport.includes("neditor.google-docs-import-evidence.v1"));
   ok(googleDocsImport.includes("appVersion must match package.json version"));
   ok(googleDocsImport.includes("sourceCommit must match current git commit"));
@@ -1076,6 +1094,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("windows-package-artifact-proof"));
   ok(evidenceKitCollector.includes("linux-package-artifact-proof"));
   ok(evidenceKitCollector.includes("ai-provider-live-endpoint-proof"));
+  ok(evidenceKitCollector.includes("ai-runtime-real-device-proof"));
   ok(evidenceKitCollector.includes("google-docs-live-import-readback"));
   ok(evidenceKitCollector.includes("rendered-export-native-viewer-human-signoff"));
   ok(evidenceKitCollector.includes("accessibility-assistive-technology-human-signoff"));
@@ -1085,12 +1104,15 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("sourceCommit"));
   ok(evidenceKitCollector.includes("Optional CI path: gh workflow run neditor-release-evidence.yml"));
   ok(evidenceKitCollector.includes("provider-evidence.template.json"));
+  ok(evidenceKitCollector.includes("runtime-evidence.template.json"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
   ok(evidenceKitCollector.includes("pnpm run ingest:evidence"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit.v1"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit-report.v1"));
   ok(evidenceKitChecker.includes("runbooks/ai-provider-endpoint.md"));
+  ok(evidenceKitChecker.includes("runbooks/ai-runtime-device.md"));
+  ok(evidenceKitChecker.includes("expectedTemplateCount = 12"));
   ok(evidenceKitChecker.includes("report.json"));
   ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
   ok(evidenceKitChecker.includes("current source tree must be clean"));
@@ -1102,11 +1124,13 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceIngest.includes("NEDITOR_RELEASE_EVIDENCE_RETURN_DIR"));
   ok(evidenceIngest.includes("platform/win32-package-artifacts.json"));
   ok(evidenceIngest.includes("ai-provider/provider-evidence.json"));
+  ok(evidenceIngest.includes("ai-runtime/runtime-evidence.json"));
   ok(evidenceIngest.includes("NEDITOR_RENDERED_EXPORT_SIGNOFF"));
   ok(evidenceIngest.includes("NEDITOR_ACCESSIBILITY_SIGNOFF"));
   ok(evidenceIngest.includes("pnpm"));
   ok(evidenceIngest.includes("check:release-signing"));
   ok(evidenceIngest.includes("check:ai-provider"));
+  ok(evidenceIngest.includes("check:ai-runtime"));
   ok(evidenceIngest.includes("check:google-docs-import"));
   ok(releaseCi.includes("neditor.release-ci-workflow-report.v1"));
   ok(releaseCi.includes("browser-workflows:"));
@@ -1240,6 +1264,9 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("ai-provider-evidence"));
   ok(script.includes("ai-provider-live-endpoint-proof"));
   ok(script.includes("aiProviderEvidenceAccepted"));
+  ok(script.includes("ai-runtime-evidence"));
+  ok(script.includes("ai-runtime-real-device-proof"));
+  ok(script.includes("aiRuntimeEvidenceAccepted"));
   ok(script.includes("google-docs-import-evidence"));
   ok(script.includes("google-docs-live-import-readback"));
   ok(script.includes("release-signing-and-notarization"));

@@ -10,6 +10,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "check": "vue-tsc --noEmit",
     "check:ai-provider": "node scripts/check-ai-provider-evidence.mjs",
+    "check:ai-runtime": "node scripts/check-ai-runtime-evidence.mjs",
     "check:a11y": "node scripts/check-accessibility.mjs",
     "check:a11y:manual": "node scripts/check-accessibility-manual-signoff.mjs",
     "check:a11y:runtime": "node scripts/check-accessibility-runtime.mjs",

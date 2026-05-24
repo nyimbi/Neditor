@@ -464,13 +464,23 @@ prompt, stores only hashes, endpoint host/path, model, status, and a short
 secret-free response preview, then writes
 `.tmp/ai-provider-evidence/external/provider-evidence.json`.
 
+`pnpm run check:ai-runtime` writes `.tmp/ai-runtime-evidence/report.json` and
+creates `.tmp/ai-runtime-evidence/templates/runtime-evidence.template.json` for
+real Docs Live runtime proof. The validator accepts only current-source evidence
+that proves secure context, SpeechRecognition availability, granted microphone
+permission or stream-opened proof without stored audio, and clipboard read/write
+success without stored clipboard content. Missing real-device evidence remains a
+release gap; malformed evidence, stale commits, recorded audio samples, or
+clipboard text fail validation.
+
 `pnpm run check:release-readiness` aggregates the current local proof set into
 `.tmp/release-readiness/report.json`. It fails if required current-host reports
 are missing or failed, and otherwise records remaining external evidence gaps
 such as Windows/Linux package artifacts, Windows/Linux WebDriver execution,
-release signing/notarization, live approved-provider endpoint proof, Google Docs
-live import/readback, optional missing engines, and human reviewer sign-off for
-accessibility or native-viewer export review.
+release signing/notarization, live approved-provider endpoint proof, real Docs
+Live runtime device proof, Google Docs live import/readback, optional missing
+engines, and human reviewer sign-off for accessibility or native-viewer export
+review.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,

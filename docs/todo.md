@@ -639,6 +639,12 @@ green before claiming a slice is complete:
   template, accepts valid credentialed provider proof, and fails malformed,
   stale, marker-missing, or secret-bearing evidence while preserving missing
   provider credentials as an explicit release gap.
+- `pnpm run verify:local` and `pnpm run verify:local:full` now run
+  `pnpm run check:ai-runtime`. That check writes
+  `.tmp/ai-runtime-evidence/report.json`, emits a real-device runtime evidence
+  template, accepts valid microphone/clipboard runtime proof, and fails
+  malformed, stale, audio-recording, or clipboard-content evidence while
+  preserving missing real-device proof as an explicit release gap.
 - On macOS, `pnpm run verify:local:full` also includes
   `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` before the
   WebDriver step. `pnpm run test:tauri-webdriver` still reports the official
@@ -1501,10 +1507,10 @@ Finish:
 ### 12. AI Paste Cleanup And Governance
 
 Status: backend cleanup, Docs Live drafting UI, native menu proof, browser
-dictation harness proof, provider execution, provider evidence contracts, and
-governance workflows exist; real microphone permission proof, live provider
-evidence from a credentialed host, broader runtime clipboard proof, and richer
-rendered QA remain.
+dictation harness proof, provider execution, provider evidence contracts,
+runtime evidence contracts, and governance workflows exist; real microphone and
+clipboard evidence from a hardware/browser host, live provider evidence from a
+credentialed host, and richer rendered QA remain.
 
 Finish:
 
@@ -1525,6 +1531,10 @@ Finish:
   secrets. `pnpm run collect:ai-provider` can collect validator-ready proof from
   approved OpenAI-compatible, Anthropic-compatible, Gemini-compatible, or local
   HTTP endpoints without storing the API key.
+- Real Docs Live runtime evidence. `pnpm run check:ai-runtime` now validates
+  current-source runtime proof for secure context, SpeechRecognition,
+  microphone permission, microphone probing without stored audio, and clipboard
+  read/write without stored clipboard content.
 - Browser tests for clipboard/rich paste and provenance toggles. Insert, quote,
   appendix, replace document, merge into section, replace selection, citation
   TODO, draft marker, and provenance block workflows are now covered in the

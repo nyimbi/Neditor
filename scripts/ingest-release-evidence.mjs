@@ -73,6 +73,12 @@ const evidenceItems = [
     "ai-provider-endpoint/provider-evidence.json",
     "provider-evidence.json",
   ]),
+  item("ai-runtime-device", ".tmp/ai-runtime-evidence/external/runtime-evidence.json", "ai-runtime", [
+    "ai-runtime-evidence/external/runtime-evidence.json",
+    "ai-runtime/runtime-evidence.json",
+    "ai-runtime-device/runtime-evidence.json",
+    "runtime-evidence.json",
+  ]),
   item("rendered-export-signoff", ".tmp/rendered-export-audit/external/visual-review-signoff.json", "rendered-signoff", [
     "rendered-export/visual-review-signoff.json",
     "rendered-export-human-review/visual-review-signoff.json",
@@ -174,6 +180,7 @@ function runValidations(categories) {
   if (categories.has("signing")) commands.push(command("release signing evidence", "pnpm", ["run", "check:release-signing"]));
   if (categories.has("google-docs")) commands.push(command("Google Docs import evidence", "pnpm", ["run", "check:google-docs-import"]));
   if (categories.has("ai-provider")) commands.push(command("AI provider evidence", "pnpm", ["run", "check:ai-provider"]));
+  if (categories.has("ai-runtime")) commands.push(command("AI runtime evidence", "pnpm", ["run", "check:ai-runtime"]));
   if (categories.has("rendered-signoff")) {
     commands.push(
       command("rendered export signoff", "pnpm", ["run", "test:rendered-exports", "--", "--validate-signoff-only"], {
