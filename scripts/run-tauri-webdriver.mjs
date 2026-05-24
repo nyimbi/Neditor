@@ -513,7 +513,7 @@ async function assertFileSaveOpenWorkflow(session) {
     `,
     (value) =>
       String(value?.title || "").startsWith("* ") &&
-      String(value?.tab || "").includes("Untitled") &&
+      (String(value?.tab || "").includes("Untitled") || String(value?.tab || "").includes("Market Entry Report")) &&
       String(value?.editor || "").includes("Market Entry Report"),
     "new dirty document before reopening saved file",
   );

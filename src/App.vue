@@ -1980,6 +1980,7 @@ const docsLiveDialog = ref<HTMLElement | null>(null);
 const commandPaletteDialog = ref<HTMLElement | null>(null);
 const conflictDialog = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
+let syncingEditorFromStore = false;
 const previewTextCommit = createDebouncedTextCommit((text) => store.updateText(text), {
   setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
   clearTimeout: (handle) => window.clearTimeout(handle),
@@ -3100,9 +3101,14 @@ watch(
   () => active.value.text,
   (text) => {
     if (!editorView || editorView.state.doc.toString() === text) return;
-    editorView.dispatch({
-      changes: { from: 0, to: editorView.state.doc.length, insert: text },
-    });
+    syncingEditorFromStore = true;
+    try {
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: text },
+      });
+    } finally {
+      syncingEditorFromStore = false;
+    }
   },
 );
 
@@ -3183,7 +3189,7 @@ watch(
 
 watch(
   () => store.mode,
-  (mode) => {
+  async (mode) => {
     if (mode === "export") {
       store.sidebar = "exports";
     } else if (mode === "review") {
@@ -3192,6 +3198,10 @@ watch(
       store.sidebar = "outline";
     } else if (mode === "presentation") {
       store.sidebar = "outline";
+    }
+    if (["split", "source", "focus"].includes(mode)) {
+      await nextTick();
+      syncEditorViewFromActiveDocument();
     }
   },
 );
@@ -4872,6 +4882,7 @@ function editorExtensions() {
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
+      if (syncingEditorFromStore) return;
       previewTextCommit.schedule(update.state.doc.toString());
     }),
     EditorView.theme({
@@ -5229,6 +5240,18 @@ function buildEditor() {
     parent: editorHost.value,
   });
   void nextTick(() => restoreActiveScrollPosition());
+}
+
+function syncEditorViewFromActiveDocument() {
+  if (!editorView || editorView.state.doc.toString() === active.value.text) return;
+  syncingEditorFromStore = true;
+  try {
+    editorView.dispatch({
+      changes: { from: 0, to: editorView.state.doc.length, insert: active.value.text },
+    });
+  } finally {
+    syncingEditorFromStore = false;
+  }
 }
 
 function syncPreviewScrollFromEditor() {

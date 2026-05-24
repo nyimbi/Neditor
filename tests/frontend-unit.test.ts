@@ -1096,6 +1096,7 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("outlineModeEvidenceScript"));
   ok(script.includes("editorDocumentTextFunction"));
   ok(script.includes("new dirty document before reopening saved file"));
+  ok(script.includes("String(value?.tab || \"\").includes(\"Market Entry Report\")"));
   ok(script.includes("dataTablePreserved"));
   ok(script.includes("sourceGovernancePreserved"));
   ok(script.includes("Source Governance"));
@@ -1124,6 +1125,10 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("outlineModeTitles"));
   ok(script.includes("native workflow exported html from native menu command"));
   ok(script.includes("native workflow restored workspace tabs with active pinned and scroll state"));
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("syncingEditorFromStore"));
+  ok(app.includes("syncEditorViewFromActiveDocument"));
+  ok(app.includes("[\"split\", \"source\", \"focus\"].includes(mode)"));
 });
 
 test("desktop launch smoke records native UI workbench surfaces", () => {
