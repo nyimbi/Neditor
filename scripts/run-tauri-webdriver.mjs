@@ -273,6 +273,16 @@ async function assertModeSwitchAndCommandPalette(session) {
     (value) => String(value || "").includes("Search commands"),
     "native command palette input",
   );
+  await execute(session, `
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return true;
+  `);
+  await waitForValue(
+    session,
+    "return Boolean(document.querySelector('[role=\"dialog\"][aria-label=\"Command palette\"]'));",
+    (value) => value === false,
+    "native command palette closed",
+  );
   recordAssertion("native WebDriver switches modes and opens command palette");
 }
 
@@ -798,9 +808,12 @@ async function applyDesktopPreferences(session, preferences) {
 }
 
 async function showSidebar(session, value, labelText) {
+  const expectedSidebar = value;
   await execute(session, `
     const sidebar = document.querySelector('[aria-label="Sidebar panel"]');
+    if (!sidebar) throw new Error('Sidebar panel select was not visible');
     sidebar.value = ${JSON.stringify(value)};
+    sidebar.dispatchEvent(new Event('input', { bubbles: true }));
     sidebar.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   `);
@@ -808,9 +821,15 @@ async function showSidebar(session, value, labelText) {
     session,
     `
       const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
-      return [...document.querySelectorAll('label')].some((label) => normalized(label.textContent || '').includes(${JSON.stringify(labelText)}));
+      const labels = [...document.querySelectorAll('label')].map((label) => normalized(label.textContent || ''));
+      const sidebar = document.querySelector('[aria-label="Sidebar panel"]');
+      return {
+        sidebarValue: sidebar?.value || '',
+        hasExpectedLabel: labels.some((label) => label.includes(${JSON.stringify(labelText)})),
+        labels: labels.slice(0, 20),
+      };
     `,
-    Boolean,
+    (result) => result?.sidebarValue === expectedSidebar && result?.hasExpectedLabel === true,
     `${value} sidebar controls`,
   );
 }
