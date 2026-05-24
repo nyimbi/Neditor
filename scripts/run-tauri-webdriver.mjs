@@ -407,8 +407,12 @@ async function changeOutlineTitle(session, fromTitle, toTitle) {
     const row = [...document.querySelectorAll('#outline-mode .outline-mode-row')].find((item) => item.querySelector('input')?.value === fromTitle);
     if (!row) throw new Error('Missing outline row for ' + fromTitle);
     const input = row.querySelector('input');
+    input.focus();
     input.value = toTitle;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+    input.blur();
     return true;
   `);
 }
