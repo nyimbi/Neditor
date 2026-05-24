@@ -1856,6 +1856,8 @@
           <button type="submit">Plan agent workflow</button>
           <button type="button" :disabled="!agentPlan" @click="generateAgentWorkspaceRun">Generate agent packet</button>
           <button type="button" :disabled="!agentRun" @click="applyAgentWorkspaceRun">Apply agent output</button>
+          <button type="button" :disabled="!agentRun" @click="buildAgentProviderPackage">Build provider request</button>
+          <button type="button" :disabled="!agentProviderPackage" @click="copyAgentProviderPackage">Copy provider package</button>
           <button type="button" :disabled="!agentPlan" @click="hydrateDocsLiveFromAgentPlan">Send to Docs Live</button>
           <button type="button" :disabled="!agentPlan" @click="runAgentPlanReview">Review readiness</button>
           <button type="button" :disabled="!agentPlan" @click="runAgentPlanDistribution">Distribution prep</button>
@@ -1931,6 +1933,48 @@
               </article>
             </section>
             <textarea :value="agentRun.markdown" rows="12" readonly aria-label="Agent generated Markdown"></textarea>
+          </section>
+          <section class="agent-provider-panel" aria-label="AI provider handoff">
+            <header>
+              <div>
+                <strong>Provider handoff</strong>
+                <span>Generate a redacted request package for an approved AI provider or local model gateway.</span>
+              </div>
+            </header>
+            <section class="agent-provider-grid">
+              <label>
+                Provider profile
+                <select v-model="agentProviderId" @change="syncAgentProviderProfile">
+                  <option v-for="profile in aiProviderProfiles" :key="profile.id" :value="profile.id">
+                    {{ profile.label }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                Model
+                <input v-model="agentProviderModel" placeholder="Approved model or deployment name" />
+              </label>
+              <label>
+                Endpoint
+                <input v-model="agentProviderEndpoint" placeholder="https://provider.example/v1/messages" />
+              </label>
+              <label>
+                API key environment variable
+                <input v-model="agentProviderKeyEnv" placeholder="NEDITOR_AI_API_KEY" />
+              </label>
+            </section>
+            <section v-if="agentProviderPackage" class="agent-provider-output" aria-label="AI provider request package">
+              <header>
+                <div>
+                  <strong>{{ agentProviderPackage.profile.label }}</strong>
+                  <span>{{ agentProviderPackage.profile.summary }}</span>
+                </div>
+              </header>
+              <ul>
+                <li v-for="item in agentProviderPackage.checklist" :key="item">{{ item }}</li>
+              </ul>
+              <textarea :value="agentProviderPackage.markdown" rows="12" readonly aria-label="AI provider request Markdown"></textarea>
+            </section>
           </section>
         </section>
       </form>
@@ -2124,6 +2168,12 @@ import { markdown } from "@codemirror/lang-markdown";
 import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap, selectNextOccurrence } from "@codemirror/search";
 import { closeBrackets, closeBracketsKeymap, insertBracket } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
+import {
+  aiProviderProfiles,
+  buildAiProviderRequestPackage,
+  type AiProviderProfileId,
+  type AiProviderRequestPackage,
+} from "./lib/aiProviderPackages";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
   buildAgenticWorkflowPlan,
@@ -2251,6 +2301,12 @@ const agentWorkspaceOpen = ref(false);
 const agentInstruction = ref("");
 const agentPlan = ref<AgenticWorkflowPlan | null>(null);
 const agentRun = ref<AgenticWorkflowRun | null>(null);
+const defaultAgentProviderProfile = aiProviderProfiles[0];
+const agentProviderId = ref<AiProviderProfileId>("manual-review");
+const agentProviderEndpoint = ref(defaultAgentProviderProfile.endpoint);
+const agentProviderModel = ref(defaultAgentProviderProfile.model);
+const agentProviderKeyEnv = ref("NEDITOR_AI_API_KEY");
+const agentProviderPackage = ref<AiProviderRequestPackage | null>(null);
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const guidedDemoStepIndex = ref(0);
@@ -3568,6 +3624,12 @@ function openAgentWorkspace(seedInstruction = "") {
 function closeAgentWorkspace() {
   agentWorkspaceOpen.value = false;
 }
+function syncAgentProviderProfile() {
+  const profile = aiProviderProfiles.find((item) => item.id === agentProviderId.value) || aiProviderProfiles[0];
+  agentProviderEndpoint.value = profile.endpoint;
+  agentProviderModel.value = profile.model;
+  agentProviderPackage.value = null;
+}
 function buildAgentWorkspacePlan() {
   flushEditorTextToStore();
   agentPlan.value = buildAgenticWorkflowPlan({
@@ -3577,6 +3639,7 @@ function buildAgentWorkspacePlan() {
     selectedText: currentEditorSelectionText(),
   });
   agentRun.value = null;
+  agentProviderPackage.value = null;
   store.statusMessage = `Planned ${agentPlan.value.steps.length} agent workflow steps`;
 }
 function generateAgentWorkspaceRun() {
@@ -3588,7 +3651,28 @@ function generateAgentWorkspaceRun() {
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
   });
+  agentProviderPackage.value = null;
   store.statusMessage = `Generated agent packet for ${agentRun.value.plan.lanes.length} workflow lanes`;
+}
+function buildAgentProviderPackage() {
+  if (!agentRun.value) generateAgentWorkspaceRun();
+  if (!agentRun.value) return;
+  agentProviderPackage.value = buildAiProviderRequestPackage(agentRun.value, {
+    profileId: agentProviderId.value,
+    endpoint: agentProviderEndpoint.value,
+    model: agentProviderModel.value,
+    keyEnv: agentProviderKeyEnv.value,
+  });
+  store.statusMessage = `Built ${agentProviderPackage.value.profile.label} request package`;
+}
+async function copyAgentProviderPackage() {
+  if (!agentProviderPackage.value) return;
+  try {
+    await navigator.clipboard?.writeText(agentProviderPackage.value.markdown);
+    store.statusMessage = "Copied provider request package";
+  } catch {
+    store.statusMessage = "Provider request package is ready to copy";
+  }
 }
 function applyAgentWorkspaceRun() {
   const run = agentRun.value;
@@ -8262,6 +8346,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-missing-inputs li,
 .app-shell[data-theme="dark"] .agent-run-output,
 .app-shell[data-theme="dark"] .agent-run-columns article,
+.app-shell[data-theme="dark"] .agent-provider-panel,
+.app-shell[data-theme="dark"] .agent-provider-output,
 .app-shell[data-theme="dark"] .status-message,
 .app-shell[data-theme="dark"] .word-stats,
 .app-shell[data-theme="dark"] .watch-status,
@@ -8286,6 +8372,9 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-run-output > header span,
 .app-shell[data-theme="dark"] .agent-run-output > header small,
 .app-shell[data-theme="dark"] .agent-run-columns ul,
+.app-shell[data-theme="dark"] .agent-provider-panel header span,
+.app-shell[data-theme="dark"] .agent-provider-output header span,
+.app-shell[data-theme="dark"] .agent-provider-output ul,
 .app-shell[data-theme="dark"] .sidebar-hint {
   color: #aebdcc;
 }
@@ -8345,6 +8434,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-missing-inputs li,
   .app-shell[data-theme="system"] .agent-run-output,
   .app-shell[data-theme="system"] .agent-run-columns article,
+  .app-shell[data-theme="system"] .agent-provider-panel,
+  .app-shell[data-theme="system"] .agent-provider-output,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
   .app-shell[data-theme="system"] .watch-status,
@@ -8369,6 +8460,9 @@ select:hover {
   .app-shell[data-theme="system"] .agent-run-output > header span,
   .app-shell[data-theme="system"] .agent-run-output > header small,
   .app-shell[data-theme="system"] .agent-run-columns ul,
+  .app-shell[data-theme="system"] .agent-provider-panel header span,
+  .app-shell[data-theme="system"] .agent-provider-output header span,
+  .app-shell[data-theme="system"] .agent-provider-output ul,
   .app-shell[data-theme="system"] .sidebar-hint {
     color: #aebdcc;
   }
@@ -8413,6 +8507,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-missing-inputs li,
 .app-shell[data-high-contrast="true"] .agent-run-output,
 .app-shell[data-high-contrast="true"] .agent-run-columns article,
+.app-shell[data-high-contrast="true"] .agent-provider-panel,
+.app-shell[data-high-contrast="true"] .agent-provider-output,
 .app-shell[data-high-contrast="true"] .status-message,
 .app-shell[data-high-contrast="true"] .word-stats,
 .app-shell[data-high-contrast="true"] .watch-status,
@@ -9883,7 +9979,9 @@ select:hover {
 .agent-missing-inputs,
 .agent-step-list li,
 .agent-run-output,
-.agent-run-columns article {
+.agent-run-columns article,
+.agent-provider-panel,
+.agent-provider-output {
   padding: 10px;
   border: 1px solid #d8e0e8;
   background: #ffffff;
@@ -9987,6 +10085,53 @@ select:hover {
 .agent-run-columns ul {
   display: grid;
   gap: 4px;
+  padding-left: 18px;
+  color: #2d3746;
+  font-size: 12px;
+}
+
+.agent-provider-panel {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #6857a8;
+}
+
+.agent-provider-panel > header,
+.agent-provider-output > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-provider-panel > header div,
+.agent-provider-output > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-provider-panel header span,
+.agent-provider-output header span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-provider-output {
+  display: grid;
+  gap: 10px;
+  background: #f8fafc;
+}
+
+.agent-provider-output ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
   padding-left: 18px;
   color: #2d3746;
   font-size: 12px;
@@ -11113,6 +11258,7 @@ select:hover {
 
   .agent-plan-grid,
   .agent-run-columns,
+  .agent-provider-grid,
   .agent-step-list li {
     grid-template-columns: 1fr;
   }

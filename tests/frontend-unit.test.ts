@@ -8,6 +8,7 @@ import {
   isLatestDocumentTaskCurrent,
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
+import { buildAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
 import { buildAgenticWorkflowPlan, buildAgenticWorkflowRun } from "../src/lib/agenticWorkflows.js";
 import {
   bibliographyEntryStub,
@@ -420,6 +421,34 @@ test("agentic workflow run proposes selection-aware revisions with review metada
   ok(run.markdown.includes("### Proposed Text"));
 });
 
+test("AI provider packages redact secrets and preserve agent governance context", () => {
+  const run = buildAgenticWorkflowRun({
+    instruction:
+      "Create a board memo, revise for the CFO, review evidence, and prepare PDF. audience: board owner: Finance deadline: June 1 evidence: audited forecast",
+    documentTitle: "Capital Allocation Memo",
+    documentText: "# Capital Allocation Memo\n\nDraft.",
+    selectedText: "The investment grows revenue by 18%.",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+  const providerPackage = buildAiProviderRequestPackage(run, {
+    profileId: "openai-compatible",
+    model: "approved-doc-model",
+    keyEnv: "client_ai_key",
+  });
+
+  equal(providerPackage.profile.model, "approved-doc-model");
+  equal(providerPackage.redactedHeaders.Authorization, "Bearer ${CLIENT_AI_KEY}");
+  ok(providerPackage.systemPrompt.includes("preserve Markdown structure"));
+  ok(providerPackage.userPrompt.includes("Capital Allocation Memo"));
+  ok(providerPackage.userPrompt.includes("Required response"));
+  ok(JSON.stringify(providerPackage.requestBody).includes("approved-doc-model"));
+  ok(providerPackage.curl.includes("${CLIENT_AI_KEY}"));
+  ok(!providerPackage.curl.includes("client_ai_key"));
+  ok(providerPackage.markdown.includes("OpenAI-compatible JSON Request Package"));
+  ok(providerPackage.markdown.includes("Safety Checklist"));
+  ok(providerPackage.checklist.some((item) => item.includes("approves this provider")));
+});
+
 test("preview debounce coalesces edits inside the spec timing budget", () => {
   ok(PREVIEW_DEBOUNCE_MS <= 100);
   const commits: string[] = [];
@@ -704,6 +733,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Generate agent packet"));
   ok(app.includes("Apply agent output"));
   ok(app.includes('aria-label="Agent generated output"'));
+  ok(app.includes("Build provider request"));
+  ok(app.includes("Copy provider package"));
+  ok(app.includes('aria-label="AI provider handoff"'));
+  ok(app.includes("buildAiProviderRequestPackage"));
   ok(app.includes("AI-first document creation"));
   ok(app.includes("startAiDocumentCreation"));
   ok(app.includes('id: "ai-create", label: "AI Create"'));

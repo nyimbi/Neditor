@@ -195,7 +195,10 @@ web app.
   complete agent packet with a Docs Live draft, selection-aware revision
   proposal, QA gates, distribution checklist, AI provenance, blockers, and
   safe apply behavior for replacing a document, replacing selected text, or
-  appending a review packet.
+  appending a review packet. Provider handoff packages turn that run into
+  redacted prompts, JSON request bodies, headers, cURL starters, and safety
+  checklists for approved AI providers or local model gateways without storing
+  secrets in the document.
 - AI Create makes Docs Live the default first step for intent-led drafting,
   so users can begin with the outcome, audience, context, and placeholders
   instead of a blank page.

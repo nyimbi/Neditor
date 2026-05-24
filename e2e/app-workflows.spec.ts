@@ -1358,6 +1358,10 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await expect(agent.getByLabel("Agent generated output")).toContainText("Agent run prepared");
   await expect(agent.getByLabel("Agent generated output")).toContainText("QA gates");
   await expect(agent.getByLabel("Agent generated Markdown")).toHaveValue(/NEditor Agent Workspace/);
+  await agent.getByLabel("Provider profile").selectOption("openai-compatible");
+  await agent.getByRole("button", { name: "Build provider request" }).click();
+  await expect(agent.getByLabel("AI provider request package")).toContainText("approves this provider");
+  await expect(agent.getByLabel("AI provider request Markdown")).toHaveValue(/NEDITOR_AI_API_KEY/);
   await agent.getByRole("button", { name: "Send to Docs Live" }).click();
   await expect(page.getByRole("dialog", { name: "Docs Live voice drafting" })).toBeVisible();
   await page.getByRole("button", { name: "Close Docs Live" }).click();
