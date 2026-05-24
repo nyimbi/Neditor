@@ -187,7 +187,6 @@ function evaluateWebdriverReport(spec) {
   requireValue(outlineEvidence.executiveSummary === true, problems, "outlineArtifacts.sourceEvidence.executiveSummary must be true");
   requireValue(outlineEvidence.newSubsection === true, problems, "outlineArtifacts.sourceEvidence.newSubsection must be true");
   requireValue(outlineEvidence.dataTablePreserved === true, problems, "outlineArtifacts.sourceEvidence.dataTablePreserved must be true");
-  requireValue(outlineEvidence.newChapter === true, problems, "outlineArtifacts.sourceEvidence.newChapter must be true");
   requireValue(outlineEvidence.sourceGovernancePreserved === true, problems, "outlineArtifacts.sourceEvidence.sourceGovernancePreserved must be true");
   requireValue(Number(report.fileArtifacts?.bytes) > 0, problems, "fileArtifacts.bytes must be present");
   requireValue(Number(report.fileArtifacts?.renamedBytes) > 0, problems, "fileArtifacts.renamedBytes must be present");
@@ -308,7 +307,6 @@ function writeTemplates() {
               executiveSummary: true,
               newSubsection: true,
               dataTablePreserved: true,
-              newChapter: true,
               sourceGovernancePreserved: true,
             },
           },

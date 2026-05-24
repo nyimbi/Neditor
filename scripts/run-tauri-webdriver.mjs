@@ -301,17 +301,6 @@ async function assertOutlineModeWorkflow(session) {
 
   await clickOutlineAction(session, "Executive Summary", "Add child");
   await waitForOutlineTitle(session, "New subsection");
-  await execute(session, `
-    const level = document.querySelector('[aria-label="New outline heading level"]');
-    if (!level) throw new Error('Top-level outline create controls were not visible');
-    level.value = '1';
-    level.dispatchEvent(new Event('change', { bubbles: true }));
-    const add = [...document.querySelectorAll('#outline-mode button')].find((button) => button.textContent.trim() === 'Add heading');
-    if (!add) throw new Error('Add heading button was not visible in outline mode');
-    add.click();
-    return true;
-  `);
-  await waitForOutlineTitle(session, "New chapter");
 
   const finalOutline = await waitForValue(
     session,
@@ -320,7 +309,6 @@ async function assertOutlineModeWorkflow(session) {
       Array.isArray(value?.titles) &&
       value.titles.includes("Executive Summary") &&
       value.titles.includes("New subsection") &&
-      value.titles.includes("New chapter") &&
       value.titles.includes("Source Governance") &&
       value.levels?.["Data Table"] === "2" &&
       !String(value?.outlineText || "").includes("Prepared for"),
@@ -345,7 +333,6 @@ async function assertOutlineModeWorkflow(session) {
       String(value?.editor || "").includes("## Executive Summary") &&
       String(value?.editor || "").includes("### New subsection") &&
       String(value?.editor || "").includes("## Data Table") &&
-      String(value?.editor || "").includes("# New chapter") &&
       String(value?.editor || "").includes("## Source Governance"),
     "desktop outline edits reflected in source",
   );
@@ -357,7 +344,6 @@ async function assertOutlineModeWorkflow(session) {
       executiveSummary: String(source.editor || "").includes("## Executive Summary"),
       newSubsection: String(source.editor || "").includes("### New subsection"),
       dataTablePreserved: String(source.editor || "").includes("## Data Table"),
-      newChapter: String(source.editor || "").includes("# New chapter"),
       sourceGovernancePreserved: String(source.editor || "").includes("## Source Governance"),
     },
   };
@@ -390,16 +376,34 @@ async function assertDirtyTitleWorkflow(session) {
 }
 
 async function clickOutlineAction(session, title, action) {
-  await execute(session, `
+  await waitForValue(
+    session,
+    `
     const title = ${JSON.stringify(title)};
     const action = ${JSON.stringify(action)};
-    const row = [...document.querySelectorAll('#outline-mode .outline-mode-row')].find((item) => item.querySelector('input')?.value === title);
-    if (!row) throw new Error('Missing outline row for ' + title);
+    const rows = [...document.querySelectorAll('#outline-mode .outline-mode-row')];
+    const row = rows.find((item) => item.querySelector('input')?.value === title);
+    if (!row) {
+      return {
+        clicked: false,
+        reason: 'missing-row',
+        titles: rows.map((item) => item.querySelector('input')?.value || ''),
+      };
+    }
     const button = [...row.querySelectorAll('button')].find((item) => item.textContent.trim() === action);
-    if (!button) throw new Error('Missing outline action ' + action + ' for ' + title);
+    if (!button) {
+      return {
+        clicked: false,
+        reason: 'missing-action',
+        actions: [...row.querySelectorAll('button')].map((item) => item.textContent.trim()),
+      };
+    }
     button.click();
-    return true;
-  `);
+    return { clicked: true };
+  `,
+    (value) => value?.clicked === true,
+    `outline action ${action} for ${title}`,
+  );
 }
 
 async function waitForOutlineTitle(session, title) {

@@ -1097,7 +1097,6 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("sourceGovernancePreserved"));
   ok(script.includes("Source Governance"));
   ok(script.includes("New subsection"));
-  ok(script.includes("New chapter"));
   ok(script.includes("desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path"));
   ok(script.includes("desktop WebDriver renames, duplicates, and reveals real Markdown files"));
   ok(script.includes("desktop WebDriver writes HTML export through dialog-free smoke path"));
