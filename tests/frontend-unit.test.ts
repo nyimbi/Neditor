@@ -954,6 +954,10 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("external-platform-evidence"));
   ok(script.includes("missingPlatformEvidence"));
   ok(script.includes("release-signing-evidence"));
+  ok(script.includes("release-ci-workflow"));
+  ok(script.includes("releaseCiWorkflowAccepted"));
+  ok(script.includes("neditor.release-ci-workflow-report.v1"));
+  ok(script.includes("stale-for-release-ci-sources"));
   ok(script.includes("release-evidence-kit"));
   ok(script.includes("releaseEvidenceKitAccepted"));
   ok(script.includes("neditor.release-evidence-kit-report.v1"));

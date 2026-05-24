@@ -19,6 +19,7 @@ const requiredReports = [
   requiredReport("platform-package-config", ".tmp/desktop-bundle/platform-package-config-report.json", ["passed"]),
   requiredReport("external-platform-evidence", ".tmp/platform-evidence/report.json", [], platformEvidenceAccepted),
   requiredReport("release-signing-evidence", ".tmp/release-signing/report.json", [], releaseSigningAccepted),
+  requiredReport("release-ci-workflow", ".tmp/release-ci/workflow-report.json", [], releaseCiWorkflowAccepted),
   requiredReport("release-evidence-kit", ".tmp/release-evidence-kit/report.json", [], releaseEvidenceKitAccepted),
   requiredReport("desktop-command-smoke", ".tmp/desktop-smoke/native-command-report.json", [], desktopCommandPassed),
   requiredReport("rendered-export-audit", ".tmp/rendered-export-audit/rendered-export-audit-report.json", [], renderedExportAuditAccepted),
@@ -461,6 +462,25 @@ function releaseSigningAccepted(report) {
       invalid === 0
         ? `releaseSigningEvidence=${report.status || "unknown"}`
         : `invalid release signing evidence count=${invalid}`,
+  };
+}
+
+function releaseCiWorkflowAccepted(report) {
+  const issues = [];
+  if (report.schema !== "neditor.release-ci-workflow-report.v1") issues.push("missing-schema");
+  if (report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
+  if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
+  if (report.workflowPath !== ".github/workflows/neditor-release-evidence.yml") issues.push("unexpected-workflow-path");
+  if (report.packageScript !== "node scripts/check-release-ci-workflow.mjs") issues.push("unexpected-package-script");
+  if (Array.isArray(report.issues) && report.issues.length > 0) issues.push(`issues=${report.issues.length}`);
+  if (!freshForSources(report.generatedAt, [".github/workflows/neditor-release-evidence.yml", "scripts/check-release-ci-workflow.mjs", "package.json"])) {
+    issues.push("stale-for-release-ci-sources");
+  }
+
+  return {
+    accepted: issues.length === 0,
+    status: issues.length === 0 ? "passed" : "incomplete",
+    detail: issues.length === 0 ? `workflow=${report.workflowPath}` : issues.join(","),
   };
 }
 
