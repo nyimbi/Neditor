@@ -8,6 +8,7 @@ import {
   isLatestDocumentTaskCurrent,
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
+import { buildAgenticWorkflowPlan } from "../src/lib/agenticWorkflows.js";
 import {
   bibliographyEntryStub,
   bibliographyStubsForMissingKeys,
@@ -344,6 +345,34 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.markdown.includes("Commercial team"));
 });
 
+test("agentic workflow planner coordinates creation revision review and distribution", () => {
+  const plan = buildAgenticWorkflowPlan({
+    instruction:
+      "Create a board memo for the executive team, revise it for the CFO, check citations and risks, then publish as PDF and Google Docs. audience: executive team owner: Strategy deadline: June 1",
+    documentTitle: "Expansion Options",
+    documentText: "# Expansion Options\n\n## Current State\n\nDraft notes.",
+    selectedText: "This section is too generic.",
+  });
+
+  equal(plan.documentType, "board-memo");
+  equal(plan.title, "Expansion Options");
+  deepEqual(plan.distributionTargets, ["pdf", "google-docs"]);
+  ok(plan.lanes.includes("create"));
+  ok(plan.lanes.includes("revise"));
+  ok(plan.lanes.includes("review"));
+  ok(plan.lanes.includes("distribute"));
+  ok(plan.context.includes("Agent lanes requested"));
+  ok(plan.placeholderText.includes("audience: executive team"));
+  ok(plan.placeholderText.includes("distribution: pdf, google-docs"));
+  ok(plan.suggestedOutline.includes("Board memo"));
+  ok(plan.revisionInstruction.includes("revise it for the CFO"));
+  ok(plan.missingInputs.includes("evidence"));
+  ok(plan.steps.some((step) => step.action === "open-docs-live"));
+  ok(plan.steps.some((step) => step.action === "open-ai-paste"));
+  ok(plan.steps.some((step) => step.action === "open-review"));
+  ok(plan.steps.some((step) => step.action === "prepare-export"));
+});
+
 test("preview debounce coalesces edits inside the spec timing budget", () => {
   ok(PREVIEW_DEBOUNCE_MS <= 100);
   const commits: string[] = [];
@@ -620,9 +649,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("handleButtonHelpEnter"));
   ok(app.includes("NEditor Guided Demo"));
   ok(app.includes("guidedDemoSteps"));
+  ok(app.includes("AI Agent Workspace"));
+  ok(app.includes("buildAgenticWorkflowPlan"));
+  ok(app.includes("agentPlan"));
   ok(app.includes("AI-first document creation"));
   ok(app.includes("startAiDocumentCreation"));
   ok(app.includes('id: "ai-create", label: "AI Create"'));
+  ok(app.includes('id: "agent", label: "Agent"'));
   ok(app.includes("Help: Docs Live"));
   ok(app.includes("Help: Export and publishing"));
   ok(app.includes("Help: AI-first composition"));
@@ -672,6 +705,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
   ok(tauriLib.includes('"neditor-open-docs-live", "Docs Live"'));
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
+  ok(tauriLib.includes('"neditor-open-agent-workspace",'));
   ok(tauriLib.includes('"neditor-ai-create-document",'));
   ok(tauriLib.includes('"neditor-guided-demo", "Guided Demo"'));
   ok(tauriLib.includes('"neditor-help-exports",'));
@@ -679,6 +713,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('case "neditor-mode-export"'));
   ok(app.includes('case "neditor-mode-outline"'));
   ok(app.includes('case "neditor-open-help"'));
+  ok(app.includes('case "neditor-open-agent-workspace"'));
   ok(app.includes('case "neditor-ai-create-document"'));
   ok(app.includes('case "neditor-guided-demo"'));
   ok(tauriLib.includes('app.emit("neditor-menu-command", id)'));

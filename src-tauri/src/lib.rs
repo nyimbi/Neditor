@@ -285,6 +285,11 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .item(&menu_item(app, "neditor-open-docs-live", "Docs Live")?)
         .item(&menu_item(
             app,
+            "neditor-open-agent-workspace",
+            "AI Agent Workspace",
+        )?)
+        .item(&menu_item(
+            app,
             "neditor-ai-create-document",
             "AI Create Document",
         )?)

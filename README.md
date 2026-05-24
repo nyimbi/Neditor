@@ -78,7 +78,9 @@ uses it.
 
 | I need to... | What to do in NEditor |
 | --- | --- |
+| Ask the app to plan the whole document workflow | Use **Agent** or **AI Agent Workspace**, describe the outcome in plain language, then let NEditor plan creation, composition, editing, revision, review, and distribution steps. |
 | Draft a board paper, proposal, report, or briefing note | Start in **Outline** mode, create the structure, then fill in each section. |
+| Start from an AI-first document brief | Use **AI Create** to open Docs Live with an intent-first workflow for document type, outline, context, placeholders, QA, humanization, and review handoff. |
 | Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, dictate the intent, add placeholder values, generate an outline-aware questionnaire if helpful, answer it in the dialog, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
 | Reuse a company format | Start from an approved Markdown template or example document, then save a copy for the new engagement. |
 | Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
@@ -94,6 +96,8 @@ uses it.
 - Long reports, proposals, business cases, strategy papers, research briefs, and
   technical documents.
 - Documents that need structured outlines before the body text is written.
+- AI-first workflows where a business instruction should become a planned set
+  of creation, editing, revision, review, and distribution actions.
 - Voice-guided first drafts where an outline, context, and placeholder values
   should become a structured reviewable document.
 - Repeatable exports where the same source can become HTML, PDF, DOCX, PPTX,
@@ -183,6 +187,14 @@ web app.
 - First-class outline planning in the Outline panel: draft a document structure
   with indented bullets, numbers, or Markdown headings, then create or append a
   Markdown document skeleton before writing the body text.
+- AI Agent Workspace turns a plain-language instruction into an agentic plan
+  across creation, composition, editing, revision, review, and distribution. It
+  identifies lanes, missing inputs, placeholder values, suggested outline,
+  revision intent, export targets, and runnable next steps that route into Docs
+  Live, AI Paste cleanup, Review, or Export readiness.
+- AI Create makes Docs Live the default first step for intent-led drafting,
+  so users can begin with the outcome, audience, context, and placeholders
+  instead of a blank page.
 - Docs Live can take that outline plus freeform context, outline-aware
   questionnaire answers, dictated direction, and placeholder values, then work
   section by section through drafting, QA gates, humanization cleanup, and

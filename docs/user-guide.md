@@ -56,6 +56,36 @@ matches, the left document outline, and fold/unfold section commands. In
 Settings or the command bar's Buttons selector, choose icons and text, icons
 only, or text only to match the density you want.
 
+## AI-First Workflows
+
+Use **Agent** when you know the outcome but not the exact sequence of document
+operations. Describe the goal in ordinary business language, for example:
+
+> Create a board memo for the executive team, revise it for the CFO, check
+> citations and risks, then distribute as PDF and Google Docs. audience:
+> executive team owner: Strategy deadline: June 1
+
+The AI Agent Workspace converts that instruction into a visible plan:
+
+- creation, composition, editing, revision, review, and distribution lanes;
+- missing inputs such as audience, owner, deadline, tone, evidence, reviewer,
+  or approval status;
+- placeholder values to pass into Docs Live;
+- a suggested outline or the current document outline;
+- revision instructions for selected text or the whole document;
+- requested export targets such as PDF, Substack, LaTeX, or Google Docs;
+- runnable next steps that open Docs Live, AI Paste cleanup, Review, or Export
+  readiness.
+
+Use **AI Create** when the next action is clearly to create a first draft. It
+opens Docs Live with an intent-first workflow: document type, outline, spoken or
+typed context, placeholder values, AI-created questionnaire, section-by-section
+drafting, QA, humanization, and review handoff.
+
+Use **AI Paste** when text came from a chat tool and needs cleanup before it
+enters the source document. Keep provenance enabled when the document needs an
+audit trail.
+
 Use the Templates panel or Insert > Templates to browse reusable transform
 blocks. The built-in library includes business, scientific, and mathematical
 `calc` blocks, plus chart, diagram, timeline, roadmap, ADR, CSV, OpenAPI, JSON

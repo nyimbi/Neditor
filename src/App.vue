@@ -1826,6 +1826,85 @@
     </section>
 
     <section
+      v-if="agentWorkspaceOpen"
+      ref="agentWorkspaceDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="AI agent workspace"
+      tabindex="-1"
+      @keydown="handleModalKeydown('agent-workspace', $event)"
+    >
+      <form class="modal agent-workspace-modal" @submit.prevent="buildAgentWorkspacePlan">
+        <header>
+          <div>
+            <h2>AI Agent Workspace</h2>
+            <p>Plan creation, composition, editing, revision, review, and distribution from one instruction.</p>
+          </div>
+          <button type="button" aria-label="Close AI agent workspace" @click="closeAgentWorkspace">x</button>
+        </header>
+        <label>
+          What should NEditor do?
+          <textarea
+            v-model="agentInstruction"
+            rows="5"
+            data-initial-focus
+            placeholder="Create a board memo for the executive team, revise it for the CFO, check evidence gaps, and prepare PDF plus Google Docs distribution."
+          ></textarea>
+        </label>
+        <div class="agent-workspace-actions">
+          <button type="submit">Plan agent workflow</button>
+          <button type="button" :disabled="!agentPlan" @click="hydrateDocsLiveFromAgentPlan">Send to Docs Live</button>
+          <button type="button" :disabled="!agentPlan" @click="runAgentPlanReview">Review readiness</button>
+          <button type="button" :disabled="!agentPlan" @click="runAgentPlanDistribution">Distribution prep</button>
+        </div>
+        <section v-if="agentPlan" class="agent-plan" aria-label="Agent workflow plan">
+          <header>
+            <div>
+              <strong>{{ agentPlan.title }}</strong>
+              <span>{{ agentPlan.documentType }} | {{ agentPlan.lanes.join(" -> ") }}</span>
+            </div>
+            <small>{{ agentPlan.steps.length }} steps</small>
+          </header>
+          <section class="agent-plan-grid">
+            <article>
+              <h3>Context pack</h3>
+              <pre>{{ agentPlan.context }}</pre>
+            </article>
+            <article>
+              <h3>Placeholders</h3>
+              <pre>{{ agentPlan.placeholderText }}</pre>
+            </article>
+            <article>
+              <h3>Suggested outline</h3>
+              <pre>{{ agentPlan.suggestedOutline }}</pre>
+            </article>
+            <article>
+              <h3>Revision instruction</h3>
+              <p>{{ agentPlan.revisionInstruction }}</p>
+            </article>
+          </section>
+          <section v-if="agentPlan.missingInputs.length" class="agent-missing-inputs" aria-label="Agent missing inputs">
+            <strong>Missing inputs</strong>
+            <ul>
+              <li v-for="input in agentPlan.missingInputs" :key="input">{{ input }}</li>
+            </ul>
+          </section>
+          <ol class="agent-step-list" aria-label="Agent workflow steps">
+            <li v-for="step in agentPlan.steps" :key="step.id" :data-lane="step.lane">
+              <div>
+                <small>{{ step.lane }} | {{ step.status }}</small>
+                <strong>{{ step.title }}</strong>
+                <p>{{ step.detail }}</p>
+              </div>
+              <button type="button" @click="runAgenticStep(step)">Run step</button>
+            </li>
+          </ol>
+        </section>
+      </form>
+    </section>
+
+    <section
       v-if="guidedDemoOpen"
       ref="guidedDemoDialog"
       class="modal-backdrop"
@@ -2014,6 +2093,7 @@ import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searc
 import { closeBrackets, closeBracketsKeymap, insertBracket } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
+import { buildAgenticWorkflowPlan, type AgenticWorkflowPlan, type AgenticWorkflowStep } from "./lib/agenticWorkflows";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import {
@@ -2101,6 +2181,7 @@ const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
 const aiPasteDialog = ref<HTMLElement | null>(null);
 const docsLiveDialog = ref<HTMLElement | null>(null);
+const agentWorkspaceDialog = ref<HTMLElement | null>(null);
 const guidedDemoDialog = ref<HTMLElement | null>(null);
 const commandPaletteDialog = ref<HTMLElement | null>(null);
 const conflictDialog = ref<HTMLElement | null>(null);
@@ -2128,6 +2209,9 @@ const aiConvertNumberedLists = ref(true);
 const aiConvertTables = ref(true);
 const aiPreviewBusy = ref(false);
 const aiPreviewSignature = ref("");
+const agentWorkspaceOpen = ref(false);
+const agentInstruction = ref("");
+const agentPlan = ref<AgenticWorkflowPlan | null>(null);
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const guidedDemoStepIndex = ref(0);
@@ -2890,6 +2974,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
     ],
     actions: [
       { label: "AI Create", run: () => startAiDocumentCreation() },
+      { label: "Agent workspace", run: () => openAgentWorkspace() },
       { label: "Guided demo", run: () => openGuidedDemo() },
       { label: "Review AI governance", run: () => (store.sidebar = "review") },
     ],
@@ -2913,6 +2998,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
     ],
     actions: [
       { label: "Start guided demo", run: () => openGuidedDemo() },
+      { label: "Open agent workspace", run: () => openAgentWorkspace() },
       { label: "AI Create", run: () => startAiDocumentCreation() },
       { label: "Help Center", run: () => openHelp("getting-started") },
     ],
@@ -3302,6 +3388,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     label: "Document",
     actions: [
       { id: "ai-create", label: "AI Create", title: "Create a document with the agentic Docs Live composer", icon: "ai", primary: true, run: () => startAiDocumentCreation() },
+      { id: "agent", label: "Agent", title: "Plan creation, editing, revision, review, and distribution with the AI agent workspace", icon: "ai", primary: true, run: () => openAgentWorkspace() },
       { id: "new", label: "New", title: "New document", icon: "new", primary: true, run: () => store.newDocument() },
       { id: "open", label: "Open", title: "Open document", icon: "open", run: () => openDocument() },
       { id: "save", label: "Save", title: "Save document", icon: "save", primary: true, run: () => saveDocument() },
@@ -3424,6 +3511,95 @@ function openHelp(topicId = "getting-started") {
 function runHelpAction(action: HelpTopicAction) {
   void action.run();
 }
+function currentEditorSelectionText() {
+  const selection = editorView?.state.selection.main;
+  if (!selection || selection.empty) return "";
+  return editorView?.state.sliceDoc(selection.from, selection.to) || "";
+}
+function openAgentWorkspace(seedInstruction = "") {
+  if (seedInstruction.trim()) {
+    agentInstruction.value = seedInstruction.trim();
+  } else if (!agentInstruction.value.trim()) {
+    agentInstruction.value = "Create or improve this document, revise it for the audience, run review readiness, and prepare the right distribution package.";
+  }
+  buildAgentWorkspacePlan();
+  agentWorkspaceOpen.value = true;
+  store.statusMessage = "Opened AI agent workspace";
+}
+function closeAgentWorkspace() {
+  agentWorkspaceOpen.value = false;
+}
+function buildAgentWorkspacePlan() {
+  flushEditorTextToStore();
+  agentPlan.value = buildAgenticWorkflowPlan({
+    instruction: agentInstruction.value,
+    documentTitle: active.value.compile?.semantic.title || active.value.title,
+    documentText: active.value.text,
+    selectedText: currentEditorSelectionText(),
+  });
+  store.statusMessage = `Planned ${agentPlan.value.steps.length} agent workflow steps`;
+}
+function hydrateDocsLiveFromAgentPlan() {
+  const plan = agentPlan.value;
+  if (!plan) return;
+  docsLiveDocumentType.value = plan.documentType;
+  docsLiveTitle.value = plan.title;
+  docsLiveOutlineText.value = plan.suggestedOutline;
+  docsLiveContext.value = plan.context;
+  docsLivePlaceholderText.value = plan.placeholderText;
+  docsLiveQuestionnaireAnswerText.value = plan.missingInputs.length
+    ? `Missing inputs to resolve:\n${plan.missingInputs.map((input) => `- ${input}`).join("\n")}`
+    : docsLiveQuestionnaireAnswerText.value;
+  refreshDocsLiveQuestionnaire();
+  closeAgentWorkspace();
+  docsLiveOpen.value = true;
+  store.statusMessage = "Sent agent plan to Docs Live";
+}
+function runAgentPlanReview() {
+  closeAgentWorkspace();
+  store.mode = "review";
+  store.sidebar = "review";
+  store.statusMessage = "Agent routed document to review readiness";
+}
+function runAgentPlanDistribution() {
+  const plan = agentPlan.value;
+  closeAgentWorkspace();
+  if (plan?.distributionTargets[0]) store.exportTarget = plan.distributionTargets[0];
+  store.mode = "export";
+  store.sidebar = "exports";
+  void prepareForExport();
+}
+function runAgenticStep(step: AgenticWorkflowStep) {
+  switch (step.action) {
+    case "open-docs-live":
+      hydrateDocsLiveFromAgentPlan();
+      break;
+    case "generate-docs-live-draft":
+      hydrateDocsLiveFromAgentPlan();
+      generateDocsLiveDraft();
+      break;
+    case "open-outline":
+      closeAgentWorkspace();
+      store.sidebar = "outline";
+      break;
+    case "open-ai-paste":
+      closeAgentWorkspace();
+      aiPasteText.value = currentEditorSelectionText() || agentPlan.value?.revisionInstruction || agentInstruction.value;
+      aiInsertMode.value = currentEditorSelectionText() ? "selection" : "section";
+      openAiPaste();
+      break;
+    case "open-review":
+      runAgentPlanReview();
+      break;
+    case "prepare-export":
+      runAgentPlanDistribution();
+      break;
+    case "open-exports":
+      closeAgentWorkspace();
+      store.sidebar = "exports";
+      break;
+  }
+}
 function openGuidedDemo(stepId = "ai-create") {
   const stepIndex = guidedDemoSteps.value.findIndex((step) => step.id === stepId);
   guidedDemoStepIndex.value = stepIndex >= 0 ? stepIndex : 0;
@@ -3476,6 +3652,7 @@ const commands = computed(() => [
   { name: "Refresh Git diff", group: "Versioning", run: () => void store.refreshGitDiff() },
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
+  { name: "Open AI agent workspace", group: "AI", run: () => openAgentWorkspace() },
   { name: "AI: Create document", group: "AI", run: () => startAiDocumentCreation() },
   { name: "AI: Compose from outline", group: "AI", run: () => openDocsLiveFromOutline() },
   { name: "AI: Review and clean pasted text", group: "AI", run: () => openAiPaste() },
@@ -3711,6 +3888,9 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-open-docs-live":
       openDocsLive();
       break;
+    case "neditor-open-agent-workspace":
+      openAgentWorkspace();
+      break;
     case "neditor-ai-create-document":
       startAiDocumentCreation();
       break;
@@ -3790,6 +3970,7 @@ onBeforeUnmount(() => {
 });
 
 watch(aiPasteOpen, (open) => handleModalStateChange(open, aiPasteDialog));
+watch(agentWorkspaceOpen, (open) => handleModalStateChange(open, agentWorkspaceDialog));
 watch(docsLiveOpen, (open) => handleModalStateChange(open, docsLiveDialog));
 watch(guidedDemoOpen, (open) => handleModalStateChange(open, guidedDemoDialog));
 watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteDialog));
@@ -6163,7 +6344,7 @@ function restoreModalFocus() {
   }
 }
 
-function handleModalKeydown(kind: "ai-paste" | "docs-live" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
+function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.preventDefault();
     closeModal(kind);
@@ -6189,9 +6370,11 @@ function handleModalKeydown(kind: "ai-paste" | "docs-live" | "guided-demo" | "co
   }
 }
 
-function closeModal(kind: "ai-paste" | "docs-live" | "guided-demo" | "command-palette" | "conflict") {
+function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "guided-demo" | "command-palette" | "conflict") {
   if (kind === "ai-paste") {
     closeAiPaste();
+  } else if (kind === "agent-workspace") {
+    closeAgentWorkspace();
   } else if (kind === "docs-live") {
     closeDocsLive();
   } else if (kind === "guided-demo") {
@@ -8000,6 +8183,11 @@ select:hover {
 .app-shell[data-theme="dark"] .help-keywords span,
 .app-shell[data-theme="dark"] .guided-demo-card,
 .app-shell[data-theme="dark"] .guided-demo-steps span,
+.app-shell[data-theme="dark"] .agent-plan > header,
+.app-shell[data-theme="dark"] .agent-plan-grid article,
+.app-shell[data-theme="dark"] .agent-missing-inputs,
+.app-shell[data-theme="dark"] .agent-step-list li,
+.app-shell[data-theme="dark"] .agent-missing-inputs li,
 .app-shell[data-theme="dark"] .status-message,
 .app-shell[data-theme="dark"] .word-stats,
 .app-shell[data-theme="dark"] .watch-status,
@@ -8017,6 +8205,10 @@ select:hover {
 .app-shell[data-theme="dark"] .help-tips,
 .app-shell[data-theme="dark"] .guided-demo-modal header p,
 .app-shell[data-theme="dark"] .guided-demo-card small,
+.app-shell[data-theme="dark"] .agent-workspace-modal header p,
+.app-shell[data-theme="dark"] .agent-plan > header span,
+.app-shell[data-theme="dark"] .agent-plan > header small,
+.app-shell[data-theme="dark"] .agent-step-list small,
 .app-shell[data-theme="dark"] .sidebar-hint {
   color: #aebdcc;
 }
@@ -8069,6 +8261,11 @@ select:hover {
   .app-shell[data-theme="system"] .help-keywords span,
   .app-shell[data-theme="system"] .guided-demo-card,
   .app-shell[data-theme="system"] .guided-demo-steps span,
+  .app-shell[data-theme="system"] .agent-plan > header,
+  .app-shell[data-theme="system"] .agent-plan-grid article,
+  .app-shell[data-theme="system"] .agent-missing-inputs,
+  .app-shell[data-theme="system"] .agent-step-list li,
+  .app-shell[data-theme="system"] .agent-missing-inputs li,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
   .app-shell[data-theme="system"] .watch-status,
@@ -8086,6 +8283,10 @@ select:hover {
   .app-shell[data-theme="system"] .help-tips,
   .app-shell[data-theme="system"] .guided-demo-modal header p,
   .app-shell[data-theme="system"] .guided-demo-card small,
+  .app-shell[data-theme="system"] .agent-workspace-modal header p,
+  .app-shell[data-theme="system"] .agent-plan > header span,
+  .app-shell[data-theme="system"] .agent-plan > header small,
+  .app-shell[data-theme="system"] .agent-step-list small,
   .app-shell[data-theme="system"] .sidebar-hint {
     color: #aebdcc;
   }
@@ -8123,6 +8324,11 @@ select:hover {
 .app-shell[data-high-contrast="true"] .help-keywords span,
 .app-shell[data-high-contrast="true"] .guided-demo-card,
 .app-shell[data-high-contrast="true"] .guided-demo-steps span,
+.app-shell[data-high-contrast="true"] .agent-plan > header,
+.app-shell[data-high-contrast="true"] .agent-plan-grid article,
+.app-shell[data-high-contrast="true"] .agent-missing-inputs,
+.app-shell[data-high-contrast="true"] .agent-step-list li,
+.app-shell[data-high-contrast="true"] .agent-missing-inputs li,
 .app-shell[data-high-contrast="true"] .status-message,
 .app-shell[data-high-contrast="true"] .word-stats,
 .app-shell[data-high-contrast="true"] .watch-status,
@@ -9538,6 +9744,120 @@ select:hover {
   gap: 8px;
 }
 
+.agent-workspace-modal {
+  width: min(980px, calc(100vw - 32px));
+}
+
+.agent-workspace-modal header {
+  align-items: start;
+}
+
+.agent-workspace-modal header p {
+  margin: 4px 0 0;
+  color: #526171;
+}
+
+.agent-workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agent-plan {
+  display: grid;
+  gap: 12px;
+}
+
+.agent-plan > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #d8e0e8;
+  border-left: 3px solid #2f6f9f;
+  background: #ffffff;
+}
+
+.agent-plan > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-plan > header span,
+.agent-plan > header small {
+  color: #526171;
+}
+
+.agent-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-plan-grid article,
+.agent-missing-inputs,
+.agent-step-list li {
+  padding: 10px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+}
+
+.agent-plan-grid h3,
+.agent-plan-grid p,
+.agent-missing-inputs ul,
+.agent-step-list p {
+  margin: 0;
+}
+
+.agent-plan-grid pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+.agent-missing-inputs {
+  border-left: 3px solid #c68a1a;
+}
+
+.agent-missing-inputs ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-missing-inputs li {
+  padding: 2px 7px;
+  border: 1px solid #e2c582;
+  background: #fff9e8;
+  font-size: 11px;
+}
+
+.agent-step-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-step-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-left: 3px solid #2f6f7e;
+}
+
+.agent-step-list small {
+  color: #526171;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .export-target-options label {
   margin-bottom: 0;
 }
@@ -10654,6 +10974,11 @@ select:hover {
   }
 
   .guided-demo-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-plan-grid,
+  .agent-step-list li {
     grid-template-columns: 1fr;
   }
 }

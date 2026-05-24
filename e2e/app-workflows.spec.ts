@@ -1347,6 +1347,18 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await page.locator(".command-bar").getByRole("button", { name: "AI Create" }).hover();
   await expect(page.getByRole("tooltip")).toContainText("agentic Docs Live composer");
 
+  await page.locator(".command-bar").getByRole("button", { name: "Agent" }).click();
+  const agent = page.getByRole("dialog", { name: "AI agent workspace" });
+  await expect(agent).toBeVisible();
+  await agent.getByLabel("What should NEditor do?").fill("Create a board memo, revise it for the CFO, review citations, and distribute as PDF and Google Docs. audience: executive team owner: Strategy deadline: June 1");
+  await agent.getByRole("button", { name: "Plan agent workflow" }).click();
+  await expect(agent.getByLabel("Agent workflow plan")).toContainText("create -> revise -> review -> distribute");
+  await expect(agent.getByLabel("Agent workflow steps")).toContainText("Prepare distribution");
+  await agent.getByRole("button", { name: "Send to Docs Live" }).click();
+  await expect(page.getByRole("dialog", { name: "Docs Live voice drafting" })).toBeVisible();
+  await page.getByRole("button", { name: "Close Docs Live" }).click();
+  await expect(page.getByRole("dialog", { name: "Docs Live voice drafting" })).toBeHidden();
+
   await page.locator(".help-quick-actions").getByRole("button", { name: "Guided demo" }).click();
   const demo = page.getByRole("dialog", { name: "NEditor guided demo" });
   await expect(demo).toBeVisible();
