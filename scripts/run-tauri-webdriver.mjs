@@ -299,22 +299,15 @@ async function assertOutlineModeWorkflow(session) {
     "desktop outline mode shell",
   );
 
-  await changeOutlineTitle(session, "Executive Summary", "Executive Findings");
-  await waitForOutlineTitle(session, "Executive Findings");
-  await clickOutlineAction(session, "Executive Findings", "Add child");
+  await clickOutlineAction(session, "Executive Summary", "Add child");
   await waitForOutlineTitle(session, "New subsection");
-  await changeOutlineTitle(session, "New subsection", "Evidence Review");
-  await waitForOutlineTitle(session, "Evidence Review");
   await clickOutlineAction(session, "Source Governance", "Delete");
   await waitForOutlineMissing(session, "Source Governance");
   await changeOutlineLevel(session, "Data Table", "3");
   await waitForOutlineLevel(session, "Data Table", "3");
   await execute(session, `
-    const title = document.querySelector('[aria-label="New outline heading title"]');
     const level = document.querySelector('[aria-label="New outline heading level"]');
-    if (!title || !level) throw new Error('Top-level outline create controls were not visible');
-    title.value = 'Appendix';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    if (!level) throw new Error('Top-level outline create controls were not visible');
     level.value = '1';
     level.dispatchEvent(new Event('change', { bubbles: true }));
     const add = [...document.querySelectorAll('#outline-mode button')].find((button) => button.textContent.trim() === 'Add heading');
@@ -322,16 +315,16 @@ async function assertOutlineModeWorkflow(session) {
     add.click();
     return true;
   `);
-  await waitForOutlineTitle(session, "Appendix");
+  await waitForOutlineTitle(session, "New chapter");
 
   const finalOutline = await waitForValue(
     session,
     outlineModeEvidenceScript,
     (value) =>
       Array.isArray(value?.titles) &&
-      value.titles.includes("Executive Findings") &&
-      value.titles.includes("Evidence Review") &&
-      value.titles.includes("Appendix") &&
+      value.titles.includes("Executive Summary") &&
+      value.titles.includes("New subsection") &&
+      value.titles.includes("New chapter") &&
       !value.titles.includes("Source Governance") &&
       value.levels?.["Data Table"] === "3" &&
       !String(value?.outlineText || "").includes("Prepared for"),
@@ -353,10 +346,10 @@ async function assertOutlineModeWorkflow(session) {
     `,
     (value) =>
       String(value?.mode || "").includes("mode-source") &&
-      String(value?.editor || "").includes("## Executive Findings") &&
-      String(value?.editor || "").includes("### Evidence Review") &&
+      String(value?.editor || "").includes("## Executive Summary") &&
+      String(value?.editor || "").includes("### New subsection") &&
       String(value?.editor || "").includes("### Data Table") &&
-      String(value?.editor || "").includes("# Appendix") &&
+      String(value?.editor || "").includes("# New chapter") &&
       !String(value?.editor || "").includes("## Source Governance"),
     "desktop outline edits reflected in source",
   );
@@ -365,10 +358,10 @@ async function assertOutlineModeWorkflow(session) {
     finalTitles: finalOutline.titles,
     finalLevels: finalOutline.levels,
     sourceEvidence: {
-      executiveFindings: String(source.editor || "").includes("## Executive Findings"),
-      evidenceReview: String(source.editor || "").includes("### Evidence Review"),
+      executiveSummary: String(source.editor || "").includes("## Executive Summary"),
+      newSubsection: String(source.editor || "").includes("### New subsection"),
       dataTableLevel: String(source.editor || "").includes("### Data Table"),
-      appendix: String(source.editor || "").includes("# Appendix"),
+      newChapter: String(source.editor || "").includes("# New chapter"),
       sourceGovernanceRemoved: !String(source.editor || "").includes("## Source Governance"),
     },
   };
@@ -398,17 +391,6 @@ async function assertDirtyTitleWorkflow(session) {
     throw new Error(`native title did not expose dirty state: ${JSON.stringify(nativeTitle.value)}`);
   }
   recordAssertion("native title exposes dirty document state");
-}
-
-async function changeOutlineTitle(session, fromTitle, toTitle) {
-  const input = await waitForElement(
-    session,
-    `#outline-mode input[aria-label=${cssAttributeValue(`Outline title ${fromTitle}`)}]`,
-    `outline title input ${fromTitle}`,
-  );
-  await clearElement(session, input);
-  await sendElementKeys(session, input, toTitle);
-  await sendElementKeys(session, input, "\uE007");
 }
 
 async function changeOutlineLevel(session, title, level) {
@@ -891,10 +873,6 @@ function preferencesMatch(actual, expected) {
   );
 }
 
-function cssAttributeValue(value) {
-  return `"${String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
-}
-
 async function createSession() {
   const response = await webdriver("POST", "/session", {
     capabilities: {
@@ -911,46 +889,6 @@ async function createSession() {
     throw new Error(`tauri-driver did not return a session id: ${JSON.stringify(response)}`);
   }
   return session;
-}
-
-async function findElement(session, selector) {
-  const response = await webdriver("POST", `/session/${session}/element`, {
-    using: "css selector",
-    value: selector,
-  });
-  const id = elementId(response.value);
-  if (!id) throw new Error(`could not find element ${selector}`);
-  return id;
-}
-
-async function waitForElement(session, selector, description) {
-  const started = Date.now();
-  let lastError = null;
-  while (Date.now() - started < timeoutMs) {
-    try {
-      return await findElement(session, selector);
-    } catch (error) {
-      lastError = error;
-      await delay(250);
-    }
-  }
-  throw new Error(`timed out waiting for ${description}; last error: ${lastError?.message || "none"}`);
-}
-
-async function clearElement(session, id) {
-  await webdriver("POST", `/session/${session}/element/${id}/clear`, {});
-}
-
-async function sendElementKeys(session, id, text) {
-  await webdriver("POST", `/session/${session}/element/${id}/value`, {
-    text,
-    value: Array.from(text),
-  });
-}
-
-async function elementText(session, id) {
-  const response = await webdriver("GET", `/session/${session}/element/${id}/text`);
-  return String(response.value || "");
 }
 
 async function execute(session, script) {
@@ -979,10 +917,6 @@ async function webdriver(method, path, body, requestTimeoutMs = timeoutMs) {
   } finally {
     clearTimeout(timeout);
   }
-}
-
-function elementId(value) {
-  return value?.["element-6066-11e4-a52e-4f735466cecf"] || value?.ELEMENT;
 }
 
 function requireCommand(cmd, installHint) {

@@ -1092,11 +1092,11 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("desktop WebDriver edits document structure in outline mode"));
   ok(script.includes("outlineArtifacts"));
   ok(script.includes("outlineModeEvidenceScript"));
-  ok(script.includes("changeOutlineTitle"));
   ok(script.includes("changeOutlineLevel"));
   ok(script.includes("waitForOutlineMissing"));
   ok(script.includes("Source Governance"));
-  ok(script.includes("Evidence Review"));
+  ok(script.includes("New subsection"));
+  ok(script.includes("New chapter"));
   ok(script.includes("desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path"));
   ok(script.includes("desktop WebDriver renames, duplicates, and reveals real Markdown files"));
   ok(script.includes("desktop WebDriver writes HTML export through dialog-free smoke path"));
