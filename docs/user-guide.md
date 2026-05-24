@@ -93,6 +93,12 @@ headers, cURL starter, and a safety checklist. The package is designed for
 review before it leaves the local document workspace; it does not place API
 keys or provider secrets into Markdown.
 
+If policy allows direct execution, enter the API key in **Session API key** and
+choose **Run provider request**. The key is held only in the open dialog, is not
+written to the document, and is cleared when the session ends. Review the
+provider response before using **Apply response**, because the imported text is
+still marked for human review.
+
 Use **AI Create** when the next action is clearly to create a first draft. It
 opens Docs Live with an intent-first workflow: document type, outline, spoken or
 typed context, placeholder values, AI-created questionnaire, section-by-section
@@ -261,7 +267,9 @@ NEditor is built for drafts that need evidence before publication.
   QA gates, and distribution gates before the output is accepted.
 - Use provider handoff packages when a governed AI provider or local model
   gateway should continue an agent run. Review the package, redact sensitive
-  facts where required, and import the response as a review draft.
+  facts where required, and import the response as a review draft. If direct
+  execution is allowed, use a session-only key and apply the response only after
+  checking the provider output.
 - Use `ai-source` blocks and AI-assisted section metadata so generated content
   can be marked as needing review or human-reviewed.
 

@@ -8,7 +8,7 @@ import {
   isLatestDocumentTaskCurrent,
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
-import { buildAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
+import { buildAiProviderRequestPackage, executeAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
 import { buildAgenticWorkflowPlan, buildAgenticWorkflowRun } from "../src/lib/agenticWorkflows.js";
 import {
   bibliographyEntryStub,
@@ -449,6 +449,37 @@ test("AI provider packages redact secrets and preserve agent governance context"
   ok(providerPackage.checklist.some((item) => item.includes("approves this provider")));
 });
 
+test("AI provider execution extracts Markdown without persisting secrets", async () => {
+  const run = buildAgenticWorkflowRun({
+    instruction: "Revise the summary for the board. audience: board owner: Strategy deadline: June 1 evidence: board pack",
+    documentTitle: "Board Summary",
+    documentText: "# Board Summary\n\nDraft.",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+  const providerPackage = buildAiProviderRequestPackage(run, {
+    profileId: "openai-compatible",
+    model: "approved-doc-model",
+    keyEnv: "NEDITOR_SECRET",
+  });
+  const calls: Array<{ input: string; init: { headers: Record<string, string>; body: string } }> = [];
+  const result = await executeAiProviderRequestPackage(providerPackage, "session-secret", async (input, init) => {
+    calls.push({ input, init });
+    return {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      async text() {
+        return JSON.stringify({ choices: [{ message: { content: "# Provider Draft\n\nReview-ready content." } }] });
+      },
+    };
+  });
+
+  equal(result.markdown, "# Provider Draft\n\nReview-ready content.");
+  equal(calls[0].init.headers.Authorization, "Bearer session-secret");
+  ok(!providerPackage.markdown.includes("session-secret"));
+  ok(calls[0].init.body.includes("approved-doc-model"));
+});
+
 test("preview debounce coalesces edits inside the spec timing budget", () => {
   ok(PREVIEW_DEBOUNCE_MS <= 100);
   const commits: string[] = [];
@@ -708,6 +739,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
+  const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
 
   ok(app.includes(':data-toolbar-display="store.toolbarDisplay"'));
   ok(app.includes(':style="appShellStyle"'));
@@ -735,6 +767,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent generated output"'));
   ok(app.includes("Build provider request"));
   ok(app.includes("Copy provider package"));
+  ok(app.includes("Run provider request"));
+  ok(app.includes("Session API key"));
+  ok(app.includes("executeAiProviderRequestPackage"));
+  ok(app.includes('aria-label="AI provider response"'));
   ok(app.includes('aria-label="AI provider handoff"'));
   ok(app.includes("buildAiProviderRequestPackage"));
   ok(app.includes("AI-first document creation"));
@@ -794,6 +830,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-ai-create-document",'));
   ok(tauriLib.includes('"neditor-guided-demo", "Guided Demo"'));
   ok(tauriLib.includes('"neditor-help-exports",'));
+  ok(tauriConf.includes("connect-src 'self' ipc: https:"));
   ok(tauriLib.includes('"neditor-mode-outline", "Outline Mode"'));
   ok(app.includes('case "neditor-mode-export"'));
   ok(app.includes('case "neditor-mode-outline"'));

@@ -31,6 +31,21 @@ export interface AiProviderRequestPackage {
   markdown: string;
 }
 
+export interface AiProviderExecutionResult {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  markdown: string;
+  rawText: string;
+}
+
+export type AiProviderFetch = (input: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{
+  ok: boolean;
+  status: number;
+  statusText: string;
+  text(): Promise<string>;
+}>;
+
 export const aiProviderProfiles: AiProviderProfile[] = [
   {
     id: "manual-review",
@@ -114,6 +129,38 @@ export function buildAiProviderRequestPackage(
   };
 }
 
+export async function executeAiProviderRequestPackage(
+  requestPackage: AiProviderRequestPackage,
+  apiKey = "",
+  fetcher: AiProviderFetch = globalThis.fetch.bind(globalThis) as AiProviderFetch,
+): Promise<AiProviderExecutionResult> {
+  if (!requestPackage.profile.endpoint) {
+    throw new Error("This provider profile is a manual handoff and does not define an endpoint.");
+  }
+  const headers = concreteHeaders(requestPackage.redactedHeaders, apiKey);
+  const endpoint = requestPackage.profile.endpoint.replace("{model}", encodeURIComponent(requestPackage.profile.model));
+  const response = await fetcher(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(requestPackage.requestBody),
+  });
+  const rawText = await response.text();
+  const markdown = extractProviderMarkdown(rawText, requestPackage.profile.bodyStyle);
+  if (!response.ok) {
+    throw new Error(`Provider request failed: ${response.status} ${response.statusText}${rawText ? ` - ${rawText.slice(0, 240)}` : ""}`);
+  }
+  if (!markdown.trim()) {
+    throw new Error("Provider response did not contain usable Markdown text.");
+  }
+  return {
+    ok: response.ok,
+    status: response.status,
+    statusText: response.statusText,
+    markdown,
+    rawText,
+  };
+}
+
 function buildSystemPrompt(run: AgenticWorkflowRun) {
   return [
     "You are an expert document co-writer inside NEditor.",
@@ -146,6 +193,63 @@ function buildUserPrompt(run: AgenticWorkflowRun) {
     "- Preserve or add ai-source and ai-assisted review metadata.",
     "- Include a final QA checklist and review handoff.",
   ].join("\n");
+}
+
+function concreteHeaders(headers: Record<string, string>, apiKey: string) {
+  const concrete: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (value.includes("${")) {
+      if (!apiKey.trim()) throw new Error(`Provider request needs a session API key for ${key}.`);
+      concrete[key] = value.toLowerCase().startsWith("bearer ") ? `Bearer ${apiKey.trim()}` : apiKey.trim();
+    } else {
+      concrete[key] = value;
+    }
+  }
+  return concrete;
+}
+
+function extractProviderMarkdown(rawText: string, bodyStyle: AiProviderBodyStyle) {
+  const parsed = parseJson(rawText);
+  if (!parsed) return rawText.trim();
+  if (bodyStyle === "messages") {
+    const choices = arrayValue(parsed.choices);
+    const first = recordValue(choices[0]);
+    const message = recordValue(first?.message);
+    return stringValue(message?.content) || stringValue(first?.text) || rawText.trim();
+  }
+  if (bodyStyle === "system-and-messages") {
+    const content = arrayValue(parsed.content);
+    return content.map((item) => stringValue(recordValue(item)?.text)).filter(Boolean).join("\n\n") || stringValue(parsed.completion) || rawText.trim();
+  }
+  if (bodyStyle === "contents") {
+    const candidates = arrayValue(parsed.candidates);
+    const candidate = recordValue(candidates[0]);
+    const content = recordValue(candidate?.content);
+    const parts = arrayValue(content?.parts);
+    return parts.map((item) => stringValue(recordValue(item)?.text)).filter(Boolean).join("\n\n") || rawText.trim();
+  }
+  return stringValue(parsed.response) || stringValue(parsed.output) || stringValue(parsed.text) || rawText.trim();
+}
+
+function parseJson(value: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function buildRequestBody(profile: AiProviderProfile, systemPrompt: string, userPrompt: string): Record<string, unknown> {

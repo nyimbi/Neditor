@@ -14,6 +14,7 @@ workflows.
 - Bibliographies, media, variables, data transforms, and generated sections.
 - User preferences, recent paths, external engine paths, and trust state.
 - Git history and release tags for repositories the user opens.
+- Session-only AI provider keys entered into the Agent Workspace.
 
 ## Trust Boundaries
 
@@ -26,6 +27,7 @@ workflows.
 | Export boundary | Compiler/export modules | Target artifact consumers | Readiness checks, manifests, output hashes, sidecar evidence. |
 | Git boundary | Opened repository worktree | User-controlled tags, revisions, and worktree paths | Argument-array invocation, pathspec separators, ref validation, symlink restore blocking, repository-contained restore targets. |
 | External transform boundary | Native transform fallback and trusted adapter | User-installed executables | Disabled by default, per-engine trust, executable checks, fixed adapters, no shell interpolation, timeout and output limits. |
+| AI provider boundary | Local agent packet and session key field | Approved external HTTPS providers or local model gateways | User-entered endpoint/model, redacted request package, session-only API key, response preview, human-review apply flow. |
 | Persistence boundary | Versioned schema helper | Old or malformed `settings.json` data | Migration, clamping, invalid value filtering. |
 
 ## Threats And Mitigations
@@ -123,6 +125,24 @@ Mitigations:
 - `.neditor/` is added to `.gitignore` when project-local snapshots are used.
 - Export manifests are explicit sidecars beside deliverables.
 
+### Unsafe AI Provider Execution
+
+Threat: A document run sends sensitive text or API credentials to an
+unapproved model endpoint, or imports generated text as if it were already
+reviewed.
+
+Mitigations:
+
+- Agent Workspace first builds a redacted provider request package for review.
+- API keys are typed into a session-only password field and are not written to
+  Markdown, preferences, snapshots, or manifests.
+- Provider endpoint and model remain visible before execution.
+- Provider responses are previewed as Markdown before being applied.
+- Applied responses are routed to Review and remain human-review material.
+- The desktop content-security policy allows user-approved HTTPS providers and
+  local model gateways while preserving `object-src 'none'` and
+  `frame-ancestors 'none'`.
+
 ## Explicit Non-Goals
 
 - NEditor is not a sandbox for arbitrary untrusted executables.
@@ -130,6 +150,7 @@ Mitigations:
 - NEditor does not encrypt source documents or exported artifacts.
 - NEditor does not verify third-party engine supply chains.
 - NEditor does not send telemetry or sync documents automatically.
+- NEditor does not persist AI provider API keys or certify provider compliance.
 
 ## Verification Evidence
 
@@ -146,3 +167,5 @@ Mitigations:
 - `snapshot_restore_rejects_out_of_scope_and_mismatched_sources`
 - `workspace persistence migration versions and normalizes saved settings`
 - `save_file_rejects_stale_expected_hash`
+- `AI provider packages redact secrets and preserve agent governance context`
+- `AI provider execution extracts Markdown without persisting secrets`

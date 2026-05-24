@@ -198,7 +198,9 @@ web app.
   appending a review packet. Provider handoff packages turn that run into
   redacted prompts, JSON request bodies, headers, cURL starters, and safety
   checklists for approved AI providers or local model gateways without storing
-  secrets in the document.
+  secrets in the document. If policy allows direct calls, users can run the
+  request with a session-only API key, preview the provider's Markdown response,
+  and apply it as review material without persisting the secret.
 - AI Create makes Docs Live the default first step for intent-led drafting,
   so users can begin with the outcome, audience, context, and placeholders
   instead of a blank page.

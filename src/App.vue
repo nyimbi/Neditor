@@ -1858,6 +1858,9 @@
           <button type="button" :disabled="!agentRun" @click="applyAgentWorkspaceRun">Apply agent output</button>
           <button type="button" :disabled="!agentRun" @click="buildAgentProviderPackage">Build provider request</button>
           <button type="button" :disabled="!agentProviderPackage" @click="copyAgentProviderPackage">Copy provider package</button>
+          <button type="button" :disabled="!canRunAgentProvider" @click="runAgentProviderRequest">
+            {{ agentProviderBusy ? "Running provider..." : "Run provider request" }}
+          </button>
           <button type="button" :disabled="!agentPlan" @click="hydrateDocsLiveFromAgentPlan">Send to Docs Live</button>
           <button type="button" :disabled="!agentPlan" @click="runAgentPlanReview">Review readiness</button>
           <button type="button" :disabled="!agentPlan" @click="runAgentPlanDistribution">Distribution prep</button>
@@ -1962,6 +1965,10 @@
                 API key environment variable
                 <input v-model="agentProviderKeyEnv" placeholder="NEDITOR_AI_API_KEY" />
               </label>
+              <label>
+                Session API key
+                <input v-model="agentProviderApiKey" type="password" autocomplete="off" placeholder="Used once, never saved" />
+              </label>
             </section>
             <section v-if="agentProviderPackage" class="agent-provider-output" aria-label="AI provider request package">
               <header>
@@ -1974,6 +1981,16 @@
                 <li v-for="item in agentProviderPackage.checklist" :key="item">{{ item }}</li>
               </ul>
               <textarea :value="agentProviderPackage.markdown" rows="12" readonly aria-label="AI provider request Markdown"></textarea>
+            </section>
+            <section v-if="agentProviderResult" class="agent-provider-output" aria-label="AI provider response">
+              <header>
+                <div>
+                  <strong>Provider response</strong>
+                  <span>{{ agentProviderResult.status }} {{ agentProviderResult.statusText }}</span>
+                </div>
+                <button type="button" @click="applyAgentProviderResponse">Apply response</button>
+              </header>
+              <textarea :value="agentProviderResult.markdown" rows="12" readonly aria-label="AI provider response Markdown"></textarea>
             </section>
           </section>
         </section>
@@ -2171,6 +2188,8 @@ import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnost
 import {
   aiProviderProfiles,
   buildAiProviderRequestPackage,
+  executeAiProviderRequestPackage,
+  type AiProviderExecutionResult,
   type AiProviderProfileId,
   type AiProviderRequestPackage,
 } from "./lib/aiProviderPackages";
@@ -2307,6 +2326,9 @@ const agentProviderEndpoint = ref(defaultAgentProviderProfile.endpoint);
 const agentProviderModel = ref(defaultAgentProviderProfile.model);
 const agentProviderKeyEnv = ref("NEDITOR_AI_API_KEY");
 const agentProviderPackage = ref<AiProviderRequestPackage | null>(null);
+const agentProviderApiKey = ref("");
+const agentProviderBusy = ref(false);
+const agentProviderResult = ref<AiProviderExecutionResult | null>(null);
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const guidedDemoStepIndex = ref(0);
@@ -2701,6 +2723,10 @@ const buttonHelpStyle = computed<CSSProperties>(() => ({
   transform: buttonHelp.value.placement === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
 }));
 const docsLiveSpeechAvailable = computed(() => Boolean(speechRecognitionConstructor()));
+const canRunAgentProvider = computed(() => {
+  if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
+  return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
+});
 const previewDocumentLabel = computed(() => {
   const title = active.value.compile?.semantic.title || active.value.title || "Untitled document";
   const status = active.value.compile?.semantic.status || "draft";
@@ -3629,6 +3655,7 @@ function syncAgentProviderProfile() {
   agentProviderEndpoint.value = profile.endpoint;
   agentProviderModel.value = profile.model;
   agentProviderPackage.value = null;
+  agentProviderResult.value = null;
 }
 function buildAgentWorkspacePlan() {
   flushEditorTextToStore();
@@ -3640,6 +3667,7 @@ function buildAgentWorkspacePlan() {
   });
   agentRun.value = null;
   agentProviderPackage.value = null;
+  agentProviderResult.value = null;
   store.statusMessage = `Planned ${agentPlan.value.steps.length} agent workflow steps`;
 }
 function generateAgentWorkspaceRun() {
@@ -3652,6 +3680,7 @@ function generateAgentWorkspaceRun() {
     selectedText: currentEditorSelectionText(),
   });
   agentProviderPackage.value = null;
+  agentProviderResult.value = null;
   store.statusMessage = `Generated agent packet for ${agentRun.value.plan.lanes.length} workflow lanes`;
 }
 function buildAgentProviderPackage() {
@@ -3663,7 +3692,28 @@ function buildAgentProviderPackage() {
     model: agentProviderModel.value,
     keyEnv: agentProviderKeyEnv.value,
   });
+  agentProviderResult.value = null;
   store.statusMessage = `Built ${agentProviderPackage.value.profile.label} request package`;
+}
+async function runAgentProviderRequest() {
+  if (!agentProviderPackage.value || agentProviderBusy.value) return;
+  agentProviderBusy.value = true;
+  agentProviderResult.value = null;
+  try {
+    agentProviderResult.value = await executeAiProviderRequestPackage(agentProviderPackage.value, agentProviderApiKey.value);
+    store.statusMessage = `Provider returned ${agentProviderResult.value.markdown.length} Markdown characters for review`;
+  } catch (error) {
+    store.lastError = error instanceof Error ? error.message : String(error);
+    store.statusMessage = "Provider request failed";
+  } finally {
+    agentProviderBusy.value = false;
+  }
+}
+function applyAgentProviderResponse() {
+  if (!agentProviderResult.value) return;
+  applyAgentMarkdown(agentProviderResult.value.markdown, agentRun.value?.applicationMode || "append-packet");
+  store.statusMessage = "Applied provider response for human review";
+  closeAgentWorkspace();
 }
 async function copyAgentProviderPackage() {
   if (!agentProviderPackage.value) return;
@@ -3677,23 +3727,25 @@ async function copyAgentProviderPackage() {
 function applyAgentWorkspaceRun() {
   const run = agentRun.value;
   if (!run) return;
-  if (run.applicationMode === "replace-selection" && editorView) {
+  applyAgentMarkdown(run.revision?.proposedText || run.markdown, run.applicationMode);
+  store.statusMessage = "Applied agent output for human review";
+  closeAgentWorkspace();
+}
+function applyAgentMarkdown(markdown: string, mode: AgenticWorkflowRun["applicationMode"]) {
+  if (mode === "replace-selection" && editorView) {
     const range = editorView.state.selection.main;
-    const replacement = run.revision?.proposedText || run.markdown;
     editorView.dispatch({
-      changes: { from: range.from, to: range.to, insert: replacement },
-      selection: { anchor: range.from + replacement.length },
+      changes: { from: range.from, to: range.to, insert: markdown },
+      selection: { anchor: range.from + markdown.length },
     });
     store.updateText(editorView.state.doc.toString());
     editorView.focus();
-  } else if (run.applicationMode === "replace-document") {
-    store.updateText(run.markdown);
+  } else if (mode === "replace-document") {
+    store.updateText(markdown);
   } else {
-    store.updateText(`${active.value.text.trimEnd()}\n\n${run.markdown}`);
+    store.updateText(`${active.value.text.trimEnd()}\n\n${markdown}`);
   }
   store.sidebar = "review";
-  store.statusMessage = "Applied agent output for human review";
-  closeAgentWorkspace();
 }
 function hydrateDocsLiveFromAgentPlan() {
   const plan = agentPlan.value;
@@ -10118,7 +10170,7 @@ select:hover {
 
 .agent-provider-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
 }
 
