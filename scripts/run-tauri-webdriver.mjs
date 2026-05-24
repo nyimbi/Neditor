@@ -446,7 +446,7 @@ async function closeCommandPalette(session) {
 }
 
 async function assertTransformTemplateWorkflow(session) {
-  await showSidebar(session, "templates", "Custom template");
+  await showSidebar(session, "templates", ["Search", "Category", "Transform"]);
   await execute(session, `
     const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
     const controlByLabel = ${controlByLabelScript};
@@ -825,27 +825,34 @@ async function applyDesktopPreferences(session, preferences) {
 
 async function showSidebar(session, value, labelText) {
   const expectedSidebar = value;
-  await execute(session, `
-    const sidebar = document.querySelector('[aria-label="Sidebar panel"]');
-    if (!sidebar) throw new Error('Sidebar panel select was not visible');
-    sidebar.value = ${JSON.stringify(value)};
-    sidebar.dispatchEvent(new Event('input', { bubbles: true }));
-    sidebar.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  `);
+  const expectedLabels = Array.isArray(labelText) ? labelText : [labelText];
   await waitForValue(
     session,
     `
       const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
-      const labels = [...document.querySelectorAll('label')].map((label) => normalized(label.textContent || ''));
+      const expectedLabels = ${JSON.stringify(expectedLabels)};
       const sidebar = document.querySelector('[aria-label="Sidebar panel"]');
+      if (!sidebar) {
+        return {
+          changed: false,
+          reason: 'missing-sidebar-select',
+          sidebarValue: '',
+          hasExpectedLabel: false,
+          labels: [],
+        };
+      }
+      sidebar.value = ${JSON.stringify(value)};
+      sidebar.dispatchEvent(new Event('input', { bubbles: true }));
+      sidebar.dispatchEvent(new Event('change', { bubbles: true }));
+      const labels = [...document.querySelectorAll('label')].map((label) => normalized(label.textContent || ''));
       return {
+        changed: true,
         sidebarValue: sidebar?.value || '',
-        hasExpectedLabel: labels.some((label) => label.includes(${JSON.stringify(labelText)})),
+        hasExpectedLabel: expectedLabels.every((expected) => labels.some((label) => label.includes(expected))),
         labels: labels.slice(0, 20),
       };
     `,
-    (result) => result?.sidebarValue === expectedSidebar && result?.hasExpectedLabel === true,
+    (result) => result?.changed === true && result?.sidebarValue === expectedSidebar && result?.hasExpectedLabel === true,
     `${value} sidebar controls`,
   );
 }
