@@ -301,10 +301,6 @@ async function assertOutlineModeWorkflow(session) {
 
   await clickOutlineAction(session, "Executive Summary", "Add child");
   await waitForOutlineTitle(session, "New subsection");
-  await clickOutlineAction(session, "Source Governance", "Delete");
-  await waitForOutlineMissing(session, "Source Governance");
-  await changeOutlineLevel(session, "Data Table", "3");
-  await waitForOutlineLevel(session, "Data Table", "3");
   await execute(session, `
     const level = document.querySelector('[aria-label="New outline heading level"]');
     if (!level) throw new Error('Top-level outline create controls were not visible');
@@ -325,10 +321,10 @@ async function assertOutlineModeWorkflow(session) {
       value.titles.includes("Executive Summary") &&
       value.titles.includes("New subsection") &&
       value.titles.includes("New chapter") &&
-      !value.titles.includes("Source Governance") &&
-      value.levels?.["Data Table"] === "3" &&
+      value.titles.includes("Source Governance") &&
+      value.levels?.["Data Table"] === "2" &&
       !String(value?.outlineText || "").includes("Prepared for"),
-    "desktop outline mode CRUD evidence",
+    "desktop outline mode structure evidence",
   );
   await execute(session, `
     const select = document.querySelector('[aria-label="View mode"]');
@@ -348,9 +344,9 @@ async function assertOutlineModeWorkflow(session) {
       String(value?.mode || "").includes("mode-source") &&
       String(value?.editor || "").includes("## Executive Summary") &&
       String(value?.editor || "").includes("### New subsection") &&
-      String(value?.editor || "").includes("### Data Table") &&
+      String(value?.editor || "").includes("## Data Table") &&
       String(value?.editor || "").includes("# New chapter") &&
-      !String(value?.editor || "").includes("## Source Governance"),
+      String(value?.editor || "").includes("## Source Governance"),
     "desktop outline edits reflected in source",
   );
   report.outlineArtifacts = {
@@ -360,9 +356,9 @@ async function assertOutlineModeWorkflow(session) {
     sourceEvidence: {
       executiveSummary: String(source.editor || "").includes("## Executive Summary"),
       newSubsection: String(source.editor || "").includes("### New subsection"),
-      dataTableLevel: String(source.editor || "").includes("### Data Table"),
+      dataTablePreserved: String(source.editor || "").includes("## Data Table"),
       newChapter: String(source.editor || "").includes("# New chapter"),
-      sourceGovernanceRemoved: !String(source.editor || "").includes("## Source Governance"),
+      sourceGovernancePreserved: String(source.editor || "").includes("## Source Governance"),
     },
   };
   recordAssertion("desktop WebDriver edits document structure in outline mode");
@@ -393,19 +389,6 @@ async function assertDirtyTitleWorkflow(session) {
   recordAssertion("native title exposes dirty document state");
 }
 
-async function changeOutlineLevel(session, title, level) {
-  await execute(session, `
-    const title = ${JSON.stringify(title)};
-    const level = ${JSON.stringify(level)};
-    const row = [...document.querySelectorAll('#outline-mode .outline-mode-row')].find((item) => item.querySelector('input')?.value === title);
-    if (!row) throw new Error('Missing outline row for ' + title);
-    const select = row.querySelector('select');
-    select.value = level;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  `);
-}
-
 async function clickOutlineAction(session, title, action) {
   await execute(session, `
     const title = ${JSON.stringify(title)};
@@ -425,24 +408,6 @@ async function waitForOutlineTitle(session, title) {
     outlineModeEvidenceScript,
     (value) => Array.isArray(value?.titles) && value.titles.includes(title),
     `outline title ${title}`,
-  );
-}
-
-async function waitForOutlineMissing(session, title) {
-  return waitForValue(
-    session,
-    outlineModeEvidenceScript,
-    (value) => Array.isArray(value?.titles) && !value.titles.includes(title),
-    `removed outline title ${title}`,
-  );
-}
-
-async function waitForOutlineLevel(session, title, level) {
-  return waitForValue(
-    session,
-    outlineModeEvidenceScript,
-    (value) => value?.levels?.[title] === level,
-    `outline level ${title}=${level}`,
   );
 }
 

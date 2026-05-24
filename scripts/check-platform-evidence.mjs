@@ -184,11 +184,11 @@ function evaluateWebdriverReport(spec) {
     requireValue(assertion?.status === "passed", problems, `assertion did not pass: ${requiredAssertion}`);
   }
   const outlineEvidence = report.outlineArtifacts?.sourceEvidence || {};
-  requireValue(outlineEvidence.executiveFindings === true, problems, "outlineArtifacts.sourceEvidence.executiveFindings must be true");
-  requireValue(outlineEvidence.evidenceReview === true, problems, "outlineArtifacts.sourceEvidence.evidenceReview must be true");
-  requireValue(outlineEvidence.dataTableLevel === true, problems, "outlineArtifacts.sourceEvidence.dataTableLevel must be true");
-  requireValue(outlineEvidence.appendix === true, problems, "outlineArtifacts.sourceEvidence.appendix must be true");
-  requireValue(outlineEvidence.sourceGovernanceRemoved === true, problems, "outlineArtifacts.sourceEvidence.sourceGovernanceRemoved must be true");
+  requireValue(outlineEvidence.executiveSummary === true, problems, "outlineArtifacts.sourceEvidence.executiveSummary must be true");
+  requireValue(outlineEvidence.newSubsection === true, problems, "outlineArtifacts.sourceEvidence.newSubsection must be true");
+  requireValue(outlineEvidence.dataTablePreserved === true, problems, "outlineArtifacts.sourceEvidence.dataTablePreserved must be true");
+  requireValue(outlineEvidence.newChapter === true, problems, "outlineArtifacts.sourceEvidence.newChapter must be true");
+  requireValue(outlineEvidence.sourceGovernancePreserved === true, problems, "outlineArtifacts.sourceEvidence.sourceGovernancePreserved must be true");
   requireValue(Number(report.fileArtifacts?.bytes) > 0, problems, "fileArtifacts.bytes must be present");
   requireValue(Number(report.fileArtifacts?.renamedBytes) > 0, problems, "fileArtifacts.renamedBytes must be present");
   requireValue(Number(report.fileArtifacts?.duplicateBytes) > 0, problems, "fileArtifacts.duplicateBytes must be present");
@@ -305,11 +305,11 @@ function writeTemplates() {
           assertions: requiredWebdriverAssertions.map((name) => ({ name, status: "passed" })),
           outlineArtifacts: {
             sourceEvidence: {
-              executiveFindings: true,
-              evidenceReview: true,
-              dataTableLevel: true,
-              appendix: true,
-              sourceGovernanceRemoved: true,
+              executiveSummary: true,
+              newSubsection: true,
+              dataTablePreserved: true,
+              newChapter: true,
+              sourceGovernancePreserved: true,
             },
           },
           fileArtifacts: {

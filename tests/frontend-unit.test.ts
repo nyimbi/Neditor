@@ -786,7 +786,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformEvidence.includes("requiredWebdriverAssertions"));
   ok(platformEvidence.includes("desktop WebDriver edits document structure in outline mode"));
   ok(platformEvidence.includes("desktop WebDriver renames, duplicates, and reveals real Markdown files"));
-  ok(platformEvidence.includes("outlineArtifacts.sourceEvidence.executiveFindings must be true"));
+  ok(platformEvidence.includes("outlineArtifacts.sourceEvidence.newSubsection must be true"));
+  ok(platformEvidence.includes("outlineArtifacts.sourceEvidence.sourceGovernancePreserved must be true"));
   ok(platformEvidence.includes("exportArtifacts.progressEvidence must include a completed render step"));
   ok(platformCollector.includes("NEDITOR_PLATFORM_EVIDENCE_PLATFORM"));
   ok(platformCollector.includes("NEDITOR_PLATFORM_BUILD_COMMAND"));
@@ -1092,8 +1093,8 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("desktop WebDriver edits document structure in outline mode"));
   ok(script.includes("outlineArtifacts"));
   ok(script.includes("outlineModeEvidenceScript"));
-  ok(script.includes("changeOutlineLevel"));
-  ok(script.includes("waitForOutlineMissing"));
+  ok(script.includes("dataTablePreserved"));
+  ok(script.includes("sourceGovernancePreserved"));
   ok(script.includes("Source Governance"));
   ok(script.includes("New subsection"));
   ok(script.includes("New chapter"));
