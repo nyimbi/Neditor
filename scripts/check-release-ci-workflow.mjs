@@ -60,7 +60,7 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "NEDITOR_PLATFORM_EVIDENCE_PLATFORM: ${{ matrix.platform }}", "platform job must set evidence platform");
   requireIncludes(workflow, "pnpm run collect:platform-evidence", "platform job must collect validator-ready evidence");
   requireIncludes(workflow, "pnpm run check:platform-evidence", "platform job must validate collected evidence");
-  requireIncludes(workflow, "actions/upload-artifact@v4", "workflow must upload evidence artifacts");
+  requireIncludes(workflow, "actions/upload-artifact@v7", "workflow must upload evidence artifacts with the Node 24 action runtime");
   requireIncludes(workflow, ".tmp/e2e-browser/report.json", "browser report must be uploaded");
   requireIncludes(workflow, ".tmp/platform-evidence/external/${{ matrix.platform }}/package-artifacts.json", "package evidence must be uploaded");
   requireIncludes(workflow, ".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json", "WebDriver evidence must be uploaded");

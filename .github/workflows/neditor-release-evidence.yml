@@ -48,7 +48,7 @@ jobs:
 
       - name: Upload browser workflow evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: neditor-browser-workflow-evidence
           if-no-files-found: error
@@ -143,7 +143,7 @@ jobs:
 
       - name: Upload platform evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           if-no-files-found: error
@@ -197,7 +197,7 @@ jobs:
 
       - name: Upload rendered export review package
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: neditor-rendered-export-review-package
           if-no-files-found: error
@@ -240,7 +240,7 @@ jobs:
 
       - name: Upload accessibility review package
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: neditor-accessibility-review-package
           if-no-files-found: error
