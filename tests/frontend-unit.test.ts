@@ -1097,6 +1097,7 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("outlineArtifacts"));
   ok(script.includes("outlineModeEvidenceScript"));
   ok(script.includes("editorDocumentTextFunction"));
+  ok(script.includes("window.__NEDITOR_DESKTOP_WORKFLOW__?.activeDocumentText?.()"));
   ok(script.includes("new dirty document before reopening saved file"));
   ok(script.includes("String(value?.tab || \"\").includes(\"Market Entry Report\")"));
   ok(script.includes("dataTablePreserved"));
@@ -1128,6 +1129,8 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("native workflow exported html from native menu command"));
   ok(script.includes("native workflow restored workspace tabs with active pinned and scroll state"));
   const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("__NEDITOR_DESKTOP_WORKFLOW__"));
+  ok(app.includes("desktop_workflow_smoke_enabled"));
   ok(app.includes(":data-document-path=\"document.path || ''\""));
   ok(app.includes("syncingEditorFromStore"));
   ok(app.includes("syncEditorViewFromActiveDocument"));

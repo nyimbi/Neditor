@@ -1964,6 +1964,17 @@ type ExportTarget = typeof store.exportTarget;
 type WindowTitleTarget = {
   setTitle(title: string): Promise<void>;
 };
+type DesktopWorkflowTestHooks = {
+  activeDocumentPath(): string | null;
+  activeDocumentText(): string;
+  activeDocumentTitle(): string;
+};
+
+declare global {
+  interface Window {
+    __NEDITOR_DESKTOP_WORKFLOW__?: DesktopWorkflowTestHooks;
+  }
+}
 
 function getWindowTitleTarget(): WindowTitleTarget | null {
   try {
@@ -3055,6 +3066,16 @@ async function runNativeMenuCommand(command: string) {
   }
 }
 
+async function installDesktopWorkflowTestHooks() {
+  const enabled = await invoke<boolean>("desktop_workflow_smoke_enabled").catch(() => false);
+  if (!enabled) return;
+  window.__NEDITOR_DESKTOP_WORKFLOW__ = {
+    activeDocumentPath: () => active.value.path,
+    activeDocumentText: () => active.value.text,
+    activeDocumentTitle: () => active.value.title,
+  };
+}
+
 onMounted(async () => {
   await store.boot();
   await bindNativeMenuCommands();
@@ -3067,6 +3088,7 @@ onMounted(async () => {
     await reportDesktopUiSmoke();
     await runDesktopWorkflowSmokeIfEnabled();
   });
+  void installDesktopWorkflowTestHooks();
   window.addEventListener("keydown", handleShortcut);
 });
 
@@ -3078,6 +3100,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(autoSnapshotHandle);
   window.clearTimeout(scrollPersistHandle);
   window.removeEventListener("keydown", handleShortcut);
+  delete window.__NEDITOR_DESKTOP_WORKFLOW__;
   unlistenNativeMenuCommand?.();
   unlistenNativeMenuCommand = null;
   stopDocsLiveDictation();

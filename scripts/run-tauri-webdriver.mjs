@@ -101,6 +101,8 @@ const outlineModeEvidenceScript = `
 
 const editorDocumentTextFunction = `
   function editorDocumentText() {
+    const hookText = window.__NEDITOR_DESKTOP_WORKFLOW__?.activeDocumentText?.();
+    if (typeof hookText === 'string') return hookText;
     const candidates = [...document.querySelectorAll('.cm-editor, .cm-content')];
     for (const node of candidates) {
       let cmView = node.cmView;
