@@ -1090,6 +1090,8 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("native-workflow-file.md"));
   ok(script.includes("native-workflow-renamed.md"));
   ok(script.includes("native-workflow-duplicate.md"));
+  ok(script.includes("activateDocumentTabByPath(session, \"native-workflow-duplicate.md\")"));
+  ok(script.includes("data-document-path"));
   ok(script.includes("native-workflow-export.html"));
   ok(script.includes("desktop WebDriver edits document structure in outline mode"));
   ok(script.includes("outlineArtifacts"));
@@ -1126,8 +1128,13 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("native workflow exported html from native menu command"));
   ok(script.includes("native workflow restored workspace tabs with active pinned and scroll state"));
   const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes(":data-document-path=\"document.path || ''\""));
   ok(app.includes("syncingEditorFromStore"));
   ok(app.includes("syncEditorViewFromActiveDocument"));
+  ok(app.includes("previewTextCommit.cancel();\n  store.updateText(lines.join"));
+  ok(app.includes("const text = editorView?.state.doc.toString() ?? active.value.text"));
+  ok(app.includes("previewTextCommit.cancel();\n  store.updateText(`${before}${prefix}${block}${suffix}${after}`);"));
+  ok(app.includes("void nextTick(() => syncEditorViewFromActiveDocument())"));
   ok(app.includes("[\"split\", \"source\", \"focus\"].includes(mode)"));
 });
 

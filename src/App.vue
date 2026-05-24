@@ -43,6 +43,8 @@
             :key="document.id"
             class="tab"
             :class="{ active: document.id === store.activeId }"
+            :title="document.path || document.title"
+            :data-document-path="document.path || ''"
             draggable="true"
             @dragstart="draggedTabId = document.id"
             @dragend="draggedTabId = ''"
@@ -5548,8 +5550,10 @@ function sectionEndLineIndex(heading: OutlineModeHeading, lines: string[]) {
 }
 
 function applyOutlineModeText(lines: string[], statusMessage: string) {
+  previewTextCommit.cancel();
   store.updateText(lines.join("\n").replace(/\n{4,}/g, "\n\n\n"));
   store.statusMessage = statusMessage;
+  void nextTick(() => syncEditorViewFromActiveDocument());
 }
 
 function renameOutlineHeading(heading: OutlineModeHeading, title: string) {
@@ -6787,14 +6791,16 @@ function cancelTableDraft() {
 }
 
 function insertTableAtCursor(lines: string[]) {
-  const text = active.value.text;
+  const text = editorView?.state.doc.toString() ?? active.value.text;
   const position = editorView?.state.selection.main.to ?? text.length;
   const before = text.slice(0, position);
   const after = text.slice(position);
   const block = lines.join("\n");
   const prefix = !before ? "" : before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
   const suffix = !after ? "\n" : after.startsWith("\n") ? "\n" : "\n\n";
+  previewTextCommit.cancel();
   store.updateText(`${before}${prefix}${block}${suffix}${after}`);
+  void nextTick(() => syncEditorViewFromActiveDocument());
 }
 
 function addTableRow() {

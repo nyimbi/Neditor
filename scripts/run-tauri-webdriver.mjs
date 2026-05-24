@@ -591,20 +591,21 @@ async function assertRenameDuplicateRevealWorkflow(session) {
     return true;
   `);
   await waitForPathExists(workflowDuplicatePath, "duplicated real Markdown file artifact");
-  await activateDocumentTab(session, "native-workflow-duplicate");
+  await activateDocumentTabByPath(session, "native-workflow-duplicate.md");
   const duplicated = await waitForValue(
     session,
     `
       return {
         title: document.title,
         tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+        activePath: document.querySelector('.document-tabs .tab.active')?.getAttribute('data-document-path') || '',
         status: document.querySelector('.status-bar')?.textContent || '',
         editor: document.querySelector('.cm-content')?.textContent || '',
       };
     `,
     (value) =>
       !String(value?.title || "").startsWith("* ") &&
-      String(value?.tab || "").includes("native-workflow-duplicate") &&
+      String(value?.activePath || "").replace(/\\/g, "/").includes("native-workflow-duplicate.md") &&
       String(value?.editor || "").trim().length > 20,
     "duplicated real Markdown file",
   );
@@ -871,6 +872,36 @@ async function activateDocumentTab(session, labelFragment) {
     `,
     (value) => value?.found === true && String(value?.active || "").includes(labelFragment),
     `${labelFragment} document tab activation`,
+  );
+}
+
+async function activateDocumentTabByPath(session, pathFragment) {
+  await waitForValue(
+    session,
+    `
+      const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const normalizedPath = (value) => normalized(value).replace(/\\\\/g, '/');
+      const target = [...document.querySelectorAll('.document-tabs .tab')].find((item) => normalizedPath(item.getAttribute('data-document-path')).includes(${JSON.stringify(pathFragment)}));
+      if (!target) {
+        return {
+          found: false,
+          active: normalized(document.querySelector('.document-tabs .tab.active')?.textContent || ''),
+          activePath: normalizedPath(document.querySelector('.document-tabs .tab.active')?.getAttribute('data-document-path') || ''),
+          tabs: [...document.querySelectorAll('.document-tabs .tab')].map((item) => ({
+            label: normalized(item.textContent),
+            path: normalizedPath(item.getAttribute('data-document-path') || ''),
+          })).slice(0, 10),
+        };
+      }
+      target.querySelector('.tab-main')?.click();
+      return {
+        found: true,
+        active: normalized(document.querySelector('.document-tabs .tab.active')?.textContent || ''),
+        activePath: normalizedPath(document.querySelector('.document-tabs .tab.active')?.getAttribute('data-document-path') || ''),
+      };
+    `,
+    (value) => value?.found === true && String(value?.activePath || "").includes(pathFragment),
+    `${pathFragment} document tab activation`,
   );
 }
 
