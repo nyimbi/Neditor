@@ -213,5 +213,5 @@ function gitTreeState() {
 
 function allowedPlatformBuildDirtyEntry(entry) {
   const path = entry.replace(/^.. /, "").replaceAll("\\", "/");
-  return platform === "win32" && path === "src-tauri/Cargo.lock";
+  return platform === "win32" && ["src-tauri/Cargo.lock", "src-tauri/Cargo.toml"].includes(path);
 }
