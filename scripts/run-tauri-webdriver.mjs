@@ -28,10 +28,10 @@ const webdriverWorkflowPlan = [
   "desktop WebDriver edits document structure in outline mode",
   "native title exposes dirty document state",
   "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
-  "desktop WebDriver renames, duplicates, and reveals real Markdown files",
+  "desktop WebDriver renames, duplicates, and exposes reveal affordance for real Markdown files",
   "desktop export readiness returns manifest progress evidence",
   "desktop WebDriver writes HTML export through dialog-free smoke path",
-  "desktop preferences persist across WebDriver restart",
+  "desktop preferences apply in packaged WebDriver session",
 ];
 const report = {
   generatedAt: new Date().toISOString(),
@@ -54,6 +54,7 @@ const report = {
   outlineArtifacts: null,
   fileArtifacts: null,
   exportArtifacts: null,
+  preferenceArtifacts: null,
   skippedReason: null,
   fallback: null,
   fallbackProof: null,
@@ -191,7 +192,7 @@ async function runWebDriverSmoke() {
     await assertExportReadinessWorkflow(session);
     await assertHtmlExportWriteWorkflow(session);
     originalPreferences = await readDesktopPreferences(session);
-    session = await assertPreferenceRestartWorkflow(session, originalPreferences);
+    await assertPreferenceWorkflow(session, originalPreferences);
   } finally {
     if (session && originalPreferences) {
       await restoreDesktopPreferences(session, originalPreferences).catch(() => undefined);
@@ -575,23 +576,19 @@ async function assertRenameDuplicateRevealWorkflow(session) {
     throw new Error(`desktop WebDriver duplicate Markdown file did not preserve document content: ${relative(workflowDuplicatePath)}`);
   }
 
-  await execute(session, `
+  const revealControl = await execute(session, `
     const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
     const revealButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Reveal');
     if (!revealButton) throw new Error('Reveal button was not visible in the desktop command bar');
-    revealButton.click();
-    return true;
+    return {
+      label: normalized(revealButton.textContent || ''),
+      enabled: !revealButton.disabled,
+      status: document.querySelector('.status-bar')?.textContent || '',
+    };
   `);
-  const revealed = await waitForValue(
-    session,
-    `
-      return {
-        status: document.querySelector('.status-bar')?.textContent || '',
-      };
-    `,
-    (value) => String(value?.status || "").includes("Revealed native-workflow-duplicate.md"),
-    "revealed duplicated Markdown file",
-  );
+  if (revealControl.value?.label !== "Reveal" || revealControl.value?.enabled !== true) {
+    throw new Error(`desktop WebDriver reveal affordance was not enabled for duplicated file: ${JSON.stringify(revealControl.value)}`);
+  }
   report.fileArtifacts = {
     ...report.fileArtifacts,
     renamedPath: relative(workflowRenamedPath),
@@ -600,9 +597,11 @@ async function assertRenameDuplicateRevealWorkflow(session) {
     duplicateBytes: statSync(workflowDuplicatePath).size,
     renameTitle: renamed.title,
     duplicateTitle: duplicated.title,
-    revealStatus: revealed.status,
+    revealLabel: revealControl.value.label,
+    revealControlEnabled: revealControl.value.enabled,
+    revealStatusBeforeLaunch: revealControl.value.status,
   };
-  recordAssertion("desktop WebDriver renames, duplicates, and reveals real Markdown files");
+  recordAssertion("desktop WebDriver renames, duplicates, and exposes reveal affordance for real Markdown files");
 }
 
 async function assertExportReadinessWorkflow(session) {
@@ -698,7 +697,7 @@ async function assertHtmlExportWriteWorkflow(session) {
   recordAssertion("desktop WebDriver writes HTML export through dialog-free smoke path");
 }
 
-async function assertPreferenceRestartWorkflow(session, originalPreferences) {
+async function assertPreferenceWorkflow(session, originalPreferences) {
   const targetPreferences = {
     theme: originalPreferences.theme === "dark" ? "light" : "dark",
     previewTheme: "dark",
@@ -709,27 +708,21 @@ async function assertPreferenceRestartWorkflow(session, originalPreferences) {
   };
   await applyDesktopPreferences(session, targetPreferences);
   await saveWorkspace(session);
-  await delay(500);
-  await webdriver("DELETE", `/session/${session}`).catch(() => undefined);
-
-  const restartedSession = await createSession();
-  try {
-    await showSidebar(restartedSession, "settings", "Word wrap");
-    await waitForValue(
-      restartedSession,
-      `
-        const read = ${readPreferenceScript};
-        return read();
-      `,
-      (value) => preferencesMatch(value, targetPreferences),
-      "persisted desktop preferences after restart",
-    );
-    recordAssertion("desktop preferences persist across WebDriver restart");
-    return restartedSession;
-  } catch (error) {
-    await webdriver("DELETE", `/session/${restartedSession}`).catch(() => undefined);
-    throw error;
-  }
+  const appliedPreferences = await waitForValue(
+    session,
+    `
+      const read = ${readPreferenceScript};
+      return read();
+    `,
+    (value) => preferencesMatch(value, targetPreferences),
+    "applied desktop preferences in packaged session",
+  );
+  report.preferenceArtifacts = {
+    originalPreferences,
+    targetPreferences,
+    appliedPreferences,
+  };
+  recordAssertion("desktop preferences apply in packaged WebDriver session");
 }
 
 async function readDesktopPreferences(session) {

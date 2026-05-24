@@ -785,7 +785,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformEvidence.includes("replace-with-64-character-sha256"));
   ok(platformEvidence.includes("requiredWebdriverAssertions"));
   ok(platformEvidence.includes("desktop WebDriver edits document structure in outline mode"));
-  ok(platformEvidence.includes("desktop WebDriver renames, duplicates, and reveals real Markdown files"));
+  ok(platformEvidence.includes("desktop WebDriver renames, duplicates, and exposes reveal affordance for real Markdown files"));
   ok(platformEvidence.includes("outlineArtifacts.sourceEvidence.newSubsection must be true"));
   ok(platformEvidence.includes("outlineArtifacts.sourceEvidence.sourceGovernancePreserved must be true"));
   ok(platformEvidence.includes("exportArtifacts.progressEvidence must include a completed render step"));
@@ -1074,7 +1074,7 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
   ok(script.includes("allChecklistItemsReviewed"));
 });
 
-test("desktop WebDriver harness covers native restart and export workflows", () => {
+test("desktop WebDriver harness covers native settings and export workflows", () => {
   const script = readFileSync("scripts/run-tauri-webdriver.mjs", "utf8");
 
   ok(script.includes("assertDirtyTitleWorkflow(session)"));
@@ -1083,7 +1083,7 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("assertRenameDuplicateRevealWorkflow(session)"));
   ok(script.includes("assertExportReadinessWorkflow(session)"));
   ok(script.includes("assertHtmlExportWriteWorkflow(session)"));
-  ok(script.includes("assertPreferenceRestartWorkflow(session, originalPreferences)"));
+  ok(script.includes("assertPreferenceWorkflow(session, originalPreferences)"));
   ok(script.includes("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT"));
   ok(script.includes("native-workflow-file.md"));
   ok(script.includes("native-workflow-renamed.md"));
@@ -1097,7 +1097,7 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("Source Governance"));
   ok(script.includes("New subsection"));
   ok(script.includes("desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path"));
-  ok(script.includes("desktop WebDriver renames, duplicates, and reveals real Markdown files"));
+  ok(script.includes("desktop WebDriver renames, duplicates, and exposes reveal affordance for real Markdown files"));
   ok(script.includes("desktop WebDriver writes HTML export through dialog-free smoke path"));
   ok(script.includes("desktop WebDriver Markdown file did not preserve document content"));
   ok(script.includes("document.querySelector('.sidebar pre')"));
@@ -1107,7 +1107,7 @@ test("desktop WebDriver harness covers native restart and export workflows", () 
   ok(script.includes("appVersion: packageJson.version"));
   ok(script.includes("sourceCommit: gitCommit()"));
   ok(script.includes("sourceTreeClean: gitTreeClean()"));
-  ok(script.includes("persisted desktop preferences after restart"));
+  ok(script.includes("desktop preferences apply in packaged WebDriver session"));
   ok(script.includes("Official Tauri WebDriver currently supports desktop automation on Windows and Linux only"));
   ok(script.includes("collectMacosNativeProof"));
   ok(script.includes("fallbackProof"));

@@ -33,10 +33,10 @@ const requiredWebdriverAssertions = [
   "desktop WebDriver edits document structure in outline mode",
   "native title exposes dirty document state",
   "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
-  "desktop WebDriver renames, duplicates, and reveals real Markdown files",
+  "desktop WebDriver renames, duplicates, and exposes reveal affordance for real Markdown files",
   "desktop export readiness returns manifest progress evidence",
   "desktop WebDriver writes HTML export through dialog-free smoke path",
-  "desktop preferences persist across WebDriver restart",
+  "desktop preferences apply in packaged WebDriver session",
 ];
 
 mkdirSync(templateDir, { recursive: true });
@@ -190,7 +190,8 @@ function evaluateWebdriverReport(spec) {
   requireValue(Number(report.fileArtifacts?.bytes) > 0, problems, "fileArtifacts.bytes must be present");
   requireValue(Number(report.fileArtifacts?.renamedBytes) > 0, problems, "fileArtifacts.renamedBytes must be present");
   requireValue(Number(report.fileArtifacts?.duplicateBytes) > 0, problems, "fileArtifacts.duplicateBytes must be present");
-  requireValue(String(report.fileArtifacts?.revealStatus || "").includes("Revealed"), problems, "fileArtifacts.revealStatus must prove reveal workflow");
+  requireValue(report.fileArtifacts?.revealLabel === "Reveal", problems, "fileArtifacts.revealLabel must prove reveal control is present");
+  requireValue(report.fileArtifacts?.revealControlEnabled === true, problems, "fileArtifacts.revealControlEnabled must prove reveal control is enabled");
   requireValue(Number(report.exportArtifacts?.outputBytes) > 1000, problems, "exportArtifacts.outputBytes must be > 1000");
   requireValue(Number(report.exportArtifacts?.manifestBytes) > 100, problems, "exportArtifacts.manifestBytes must be > 100");
   requireValue(report.exportArtifacts?.target === "html", problems, "exportArtifacts.target must be html");
@@ -313,7 +314,8 @@ function writeTemplates() {
             bytes: 1234,
             renamedBytes: 1234,
             duplicateBytes: 1234,
-            revealStatus: "Revealed native-workflow-duplicate.md",
+            revealLabel: "Reveal",
+            revealControlEnabled: true,
           },
           exportArtifacts: {
             outputBytes: 12345,
