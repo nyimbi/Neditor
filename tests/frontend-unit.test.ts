@@ -788,6 +788,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformEvidence.includes("desktop WebDriver renames, duplicates, and exposes reveal affordance for real Markdown files"));
   ok(platformEvidence.includes("outlineArtifacts.sourceEvidence.newSubsection must be true"));
   ok(platformEvidence.includes("outlineArtifacts.sourceEvidence.sourceGovernancePreserved must be true"));
+  ok(platformCollector.includes("/^[ MADRCU?!]{1,2}\\s+/"));
+  ok(platformCollector.includes('["src-tauri/Cargo.lock", "src-tauri/Cargo.toml"].includes(path)'));
   ok(platformEvidence.includes("exportArtifacts.progressEvidence must include a completed render step"));
   ok(platformCollector.includes("NEDITOR_PLATFORM_EVIDENCE_PLATFORM"));
   ok(platformCollector.includes("NEDITOR_PLATFORM_BUILD_COMMAND"));
@@ -1128,7 +1130,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   const smoke = readFileSync("scripts/check-desktop-smoke.mjs", "utf8");
 
   ok(app.includes("write_desktop_ui_smoke_report"));
-  ok(app.includes("desktop_workflow_smoke_enabled"));
+  ok(app.includes("desktop_workflow_smoke_autorun_enabled"));
   ok(app.includes("write_desktop_workflow_smoke_report"));
   ok(app.includes("desktop_workflow_smoke_file_path"));
   ok(app.includes("desktop_workflow_smoke_named_path"));
@@ -1208,6 +1210,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("previewLabel"));
   ok(rust.includes("fn write_desktop_ui_smoke_report"));
   ok(rust.includes("fn desktop_workflow_smoke_enabled"));
+  ok(rust.includes("fn desktop_workflow_smoke_autorun_enabled"));
   ok(rust.includes("fn desktop_workflow_smoke_named_path"));
   ok(rust.includes("fn write_desktop_workflow_smoke_report"));
   ok(rust.includes("fn emit_desktop_workflow_smoke_menu_command"));

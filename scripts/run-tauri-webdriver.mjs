@@ -160,6 +160,7 @@ async function runWebDriverSmoke() {
     env: {
       ...process.env,
       NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT: workflowReportPath,
+      NEDITOR_DESKTOP_WORKFLOW_DISABLE_AUTORUN: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

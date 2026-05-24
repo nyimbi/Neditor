@@ -160,6 +160,7 @@ pub fn run() {
             cleanup_ai_paste,
             write_desktop_ui_smoke_report,
             desktop_workflow_smoke_enabled,
+            desktop_workflow_smoke_autorun_enabled,
             desktop_workflow_smoke_file_path,
             desktop_workflow_smoke_named_path,
             desktop_workflow_smoke_export_path,
@@ -340,6 +341,12 @@ fn write_desktop_ui_smoke_report(payload: serde_json::Value) -> Result<(), Strin
 #[tauri::command]
 fn desktop_workflow_smoke_enabled() -> bool {
     std::env::var("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT").is_ok()
+}
+
+#[tauri::command]
+fn desktop_workflow_smoke_autorun_enabled() -> bool {
+    std::env::var("NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT").is_ok()
+        && std::env::var("NEDITOR_DESKTOP_WORKFLOW_DISABLE_AUTORUN").is_err()
 }
 
 #[tauri::command]

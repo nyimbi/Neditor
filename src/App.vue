@@ -3325,7 +3325,7 @@ async function reportDesktopUiSmoke() {
 }
 
 async function runDesktopWorkflowSmokeIfEnabled() {
-  const enabled = await invoke<boolean>("desktop_workflow_smoke_enabled").catch(() => false);
+  const enabled = await invoke<boolean>("desktop_workflow_smoke_autorun_enabled").catch(() => false);
   if (!enabled) return;
   desktopWorkflowSmokeActive.value = true;
 
