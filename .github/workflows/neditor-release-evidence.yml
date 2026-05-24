@@ -6,6 +6,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: neditor-release-evidence-${{ github.ref }}
   cancel-in-progress: false
@@ -63,10 +66,12 @@ jobs:
           - label: Windows
             os: windows-latest
             platform: win32
+            bundles: msi nsis
             artifact: neditor-platform-evidence-win32
           - label: Linux
             os: ubuntu-latest
             platform: linux
+            bundles: deb rpm appimage
             artifact: neditor-platform-evidence-linux
 
     steps:
@@ -114,7 +119,7 @@ jobs:
         run: pnpm run build
 
       - name: Build Tauri packages
-        run: pnpm tauri build --bundles all
+        run: pnpm tauri build --bundles ${{ matrix.bundles }}
 
       - name: Run Linux Tauri WebDriver workflow
         if: runner.os == 'Linux'
@@ -129,7 +134,7 @@ jobs:
       - name: Collect platform evidence
         env:
           NEDITOR_PLATFORM_EVIDENCE_PLATFORM: ${{ matrix.platform }}
-          NEDITOR_PLATFORM_BUILD_COMMAND: pnpm run build && pnpm tauri build --bundles all
+          NEDITOR_PLATFORM_BUILD_COMMAND: pnpm run build && pnpm tauri build --bundles ${{ matrix.bundles }}
         run: pnpm run collect:platform-evidence
 
       - name: Validate platform evidence contract
@@ -173,7 +178,12 @@ jobs:
       - name: Install system rendered review dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y poppler-utils
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            poppler-utils
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile

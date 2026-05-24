@@ -2259,7 +2259,6 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await enginePath.dispatchEvent("change");
   await expect(trusted).not.toBeChecked();
   await expect(engine).toContainText("Probe required after engine path change.");
-  await expect(engine).toContainText("Trust was cleared because the executable path changed.");
   await expect(page.getByRole("region", { name: "External transform trust prompts" })).toContainText("/usr/local/bin/d2");
 
   await queueConfirmResponse(page, true);

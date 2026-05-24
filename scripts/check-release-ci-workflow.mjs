@@ -35,6 +35,7 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "workflow_dispatch:", "workflow must be manually dispatchable");
   requireIncludes(workflow, "permissions:", "workflow must declare permissions");
   requireIncludes(workflow, "contents: read", "workflow must use read-only repository contents permission");
+  requireIncludes(workflow, "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24", "workflow must opt JavaScript actions into Node 24");
   requireIncludes(workflow, "browser-workflows:", "workflow must include browser workflow proof job");
   requireIncludes(workflow, "platform-proof:", "workflow must include platform proof job");
   requireIncludes(workflow, "rendered-export-review:", "workflow must include rendered export review job");
@@ -43,6 +44,8 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "windows-latest", "workflow must run Windows proof on windows-latest");
   requireIncludes(workflow, "platform: win32", "workflow matrix must include win32 platform");
   requireIncludes(workflow, "platform: linux", "workflow matrix must include linux platform");
+  requireIncludes(workflow, "bundles: msi nsis", "Windows proof must build supported Windows bundle targets");
+  requireIncludes(workflow, "bundles: deb rpm appimage", "Linux proof must build supported Linux bundle targets");
   requireIncludes(workflow, "pnpm exec playwright install --with-deps chromium", "browser job must install Chromium with host dependencies");
   requireIncludes(workflow, "pnpm run check:e2e-env", "browser job must run browser environment preflight");
   requireIncludes(workflow, "pnpm run test:e2e", "browser job must run full browser workflow suite");
@@ -52,7 +55,7 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "choco install selenium-chromium-edge-driver", "Windows job must install Edge WebDriver");
   requireIncludes(workflow, "MSEDGEDRIVER_TELEMETRY_OPTOUT", "Windows WebDriver job must opt out of EdgeDriver telemetry");
   requireIncludes(workflow, "pnpm run test:tauri-webdriver -- --strict", "Windows job must run strict WebDriver workflow");
-  requireIncludes(workflow, "pnpm tauri build --bundles all", "platform job must build all Tauri package targets");
+  requireIncludes(workflow, "pnpm tauri build --bundles ${{ matrix.bundles }}", "platform job must build matrix-supported Tauri package targets");
   requireIncludes(workflow, "NEDITOR_PLATFORM_EVIDENCE_PLATFORM: ${{ matrix.platform }}", "platform job must set evidence platform");
   requireIncludes(workflow, "pnpm run collect:platform-evidence", "platform job must collect validator-ready evidence");
   requireIncludes(workflow, "pnpm run check:platform-evidence", "platform job must validate collected evidence");
@@ -63,6 +66,7 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "src-tauri/target/release/bundle/**", "built package artifacts must be uploaded for inspection");
   requireIncludes(workflow, "pnpm run test:rendered-exports", "rendered export job must run the rendered export audit");
   requireIncludes(workflow, "poppler-utils", "rendered export job must install Poppler proof tools");
+  requireIncludes(workflow, "libwebkit2gtk-4.1-dev", "rendered export job must install Tauri Linux build libraries");
   requireIncludes(workflow, ".tmp/rendered-export-audit/**", "rendered export review package must be uploaded");
   requireIncludes(workflow, "pnpm run check:a11y", "accessibility job must run static accessibility checks");
   requireIncludes(workflow, "pnpm run check:a11y:runtime", "accessibility job must run runtime accessibility checks");

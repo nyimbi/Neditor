@@ -452,6 +452,7 @@ function buildDocsLiveReviewPacket(
     "Final export should remain blocked until unresolved facts, figures, citations, and assumptions are checked.",
   ];
   const humanizationChecklist = [
+    "Remove AI cruft: prompt echoes, generic setup phrases, unsupported confidence, and padded transitions.",
     "Replace prompt-shaped phrasing with natural subject-matter-owner language.",
     "Cut repeated framing, unsupported certainty, filler adjectives, and generic transition sentences.",
     "Add named people, teams, sources, dates, calculations, or examples wherever the draft sounds abstract.",
