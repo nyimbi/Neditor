@@ -147,3 +147,91 @@ jobs:
             .tmp/platform-evidence/report.json
             .tmp/desktop-webdriver/report.json
             src-tauri/target/release/bundle/**
+
+  rendered-export-review:
+    name: Rendered export review package
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system rendered review dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium with host dependencies
+        run: PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install --with-deps chromium
+
+      - name: Run rendered export audit
+        run: pnpm run test:rendered-exports
+
+      - name: Upload rendered export review package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neditor-rendered-export-review-package
+          if-no-files-found: error
+          path: |
+            .tmp/rendered-export-audit/**
+
+  accessibility-review:
+    name: Accessibility review package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium with host dependencies
+        run: PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install --with-deps chromium
+
+      - name: Run static accessibility checks
+        run: pnpm run check:a11y
+
+      - name: Run runtime accessibility workflows
+        run: pnpm run check:a11y:runtime
+
+      - name: Generate manual accessibility review contract
+        run: pnpm run check:a11y:manual
+
+      - name: Upload accessibility review package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neditor-accessibility-review-package
+          if-no-files-found: error
+          path: |
+            .tmp/accessibility/**

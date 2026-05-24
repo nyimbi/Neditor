@@ -394,10 +394,12 @@ accepted.
 `pnpm run check:release-ci` verifies that
 `.github/workflows/neditor-release-evidence.yml` remains wired to run the
 browser workflow suite on Ubuntu plus strict Windows/Linux Tauri WebDriver and
-package evidence collection. Trigger that workflow manually when release
-readiness needs supported-host proof, then download the uploaded evidence
-artifacts and import them locally with `pnpm run ingest:evidence -- --source
-/path/to/unpacked-artifacts`.
+package evidence collection. It also uploads rendered export and accessibility
+review packages containing the dashboards, templates, reports, screenshots, and
+manual sign-off contracts needed by human reviewers. Trigger that workflow
+manually when release readiness needs supported-host proof, then download the
+uploaded evidence artifacts and import returned completed sign-offs locally with
+`pnpm run ingest:evidence -- --source /path/to/unpacked-artifacts`.
 
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`

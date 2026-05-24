@@ -37,6 +37,8 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "contents: read", "workflow must use read-only repository contents permission");
   requireIncludes(workflow, "browser-workflows:", "workflow must include browser workflow proof job");
   requireIncludes(workflow, "platform-proof:", "workflow must include platform proof job");
+  requireIncludes(workflow, "rendered-export-review:", "workflow must include rendered export review job");
+  requireIncludes(workflow, "accessibility-review:", "workflow must include accessibility review job");
   requireIncludes(workflow, "ubuntu-latest", "workflow must run Linux proof on ubuntu-latest");
   requireIncludes(workflow, "windows-latest", "workflow must run Windows proof on windows-latest");
   requireIncludes(workflow, "platform: win32", "workflow matrix must include win32 platform");
@@ -59,6 +61,13 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, ".tmp/platform-evidence/external/${{ matrix.platform }}/package-artifacts.json", "package evidence must be uploaded");
   requireIncludes(workflow, ".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json", "WebDriver evidence must be uploaded");
   requireIncludes(workflow, "src-tauri/target/release/bundle/**", "built package artifacts must be uploaded for inspection");
+  requireIncludes(workflow, "pnpm run test:rendered-exports", "rendered export job must run the rendered export audit");
+  requireIncludes(workflow, "poppler-utils", "rendered export job must install Poppler proof tools");
+  requireIncludes(workflow, ".tmp/rendered-export-audit/**", "rendered export review package must be uploaded");
+  requireIncludes(workflow, "pnpm run check:a11y", "accessibility job must run static accessibility checks");
+  requireIncludes(workflow, "pnpm run check:a11y:runtime", "accessibility job must run runtime accessibility checks");
+  requireIncludes(workflow, "pnpm run check:a11y:manual", "accessibility job must generate the manual accessibility contract");
+  requireIncludes(workflow, ".tmp/accessibility/**", "accessibility review package must be uploaded");
   if (/\t/.test(workflow)) issues.push("workflow must not contain tab indentation");
 }
 

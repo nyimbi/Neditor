@@ -847,8 +847,12 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCi.includes("neditor.release-ci-workflow-report.v1"));
   ok(releaseCi.includes("browser-workflows:"));
   ok(releaseCi.includes("platform-proof:"));
+  ok(releaseCi.includes("rendered-export-review:"));
+  ok(releaseCi.includes("accessibility-review:"));
   ok(releaseCi.includes("xvfb-run -a pnpm run test:tauri-webdriver -- --strict"));
   ok(releaseCi.includes(".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json"));
+  ok(releaseCi.includes(".tmp/rendered-export-audit/**"));
+  ok(releaseCi.includes(".tmp/accessibility/**"));
   ok(releaseWorkflow.includes("name: NEditor Release Evidence"));
   ok(releaseWorkflow.includes("workflow_dispatch:"));
   ok(releaseWorkflow.includes("Browser workflow proof"));
@@ -863,6 +867,14 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseWorkflow.includes("MSEDGEDRIVER_TELEMETRY_OPTOUT"));
   ok(releaseWorkflow.includes("pnpm run collect:platform-evidence"));
   ok(releaseWorkflow.includes("pnpm run check:platform-evidence"));
+  ok(releaseWorkflow.includes("Rendered export review package"));
+  ok(releaseWorkflow.includes("poppler-utils"));
+  ok(releaseWorkflow.includes("pnpm run test:rendered-exports"));
+  ok(releaseWorkflow.includes("neditor-rendered-export-review-package"));
+  ok(releaseWorkflow.includes("Accessibility review package"));
+  ok(releaseWorkflow.includes("pnpm run check:a11y:runtime"));
+  ok(releaseWorkflow.includes("pnpm run check:a11y:manual"));
+  ok(releaseWorkflow.includes("neditor-accessibility-review-package"));
 });
 
 test("runtime accessibility audit executes focused browser workflows", () => {
