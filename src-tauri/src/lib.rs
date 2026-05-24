@@ -286,9 +286,36 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .item(&menu_item(app, "neditor-clean-ai-paste", "Clean AI Paste")?)
         .build()?;
 
+    let help_menu = SubmenuBuilder::new(app, "Help")
+        .item(&menu_item(app, "neditor-open-help", "NEditor Help Center")?)
+        .separator()
+        .item(&menu_item(
+            app,
+            "neditor-help-getting-started",
+            "Getting Started",
+        )?)
+        .item(&menu_item(app, "neditor-help-docs-live", "Docs Live")?)
+        .item(&menu_item(
+            app,
+            "neditor-help-exports",
+            "Export and Publishing",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-help-shortcuts",
+            "Keyboard Shortcuts",
+        )?)
+        .build()?;
+
     Menu::with_items(
         app,
-        &[&file_menu, &edit_menu, &view_menu, &writing_tools_menu],
+        &[
+            &file_menu,
+            &edit_menu,
+            &view_menu,
+            &writing_tools_menu,
+            &help_menu,
+        ],
     )
 }
 

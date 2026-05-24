@@ -440,7 +440,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       "/ignored.md": "not-a-position",
     },
     mode: "outline",
-    sidebar: "settings",
+    sidebar: "help",
     transformEnginePaths: { dot: "/usr/bin/dot", bad: 10 },
     trustedTransformEngines: { dot: true, bad: "yes" },
     disabledTransformEngines: { d2: true, dot: false, bad: "no" },
@@ -543,7 +543,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.activePath, "/b.md");
   deepEqual(migrated.scrollPositions, { "/a.md": { editor: 1, preview: 0 } });
   equal(migrated.mode, "outline");
-  equal(migrated.sidebar, "settings");
+  equal(migrated.sidebar, "help");
   deepEqual(migrated.transformEnginePaths, { dot: "/usr/bin/dot" });
   deepEqual(migrated.trustedTransformEngines, { dot: true });
   deepEqual(migrated.disabledTransformEngines, { d2: true, dot: false });
@@ -613,6 +613,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Collapse all toolbars"));
   ok(app.includes("Expand all toolbars"));
   ok(app.includes("toggleToolbarRow"));
+  ok(app.includes("Help Center"));
+  ok(app.includes('aria-label="Help center"'));
+  ok(app.includes("filteredHelpTopics"));
+  ok(app.includes("Help: Docs Live"));
+  ok(app.includes("Help: Export and publishing"));
+  ok(app.includes("openHelp(\"keyboard-shortcuts\")"));
   ok(app.includes("Docs Live"));
   ok(app.includes("openDocsLiveFromOutline"));
   ok(app.includes("openDocsLiveFromDocumentOutline"));
@@ -654,11 +660,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Export")'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Edit")'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "View")'));
+  ok(tauriLib.includes('SubmenuBuilder::new(app, "Help")'));
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
   ok(tauriLib.includes('"neditor-open-docs-live", "Docs Live"'));
+  ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
+  ok(tauriLib.includes('"neditor-help-exports",'));
   ok(tauriLib.includes('"neditor-mode-outline", "Outline Mode"'));
   ok(app.includes('case "neditor-mode-export"'));
   ok(app.includes('case "neditor-mode-outline"'));
+  ok(app.includes('case "neditor-open-help"'));
   ok(tauriLib.includes('app.emit("neditor-menu-command", id)'));
   ok(app.includes("commandToolbarRows"));
   ok(app.includes("command-toolbar-row"));
@@ -673,9 +683,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   for (const label of ["Document", "Manage", "Write", "Navigate", "Insert", "Review"]) {
     ok(app.includes(`label: "${label}"`), `missing ${label} command group`);
   }
-  for (const icon of ["saveAs", "snapshot", "templates", "equation", "outline", "fold", "unfold", "comment", "html", "mic", "collapse", "expand"]) {
+  for (const icon of ["saveAs", "snapshot", "templates", "equation", "outline", "fold", "unfold", "comment", "html", "mic", "help", "collapse", "expand"]) {
     ok(app.includes(`${icon}: [`), `missing ${icon} icon path`);
   }
+  ok(app.includes('value="help"'));
+  ok(store.includes('| "help"'));
   ok(app.includes('store.sidebar === \'templates\''));
   ok(store.includes("toolbarTextSize: 10"));
   ok(store.includes("toolbarCollapsedRows: []"));

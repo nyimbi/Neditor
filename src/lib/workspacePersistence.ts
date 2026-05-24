@@ -42,7 +42,18 @@ export type ExportTarget =
   | "latex"
   | "google-docs";
 export type WorkbenchMode = "split" | "source" | "preview" | "focus" | "outline" | "export" | "review" | "presentation";
-export type SidebarPanel = "files" | "outline" | "diagnostics" | "tables" | "templates" | "references" | "exports" | "versioning" | "review" | "settings";
+export type SidebarPanel =
+  | "files"
+  | "outline"
+  | "diagnostics"
+  | "tables"
+  | "templates"
+  | "references"
+  | "exports"
+  | "versioning"
+  | "review"
+  | "help"
+  | "settings";
 export type ThemePreference = "system" | "light" | "dark";
 export type ToolbarDisplay = "both" | "icons" | "text";
 export type TransformInputMode = "stdin" | "file";
@@ -447,7 +458,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (mode) migrated.mode = mode;
   const sidebar = enumValue(
     raw.sidebar,
-    ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "settings"] as const,
+    ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "help", "settings"] as const,
   );
   if (sidebar) migrated.sidebar = sidebar;
   migrated.transformEnginePaths = stringRecord(raw.transformEnginePaths);

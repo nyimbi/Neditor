@@ -1325,6 +1325,26 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.locator(".sidebar").getByRole("heading", { name: "Outline" })).toBeVisible();
 });
 
+test("offers searchable contextual help with workflow actions", async ({ page }) => {
+  await page.getByLabel("Sidebar panel").selectOption("help");
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Help Center" })).toBeVisible();
+  await expect(page.locator(".help-quick-actions").getByRole("button", { name: "Docs Live" })).toBeVisible();
+  await expect(page.getByLabel("Selected help topic").getByText("Create, open, save, and orient yourself in the writing workspace.")).toBeVisible();
+
+  await page.getByLabel("Search help").fill("substack");
+  await expect(page.getByRole("button", { name: /Export and publishing/ })).toBeVisible();
+  await page.getByRole("button", { name: /Export and publishing/ }).click();
+  await expect(page.getByLabel("Selected help topic").getByText(/Markdown bundles, blog packages, Substack/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Export panel" }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Export" })).toBeVisible();
+
+  await page.locator(".command-bar").getByRole("button", { name: "Help" }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("help");
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Help Center" })).toBeVisible();
+});
+
 test("exposes keyboard skip links to primary workbench regions", async ({ page }) => {
   for (const [linkName, targetSelector] of [
     ["Skip to commands", "#main-commands"],

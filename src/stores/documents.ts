@@ -336,6 +336,7 @@ export const useDocumentsStore = defineStore("documents", {
       | "exports"
       | "versioning"
       | "review"
+      | "help"
       | "settings",
     theme: "system" as "system" | "light" | "dark",
     previewTheme: "match" as PreviewTheme,
@@ -511,7 +512,9 @@ export const useDocumentsStore = defineStore("documents", {
         }
         if (
           persisted.sidebar &&
-          ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "settings"].includes(persisted.sidebar)
+          ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "help", "settings"].includes(
+            persisted.sidebar,
+          )
         ) {
           this.sidebar = persisted.sidebar;
         }

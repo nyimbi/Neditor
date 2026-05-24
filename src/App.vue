@@ -167,6 +167,7 @@
             <option value="exports">Exports</option>
             <option value="versioning">Versioning</option>
             <option value="review">Review</option>
+            <option value="help">Help</option>
             <option value="settings">Settings</option>
           </select>
         </label>
@@ -1170,6 +1171,67 @@
           </article>
         </template>
 
+        <template v-else-if="store.sidebar === 'help'">
+          <h2>Help Center</h2>
+          <section class="help-center" aria-label="Help center">
+            <div class="help-controls">
+              <label>
+                Search help
+                <input v-model="helpQuery" type="search" placeholder="export, outline, voice, shortcut" />
+              </label>
+              <label>
+                Area
+                <select v-model="helpCategory">
+                  <option value="all">All areas</option>
+                  <option v-for="category in helpCategoryOptions" :key="category.id" :value="category.id">{{ category.label }}</option>
+                </select>
+              </label>
+            </div>
+            <div class="help-quick-actions" aria-label="Popular help actions">
+              <button type="button" @click="openHelp('getting-started')">Start</button>
+              <button type="button" @click="openHelp('docs-live')">Docs Live</button>
+              <button type="button" @click="openHelp('export-publishing')">Export</button>
+              <button type="button" @click="openHelp('keyboard-shortcuts')">Shortcuts</button>
+            </div>
+            <section class="help-topic-list" role="list" aria-label="Help topics">
+              <div v-for="topic in filteredHelpTopics" :key="topic.id" role="listitem">
+                <button
+                  class="help-topic-button"
+                  :class="{ active: topic.id === selectedHelpTopic?.id }"
+                  type="button"
+                  @click="selectHelpTopic(topic.id)"
+                >
+                  <strong>{{ topic.title }}</strong>
+                  <small>{{ topic.summary }}</small>
+                </button>
+              </div>
+            </section>
+            <p v-if="!filteredHelpTopics.length" class="sidebar-hint">No help topics matched that search.</p>
+            <article v-if="selectedHelpTopic" class="help-topic-detail" aria-label="Selected help topic">
+              <div class="help-topic-header">
+                <small>{{ helpCategoryLabel(selectedHelpTopic.category) }}</small>
+                <h3>{{ selectedHelpTopic.title }}</h3>
+                <p>{{ selectedHelpTopic.summary }}</p>
+              </div>
+              <p class="help-when">{{ selectedHelpTopic.when }}</p>
+              <ol class="help-steps">
+                <li v-for="step in selectedHelpTopic.steps" :key="step">{{ step }}</li>
+              </ol>
+              <ul class="help-tips">
+                <li v-for="tip in selectedHelpTopic.tips" :key="tip">{{ tip }}</li>
+              </ul>
+              <div class="help-action-row">
+                <button v-for="action in selectedHelpTopic.actions" :key="action.label" type="button" @click="runHelpAction(action)">
+                  {{ action.label }}
+                </button>
+              </div>
+              <div class="help-keywords" aria-label="Topic keywords">
+                <span v-for="keyword in selectedHelpTopic.keywords" :key="keyword">{{ keyword }}</span>
+              </div>
+            </article>
+          </section>
+        </template>
+
         <template v-else>
           <h2>Settings</h2>
           <label>
@@ -2065,6 +2127,9 @@ const customTemplateDraft = ref<CustomTransformTemplate>(blankCustomTransformTem
 const editingCustomTemplateId = ref("");
 const draggedTabId = ref("");
 const exportProfileName = ref("Client delivery");
+const helpQuery = ref("");
+const helpCategory = ref<"all" | HelpCategory>("all");
+const selectedHelpTopicId = ref("getting-started");
 
 type FigureCropPosition = "center" | "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -2143,6 +2208,25 @@ interface FigureListItem {
   source_file?: string | null;
 }
 
+type HelpCategory = "basics" | "writing" | "structure" | "content" | "review" | "export" | "settings";
+
+interface HelpTopicAction {
+  label: string;
+  run: () => unknown;
+}
+
+interface HelpTopic {
+  id: string;
+  title: string;
+  category: HelpCategory;
+  summary: string;
+  when: string;
+  steps: string[];
+  tips: string[];
+  actions: HelpTopicAction[];
+  keywords: string[];
+}
+
 interface TransformTrustPrompt {
   name: string;
   path: string;
@@ -2212,6 +2296,7 @@ type ToolbarIconName =
   | "unfold"
   | "collapse"
   | "expand"
+  | "help"
   | "html"
   | "pin"
   | "close";
@@ -2284,6 +2369,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   unfold: ["M5 7h14", "M5 12h14", "M5 17h14"],
   collapse: ["M7 9l5 5 5-5"],
   expand: ["M9 7l5 5-5 5"],
+  help: ["M9 9a3 3 0 1 1 5.4 1.8c-.7 1.1-2.4 1.5-2.4 3.2", "M12 18h.01", "M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z"],
   html: ["M8 8l-4 4 4 4", "M16 8l4 4-4 4", "M14 5l-4 14"],
   pin: ["M14 4l6 6-4 1-4 6-1 3-1-1-3-3-3-3-1-1 3-1 6-4z", "M9 15l-5 5"],
   close: ["M6 6l12 12", "M18 6L6 18"],
@@ -2708,6 +2794,307 @@ const customTemplateIsValid = computed(
   () => Boolean(customTemplateDraft.value.name.trim() && customTemplateDraft.value.transform.trim() && customTemplateDraft.value.body.trim()),
 );
 const customTemplateFillFields = computed(() => transformTemplateFillFields(customTemplateDraft.value));
+const helpCategoryOptions: { id: HelpCategory; label: string }[] = [
+  { id: "basics", label: "Basics" },
+  { id: "writing", label: "Writing" },
+  { id: "structure", label: "Structure" },
+  { id: "content", label: "Content blocks" },
+  { id: "review", label: "Review" },
+  { id: "export", label: "Export" },
+  { id: "settings", label: "Settings" },
+];
+const helpTopics = computed<HelpTopic[]>(() => [
+  {
+    id: "getting-started",
+    title: "Getting started",
+    category: "basics",
+    summary: "Create, open, save, and orient yourself in the writing workspace.",
+    when: "Use this when you are new to NEditor or returning to a document set after time away.",
+    steps: [
+      "Use New, Open, Save, and Save As from the File toolbar or File menu.",
+      "Open a folder when you want a file browser, recent files, and project-relative includes.",
+      "Use the View toolbar to choose Split, Source, Preview, Focus, Outline, Export, or Review mode.",
+      "Keep the sidebar on Outline while drafting, Exports while preparing delivery, or Help while learning a workflow.",
+    ],
+    tips: [
+      "Split view is best for normal writing because source and preview stay side by side.",
+      "Focus mode hides nonessential panes when you only need to write.",
+      "The status strip at the bottom reports saves, exports, diagnostics, and Docs Live progress.",
+    ],
+    actions: [
+      { label: "New document", run: () => store.newDocument() },
+      { label: "Open file", run: () => openDocument() },
+      { label: "Show outline", run: () => showOutline() },
+    ],
+    keywords: ["new", "open", "save", "workspace", "mode", "sidebar"],
+  },
+  {
+    id: "file-management",
+    title: "File and workspace management",
+    category: "basics",
+    summary: "Manage individual documents, folders, recent files, snapshots, and disk changes.",
+    when: "Use this when you need predictable document handling for business files and client deliverables.",
+    steps: [
+      "Save new documents with Save As so NEditor can track on-disk changes.",
+      "Use Open Folder to browse a working folder and keep includes close to the main document.",
+      "Use Rename, Duplicate, Reveal, Revert, and Snapshot from the File toolbar when managing versions.",
+      "Use recently closed and pinned tabs to recover work without hunting through folders.",
+    ],
+    tips: [
+      "Snapshots are useful before large AI-assisted rewrites or export cleanup passes.",
+      "NEditor warns when a watched file changes outside the app so you can resolve conflicts before saving.",
+    ],
+    actions: [
+      { label: "Open folder", run: () => openFolder() },
+      { label: "Save workspace", run: () => saveWorkspace() },
+      { label: "Show versioning", run: () => (store.sidebar = "versioning") },
+    ],
+    keywords: ["folder", "recent", "snapshot", "rename", "duplicate", "conflict"],
+  },
+  {
+    id: "editing-markdown",
+    title: "Writing and Markdown editing",
+    category: "writing",
+    summary: "Use rich toolbar commands while keeping the document portable Markdown.",
+    when: "Use this for everyday drafting, formatting, and source editing.",
+    steps: [
+      "Select text and use Bold, Italic, Code, Link, Heading, Fence, Table, Figure, Equation, or TOC.",
+      "Use Find and Replace for targeted edits across the current document.",
+      "Fold all sections when you want to reduce visual noise in a long Markdown file.",
+      "Use the command palette for commands that are not visible in the current toolbar layout.",
+    ],
+    tips: [
+      "Markdown source remains readable, so files stay usable in Git, docs pipelines, and plain text tools.",
+      "Line numbers and code folding can be toggled in Settings.",
+    ],
+    actions: [
+      { label: "Find and replace", run: () => runEditorCommand(openSearchPanel) },
+      { label: "Command palette", run: () => (commandPaletteOpen.value = true) },
+      { label: "Settings", run: () => (store.sidebar = "settings") },
+    ],
+    keywords: ["markdown", "format", "find", "replace", "fold", "toolbar"],
+  },
+  {
+    id: "outline-first",
+    title: "Outline-first drafting",
+    category: "structure",
+    summary: "Plan chapters, sections, subsections, and subsubsections before writing body text.",
+    when: "Use this when the structure matters before the prose, such as reports, proposals, policies, and board papers.",
+    steps: [
+      "Open the Outline sidebar to sketch a document plan using indented bullets or Markdown heading marks.",
+      "Create a document from the outline or append the outline to the current document.",
+      "Switch to Outline mode to CRUD the actual document headings without body text in the way.",
+      "Use Docs Live from the outline when you are ready to flesh out sections systematically.",
+    ],
+    tips: [
+      "Outline mode shows only chapter-level structure through subsubsections.",
+      "Use Add child and Add sibling to keep document hierarchy consistent.",
+    ],
+    actions: [
+      { label: "Plan outline", run: () => planDocumentOutline() },
+      { label: "Outline mode", run: () => (store.mode = "outline") },
+      { label: "Docs Live from outline", run: () => openDocsLiveFromOutline() },
+    ],
+    keywords: ["outline", "chapters", "sections", "plan", "CRUD", "structure"],
+  },
+  {
+    id: "docs-live",
+    title: "Docs Live voice drafting",
+    category: "writing",
+    summary: "Dictate the document type, context, outline, and placeholders, then generate a structured first draft.",
+    when: "Use this when you want NEditor to act as a thought partner and co-writer from spoken or typed context.",
+    steps: [
+      "Open Docs Live and choose the document type and drafting depth.",
+      "Load the current document outline or paste a planned outline.",
+      "Dictate or type context, placeholders, constraints, and known facts.",
+      "Generate the draft, review the section runbook, then insert or append the result.",
+    ],
+    tips: [
+      "Docs Live creates a questionnaire when the context is thin so missing details are explicit.",
+      "Generated drafts include QA, humanization, and review preparation blocks so humans can audit them.",
+    ],
+    actions: [
+      { label: "Open Docs Live", run: () => openDocsLive() },
+      { label: "Load outline", run: () => loadDocsLiveOutlineFromDocument() },
+      { label: "Review panel", run: () => (store.sidebar = "review") },
+    ],
+    keywords: ["voice", "dictation", "AI", "draft", "questionnaire", "humanize"],
+  },
+  {
+    id: "tables-calculations-templates",
+    title: "Tables, calculations, and templates",
+    category: "content",
+    summary: "Insert structured tables, calculation blocks, and reusable business or scientific templates.",
+    when: "Use this for financial models, metrics tables, formulas, calculations, and repeatable transform snippets.",
+    steps: [
+      "Open Templates to browse built-in calculation and transform templates by category.",
+      "Use Create custom template for reusable organization-specific blocks.",
+      "Open the table editor to normalize pasted spreadsheet data before inserting it.",
+      "Run transforms after inserting calculation or external transform blocks.",
+    ],
+    tips: [
+      "Template fill fields show which placeholder values you need to replace.",
+      "External transform engines require trust before NEditor executes them.",
+    ],
+    actions: [
+      { label: "Open templates", run: () => openTransformTemplates() },
+      { label: "Open table editor", run: () => openTableEditor() },
+      { label: "Run transforms", run: () => store.compileActive() },
+    ],
+    keywords: ["calc", "tables", "templates", "transform", "formula", "spreadsheet"],
+  },
+  {
+    id: "references-citations",
+    title: "References, citations, glossary, and index",
+    category: "content",
+    summary: "Keep citations, bibliography entries, cross references, glossary terms, and index terms visible.",
+    when: "Use this when the document needs traceable sources, labeled figures, terms, or formal references.",
+    steps: [
+      "Open References to inspect resolved and missing citations.",
+      "Add bibliography, glossary, index, list of figures, and list of tables snippets when needed.",
+      "Use cross reference diagnostics to find broken labels before export.",
+      "Choose citation style defaults in Settings for repeat exports.",
+    ],
+    tips: [
+      "Missing citation keys are easier to fix before the export readiness pass.",
+      "Glossary and index output can be included or excluded in export defaults.",
+    ],
+    actions: [
+      { label: "Open references", run: () => (store.sidebar = "references") },
+      { label: "Insert bibliography", run: () => insertBlock(bibliographySnippet) },
+      { label: "Citation settings", run: () => (store.sidebar = "settings") },
+    ],
+    keywords: ["citation", "bibliography", "glossary", "index", "cross reference"],
+  },
+  {
+    id: "review-provenance",
+    title: "Review, comments, and AI provenance",
+    category: "review",
+    summary: "Track review comments, change notes, release status, and human review of AI-assisted sections.",
+    when: "Use this before handing a document to reviewers, clients, managers, or compliance stakeholders.",
+    steps: [
+      "Open Review to see unresolved comments, release state, change notes, and AI provenance.",
+      "Insert review comments or change notes directly into the Markdown source.",
+      "Mark AI sources and AI-assisted sections as human reviewed after checking the content.",
+      "Run AI Paste cleanup for text copied from chat tools before it enters the document.",
+    ],
+    tips: [
+      "Review metadata travels with the Markdown, so provenance does not depend on local app state.",
+      "Export options can include comments and AI provenance when an audit trail is required.",
+    ],
+    actions: [
+      { label: "Review panel", run: () => (store.sidebar = "review") },
+      { label: "Clean AI paste", run: () => openAiPaste() },
+      { label: "Insert AI source", run: () => insertBlock(aiSnippet) },
+    ],
+    keywords: ["review", "comment", "provenance", "AI source", "approval", "human reviewed"],
+  },
+  {
+    id: "export-publishing",
+    title: "Export and publishing",
+    category: "export",
+    summary: "Prepare and export HTML, PDF, DOCX, PPTX, Markdown bundles, blog packages, Substack, LaTeX, and Google Docs packages.",
+    when: "Use this when the document needs to leave NEditor as a deliverable or publishing package.",
+    steps: [
+      "Open Exports and choose the target format.",
+      "Set delivery options such as HTML language, canonical URL, layout preset, comments, provenance, glossary, and agenda.",
+      "Run Prepare for export to see readiness diagnostics before generating files.",
+      "Save export profiles for client, internal, blog, Substack, LaTeX, or Google Docs delivery settings.",
+    ],
+    tips: [
+      "Prepare for export is the safest first step when a document has references, figures, transforms, or layout directives.",
+      "Export profiles reduce repeated setup for business users who publish the same way each week.",
+    ],
+    actions: [
+      { label: "Export panel", run: () => (store.sidebar = "exports") },
+      { label: "Prepare export", run: () => prepareForExport() },
+      { label: "Export HTML", run: () => exportDocumentAs("html") },
+    ],
+    keywords: ["html", "pdf", "docx", "pptx", "blog", "substack", "latex", "google docs"],
+  },
+  {
+    id: "keyboard-shortcuts",
+    title: "Keyboard shortcuts",
+    category: "settings",
+    summary: "Use common shortcuts for save, open, new, export, formatting, and command discovery.",
+    when: "Use this when you want to move quickly without relying on toolbar visibility.",
+    steps: [
+      "Use Cmd or Ctrl plus S to save, Shift plus Cmd or Ctrl plus S for Save As.",
+      "Use Cmd or Ctrl plus O to open, N for new, E for export, B for bold, and I for italic.",
+      "Use Cmd or Ctrl plus K, or Shift plus Cmd or Ctrl plus P, to open the command palette.",
+      "Use the View toolbar to collapse toolbar rows when you need more writing space.",
+    ],
+    tips: [
+      "The command palette is the fastest way to find actions while learning the app.",
+      "Toolbar text can be resized or hidden if you prefer icons only.",
+    ],
+    actions: [
+      { label: "Command palette", run: () => (commandPaletteOpen.value = true) },
+      { label: "Collapse toolbars", run: () => setAllCommandToolbarsCollapsed(true) },
+      { label: "Toolbar settings", run: () => (store.sidebar = "settings") },
+    ],
+    keywords: ["shortcut", "keyboard", "command palette", "collapse", "toolbar"],
+  },
+  {
+    id: "display-accessibility",
+    title: "Display and accessibility settings",
+    category: "settings",
+    summary: "Tune toolbar density, text size, theme, editor fonts, line height, and motion preferences.",
+    when: "Use this when the interface feels too dense, too large, too small, or visually uncomfortable.",
+    steps: [
+      "Choose icons and text, icons only, or text only for toolbar buttons.",
+      "Resize toolbar text and editor or preview fonts to match your workspace.",
+      "Toggle high contrast, reduced motion, word wrap, line numbers, and code folding.",
+      "Collapse toolbar rows when vertical screen space matters.",
+    ],
+    tips: [
+      "Icons plus text is clearest while learning; icons only saves the most space once commands are familiar.",
+      "Preview theme can match the app or stay fixed for export-like review.",
+    ],
+    actions: [
+      { label: "Open settings", run: () => (store.sidebar = "settings") },
+      { label: "Icons and text", run: () => (store.toolbarDisplay = "both") },
+      { label: "Icons only", run: () => (store.toolbarDisplay = "icons") },
+    ],
+    keywords: ["accessibility", "theme", "font", "toolbar", "text size", "contrast"],
+  },
+  {
+    id: "troubleshooting",
+    title: "Troubleshooting",
+    category: "basics",
+    summary: "Find diagnostics, export readiness problems, transform trust prompts, and external file conflicts.",
+    when: "Use this when preview, transforms, export, or saving does not behave as expected.",
+    steps: [
+      "Open Diagnostics to inspect compile errors and warnings.",
+      "Use Go to source from diagnostics whenever line information is available.",
+      "Run Prepare for export for delivery-specific checks.",
+      "Review transform trust prompts before enabling external renderers.",
+    ],
+    tips: [
+      "Most export issues are easiest to fix from readiness diagnostics rather than from the generated file.",
+      "If a file changed on disk, resolve the conflict before saving to avoid losing external edits.",
+    ],
+    actions: [
+      { label: "Diagnostics", run: () => (store.sidebar = "diagnostics") },
+      { label: "Prepare export", run: () => prepareForExport() },
+      { label: "Exports", run: () => (store.sidebar = "exports") },
+    ],
+    keywords: ["diagnostics", "error", "warning", "export readiness", "conflict", "trust"],
+  },
+]);
+const filteredHelpTopics = computed(() => {
+  const query = helpQuery.value.trim().toLowerCase();
+  return helpTopics.value.filter((topic) => {
+    if (helpCategory.value !== "all" && topic.category !== helpCategory.value) return false;
+    if (!query) return true;
+    return [topic.title, topic.summary, topic.when, ...topic.steps, ...topic.tips, ...topic.keywords].join(" ").toLowerCase().includes(query);
+  });
+});
+const selectedHelpTopic = computed(() => {
+  const selected = helpTopics.value.find((topic) => topic.id === selectedHelpTopicId.value);
+  if (selected && filteredHelpTopics.value.includes(selected)) return selected;
+  return filteredHelpTopics.value[0] || helpTopics.value[0] || null;
+});
 const commandBarGroups = computed<CommandBarGroup[]>(() => [
   {
     id: "document",
@@ -2780,6 +3167,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "ai-paste", label: "AI Paste", title: "Paste from AI chat", icon: "ai", run: () => openAiPaste() },
       { id: "comment", label: "Comment", title: "Insert review comment", icon: "comment", run: () => insertBlock(commentSnippet) },
       { id: "commands", label: "Commands", title: "Open command palette", icon: "commands", run: () => (commandPaletteOpen.value = true) },
+      { id: "help", label: "Help", title: "Open Help Center", icon: "help", run: () => openHelp() },
     ],
   },
 ]);
@@ -2818,6 +3206,21 @@ function toggleToolbarRow(id: string) {
 function setAllCommandToolbarsCollapsed(collapsed: boolean) {
   store.toolbarCollapsedRows = collapsed ? [...toolbarCollapseRowIds] : [];
 }
+function helpCategoryLabel(category: HelpCategory) {
+  return helpCategoryOptions.find((option) => option.id === category)?.label || "Help";
+}
+function selectHelpTopic(topicId: string) {
+  selectedHelpTopicId.value = topicId;
+}
+function openHelp(topicId = "getting-started") {
+  if (store.mode === "outline") store.mode = "split";
+  store.sidebar = "help";
+  selectedHelpTopicId.value = topicId;
+  store.statusMessage = "Opened Help Center";
+}
+function runHelpAction(action: HelpTopicAction) {
+  void action.run();
+}
 const commands = computed(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
@@ -2837,6 +3240,11 @@ const commands = computed(() => [
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
   { name: "Open Docs Live", group: "AI", run: () => openDocsLive() },
   { name: "Paste from AI chat", group: "AI", run: () => openAiPaste() },
+  { name: "Open Help Center", group: "Help", run: () => openHelp() },
+  { name: "Help: Getting started", group: "Help", run: () => openHelp("getting-started") },
+  { name: "Help: Docs Live", group: "Help", run: () => openHelp("docs-live") },
+  { name: "Help: Export and publishing", group: "Help", run: () => openHelp("export-publishing") },
+  { name: "Help: Keyboard shortcuts", group: "Help", run: () => openHelp("keyboard-shortcuts") },
   { name: "Run transforms", group: "Transforms", run: () => void store.compileActive() },
   { name: "Find and replace", group: "Edit", run: () => runEditorCommand(openSearchPanel) },
   { name: "Find next", group: "Edit", run: () => runEditorCommand(findNext) },
@@ -3062,6 +3470,21 @@ async function runNativeMenuCommand(command: string) {
       break;
     case "neditor-clean-ai-paste":
       openAiPaste();
+      break;
+    case "neditor-open-help":
+      openHelp();
+      break;
+    case "neditor-help-getting-started":
+      openHelp("getting-started");
+      break;
+    case "neditor-help-docs-live":
+      openHelp("docs-live");
+      break;
+    case "neditor-help-exports":
+      openHelp("export-publishing");
+      break;
+    case "neditor-help-shortcuts":
+      openHelp("keyboard-shortcuts");
       break;
   }
 }
@@ -7272,6 +7695,9 @@ select:hover {
 .app-shell[data-theme="dark"] .template-card,
 .app-shell[data-theme="dark"] .template-source,
 .app-shell[data-theme="dark"] .template-meta span,
+.app-shell[data-theme="dark"] .help-topic-button,
+.app-shell[data-theme="dark"] .help-topic-header small,
+.app-shell[data-theme="dark"] .help-keywords span,
 .app-shell[data-theme="dark"] .status-message,
 .app-shell[data-theme="dark"] .word-stats,
 .app-shell[data-theme="dark"] .watch-status,
@@ -7283,8 +7709,18 @@ select:hover {
 
 .app-shell[data-theme="dark"] .template-card-header small,
 .app-shell[data-theme="dark"] .template-fill-fields,
+.app-shell[data-theme="dark"] .help-topic-button small,
+.app-shell[data-theme="dark"] .help-topic-header p,
+.app-shell[data-theme="dark"] .help-when,
+.app-shell[data-theme="dark"] .help-tips,
 .app-shell[data-theme="dark"] .sidebar-hint {
   color: #aebdcc;
+}
+
+.app-shell[data-theme="dark"] .help-topic-button:hover,
+.app-shell[data-theme="dark"] .help-topic-button:focus-visible,
+.app-shell[data-theme="dark"] .help-topic-button.active {
+  background: #203247;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -7320,6 +7756,9 @@ select:hover {
   .app-shell[data-theme="system"] .template-card,
   .app-shell[data-theme="system"] .template-source,
   .app-shell[data-theme="system"] .template-meta span,
+  .app-shell[data-theme="system"] .help-topic-button,
+  .app-shell[data-theme="system"] .help-topic-header small,
+  .app-shell[data-theme="system"] .help-keywords span,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
   .app-shell[data-theme="system"] .watch-status,
@@ -7331,8 +7770,18 @@ select:hover {
 
   .app-shell[data-theme="system"] .template-card-header small,
   .app-shell[data-theme="system"] .template-fill-fields,
+  .app-shell[data-theme="system"] .help-topic-button small,
+  .app-shell[data-theme="system"] .help-topic-header p,
+  .app-shell[data-theme="system"] .help-when,
+  .app-shell[data-theme="system"] .help-tips,
   .app-shell[data-theme="system"] .sidebar-hint {
     color: #aebdcc;
+  }
+
+  .app-shell[data-theme="system"] .help-topic-button:hover,
+  .app-shell[data-theme="system"] .help-topic-button:focus-visible,
+  .app-shell[data-theme="system"] .help-topic-button.active {
+    background: #203247;
   }
 }
 
@@ -7353,6 +7802,9 @@ select:hover {
 .app-shell[data-high-contrast="true"] .template-card,
 .app-shell[data-high-contrast="true"] .template-source,
 .app-shell[data-high-contrast="true"] .template-meta span,
+.app-shell[data-high-contrast="true"] .help-topic-button,
+.app-shell[data-high-contrast="true"] .help-topic-header small,
+.app-shell[data-high-contrast="true"] .help-keywords span,
 .app-shell[data-high-contrast="true"] .status-message,
 .app-shell[data-high-contrast="true"] .word-stats,
 .app-shell[data-high-contrast="true"] .watch-status,
@@ -7367,7 +7819,8 @@ select:hover {
 }
 
 .app-shell[data-high-contrast="true"] .tab.active,
-.app-shell[data-high-contrast="true"] .file-row.active {
+.app-shell[data-high-contrast="true"] .file-row.active,
+.app-shell[data-high-contrast="true"] .help-topic-button.active {
   outline: 2px solid #000000;
   background: #fff6a3;
 }
@@ -8542,6 +8995,127 @@ select:hover {
 
 .export-target-options h3 {
   margin: 0;
+}
+
+.help-center {
+  display: grid;
+  gap: 12px;
+}
+
+.help-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.help-quick-actions,
+.help-action-row,
+.help-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.help-quick-actions button,
+.help-action-row button {
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+.help-topic-list {
+  display: grid;
+  gap: 6px;
+}
+
+.help-topic-button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #d8e0e8;
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+  background: #ffffff;
+  color: inherit;
+  text-align: left;
+}
+
+.help-topic-button:hover,
+.help-topic-button:focus-visible,
+.help-topic-button.active {
+  border-left-color: #2f6f9f;
+  background: #f1f6fb;
+}
+
+.help-topic-button strong,
+.help-topic-button small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.help-topic-button small {
+  color: #526171;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.help-topic-detail {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #d8e0e8;
+}
+
+.help-topic-header {
+  display: grid;
+  gap: 4px;
+}
+
+.help-topic-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.help-topic-header p,
+.help-when {
+  margin: 0;
+  color: #44566a;
+}
+
+.help-topic-header small {
+  width: fit-content;
+  padding: 2px 7px;
+  border: 1px solid #c7d5e5;
+  border-radius: 999px;
+  background: #f2f7fc;
+  color: #31516f;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.help-steps,
+.help-tips {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.help-steps li,
+.help-tips li {
+  line-height: 1.4;
+}
+
+.help-tips {
+  color: #526171;
+}
+
+.help-keywords span {
+  padding: 2px 6px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+  color: #44566a;
+  font-size: 11px;
 }
 
 .export-target-options label {
