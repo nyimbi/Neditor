@@ -77,6 +77,14 @@ The AI Agent Workspace converts that instruction into a visible plan:
 - runnable next steps that open Docs Live, AI Paste cleanup, Review, or Export
   readiness.
 
+Choose **Generate agent packet** when the instruction should become a reviewable
+artifact immediately. NEditor creates an auditable packet with AI provenance,
+the generated draft when creation or composition is requested, a
+selection-aware revision proposal when editing or revision is requested, QA
+gates, distribution gates, and blockers for missing inputs. **Apply agent
+output** uses the packet's safe apply mode: replace a new document, replace the
+selected text, or append a review packet to the current source.
+
 Use **AI Create** when the next action is clearly to create a first draft. It
 opens Docs Live with an intent-first workflow: document type, outline, spoken or
 typed context, placeholder values, AI-created questionnaire, section-by-section
@@ -240,6 +248,9 @@ NEditor is built for drafts that need evidence before publication.
   drafting plan, review packet, QA checks, humanization tasks, and reviewer
   handoff prompts. The review packet summarizes context sources, the section
   work queue, assumptions to verify, cleanup checks, and reviewer ownership.
+- Use Agent Workspace packets for multi-step document work that combines
+  drafting, revision, review, and distribution. The packet records blockers,
+  QA gates, and distribution gates before the output is accepted.
 - Use `ai-source` blocks and AI-assisted section metadata so generated content
   can be marked as needing review or human-reviewed.
 

@@ -1854,6 +1854,8 @@
         </label>
         <div class="agent-workspace-actions">
           <button type="submit">Plan agent workflow</button>
+          <button type="button" :disabled="!agentPlan" @click="generateAgentWorkspaceRun">Generate agent packet</button>
+          <button type="button" :disabled="!agentRun" @click="applyAgentWorkspaceRun">Apply agent output</button>
           <button type="button" :disabled="!agentPlan" @click="hydrateDocsLiveFromAgentPlan">Send to Docs Live</button>
           <button type="button" :disabled="!agentPlan" @click="runAgentPlanReview">Review readiness</button>
           <button type="button" :disabled="!agentPlan" @click="runAgentPlanDistribution">Distribution prep</button>
@@ -1900,6 +1902,36 @@
               <button type="button" @click="runAgenticStep(step)">Run step</button>
             </li>
           </ol>
+          <section v-if="agentRun" class="agent-run-output" aria-label="Agent generated output">
+            <header>
+              <div>
+                <strong>{{ agentRun.summary }}</strong>
+                <span>Apply mode: {{ agentRun.applicationMode }}</span>
+              </div>
+              <small>{{ agentRun.blockers.length }} blockers</small>
+            </header>
+            <section v-if="agentRun.blockers.length" class="agent-missing-inputs" aria-label="Agent run blockers">
+              <strong>Resolve before final release</strong>
+              <ul>
+                <li v-for="blocker in agentRun.blockers" :key="blocker">{{ blocker }}</li>
+              </ul>
+            </section>
+            <section class="agent-run-columns">
+              <article>
+                <h3>QA gates</h3>
+                <ul>
+                  <li v-for="item in agentRun.reviewChecklist" :key="item">{{ item }}</li>
+                </ul>
+              </article>
+              <article>
+                <h3>Distribution gates</h3>
+                <ul>
+                  <li v-for="item in agentRun.distributionChecklist" :key="item">{{ item }}</li>
+                </ul>
+              </article>
+            </section>
+            <textarea :value="agentRun.markdown" rows="12" readonly aria-label="Agent generated Markdown"></textarea>
+          </section>
         </section>
       </form>
     </section>
@@ -2093,7 +2125,13 @@ import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searc
 import { closeBrackets, closeBracketsKeymap, insertBracket } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
-import { buildAgenticWorkflowPlan, type AgenticWorkflowPlan, type AgenticWorkflowStep } from "./lib/agenticWorkflows";
+import {
+  buildAgenticWorkflowPlan,
+  buildAgenticWorkflowRun,
+  type AgenticWorkflowPlan,
+  type AgenticWorkflowRun,
+  type AgenticWorkflowStep,
+} from "./lib/agenticWorkflows";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import {
@@ -2212,6 +2250,7 @@ const aiPreviewSignature = ref("");
 const agentWorkspaceOpen = ref(false);
 const agentInstruction = ref("");
 const agentPlan = ref<AgenticWorkflowPlan | null>(null);
+const agentRun = ref<AgenticWorkflowRun | null>(null);
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const guidedDemoStepIndex = ref(0);
@@ -3537,7 +3576,40 @@ function buildAgentWorkspacePlan() {
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
   });
+  agentRun.value = null;
   store.statusMessage = `Planned ${agentPlan.value.steps.length} agent workflow steps`;
+}
+function generateAgentWorkspaceRun() {
+  flushEditorTextToStore();
+  if (!agentPlan.value) buildAgentWorkspacePlan();
+  agentRun.value = buildAgenticWorkflowRun({
+    instruction: agentInstruction.value,
+    documentTitle: active.value.compile?.semantic.title || active.value.title,
+    documentText: active.value.text,
+    selectedText: currentEditorSelectionText(),
+  });
+  store.statusMessage = `Generated agent packet for ${agentRun.value.plan.lanes.length} workflow lanes`;
+}
+function applyAgentWorkspaceRun() {
+  const run = agentRun.value;
+  if (!run) return;
+  if (run.applicationMode === "replace-selection" && editorView) {
+    const range = editorView.state.selection.main;
+    const replacement = run.revision?.proposedText || run.markdown;
+    editorView.dispatch({
+      changes: { from: range.from, to: range.to, insert: replacement },
+      selection: { anchor: range.from + replacement.length },
+    });
+    store.updateText(editorView.state.doc.toString());
+    editorView.focus();
+  } else if (run.applicationMode === "replace-document") {
+    store.updateText(run.markdown);
+  } else {
+    store.updateText(`${active.value.text.trimEnd()}\n\n${run.markdown}`);
+  }
+  store.sidebar = "review";
+  store.statusMessage = "Applied agent output for human review";
+  closeAgentWorkspace();
 }
 function hydrateDocsLiveFromAgentPlan() {
   const plan = agentPlan.value;
@@ -8188,6 +8260,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-missing-inputs,
 .app-shell[data-theme="dark"] .agent-step-list li,
 .app-shell[data-theme="dark"] .agent-missing-inputs li,
+.app-shell[data-theme="dark"] .agent-run-output,
+.app-shell[data-theme="dark"] .agent-run-columns article,
 .app-shell[data-theme="dark"] .status-message,
 .app-shell[data-theme="dark"] .word-stats,
 .app-shell[data-theme="dark"] .watch-status,
@@ -8209,6 +8283,9 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-plan > header span,
 .app-shell[data-theme="dark"] .agent-plan > header small,
 .app-shell[data-theme="dark"] .agent-step-list small,
+.app-shell[data-theme="dark"] .agent-run-output > header span,
+.app-shell[data-theme="dark"] .agent-run-output > header small,
+.app-shell[data-theme="dark"] .agent-run-columns ul,
 .app-shell[data-theme="dark"] .sidebar-hint {
   color: #aebdcc;
 }
@@ -8266,6 +8343,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-missing-inputs,
   .app-shell[data-theme="system"] .agent-step-list li,
   .app-shell[data-theme="system"] .agent-missing-inputs li,
+  .app-shell[data-theme="system"] .agent-run-output,
+  .app-shell[data-theme="system"] .agent-run-columns article,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
   .app-shell[data-theme="system"] .watch-status,
@@ -8287,6 +8366,9 @@ select:hover {
   .app-shell[data-theme="system"] .agent-plan > header span,
   .app-shell[data-theme="system"] .agent-plan > header small,
   .app-shell[data-theme="system"] .agent-step-list small,
+  .app-shell[data-theme="system"] .agent-run-output > header span,
+  .app-shell[data-theme="system"] .agent-run-output > header small,
+  .app-shell[data-theme="system"] .agent-run-columns ul,
   .app-shell[data-theme="system"] .sidebar-hint {
     color: #aebdcc;
   }
@@ -8329,6 +8411,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-missing-inputs,
 .app-shell[data-high-contrast="true"] .agent-step-list li,
 .app-shell[data-high-contrast="true"] .agent-missing-inputs li,
+.app-shell[data-high-contrast="true"] .agent-run-output,
+.app-shell[data-high-contrast="true"] .agent-run-columns article,
 .app-shell[data-high-contrast="true"] .status-message,
 .app-shell[data-high-contrast="true"] .word-stats,
 .app-shell[data-high-contrast="true"] .watch-status,
@@ -9797,7 +9881,9 @@ select:hover {
 
 .agent-plan-grid article,
 .agent-missing-inputs,
-.agent-step-list li {
+.agent-step-list li,
+.agent-run-output,
+.agent-run-columns article {
   padding: 10px;
   border: 1px solid #d8e0e8;
   background: #ffffff;
@@ -9856,6 +9942,54 @@ select:hover {
   color: #526171;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.agent-run-output {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #4f7f55;
+}
+
+.agent-run-output > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-run-output > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-run-output > header span,
+.agent-run-output > header small {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-run-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-run-columns article {
+  display: grid;
+  gap: 6px;
+}
+
+.agent-run-columns h3,
+.agent-run-columns ul {
+  margin: 0;
+}
+
+.agent-run-columns ul {
+  display: grid;
+  gap: 4px;
+  padding-left: 18px;
+  color: #2d3746;
+  font-size: 12px;
 }
 
 .export-target-options label {
@@ -10978,6 +11112,7 @@ select:hover {
   }
 
   .agent-plan-grid,
+  .agent-run-columns,
   .agent-step-list li {
     grid-template-columns: 1fr;
   }

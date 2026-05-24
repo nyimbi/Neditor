@@ -1354,6 +1354,10 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await agent.getByRole("button", { name: "Plan agent workflow" }).click();
   await expect(agent.getByLabel("Agent workflow plan")).toContainText("create -> revise -> review -> distribute");
   await expect(agent.getByLabel("Agent workflow steps")).toContainText("Prepare distribution");
+  await agent.getByRole("button", { name: "Generate agent packet" }).click();
+  await expect(agent.getByLabel("Agent generated output")).toContainText("Agent run prepared");
+  await expect(agent.getByLabel("Agent generated output")).toContainText("QA gates");
+  await expect(agent.getByLabel("Agent generated Markdown")).toHaveValue(/NEditor Agent Workspace/);
   await agent.getByRole("button", { name: "Send to Docs Live" }).click();
   await expect(page.getByRole("dialog", { name: "Docs Live voice drafting" })).toBeVisible();
   await page.getByRole("button", { name: "Close Docs Live" }).click();

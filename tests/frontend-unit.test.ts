@@ -8,7 +8,7 @@ import {
   isLatestDocumentTaskCurrent,
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
-import { buildAgenticWorkflowPlan } from "../src/lib/agenticWorkflows.js";
+import { buildAgenticWorkflowPlan, buildAgenticWorkflowRun } from "../src/lib/agenticWorkflows.js";
 import {
   bibliographyEntryStub,
   bibliographyStubsForMissingKeys,
@@ -373,6 +373,53 @@ test("agentic workflow planner coordinates creation revision review and distribu
   ok(plan.steps.some((step) => step.action === "prepare-export"));
 });
 
+test("agentic workflow run generates auditable creation and distribution packets", () => {
+  const run = buildAgenticWorkflowRun({
+    instruction:
+      "Create a proposal for Acme, compose it section by section, review evidence, and publish to Substack plus Google Docs. audience: executive committee owner: Growth deadline: June 1 evidence: CRM forecast",
+    documentTitle: "Acme Growth Proposal",
+    documentText: "",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  equal(run.applicationMode, "replace-document");
+  equal(run.revision, null);
+  ok(run.summary.includes("Create"));
+  ok(run.plan.distributionTargets.includes("substack"));
+  ok(run.plan.distributionTargets.includes("google-docs"));
+  ok(run.markdown.includes("provider: NEditor Agent Workspace"));
+  ok(run.markdown.includes("model: local-agentic-workflow"));
+  ok(run.markdown.includes("## Generated Draft"));
+  ok(run.markdown.includes("provider: NEditor Docs Live"));
+  ok(run.markdown.includes("## Quality Assurance"));
+  ok(run.markdown.includes("## Distribution"));
+  ok(run.distributionChecklist.some((item) => item.startsWith("substack:")));
+  ok(run.reviewChecklist.some((item) => item.includes("human-reviewed")));
+});
+
+test("agentic workflow run proposes selection-aware revisions with review metadata", () => {
+  const run = buildAgenticWorkflowRun({
+    instruction:
+      "Revise this for the CFO, make it concise, humanize the tone, then check risks. audience: finance committee owner: Strategy deadline: June 1 evidence: signed forecast",
+    documentTitle: "Expansion Options",
+    documentText: "# Expansion Options\n\nDraft body.",
+    selectedText:
+      "It is important to note that leveraging various growth opportunities can be robust. The plan increases ARR by 24%. This paragraph is too long.",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  equal(run.applicationMode, "replace-selection");
+  ok(run.revision);
+  ok(run.revision?.proposedText.includes("source=NEditor Agent Workspace"));
+  ok(run.revision?.proposedText.includes("Finance review focus"));
+  ok(!run.revision?.proposedText.includes("It is important to note"));
+  ok(!run.revision?.proposedText.includes("leveraging"));
+  ok(run.reviewChecklist.some((item) => item.includes("Compare the revision proposal")));
+  ok(run.markdown.includes("## Revision Proposal"));
+  ok(run.markdown.includes("### Original Text"));
+  ok(run.markdown.includes("### Proposed Text"));
+});
+
 test("preview debounce coalesces edits inside the spec timing budget", () => {
   ok(PREVIEW_DEBOUNCE_MS <= 100);
   const commits: string[] = [];
@@ -651,7 +698,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("guidedDemoSteps"));
   ok(app.includes("AI Agent Workspace"));
   ok(app.includes("buildAgenticWorkflowPlan"));
+  ok(app.includes("buildAgenticWorkflowRun"));
   ok(app.includes("agentPlan"));
+  ok(app.includes("agentRun"));
+  ok(app.includes("Generate agent packet"));
+  ok(app.includes("Apply agent output"));
+  ok(app.includes('aria-label="Agent generated output"'));
   ok(app.includes("AI-first document creation"));
   ok(app.includes("startAiDocumentCreation"));
   ok(app.includes('id: "ai-create", label: "AI Create"'));

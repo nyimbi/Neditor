@@ -1,4 +1,4 @@
-import { docsLiveDocumentTypes, normalizeDocsLiveDocumentType, type DocsLiveDocumentType } from "./docsLive.js";
+import { buildDocsLiveDraft, docsLiveDocumentTypes, normalizeDocsLiveDocumentType, type DocsLiveDocumentType } from "./docsLive.js";
 import { outlinePlanFromMarkdown } from "./documentOutline.js";
 import type { ExportTarget } from "./workspacePersistence.js";
 
@@ -41,6 +41,27 @@ export interface AgenticWorkflowPlan {
   distributionTargets: ExportTarget[];
   missingInputs: string[];
   steps: AgenticWorkflowStep[];
+}
+
+export interface AgenticWorkflowRunRequest extends AgenticWorkflowRequest {
+  generatedAt?: string;
+}
+
+export interface AgenticWorkflowRevision {
+  originalText: string;
+  proposedText: string;
+  changeSummary: string[];
+}
+
+export interface AgenticWorkflowRun {
+  plan: AgenticWorkflowPlan;
+  summary: string;
+  markdown: string;
+  applicationMode: "replace-document" | "replace-selection" | "append-packet";
+  revision: AgenticWorkflowRevision | null;
+  reviewChecklist: string[];
+  distributionChecklist: string[];
+  blockers: string[];
 }
 
 const exportSignals: Array<[ExportTarget, RegExp]> = [
@@ -106,6 +127,51 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
   };
 }
 
+export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): AgenticWorkflowRun {
+  const plan = buildAgenticWorkflowPlan(request);
+  const hasSelection = Boolean(request.selectedText?.trim());
+  const hasDocument = Boolean(request.documentText?.trim());
+  const revision = plan.lanes.some((lane) => lane === "edit" || lane === "revise") ? buildRevision(request, plan) : null;
+  const draft = plan.lanes.some((lane) => lane === "create" || lane === "compose")
+    ? buildDocsLiveDraft({
+        documentType: plan.documentType,
+        title: plan.title,
+        outline: plan.suggestedOutline,
+        context: plan.context,
+        questionnaireAnswers: plan.missingInputs.length
+          ? `Unresolved agent inputs:\n${plan.missingInputs.map((input) => `- ${input}`).join("\n")}`
+          : "",
+        placeholders: plan.placeholderText,
+        draftingDepth: plan.primaryLane === "compose" ? "detailed" : "standard",
+        generatedAt: request.generatedAt,
+      })
+    : null;
+  const reviewChecklist = buildReviewChecklist(plan, revision);
+  const distributionChecklist = buildDistributionChecklist(plan);
+  const blockers = buildRunBlockers(plan, hasDocument, hasSelection);
+  const applicationMode = inferApplicationMode(plan, hasDocument, hasSelection);
+  const markdown = buildRunMarkdown({
+    plan,
+    draftMarkdown: draft?.markdown || "",
+    revision,
+    reviewChecklist,
+    distributionChecklist,
+    blockers,
+    generatedAt: request.generatedAt || new Date().toISOString(),
+  });
+
+  return {
+    plan,
+    summary: `Agent run prepared ${plan.lanes.map(titleCase).join(", ")} for ${plan.title}.`,
+    markdown,
+    applicationMode,
+    revision,
+    reviewChecklist,
+    distributionChecklist,
+    blockers,
+  };
+}
+
 function detectLanes(corpus: string): AgenticWorkflowLane[] {
   const detected = laneSignals.flatMap(([lane, signal]) => (signal.test(corpus) ? [lane] : []));
   if (!detected.length) return ["create", "review"];
@@ -121,6 +187,81 @@ function detectLanes(corpus: string): AgenticWorkflowLane[] {
 function detectDistributionTargets(corpus: string): ExportTarget[] {
   const targets = exportSignals.flatMap(([target, signal]) => (signal.test(corpus) ? [target] : []));
   return Array.from(new Set(targets));
+}
+
+function buildRevision(request: AgenticWorkflowRunRequest, plan: AgenticWorkflowPlan): AgenticWorkflowRevision {
+  const originalText = (request.selectedText || request.documentText || "").trim();
+  const proposedText = reviseText(originalText, plan.revisionInstruction, plan.placeholderText);
+  const changeSummary = [
+    "Preserved the user's intent while making the requested revision explicit.",
+    "Added AI-assisted review metadata so the change remains governable before export.",
+    plan.lanes.includes("review") ? "Prepared QA prompts for evidence, tone, and reviewer sign-off." : "",
+  ].filter(Boolean);
+
+  return {
+    originalText,
+    proposedText,
+    changeSummary,
+  };
+}
+
+function reviseText(text: string, instruction: string, placeholders: string) {
+  const cleaned = humanizeText(text || "Draft the requested change here with verified facts and named owners.");
+  const lowerInstruction = instruction.toLowerCase();
+  let proposed = cleaned;
+  if (/\b(shorten|concise|brief|crisp|executive)\b/.test(lowerInstruction)) {
+    proposed = shortenText(proposed);
+  }
+  if (/\b(expand|detail|flesh out|elaborate)\b/.test(lowerInstruction)) {
+    proposed = expandText(proposed, placeholders);
+  }
+  if (/\b(cfo|finance|financial|budget|investment|roi)\b/.test(lowerInstruction)) {
+    proposed = addFinanceFrame(proposed);
+  } else if (/\b(board|executive|ceo|leadership)\b/.test(lowerInstruction)) {
+    proposed = addExecutiveFrame(proposed);
+  }
+  if (/\b(humanize|natural|less ai|plain language|non-technical)\b/.test(lowerInstruction)) {
+    proposed = humanizeText(proposed);
+  }
+  return [
+    "<!-- ai-assisted: status=needs-review | reviewedBy= | reviewedAt= | source=NEditor Agent Workspace | promptSummary=Agentic revision proposal -->",
+    "",
+    proposed.trim(),
+  ].join("\n");
+}
+
+function humanizeText(text: string) {
+  return text
+    .replace(/\b(it is important to note that|in today's fast-paced world|leveraging|robust|seamlessly|delve into)\b/gi, "")
+    .replace(/\butilize\b/gi, "use")
+    .replace(/\bvarious\b/gi, "specific")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function shortenText(text: string) {
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+  if (sentences.length <= 2) return text;
+  return sentences.slice(0, 2).join(" ");
+}
+
+function expandText(text: string, placeholders: string) {
+  const evidence = extractKeyValue(placeholders, "evidence") || "the strongest verified evidence";
+  const owner = extractKeyValue(placeholders, "owner") || "the accountable owner";
+  return [
+    text,
+    "",
+    `This section should be completed with ${evidence}, a named implication for the reader, and a clear owner: ${owner}.`,
+  ].join("\n");
+}
+
+function addFinanceFrame(text: string) {
+  return `Finance review focus: state the investment, cost, risk, and measurable return before the recommendation.\n\n${text}`;
+}
+
+function addExecutiveFrame(text: string) {
+  return `Decision focus: make the recommendation, the reason to act now, and the consequence of waiting clear in the first paragraph.\n\n${text}`;
 }
 
 function inferTitle(request: AgenticWorkflowRequest, documentType: DocsLiveDocumentType, lane: AgenticWorkflowLane) {
@@ -243,10 +384,152 @@ function buildPlanSteps(
   return steps.length ? steps : buildPlanSteps(["create", "review"], missingInputs, targets, hasDocument, hasSelection);
 }
 
+function buildReviewChecklist(plan: AgenticWorkflowPlan, revision: AgenticWorkflowRevision | null) {
+  return [
+    "Confirm the document has a clear audience, decision, owner, deadline, and review status.",
+    "Replace unresolved placeholders with verified names, dates, numbers, and source references.",
+    "Check each factual claim against the evidence or add a citation TODO before export.",
+    "Mark every AI source block and AI-assisted section human-reviewed only after a person verifies it.",
+    revision ? "Compare the revision proposal against the original text before applying final edits." : "",
+    plan.distributionTargets.length ? "Run export readiness for every requested distribution target." : "",
+  ].filter(Boolean);
+}
+
+function buildDistributionChecklist(plan: AgenticWorkflowPlan) {
+  if (!plan.distributionTargets.length) {
+    return ["Select distribution targets, then run export readiness before release."];
+  }
+  return plan.distributionTargets.flatMap((target) => [
+    `${target}: confirm approval status, reviewer, metadata, brand settings, and manifest settings.`,
+    `${target}: export a review copy and inspect the package or artifact before publishing.`,
+  ]);
+}
+
+function buildRunBlockers(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSelection: boolean) {
+  const blockers = [...plan.missingInputs.map((input) => `Missing input: ${input}`)];
+  if ((plan.lanes.includes("edit") || plan.lanes.includes("revise")) && !hasDocument && !hasSelection) {
+    blockers.push("Revision requested but no document or selection was supplied.");
+  }
+  if (plan.lanes.includes("distribute") && !plan.distributionTargets.length) {
+    blockers.push("Distribution requested but no export or publishing target was identified.");
+  }
+  return Array.from(new Set(blockers));
+}
+
+function inferApplicationMode(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSelection: boolean): AgenticWorkflowRun["applicationMode"] {
+  if (hasSelection && (plan.lanes.includes("edit") || plan.lanes.includes("revise"))) return "replace-selection";
+  if ((plan.lanes.includes("create") || plan.lanes.includes("compose")) && !hasDocument) return "replace-document";
+  if (plan.lanes.includes("create") && !plan.lanes.includes("edit") && !plan.lanes.includes("revise")) return "replace-document";
+  return "append-packet";
+}
+
+function buildRunMarkdown(input: {
+  plan: AgenticWorkflowPlan;
+  draftMarkdown: string;
+  revision: AgenticWorkflowRevision | null;
+  reviewChecklist: string[];
+  distributionChecklist: string[];
+  blockers: string[];
+  generatedAt: string;
+}) {
+  const { plan, draftMarkdown, revision, reviewChecklist, distributionChecklist, blockers, generatedAt } = input;
+  const lines = [
+    "---",
+    `title: ${yamlScalar(`${plan.title} Agent Run`)}`,
+    "status: draft",
+    "toc: true",
+    "---",
+    "",
+    `# ${plan.title} Agent Run`,
+    "",
+    "```ai-source",
+    "provider: NEditor Agent Workspace",
+    "model: local-agentic-workflow",
+    `date: ${generatedAt}`,
+    `promptSummary: ${sanitizeMarkerValue(plan.instruction || "Agentic document workflow")}`,
+    "reviewedBy: ",
+    "reviewedAt: ",
+    "status: needs-review",
+    "```",
+    "",
+    "## Agent Plan",
+    "",
+    `Primary lane: ${titleCase(plan.primaryLane)}`,
+    "",
+    `Workflow lanes: ${plan.lanes.map(titleCase).join(" -> ")}`,
+    "",
+    "### Context Pack",
+    "",
+    fencedBlock("text", plan.context),
+    "",
+    "### Placeholders",
+    "",
+    fencedBlock("yaml", plan.placeholderText),
+    "",
+    "### Suggested Outline",
+    "",
+    fencedBlock("text", plan.suggestedOutline),
+    "",
+  ];
+
+  if (blockers.length) {
+    lines.push("### Blockers", "", ...blockers.map((blocker) => `- [ ] ${blocker}`), "");
+  }
+  if (draftMarkdown.trim()) {
+    lines.push("## Generated Draft", "", draftMarkdown.trim(), "");
+  }
+  if (revision) {
+    lines.push(
+      "## Revision Proposal",
+      "",
+      "### Change Summary",
+      "",
+      ...revision.changeSummary.map((item) => `- ${item}`),
+      "",
+      "### Original Text",
+      "",
+      fencedBlock("markdown", revision.originalText || "(No source text supplied.)"),
+      "",
+      "### Proposed Text",
+      "",
+      revision.proposedText,
+      "",
+    );
+  }
+  lines.push(
+    "## Quality Assurance",
+    "",
+    ...reviewChecklist.map((item) => `- [ ] ${item}`),
+    "",
+    "## Distribution",
+    "",
+    ...distributionChecklist.map((item) => `- [ ] ${item}`),
+    "",
+    "## Human Review Handoff",
+    "",
+    "A person should verify sources, numbers, tone, reviewer metadata, and export readiness before this agent run is accepted.",
+    "",
+  );
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+function fencedBlock(language: string, value: string) {
+  return ["```" + language, value.trim() || "(empty)", "```"].join("\n");
+}
+
 function extractKeyValue(corpus: string, key: string) {
   const keys = ["audience", "owner", "deadline", "tone", "evidence", "reviewer", "client", "company", "distribution"];
   const nextKey = keys.filter((item) => item !== key).join("|");
   return corpus.match(new RegExp(`\\b${key}\\s*(?:is|=|:)\\s*([^\\n.]+?)(?=\\s+(?:${nextKey})\\s*(?:is|=|:)|[.\\n]|$)`, "i"))?.[1]?.trim();
+}
+
+function sanitizeMarkerValue(value: string) {
+  return value.replace(/[\r\n|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+}
+
+function yamlScalar(value: string) {
+  if (/^[A-Za-z0-9 _.,:/-]+$/.test(value)) return value;
+  return JSON.stringify(value);
 }
 
 function inferTone(corpus: string) {

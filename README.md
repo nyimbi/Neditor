@@ -78,7 +78,7 @@ uses it.
 
 | I need to... | What to do in NEditor |
 | --- | --- |
-| Ask the app to plan the whole document workflow | Use **Agent** or **AI Agent Workspace**, describe the outcome in plain language, then let NEditor plan creation, composition, editing, revision, review, and distribution steps. |
+| Ask the app to plan and run the whole document workflow | Use **Agent** or **AI Agent Workspace**, describe the outcome in plain language, generate an agent packet, then apply the governed creation, revision, QA, and distribution output for human review. |
 | Draft a board paper, proposal, report, or briefing note | Start in **Outline** mode, create the structure, then fill in each section. |
 | Start from an AI-first document brief | Use **AI Create** to open Docs Live with an intent-first workflow for document type, outline, context, placeholders, QA, humanization, and review handoff. |
 | Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, dictate the intent, add placeholder values, generate an outline-aware questionnaire if helpful, answer it in the dialog, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
@@ -191,7 +191,11 @@ web app.
   across creation, composition, editing, revision, review, and distribution. It
   identifies lanes, missing inputs, placeholder values, suggested outline,
   revision intent, export targets, and runnable next steps that route into Docs
-  Live, AI Paste cleanup, Review, or Export readiness.
+  Live, AI Paste cleanup, Review, or Export readiness. It can also generate a
+  complete agent packet with a Docs Live draft, selection-aware revision
+  proposal, QA gates, distribution checklist, AI provenance, blockers, and
+  safe apply behavior for replacing a document, replacing selected text, or
+  appending a review packet.
 - AI Create makes Docs Live the default first step for intent-led drafting,
   so users can begin with the outcome, audience, context, and placeholders
   instead of a blank page.
