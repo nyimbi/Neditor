@@ -283,11 +283,17 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         )?)
         .separator()
         .item(&menu_item(app, "neditor-open-docs-live", "Docs Live")?)
+        .item(&menu_item(
+            app,
+            "neditor-ai-create-document",
+            "AI Create Document",
+        )?)
         .item(&menu_item(app, "neditor-clean-ai-paste", "Clean AI Paste")?)
         .build()?;
 
     let help_menu = SubmenuBuilder::new(app, "Help")
         .item(&menu_item(app, "neditor-open-help", "NEditor Help Center")?)
+        .item(&menu_item(app, "neditor-guided-demo", "Guided Demo")?)
         .separator()
         .item(&menu_item(
             app,

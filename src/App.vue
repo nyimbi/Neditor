@@ -1190,6 +1190,7 @@
             <div class="help-quick-actions" aria-label="Popular help actions">
               <button type="button" @click="openHelp('getting-started')">Start</button>
               <button type="button" @click="openHelp('docs-live')">Docs Live</button>
+              <button type="button" @click="openGuidedDemo()">Guided demo</button>
               <button type="button" @click="openHelp('export-publishing')">Export</button>
               <button type="button" @click="openHelp('keyboard-shortcuts')">Shortcuts</button>
             </div>
@@ -1601,6 +1602,10 @@
       </span>
     </footer>
 
+    <div v-if="buttonHelp.visible" class="button-help-tooltip" role="tooltip" :style="buttonHelpStyle">
+      {{ buttonHelp.text }}
+    </div>
+
     <section
       v-if="aiPasteOpen"
       ref="aiPasteDialog"
@@ -1818,6 +1823,50 @@
           <button type="button" :disabled="!docsLiveGeneratedMarkdown" @click="applyDocsLiveDraft">Apply draft</button>
         </footer>
       </form>
+    </section>
+
+    <section
+      v-if="guidedDemoOpen"
+      ref="guidedDemoDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="NEditor guided demo"
+      tabindex="-1"
+      @keydown="handleModalKeydown('guided-demo', $event)"
+    >
+      <div class="modal guided-demo-modal">
+        <header>
+          <div>
+            <h2>NEditor Guided Demo</h2>
+            <p>{{ currentDemoStep?.summary }}</p>
+          </div>
+          <button type="button" aria-label="Close guided demo" @click="closeGuidedDemo">x</button>
+        </header>
+        <section class="guided-demo-layout">
+          <ol class="guided-demo-steps" aria-label="Guided demo steps">
+            <li v-for="(step, index) in guidedDemoSteps" :key="step.id" :class="{ active: index === guidedDemoStepIndex }">
+              <button type="button" @click="selectGuidedDemoStep(index)">
+                <span>{{ index + 1 }}</span>
+                <strong>{{ step.title }}</strong>
+              </button>
+            </li>
+          </ol>
+          <article v-if="currentDemoStep" class="guided-demo-card" aria-live="polite">
+            <small>{{ currentDemoStep.mode }}</small>
+            <h3>{{ currentDemoStep.title }}</h3>
+            <p>{{ currentDemoStep.detail }}</p>
+            <ul>
+              <li v-for="point in currentDemoStep.points" :key="point">{{ point }}</li>
+            </ul>
+            <div class="guided-demo-actions">
+              <button type="button" :disabled="guidedDemoStepIndex === 0" @click="previousGuidedDemoStep">Previous</button>
+              <button type="button" @click="runGuidedDemoStep(currentDemoStep)">Try this step</button>
+              <button type="button" :disabled="guidedDemoStepIndex === guidedDemoSteps.length - 1" @click="nextGuidedDemoStep">Next</button>
+            </div>
+          </article>
+        </section>
+      </div>
     </section>
 
     <section
@@ -2052,6 +2101,7 @@ const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
 const aiPasteDialog = ref<HTMLElement | null>(null);
 const docsLiveDialog = ref<HTMLElement | null>(null);
+const guidedDemoDialog = ref<HTMLElement | null>(null);
 const commandPaletteDialog = ref<HTMLElement | null>(null);
 const conflictDialog = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
@@ -2079,6 +2129,8 @@ const aiConvertTables = ref(true);
 const aiPreviewBusy = ref(false);
 const aiPreviewSignature = ref("");
 const docsLiveOpen = ref(false);
+const guidedDemoOpen = ref(false);
+const guidedDemoStepIndex = ref(0);
 const docsLiveDocumentType = ref<DocsLiveDocumentType>("business-brief");
 const docsLiveTitle = ref("");
 const docsLiveOutlineText = ref("");
@@ -2130,6 +2182,7 @@ const exportProfileName = ref("Client delivery");
 const helpQuery = ref("");
 const helpCategory = ref<"all" | HelpCategory>("all");
 const selectedHelpTopicId = ref("getting-started");
+const buttonHelp = ref({ visible: false, text: "", x: 0, y: 0, placement: "bottom" as "top" | "bottom" });
 
 type FigureCropPosition = "center" | "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -2225,6 +2278,16 @@ interface HelpTopic {
   tips: string[];
   actions: HelpTopicAction[];
   keywords: string[];
+}
+
+interface GuidedDemoStep {
+  id: string;
+  title: string;
+  mode: string;
+  summary: string;
+  detail: string;
+  points: string[];
+  run: () => unknown;
 }
 
 interface TransformTrustPrompt {
@@ -2452,6 +2515,11 @@ const previewDocumentStyle = computed(() => ({
 }));
 const appShellStyle = computed(() => ({
   "--toolbar-font-size": `${clampToolbarTextSize(store.toolbarTextSize)}px`,
+}));
+const buttonHelpStyle = computed<CSSProperties>(() => ({
+  left: `${buttonHelp.value.x}px`,
+  top: `${buttonHelp.value.y}px`,
+  transform: buttonHelp.value.placement === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
 }));
 const docsLiveSpeechAvailable = computed(() => Boolean(speechRecognitionConstructor()));
 const previewDocumentLabel = computed(() => {
@@ -2805,6 +2873,52 @@ const helpCategoryOptions: { id: HelpCategory; label: string }[] = [
 ];
 const helpTopics = computed<HelpTopic[]>(() => [
   {
+    id: "ai-first-composition",
+    title: "AI-first document creation",
+    category: "writing",
+    summary: "Use Docs Live as the agentic composer for outlines, context gathering, drafting, QA, and review preparation.",
+    when: "Use this when you want to start from a business outcome instead of a blank page.",
+    steps: [
+      "Open AI Create or Docs Live and choose the document type.",
+      "Give the agent the audience, outcome, constraints, source facts, tone, and placeholder values.",
+      "Let the AI-created questionnaire expose missing context before drafting.",
+      "Generate the draft section by section, then use the QA register and humanization checklist before applying it.",
+    ],
+    tips: [
+      "AI-first does not mean unreviewed: keep provenance, comments, and human review status visible.",
+      "Outline-first inputs produce better drafts because sections have a clear job before prose is generated.",
+    ],
+    actions: [
+      { label: "AI Create", run: () => startAiDocumentCreation() },
+      { label: "Guided demo", run: () => openGuidedDemo() },
+      { label: "Review AI governance", run: () => (store.sidebar = "review") },
+    ],
+    keywords: ["AI first", "agentic", "create", "compose", "questionnaire", "QA", "humanize"],
+  },
+  {
+    id: "guided-demo",
+    title: "Guided product demo",
+    category: "basics",
+    summary: "Walk through NEditor capabilities from AI creation to outline planning, review, templates, and export.",
+    when: "Use this when onboarding a new user or evaluating what NEditor can do.",
+    steps: [
+      "Start the guided demo from Help or the command palette.",
+      "Move step by step through AI creation, outline planning, systematic composition, templates, review, and export.",
+      "Use Try this step to route the workbench to the relevant real feature.",
+      "Return to Help at any time for deeper workflow guidance.",
+    ],
+    tips: [
+      "The demo is interactive: every step points at the actual product surface.",
+      "It is designed for non-technical business users who need a quick capability tour.",
+    ],
+    actions: [
+      { label: "Start guided demo", run: () => openGuidedDemo() },
+      { label: "AI Create", run: () => startAiDocumentCreation() },
+      { label: "Help Center", run: () => openHelp("getting-started") },
+    ],
+    keywords: ["demo", "tour", "onboarding", "walkthrough", "capabilities"],
+  },
+  {
     id: "getting-started",
     title: "Getting started",
     category: "basics",
@@ -3095,11 +3209,99 @@ const selectedHelpTopic = computed(() => {
   if (selected && filteredHelpTopics.value.includes(selected)) return selected;
   return filteredHelpTopics.value[0] || helpTopics.value[0] || null;
 });
+const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
+  {
+    id: "ai-create",
+    title: "Create with AI",
+    mode: "Agentic creation",
+    summary: "Start with intent, audience, outline, context, and placeholders instead of a blank page.",
+    detail: "Docs Live is the AI-first composition surface. It asks for missing context, builds a section plan, drafts systematically, and prepares review notes.",
+    points: [
+      "Choose the document type and drafting depth.",
+      "Describe the business goal in speech or text.",
+      "Add placeholders such as client, audience, owner, deadline, and required evidence.",
+    ],
+    run: () => startAiDocumentCreation(),
+  },
+  {
+    id: "outline",
+    title: "Plan the structure",
+    mode: "Outline-first work",
+    summary: "Create the document architecture before drafting prose.",
+    detail: "The outline planner and Outline mode let users build chapters, sections, subsections, and subsubsections as a first-class document artifact.",
+    points: [
+      "Sketch a hierarchy in the Outline sidebar.",
+      "Create or append the planned document skeleton.",
+      "Switch to Outline mode to CRUD headings without body text in the way.",
+    ],
+    run: () => planDocumentOutline(),
+  },
+  {
+    id: "compose",
+    title: "Compose section by section",
+    mode: "Systematic drafting",
+    summary: "Generate a draft from outline plus context and inspect the runbook.",
+    detail: "Docs Live produces a workflow, section cards, QA register, humanization checklist, and reviewer handoff so generated text is easier to evaluate.",
+    points: [
+      "Load the current document outline.",
+      "Generate the draft after context and questionnaire answers are ready.",
+      "Review section QA notes before applying the draft.",
+    ],
+    run: () => openDocsLiveFromDocumentOutline(),
+  },
+  {
+    id: "templates",
+    title: "Insert smart building blocks",
+    mode: "Templates and transforms",
+    summary: "Use reusable calculation, table, business, scientific, and transform templates.",
+    detail: "Templates expose fill values and reusable snippets so non-technical users can insert structured document logic without writing syntax from scratch.",
+    points: [
+      "Search templates by category or transform type.",
+      "Duplicate useful examples into custom templates.",
+      "Run transforms after inserting calculations or diagrams.",
+    ],
+    run: () => openTransformTemplates(),
+  },
+  {
+    id: "review",
+    title: "Govern AI output",
+    mode: "Review and provenance",
+    summary: "Track comments, changes, AI sources, and human review status.",
+    detail: "The Review panel keeps AI provenance visible and lets users mark AI-assisted material as human reviewed before export.",
+    points: [
+      "Clean pasted AI chat output before inserting it.",
+      "Add comments and change notes.",
+      "Mark AI sources and sections as human reviewed after inspection.",
+    ],
+    run: () => {
+      store.sidebar = "review";
+      openAiPaste();
+    },
+  },
+  {
+    id: "export",
+    title: "Prepare delivery",
+    mode: "Export readiness",
+    summary: "Validate and export to business and publishing targets.",
+    detail: "Export readiness checks diagnostics, metadata, references, layout, and target-specific requirements before creating deliverables.",
+    points: [
+      "Choose HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, or Google Docs package.",
+      "Run Prepare for export before generating files.",
+      "Save export profiles for repeated client or publishing workflows.",
+    ],
+    run: () => {
+      store.sidebar = "exports";
+      void prepareForExport();
+    },
+  },
+]);
+const currentDemoStep = computed(() => guidedDemoSteps.value[guidedDemoStepIndex.value] || guidedDemoSteps.value[0] || null);
 const commandBarGroups = computed<CommandBarGroup[]>(() => [
   {
     id: "document",
     label: "Document",
     actions: [
+      { id: "ai-create", label: "AI Create", title: "Create a document with the agentic Docs Live composer", icon: "ai", primary: true, run: () => startAiDocumentCreation() },
       { id: "new", label: "New", title: "New document", icon: "new", primary: true, run: () => store.newDocument() },
       { id: "open", label: "Open", title: "Open document", icon: "open", run: () => openDocument() },
       { id: "save", label: "Save", title: "Save document", icon: "save", primary: true, run: () => saveDocument() },
@@ -3168,6 +3370,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "comment", label: "Comment", title: "Insert review comment", icon: "comment", run: () => insertBlock(commentSnippet) },
       { id: "commands", label: "Commands", title: "Open command palette", icon: "commands", run: () => (commandPaletteOpen.value = true) },
       { id: "help", label: "Help", title: "Open Help Center", icon: "help", run: () => openHelp() },
+      { id: "demo", label: "Demo", title: "Start guided product demo", icon: "help", run: () => openGuidedDemo() },
     ],
   },
 ]);
@@ -3221,6 +3424,41 @@ function openHelp(topicId = "getting-started") {
 function runHelpAction(action: HelpTopicAction) {
   void action.run();
 }
+function openGuidedDemo(stepId = "ai-create") {
+  const stepIndex = guidedDemoSteps.value.findIndex((step) => step.id === stepId);
+  guidedDemoStepIndex.value = stepIndex >= 0 ? stepIndex : 0;
+  guidedDemoOpen.value = true;
+  store.statusMessage = "Started guided product demo";
+}
+function closeGuidedDemo() {
+  guidedDemoOpen.value = false;
+}
+function selectGuidedDemoStep(index: number) {
+  guidedDemoStepIndex.value = Math.min(Math.max(index, 0), Math.max(0, guidedDemoSteps.value.length - 1));
+}
+function previousGuidedDemoStep() {
+  selectGuidedDemoStep(guidedDemoStepIndex.value - 1);
+}
+function nextGuidedDemoStep() {
+  selectGuidedDemoStep(guidedDemoStepIndex.value + 1);
+}
+async function runGuidedDemoStep(step: GuidedDemoStep) {
+  closeGuidedDemo();
+  await nextTick();
+  void step.run();
+}
+function startAiDocumentCreation() {
+  if (store.mode === "outline") store.mode = "split";
+  docsLiveDocumentType.value = docsLiveDocumentType.value || "business-brief";
+  docsLiveDraftingDepth.value = "standard";
+  docsLiveInsertMode.value = "replace";
+  if (!docsLiveContext.value.trim()) {
+    docsLiveContext.value = "Describe the outcome, audience, decision needed, evidence, constraints, tone, and review expectations.";
+  }
+  openDocsLive();
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = "AI-first document creation ready in Docs Live";
+}
 const commands = computed(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
@@ -3238,9 +3476,14 @@ const commands = computed(() => [
   { name: "Refresh Git diff", group: "Versioning", run: () => void store.refreshGitDiff() },
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
+  { name: "AI: Create document", group: "AI", run: () => startAiDocumentCreation() },
+  { name: "AI: Compose from outline", group: "AI", run: () => openDocsLiveFromOutline() },
+  { name: "AI: Review and clean pasted text", group: "AI", run: () => openAiPaste() },
   { name: "Open Docs Live", group: "AI", run: () => openDocsLive() },
   { name: "Paste from AI chat", group: "AI", run: () => openAiPaste() },
   { name: "Open Help Center", group: "Help", run: () => openHelp() },
+  { name: "Start guided demo", group: "Help", run: () => openGuidedDemo() },
+  { name: "Help: AI-first composition", group: "Help", run: () => openHelp("ai-first-composition") },
   { name: "Help: Getting started", group: "Help", run: () => openHelp("getting-started") },
   { name: "Help: Docs Live", group: "Help", run: () => openHelp("docs-live") },
   { name: "Help: Export and publishing", group: "Help", run: () => openHelp("export-publishing") },
@@ -3468,11 +3711,17 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-open-docs-live":
       openDocsLive();
       break;
+    case "neditor-ai-create-document":
+      startAiDocumentCreation();
+      break;
     case "neditor-clean-ai-paste":
       openAiPaste();
       break;
     case "neditor-open-help":
       openHelp();
+      break;
+    case "neditor-guided-demo":
+      openGuidedDemo();
       break;
     case "neditor-help-getting-started":
       openHelp("getting-started");
@@ -3513,6 +3762,11 @@ onMounted(async () => {
   });
   void installDesktopWorkflowTestHooks();
   window.addEventListener("keydown", handleShortcut);
+  window.addEventListener("mouseover", handleButtonHelpEnter);
+  window.addEventListener("focusin", handleButtonHelpEnter);
+  window.addEventListener("mouseout", handleButtonHelpLeave);
+  window.addEventListener("focusout", handleButtonHelpLeave);
+  window.addEventListener("scroll", hideButtonHelp, true);
 });
 
 onBeforeUnmount(() => {
@@ -3523,6 +3777,11 @@ onBeforeUnmount(() => {
   window.clearTimeout(autoSnapshotHandle);
   window.clearTimeout(scrollPersistHandle);
   window.removeEventListener("keydown", handleShortcut);
+  window.removeEventListener("mouseover", handleButtonHelpEnter);
+  window.removeEventListener("focusin", handleButtonHelpEnter);
+  window.removeEventListener("mouseout", handleButtonHelpLeave);
+  window.removeEventListener("focusout", handleButtonHelpLeave);
+  window.removeEventListener("scroll", hideButtonHelp, true);
   delete window.__NEDITOR_DESKTOP_WORKFLOW__;
   unlistenNativeMenuCommand?.();
   unlistenNativeMenuCommand = null;
@@ -3532,6 +3791,7 @@ onBeforeUnmount(() => {
 
 watch(aiPasteOpen, (open) => handleModalStateChange(open, aiPasteDialog));
 watch(docsLiveOpen, (open) => handleModalStateChange(open, docsLiveDialog));
+watch(guidedDemoOpen, (open) => handleModalStateChange(open, guidedDemoDialog));
 watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteDialog));
 watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
 
@@ -5823,6 +6083,44 @@ function focusSkipTarget(event: Event) {
   target.focus({ preventScroll: true });
 }
 
+function buttonFromEvent(event: Event) {
+  const target = event.target instanceof Element ? event.target : null;
+  return target?.closest("button") as HTMLButtonElement | null;
+}
+
+function buttonHelpText(button: HTMLButtonElement) {
+  const explicit = button.getAttribute("data-help") || button.getAttribute("title") || button.getAttribute("aria-label");
+  const visible = button.innerText.replace(/\s+/g, " ").trim();
+  const base = (explicit || visible || "Button").replace(/\s+/g, " ").trim();
+  if (!button.disabled) return base;
+  const disabledReason = button.getAttribute("data-disabled-help") || "This action is unavailable until the required document state is ready.";
+  return `${base}. ${disabledReason}`;
+}
+
+function handleButtonHelpEnter(event: Event) {
+  const button = buttonFromEvent(event);
+  if (!button || button.closest(".button-help-tooltip")) return;
+  const text = buttonHelpText(button);
+  if (!text) return;
+  const rect = button.getBoundingClientRect();
+  const placement = rect.bottom + 52 < window.innerHeight ? "bottom" : "top";
+  const x = Math.min(Math.max(rect.left + rect.width / 2, 96), Math.max(96, window.innerWidth - 96));
+  const y = placement === "bottom" ? rect.bottom + 8 : rect.top - 8;
+  buttonHelp.value = { visible: true, text, x, y, placement };
+}
+
+function handleButtonHelpLeave(event: Event) {
+  const button = buttonFromEvent(event);
+  if (!button) return;
+  const related = "relatedTarget" in event && event.relatedTarget instanceof Node ? event.relatedTarget : null;
+  if (related && button.contains(related)) return;
+  hideButtonHelp();
+}
+
+function hideButtonHelp() {
+  buttonHelp.value = { ...buttonHelp.value, visible: false };
+}
+
 async function handleModalStateChange(open: boolean, dialogRef: { value: HTMLElement | null }) {
   if (open) {
     modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -5865,7 +6163,7 @@ function restoreModalFocus() {
   }
 }
 
-function handleModalKeydown(kind: "ai-paste" | "docs-live" | "command-palette" | "conflict", event: KeyboardEvent) {
+function handleModalKeydown(kind: "ai-paste" | "docs-live" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.preventDefault();
     closeModal(kind);
@@ -5891,11 +6189,13 @@ function handleModalKeydown(kind: "ai-paste" | "docs-live" | "command-palette" |
   }
 }
 
-function closeModal(kind: "ai-paste" | "docs-live" | "command-palette" | "conflict") {
+function closeModal(kind: "ai-paste" | "docs-live" | "guided-demo" | "command-palette" | "conflict") {
   if (kind === "ai-paste") {
     closeAiPaste();
   } else if (kind === "docs-live") {
     closeDocsLive();
+  } else if (kind === "guided-demo") {
+    closeGuidedDemo();
   } else if (kind === "command-palette") {
     closeCommandPalette();
   } else {
@@ -7698,6 +7998,8 @@ select:hover {
 .app-shell[data-theme="dark"] .help-topic-button,
 .app-shell[data-theme="dark"] .help-topic-header small,
 .app-shell[data-theme="dark"] .help-keywords span,
+.app-shell[data-theme="dark"] .guided-demo-card,
+.app-shell[data-theme="dark"] .guided-demo-steps span,
 .app-shell[data-theme="dark"] .status-message,
 .app-shell[data-theme="dark"] .word-stats,
 .app-shell[data-theme="dark"] .watch-status,
@@ -7713,6 +8015,8 @@ select:hover {
 .app-shell[data-theme="dark"] .help-topic-header p,
 .app-shell[data-theme="dark"] .help-when,
 .app-shell[data-theme="dark"] .help-tips,
+.app-shell[data-theme="dark"] .guided-demo-modal header p,
+.app-shell[data-theme="dark"] .guided-demo-card small,
 .app-shell[data-theme="dark"] .sidebar-hint {
   color: #aebdcc;
 }
@@ -7720,6 +8024,10 @@ select:hover {
 .app-shell[data-theme="dark"] .help-topic-button:hover,
 .app-shell[data-theme="dark"] .help-topic-button:focus-visible,
 .app-shell[data-theme="dark"] .help-topic-button.active {
+  background: #203247;
+}
+
+.app-shell[data-theme="dark"] .guided-demo-steps .active button {
   background: #203247;
 }
 
@@ -7759,6 +8067,8 @@ select:hover {
   .app-shell[data-theme="system"] .help-topic-button,
   .app-shell[data-theme="system"] .help-topic-header small,
   .app-shell[data-theme="system"] .help-keywords span,
+  .app-shell[data-theme="system"] .guided-demo-card,
+  .app-shell[data-theme="system"] .guided-demo-steps span,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
   .app-shell[data-theme="system"] .watch-status,
@@ -7774,6 +8084,8 @@ select:hover {
   .app-shell[data-theme="system"] .help-topic-header p,
   .app-shell[data-theme="system"] .help-when,
   .app-shell[data-theme="system"] .help-tips,
+  .app-shell[data-theme="system"] .guided-demo-modal header p,
+  .app-shell[data-theme="system"] .guided-demo-card small,
   .app-shell[data-theme="system"] .sidebar-hint {
     color: #aebdcc;
   }
@@ -7781,6 +8093,10 @@ select:hover {
   .app-shell[data-theme="system"] .help-topic-button:hover,
   .app-shell[data-theme="system"] .help-topic-button:focus-visible,
   .app-shell[data-theme="system"] .help-topic-button.active {
+    background: #203247;
+  }
+
+  .app-shell[data-theme="system"] .guided-demo-steps .active button {
     background: #203247;
   }
 }
@@ -7805,6 +8121,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .help-topic-button,
 .app-shell[data-high-contrast="true"] .help-topic-header small,
 .app-shell[data-high-contrast="true"] .help-keywords span,
+.app-shell[data-high-contrast="true"] .guided-demo-card,
+.app-shell[data-high-contrast="true"] .guided-demo-steps span,
 .app-shell[data-high-contrast="true"] .status-message,
 .app-shell[data-high-contrast="true"] .word-stats,
 .app-shell[data-high-contrast="true"] .watch-status,
@@ -9118,6 +9436,108 @@ select:hover {
   font-size: 11px;
 }
 
+.button-help-tooltip {
+  position: fixed;
+  z-index: 1200;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 7px 9px;
+  border: 1px solid #1f3147;
+  border-radius: 6px;
+  background: #172231;
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.24);
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.guided-demo-modal {
+  width: min(860px, calc(100vw - 32px));
+}
+
+.guided-demo-modal header {
+  align-items: start;
+}
+
+.guided-demo-modal header p {
+  margin: 4px 0 0;
+  color: #526171;
+}
+
+.guided-demo-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.guided-demo-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guided-demo-steps button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  text-align: left;
+}
+
+.guided-demo-steps span {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #e5edf7;
+  color: #174a88;
+  font-weight: 800;
+  font-size: 11px;
+}
+
+.guided-demo-steps .active button {
+  border-color: #7fa2cd;
+  background: #eef6ff;
+}
+
+.guided-demo-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #d8e0e8;
+  border-left: 3px solid #2f6f9f;
+  background: #ffffff;
+}
+
+.guided-demo-card small {
+  color: #31516f;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.guided-demo-card h3,
+.guided-demo-card p,
+.guided-demo-card ul {
+  margin: 0;
+}
+
+.guided-demo-card ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+}
+
+.guided-demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .export-target-options label {
   margin-bottom: 0;
 }
@@ -10230,6 +10650,10 @@ select:hover {
   }
 
   .docs-live-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .guided-demo-layout {
     grid-template-columns: 1fr;
   }
 }

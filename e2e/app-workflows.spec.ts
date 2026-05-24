@@ -1343,6 +1343,20 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await page.locator(".command-bar").getByRole("button", { name: "Help" }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("help");
   await expect(page.locator(".sidebar").getByRole("heading", { name: "Help Center" })).toBeVisible();
+
+  await page.locator(".command-bar").getByRole("button", { name: "AI Create" }).hover();
+  await expect(page.getByRole("tooltip")).toContainText("agentic Docs Live composer");
+
+  await page.locator(".help-quick-actions").getByRole("button", { name: "Guided demo" }).click();
+  const demo = page.getByRole("dialog", { name: "NEditor guided demo" });
+  await expect(demo).toBeVisible();
+  await expect(demo).toContainText("Create with AI");
+  await demo.getByRole("button", { name: "Next" }).click();
+  await expect(demo).toContainText("Plan the structure");
+  await demo.getByRole("button", { name: "Previous" }).click();
+  await demo.getByRole("button", { name: "Try this step" }).click();
+  await expect(page.getByRole("dialog", { name: "Docs Live voice drafting" })).toBeVisible();
+  await expect(page.getByLabel("Document type")).toBeVisible();
 });
 
 test("exposes keyboard skip links to primary workbench regions", async ({ page }) => {
