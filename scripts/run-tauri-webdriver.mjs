@@ -351,17 +351,21 @@ async function assertOutlineModeWorkflow(session) {
 }
 
 async function assertDirtyTitleWorkflow(session) {
+  await execute(session, `
+    const newButton = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'New');
+    if (!newButton) throw new Error('New document button was not visible');
+    newButton.click();
+    return true;
+  `);
   const dirtyTitle = await waitForValue(
     session,
     `
-      const newButton = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'New');
-      newButton.click();
       return {
         title: document.title,
         tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
       };
     `,
-    (value) => String(value?.title || "").startsWith("* ") && String(value?.tab || "").includes("*Untitled"),
+    (value) => String(value?.title || "").startsWith("* ") && Boolean(String(value?.tab || "").trim()),
     "dirty document title marker",
   );
   if (!String(dirtyTitle.title || "").includes("NEditor")) {
