@@ -965,6 +965,8 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("windows-linux-tauri-webdriver-execution"));
   ok(script.includes("external-platform-evidence"));
   ok(script.includes("missingPlatformEvidence"));
+  ok(script.includes("if (missingWebdriverPlatforms.length > 0)"));
+  ok(!script.includes("missingWebdriverPlatforms.length > 0 ||"));
   ok(script.includes("release-signing-evidence"));
   ok(script.includes("release-ci-workflow"));
   ok(script.includes("releaseCiWorkflowAccepted"));

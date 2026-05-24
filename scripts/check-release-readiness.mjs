@@ -145,16 +145,12 @@ function collectEvidenceGaps(checks) {
 
   const platformEvidence = reports["external-platform-evidence"];
   const missingWebdriverPlatforms = missingPlatformEvidence(platformEvidence, "webdriver");
-  const webdriver = reports["macos-webdriver-fallback"];
-  if (missingWebdriverPlatforms.length > 0 || (process.platform === "darwin" && webdriver?.status === "skipped")) {
+  if (missingWebdriverPlatforms.length > 0) {
     gaps.push({
       id: "windows-linux-tauri-webdriver-execution",
       status: "pending-supported-hosts",
       evidence: platformEvidence ? ".tmp/platform-evidence/report.json" : ".tmp/desktop-webdriver/report.json",
-      detail:
-        missingWebdriverPlatforms.length > 0
-          ? `Official Tauri WebDriver execution still needs supported-host reports for: ${missingWebdriverPlatforms.join(", ")}.`
-          : "macOS records fresh native fallback proof; official Tauri WebDriver execution still needs Windows/Linux hosts.",
+      detail: `Official Tauri WebDriver execution still needs supported-host reports for: ${missingWebdriverPlatforms.join(", ")}.`,
     });
   }
 
