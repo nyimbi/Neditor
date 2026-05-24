@@ -479,13 +479,14 @@ async function assertFileSaveOpenWorkflow(session) {
       return {
         title: document.title,
         tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+        activePath: document.querySelector('.document-tabs .tab.active')?.getAttribute('data-document-path') || '',
         status: document.querySelector('.status-bar')?.textContent || '',
         editor: document.querySelector('.cm-content')?.textContent || '',
       };
     `,
     (value) =>
       !String(value?.title || "").startsWith("* ") &&
-      String(value?.tab || "").includes("native-workflow-file") &&
+      String(value?.activePath || "").replace(/\\/g, "/").includes("native-workflow-file.md") &&
       String(value?.editor || "").trim().length > 20,
     "saved real Markdown file",
   );
@@ -532,13 +533,14 @@ async function assertFileSaveOpenWorkflow(session) {
       return {
         title: document.title,
         tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+        activePath: document.querySelector('.document-tabs .tab.active')?.getAttribute('data-document-path') || '',
         status: document.querySelector('.status-bar')?.textContent || '',
         editor: editorDocumentText(),
       };
     `,
     (value) =>
       !String(value?.title || "").startsWith("* ") &&
-      String(value?.tab || "").includes("native-workflow-file") &&
+      String(value?.activePath || "").replace(/\\/g, "/").includes("native-workflow-file.md") &&
       String(value?.editor || "").trim().length > 20,
     "reopened real Markdown file",
   );
@@ -564,13 +566,14 @@ async function assertRenameDuplicateRevealWorkflow(session) {
       return {
         title: document.title,
         tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+        activePath: document.querySelector('.document-tabs .tab.active')?.getAttribute('data-document-path') || '',
         status: document.querySelector('.status-bar')?.textContent || '',
         editor: document.querySelector('.cm-content')?.textContent || '',
       };
     `,
     (value) =>
       !String(value?.title || "").startsWith("* ") &&
-      String(value?.tab || "").includes("native-workflow-renamed") &&
+      String(value?.activePath || "").replace(/\\/g, "/").includes("native-workflow-renamed.md") &&
       String(value?.status || "").includes("Renamed") &&
       String(value?.editor || "").trim().length > 20,
     "renamed real Markdown file",
@@ -582,11 +585,12 @@ async function assertRenameDuplicateRevealWorkflow(session) {
     throw new Error(`desktop WebDriver rename left the old Markdown path behind: ${relative(workflowFilePath)}`);
   }
 
-  await activateDocumentTab(session, "native-workflow-renamed");
+  await activateDocumentTabByPath(session, "native-workflow-renamed.md");
   await execute(session, `
     const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
-    const activeTab = normalized(document.querySelector('.document-tabs .tab.active')?.textContent || '');
-    if (!activeTab.includes('native-workflow-renamed')) throw new Error('Expected renamed workflow file to be active before duplicate, found ' + activeTab);
+    const normalizedPath = (value) => normalized(value).replace(/\\\\/g, '/');
+    const activePath = normalizedPath(document.querySelector('.document-tabs .tab.active')?.getAttribute('data-document-path') || '');
+    if (!activePath.includes('native-workflow-renamed.md')) throw new Error('Expected renamed workflow file to be active before duplicate, found ' + activePath);
     const duplicateButton = document.querySelector('#main-commands button[aria-label="Duplicate"]');
     if (!duplicateButton) throw new Error('Duplicate button was not visible in the desktop command bar');
     duplicateButton.click();
@@ -851,30 +855,6 @@ async function saveWorkspace(session) {
     button.click();
     return true;
   `);
-}
-
-async function activateDocumentTab(session, labelFragment) {
-  await waitForValue(
-    session,
-    `
-      const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
-      const target = [...document.querySelectorAll('.document-tabs .tab')].find((item) => normalized(item.textContent).includes(${JSON.stringify(labelFragment)}));
-      if (!target) {
-        return {
-          found: false,
-          active: normalized(document.querySelector('.document-tabs .tab.active')?.textContent || ''),
-          tabs: [...document.querySelectorAll('.document-tabs .tab')].map((item) => normalized(item.textContent)).slice(0, 10),
-        };
-      }
-      target.querySelector('.tab-main')?.click();
-      return {
-        found: true,
-        active: normalized(document.querySelector('.document-tabs .tab.active')?.textContent || ''),
-      };
-    `,
-    (value) => value?.found === true && String(value?.active || "").includes(labelFragment),
-    `${labelFragment} document tab activation`,
-  );
 }
 
 async function activateDocumentTabByPath(session, pathFragment) {

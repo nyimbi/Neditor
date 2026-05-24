@@ -1090,6 +1090,8 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("native-workflow-file.md"));
   ok(script.includes("native-workflow-renamed.md"));
   ok(script.includes("native-workflow-duplicate.md"));
+  ok(script.includes("activePath || \"\").replace(/\\\\/g, \"/\").includes(\"native-workflow-file.md\")"));
+  ok(script.includes("activePath || \"\").replace(/\\\\/g, \"/\").includes(\"native-workflow-renamed.md\")"));
   ok(script.includes("activateDocumentTabByPath(session, \"native-workflow-duplicate.md\")"));
   ok(script.includes("data-document-path"));
   ok(script.includes("native-workflow-export.html"));
