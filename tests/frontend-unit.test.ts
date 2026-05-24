@@ -1094,6 +1094,8 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("desktop WebDriver edits document structure in outline mode"));
   ok(script.includes("outlineArtifacts"));
   ok(script.includes("outlineModeEvidenceScript"));
+  ok(script.includes("editorDocumentTextFunction"));
+  ok(script.includes("new dirty document before reopening saved file"));
   ok(script.includes("dataTablePreserved"));
   ok(script.includes("sourceGovernancePreserved"));
   ok(script.includes("Source Governance"));

@@ -99,6 +99,22 @@ const outlineModeEvidenceScript = `
   };
 `;
 
+const editorDocumentTextFunction = `
+  function editorDocumentText() {
+    const candidates = [...document.querySelectorAll('.cm-editor, .cm-content')];
+    for (const node of candidates) {
+      let cmView = node.cmView;
+      const seen = new Set();
+      while (cmView && !seen.has(cmView)) {
+        seen.add(cmView);
+        if (cmView.view?.state?.doc) return cmView.view.state.doc.toString();
+        cmView = cmView.parent;
+      }
+    }
+    return document.querySelector('.cm-content')?.textContent || '';
+  }
+`;
+
 if (!existsSync(application) || !statSync(application).isFile()) {
   fail(`desktop binary is missing: ${relative(application)}. Run ./node_modules/.bin/tauri build --no-bundle first.`);
 }
@@ -302,9 +318,11 @@ async function assertOutlineModeWorkflow(session) {
   const source = await waitForValue(
     session,
     `
+      ${editorDocumentTextFunction}
       return {
         mode: document.querySelector('.workspace')?.className || '',
-        editor: document.querySelector('.cm-content')?.textContent || '',
+        editor: editorDocumentText(),
+        renderedEditor: document.querySelector('.cm-content')?.textContent || '',
       };
     `,
     (value) =>
@@ -481,6 +499,25 @@ async function assertFileSaveOpenWorkflow(session) {
     const newButton = document.querySelector('#main-commands button[aria-label="New"]');
     if (!newButton) throw new Error('New button was not visible in the desktop command bar');
     newButton.click();
+    return true;
+  `);
+  await waitForValue(
+    session,
+    `
+      ${editorDocumentTextFunction}
+      return {
+        title: document.title,
+        tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
+        editor: editorDocumentText(),
+      };
+    `,
+    (value) =>
+      String(value?.title || "").startsWith("* ") &&
+      String(value?.tab || "").includes("Untitled") &&
+      String(value?.editor || "").includes("Market Entry Report"),
+    "new dirty document before reopening saved file",
+  );
+  await execute(session, `
     const openButton = document.querySelector('#main-commands button[aria-label="Open"]');
     if (!openButton) throw new Error('Open button was not visible in the desktop command bar');
     openButton.click();
@@ -489,11 +526,12 @@ async function assertFileSaveOpenWorkflow(session) {
   const reopened = await waitForValue(
     session,
     `
+      ${editorDocumentTextFunction}
       return {
         title: document.title,
         tab: document.querySelector('.document-tabs .tab.active')?.textContent || '',
         status: document.querySelector('.status-bar')?.textContent || '',
-        editor: document.querySelector('.cm-content')?.textContent || '',
+        editor: editorDocumentText(),
       };
     `,
     (value) =>
