@@ -56,6 +56,7 @@ requireText(matrix, "pnpm run check:ai-roadmap", "spec matrix cites the roadmap 
 const productSurfaceChecks = [
   ["Docs Live voice drafting", app],
   ["AI Agent Workspace", app],
+  ["Document intent sheet", app],
   ["Agent workflow playbooks", app],
   ["AI control center", app],
   ["Agent lifecycle task board", app],

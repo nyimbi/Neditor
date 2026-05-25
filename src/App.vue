@@ -2449,6 +2449,17 @@
                 <li v-for="item in agentPlan.contextCompleteness.recommendations" :key="item">{{ item }}</li>
               </ul>
             </article>
+            <article class="agent-intent-sheet" :data-status="agentPlan.documentIntent.status">
+              <h3>Document intent sheet</h3>
+              <strong>{{ agentPlan.documentIntent.completenessScore }}/100 {{ agentPlan.documentIntent.status }}</strong>
+              <p>{{ agentPlan.documentIntent.summary }}</p>
+              <dl>
+                <div v-for="field in agentPlan.documentIntent.fields" :key="field.key" :data-status="field.status">
+                  <dt>{{ field.label }}</dt>
+                  <dd>{{ field.value }} <span>{{ field.source }}</span></dd>
+                </div>
+              </dl>
+            </article>
             <article>
               <h3>Context pack</h3>
               <pre>{{ agentPlan.context }}</pre>
@@ -14001,6 +14012,49 @@ select:hover {
 
 .agent-context-score[data-status="strong"] {
   border-left: 3px solid #4f7f55;
+}
+
+.agent-intent-sheet[data-status="needs-input"] {
+  border-left: 3px solid #ba5c4b;
+}
+
+.agent-intent-sheet[data-status="ready"] {
+  border-left: 3px solid #4f7f55;
+}
+
+.agent-intent-sheet dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.agent-intent-sheet dl div {
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+}
+
+.agent-intent-sheet dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #5b6979;
+}
+
+.agent-intent-sheet dd {
+  margin: 2px 0 0;
+  font-size: 0.84rem;
+  color: #203040;
+  overflow-wrap: anywhere;
+}
+
+.agent-intent-sheet dd span {
+  display: block;
+  margin-top: 2px;
+  color: #647386;
+  font-size: 0.72rem;
 }
 
 .agent-missing-inputs {

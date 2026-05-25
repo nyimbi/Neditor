@@ -50,6 +50,7 @@ export interface AgenticWorkflowPlan {
   documentType: DocsLiveDocumentType;
   primaryLane: AgenticWorkflowLane;
   lanes: AgenticWorkflowLane[];
+  documentIntent: AgenticDocumentIntentSheet;
   contextAnswers: string;
   sourcePackText: string;
   sourcePack: AgenticSourcePack;
@@ -63,6 +64,27 @@ export interface AgenticWorkflowPlan {
   distributionTargets: ExportTarget[];
   missingInputs: string[];
   steps: AgenticWorkflowStep[];
+}
+
+export type AgenticDocumentIntentFieldStatus = "provided" | "needs-review" | "missing";
+
+export interface AgenticDocumentIntentField {
+  key: string;
+  label: string;
+  value: string;
+  status: AgenticDocumentIntentFieldStatus;
+  source: "instruction" | "context" | "source-pack" | "current-document" | "derived" | "missing";
+  guidance: string;
+}
+
+export interface AgenticDocumentIntentSheet {
+  summary: string;
+  completenessScore: number;
+  status: "ready" | "needs-input";
+  fields: AgenticDocumentIntentField[];
+  missingFields: string[];
+  reviewPrompts: string[];
+  markdown: string;
 }
 
 export interface AgenticContextCompleteness {
@@ -466,6 +488,15 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
   const context = buildContext(request, lanes, distributionTargets);
   const placeholderText = buildPlaceholderText(corpus, title, lanes, distributionTargets);
   const contextCompleteness = scoreContextCompleteness(corpus, context, placeholderText, distributionTargets);
+  const documentIntent = buildDocumentIntentSheet({
+    request,
+    corpus,
+    title,
+    documentType,
+    lanes,
+    distributionTargets,
+    contextCompleteness,
+  });
   const suggestedOutline = buildSuggestedOutline(request, primaryLane, documentType);
   const missingInputs = buildMissingInputs(corpus, lanes, distributionTargets);
   const revisionInstruction = buildRevisionInstruction(instruction, lanes, request.selectedText);
@@ -479,6 +510,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     documentType,
     primaryLane,
     lanes,
+    documentIntent,
     contextAnswers,
     sourcePackText,
     sourcePack,
@@ -1193,6 +1225,220 @@ function buildPlaceholderText(corpus: string, title: string, lanes: AgenticWorkf
     .join("\n");
 }
 
+function buildDocumentIntentSheet(input: {
+  request: AgenticWorkflowRequest;
+  corpus: string;
+  title: string;
+  documentType: DocsLiveDocumentType;
+  lanes: AgenticWorkflowLane[];
+  distributionTargets: ExportTarget[];
+  contextCompleteness: AgenticContextCompleteness;
+}): AgenticDocumentIntentSheet {
+  const { request, corpus, title, documentType, lanes, distributionTargets, contextCompleteness } = input;
+  const corpusParts = [
+    { source: "context" as const, text: request.contextAnswers || "" },
+    { source: "instruction" as const, text: request.instruction || "" },
+    { source: "source-pack" as const, text: request.sourcePackText || "" },
+    { source: "current-document" as const, text: [request.documentTitle || "", request.documentText || "", request.selectedText || ""].join("\n") },
+  ];
+  const fieldProfiles: Array<{
+    key: string;
+    label: string;
+    aliases: string[];
+    fallback?: string;
+    source?: AgenticDocumentIntentField["source"];
+    required: boolean;
+    guidance: string;
+  }> = [
+    {
+      key: "document-type",
+      label: "Document type",
+      aliases: ["document type", "type"],
+      fallback: docsLiveDocumentTypes.find((type) => type.id === documentType)?.label || titleCase(documentType),
+      source: "derived",
+      required: true,
+      guidance: "Confirm the document type because it controls outline defaults, quality gates, and review expectations.",
+    },
+    {
+      key: "title",
+      label: "Working title",
+      aliases: ["title", "document title", "called", "titled"],
+      fallback: title,
+      source: request.documentTitle ? "current-document" : "derived",
+      required: true,
+      guidance: "Use a specific working title so drafts, exports, and review packets are traceable.",
+    },
+    {
+      key: "audience",
+      label: "Audience",
+      aliases: ["audience", "reader", "recipient", "stakeholder"],
+      required: true,
+      guidance: "Name the reader or decision-maker before drafting tone, detail, and calls to action.",
+    },
+    {
+      key: "outcome",
+      label: "Outcome",
+      aliases: ["outcome", "decision", "goal", "purpose", "reader should", "objective"],
+      required: true,
+      guidance: "State the decision, approval, understanding, or action the document should produce.",
+    },
+    {
+      key: "owner",
+      label: "Owner",
+      aliases: ["owner", "accountable owner", "author"],
+      required: true,
+      guidance: "Assign an accountable owner for follow-up, review, and export handoff.",
+    },
+    {
+      key: "deadline",
+      label: "Deadline",
+      aliases: ["deadline", "due", "due date", "needed by"],
+      required: true,
+      guidance: "Capture timing so the agent can prioritize completeness, review, and distribution readiness.",
+    },
+    {
+      key: "tone",
+      label: "Tone",
+      aliases: ["tone", "voice", "style"],
+      fallback: inferTone(corpus),
+      source: "derived",
+      required: false,
+      guidance: "Confirm tone and detail level before humanization or executive review.",
+    },
+    {
+      key: "evidence",
+      label: "Evidence",
+      aliases: ["evidence", "source", "sources", "data", "proof", "reference"],
+      required: true,
+      guidance: "Name the source material that will support material claims, numbers, dates, and risks.",
+    },
+    {
+      key: "reviewer",
+      label: "Reviewer",
+      aliases: ["reviewer", "approver", "reviewed by", "approved by"],
+      required: Boolean(distributionTargets.length || lanes.includes("review")),
+      guidance: "Name who must inspect the draft before it becomes approved or publishable.",
+    },
+    {
+      key: "approval-status",
+      label: "Approval status",
+      aliases: ["status", "approval status", "release status"],
+      required: Boolean(distributionTargets.length),
+      guidance: "Distribution needs explicit draft, in-review, approved, published, or archived status.",
+    },
+    {
+      key: "distribution",
+      label: "Distribution targets",
+      aliases: ["distribution", "export", "publish", "release target"],
+      fallback: distributionTargets.length ? distributionTargets.join(", ") : "",
+      source: distributionTargets.length ? "derived" : "missing",
+      required: lanes.includes("distribute"),
+      guidance: "Select target outputs before export readiness, manifests, and publishing handoffs.",
+    },
+    {
+      key: "constraints",
+      label: "Constraints",
+      aliases: ["constraints", "requirements", "must", "must not", "risk", "risks", "legal", "budget"],
+      required: false,
+      guidance: "Capture policy, legal, budget, risk, confidentiality, or formatting limits before provider handoff.",
+    },
+  ];
+
+  const fields = fieldProfiles.map((profile) => {
+    const found = findIntentValue(corpusParts, profile.aliases);
+    const value = found?.value || profile.fallback || "";
+    const status: AgenticDocumentIntentFieldStatus = value
+      ? found || profile.source !== "missing"
+        ? profile.required && !found && profile.source === "derived"
+          ? "needs-review"
+          : "provided"
+        : "missing"
+      : profile.required
+        ? "missing"
+        : "needs-review";
+    return {
+      key: profile.key,
+      label: profile.label,
+      value: value || "TBD",
+      status,
+      source: found?.source || profile.source || (value ? "derived" : "missing"),
+      guidance: profile.guidance,
+    };
+  });
+  const requiredFields = fields.filter((field) => field.key !== "constraints" && field.key !== "tone");
+  const missingFields = fields.filter((field) => field.status === "missing").map((field) => field.label);
+  const providedWeight = requiredFields.filter((field) => field.status === "provided").length;
+  const reviewWeight = requiredFields.filter((field) => field.status === "needs-review").length * 0.5;
+  const completenessScore = Math.round(((providedWeight + reviewWeight) / Math.max(1, requiredFields.length)) * 100);
+  const reviewPrompts = [
+    ...fields
+      .filter((field) => field.status !== "provided")
+      .map((field) => `${field.label}: ${field.guidance}`),
+    contextCompleteness.status === "thin" ? "Context completeness is thin; ask the user for the missing intent fields before drafting final copy." : "",
+  ].filter(Boolean);
+  const status: AgenticDocumentIntentSheet["status"] = missingFields.some((label) => ["Audience", "Outcome", "Owner", "Evidence"].includes(label))
+    ? "needs-input"
+    : "ready";
+  const summary =
+    status === "ready"
+      ? `Document intent is ready for ${titleCase(lanes[0] || "create")} with ${completenessScore}/100 completeness.`
+      : `Document intent needs ${missingFields.join(", ") || "review"} before responsible drafting or distribution.`;
+  const markdown = [
+    "| Field | Value | Status | Source | Guidance |",
+    "| --- | --- | --- | --- | --- |",
+    ...fields.map(
+      (field) =>
+        `| ${escapeTableCell(field.label)} | ${escapeTableCell(field.value)} | ${field.status} | ${field.source} | ${escapeTableCell(field.guidance)} |`,
+    ),
+  ].join("\n");
+  return {
+    summary,
+    completenessScore,
+    status,
+    fields,
+    missingFields,
+    reviewPrompts,
+    markdown,
+  };
+}
+
+function findIntentValue(
+  corpusParts: Array<{ source: AgenticDocumentIntentField["source"]; text: string }>,
+  aliases: string[],
+): { value: string; source: AgenticDocumentIntentField["source"] } | null {
+  for (const part of corpusParts) {
+    if (!part.text.trim()) continue;
+    for (const alias of aliases) {
+      const value = extractIntentKeyValue(part.text, alias);
+      if (value) return { value, source: part.source };
+    }
+  }
+  return null;
+}
+
+function extractIntentKeyValue(text: string, alias: string) {
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  const keyValue = text.match(new RegExp(`\\b${escaped}\\b\\s*(?:is|=|:|should be|should)\\s*([^\\n.]+)`, "i"))?.[1]?.trim();
+  if (keyValue) return cleanIntentValue(keyValue);
+  if (alias === "outcome" || alias === "decision" || alias === "purpose" || alias === "goal") {
+    const purpose = text.match(/\b(?:to|so that|in order to)\s+([^.\n]{8,180})/i)?.[1]?.trim();
+    if (purpose) return cleanIntentValue(purpose);
+  }
+  if (alias === "audience" || alias === "reader" || alias === "recipient") {
+    const audience = text.match(/\bfor\s+(?:the\s+)?([^.\n]{4,100}?)(?=\s+(?:owner|deadline|tone|evidence|reviewer)\s*(?:is|=|:)|[.\n]|$)/i)?.[1]?.trim();
+    if (audience) return cleanIntentValue(audience);
+  }
+  return "";
+}
+
+function cleanIntentValue(value: string) {
+  return value
+    .replace(/\s+(?:audience|owner|deadline|tone|evidence|reviewer|status|distribution|release target)\s*(?:is|=|:).+$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+}
+
 function scoreContextCompleteness(corpus: string, context: string, placeholderText: string, targets: ExportTarget[]): AgenticContextCompleteness {
   const combined = [corpus, context, placeholderText].join("\n");
   const checks = [
@@ -1517,16 +1763,18 @@ function buildLifecycleTasks(input: {
     lane: "create",
     title: "Resolve intent, context, and placeholder inputs",
     owner: "Planner Agent",
-    status: hasBlockers || plan.contextCompleteness.status === "thin" ? "needs-input" : "ready",
+    status: hasBlockers || plan.contextCompleteness.status === "thin" || plan.documentIntent.status === "needs-input" ? "needs-input" : "ready",
     action: "open-docs-live",
     evidence: [
+      `Document intent: ${plan.documentIntent.completenessScore}/100 (${plan.documentIntent.status})`,
       `Context completeness: ${plan.contextCompleteness.score}/100 (${plan.contextCompleteness.status})`,
       ...(blockers.length ? blockers.slice(0, 6) : ["Instruction, context pack, placeholders, and outline are available."]),
+      ...plan.documentIntent.reviewPrompts.slice(0, 4),
       ...plan.contextCompleteness.recommendations.slice(0, 4),
     ],
     nextStep:
-      hasBlockers || plan.contextCompleteness.status === "thin"
-        ? "Capture missing inputs and improve audience, evidence, constraints, examples, tone, or approval context."
+      hasBlockers || plan.contextCompleteness.status === "thin" || plan.documentIntent.status === "needs-input"
+        ? "Capture missing intent fields and improve audience, outcome, owner, evidence, constraints, examples, tone, or approval context."
         : "Proceed to outline or section drafting.",
   });
 
@@ -2346,6 +2594,8 @@ function buildAuditTrail(input: {
     generatedAt,
   } = input;
   const contextPayload = [
+    plan.documentIntent.summary,
+    plan.documentIntent.markdown,
     plan.context,
     plan.sourcePackText,
     plan.sourcePack.markdown,
@@ -2379,6 +2629,9 @@ function buildAuditTrail(input: {
       ...item.riskNotes,
       item.recommendation,
     ]),
+    plan.documentIntent.summary,
+    ...plan.documentIntent.fields.flatMap((field) => [field.key, field.value, field.status, field.source, field.guidance]),
+    ...plan.documentIntent.reviewPrompts,
     ...plan.sourcePack.items.flatMap((item) => [item.kind, item.label, item.detail]),
     ...sectionWorkQueue.flatMap((section) => [
       section.id,
@@ -2416,6 +2669,7 @@ function buildAuditTrail(input: {
     rollbackPlan: rollbackPlan(applicationMode),
     reviewEvents: [
       "Agent plan generated from current instruction, document context, and selection state.",
+      `Document intent sheet prepared at ${plan.documentIntent.completenessScore}/100 with ${plan.documentIntent.missingFields.length} missing field(s).`,
       "AI provenance metadata attached to generated packet.",
       blockers.length ? `Human review required before release because ${blockers.length} blocker item(s) remain.` : "No blocker items detected at packet generation time.",
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
@@ -2477,6 +2731,13 @@ function buildReleaseEvidenceBundle(input: {
           ? "needs-review"
           : "available",
       "Context completeness, current document evidence, selected text, source pack, citation TODOs, and claim inventory are captured in the control center.",
+      true,
+    ),
+    releaseEvidenceItem(
+      "Document intent sheet",
+      "Planner Agent",
+      plan.documentIntent.status === "ready" ? "available" : "needs-review",
+      `${plan.documentIntent.completenessScore}/100 intent completeness; missing ${plan.documentIntent.missingFields.join(", ") || "none"}.`,
       true,
     ),
     releaseEvidenceItem(
@@ -2607,6 +2868,11 @@ function buildSourceGrounding(
       label: "User instruction",
       detail: plan.instruction ? "Plain-language intent captured as the agent objective." : "No explicit instruction was supplied.",
       status: plan.instruction ? "available" : "missing",
+    },
+    {
+      label: "Document intent sheet",
+      detail: `${plan.documentIntent.summary} Missing fields: ${plan.documentIntent.missingFields.join(", ") || "none"}.`,
+      status: plan.documentIntent.status === "ready" ? "available" : "needs-review",
     },
     {
       label: "Current document",
@@ -3366,6 +3632,15 @@ function buildRunMarkdown(input: {
     "",
     `Context completeness: ${plan.contextCompleteness.score}/100 (${plan.contextCompleteness.status})`,
     "",
+    "### Document Intent Sheet",
+    "",
+    plan.documentIntent.summary,
+    "",
+    plan.documentIntent.markdown,
+    "",
+    ...(plan.documentIntent.reviewPrompts.length
+      ? ["Intent review prompts:", ...plan.documentIntent.reviewPrompts.map((prompt) => `- [ ] ${prompt}`), ""]
+      : []),
     "### Context Pack",
     "",
     fencedBlock("text", plan.context),

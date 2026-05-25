@@ -583,6 +583,11 @@ test("agentic workflow planner coordinates creation revision review and distribu
   ok(plan.context.includes("Agent lanes requested"));
   ok(plan.placeholderText.includes("audience: executive team"));
   ok(plan.placeholderText.includes("distribution: pdf, google-docs"));
+  ok(plan.documentIntent.fields.some((field) => field.key === "audience" && field.value === "executive team"));
+  ok(plan.documentIntent.fields.some((field) => field.key === "owner" && field.value === "Strategy"));
+  ok(plan.documentIntent.fields.some((field) => field.key === "distribution" && field.value === "pdf, google-docs"));
+  ok(plan.documentIntent.missingFields.includes("Evidence"));
+  ok(plan.documentIntent.reviewPrompts.some((prompt) => prompt.includes("Outcome")));
   equal(plan.contextCompleteness.status, "usable");
   ok(plan.contextCompleteness.present.includes("audience"));
   ok(plan.contextCompleteness.missing.includes("examples"));
@@ -605,7 +610,7 @@ test("agentic workflow planner uses context answers to close missing inputs", ()
   const plan = buildAgenticWorkflowPlan({
     instruction: "Create a board memo, review risks, and prepare PDF distribution.",
     contextAnswers:
-      "audience: board\nowner: Finance\ndeadline: June 1\ntone: direct\nevidence: audited forecast\nreviewer: CFO\nstatus: approved for review",
+      "audience: board\noutcome: approve the capital allocation\nowner: Finance\ndeadline: June 1\ntone: direct\nevidence: audited forecast\nreviewer: CFO\nstatus: approved for review",
     documentTitle: "Capital Allocation Memo",
     documentText: "# Capital Allocation Memo\n\n## Current Ask\n\nDraft notes.",
   });
@@ -615,6 +620,11 @@ test("agentic workflow planner uses context answers to close missing inputs", ()
   ok(plan.placeholderText.includes("audience: board"));
   ok(plan.placeholderText.includes("owner: Finance"));
   ok(plan.placeholderText.includes("evidence: audited forecast"));
+  equal(plan.documentIntent.status, "ready");
+  ok(plan.documentIntent.completenessScore >= 80);
+  ok(plan.documentIntent.fields.some((field) => field.key === "reviewer" && field.value === "CFO"));
+  ok(plan.documentIntent.fields.some((field) => field.key === "approval-status" && field.value === "approved for review"));
+  ok(plan.documentIntent.markdown.includes("| Audience | board | provided | context |"));
   equal(plan.contextCompleteness.status, "strong");
   ok(plan.contextCompleteness.score >= 80);
   ok(plan.distributionTargets.includes("pdf"));
@@ -630,8 +640,11 @@ test("agentic workflow planner uses context answers to close missing inputs", ()
   });
 
   ok(run.markdown.includes("Agent context answers:"));
+  ok(run.markdown.includes("### Document Intent Sheet"));
   ok(run.markdown.includes("### Context Completeness"));
+  ok(run.auditTrail.reviewEvents.some((event) => event.includes("Document intent sheet prepared")));
   ok(run.auditTrail.contextFingerprint.length === 16);
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Document intent sheet" && item.status === "available"));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Context completeness" && item.status === "available"));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.status === "available"));
 });
@@ -723,6 +736,9 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Generated Draft"));
   ok(run.markdown.includes("provider: NEditor Docs Live"));
   ok(run.markdown.includes("## Quality Assurance"));
+  ok(run.markdown.includes("### Document Intent Sheet"));
+  ok(run.markdown.includes("| Audience | executive committee | provided | instruction |"));
+  ok(run.plan.documentIntent.fields.some((field) => field.key === "evidence" && field.value === "CRM forecast"));
   ok(run.markdown.includes("### Document-Type Quality Gates"));
   ok(run.markdown.includes("Client Need"));
   ok(run.markdown.includes("## Review Comment Resolution Queue"));
@@ -745,6 +761,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("### Rollback Plan"));
   ok(run.markdown.includes("## Release Evidence Bundle"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent audit trail" && item.status === "available"));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Document intent sheet" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Substack newsletter package evidence" && item.requiredBeforeRelease));
   ok(
@@ -773,11 +790,13 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.controlCenter.readinessScore > 0);
   ok(run.controlCenter.status === "needs-input" || run.controlCenter.status === "ready");
   ok(run.controlCenter.nextActions.some((action) => action.label === "Verify target artifacts"));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Document intent sheet"));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.status === "available"));
   ok(run.controlCenter.governance.some((item) => item.label === "AI provenance" && item.status === "available"));
   ok(run.controlCenter.distribution.some((item) => item.label === "Substack newsletter package"));
   ok(run.lifecycleTasks.length >= run.sectionWorkQueue.length + run.reviewerAgents.length);
   ok(run.lifecycleTasks.some((task) => task.title.includes("Resolve intent") && task.owner === "Planner Agent"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-intake-context" && task.evidence.some((item) => item.includes("Document intent"))));
   ok(run.lifecycleTasks.some((task) => task.owner === "Docs Live Section Agent" && task.action === "generate-docs-live-draft" && task.sectionId));
   ok(run.lifecycleTasks.some((task) => task.owner === "Distribution Agent" && task.lane === "distribute" && task.target === "substack"));
   equal(run.reviewerAgents.length, 6);
@@ -1772,6 +1791,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("buildAgenticWorkflowRun"));
   ok(app.includes("agentPlan"));
   ok(app.includes("agentPlan.contextCompleteness"));
+  ok(app.includes("agentPlan.documentIntent"));
+  ok(app.includes("Document intent sheet"));
+  ok(app.includes("agent-intent-sheet"));
   ok(app.includes("agentPlan.revisionModes"));
   ok(app.includes("Revision passes"));
   ok(app.includes("agent-revision-modes"));

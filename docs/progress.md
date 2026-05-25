@@ -32,6 +32,13 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- The Agent Workspace now builds a structured document intent sheet before
+  drafting or distribution. The sheet extracts document type, working title,
+  audience, outcome, owner, deadline, tone, evidence, reviewer, approval
+  status, distribution targets, and constraints from the instruction, context
+  answers, source pack, and current document; surfaces missing fields in the
+  plan UI; feeds the AI Control Center and release evidence bundle; and is
+  included in generated agent packets and audit fingerprints.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,
