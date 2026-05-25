@@ -10928,24 +10928,47 @@ function parseFrontMatterVariables(text: string): FrontMatterVariableRow[] {
   const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
   if (endIndex <= 0) return [];
   const rows: FrontMatterVariableRow[] = [];
+  const stack: Array<{ indent: number; path: string; excluded: boolean }> = [];
   for (let index = 1; index < endIndex; index += 1) {
     const raw = lines[index];
-    const match = raw.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
-    if (!match || frontMatterVariableExcludedKeys.has(match[1])) continue;
-    const value = cleanYamlScalar(match[2]);
+    const match = raw.match(/^(\s*)([A-Za-z][\w-]*):\s*(.*)$/);
+    if (!match) continue;
+    const indent = yamlIndentWidth(match[1]);
+    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+    const parent = stack[stack.length - 1];
+    const key = match[2];
+    const path = parent ? `${parent.path}.${key}` : key;
+    const excluded = Boolean(parent?.excluded || (!parent && frontMatterVariableExcludedKeys.has(key)));
+    const hasChildren = hasIndentedYamlChildren(lines, endIndex, index, indent);
+    if (hasChildren) stack.push({ indent, path, excluded });
+    if (excluded) continue;
+    const value = cleanYamlScalar(match[3]);
     if (!value || value === "[]" || value === "{}") {
-      rows.push({ key: match[1], value: "", status: "empty", line: index + 1 });
+      if (!hasChildren) rows.push({ key: path, value: "", status: "empty", line: index + 1 });
       continue;
     }
     if (/^[>|]$/.test(value) || value.startsWith("[") || value.startsWith("{")) continue;
     rows.push({
-      key: match[1],
+      key: path,
       value,
       status: "ready",
       line: index + 1,
     });
   }
   return rows.sort((left, right) => left.key.localeCompare(right.key));
+}
+
+function yamlIndentWidth(indent: string) {
+  return indent.replace(/\t/g, "  ").length;
+}
+
+function hasIndentedYamlChildren(lines: string[], endIndex: number, index: number, indent: number) {
+  for (let nextIndex = index + 1; nextIndex < endIndex; nextIndex += 1) {
+    const next = lines[nextIndex];
+    if (!next.trim() || next.trimStart().startsWith("#")) continue;
+    return yamlIndentWidth(next.match(/^\s*/)?.[0] || "") > indent;
+  }
+  return false;
 }
 
 function parseMergedMetadataVariables(metadata: Record<string, unknown>, frontMatterRows: FrontMatterVariableRow[]): FrontMatterVariableRow[] {

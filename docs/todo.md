@@ -1630,6 +1630,10 @@ Finish:
   compile, transform artifacts, manifests, and cross-target export outputs, with
   absolute paths, parent-directory escapes, and resolved symlink escapes blocked
   before file reads.
+- Document variable management for business metadata. The References panel now
+  surfaces nested YAML front matter variables as dotted placeholder paths such as
+  `account.ownerName`, preserves source-line navigation, and inserts filtered
+  placeholders from those nested variables.
 - Validation for malformed data source paths, broken formulas, circular or
   unsupported dependencies, and mixed span/formula tables. Data source coverage
   now proves missing path, unsupported type, unreadable file, outside-folder

@@ -1750,6 +1750,7 @@ Additional document variable filter verification:
 | --- | --- | --- |
 | `cargo test --locked compiler_formats_document_variables_and_reports_bad_filters --lib -- --nocapture` in `src-tauri` | Pass | Focused compiler test proves document variable defaults, chained text filters, numeric filters, unsupported-filter diagnostics, nonnumeric-filter diagnostics, and source-ranged warnings. |
 | `cargo test --locked formatted_document_variables_survive_cross_target_exports --lib -- --nocapture` in `src-tauri` | Pass | Focused export-conformance test proves formatted document variables survive HTML, PDF, DOCX, PPTX, and Markdown bundle text outputs. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "manages front matter data sources" --project chromium` | Pass | Focused browser workflow now proves the References-panel variable manager surfaces nested YAML metadata as dotted paths such as `account.ownerName` and `account.renewalValue`, then inserts a filtered `{{account.ownerName \| title}}` placeholder. |
 | `cargo fmt --check` in `src-tauri` | Pass | Formatting remained clean after extending document variable filters. |
 | `cargo check --locked` in `src-tauri` | Pass | Dev-profile Rust check passed after the document variable filter update. |
 | `cargo check --locked --features native-watch` in `src-tauri` | Pass | Native watcher feature still compiles after the document variable filter update. |

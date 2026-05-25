@@ -2826,6 +2826,9 @@ test("manages front matter data sources from the references panel", async ({ pag
       "title: Data Source UI",
       "status: draft",
       "client: Example Corp",
+      "account:",
+      "  ownerName: Asha M.",
+      "  renewalValue: 90000",
       "budget: 125000",
       "owner:",
       "dataSources:",
@@ -2866,7 +2869,10 @@ test("manages front matter data sources from the references panel", async ({ pag
   await expect(variables).toContainText("front matter variables");
   await expect(variables).toContainText("project/merged variables");
   await expect(variables.locator(".snapshot-row").filter({ hasText: "client" })).toContainText("Example Corp");
-  await expect(variables.locator(".snapshot-row").filter({ hasText: "owner" })).toContainText("empty");
+  await expect(variables.locator(".snapshot-row").filter({ hasText: "account.ownerName" })).toContainText("Asha M.");
+  await expect(variables.locator(".snapshot-row").filter({ hasText: "account.renewalValue" })).toContainText("90000");
+  await expect(variables).toContainText("owner");
+  await expect(variables).toContainText("empty");
   await expect(variables.locator(".snapshot-row").filter({ hasText: "projectLead" })).toContainText("Strategy PMO");
   await variables.getByLabel("Document variable insert filter").selectOption("currency");
   await variables.locator(".snapshot-row").filter({ hasText: "budget" }).getByRole("button", { name: "Insert variable" }).click();
@@ -2874,6 +2880,9 @@ test("manages front matter data sources from the references panel", async ({ pag
   await variables.getByLabel("Document variable insert filter").selectOption("upper");
   await variables.locator(".snapshot-row").filter({ hasText: "projectLead" }).getByRole("button", { name: "Insert variable" }).click();
   await expect.poll(() => editorText(page)).toContain("{{projectLead | upper}}");
+  await variables.getByLabel("Document variable insert filter").selectOption("title");
+  await variables.locator(".snapshot-row").filter({ hasText: "account.ownerName" }).getByRole("button", { name: "Insert variable" }).click();
+  await expect.poll(() => editorText(page)).toContain("{{account.ownerName | title}}");
   await variables.getByPlaceholder("client, owner, budget").fill("reviewer");
   await variables.getByPlaceholder("Example Corp, Strategy Office, 125000").fill("QA Lead");
   await variables.getByRole("button", { name: "Add variable" }).click();

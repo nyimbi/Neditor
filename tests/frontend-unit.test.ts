@@ -2450,6 +2450,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("mergedMetadataVariableRows"));
   ok(app.includes("documentVariableManagerSummary"));
   ok(app.includes("parseFrontMatterVariables"));
+  ok(app.includes("hasIndentedYamlChildren"));
+  ok(app.includes("yamlIndentWidth"));
+  ok(app.includes("`${parent.path}.${key}`"));
   ok(app.includes("parseMergedMetadataVariables"));
   ok(app.includes("project/merged metadata"));
   ok(app.includes("insertDocumentVariable"));
