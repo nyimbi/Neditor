@@ -18,6 +18,7 @@ import {
 } from "../src/lib/aiProviderPackages.js";
 import {
   agenticWorkflowPlaybooks,
+  buildAgenticDocumentMemory,
   buildAgenticLifecycleTaskBrief,
   buildAgenticReleaseEvidenceAuditPackage,
   buildAgenticSectionWorkBrief,
@@ -689,6 +690,47 @@ test("agentic source pack builder structures notes urls files claims and reviewe
   ok(providerPackage.userPrompt.includes("User-managed source pack:"));
 });
 
+test("agentic document memory preserves reusable terminology style and decisions", () => {
+  const memory = buildAgenticDocumentMemory({
+    memoryText: [
+      "[terminology] ARR: Annual recurring revenue",
+      "[style] Executive voice: concise and concrete",
+      "[accepted] Positioning: Lead with renewal economics",
+      "[rejected] Scope: Do not frame this as a product launch",
+      "[review] CFO preference: verify forecast basis before approval",
+      "[distribution] Handoff: Google Docs for comments, PDF for board pack",
+    ].join("\n"),
+    contextAnswers: "Prefer plain language. Avoid vague AI phrasing.",
+    documentText: "Decision: accepted option B. Reviewer prefers short risk bullets.",
+  });
+
+  equal(memory.entries.length, 8);
+  equal(memory.terminology[0].label, "ARR");
+  ok(memory.style.some((entry) => entry.detail.includes("concise")));
+  ok(memory.acceptedDecisions.some((entry) => entry.detail.includes("renewal economics")));
+  ok(memory.rejectedDirections.some((entry) => entry.detail.includes("product launch")));
+  ok(memory.reviewPreferences.some((entry) => entry.detail.includes("forecast basis") || entry.detail.includes("risk bullets")));
+  ok(memory.distributionPreferences.some((entry) => entry.detail.includes("Google Docs")));
+  ok(memory.summary.includes("terminology"));
+  ok(memory.markdown.includes("[terminology] ARR"));
+
+  const run = buildAgenticWorkflowRun({
+    instruction: "Create a board memo and prepare PDF. audience: board owner: CFO deadline: June 1 evidence: audited forecast outcome: approve renewal",
+    memoryText: memory.markdown,
+    documentTitle: "Renewal Memo",
+    documentText: "# Renewal Memo\n\nDecision: accepted option B.",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  ok(run.plan.documentMemory.entries.length >= memory.entries.length);
+  ok(run.plan.context.includes("Reusable document memory"));
+  ok(run.markdown.includes("### Document Memory"));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Document memory" && item.status === "available"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-document-memory-review"));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Document memory pack" && item.status === "available"));
+  ok(run.auditTrail.reviewEvents.some((event) => event.includes("Reusable document memory")));
+});
+
 test("agentic workflow playbooks cover common business and publishing starts", () => {
   ok(agenticWorkflowPlaybooks.length >= 10);
   ok(agenticWorkflowPlaybooks.some((playbook) => playbook.id === "board-memo-to-approval"));
@@ -1231,6 +1273,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         instruction: "Create a board memo",
         contextAnswers: "audience: board\nowner: CFO\nevidence: audited forecast",
         sourcePackText: "[claim] Forecast: Revenue grew 18%.",
+        memoryText: "[terminology] ARR: Annual recurring revenue",
         documentType: "board-memo",
         lanes: ["create", "review", "create"],
         distributionTargets: ["pdf", "bad-target"],
@@ -1506,6 +1549,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     instruction: "Create a board memo",
     contextAnswers: "audience: board\nowner: CFO\nevidence: audited forecast",
     sourcePackText: "[claim] Forecast: Revenue grew 18%.",
+    memoryText: "[terminology] ARR: Annual recurring revenue",
     documentType: "board-memo",
     lanes: ["create", "review"],
     distributionTargets: ["pdf"],
@@ -1873,6 +1917,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentRun"));
   ok(app.includes("agentContextAnswers"));
   ok(app.includes("agentSourcePackText"));
+  ok(app.includes("agentMemoryText"));
+  ok(app.includes("Document memory"));
   ok(app.includes("Source Pack Builder"));
   ok(app.includes("agentSourcePackPreview"));
   ok(app.includes("addAgentSourcePackItem"));

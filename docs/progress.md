@@ -40,6 +40,11 @@ Recent pushed checkpoints visible in current git history:
   plan UI; feeds the AI Control Center and release evidence bundle; and is
   included in generated agent packets, audit fingerprints, persisted run
   history, and filtered run-history audits.
+- The Agent Workspace also accepts reusable document memory for terminology,
+  style, accepted decisions, rejected directions, reviewer preferences, and
+  distribution preferences. Memory items are parsed deterministically, included
+  in the context pack, surfaced in the plan UI, carried into lifecycle tasks,
+  AI Control Center grounding, release evidence, and run-history replanning.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,

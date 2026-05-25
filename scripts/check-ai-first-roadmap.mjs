@@ -57,6 +57,7 @@ const productSurfaceChecks = [
   ["Docs Live voice drafting", app],
   ["AI Agent Workspace", app],
   ["Document intent sheet", app],
+  ["Document memory", app],
   ["Agent workflow playbooks", app],
   ["AI control center", app],
   ["Agent lifecycle task board", app],

@@ -17,6 +17,7 @@ export interface AgenticWorkflowRequest {
   instruction: string;
   contextAnswers?: string;
   sourcePackText?: string;
+  memoryText?: string;
   documentTitle?: string;
   documentText?: string;
   selectedText?: string;
@@ -54,6 +55,8 @@ export interface AgenticWorkflowPlan {
   contextAnswers: string;
   sourcePackText: string;
   sourcePack: AgenticSourcePack;
+  memoryText: string;
+  documentMemory: AgenticDocumentMemory;
   suggestedOutline: string;
   context: string;
   placeholderText: string;
@@ -113,6 +116,34 @@ export interface AgenticSourcePack {
   claims: AgenticSourcePackItem[];
   notes: AgenticSourcePackItem[];
   markdown: string;
+}
+
+export type AgenticDocumentMemoryKind =
+  | "terminology"
+  | "style"
+  | "accepted-decision"
+  | "rejected-direction"
+  | "review-preference"
+  | "distribution-preference";
+
+export interface AgenticDocumentMemoryEntry {
+  id: string;
+  kind: AgenticDocumentMemoryKind;
+  label: string;
+  detail: string;
+  source: "user-memory" | "context" | "current-document";
+}
+
+export interface AgenticDocumentMemory {
+  entries: AgenticDocumentMemoryEntry[];
+  terminology: AgenticDocumentMemoryEntry[];
+  style: AgenticDocumentMemoryEntry[];
+  acceptedDecisions: AgenticDocumentMemoryEntry[];
+  rejectedDirections: AgenticDocumentMemoryEntry[];
+  reviewPreferences: AgenticDocumentMemoryEntry[];
+  distributionPreferences: AgenticDocumentMemoryEntry[];
+  markdown: string;
+  summary: string;
 }
 
 export interface AgenticQualityGate {
@@ -479,7 +510,13 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
   const contextAnswers = request.contextAnswers?.trim() || "";
   const sourcePackText = request.sourcePackText?.trim() || "";
   const sourcePack = buildAgenticSourcePack(sourcePackText);
-  const corpus = [instruction, contextAnswers, sourcePackText, request.documentTitle, request.documentText, request.selectedText].filter(Boolean).join("\n");
+  const memoryText = request.memoryText?.trim() || "";
+  const documentMemory = buildAgenticDocumentMemory({
+    memoryText,
+    contextAnswers,
+    documentText: request.documentText || "",
+  });
+  const corpus = [instruction, contextAnswers, sourcePackText, memoryText, request.documentTitle, request.documentText, request.selectedText].filter(Boolean).join("\n");
   const lanes = detectLanes(corpus);
   const primaryLane = lanes[0] || "create";
   const documentType = normalizeDocsLiveDocumentType(corpus);
@@ -514,6 +551,8 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     contextAnswers,
     sourcePackText,
     sourcePack,
+    memoryText,
+    documentMemory,
     suggestedOutline,
     context,
     placeholderText,
@@ -749,6 +788,47 @@ export function buildAgenticSourcePack(sourcePackText: string): AgenticSourcePac
   };
 }
 
+export function buildAgenticDocumentMemory(input: {
+  memoryText?: string;
+  contextAnswers?: string;
+  documentText?: string;
+}): AgenticDocumentMemory {
+  const entries = [
+    ...parseAgenticMemoryText(input.memoryText || "", "user-memory"),
+    ...deriveAgenticMemoryEntries(input.contextAnswers || "", "context"),
+    ...deriveAgenticMemoryEntries(input.documentText || "", "current-document"),
+  ].slice(0, 60);
+  const deduped: AgenticDocumentMemoryEntry[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    const key = `${entry.kind}:${entry.label.toLowerCase()}:${entry.detail.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(entry);
+    if (deduped.length >= 40) break;
+  }
+  const byKind = (kind: AgenticDocumentMemoryKind) => deduped.filter((item) => item.kind === kind);
+  const summaryParts = [
+    byKind("terminology").length ? `${byKind("terminology").length} terminology` : "",
+    byKind("style").length ? `${byKind("style").length} style` : "",
+    byKind("accepted-decision").length ? `${byKind("accepted-decision").length} accepted decisions` : "",
+    byKind("rejected-direction").length ? `${byKind("rejected-direction").length} rejected directions` : "",
+    byKind("review-preference").length ? `${byKind("review-preference").length} review preferences` : "",
+    byKind("distribution-preference").length ? `${byKind("distribution-preference").length} distribution preferences` : "",
+  ].filter(Boolean);
+  return {
+    entries: deduped,
+    terminology: byKind("terminology"),
+    style: byKind("style"),
+    acceptedDecisions: byKind("accepted-decision"),
+    rejectedDirections: byKind("rejected-direction"),
+    reviewPreferences: byKind("review-preference"),
+    distributionPreferences: byKind("distribution-preference"),
+    markdown: formatAgenticDocumentMemory(deduped),
+    summary: summaryParts.length ? `Document memory carries ${summaryParts.join(", ")}.` : "No reusable document memory has been captured yet.",
+  };
+}
+
 export function serializeAgenticSourcePackItem(kind: AgenticSourcePackItemKind, label: string, detail: string) {
   const cleanKind = kind || "note";
   const cleanLabel = label.trim() || titleCase(cleanKind);
@@ -799,6 +879,80 @@ function sourcePackItem(kind: AgenticSourcePackItemKind, label: string, detail: 
     label: safeLabel.slice(0, 180),
     detail: safeDetail.slice(0, 1_200),
   };
+}
+
+function parseAgenticMemoryText(text: string, source: AgenticDocumentMemoryEntry["source"]) {
+  const entries: AgenticDocumentMemoryEntry[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim().replace(/^[-*]\s+/, "");
+    if (!line) continue;
+    const tagged = line.match(/^\[(terminology|term|style|accepted-decision|accepted|decision|rejected-direction|rejected|avoid|review-preference|review|distribution-preference|distribution)\]\s*([^:]+)?(?::\s*([\s\S]+))?$/i);
+    if (tagged) {
+      const kind = normalizeMemoryKind(tagged[1]);
+      const label = (tagged[2] || titleCase(kind)).trim();
+      const detail = (tagged[3] || label).trim();
+      entries.push(memoryEntry(kind, label, detail, source));
+      continue;
+    }
+    const derived = memoryEntryFromSignal(line, source);
+    if (derived) entries.push(derived);
+    if (entries.length >= 60) break;
+  }
+  return entries;
+}
+
+function deriveAgenticMemoryEntries(text: string, source: AgenticDocumentMemoryEntry["source"]) {
+  return parseAgenticMemoryText(
+    text
+      .split(/\r?\n/)
+      .filter((line) => /\b(prefer|avoid|do not|don't|use term|call it|accepted|approved|rejected|reviewer prefers|publish|distribution)\b/i.test(line))
+      .join("\n"),
+    source,
+  );
+}
+
+function memoryEntryFromSignal(line: string, source: AgenticDocumentMemoryEntry["source"]): AgenticDocumentMemoryEntry | null {
+  if (/\b(?:use term|call it|terminology|glossary)\b/i.test(line)) return memoryEntry("terminology", line.slice(0, 90), line, source);
+  if (/\b(?:tone|style|voice|prefer|plain language|executive|technical)\b/i.test(line)) return memoryEntry("style", line.slice(0, 90), line, source);
+  if (/\b(?:accepted|approved|decision|decided|chosen)\b/i.test(line)) return memoryEntry("accepted-decision", line.slice(0, 90), line, source);
+  if (/\b(?:rejected|avoid|do not|don't|never use)\b/i.test(line)) return memoryEntry("rejected-direction", line.slice(0, 90), line, source);
+  if (/\b(?:reviewer prefers|review preference|approver wants|legal wants|cfo wants)\b/i.test(line)) return memoryEntry("review-preference", line.slice(0, 90), line, source);
+  if (/\b(?:distribution|publish|export|substack|blog|google docs|pdf|docx)\b/i.test(line)) {
+    return memoryEntry("distribution-preference", line.slice(0, 90), line, source);
+  }
+  return null;
+}
+
+function normalizeMemoryKind(value: string): AgenticDocumentMemoryKind {
+  const normalized = value.toLowerCase();
+  if (normalized === "term") return "terminology";
+  if (normalized === "accepted" || normalized === "decision") return "accepted-decision";
+  if (normalized === "rejected" || normalized === "avoid") return "rejected-direction";
+  if (normalized === "review") return "review-preference";
+  if (normalized === "distribution") return "distribution-preference";
+  return normalized as AgenticDocumentMemoryKind;
+}
+
+function memoryEntry(
+  kind: AgenticDocumentMemoryKind,
+  label: string,
+  detail: string,
+  source: AgenticDocumentMemoryEntry["source"],
+): AgenticDocumentMemoryEntry {
+  const safeLabel = label.trim() || titleCase(kind);
+  const safeDetail = detail.trim() || safeLabel;
+  return {
+    id: `memory-${kind}-${stableFingerprint(`${kind}\n${safeLabel}\n${safeDetail}\n${source}`).slice(0, 12)}`,
+    kind,
+    label: safeLabel.slice(0, 160),
+    detail: safeDetail.slice(0, 1_200),
+    source,
+  };
+}
+
+function formatAgenticDocumentMemory(entries: AgenticDocumentMemoryEntry[]) {
+  if (!entries.length) return "";
+  return entries.map((entry) => `- [${entry.kind}] ${entry.label}: ${entry.detail} (${entry.source})`).join("\n");
 }
 
 function formatAgenticSourcePack(items: AgenticSourcePackItem[]) {
@@ -1192,9 +1346,16 @@ function inferTitle(request: AgenticWorkflowRequest, documentType: DocsLiveDocum
 
 function buildContext(request: AgenticWorkflowRequest, lanes: AgenticWorkflowLane[], targets: ExportTarget[]) {
   const sourcePack = buildAgenticSourcePack(request.sourcePackText || "");
+  const documentMemory = buildAgenticDocumentMemory({
+    memoryText: request.memoryText || "",
+    contextAnswers: request.contextAnswers || "",
+    documentText: request.documentText || "",
+  });
   return [
     `User intent: ${request.instruction.trim() || "Create and improve the current document."}`,
     request.contextAnswers?.trim() ? `Agent context answers: ${request.contextAnswers.trim().slice(0, 1600)}` : "",
+    documentMemory.entries.length ? `Document memory: ${documentMemory.summary}` : "",
+    documentMemory.markdown ? `Reusable document memory:\n${documentMemory.markdown.slice(0, 2200)}` : "",
     sourcePack.items.length
       ? `User source pack: ${sourcePack.items.length} item(s), including ${sourcePack.claims.length} claim(s), ${sourcePack.urls.length} URL(s), ${sourcePack.files.length} file(s), ${sourcePack.references.length} reference(s), and ${sourcePack.reviewerComments.length} reviewer comment(s).`
       : "",
@@ -1846,6 +2007,19 @@ function buildLifecycleTasks(input: {
       action: "open-review",
       evidence: plan.sourcePack.items.slice(0, 8).map((item) => `${titleCase(item.kind)} ${item.label}: ${item.detail}`),
       nextStep: "Confirm each source-pack note, URL, file, reference, reviewer comment, and claim is safe and relevant before provider handoff.",
+    });
+  }
+
+  if (plan.documentMemory.entries.length) {
+    tasks.push({
+      id: "task-document-memory-review",
+      lane: "review",
+      title: "Apply reusable document memory",
+      owner: "Planner Agent",
+      status: "needs-input",
+      action: "open-review",
+      evidence: plan.documentMemory.entries.slice(0, 8).map((entry) => `${titleCase(entry.kind)} ${entry.label}: ${entry.detail}`),
+      nextStep: "Confirm terminology, style decisions, accepted choices, rejected directions, and review preferences before generating or accepting new content.",
     });
   }
 
@@ -2596,8 +2770,11 @@ function buildAuditTrail(input: {
   const contextPayload = [
     plan.documentIntent.summary,
     plan.documentIntent.markdown,
+    plan.documentMemory.summary,
+    plan.documentMemory.markdown,
     plan.context,
     plan.sourcePackText,
+    plan.memoryText,
     plan.sourcePack.markdown,
     plan.placeholderText,
     plan.suggestedOutline,
@@ -2632,6 +2809,8 @@ function buildAuditTrail(input: {
     plan.documentIntent.summary,
     ...plan.documentIntent.fields.flatMap((field) => [field.key, field.value, field.status, field.source, field.guidance]),
     ...plan.documentIntent.reviewPrompts,
+    plan.documentMemory.summary,
+    ...plan.documentMemory.entries.flatMap((entry) => [entry.kind, entry.label, entry.detail, entry.source]),
     ...plan.sourcePack.items.flatMap((item) => [item.kind, item.label, item.detail]),
     ...sectionWorkQueue.flatMap((section) => [
       section.id,
@@ -2690,6 +2869,9 @@ function buildAuditTrail(input: {
       plan.sourcePack.items.length
         ? `User source pack included ${plan.sourcePack.items.length} structured item(s) for provider and reviewer grounding.`
         : "No user-managed source pack items were supplied.",
+      plan.documentMemory.entries.length
+        ? `Reusable document memory included ${plan.documentMemory.entries.length} terminology, style, decision, review, or distribution item(s).`
+        : "No reusable document memory items were supplied.",
       `Document-type quality gates staged: ${plan.qualityGates.map((gate) => gate.label).join(", ")}.`,
       documentEvidence.reviewCommentResolutions.length
         ? `Review comment resolution queue staged for ${documentEvidence.reviewCommentResolutions.length} unresolved comment(s).`
@@ -2739,6 +2921,15 @@ function buildReleaseEvidenceBundle(input: {
       plan.documentIntent.status === "ready" ? "available" : "needs-review",
       `${plan.documentIntent.completenessScore}/100 intent completeness; missing ${plan.documentIntent.missingFields.join(", ") || "none"}.`,
       true,
+    ),
+    releaseEvidenceItem(
+      "Document memory pack",
+      "Planner Agent",
+      plan.documentMemory.entries.length ? "available" : "needs-review",
+      plan.documentMemory.entries.length
+        ? `${plan.documentMemory.entries.length} reusable terminology, style, decision, review, or distribution memory item(s) are attached.`
+        : "No reusable document memory has been captured for future agent runs.",
+      false,
     ),
     releaseEvidenceItem(
       "Reference integrity",
@@ -2904,6 +3095,11 @@ function buildSourceGrounding(
         ? `${plan.sourcePack.items.length} user-managed source item(s): ${plan.sourcePack.claims.length} claim(s), ${plan.sourcePack.urls.length} URL(s), ${plan.sourcePack.files.length} file(s), ${plan.sourcePack.references.length} reference(s), ${plan.sourcePack.reviewerComments.length} reviewer comment(s).`
         : "No user-managed source pack items were supplied.",
       status: plan.sourcePack.items.length ? "available" : "needs-review",
+    },
+    {
+      label: "Document memory",
+      detail: plan.documentMemory.entries.length ? plan.documentMemory.summary : "No reusable terminology, style, decision, or review memory is available.",
+      status: "available",
     },
     {
       label: "Evidence",
@@ -3652,6 +3848,21 @@ function buildRunMarkdown(input: {
     `Missing: ${plan.contextCompleteness.missing.join(", ") || "none"}`,
     "",
     ...plan.contextCompleteness.recommendations.map((item) => `- [ ] ${item}`),
+    "",
+    "### Document Memory",
+    "",
+    plan.documentMemory.summary,
+    "",
+    ...(plan.documentMemory.entries.length
+      ? [
+          "| Kind | Label | Source | Detail |",
+          "| --- | --- | --- | --- |",
+          ...plan.documentMemory.entries.map(
+            (entry) =>
+              `| ${entry.kind} | ${escapeTableCell(entry.label)} | ${entry.source} | ${escapeTableCell(entry.detail)} |`,
+          ),
+        ]
+      : ["No reusable document memory was supplied."]),
     "",
     "### User Source Pack",
     "",

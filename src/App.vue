@@ -2351,6 +2351,14 @@
               placeholder="[claim] ARR forecast: ARR grows 18% in Q2 according to finance workbook&#10;[url] Pricing source: https://example.com/pricing&#10;[reviewer-comment] CFO: Check renewal risk before board review"
             ></textarea>
           </label>
+          <label>
+            Document memory
+            <textarea
+              v-model="agentMemoryText"
+              rows="5"
+              placeholder="[terminology] ARR: Annual recurring revenue&#10;[style] Executive tone: concise, concrete, no generic AI phrasing&#10;[rejected] Scope: Do not frame this as a product launch"
+            ></textarea>
+          </label>
           <ul v-if="agentSourcePackPreview.items.length" class="agent-source-pack-list">
             <li v-for="item in agentSourcePackPreview.items" :key="item.id">
               <strong>{{ item.kind }} | {{ item.label }}</strong>
@@ -2473,6 +2481,13 @@
               <p>{{ agentPlan.sourcePack.items.length }} managed source items</p>
               <ul>
                 <li v-for="item in agentPlan.sourcePack.items.slice(0, 6)" :key="item.id">{{ item.kind }}: {{ item.label }}</li>
+              </ul>
+            </article>
+            <article class="agent-document-memory">
+              <h3>Document memory</h3>
+              <p>{{ agentPlan.documentMemory.summary }}</p>
+              <ul>
+                <li v-for="item in agentPlan.documentMemory.entries.slice(0, 6)" :key="item.id">{{ item.kind }}: {{ item.label }}</li>
               </ul>
             </article>
             <article class="agent-quality-gates">
@@ -3560,6 +3575,7 @@ const agentWorkspaceOpen = ref(false);
 const agentInstruction = ref("");
 const agentContextAnswers = ref("");
 const agentSourcePackText = ref("");
+const agentMemoryText = ref("");
 const agentSourcePackKind = ref<AgenticSourcePackItemKind>("note");
 const agentSourcePackLabel = ref("");
 const agentSourcePackDetail = ref("");
@@ -4247,6 +4263,7 @@ const filteredAgentRunHistory = computed(() => {
       item.instruction,
       item.contextAnswers || "",
       item.sourcePackText || "",
+      item.memoryText || "",
       item.packetPreview || "",
       item.status,
       item.applicationMode,
@@ -5591,6 +5608,7 @@ function buildAgentWorkspacePlan() {
     instruction: agentInstruction.value,
     contextAnswers: agentContextAnswers.value,
     sourcePackText: agentSourcePackText.value,
+    memoryText: agentMemoryText.value,
     documentTitle: active.value.compile?.semantic.title || active.value.title,
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
@@ -5609,6 +5627,7 @@ function generateAgentWorkspaceRun() {
     instruction: agentInstruction.value,
     contextAnswers: agentContextAnswers.value,
     sourcePackText: agentSourcePackText.value,
+    memoryText: agentMemoryText.value,
     documentTitle: active.value.compile?.semantic.title || active.value.title,
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
@@ -5641,6 +5660,7 @@ function agentRunHistoryItem(
     instruction: run.plan.instruction,
     contextAnswers: run.plan.contextAnswers,
     sourcePackText: run.plan.sourcePackText,
+    memoryText: run.plan.memoryText,
     documentType: run.plan.documentType,
     lanes: run.plan.lanes,
     distributionTargets: run.plan.distributionTargets,
@@ -5753,6 +5773,7 @@ function replanAgentHistoryRun(item: AgentRunHistoryItem) {
   agentInstruction.value = item.instruction;
   agentContextAnswers.value = item.contextAnswers || "";
   agentSourcePackText.value = item.sourcePackText || "";
+  agentMemoryText.value = item.memoryText || "";
   agentRun.value = null;
   agentLifecycleTaskStates.value = Object.fromEntries((item.lifecycleTaskStates || []).map((state) => [state.taskId, state]));
   agentEditAcceptanceStates.value = Object.fromEntries((item.editAcceptanceStates || []).map((state) => [state.itemId, state]));

@@ -238,6 +238,7 @@ export interface AgentRunHistoryItem {
   instruction: string;
   contextAnswers?: string;
   sourcePackText?: string;
+  memoryText?: string;
   documentType: string;
   lanes: string[];
   distributionTargets: ExportTarget[];
@@ -837,6 +838,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     instruction: normalizedString(value.instruction, 500),
     contextAnswers: normalizedString(value.contextAnswers, 4_000) || undefined,
     sourcePackText: normalizedString(value.sourcePackText, 8_000) || undefined,
+    memoryText: normalizedString(value.memoryText, 8_000) || undefined,
     documentType: normalizedString(value.documentType, 80),
     lanes: stringArray(value.lanes, 12) || [],
     distributionTargets,
