@@ -177,8 +177,12 @@ controls on a live document.
 
 Use **AI Create** when the next action is clearly to create a first draft. It
 opens Docs Live with an intent-first workflow: document type, outline, spoken or
-typed context, placeholder values, AI-created questionnaire, section-by-section
-drafting, QA, humanization, and review handoff.
+typed context, managed placeholder values, AI-created questionnaire,
+section-by-section drafting, QA, humanization, and review handoff. Use the
+Placeholder Manager when you want a business-friendly table for clients,
+owners, dates, evidence, reviewers, numbers, sources, and repeated variables;
+it keeps the underlying plain-text placeholder block synchronized for Docs Live,
+agent packets, and provider handoffs.
 
 Docs Live includes blueprints for business briefs, board memos, proposals,
 strategy plans, project plans, research briefs, policies, meeting briefs,

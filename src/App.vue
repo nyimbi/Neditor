@@ -1825,6 +1825,44 @@
             Placeholder values
             <textarea v-model="docsLivePlaceholderText" rows="8" placeholder="client: Acme&#10;audience: executive team&#10;deadline: June 1&#10;owner: Finance"></textarea>
           </label>
+          <section class="docs-live-placeholder-manager docs-live-wide" aria-label="Docs Live placeholder manager">
+            <header>
+              <div>
+                <strong>Placeholder Manager</strong>
+                <span>{{ docsLivePlaceholderRows.length }} values | Missing {{ docsLiveMissingPlaceholderKeys.join(", ") || "none" }}</span>
+              </div>
+            </header>
+            <div class="docs-live-placeholder-add">
+              <label>
+                Key
+                <input v-model="docsLivePlaceholderKey" placeholder="client, amount, source" />
+              </label>
+              <label>
+                Value
+                <input v-model="docsLivePlaceholderValue" placeholder="Acme, $250K, audited forecast" />
+              </label>
+              <button type="button" :disabled="!docsLivePlaceholderKey.trim() || !docsLivePlaceholderValue.trim()" @click="addDocsLivePlaceholder">
+                Add value
+              </button>
+            </div>
+            <div class="docs-live-placeholder-grid" role="table" aria-label="Managed placeholder values">
+              <div class="docs-live-placeholder-head" role="row">
+                <span role="columnheader">Key</span>
+                <span role="columnheader">Value</span>
+                <span role="columnheader">Action</span>
+              </div>
+              <div v-for="entry in docsLivePlaceholderRows" :key="entry.key" role="row">
+                <span role="cell">{{ entry.key }}</span>
+                <input
+                  role="cell"
+                  :value="entry.value"
+                  :aria-label="`Value for ${entry.key}`"
+                  @change="updateDocsLivePlaceholder(entry.key, inputValue($event))"
+                />
+                <button type="button" role="cell" @click="removeDocsLivePlaceholderValue(entry.key)">Remove</button>
+              </div>
+            </div>
+          </section>
           <label>
             AI-created questionnaire
             <textarea v-model="docsLiveQuestionnaireText" rows="7" readonly></textarea>
@@ -2682,7 +2720,10 @@ import { createDebouncedTextCommit } from "./lib/debounce";
 import {
   buildDocsLiveDraft,
   buildDocsLiveQuestionnaire,
+  docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
+  removeDocsLivePlaceholder,
+  upsertDocsLivePlaceholder,
   type DocsLiveDocumentType,
   type DocsLiveDraft,
   type DocsLiveDraftDepth,
@@ -2821,6 +2862,8 @@ const docsLiveTranscript = ref("");
 const docsLiveInterimTranscript = ref("");
 const docsLiveContext = ref("");
 const docsLivePlaceholderText = ref("");
+const docsLivePlaceholderKey = ref("");
+const docsLivePlaceholderValue = ref("");
 const docsLiveQuestionnaireText = ref(buildDocsLiveQuestionnaire("business-brief"));
 const docsLiveQuestionnaireAnswerText = ref("");
 const docsLiveGeneratedMarkdown = ref("");
@@ -3210,6 +3253,12 @@ const buttonHelpStyle = computed<CSSProperties>(() => ({
   transform: buttonHelp.value.placement === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
 }));
 const docsLiveSpeechAvailable = computed(() => Boolean(speechRecognitionConstructor()));
+const docsLivePlaceholderRows = computed(() => docsLivePlaceholderEntries(docsLivePlaceholderText.value));
+const docsLiveRequiredPlaceholderKeys = ["audience", "owner", "deadline", "evidence", "tone", "reviewer"];
+const docsLiveMissingPlaceholderKeys = computed(() => {
+  const present = new Set(docsLivePlaceholderRows.value.map((entry) => entry.key));
+  return docsLiveRequiredPlaceholderKeys.filter((key) => !present.has(key));
+});
 const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
@@ -8512,6 +8561,30 @@ function refreshDocsLiveQuestionnaire() {
   });
 }
 
+function addDocsLivePlaceholder() {
+  docsLivePlaceholderText.value = upsertDocsLivePlaceholder(
+    docsLivePlaceholderText.value,
+    docsLivePlaceholderKey.value,
+    docsLivePlaceholderValue.value,
+  );
+  docsLivePlaceholderKey.value = "";
+  docsLivePlaceholderValue.value = "";
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = "Added Docs Live placeholder value";
+}
+
+function updateDocsLivePlaceholder(key: string, value: string) {
+  docsLivePlaceholderText.value = upsertDocsLivePlaceholder(docsLivePlaceholderText.value, key, value);
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = `Updated ${key} placeholder value`;
+}
+
+function removeDocsLivePlaceholderValue(key: string) {
+  docsLivePlaceholderText.value = removeDocsLivePlaceholder(docsLivePlaceholderText.value, key);
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = `Removed ${key} placeholder value`;
+}
+
 function loadDocsLiveOutlineFromDocument() {
   docsLiveOutlineText.value = outlinePlanFromMarkdown(active.value.text) || outlineDraftText.value;
   docsLiveTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
@@ -9432,6 +9505,7 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-provider-panel,
 .app-shell[data-theme="dark"] .agent-provider-output,
 .app-shell[data-theme="dark"] .docs-live-runtime,
+.app-shell[data-theme="dark"] .docs-live-placeholder-manager,
 .app-shell[data-theme="dark"] .docs-live-workflow,
 .app-shell[data-theme="dark"] .status-message,
 .app-shell[data-theme="dark"] .word-stats,
@@ -9554,6 +9628,7 @@ select:hover {
   .app-shell[data-theme="system"] .agent-provider-panel,
   .app-shell[data-theme="system"] .agent-provider-output,
   .app-shell[data-theme="system"] .docs-live-runtime,
+  .app-shell[data-theme="system"] .docs-live-placeholder-manager,
   .app-shell[data-theme="system"] .docs-live-workflow,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
@@ -12616,6 +12691,52 @@ select:hover {
   gap: 4px;
   margin: 0;
   padding-left: 18px;
+}
+
+.docs-live-placeholder-manager {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d7dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.docs-live-placeholder-manager header,
+.docs-live-placeholder-add,
+.docs-live-placeholder-grid [role="row"] {
+  display: grid;
+  gap: 8px;
+  align-items: end;
+}
+
+.docs-live-placeholder-manager header {
+  grid-template-columns: 1fr;
+}
+
+.docs-live-placeholder-manager header span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.docs-live-placeholder-add {
+  grid-template-columns: minmax(120px, 0.4fr) minmax(180px, 1fr) auto;
+}
+
+.docs-live-placeholder-grid {
+  display: grid;
+  gap: 4px;
+}
+
+.docs-live-placeholder-grid [role="row"] {
+  grid-template-columns: minmax(100px, 0.35fr) minmax(180px, 1fr) auto;
+}
+
+.docs-live-placeholder-head {
+  color: #526171;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .docs-live-workflow {

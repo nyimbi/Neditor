@@ -40,9 +40,12 @@ import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debou
 import {
   buildDocsLiveDraft,
   buildDocsLiveQuestionnaire,
+  docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
   extractDocsLivePlaceholders,
   normalizeDocsLiveDocumentType,
+  removeDocsLivePlaceholder,
+  upsertDocsLivePlaceholder,
 } from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
@@ -328,6 +331,13 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
     audience: "executive team",
     deadline: "June 1",
   });
+  deepEqual(docsLivePlaceholderEntries("Client Name: Acme\nowner = Finance\nclient_name: duplicate ignored"), [
+    { key: "client name", value: "Acme" },
+    { key: "owner", value: "Finance" },
+  ]);
+  equal(upsertDocsLivePlaceholder("client: Acme", "Deadline", "June 1"), "client: Acme\ndeadline: June 1");
+  equal(upsertDocsLivePlaceholder("client: Acme", "client", "Globex"), "client: Globex");
+  equal(removeDocsLivePlaceholder("client: Acme\nowner: Finance", "client"), "owner: Finance");
 
   const questionnaire = buildDocsLiveQuestionnaire("proposal", {
     title: "Acme Renewal Proposal",
@@ -1330,6 +1340,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("NEditor Guided Demo"));
   ok(app.includes("guidedDemoSteps"));
   ok(app.includes("AI Agent Workspace"));
+  ok(app.includes('aria-label="Docs Live placeholder manager"'));
+  ok(app.includes("docsLivePlaceholderRows"));
+  ok(app.includes("docsLiveMissingPlaceholderKeys"));
+  ok(app.includes("addDocsLivePlaceholder"));
+  ok(app.includes("updateDocsLivePlaceholder"));
+  ok(app.includes("removeDocsLivePlaceholderValue"));
   ok(app.includes('aria-label="Agent workflow playbooks"'));
   ok(app.includes("agenticWorkflowPlaybooks"));
   ok(app.includes("applyAgentWorkflowPlaybook"));

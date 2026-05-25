@@ -43,6 +43,11 @@ export interface DocsLiveQuestionnaireRequest {
 
 export type DocsLiveDraftDepth = "concise" | "standard" | "detailed";
 
+export interface DocsLivePlaceholderEntry {
+  key: string;
+  value: string;
+}
+
 export interface DocsLiveDraft {
   title: string;
   documentType: DocsLiveDocumentType;
@@ -432,11 +437,7 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
 }
 
 export function extractDocsLivePlaceholders(input: string): Record<string, string> {
-  const placeholders: Record<string, string> = {};
-  for (const line of input.split(/\r?\n/)) {
-    const pair = line.match(/^\s*([A-Za-z][A-Za-z0-9 _-]{1,36})\s*[:=]\s*(.+?)\s*$/);
-    if (pair) placeholders[normalizePlaceholderKey(pair[1])] = pair[2].trim();
-  }
+  const placeholders = Object.fromEntries(docsLivePlaceholderEntries(input).map((entry) => [entry.key, entry.value]));
   for (const key of placeholderSignals) {
     const signal = new RegExp(`\\b${key}\\s+(?:is|are|=|:)\\s+([^.;\\n]+)`, "i");
     const match = input.match(signal);
@@ -445,6 +446,41 @@ export function extractDocsLivePlaceholders(input: string): Record<string, strin
     }
   }
   return placeholders;
+}
+
+export function docsLivePlaceholderEntries(input: string): DocsLivePlaceholderEntry[] {
+  const entries: DocsLivePlaceholderEntry[] = [];
+  const seen = new Set<string>();
+  for (const line of input.split(/\r?\n/)) {
+    const pair = line.match(/^\s*([A-Za-z][A-Za-z0-9 _-]{1,36})\s*[:=]\s*(.+?)\s*$/);
+    if (!pair) continue;
+    const key = normalizePlaceholderKey(pair[1]);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    entries.push({ key, value: pair[2].trim() });
+  }
+  return entries;
+}
+
+export function serializeDocsLivePlaceholders(entries: DocsLivePlaceholderEntry[]) {
+  return entries
+    .map((entry) => ({ key: normalizePlaceholderKey(entry.key), value: entry.value.trim() }))
+    .filter((entry) => entry.key && entry.value)
+    .map((entry) => `${entry.key}: ${entry.value}`)
+    .join("\n");
+}
+
+export function upsertDocsLivePlaceholder(input: string, key: string, value: string) {
+  const normalizedKey = normalizePlaceholderKey(key);
+  if (!normalizedKey || !value.trim()) return input.trim();
+  const entries = docsLivePlaceholderEntries(input).filter((entry) => entry.key !== normalizedKey);
+  entries.push({ key: normalizedKey, value: value.trim() });
+  return serializeDocsLivePlaceholders(entries);
+}
+
+export function removeDocsLivePlaceholder(input: string, key: string) {
+  const normalizedKey = normalizePlaceholderKey(key);
+  return serializeDocsLivePlaceholders(docsLivePlaceholderEntries(input).filter((entry) => entry.key !== normalizedKey));
 }
 
 function inferDocumentType(request: DocsLiveDraftRequest) {
