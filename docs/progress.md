@@ -101,6 +101,11 @@ Recent pushed checkpoints visible in current git history:
   against disk, reloads clean documents, clears the dirty marker, and reports
   `Reloaded external changes`; the full browser suite now passes 60 Chromium
   workflows including the inactive-tab watcher case.
+- Preview click-to-source navigation now covers non-heading anchored artifacts.
+  Clicking a rendered figure, table, or equation with a stable preview anchor
+  uses the same source-target resolver as headings and cross-reference links,
+  and the focused browser workflow now proves direct figure-caption click-through
+  to the Markdown image line.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,

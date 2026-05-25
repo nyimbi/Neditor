@@ -12612,8 +12612,9 @@ function handlePreviewClick(event: MouseEvent) {
     return;
   }
   const link = target.closest("a[href^='#']");
-  const heading = target.closest("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
-  const anchor = heading?.id || link?.getAttribute("href")?.slice(1) || "";
+  const heading = target.closest<HTMLElement>("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
+  const anchoredArtifact = target.closest<HTMLElement>("figure[id], table[id], .figure[id], .equation[id]");
+  const anchor = heading?.id || link?.getAttribute("href")?.slice(1) || anchoredArtifact?.id || "";
   if (!anchor) return;
   const sourceTarget = sourceTargetForAnchor(anchor);
   if (!sourceTarget?.line) return;

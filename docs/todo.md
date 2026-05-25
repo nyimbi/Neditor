@@ -446,6 +446,9 @@ Recent local verification evidence from this buildout:
   navigation browser coverage.
 - `pnpm exec playwright test --list`: listed 24 Chromium workflow tests after
   adding preview scroll sync and heading click-to-source coverage.
+- `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "syncs editor and preview scrolling" --project chromium`:
+  passed on 2026-05-25 after expanding preview click-to-source coverage from
+  headings to direct non-heading anchored figure artifacts.
 - `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "syncs editor"
   --project chromium`: blocked locally because the Chromium headless-shell
   executable is missing from the Playwright cache.
@@ -1509,7 +1512,9 @@ Finish:
 
 - Debounced rendering behavior on large documents.
 - Editor/preview synchronized scrolling.
-- Preview heading click jumps to source.
+- Preview heading and anchored artifact clicks jump to source for headings and
+  stable preview figures, with table/equation artifact anchors wired through
+  the same resolver.
 - Separate preview theme behavior.
 - Inline warning rendering. The preview now injects escaped diagnostic callouts
   into the rendered flow and delegates source jumps back to the editor.

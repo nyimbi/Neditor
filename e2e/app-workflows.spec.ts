@@ -267,6 +267,13 @@ async function installTauriMock(page: Page, stateKey: string) {
         .map((line) => {
           if (line.startsWith("# ")) return `<h1 id="${escapeHtml(line.slice(2).toLowerCase().replace(/\s+/g, "-"))}">${escapeHtml(line.slice(2))}</h1>`;
           if (line.startsWith("## ")) return `<h2 id="${escapeHtml(line.slice(3).toLowerCase().replace(/\s+/g, "-"))}">${escapeHtml(line.slice(3))}</h2>`;
+          const figure = line.match(/^!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?/);
+          if (figure) {
+            const attrs = parseFigureAttributes(figure[3] || "");
+            const id = attrs.id ? ` id="${escapeHtml(attrs.id)}"` : "";
+            const caption = attrs.caption || figure[1] || "Figure";
+            return `<figure${id} class="figure"><img src="${escapeHtml(figure[2])}" alt="${escapeHtml(figure[1])}"/><figcaption>${escapeHtml(caption)}</figcaption></figure>`;
+          }
           const tocItem = line.match(/^\s*-\s+\[(.+?)\]\(#(.+?)\)$/);
           if (tocItem) return `<li><a href="#${escapeHtml(tocItem[2])}">${escapeHtml(tocItem[1])}</a></li>`;
           if (line.trim().startsWith("|")) return `<pre>${escapeHtml(line)}</pre>`;
@@ -1889,6 +1896,8 @@ test("syncs editor and preview scrolling and jumps preview headings to source", 
     "",
     "The preview heading click should focus this source line.",
     "",
+    "![Preview figure](assets/preview-navigation.png){#fig:preview-navigation caption=\"Preview figure source\"}",
+    "",
     ...Array.from({ length: 24 }, (_, index) => [
       `## Follow-up ${index + 1}`,
       "",
@@ -1923,6 +1932,12 @@ test("syncs editor and preview scrolling and jumps preview headings to source", 
 
   await expect(page.locator(".cm-line").filter({ hasText: "## Navigation Target" })).toBeVisible();
   await expect.poll(() => editorScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+
+  const targetFigure = previewPane.locator("figure#fig\\:preview-navigation figcaption");
+  await targetFigure.scrollIntoViewIfNeeded();
+  await targetFigure.click();
+
+  await expect(page.locator(".cm-line").filter({ hasText: "Preview figure" })).toBeVisible();
 });
 
 test("renders generated table of contents in preview and links back to source", async ({ page }) => {
