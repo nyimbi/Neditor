@@ -29,6 +29,7 @@ const requiredReports = [
   requiredReport("google-docs-import-evidence", ".tmp/google-docs-import/report.json", [], googleDocsImportAccepted),
   requiredReport("external-engine-probe", ".tmp/external-engines/probe-report.json", [], externalEngineProbePassed),
   requiredReport("performance-audit", ".tmp/performance-audit/report.json", [], performanceAuditAccepted),
+  requiredReport("performance-profile-evidence", ".tmp/performance-profile/report.json", [], performanceProfileEvidenceAccepted),
 ];
 
 if (process.platform === "darwin") {
@@ -202,6 +203,16 @@ function collectEvidenceGaps(checks) {
       status: aiRuntime?.status || "pending-real-runtime-evidence",
       evidence: ".tmp/ai-runtime-evidence/report.json",
       detail: "Docs Live runtime readiness is implemented, but real microphone permission and clipboard read/write proof needs a real browser or Tauri WebView device session.",
+    });
+  }
+
+  const performanceProfile = reports["performance-profile-evidence"];
+  if (Number(performanceProfile?.summary?.acceptedEvidence || 0) < 1) {
+    gaps.push({
+      id: "release-device-native-performance-profile",
+      status: performanceProfile?.status || "pending-release-device-profile",
+      evidence: ".tmp/performance-profile/report.json",
+      detail: "Bounded local performance checks pass, but a sustained release-device native profile with profiler artifact hashes is still pending.",
     });
   }
 
@@ -390,6 +401,18 @@ function performanceAuditAccepted(report) {
   };
 }
 
+function performanceProfileEvidenceAccepted(report) {
+  const invalid = Number(report.summary?.invalidEvidence || 0);
+  return {
+    accepted: invalid === 0,
+    status: report.status || "unknown",
+    detail:
+      invalid === 0
+        ? `performanceProfile=${report.status || "unknown"} accepted=${Number(report.summary?.acceptedEvidence || 0)}`
+        : `invalid performance profile evidence count=${invalid}`,
+  };
+}
+
 function focusedPlaywrightReportAccepted(report, minimumTests) {
   return (
     report?.schema === "neditor.e2e-browser-workflow.v1" &&
@@ -538,8 +561,8 @@ function releaseEvidenceKitAccepted(report) {
   if (report.readinessStatus !== report.currentReadinessStatus) issues.push("readiness-status-mismatch");
   if (Number(report.summary?.missingTemplates || 0) !== 0) issues.push("missing-templates");
   if (Number(report.summary?.staleTemplates || 0) !== 0) issues.push("stale-templates");
-  if (Number(report.summary?.copiedTemplates || 0) < 13) issues.push("incomplete-template-set");
-  if (Number(report.summary?.runbooks || 0) < 9) issues.push("incomplete-runbook-set");
+  if (Number(report.summary?.copiedTemplates || 0) < 14) issues.push("incomplete-template-set");
+  if (Number(report.summary?.runbooks || 0) < 10) issues.push("incomplete-runbook-set");
   if (Number(report.summary?.issues || 0) !== 0) issues.push("reported-issues");
 
   return {

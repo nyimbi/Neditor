@@ -46,6 +46,7 @@ const fullCommands = [
   command("Rendered export audit", "pnpm", ["run", "test:rendered-exports"]),
   command("Google Docs import evidence contract", "pnpm", ["run", "check:google-docs-import"]),
   command("AI provider live endpoint evidence contract", "pnpm", ["run", "check:ai-provider"]),
+  command("Release device performance profile contract", "pnpm", ["run", "check:performance-profile"]),
   command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"]),
   command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"]),
   command("Release signing evidence contract", "pnpm", ["run", "check:release-signing"]),

@@ -528,10 +528,12 @@ uploaded evidence artifacts and import returned completed sign-offs locally with
 `pnpm run collect:evidence-kit` packages the current release-readiness gaps into
 a reviewer-friendly bundle with runbooks, templates, and return paths for
 platform evidence, signing, live AI provider/runtime proof, Google Docs import,
-human review sign-offs, and optional external engines such as Pikchr. The ingest
-tool recognizes returned optional-engine proof under paths such as
-`external-engines/external/pikchr.json` and validates it through
-`pnpm run check:engines`.
+release-device performance profiling, human review sign-offs, and optional
+external engines such as Pikchr. The ingest tool recognizes returned
+performance profile proof under paths such as `performance/native-profile.json`
+and optional-engine proof under paths such as
+`external-engines/external/pikchr.json`, then validates them through
+`pnpm run check:performance-profile` and `pnpm run check:engines`.
 
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`
@@ -619,6 +621,17 @@ generated `.tex` file into `.tmp/rendered-export-audit/latex-compile/`.
 `pnpm run test:performance-audit` writes `.tmp/performance-audit/report.json`
 after running the Rust performance stress tests and the focused browser
 large-document workflow through the project-local Playwright browser cache.
+
+`pnpm run check:performance-profile` writes
+`.tmp/performance-profile/report.json` and creates
+`.tmp/performance-profile/templates/native-profile.template.json` for sustained
+release-device native profiling evidence. Missing profile evidence remains a
+release gap, but malformed supplied evidence fails validation. Accepted proof
+must match the current app version, current Git commit, and clean source tree,
+cover at least a 30 minute Tauri release-device session, include startup/open,
+large-document edit/preview, export, native file-watch conflict, and Agent
+Workspace review scenarios, and store profiler artifact hashes instead of raw
+trace data.
 
 `pnpm run test:desktop-smoke` verifies the local Vite build, Tauri
 configuration, package metadata, MIT license metadata, release desktop binary

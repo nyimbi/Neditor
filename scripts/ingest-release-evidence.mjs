@@ -79,6 +79,12 @@ const evidenceItems = [
     "ai-runtime-device/runtime-evidence.json",
     "runtime-evidence.json",
   ]),
+  item("performance-native-profile", ".tmp/performance-profile/external/native-profile.json", "performance-profile", [
+    "performance-profile/external/native-profile.json",
+    "performance/native-profile.json",
+    "release-device-performance-profile/native-profile.json",
+    "native-profile.json",
+  ]),
   item("rendered-export-signoff", ".tmp/rendered-export-audit/external/visual-review-signoff.json", "rendered-signoff", [
     "rendered-export/visual-review-signoff.json",
     "rendered-export-human-review/visual-review-signoff.json",
@@ -187,6 +193,7 @@ function runValidations(categories) {
   if (categories.has("google-docs")) commands.push(command("Google Docs import evidence", "pnpm", ["run", "check:google-docs-import"]));
   if (categories.has("ai-provider")) commands.push(command("AI provider evidence", "pnpm", ["run", "check:ai-provider"]));
   if (categories.has("ai-runtime")) commands.push(command("AI runtime evidence", "pnpm", ["run", "check:ai-runtime"]));
+  if (categories.has("performance-profile")) commands.push(command("performance profile evidence", "pnpm", ["run", "check:performance-profile"]));
   if (categories.has("external-engine")) commands.push(command("external engine evidence", "pnpm", ["run", "check:engines"]));
   if (categories.has("rendered-signoff")) {
     commands.push(

@@ -12,7 +12,7 @@ const reportPath = join(kitDir, "report.json");
 const readinessPath = join(root, ".tmp", "release-readiness", "report.json");
 const currentSourceCommit = gitCommit();
 const currentSourceTreeClean = gitTreeClean();
-const expectedTemplateCount = 13;
+const expectedTemplateCount = 14;
 const expectedRunbooks = [
   "runbooks/windows-platform.md",
   "runbooks/linux-platform.md",
@@ -21,6 +21,7 @@ const expectedRunbooks = [
   "runbooks/ai-runtime-device.md",
   "runbooks/google-docs-import.md",
   "runbooks/rendered-export-human-review.md",
+  "runbooks/release-device-performance-profile.md",
   "runbooks/accessibility-human-review.md",
   "runbooks/optional-external-engines.md",
 ];
