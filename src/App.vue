@@ -3183,6 +3183,17 @@
                 <dd>{{ commandAgentPlanPreview.missingInputs.length ? commandAgentPlanPreview.missingInputs.slice(0, 4).join(", ") : "Ready to draft" }}</dd>
               </div>
             </dl>
+            <div v-if="commandAgentRouteSuggestions.length" class="command-agent-routes" role="region" aria-label="AI command route suggestions">
+              <button
+                v-for="route in commandAgentRouteSuggestions"
+                :key="route.id"
+                type="button"
+                :title="route.detail"
+                @click="runCommandPaletteAgentRoute(route.id)"
+              >
+                {{ route.label }}
+              </button>
+            </div>
           </div>
           <div class="command-agent-actions">
             <button type="button" @click="openCommandPaletteAgentPlan">Plan first</button>
@@ -3885,6 +3896,14 @@ interface CommandToolbarRow {
   id: string;
   label: string;
   groups: CommandBarGroup[];
+}
+
+type CommandAgentRouteId = "docs-live" | "ai-paste" | "review" | "export" | "outline" | "provider";
+
+interface CommandAgentRouteSuggestion {
+  id: CommandAgentRouteId;
+  label: string;
+  detail: string;
 }
 
 interface OutlineModeHeading {
@@ -6511,6 +6530,52 @@ const commandAgentPlanPreview = computed(() => {
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
   });
+});
+const commandAgentRouteSuggestions = computed<CommandAgentRouteSuggestion[]>(() => {
+  const instruction = commandQuery.value.trim().toLowerCase();
+  if (!commandAgentInstructionAvailable.value) return [];
+  const candidates: Array<CommandAgentRouteSuggestion & { rank: number }> = [
+    {
+      id: "docs-live",
+      label: "Docs Live",
+      detail: "Open voice/context drafting with the current instruction as the starting brief.",
+      rank: /\b(create|draft|write|compose|section|voice|dictate|first draft)\b/.test(instruction) ? 0 : 3,
+    },
+    {
+      id: "ai-paste",
+      label: "AI Paste cleanup",
+      detail: "Open cleanup for pasted chat output, provenance, citations, and insertion mode.",
+      rank: /\b(paste|cleanup|clean up|chat output|clipboard|ai text)\b/.test(instruction) ? 0 : 5,
+    },
+    {
+      id: "review",
+      label: "Review governance",
+      detail: "Open review, provenance, comments, AI markers, and readiness blockers.",
+      rank: /\b(review|qa|quality|citation|claim|humanize|governance|approve|risk)\b/.test(instruction) ? 0 : 4,
+    },
+    {
+      id: "export",
+      label: "Export readiness",
+      detail: "Open target-aware export readiness, manifests, publishing packages, and distribution evidence.",
+      rank: /\b(export|publish|distribut|blog|substack|google docs|latex|html|pdf|docx|pptx)\b/.test(instruction) ? 0 : 4,
+    },
+    {
+      id: "outline",
+      label: "Outline mode",
+      detail: "Open outline-first planning for chapters, sections, subsections, and drafting queues.",
+      rank: /\b(outline|structure|plan|chapter|section|toc)\b/.test(instruction) ? 0 : 4,
+    },
+    {
+      id: "provider",
+      label: "Provider handoff",
+      detail: "Open the Agent Workspace, generate a governed packet, and build a redacted provider request.",
+      rank: /\b(provider|model|openai|anthropic|gemini|local gateway|handoff|run ai)\b/.test(instruction) ? 0 : 4,
+    },
+  ];
+  return candidates
+    .sort((left, right) => left.rank - right.rank || left.label.localeCompare(right.label))
+    .slice(0, 4)
+    .map(({ rank: _rank, ...route }) => route);
 });
 
 async function bindNativeMenuCommands() {
@@ -10861,6 +10926,58 @@ async function runCommandPaletteAgentInstruction() {
   openAgentWorkspace(instruction);
   generateAgentWorkspaceRun();
   store.statusMessage = "Generated agent packet from command palette instruction";
+}
+
+async function runCommandPaletteAgentRoute(routeId: CommandAgentRouteId) {
+  const instruction = commandQuery.value.trim();
+  closeCommandPalette();
+  await nextTick();
+  switch (routeId) {
+    case "docs-live":
+      if (instruction) docsLiveContext.value = docsLiveContext.value ? `${docsLiveContext.value}\n${instruction}` : instruction;
+      openDocsLive();
+      store.statusMessage = "Routed command palette instruction to Docs Live";
+      break;
+    case "ai-paste":
+      await openAiPaste();
+      store.statusMessage = "Routed command palette instruction to AI Paste cleanup";
+      break;
+    case "review":
+      store.mode = "review";
+      store.sidebar = "review";
+      store.statusMessage = "Routed command palette instruction to review governance";
+      break;
+    case "export":
+      store.mode = "export";
+      store.sidebar = "exports";
+      store.statusMessage = "Routed command palette instruction to export readiness";
+      break;
+    case "outline":
+      store.mode = "outline";
+      store.sidebar = "outline";
+      store.statusMessage = "Routed command palette instruction to outline mode";
+      break;
+    case "provider":
+      selectAgentProviderProfileForInstruction(instruction);
+      openAgentWorkspace(instruction || "Prepare this document for governed AI provider handoff.");
+      generateAgentWorkspaceRun();
+      buildAgentProviderPackage();
+      store.statusMessage = "Routed command palette instruction to provider handoff";
+      break;
+  }
+}
+
+function selectAgentProviderProfileForInstruction(instruction: string) {
+  const text = instruction.toLowerCase();
+  let providerId: AiProviderProfileId | null = null;
+  if (/\b(gemini|google ai)\b/.test(text)) providerId = "gemini-compatible";
+  else if (/\b(anthropic|claude)\b/.test(text)) providerId = "anthropic-compatible";
+  else if (/\b(localhost|ollama|lm studio|local gateway|local model)\b/.test(text)) providerId = "local-openai";
+  else if (/\b(private network|internal gateway|intranet)\b/.test(text)) providerId = "private-openai";
+  else if (/\b(openai|chatgpt|gpt|openai-compatible)\b/.test(text)) providerId = "openai-compatible";
+  if (!providerId || providerId === agentProviderId.value) return;
+  agentProviderId.value = providerId;
+  syncAgentProviderProfile();
 }
 
 function toolbarIconPaths(icon: ToolbarIconName) {
@@ -15677,6 +15794,17 @@ select:hover {
   margin: 0;
   overflow-wrap: anywhere;
   font-size: 12px;
+}
+
+.command-agent-routes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.command-agent-routes button {
+  font-size: 11px;
+  padding: 5px 8px;
 }
 
 .command-row {

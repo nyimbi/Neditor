@@ -163,8 +163,11 @@ duplicating the work at the end of the document; if the section does not exist,
 NEditor appends the generated section as a new review block.
 The same packet includes a **Lifecycle Task Board** that turns the whole
 document workflow into owned tasks across creation, composition, editing,
-revision, review, and distribution. Use **Run task** when a task should route
-you to Docs Live, Outline, AI Paste, Review, or Export readiness from the
+revision, review, and distribution. Natural-language instructions in the
+Command Palette now surface route buttons for Docs Live, AI Paste cleanup,
+Review governance, Export readiness, Outline mode, and provider handoff. Use
+**Run task** when a task should route you to Docs Live, Outline, AI Paste,
+Review, or Export readiness from the
 agent's plan. Filter the task board by lane, status, or freeform search when a
 packet has many section, reviewer, evidence, and distribution tasks. Use
 **Start**, **Needs review**, and **Complete** to persist each

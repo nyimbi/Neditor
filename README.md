@@ -191,10 +191,11 @@ web app.
 - CodeMirror editing with Markdown highlighting, diagnostics gutter, line
   numbers, word wrap, find/replace, smart list continuation, bracket pairing,
   word count, character count, and reading-time status.
-- Command palette for app actions, natural-language AI agent instructions, and
-  document-aware navigation across headings, citations, glossary terms, index
-  terms, open documents, workspace files, and recent Docs Live draft recovery
-  actions.
+- Command palette for app actions, natural-language AI agent instructions, AI
+  route suggestions for Docs Live, AI Paste cleanup, Review, Export readiness,
+  Outline mode, and provider handoff, plus document-aware navigation across
+  headings, citations, glossary terms, index terms, open documents, workspace
+  files, and recent Docs Live draft recovery actions.
 - First-class outline planning in the Outline panel: draft a document structure
   with indented bullets, numbers, or Markdown headings, then create or append a
   Markdown document skeleton before writing the body text.
@@ -207,7 +208,8 @@ web app.
   applications, technical/LaTeX papers, blog/Substack publishing, and executive
   revision passes, then identifies lanes, missing inputs, placeholder values,
   suggested outline, revision intent, export targets, and runnable next steps
-  that route into Docs Live, AI Paste cleanup, Review, or Export readiness. It
+  that route into Docs Live, AI Paste cleanup, Review, Export readiness,
+  Outline mode, or provider handoff. It
   gives users a dedicated **Context answers and constraints** field plus
   **Replan with answers** action so missing-input answers become part of the
   context pack, placeholders, packet, Docs Live handoff, provider package, and

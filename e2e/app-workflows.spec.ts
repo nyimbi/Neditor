@@ -1441,6 +1441,34 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await expect(page.getByLabel("Document type")).toBeVisible();
 });
 
+test("routes natural language command palette instructions to AI workflow surfaces", async ({ page }) => {
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page
+    .getByLabel("Search commands, headings, citations, glossary, index terms, or enter an AI instruction")
+    .fill("Draft a customer renewal memo with Docs Live, review claims, export to Substack, and prepare provider handoff");
+  const aiRoute = page.getByRole("region", { name: "AI command route", exact: true });
+  await expect(aiRoute).toContainText("Generate with AI agent");
+  const suggestions = page.getByRole("region", { name: "AI command route suggestions", exact: true });
+  await expect(suggestions).toContainText("Docs Live");
+  await expect(suggestions).toContainText("Export readiness");
+  await expect(suggestions).toContainText("Provider handoff");
+  await expect(suggestions).toContainText("Review governance");
+  await suggestions.getByRole("button", { name: "Export readiness" }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Export" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page
+    .getByLabel("Search commands, headings, citations, glossary, index terms, or enter an AI instruction")
+    .fill("Prepare provider handoff for Google Docs with OpenAI-compatible model");
+  await page.getByRole("region", { name: "AI command route suggestions", exact: true }).getByRole("button", { name: "Provider handoff" }).click();
+  const agent = page.getByRole("dialog", { name: "AI agent workspace" });
+  await expect(agent).toBeVisible();
+  await expect(agent.getByLabel("AI provider handoff")).toBeVisible();
+  await expect(agent.getByLabel("AI provider request package")).toContainText("OpenAI-compatible");
+  await expect(agent.getByLabel("AI provider request Markdown")).toHaveValue(/Google Docs/);
+});
+
 test("exposes keyboard skip links to primary workbench regions", async ({ page }) => {
   for (const [linkName, targetSelector] of [
     ["Skip to commands", "#main-commands"],
