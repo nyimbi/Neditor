@@ -88,7 +88,10 @@ Editor keybinding mode update:
   with Default, Emacs-style, and Vim-style options. Emacs-style mode uses
   CodeMirror's Emacs keymap. Vim-style mode provides visible insert/normal
   state plus common normal-mode navigation and editing commands, and the Help
-  Center documents the supported command set.
+  Center documents the supported command set. Focused browser proof now covers
+  Emacs line editing, Vim insert/normal transitions, normal-mode character
+  blocking, line-start insertion, line-end append editing, and reload
+  persistence.
 
 ## Current Verification Snapshot
 
@@ -1545,7 +1548,8 @@ Finish:
 - Markdown syntax highlighting.
 - Diagnostics gutter/range visual-state local browser/native execution proof.
 - Broader Markdown shortcut edge cases.
-- Vim/emacs keybindings classification: deferred unless intentionally added.
+- Native Vim/Emacs keybinding execution proof and broader modal-editing parity
+  beyond the focused browser workflow.
 
 ### 11. Preview Ergonomics
 

@@ -3089,6 +3089,8 @@ test("browser e2e runner emits structured workflow evidence for release readines
   ok(script.includes("summarizePlaywrightOutput"));
   ok(script.includes("workflowEvidence"));
   ok(script.includes("docsLiveDraft"));
+  ok(script.includes("editorKeybindingModes"));
+  ok(script.includes("runs configurable Emacs and Vim-style editor keybinding modes"));
   ok(script.includes("generates a Docs Live draft from outline, context, and placeholders"));
   ok(script.includes("stdoutTail"));
   ok(script.includes("stderrTail"));

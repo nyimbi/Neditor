@@ -2491,6 +2491,74 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await expect(page.locator(".cm-line").filter({ hasText: "## Command Target" })).toBeVisible();
 });
 
+test("runs configurable Emacs and Vim-style editor keybinding modes", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/keybinding-modes.md",
+    [
+      "---",
+      "title: Keybinding Modes",
+      "status: draft",
+      "---",
+      "",
+      "# Keybinding Modes",
+      "",
+      "Opening line for keybinding workflow proof.",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/keybinding-modes.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+
+  const editor = page.getByRole("textbox", { name: "Primary Markdown editor" });
+  const keybindings = page.getByLabel("Editor keybindings");
+  const status = page.locator(".keymap-status");
+
+  await keybindings.selectOption("emacs");
+  await expect(status).toContainText("Emacs-style keys");
+  await expect(editor).toHaveAttribute("data-keymap-mode", "emacs");
+  await editor.click();
+  await moveEditorCursorToEnd(page);
+  await page.keyboard.insertText("\nEmacs target");
+  await page.keyboard.press("Control+A");
+  await page.keyboard.insertText("Start ");
+  await page.keyboard.press("Control+E");
+  await page.keyboard.insertText(" End");
+  await expect.poll(() => editorText(page)).toContain("Start Emacs target End");
+
+  await keybindings.selectOption("vim");
+  await expect(status).toContainText("Vim insert mode");
+  await expect(editor).toHaveAttribute("data-keymap-mode", "vim");
+  await expect(editor).toHaveAttribute("data-vim-mode", "insert");
+  await editor.click();
+  await moveEditorCursorToEnd(page);
+  await page.keyboard.insertText("\nVim target");
+  await page.keyboard.press("Escape");
+  await expect(status).toContainText("Vim normal mode");
+  await expect(editor).toHaveAttribute("data-vim-mode", "normal");
+
+  const beforeBlockedNormalText = await editorText(page);
+  await page.keyboard.press("z");
+  await expect.poll(() => editorText(page)).toBe(beforeBlockedNormalText);
+
+  await page.keyboard.press("0");
+  await page.keyboard.press("i");
+  await expect(status).toContainText("Vim insert mode");
+  await page.keyboard.insertText("VIM ");
+  await expect.poll(() => editorText(page)).toContain("VIM Vim target");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("$");
+  await page.keyboard.press("a");
+  await page.keyboard.insertText(" done");
+  await expect.poll(() => editorText(page)).toContain("VIM Vim target done");
+
+  await page.getByRole("button", { name: "Save Workspace" }).click();
+  await page.reload();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("settings");
+  await expect(page.getByLabel("Editor keybindings")).toHaveValue("vim");
+  await expect(page.locator(".keymap-status")).toContainText("Vim insert mode");
+});
+
 test("navigates source from the outline sidebar", async ({ page }) => {
   const outlineDocument = [
     "---",

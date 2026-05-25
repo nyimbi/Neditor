@@ -44,7 +44,11 @@ Recent pushed checkpoints visible in current git history:
   native Emacs keymap, and Vim-style mode adds visible insert/normal state plus
   common normal-mode navigation/edit commands without adding a dependency.
   The status bar reports the active keybinding mode, and the Help Center
-  documents the supported key sets for keyboard-first writers.
+  documents the supported key sets for keyboard-first writers. A focused
+  Chromium workflow now proves Emacs line-start/line-end editing, Vim
+  insert/normal status transitions, normal-mode character blocking,
+  line-start insertion, line-end append editing, and persisted Vim mode after
+  reload.
 - Smart Markdown list continuation now covers more business-writing edge cases:
   tab-indented lists, zero-padded ordered lists, uppercase checked task lists,
   and nested blockquoted numbered lists, with width-preserving ordered-list

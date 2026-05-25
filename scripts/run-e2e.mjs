@@ -98,6 +98,9 @@ function workflowEvidence(command, stdout) {
     splitSourcePanes:
       /split source/i.test(commandText) ||
       output.includes("syncs split source panes through editing, preview, and primary scroll"),
+    editorKeybindingModes:
+      /keybinding/i.test(commandText) ||
+      output.includes("runs configurable Emacs and Vim-style editor keybinding modes"),
     exportWorkflows:
       /export/i.test(commandText) ||
       output.includes("runs export readiness, success, and failure workflows"),
