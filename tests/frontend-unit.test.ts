@@ -742,6 +742,10 @@ test("workspace persistence migration versions and normalizes saved settings", (
         sourceFingerprint: "1111111111111111",
         contextFingerprint: "2222222222222222",
         instructionFingerprint: "3333333333333333",
+        packetMarkdown: "# Agent Packet\n\nGenerated body",
+        packetPreview: "Generated body preview",
+        sectionCount: 8,
+        reviewerCount: 6,
         appliedAt: "2026-05-25T10:06:00.000Z",
         providerProfile: " local ",
       },
@@ -873,6 +877,10 @@ test("workspace persistence migration versions and normalizes saved settings", (
     sourceFingerprint: "1111111111111111",
     contextFingerprint: "2222222222222222",
     instructionFingerprint: "3333333333333333",
+    packetMarkdown: "# Agent Packet\n\nGenerated body",
+    packetPreview: "Generated body preview",
+    sectionCount: 8,
+    reviewerCount: 6,
     appliedAt: "2026-05-25T10:06:00.000Z",
     providerProfile: "local",
   });
@@ -994,6 +1002,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent run history"'));
   ok(app.includes("store.agentRunHistory"));
   ok(app.includes("recordAgentRunHistory"));
+  ok(app.includes("appendAgentHistoryPacket"));
+  ok(app.includes("copyAgentHistoryPacket"));
+  ok(app.includes("item.packetPreview"));
+  ok(app.includes("item.sectionCount"));
   ok(app.includes("Source grounding"));
   ok(app.includes("Distribution state"));
   ok(app.includes('aria-label="Agent distribution target runbooks"'));

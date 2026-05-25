@@ -100,7 +100,9 @@ The packet also includes an
 context, source, and output payloads, rollback guidance, and review events.
 Generated and applied runs are also saved in local workspace history so a user
 can reopen the Agent Workspace later and inspect recent run IDs, readiness,
-provider, apply mode, and fingerprints.
+provider, apply mode, fingerprints, section/reviewer counts, and a bounded
+packet snapshot that can be appended back into the document or copied for
+review.
 **Apply agent output** uses the packet's safe apply mode: replace a new
 document, replace the selected text, or append a review packet to the current
 source.

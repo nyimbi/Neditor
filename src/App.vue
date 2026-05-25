@@ -2175,6 +2175,11 @@
                   <strong>{{ item.title }}</strong>
                   <span>{{ item.status }} | {{ item.applicationMode }} | {{ item.readinessScore }}/100</span>
                   <small>{{ item.runId }} | {{ item.updatedAt }}</small>
+                  <p v-if="item.packetPreview">{{ item.packetPreview }}</p>
+                  <div class="agent-history-actions">
+                    <button type="button" :disabled="!item.packetMarkdown" @click="appendAgentHistoryPacket(item)">Append packet</button>
+                    <button type="button" :disabled="!item.packetMarkdown" @click="copyAgentHistoryPacket(item)">Copy packet</button>
+                  </div>
                 </div>
                 <dl>
                   <div>
@@ -2188,6 +2193,14 @@
                   <div>
                     <dt>Provider</dt>
                     <dd>{{ item.providerProfile || "local planner" }}</dd>
+                  </div>
+                  <div>
+                    <dt>Sections</dt>
+                    <dd>{{ item.sectionCount || 0 }}</dd>
+                  </div>
+                  <div>
+                    <dt>Reviewers</dt>
+                    <dd>{{ item.reviewerCount || 0 }}</dd>
                   </div>
                 </dl>
               </li>
@@ -4010,12 +4023,30 @@ function agentRunHistoryItem(
     sourceFingerprint: run.auditTrail.sourceFingerprint,
     contextFingerprint: run.auditTrail.contextFingerprint,
     instructionFingerprint: run.auditTrail.instructionFingerprint,
+    packetMarkdown: run.markdown.slice(0, 24_000),
+    packetPreview: run.summary.slice(0, 260),
+    sectionCount: run.sectionWorkQueue.length,
+    reviewerCount: run.reviewerAgents.length,
     appliedAt: status === "generated" ? undefined : now,
     providerProfile: providerProfile || undefined,
   };
 }
 function recordAgentRunHistory(run: AgenticWorkflowRun, status: AgentRunHistoryItem["status"], providerProfile = "") {
   store.recordAgentRunHistory(agentRunHistoryItem(run, status, providerProfile));
+}
+function appendAgentHistoryPacket(item: AgentRunHistoryItem) {
+  if (!item.packetMarkdown) return;
+  applyAgentMarkdown(item.packetMarkdown, "append-packet");
+  store.statusMessage = `Appended saved agent packet ${item.runId}`;
+}
+async function copyAgentHistoryPacket(item: AgentRunHistoryItem) {
+  if (!item.packetMarkdown) return;
+  try {
+    await navigator.clipboard?.writeText(item.packetMarkdown);
+    store.statusMessage = `Copied saved agent packet ${item.runId}`;
+  } catch {
+    store.statusMessage = `Saved agent packet ${item.runId} is ready to copy`;
+  }
 }
 function buildAgentProviderPackage() {
   if (!agentRun.value) generateAgentWorkspaceRun();
@@ -8843,6 +8874,7 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-section-workqueue small,
 .app-shell[data-theme="dark"] .agent-section-workqueue span,
 .app-shell[data-theme="dark"] .agent-section-workqueue ul,
+.app-shell[data-theme="dark"] .agent-history p,
 .app-shell[data-theme="dark"] .agent-run-columns ul,
 .app-shell[data-theme="dark"] .agent-distribution-runbooks ul,
 .app-shell[data-theme="dark"] .agent-provider-panel header span,
@@ -8964,6 +8996,7 @@ select:hover {
   .app-shell[data-theme="system"] .agent-section-workqueue small,
   .app-shell[data-theme="system"] .agent-section-workqueue span,
   .app-shell[data-theme="system"] .agent-section-workqueue ul,
+  .app-shell[data-theme="system"] .agent-history p,
   .app-shell[data-theme="system"] .agent-run-columns ul,
   .app-shell[data-theme="system"] .agent-distribution-runbooks ul,
   .app-shell[data-theme="system"] .agent-provider-panel header span,
@@ -11040,6 +11073,25 @@ select:hover {
   margin: 0;
   overflow-wrap: anywhere;
   font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+}
+
+.agent-history p {
+  margin: 4px 0 0;
+  color: #2d3746;
+  font-size: 12px;
+}
+
+.agent-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.agent-history-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
   font-size: 11px;
 }
 

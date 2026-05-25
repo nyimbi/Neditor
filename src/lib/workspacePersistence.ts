@@ -119,6 +119,10 @@ export interface AgentRunHistoryItem {
   sourceFingerprint: string;
   contextFingerprint: string;
   instructionFingerprint: string;
+  packetMarkdown?: string;
+  packetPreview?: string;
+  sectionCount?: number;
+  reviewerCount?: number;
   appliedAt?: string;
   providerProfile?: string;
 }
@@ -415,6 +419,10 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     sourceFingerprint: normalizedString(value.sourceFingerprint, 32),
     contextFingerprint: normalizedString(value.contextFingerprint, 32),
     instructionFingerprint: normalizedString(value.instructionFingerprint, 32),
+    packetMarkdown: normalizedString(value.packetMarkdown, 24_000) || undefined,
+    packetPreview: normalizedString(value.packetPreview, 1_200) || undefined,
+    sectionCount: Math.max(numberValue(value.sectionCount) ?? 0, 0),
+    reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
     appliedAt: normalizedString(value.appliedAt, 40) || undefined,
     providerProfile: normalizedString(value.providerProfile, 120) || undefined,
   };
