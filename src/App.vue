@@ -2552,6 +2552,10 @@
                   <span>{{ agentRun.releaseEvidenceBundle.summary }}</span>
                 </div>
                 <small>{{ agentRun.releaseEvidenceBundle.blockers.length }} blockers</small>
+                <div class="agent-release-evidence-actions">
+                  <button type="button" @click="insertAgentReleaseEvidenceAuditPackage">Insert audit package</button>
+                  <button type="button" @click="copyAgentReleaseEvidenceAuditPackage">Copy audit package</button>
+                </div>
               </header>
               <section class="agent-release-evidence-grid">
                 <article
@@ -2950,6 +2954,7 @@ import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferen
 import {
   agenticWorkflowPlaybooks,
   buildAgenticLifecycleTaskBrief,
+  buildAgenticReleaseEvidenceAuditPackage,
   buildAgenticSectionWorkBrief,
   buildAgenticSourcePack,
   buildAgenticWorkflowPlan,
@@ -5224,6 +5229,25 @@ async function copyAgentLifecycleTaskBrief(task: AgenticLifecycleTask) {
     store.statusMessage = `Copied ${task.title} task brief`;
   } catch {
     store.statusMessage = `${task.title} task brief is ready to copy`;
+  }
+}
+function insertAgentReleaseEvidenceAuditPackage() {
+  const run = agentRun.value;
+  if (!run) return;
+  insertBlock(buildAgenticReleaseEvidenceAuditPackage(run));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted release evidence audit package";
+}
+async function copyAgentReleaseEvidenceAuditPackage() {
+  const run = agentRun.value;
+  if (!run) return;
+  const auditPackage = buildAgenticReleaseEvidenceAuditPackage(run);
+  try {
+    await navigator.clipboard?.writeText(auditPackage);
+    store.statusMessage = "Copied release evidence audit package";
+  } catch {
+    store.statusMessage = "Release evidence audit package is ready to copy";
   }
 }
 function runAgentPlanReview() {
@@ -12344,6 +12368,18 @@ select:hover {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 4px;
+}
+
+.agent-release-evidence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-release-evidence-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .agent-section-depth {

@@ -680,6 +680,27 @@ export function buildAgenticLifecycleTaskBrief(task: AgenticLifecycleTask): stri
   ].join("\n");
 }
 
+export function buildAgenticReleaseEvidenceAuditPackage(run: AgenticWorkflowRun): string {
+  return [
+    "## NEditor Release Evidence Audit Package",
+    "",
+    `Run ID: ${run.auditTrail.runId}`,
+    "",
+    `Document: ${run.plan.title}`,
+    "",
+    `Generated: ${run.auditTrail.generatedAt}`,
+    "",
+    `Application mode: ${run.applicationMode}`,
+    "",
+    ...releaseEvidenceBundleMarkdown(run.releaseEvidenceBundle),
+    ...auditTrailMarkdown(run.auditTrail),
+    ...controlCenterMarkdown(run.controlCenter),
+    ...reviewerAgentsMarkdown(run.reviewerAgents),
+    ...lifecycleTasksMarkdown(run.lifecycleTasks),
+    ...(run.distributionTargetPlans.length ? distributionTargetRunbookMarkdown(run.distributionTargetPlans) : ["## Distribution Runbooks", "", "No distribution target runbooks were staged for this run.", ""]),
+  ].join("\n");
+}
+
 export function buildAgenticSourcePack(sourcePackText: string): AgenticSourcePack {
   const items = parseAgenticSourcePackItems(sourcePackText).slice(0, 80);
   const byKind = (kind: AgenticSourcePackItemKind) => items.filter((item) => item.kind === kind);

@@ -19,6 +19,7 @@ import {
 import {
   agenticWorkflowPlaybooks,
   buildAgenticLifecycleTaskBrief,
+  buildAgenticReleaseEvidenceAuditPackage,
   buildAgenticSectionWorkBrief,
   buildAgenticSourcePack,
   buildAgenticWorkflowPlan,
@@ -727,6 +728,12 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Release Evidence Bundle"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent audit trail" && item.status === "available"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
+  const releaseAuditPackage = buildAgenticReleaseEvidenceAuditPackage(run);
+  ok(releaseAuditPackage.includes("## NEditor Release Evidence Audit Package"));
+  ok(releaseAuditPackage.includes("## Release Evidence Bundle"));
+  ok(releaseAuditPackage.includes("## Agent Audit Trail"));
+  ok(releaseAuditPackage.includes("## Agent Lifecycle Task Board"));
+  ok(releaseAuditPackage.includes("### Target Runbooks"));
   ok(run.markdown.includes("Substack newsletter package"));
   ok(run.markdown.includes("Google Docs collaboration package"));
   ok(run.auditTrail.runId.startsWith("agent-20260524T10000"));
@@ -1589,6 +1596,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Release Evidence Bundle"));
   ok(app.includes("agentRun.releaseEvidenceBundle"));
   ok(app.includes("agent-release-evidence"));
+  ok(app.includes("insertAgentReleaseEvidenceAuditPackage"));
+  ok(app.includes("copyAgentReleaseEvidenceAuditPackage"));
+  ok(app.includes("buildAgenticReleaseEvidenceAuditPackage"));
+  ok(app.includes("Insert audit package"));
+  ok(app.includes("Copy audit package"));
   ok(app.includes("Revise"));
   ok(app.includes("agent-context-score"));
   ok(app.includes("agentRun"));
