@@ -32,6 +32,10 @@ Good first examples:
 - [Proposal with budget tables and formulas](../examples/proposal-budget.md)
 - [AI-assisted draft with review provenance](../examples/ai-assisted-draft.md)
 
+These fixtures are not static samples: automated export tests prove their
+audience, local-first delivery model, and Markdown source-of-truth metadata stay
+intact in reviewable artifacts.
+
 ## Workbench Basics
 
 The main screen is a document workbench rather than a note-only editor.

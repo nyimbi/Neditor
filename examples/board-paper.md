@@ -9,6 +9,10 @@ classification: confidential
 client: Acme Holdings
 targetPersona:
   - Executives and managers
+positioning:
+  model: local-first document-file workbench
+  sourceOfTruth: Markdown source file
+  cloudSync: false
 toc: true
 brand:
   name: Acme Holdings

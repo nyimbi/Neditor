@@ -8,6 +8,10 @@ approvedAt: 2026-05-20T10:00:00Z
 classification: client-confidential
 targetPersona:
   - Consultants
+positioning:
+  model: local-first document-file workbench
+  sourceOfTruth: Markdown source file
+  cloudSync: false
 toc: true
 brand:
   name: Meridian Advisory

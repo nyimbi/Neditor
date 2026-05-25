@@ -124,6 +124,16 @@ pub(super) fn render_custom_properties(response: &CompileResponse) -> String {
     );
     push_custom_property(
         &mut properties,
+        "NEditorDeliveryModel",
+        &metadata_string(&response.metadata, "positioning.model").unwrap_or_default(),
+    );
+    push_custom_property(
+        &mut properties,
+        "NEditorSourceOfTruth",
+        &metadata_string(&response.metadata, "positioning.sourceOfTruth").unwrap_or_default(),
+    );
+    push_custom_property(
+        &mut properties,
         "NEditorSourceHash",
         &response.export_manifest.source_hash,
     );
@@ -192,6 +202,12 @@ pub(super) fn export_metadata_lines(response: &CompileResponse, options: &Value)
     }
     if let Some(personas) = target_persona_summary(&response.metadata) {
         lines.push(format!("Audience: {personas}"));
+    }
+    if let Some(model) = metadata_string(&response.metadata, "positioning.model") {
+        lines.push(format!("Delivery model: {model}"));
+    }
+    if let Some(source) = metadata_string(&response.metadata, "positioning.sourceOfTruth") {
+        lines.push(format!("Source of truth: {source}"));
     }
     if let Some(logo) = export_logo(&response.metadata) {
         lines.push(format!("Logo: {logo}"));

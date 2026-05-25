@@ -7,6 +7,10 @@ classification: internal-draft
 targetPersona:
   - Teams using AI chat output
   - Product and engineering teams
+positioning:
+  model: local-first document-file workbench
+  sourceOfTruth: Markdown source file
+  cloudSync: false
 toc: true
 layout:
   header: "{{title}}"

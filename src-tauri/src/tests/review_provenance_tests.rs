@@ -109,10 +109,7 @@ fn compiler_accepts_ai_provenance_block_name_aliases() {
     assert_eq!(response.semantic.ai_sources.len(), 2);
     assert_eq!(response.semantic.ai_sources[0].provider, "OpenAI");
     assert_eq!(response.semantic.ai_sources[0].model, "gpt-5.4");
-    assert_eq!(
-        response.semantic.ai_sources[0].date,
-        "2026-05-19T09:00:00Z"
-    );
+    assert_eq!(response.semantic.ai_sources[0].date, "2026-05-19T09:00:00Z");
     assert_eq!(response.semantic.ai_sources[1].provider, "Claude");
     assert_eq!(response.semantic.ai_sources[1].model, "claude-approved");
     assert_eq!(
@@ -130,10 +127,7 @@ fn compiler_accepts_ai_assisted_comment_marker_aliases() {
         });
 
     assert_eq!(response.semantic.ai_assisted_sections.len(), 2);
-    assert_eq!(
-        response.semantic.ai_assisted_sections[0].source,
-        "OpenAI"
-    );
+    assert_eq!(response.semantic.ai_assisted_sections[0].source, "OpenAI");
     assert_eq!(
         response.semantic.ai_assisted_sections[0].prompt_summary,
         "Generated intro"

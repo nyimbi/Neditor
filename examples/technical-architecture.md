@@ -9,6 +9,10 @@ targetPersona:
   - Technical writers
   - Product and engineering teams
   - Developers
+positioning:
+  model: local-first document-file workbench
+  sourceOfTruth: Markdown source file
+  cloudSync: false
 toc: true
 layout:
   header: "{{title}}"

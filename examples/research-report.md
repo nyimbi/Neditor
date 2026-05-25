@@ -9,6 +9,10 @@ citationStyle: author-year
 targetPersona:
   - Researchers and analysts
   - Students and academics
+positioning:
+  model: local-first document-file workbench
+  sourceOfTruth: Markdown source file
+  cloudSync: false
 toc: true
 ---
 

@@ -8,6 +8,10 @@ classification: proposal
 targetPersona:
   - Consultants
   - Product and engineering teams
+positioning:
+  model: local-first document-file workbench
+  sourceOfTruth: Markdown source file
+  cloudSync: false
 toc: true
 brand:
   name: Meridian Advisory

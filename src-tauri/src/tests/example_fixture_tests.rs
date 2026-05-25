@@ -82,6 +82,21 @@ fn example_project_fixtures_compile_and_export() {
             response.semantic.title
         );
         let personas = metadata_string_array(&response.metadata, "targetPersona");
+        assert_eq!(
+            metadata_string_value(&response.metadata, "positioning.model").as_deref(),
+            Some("local-first document-file workbench"),
+            "{relative_path} should declare local-first product positioning"
+        );
+        assert_eq!(
+            metadata_string_value(&response.metadata, "positioning.sourceOfTruth").as_deref(),
+            Some("Markdown source file"),
+            "{relative_path} should declare Markdown source of truth"
+        );
+        assert_eq!(
+            metadata_string_value(&response.metadata, "positioning.cloudSync").as_deref(),
+            Some("false"),
+            "{relative_path} should explicitly reject background cloud sync"
+        );
         for expected_persona in expected_personas {
             assert!(
                 personas.iter().any(|persona| persona == expected_persona),
@@ -111,6 +126,11 @@ fn example_project_fixtures_compile_and_export() {
                 .iter()
                 .any(|persona| html.contains(persona)),
             "{relative_path} should carry target persona metadata into HTML"
+        );
+        assert!(
+            html.contains(r#"<meta name="neditor-delivery-model" content="local-first document-file workbench">"#)
+                && html.contains(r#"<meta name="neditor-source-of-truth" content="Markdown source file">"#),
+            "{relative_path} should carry local-first positioning into HTML metadata"
         );
         for feature_marker in feature_markers {
             assert!(
@@ -155,6 +175,13 @@ fn example_project_fixtures_compile_and_export() {
             docx_custom.contains(r#"name="NEditorTargetPersona""#),
             "{relative_path} should carry audience evidence into DOCX custom properties"
         );
+        assert!(
+            docx_custom.contains(r#"name="NEditorDeliveryModel""#)
+                && docx_custom.contains("local-first document-file workbench")
+                && docx_custom.contains(r#"name="NEditorSourceOfTruth""#)
+                && docx_custom.contains("Markdown source file"),
+            "{relative_path} should carry local-first positioning into DOCX custom properties"
+        );
         for expected_persona in expected_personas {
             assert!(
                 docx_custom.contains(expected_persona),
@@ -185,6 +212,13 @@ fn example_project_fixtures_compile_and_export() {
         assert!(
             pptx_custom.contains(r#"name="NEditorTargetPersona""#),
             "{relative_path} should carry audience evidence into PPTX custom properties"
+        );
+        assert!(
+            pptx_custom.contains(r#"name="NEditorDeliveryModel""#)
+                && pptx_custom.contains("local-first document-file workbench")
+                && pptx_custom.contains(r#"name="NEditorSourceOfTruth""#)
+                && pptx_custom.contains("Markdown source file"),
+            "{relative_path} should carry local-first positioning into PPTX custom properties"
         );
         for expected_persona in expected_personas {
             assert!(
@@ -231,6 +265,12 @@ fn example_project_fixtures_compile_and_export() {
                 "{relative_path} should carry target persona metadata into bundled metadata"
             );
         }
+        assert!(
+            bundled_metadata.contains("local-first document-file workbench")
+                && bundled_metadata.contains("Markdown source file")
+                && bundled_metadata.contains("\"cloudSync\": false"),
+            "{relative_path} should carry local-first positioning into bundled metadata"
+        );
     }
 
     for required_persona in [
@@ -275,6 +315,19 @@ fn metadata_string_array(metadata: &Value, key: &str) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+fn metadata_string_value(metadata: &Value, path: &str) -> Option<String> {
+    let mut current = metadata;
+    for part in path.split('.') {
+        current = current.get(part)?;
+    }
+    match current {
+        Value::String(value) => Some(value.clone()),
+        Value::Bool(value) => Some(value.to_string()),
+        Value::Number(value) => Some(value.to_string()),
+        other => Some(other.to_string()),
+    }
 }
 
 fn example_contains_feature(response: &CompileResponse, marker: &str) -> bool {

@@ -417,7 +417,10 @@ supported targets:
 These examples are covered by Rust fixture tests so they stay executable instead
 of becoming stale marketing samples. The tests also keep the README links in
 sync and prove each example's audience metadata and representative features
-survive HTML, PDF, DOCX, PPTX, and Markdown bundle exports.
+survive HTML, PDF, DOCX, PPTX, and Markdown bundle exports. Each example also
+declares local-first positioning metadata, and export tests prove that the
+delivery model and Markdown source-of-truth survive HTML metadata, Office custom
+properties, and Markdown bundle metadata.
 
 ## Planning Documents
 

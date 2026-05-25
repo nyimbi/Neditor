@@ -188,6 +188,14 @@ fn html_head_metadata(
         ("neditor-date", date),
         ("neditor-version", version),
         ("neditor-classification", classification),
+        (
+            "neditor-delivery-model",
+            &metadata_string(&response.metadata, "positioning.model"),
+        ),
+        (
+            "neditor-source-of-truth",
+            &metadata_string(&response.metadata, "positioning.sourceOfTruth"),
+        ),
     ] {
         if let Some(value) = value.as_ref().filter(|value| !value.trim().is_empty()) {
             tags.push(html_meta_tag(name, value));
