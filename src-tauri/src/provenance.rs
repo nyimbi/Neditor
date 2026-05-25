@@ -26,7 +26,7 @@ pub(crate) struct AiAssistedSection {
 }
 
 pub(crate) fn collect_ai_sources(text: &str) -> Vec<AiSource> {
-    collect_ai_fence_bodies_with_lines(text, "ai-source")
+    collect_ai_fence_bodies_with_lines(text)
         .into_iter()
         .map(|(line, body)| {
             let map = body
@@ -36,9 +36,24 @@ pub(crate) fn collect_ai_sources(text: &str) -> Vec<AiSource> {
                 .collect::<HashMap<_, _>>();
             AiSource {
                 line,
-                provider: map.get("provider").cloned().unwrap_or_default(),
-                model: map.get("model").cloned().unwrap_or_default(),
-                date: map.get("date").cloned().unwrap_or_default(),
+                provider: map
+                    .get("provider")
+                    .or_else(|| map.get("aiProvider"))
+                    .or_else(|| map.get("tool"))
+                    .cloned()
+                    .unwrap_or_default(),
+                model: map
+                    .get("model")
+                    .or_else(|| map.get("modelName"))
+                    .or_else(|| map.get("deployment"))
+                    .cloned()
+                    .unwrap_or_default(),
+                date: map
+                    .get("date")
+                    .or_else(|| map.get("generatedAt"))
+                    .or_else(|| map.get("createdAt"))
+                    .cloned()
+                    .unwrap_or_default(),
                 prompt_summary: map
                     .get("promptSummary")
                     .or_else(|| map.get("prompt_summary"))
@@ -75,10 +90,7 @@ pub(crate) fn collect_ai_assisted_sections(
         .filter_map(|(index, line)| {
             let line_number = index + 1;
             let trimmed = line.trim();
-            if let Some(content) = trimmed
-                .strip_prefix("<!-- ai-assisted:")
-                .and_then(|content| content.strip_suffix("-->"))
-            {
+            if let Some(content) = ai_assisted_marker_content(trimmed) {
                 return Some(parse_ai_assisted_section(line_number, content, headings));
             }
             if trimmed == "<!-- draft: AI paste cleanup review required -->" {
@@ -97,14 +109,14 @@ pub(crate) fn collect_ai_assisted_sections(
         .collect()
 }
 
-fn collect_ai_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(usize, String)> {
+fn collect_ai_fence_bodies_with_lines(text: &str) -> Vec<(usize, String)> {
     let mut bodies = Vec::new();
     let mut lines = text.lines().enumerate();
     while let Some((line_index, line)) = lines.next() {
         if line
             .trim()
             .strip_prefix("```")
-            .map(|info| info.split_whitespace().next().unwrap_or("") == target)
+            .map(|info| is_ai_source_fence_language(info.split_whitespace().next().unwrap_or("")))
             .unwrap_or(false)
         {
             let mut body = String::new();
@@ -119,6 +131,35 @@ fn collect_ai_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(usize, S
         }
     }
     bodies
+}
+
+fn is_ai_source_fence_language(language: &str) -> bool {
+    matches!(
+        language.trim().to_ascii_lowercase().as_str(),
+        "ai-source"
+            | "ai_source"
+            | "ai-provenance"
+            | "ai_provenance"
+            | "llm-source"
+            | "llm_source"
+            | "llm-provenance"
+            | "llm_provenance"
+    )
+}
+
+fn ai_assisted_marker_content(line: &str) -> Option<&str> {
+    let inner = line.strip_prefix("<!--")?.strip_suffix("-->")?.trim();
+    [
+        "ai-assisted:",
+        "ai_assisted:",
+        "ai-assisted-section:",
+        "ai-generated:",
+        "ai:",
+        "llm-assisted:",
+        "llm-generated:",
+    ]
+    .into_iter()
+    .find_map(|prefix| inner.strip_prefix(prefix).map(str::trim))
 }
 
 fn parse_ai_assisted_section(
@@ -146,7 +187,7 @@ fn parse_ai_assisted_section(
                 "status" => status = value,
                 "reviewedBy" | "reviewed_by" | "reviewer" => reviewed_by = value,
                 "reviewedAt" | "reviewed_at" | "reviewDate" => reviewed_at = value,
-                "source" => source = value,
+                "source" | "provider" | "tool" => source = value,
                 "promptSummary" | "prompt_summary" | "prompt" => prompt_summary = value,
                 _ => {}
             }

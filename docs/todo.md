@@ -1550,7 +1550,11 @@ Finish:
   preserves escaped code text, normalizes common AI `Copy code`, spaced
   backtick, and tilde fence variants, and keeps citation TODO insertion out of
   fenced code.
-- Provenance block aliases.
+- Provenance block aliases. The compiler and document AST now accept canonical
+  `ai-source` fences plus `ai-provenance`, `llm-source`, and `llm-provenance`
+  fence aliases, including underscore variants and tilde fences, and accept
+  `ai-generated`, `llm-assisted`, and related comment markers for AI-assisted
+  section review metadata.
 - AI-assisted section review-state toggles. The Review sidebar toggles
   `ai-source` blocks and AI-assisted section markers between needs-review and
   human-reviewed states.

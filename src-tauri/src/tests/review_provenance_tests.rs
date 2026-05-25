@@ -99,6 +99,55 @@ fn compiler_accepts_ai_source_metadata_aliases() {
 }
 
 #[test]
+fn compiler_accepts_ai_provenance_block_name_aliases() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: AI Block Aliases\nstatus: approved\napprovedBy: QA\n---\n# AI Block Aliases\n```ai-provenance\naiProvider: OpenAI\nmodelName: gpt-5.4\ngeneratedAt: 2026-05-19T09:00:00Z\npromptSummary: Alias provenance block\nreviewedBy: Jane Doe\nreviewedAt: 2026-05-19T10:00:00Z\nstatus: human-reviewed\n```\n\n```llm-source\ntool: Claude\ndeployment: claude-approved\ncreatedAt: 2026-05-19T09:30:00Z\nprompt: Secondary alias block\nreviewer: Sam Reviewer\nreviewDate: 2026-05-19T10:30:00Z\nstatus: human-reviewed\n```\n"
+                .to_string(),
+            file_path: None,
+        });
+
+    assert_eq!(response.semantic.ai_sources.len(), 2);
+    assert_eq!(response.semantic.ai_sources[0].provider, "OpenAI");
+    assert_eq!(response.semantic.ai_sources[0].model, "gpt-5.4");
+    assert_eq!(
+        response.semantic.ai_sources[0].date,
+        "2026-05-19T09:00:00Z"
+    );
+    assert_eq!(response.semantic.ai_sources[1].provider, "Claude");
+    assert_eq!(response.semantic.ai_sources[1].model, "claude-approved");
+    assert_eq!(
+        response.semantic.ai_sources[1].prompt_summary,
+        "Secondary alias block"
+    );
+}
+
+#[test]
+fn compiler_accepts_ai_assisted_comment_marker_aliases() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: AI Comment Aliases\nstatus: approved\napprovedBy: QA\n---\n<!-- ai-generated: status=human-reviewed | reviewer=Jane Doe | reviewedAt=2026-05-19 | provider=OpenAI | prompt=Generated intro -->\n# AI Comment Aliases\nReviewed body.\n\n<!-- llm-assisted: human-reviewed | reviewedBy=Sam Reviewer | reviewed_at=2026-05-20 | source=Claude | prompt_summary=Edited section -->\n## Reviewed Section\nReviewed section.\n"
+                .to_string(),
+            file_path: None,
+        });
+
+    assert_eq!(response.semantic.ai_assisted_sections.len(), 2);
+    assert_eq!(
+        response.semantic.ai_assisted_sections[0].source,
+        "OpenAI"
+    );
+    assert_eq!(
+        response.semantic.ai_assisted_sections[0].prompt_summary,
+        "Generated intro"
+    );
+    assert_eq!(
+        response.semantic.ai_assisted_sections[1].reviewed_by,
+        "Sam Reviewer"
+    );
+    assert!(!response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("AI-assisted sections that are not human-reviewed")));
+}
+
+#[test]
 fn document_ast_accepts_ai_source_metadata_aliases() {
     let response = compile(CompileRequest {
             text: "---\ntitle: AI AST Aliases\nstatus: approved\napprovedBy: QA\n---\n# AI AST Aliases\n```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\nprompt: Alias prompt\nreviewer: Jane Doe\nreviewDate: 2026-05-19T09:00:00Z\nstatus: human-reviewed\n```\n"
@@ -118,4 +167,27 @@ fn document_ast_accepts_ai_source_metadata_aliases() {
     assert_eq!(ast_source.prompt_summary, "Alias prompt");
     assert_eq!(ast_source.reviewed_by, "Jane Doe");
     assert_eq!(ast_source.reviewed_at, "2026-05-19T09:00:00Z");
+}
+
+#[test]
+fn document_ast_accepts_ai_provenance_block_name_aliases() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: AI AST Block Aliases\nstatus: approved\napprovedBy: QA\n---\n# AI AST Block Aliases\n~~~llm-provenance\ntool: Gemini\nmodelName: approved-gemini\ngeneratedAt: 2026-05-19T09:00:00Z\nprompt: Alias prompt\nreviewer: Jane Doe\nreviewDate: 2026-05-19T10:00:00Z\nstatus: human-reviewed\n~~~\n"
+                .to_string(),
+            file_path: None,
+        });
+
+    let ast_source = response
+        .document_ast
+        .blocks
+        .iter()
+        .find_map(|block| match block {
+            DocumentBlock::AiSource { provenance, .. } => Some(provenance),
+            _ => None,
+        })
+        .expect("ai source AST alias block");
+    assert_eq!(ast_source.provider, "Gemini");
+    assert_eq!(ast_source.model, "approved-gemini");
+    assert_eq!(ast_source.date, "2026-05-19T09:00:00Z");
+    assert_eq!(ast_source.prompt_summary, "Alias prompt");
 }

@@ -1166,7 +1166,7 @@ fn parse_ast_code_block(lines: &[&str], index: usize) -> Option<(DocumentBlock, 
     while next_index < lines.len() {
         let line = lines[next_index];
         if line.trim_start().starts_with(marker) {
-            if language.as_deref() == Some("ai-source") {
+            if language.as_deref().is_some_and(is_ai_source_fence_language) {
                 let code = code_lines.join("\n");
                 return Some((
                     DocumentBlock::AiSource {
@@ -1192,7 +1192,7 @@ fn parse_ast_code_block(lines: &[&str], index: usize) -> Option<(DocumentBlock, 
         code_lines.push(line.to_string());
         next_index += 1;
     }
-    if language.as_deref() == Some("ai-source") {
+    if language.as_deref().is_some_and(is_ai_source_fence_language) {
         let code = code_lines.join("\n");
         return Some((
             DocumentBlock::AiSource {
@@ -1623,9 +1623,9 @@ fn parse_ast_ai_source(content: &str) -> AstAiSource {
         };
         let value = value.trim().to_string();
         match key.trim() {
-            "provider" => provenance.provider = value,
-            "model" => provenance.model = value,
-            "date" => provenance.date = value,
+            "provider" | "aiProvider" | "tool" => provenance.provider = value,
+            "model" | "modelName" | "deployment" => provenance.model = value,
+            "date" | "generatedAt" | "createdAt" => provenance.date = value,
             "promptSummary" | "prompt_summary" | "prompt" => provenance.prompt_summary = value,
             "reviewedBy" | "reviewed_by" | "reviewer" => provenance.reviewed_by = value,
             "reviewedAt" | "reviewed_at" | "reviewDate" => provenance.reviewed_at = value,
@@ -1635,6 +1635,20 @@ fn parse_ast_ai_source(content: &str) -> AstAiSource {
     }
 
     provenance
+}
+
+fn is_ai_source_fence_language(language: &str) -> bool {
+    matches!(
+        language.trim().to_ascii_lowercase().as_str(),
+        "ai-source"
+            | "ai_source"
+            | "ai-provenance"
+            | "ai_provenance"
+            | "llm-source"
+            | "llm_source"
+            | "llm-provenance"
+            | "llm_provenance"
+    )
 }
 
 fn is_footnotes_start(line: &str) -> bool {
