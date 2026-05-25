@@ -10,6 +10,7 @@ const outputDir = resolve(process.env.NEDITOR_RELEASE_EVIDENCE_KIT_DIR || join(r
 const sourceCommit = gitCommit();
 const sourceTreeClean = gitTreeClean();
 const readiness = readJson(join(root, ".tmp", "release-readiness", "report.json"));
+const readinessStatus = effectiveReadinessStatus(readiness);
 const gaps = Array.isArray(readiness?.evidenceGaps) ? readiness.evidenceGaps : Array.isArray(readiness?.gaps) ? readiness.gaps : [];
 
 const templateCopies = [
@@ -239,7 +240,7 @@ const manifest = {
   appVersion: packageJson.version,
   sourceCommit,
   sourceTreeClean,
-  readinessStatus: readiness?.status || "unknown",
+  readinessStatus,
   releaseReadinessReport: relative(join(root, ".tmp", "release-readiness", "report.json")),
   gaps: gaps.map((gap) => ({
     id: gap.id || gap.check || gap.name,
@@ -465,6 +466,16 @@ function ingestCommand() {
 
 function finalReadinessCommand() {
   return "pnpm run check:release-readiness";
+}
+
+function effectiveReadinessStatus(readinessReport) {
+  if (!readinessReport) return "unknown";
+  const status = readinessReport.status || "unknown";
+  const failures = Array.isArray(readinessReport.failures) ? readinessReport.failures : [];
+  const onlyEvidenceKitBootstrapFailure =
+    status === "failed" && failures.length > 0 && failures.every((failure) => String(failure).startsWith("release-evidence-kit "));
+  if (!onlyEvidenceKitBootstrapFailure) return status;
+  return Number(readinessReport.summary?.evidenceGaps || 0) > 0 ? "current-host-ready-with-external-gaps" : "ready";
 }
 
 function readJson(path) {

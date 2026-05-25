@@ -31,12 +31,13 @@ const issues = [];
 
 const manifest = readJson(manifestPath, "release evidence kit manifest");
 const readiness = readJson(readinessPath, "release readiness report");
+const readinessStatus = effectiveReadinessStatus(readiness);
 
 if (manifest && readiness) {
-  validateManifest(manifest, readiness);
+  validateManifest(manifest, readiness, readinessStatus);
 }
 
-writeReport(manifest, readiness);
+writeReport(manifest, readiness, readinessStatus);
 
 if (issues.length > 0) {
   console.error("Release evidence kit failed validation:");
@@ -46,7 +47,7 @@ if (issues.length > 0) {
 
 console.log(`Release evidence kit is current; checked ${relative(manifestPath)}.`);
 
-function validateManifest(manifest, readiness) {
+function validateManifest(manifest, readiness, readinessStatus) {
   requireValue(manifest.schema === "neditor.release-evidence-kit.v1", "schema must be neditor.release-evidence-kit.v1");
   requireValue(manifest.appVersion === packageJson.version, `appVersion must match package.json version ${packageJson.version}`);
   requireValue(manifest.sourceCommit === currentSourceCommit, `sourceCommit must match current git commit ${currentSourceCommit}`);
@@ -54,7 +55,7 @@ function validateManifest(manifest, readiness) {
   requireValue(currentSourceTreeClean === true, "current source tree must be clean");
   requireValue(isIsoDate(manifest.generatedAt), "generatedAt must be an ISO timestamp");
   requireValue(manifest.releaseReadinessReport === relative(readinessPath), "releaseReadinessReport must point to the current readiness report");
-  requireValue(manifest.readinessStatus === readiness.status, "readinessStatus must match the current release readiness report");
+  requireValue(manifest.readinessStatus === readinessStatus, "readinessStatus must match the current release readiness report");
 
   const readinessGaps = gaps(readiness);
   const manifestGaps = Array.isArray(manifest.gaps) ? manifest.gaps : [];
@@ -101,7 +102,7 @@ function validateManifest(manifest, readiness) {
   }
 }
 
-function writeReport(manifest, readiness) {
+function writeReport(manifest, readiness, readinessStatus) {
   mkdirSync(dirname(reportPath), { recursive: true });
   writeFileSync(
     reportPath,
@@ -119,7 +120,7 @@ function writeReport(manifest, readiness) {
         appVersion: manifest?.appVersion || null,
         currentAppVersion: packageJson.version,
         readinessStatus: manifest?.readinessStatus || null,
-        currentReadinessStatus: readiness?.status || null,
+        currentReadinessStatus: readinessStatus,
         summary: {
           gaps: Array.isArray(manifest?.gaps) ? manifest.gaps.length : 0,
           copiedTemplates: Array.isArray(manifest?.copiedTemplates) ? manifest.copiedTemplates.length : 0,
@@ -146,6 +147,16 @@ function gaps(readiness) {
   return values.map((gap) => ({
     id: gap.id || gap.check || gap.name,
   }));
+}
+
+function effectiveReadinessStatus(readinessReport) {
+  if (!readinessReport) return null;
+  const status = readinessReport.status || "unknown";
+  const failures = Array.isArray(readinessReport.failures) ? readinessReport.failures : [];
+  const onlyEvidenceKitBootstrapFailure =
+    status === "failed" && failures.length > 0 && failures.every((failure) => String(failure).startsWith("release-evidence-kit "));
+  if (!onlyEvidenceKitBootstrapFailure) return status;
+  return Number(readinessReport.summary?.evidenceGaps || 0) > 0 ? "current-host-ready-with-external-gaps" : "ready";
 }
 
 function requireFile(path, label, minBytes) {
