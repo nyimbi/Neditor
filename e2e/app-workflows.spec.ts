@@ -3187,8 +3187,21 @@ test("groups documents by document set and folder", async ({ page }) => {
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => mockFileText(page, "/workspace/loose-note.md")).toContain("documentSet: Board Pack");
 
-  await boardPack.getByLabel("Close tab group").click();
+  const documentSetManager = page.getByLabel("Document set manager");
+  await expect(documentSetManager).toContainText("1 open sets");
+  await documentSetManager.getByLabel("Rename active document set").fill("Board Packet");
+  await documentSetManager.getByRole("button", { name: "Rename all open set tabs" }).click();
+  const boardPacket = page.getByLabel("Board Packet tabs");
+  await expect(boardPacket).toContainText("3");
   await expect(page.getByLabel("Board Pack tabs")).toHaveCount(0);
+  await expect.poll(() => editorText(page)).toContain("documentSet: Board Packet");
+
+  await documentSetManager.getByRole("button", { name: "Remove active" }).click();
+  await expect(boardPacket).toContainText("2");
+  await expect.poll(() => editorText(page)).not.toContain("documentSet:");
+
+  await boardPacket.getByLabel("Close tab group").click();
+  await expect(page.getByLabel("Board Packet tabs")).toHaveCount(0);
   await expect(researchGroup.getByRole("button", { name: /Interview Notes/ })).toBeVisible();
 });
 

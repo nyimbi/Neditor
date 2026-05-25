@@ -295,6 +295,44 @@
           <button v-if="store.workspaceRoot" type="button" @click="store.refreshWorkspace">Refresh</button>
           <p v-if="store.workspaceRoot" class="workspace-root">{{ store.workspaceRoot }}</p>
           <p v-else>Open a folder to browse project files.</p>
+          <section class="document-set-manager" aria-label="Document set manager">
+            <header>
+              <div>
+                <h3>Document Sets</h3>
+                <small>{{ documentSetGroups.length }} open sets</small>
+              </div>
+            </header>
+            <label>
+              Active document set
+              <input v-model="documentSetDraft" aria-label="Active document set" placeholder="Board Pack, Client Deliverable" />
+            </label>
+            <div class="document-set-actions">
+              <button type="button" :disabled="!documentSetDraft.trim()" @click="assignActiveDocumentSet(documentSetDraft)">Assign active</button>
+              <button type="button" :disabled="!activeDocumentSet" @click="clearActiveDocumentSet">Remove active</button>
+            </div>
+            <label v-if="activeDocumentSet">
+              Rename open set
+              <input v-model="documentSetRenameDraft" aria-label="Rename active document set" placeholder="New set name" />
+            </label>
+            <button
+              v-if="activeDocumentSet"
+              type="button"
+              :disabled="!documentSetRenameDraft.trim() || documentSetRenameDraft.trim() === activeDocumentSet"
+              @click="renameActiveDocumentSet"
+            >
+              Rename all open set tabs
+            </button>
+            <div v-if="documentSetGroups.length" class="document-set-list" role="list" aria-label="Open document sets">
+              <article v-for="group in documentSetGroups" :key="group.key" role="listitem">
+                <div>
+                  <strong>{{ group.label }}</strong>
+                  <small>{{ group.documents.length }} open document{{ group.documents.length === 1 ? "" : "s" }}</small>
+                </div>
+                <button type="button" :disabled="!active.path || activeDocumentSet === group.label" @click="assignActiveDocumentSet(group.label)">Add active</button>
+              </article>
+            </div>
+            <p v-else class="sidebar-hint">Use document sets to keep board packs, proposals, appendices, and review bundles grouped together.</p>
+          </section>
           <button
             v-for="entry in store.workspaceFiles"
             :key="entry.path"
@@ -3913,6 +3951,8 @@ const outlineDraftTitle = ref("");
 const outlineDraftIncludeToc = ref(true);
 const outlineModeNewTitle = ref("New chapter");
 const outlineModeNewLevel = ref(1);
+const documentSetDraft = ref("");
+const documentSetRenameDraft = ref("");
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const isNewTableDraft = ref(false);
@@ -4943,6 +4983,16 @@ const groupedDocuments = computed<DocumentTabGroup[]>(() => {
   }
   return Array.from(groups.values());
 });
+const documentSetGroups = computed(() => groupedDocuments.value.filter((group) => group.key.startsWith("set:")));
+const activeDocumentSet = computed(() => documentSetName(active.value));
+watch(
+  activeDocumentSet,
+  (setName) => {
+    documentSetDraft.value = setName;
+    documentSetRenameDraft.value = setName;
+  },
+  { immediate: true },
+);
 const rootConflictCanMerge = computed(
   () => store.externalConflict?.reason === "root" && typeof store.externalConflict.externalText === "string",
 );
@@ -10036,11 +10086,66 @@ function dropTabOnGroup(group: DocumentTabGroup) {
   if (group.key.startsWith("set:") && document) {
     store.setPinned(document.id, false);
     store.setActiveDocument(document.id);
-    store.updateText(upsertFrontMatterField(document.text, "documentSet", group.label));
+    applyTextToDocument(document, setDocumentSetFrontMatter(document.text, group.label));
+    documentSetDraft.value = group.label;
+    documentSetRenameDraft.value = group.label;
+    store.statusMessage = `Added ${document.title} to ${group.label}`;
   } else {
     store.setPinned(draggedTabId.value, group.key === "pinned");
   }
   draggedTabId.value = "";
+}
+
+function assignActiveDocumentSet(setName: string) {
+  const cleanName = setName.trim();
+  if (!cleanName) return;
+  const document = active.value;
+  applyTextToDocument(document, setDocumentSetFrontMatter(document.text, cleanName));
+  documentSetDraft.value = cleanName;
+  documentSetRenameDraft.value = cleanName;
+  store.statusMessage = `Assigned ${document.title} to ${cleanName}`;
+}
+
+function clearActiveDocumentSet() {
+  const currentSet = activeDocumentSet.value;
+  if (!currentSet) return;
+  const document = active.value;
+  applyTextToDocument(document, clearDocumentSetFrontMatter(document.text));
+  documentSetDraft.value = "";
+  documentSetRenameDraft.value = "";
+  store.statusMessage = `Removed ${document.title} from ${currentSet}`;
+}
+
+function renameActiveDocumentSet() {
+  const oldName = activeDocumentSet.value;
+  const newName = documentSetRenameDraft.value.trim();
+  if (!oldName || !newName || oldName === newName) return;
+  let changed = 0;
+  for (const document of store.documents) {
+    if (documentSetName(document) !== oldName) continue;
+    applyTextToDocument(document, setDocumentSetFrontMatter(document.text, newName), false);
+    changed += 1;
+  }
+  void store.compileActive();
+  void store.persistWorkspace();
+  documentSetDraft.value = newName;
+  documentSetRenameDraft.value = newName;
+  store.statusMessage = `Renamed ${changed} open ${oldName} document${changed === 1 ? "" : "s"} to ${newName}`;
+}
+
+function applyTextToDocument(document: OpenDocument, text: string, compileActiveDocument = true) {
+  document.text = text;
+  document.dirty = typeof document.savedText === "string" ? text !== document.savedText : true;
+  if (document.id === store.activeId && compileActiveDocument) void store.compileActive();
+  void store.persistWorkspace();
+}
+
+function setDocumentSetFrontMatter(text: string, setName: string) {
+  return upsertFrontMatterField(clearDocumentSetFrontMatter(text), "documentSet", setName);
+}
+
+function clearDocumentSetFrontMatter(text: string) {
+  return ["documentSet", "document_set", "set"].reduce((next, key) => removeFrontMatterField(next, key), text);
 }
 
 function tabGroupDescriptor(document: OpenDocument): Omit<DocumentTabGroup, "documents"> {
@@ -10076,9 +10181,24 @@ function tabGroupDescriptor(document: OpenDocument): Omit<DocumentTabGroup, "doc
 }
 
 function documentSetName(document: OpenDocument) {
+  const textValue = documentSetNameFromText(document.text);
+  if (textValue) return textValue;
   const metadata = document.compile?.metadata || {};
   const value = metadata.documentSet || metadata.document_set || metadata.set;
   return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function documentSetNameFromText(text: string) {
+  if (!text.startsWith("---\n")) return "";
+  const lines = text.split("\n");
+  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
+  if (endIndex <= 0) return "";
+  for (let index = 1; index < endIndex; index += 1) {
+    const match = lines[index].match(/^\s*(documentSet|document_set|set)\s*:\s*(.+?)\s*$/);
+    if (!match) continue;
+    return match[2].replace(/^['"]|['"]$/g, "").trim();
+  }
+  return "";
 }
 
 function folderFromDocumentPath(path: string) {
@@ -10403,6 +10523,16 @@ function upsertFrontMatterField(text: string, key: string, value: string) {
   } else {
     lines.splice(endIndex, 0, line);
   }
+  return lines.join("\n");
+}
+
+function removeFrontMatterField(text: string, key: string) {
+  if (!text.startsWith("---\n")) return text;
+  const lines = text.split("\n");
+  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
+  if (endIndex <= 0) return text;
+  const existingIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
+  if (existingIndex > 0) lines.splice(existingIndex, 1);
   return lines.join("\n");
 }
 
@@ -13665,6 +13795,62 @@ select:hover {
 .file-row.active {
   background: #e5edf7;
   color: #174a88;
+}
+
+.document-set-manager {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 12px;
+  padding: 8px;
+  border: 1px solid #d9e2ed;
+  background: #f8fafc;
+}
+
+.document-set-manager header,
+.document-set-list article,
+.document-set-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.document-set-manager h3,
+.document-set-manager p {
+  margin: 0;
+}
+
+.document-set-manager label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.document-set-list {
+  display: grid;
+  gap: 6px;
+}
+
+.document-set-list article {
+  padding: 6px;
+  border: 1px solid #d9e2ed;
+  background: #ffffff;
+}
+
+.document-set-list article div {
+  display: grid;
+  gap: 2px;
+}
+
+.app-shell[data-theme="dark"] .document-set-manager {
+  border-color: #34465a;
+  background: #1b2736;
+}
+
+.app-shell[data-theme="dark"] .document-set-list article {
+  border-color: #34465a;
+  background: #223246;
 }
 
 .sidebar-hint {

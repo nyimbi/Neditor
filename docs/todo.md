@@ -893,8 +893,9 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
   persistence.
 - Document grouping workflow: group tabs by folder and front matter document
   set, drag a loose document into an existing document set, save the generated
-  `documentSet` front matter, and close a tab group without disturbing other
-  groups.
+  `documentSet` front matter, rename the open set through the Files-sidebar
+  Document Sets manager, remove the active document from the set, and close a
+  tab group without disturbing other groups.
 - Generated-section insertion workflow: command-palette insertion for `[TOC]`,
   `[INDEX]`, `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, and `[LIST_OF_TABLES]`.
 - References workflow: citation command navigation plus resolved bibliography
@@ -1420,8 +1421,9 @@ cases and broader platform proof remain incomplete.
 Finish:
 
 - Folder/workspace/project grouping behavior. The browser harness now covers
-  folder grouping for open documents and document-set grouping from front
-  matter metadata.
+  folder grouping for open documents, document-set grouping from current front
+  matter text, active document assignment, open-set rename, and active document
+  removal from a set.
 - Remaining document-set edge cases: saved workspace package evidence and
   deeper pointer drag/reorder behavior beyond moving a loose tab into an
   existing set.
