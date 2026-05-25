@@ -90,6 +90,17 @@ export interface AgenticWorkflowRevision {
   meaningDriftFindings: AgenticMeaningDriftFinding[];
 }
 
+export interface AgenticEditAcceptanceItem {
+  id: string;
+  scope: "selection" | "section" | "document";
+  heading: string;
+  originalText: string;
+  proposedText: string;
+  changeSummary: string[];
+  riskNotes: string[];
+  recommendation: string;
+}
+
 export type AgenticRevisionMode =
   | "clarity"
   | "brevity"
@@ -147,6 +158,7 @@ export interface AgenticWorkflowRun {
   markdown: string;
   applicationMode: "replace-document" | "replace-selection" | "append-packet";
   revision: AgenticWorkflowRevision | null;
+  editAcceptanceQueue: AgenticEditAcceptanceItem[];
   controlCenter: AgenticControlCenter;
   auditTrail: AgenticAuditTrail;
   documentEvidence: AgenticDocumentEvidence;
@@ -385,6 +397,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const hasSelection = Boolean(request.selectedText?.trim());
   const hasDocument = Boolean(request.documentText?.trim());
   const revision = plan.lanes.some((lane) => lane === "edit" || lane === "revise") ? buildRevision(request, plan) : null;
+  const editAcceptanceQueue = buildEditAcceptanceQueue(request, plan, revision);
   const draft = plan.lanes.some((lane) => lane === "create" || lane === "compose")
     ? buildDocsLiveDraft({
         documentType: plan.documentType,
@@ -399,7 +412,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
         generatedAt,
       })
     : null;
-  const reviewChecklist = buildReviewChecklist(plan, revision);
+  const reviewChecklist = buildReviewChecklist(plan, revision, editAcceptanceQueue);
   const distributionTargetPlans = buildDistributionTargetPlans(plan);
   const distributionChecklist = buildDistributionChecklist(plan, distributionTargetPlans);
   const blockers = buildRunBlockers(plan, hasDocument, hasSelection);
@@ -407,13 +420,34 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const documentEvidence = analyzeAgenticDocumentEvidence(request.documentText || "", plan);
   const outlineCritique = buildOutlineCritique(plan);
   const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence, outlineCritique });
-  const reviewerAgents = buildReviewerAgents({ plan, draftMarkdown: draft?.markdown || "", revision, controlCenter, distributionTargetPlans, blockers, documentEvidence, outlineCritique });
+  const reviewerAgents = buildReviewerAgents({
+    plan,
+    draftMarkdown: draft?.markdown || "",
+    revision,
+    editAcceptanceQueue,
+    controlCenter,
+    distributionTargetPlans,
+    blockers,
+    documentEvidence,
+    outlineCritique,
+  });
   const sectionWorkQueue = buildSectionWorkQueue(plan, reviewerAgents);
-  const lifecycleTasks = buildLifecycleTasks({ plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence, outlineCritique });
+  const lifecycleTasks = buildLifecycleTasks({
+    plan,
+    revision,
+    editAcceptanceQueue,
+    reviewerAgents,
+    sectionWorkQueue,
+    distributionTargetPlans,
+    blockers,
+    documentEvidence,
+    outlineCritique,
+  });
   const auditTrail = buildAuditTrail({
     plan,
     request,
     revision,
+    editAcceptanceQueue,
     draftMarkdown: draft?.markdown || "",
     lifecycleTasks,
     reviewerAgents,
@@ -431,6 +465,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     plan,
     draftMarkdown: draft?.markdown || "",
     revision,
+    editAcceptanceQueue,
     controlCenter,
     documentEvidence,
     auditTrail,
@@ -451,6 +486,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     markdown,
     applicationMode,
     revision,
+    editAcceptanceQueue,
     controlCenter,
     auditTrail,
     documentEvidence,
@@ -567,6 +603,104 @@ function buildRevision(request: AgenticWorkflowRunRequest, plan: AgenticWorkflow
     revisionPasses,
     meaningDriftFindings,
   };
+}
+
+function buildEditAcceptanceQueue(
+  request: AgenticWorkflowRunRequest,
+  plan: AgenticWorkflowPlan,
+  revision: AgenticWorkflowRevision | null,
+): AgenticEditAcceptanceItem[] {
+  if (!revision) return [];
+  if (request.selectedText?.trim()) {
+    return [
+      editAcceptanceItem({
+        scope: "selection",
+        heading: "Selected text revision",
+        originalText: revision.originalText,
+        proposedText: revision.proposedText,
+        changeSummary: revision.changeSummary,
+        driftFindings: revision.meaningDriftFindings,
+      }),
+    ];
+  }
+
+  const sections = markdownRevisionSections(revision.originalText);
+  if (sections.length <= 1) {
+    return [
+      editAcceptanceItem({
+        scope: "document",
+        heading: plan.title,
+        originalText: revision.originalText,
+        proposedText: revision.proposedText,
+        changeSummary: revision.changeSummary,
+        driftFindings: revision.meaningDriftFindings,
+      }),
+    ];
+  }
+
+  return sections.slice(0, 12).map((section) => {
+    const proposedText = reviseText(section.markdown, plan.revisionInstruction, plan.placeholderText, revision.revisionPasses);
+    return editAcceptanceItem({
+      scope: "section",
+      heading: section.heading,
+      originalText: section.markdown,
+      proposedText,
+      changeSummary: [
+        `Prepared a scoped revision for "${section.heading}".`,
+        `Applied revision passes: ${revision.revisionPasses.map((pass) => pass.label).join(", ") || "none"}.`,
+      ],
+      driftFindings: findMeaningDrift(section.markdown, proposedText),
+    });
+  });
+}
+
+function editAcceptanceItem(input: {
+  scope: AgenticEditAcceptanceItem["scope"];
+  heading: string;
+  originalText: string;
+  proposedText: string;
+  changeSummary: string[];
+  driftFindings: AgenticMeaningDriftFinding[];
+}): AgenticEditAcceptanceItem {
+  const riskNotes = input.driftFindings.length
+    ? input.driftFindings.map((finding) => `${titleCase(finding.kind)} ${finding.severity}: ${finding.detail}`)
+    : ["No changed or missing numbers, dates, commitments, or caveats were detected for this item."];
+  return {
+    id: `accept-${input.scope}-${stableFingerprint([input.heading, input.originalText, input.proposedText].join("\n")).slice(0, 12)}`,
+    scope: input.scope,
+    heading: input.heading,
+    originalText: input.originalText,
+    proposedText: input.proposedText,
+    changeSummary: input.changeSummary,
+    riskNotes,
+    recommendation: input.driftFindings.some((finding) => finding.severity === "blocker")
+      ? "Resolve risk notes before accepting this edit."
+      : "Accept, reject, or request another revision before applying this edit.",
+  };
+}
+
+function markdownRevisionSections(markdown: string) {
+  const lines = markdown.split(/\r?\n/);
+  const sections: Array<{ heading: string; markdown: string }> = [];
+  const starts: Array<{ index: number; level: number; heading: string }> = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(/^(#{1,4})\s+(.+?)\s*$/);
+    if (!match) continue;
+    starts.push({ index, level: match[1].length, heading: match[2].replace(/\s+#+\s*$/, "").trim() });
+  }
+  for (let index = 0; index < starts.length; index += 1) {
+    const start = starts[index];
+    let end = lines.length;
+    for (let scan = index + 1; scan < starts.length; scan += 1) {
+      if (starts[scan].level <= start.level) {
+        end = starts[scan].index;
+        break;
+      }
+    }
+    const sectionMarkdown = lines.slice(start.index, end).join("\n").trim();
+    if (sectionMarkdown) sections.push({ heading: start.heading, markdown: sectionMarkdown });
+  }
+  return sections;
 }
 
 function detectRevisionModes(corpus: string, lanes: AgenticWorkflowLane[], documentType: DocsLiveDocumentType): AgenticRevisionMode[] {
@@ -956,7 +1090,11 @@ function buildPlanSteps(
   return steps.length ? steps : buildPlanSteps(["create", "review"], missingInputs, targets, hasDocument, hasSelection);
 }
 
-function buildReviewChecklist(plan: AgenticWorkflowPlan, revision: AgenticWorkflowRevision | null) {
+function buildReviewChecklist(
+  plan: AgenticWorkflowPlan,
+  revision: AgenticWorkflowRevision | null,
+  editAcceptanceQueue: AgenticEditAcceptanceItem[],
+) {
   return [
     "Confirm the document has a clear audience, decision, owner, deadline, and review status.",
     "Replace unresolved placeholders with verified names, dates, numbers, and source references.",
@@ -964,6 +1102,7 @@ function buildReviewChecklist(plan: AgenticWorkflowPlan, revision: AgenticWorkfl
     "Mark every AI source block and AI-assisted section human-reviewed only after a person verifies it.",
     revision ? "Compare the revision proposal against the original text before applying final edits." : "",
     revision?.revisionPasses.length ? `Complete revision passes before acceptance: ${revision.revisionPasses.map((pass) => pass.label).join(", ")}.` : "",
+    editAcceptanceQueue.length ? "Accept, reject, or request revision for each edit acceptance queue item before applying changes." : "",
     revision?.meaningDriftFindings.length ? "Resolve all meaning-drift findings before accepting the revision." : "",
     plan.distributionTargets.length ? "Run export readiness for every requested distribution target." : "",
   ].filter(Boolean);
@@ -1005,6 +1144,7 @@ function buildDistributionChecklist(plan: AgenticWorkflowPlan, targetPlans: Agen
 function buildLifecycleTasks(input: {
   plan: AgenticWorkflowPlan;
   revision: AgenticWorkflowRevision | null;
+  editAcceptanceQueue: AgenticEditAcceptanceItem[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -1012,7 +1152,7 @@ function buildLifecycleTasks(input: {
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticLifecycleTask[] {
-  const { plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
+  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const tasks: AgenticLifecycleTask[] = [];
   const hasBlockers = blockers.length > 0;
   const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
@@ -1076,6 +1216,21 @@ function buildLifecycleTasks(input: {
       nextStep: revision.meaningDriftFindings.length
         ? "Resolve meaning-drift findings for changed numbers, dates, commitments, or caveats before accepting the replacement."
         : "Compare original and proposed text before accepting the replacement.",
+    });
+  }
+
+  if (editAcceptanceQueue.length) {
+    tasks.push({
+      id: "task-edit-acceptance-queue",
+      lane: plan.lanes.includes("revise") ? "revise" : "edit",
+      title: "Resolve edit acceptance queue",
+      owner: "Revision Agent",
+      status: editAcceptanceQueue.some((item) => item.riskNotes.some((note) => /\bblocker\b/i.test(note))) ? "needs-input" : baseStatus,
+      action: "open-ai-paste",
+      evidence: editAcceptanceQueue
+        .slice(0, 8)
+        .map((item) => `${titleCase(item.scope)} ${item.heading}: ${item.recommendation}`),
+      nextStep: "Accept, reject, or request another revision for each queued edit before applying accepted changes.",
     });
   }
 
@@ -1492,13 +1647,14 @@ function buildReviewerAgents(input: {
   plan: AgenticWorkflowPlan;
   draftMarkdown: string;
   revision: AgenticWorkflowRevision | null;
+  editAcceptanceQueue: AgenticEditAcceptanceItem[];
   controlCenter: AgenticControlCenter;
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticReviewerAgent[] {
-  const { plan, draftMarkdown, revision, controlCenter, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
+  const { plan, draftMarkdown, revision, editAcceptanceQueue, controlCenter, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const evidenceValue = extractKeyValue(plan.placeholderText, "evidence");
   const hasSpecificEvidence = Boolean(evidenceValue && !/^TBD\b/i.test(evidenceValue));
   const hasDraft = Boolean(draftMarkdown.trim());
@@ -1525,6 +1681,9 @@ function buildReviewerAgents(input: {
           : revision
             ? "Meaning-drift scan did not flag changed numbers, dates, commitments, or caveats."
             : "",
+        editAcceptanceQueue.length
+          ? `Edit acceptance queue prepared ${editAcceptanceQueue.length} item(s) for item-by-item approval.`
+          : "",
         documentEvidence.humanizationFindings.length
           ? `Humanization scan found ${documentEvidence.humanizationFindings.length} generic, repetitive, vague, or overconfident phrasing item(s).`
           : "No obvious generic AI phrasing patterns were detected in the current document.",
@@ -1535,6 +1694,7 @@ function buildReviewerAgents(input: {
         outlineCritique.length ? "Resolve outline critique items before treating section drafting as locked." : "",
         revision ? "Compare the proposed revision to the source text for meaning drift and over-compression." : "",
         revision?.revisionPasses.length ? `Complete the ${revision.revisionPasses.map((pass) => pass.label).join(", ")} revision pass checklist before sign-off.` : "",
+        editAcceptanceQueue.length ? "Resolve every edit acceptance queue item as accepted, rejected, or needing another revision before applying changes." : "",
         revision?.meaningDriftFindings.length ? "Resolve meaning-drift findings before accepting the proposed revision." : "",
         documentEvidence.humanizationFindings.length ? "Rewrite current-document humanization findings before final reader review." : "",
         hasDraft ? "Run a humanization pass for generic AI phrasing, repetition, and claims that sound confident without support." : "",
@@ -1705,6 +1865,7 @@ function buildAuditTrail(input: {
   plan: AgenticWorkflowPlan;
   request: AgenticWorkflowRunRequest;
   revision: AgenticWorkflowRevision | null;
+  editAcceptanceQueue: AgenticEditAcceptanceItem[];
   draftMarkdown: string;
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
@@ -1722,6 +1883,7 @@ function buildAuditTrail(input: {
     plan,
     request,
     revision,
+    editAcceptanceQueue,
     draftMarkdown,
     lifecycleTasks,
     reviewerAgents,
@@ -1753,6 +1915,14 @@ function buildAuditTrail(input: {
     ]),
     ...reviewerAgents.flatMap((agent) => [agent.id, agent.label, agent.mandate, agent.status, ...agent.findings, ...agent.requiredActions]),
     ...(revision?.revisionPasses.flatMap((pass) => [pass.mode, pass.label, pass.rationale, ...pass.checklist]) || []),
+    ...editAcceptanceQueue.flatMap((item) => [
+      item.id,
+      item.scope,
+      item.heading,
+      ...item.changeSummary,
+      ...item.riskNotes,
+      item.recommendation,
+    ]),
     ...sectionWorkQueue.flatMap((section) => [
       section.id,
       section.heading,
@@ -1793,6 +1963,9 @@ function buildAuditTrail(input: {
       revision?.revisionPasses.length
         ? `Revision pass plan prepared for ${revision.revisionPasses.map((pass) => pass.label).join(", ")}.`
         : "No explicit revision pass plan was needed for this run.",
+      editAcceptanceQueue.length
+        ? `Edit acceptance queue prepared ${editAcceptanceQueue.length} item(s) for item-by-item approval.`
+        : "No edit acceptance queue was needed for this run.",
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
         : "No distribution target selected at packet generation time.",
@@ -2340,6 +2513,7 @@ function buildRunMarkdown(input: {
   plan: AgenticWorkflowPlan;
   draftMarkdown: string;
   revision: AgenticWorkflowRevision | null;
+  editAcceptanceQueue: AgenticEditAcceptanceItem[];
   controlCenter: AgenticControlCenter;
   documentEvidence: AgenticDocumentEvidence;
   auditTrail: AgenticAuditTrail;
@@ -2357,6 +2531,7 @@ function buildRunMarkdown(input: {
     plan,
     draftMarkdown,
     revision,
+    editAcceptanceQueue,
     controlCenter,
     documentEvidence,
     auditTrail,
@@ -2429,6 +2604,7 @@ function buildRunMarkdown(input: {
   lines.push(...outlineCritiqueMarkdown(outlineCritique));
   lines.push(...claimInventoryMarkdown(documentEvidence.claimInventory));
   lines.push(...humanizationFindingsMarkdown(documentEvidence.humanizationFindings));
+  lines.push(...editAcceptanceQueueMarkdown(editAcceptanceQueue));
   lines.push(...lifecycleTasksMarkdown(lifecycleTasks));
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
@@ -2478,6 +2654,36 @@ function buildRunMarkdown(input: {
     "",
   );
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+function editAcceptanceQueueMarkdown(editAcceptanceQueue: AgenticEditAcceptanceItem[]) {
+  if (!editAcceptanceQueue.length) return [];
+  const lines = ["## Edit Acceptance Queue", ""];
+  for (const item of editAcceptanceQueue) {
+    lines.push(
+      `### ${item.heading}`,
+      "",
+      `Scope: ${item.scope}`,
+      "",
+      `Recommendation: ${item.recommendation}`,
+      "",
+      "Change summary:",
+      ...item.changeSummary.map((summary) => `- ${summary}`),
+      "",
+      "Risk notes:",
+      ...item.riskNotes.map((note) => `- [ ] ${note}`),
+      "",
+      "Original:",
+      "",
+      fencedBlock("markdown", item.originalText || "(No source text supplied.)"),
+      "",
+      "Proposed:",
+      "",
+      item.proposedText,
+      "",
+    );
+  }
+  return lines;
 }
 
 function revisionPassesMarkdown(revisionPasses: AgenticRevisionPass[]) {

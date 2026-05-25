@@ -2166,6 +2166,55 @@
                 </article>
               </section>
             </section>
+            <section v-if="agentRun.editAcceptanceQueue.length" class="agent-edit-acceptance-queue" aria-label="Agent edit acceptance queue">
+              <header>
+                <div>
+                  <strong>Edit Acceptance Queue</strong>
+                  <span>Review generated edits one item at a time before applying accepted changes.</span>
+                </div>
+                <small>{{ acceptedAgentEditCount }} accepted of {{ agentRun.editAcceptanceQueue.length }}</small>
+              </header>
+              <ol>
+                <li v-for="row in agentEditAcceptanceRows" :key="row.item.id" :data-scope="row.item.scope" :data-status="row.state.status">
+                  <div>
+                    <small>{{ row.item.scope }} | {{ row.state.status }}</small>
+                    <strong>{{ row.item.heading }}</strong>
+                    <p>{{ row.item.recommendation }}</p>
+                    <p v-if="row.state.note" class="sidebar-hint">Acceptance note: {{ row.state.note }}</p>
+                  </div>
+                  <section class="agent-edit-acceptance-compare">
+                    <article>
+                      <h3>Original</h3>
+                      <pre>{{ row.item.originalText }}</pre>
+                    </article>
+                    <article>
+                      <h3>Proposed</h3>
+                      <pre>{{ row.item.proposedText }}</pre>
+                    </article>
+                  </section>
+                  <div>
+                    <h3>Risk notes</h3>
+                    <ul>
+                      <li v-for="note in row.item.riskNotes" :key="note">{{ note }}</li>
+                    </ul>
+                  </div>
+                  <div class="agent-lifecycle-actions">
+                    <button type="button" @click="setAgentEditAcceptanceStatus(row.item, 'accepted')">Accept</button>
+                    <button type="button" @click="setAgentEditAcceptanceStatus(row.item, 'rejected')">Reject</button>
+                    <button type="button" @click="reviseAgentAcceptanceItem(row.item)">Revise</button>
+                  </div>
+                  <label>
+                    Acceptance note
+                    <input
+                      :value="row.state.note || ''"
+                      placeholder="Reason accepted, rejected, or sent for another pass"
+                      @change="setAgentEditAcceptanceNote(row.item, inputValue($event))"
+                    />
+                  </label>
+                </li>
+              </ol>
+              <button type="button" :disabled="acceptedAgentEditCount === 0" @click="applyAcceptedAgentEdits">Apply accepted edits</button>
+            </section>
             <section class="agent-lifecycle-board" aria-label="Agent lifecycle task board">
               <header>
                 <div>
@@ -2719,6 +2768,7 @@ import {
   type AgenticWorkflowPlan,
   type AgenticWorkflowRun,
   type AgenticLifecycleTask,
+  type AgenticEditAcceptanceItem,
   type AgenticSectionWorkItem,
   type AgenticWorkflowStep,
 } from "./lib/agenticWorkflows";
@@ -2757,7 +2807,14 @@ import {
   type CustomTransformTemplate,
   type TransformTemplate,
 } from "./lib/transformTemplates";
-import { SUPPORTED_CITATION_STYLES, type AgentLifecycleExecutionStatus, type AgentLifecycleTaskState, type AgentRunHistoryItem } from "./lib/workspacePersistence";
+import {
+  SUPPORTED_CITATION_STYLES,
+  type AgentEditAcceptanceState,
+  type AgentEditAcceptanceStatus,
+  type AgentLifecycleExecutionStatus,
+  type AgentLifecycleTaskState,
+  type AgentRunHistoryItem,
+} from "./lib/workspacePersistence";
 import {
   appendConflictMergePart,
   moveConflictMergePart,
@@ -2855,6 +2912,7 @@ const agentContextAnswers = ref("");
 const agentPlan = ref<AgenticWorkflowPlan | null>(null);
 const agentRun = ref<AgenticWorkflowRun | null>(null);
 const agentLifecycleTaskStates = ref<Record<string, AgentLifecycleTaskState>>({});
+const agentEditAcceptanceStates = ref<Record<string, AgentEditAcceptanceState>>({});
 const defaultAgentProviderProfile = aiProviderProfiles[0];
 const agentProviderId = ref<AiProviderProfileId>("manual-review");
 const agentProviderEndpoint = ref(defaultAgentProviderProfile.endpoint);
@@ -3285,6 +3343,15 @@ const latestAgentRunHistory = computed(() => store.agentRunHistory[0] || null);
 const activeAgentControlCenter = computed(() => agentRun.value?.controlCenter || latestAgentRunHistory.value?.controlCenter || null);
 const agentTaskLaneOptions: Array<"all" | AgenticWorkflowLane> = ["all", "create", "compose", "edit", "revise", "review", "distribute"];
 const agentTaskStatusOptions: Array<"all" | AgentLifecycleExecutionStatus> = ["all", "queued", "in-progress", "needs-review", "complete", "blocked"];
+const agentEditAcceptanceRows = computed(() =>
+  (agentRun.value?.editAcceptanceQueue || []).map((item) => ({
+    item,
+    state: agentEditAcceptanceStates.value[item.id] || defaultAgentEditAcceptanceState(item),
+  })),
+);
+const acceptedAgentEditCount = computed(() =>
+  agentEditAcceptanceRows.value.filter((row) => row.state.status === "accepted").length,
+);
 const agentLifecycleTaskRows = computed(() =>
   (agentRun.value?.lifecycleTasks || [])
     .map((task) => ({
@@ -4373,6 +4440,7 @@ function buildAgentWorkspacePlan() {
   });
   agentRun.value = null;
   agentLifecycleTaskStates.value = {};
+  agentEditAcceptanceStates.value = {};
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   store.statusMessage = `Planned ${agentPlan.value.steps.length} agent workflow steps`;
@@ -4389,6 +4457,9 @@ function generateAgentWorkspaceRun() {
   });
   agentLifecycleTaskStates.value = Object.fromEntries(
     agentRun.value.lifecycleTasks.map((task) => [task.id, defaultAgentLifecycleTaskState(task)]),
+  );
+  agentEditAcceptanceStates.value = Object.fromEntries(
+    agentRun.value.editAcceptanceQueue.map((item) => [item.id, defaultAgentEditAcceptanceState(item)]),
   );
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
@@ -4427,6 +4498,7 @@ function agentRunHistoryItem(
     reviewerCount: run.reviewerAgents.length,
     taskCount: run.lifecycleTasks.length,
     lifecycleTaskStates: agentLifecycleTaskStateList(),
+    editAcceptanceStates: agentEditAcceptanceStateList(),
     controlCenter: run.controlCenter,
     documentEvidence: run.documentEvidence,
     outlineCritique: run.outlineCritique,
@@ -4452,11 +4524,30 @@ function defaultAgentLifecycleTaskState(task: AgenticLifecycleTask): AgentLifecy
     updatedAt: agentRun.value?.auditTrail.generatedAt || new Date(0).toISOString(),
   };
 }
+function defaultAgentEditAcceptanceState(item: AgenticEditAcceptanceItem): AgentEditAcceptanceState {
+  return {
+    itemId: item.id,
+    heading: item.heading,
+    scope: item.scope,
+    status: "queued",
+    updatedAt: agentRun.value?.auditTrail.generatedAt || new Date(0).toISOString(),
+  };
+}
 function agentLifecycleTaskStateList() {
   if (!agentRun.value) return [];
   return agentRun.value.lifecycleTasks.map((task) => agentLifecycleTaskStates.value[task.id] || defaultAgentLifecycleTaskState(task));
 }
+function agentEditAcceptanceStateList() {
+  if (!agentRun.value) return [];
+  return agentRun.value.editAcceptanceQueue.map((item) => agentEditAcceptanceStates.value[item.id] || defaultAgentEditAcceptanceState(item));
+}
 function persistAgentLifecycleTaskStates() {
+  if (!agentRun.value) return;
+  const existing = store.agentRunHistory.find((item) => item.runId === agentRun.value?.auditTrail.runId);
+  const packetMarkdownOverride = existing?.packetMarkdown && existing.packetMarkdown !== agentRun.value.markdown ? existing.packetMarkdown : "";
+  recordAgentRunHistory(agentRun.value, existing?.status || "generated", existing?.providerProfile || "", packetMarkdownOverride, existing?.sourcePack);
+}
+function persistAgentEditAcceptanceStates() {
   if (!agentRun.value) return;
   const existing = store.agentRunHistory.find((item) => item.runId === agentRun.value?.auditTrail.runId);
   const packetMarkdownOverride = existing?.packetMarkdown && existing.packetMarkdown !== agentRun.value.markdown ? existing.packetMarkdown : "";
@@ -4503,10 +4594,38 @@ function replanAgentHistoryRun(item: AgentRunHistoryItem) {
   agentContextAnswers.value = item.contextAnswers || "";
   agentRun.value = null;
   agentLifecycleTaskStates.value = Object.fromEntries((item.lifecycleTaskStates || []).map((state) => [state.taskId, state]));
+  agentEditAcceptanceStates.value = Object.fromEntries((item.editAcceptanceStates || []).map((state) => [state.itemId, state]));
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   buildAgentWorkspacePlan();
   store.statusMessage = `Replanned saved agent run ${item.runId}`;
+}
+function setAgentEditAcceptanceStatus(item: AgenticEditAcceptanceItem, status: AgentEditAcceptanceStatus) {
+  const now = new Date().toISOString();
+  agentEditAcceptanceStates.value = {
+    ...agentEditAcceptanceStates.value,
+    [item.id]: {
+      ...(agentEditAcceptanceStates.value[item.id] || defaultAgentEditAcceptanceState(item)),
+      status,
+      updatedAt: now,
+      appliedAt: status === "accepted" ? agentEditAcceptanceStates.value[item.id]?.appliedAt : undefined,
+    },
+  };
+  persistAgentEditAcceptanceStates();
+  store.statusMessage = `Marked ${item.heading} ${status}`;
+}
+function setAgentEditAcceptanceNote(item: AgenticEditAcceptanceItem, note: string) {
+  const now = new Date().toISOString();
+  agentEditAcceptanceStates.value = {
+    ...agentEditAcceptanceStates.value,
+    [item.id]: {
+      ...(agentEditAcceptanceStates.value[item.id] || defaultAgentEditAcceptanceState(item)),
+      note: note.trim() || undefined,
+      updatedAt: now,
+    },
+  };
+  persistAgentEditAcceptanceStates();
+  store.statusMessage = `Updated ${item.heading} acceptance note`;
 }
 function appendAgentHistoryPacket(item: AgentRunHistoryItem) {
   if (!item.packetMarkdown) return;
@@ -4636,10 +4755,76 @@ async function copyAgentProviderSourcePack() {
 function applyAgentWorkspaceRun() {
   const run = agentRun.value;
   if (!run) return;
+  if (run.editAcceptanceQueue.length) {
+    if (!acceptedAgentEditCount.value) {
+      store.statusMessage = "Accept at least one queued edit before applying agent revisions";
+      return;
+    }
+    applyAcceptedAgentEdits();
+    return;
+  }
   applyAgentMarkdown(run.revision?.proposedText || run.markdown, run.applicationMode);
   recordAgentRunHistory(run, "applied");
   store.statusMessage = "Applied agent output for human review";
   closeAgentWorkspace();
+}
+function applyAcceptedAgentEdits() {
+  const run = agentRun.value;
+  if (!run) return;
+  const acceptedRows = agentEditAcceptanceRows.value.filter((row) => row.state.status === "accepted");
+  if (!acceptedRows.length) {
+    store.statusMessage = "No accepted agent edits to apply";
+    return;
+  }
+  let documentText = active.value.text;
+  let selectionHandled = false;
+  for (const row of acceptedRows) {
+    const item = row.item;
+    if (item.scope === "selection" && editorView && !selectionHandled) {
+      const range = editorView.state.selection.main;
+      if (!range.empty) {
+        editorView.dispatch({
+          changes: { from: range.from, to: range.to, insert: item.proposedText },
+          selection: { anchor: range.from + item.proposedText.length },
+        });
+        documentText = editorView.state.doc.toString();
+        selectionHandled = true;
+      } else if (documentText.includes(item.originalText)) {
+        documentText = documentText.replace(item.originalText, item.proposedText);
+      } else {
+        documentText = `${documentText.trimEnd()}\n\n${item.proposedText}`;
+      }
+    } else if (item.scope === "section") {
+      documentText = replaceOrAppendMarkdownSection(documentText, item.proposedText, item.heading);
+    } else if (item.scope === "document") {
+      documentText = item.proposedText;
+    }
+    const now = new Date().toISOString();
+    agentEditAcceptanceStates.value = {
+      ...agentEditAcceptanceStates.value,
+      [item.id]: {
+        ...(agentEditAcceptanceStates.value[item.id] || defaultAgentEditAcceptanceState(item)),
+        status: "accepted",
+        updatedAt: now,
+        appliedAt: now,
+      },
+    };
+  }
+  store.updateText(documentText);
+  editorView?.focus();
+  store.sidebar = "review";
+  persistAgentEditAcceptanceStates();
+  recordAgentRunHistory(run, "applied");
+  store.statusMessage = `Applied ${acceptedRows.length} accepted agent edit${acceptedRows.length === 1 ? "" : "s"}`;
+  closeAgentWorkspace();
+}
+function reviseAgentAcceptanceItem(item: AgenticEditAcceptanceItem) {
+  setAgentEditAcceptanceStatus(item, "needs-revision");
+  aiPasteText.value = item.proposedText;
+  aiInsertMode.value = item.scope === "selection" ? "selection" : item.scope === "document" ? "replace" : "section";
+  closeAgentWorkspace();
+  openAiPaste();
+  store.statusMessage = `Opened AI Paste to revise ${item.heading}`;
 }
 function applyAgentMarkdown(markdown: string, mode: AgenticWorkflowRun["applicationMode"]) {
   if (mode === "replace-selection" && editorView) {
@@ -11576,6 +11761,13 @@ select:hover {
   background: #f8fcfb;
 }
 
+.agent-edit-acceptance-queue {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #5f6b2f;
+  background: #fbfcf4;
+}
+
 .agent-lifecycle-board {
   display: grid;
   gap: 10px;
@@ -11584,6 +11776,7 @@ select:hover {
 }
 
 .agent-section-workqueue > header,
+.agent-edit-acceptance-queue > header,
 .agent-lifecycle-board > header {
   display: flex;
   justify-content: space-between;
@@ -11592,6 +11785,8 @@ select:hover {
 
 .agent-section-workqueue > header div,
 .agent-section-workqueue li > div,
+.agent-edit-acceptance-queue > header div,
+.agent-edit-acceptance-queue li > div,
 .agent-lifecycle-board > header div,
 .agent-lifecycle-board li > div {
   display: grid;
@@ -11602,6 +11797,9 @@ select:hover {
 .agent-section-workqueue > header small,
 .agent-section-workqueue small,
 .agent-section-workqueue span,
+.agent-edit-acceptance-queue > header span,
+.agent-edit-acceptance-queue > header small,
+.agent-edit-acceptance-queue small,
 .agent-lifecycle-board > header span,
 .agent-lifecycle-board > header small,
 .agent-lifecycle-board small {
@@ -11637,6 +11835,7 @@ select:hover {
 }
 
 .agent-section-workqueue ol,
+.agent-edit-acceptance-queue ol,
 .agent-lifecycle-board ol {
   display: grid;
   gap: 8px;
@@ -11659,11 +11858,56 @@ select:hover {
   border-left: 3px solid #c09a55;
 }
 
+.agent-edit-acceptance-queue li {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #98a454;
+}
+
+.agent-edit-acceptance-queue li[data-status="accepted"] {
+  border-left-color: #2f7d4c;
+}
+
+.agent-edit-acceptance-queue li[data-status="rejected"] {
+  border-left-color: #9d3d3d;
+}
+
+.agent-edit-acceptance-queue li[data-status="needs-revision"] {
+  border-left-color: #b18127;
+}
+
 .agent-section-workqueue p,
 .agent-section-workqueue ul,
+.agent-edit-acceptance-queue p,
+.agent-edit-acceptance-queue ul,
 .agent-lifecycle-board p,
 .agent-lifecycle-board ul {
   margin: 0;
+}
+
+.agent-edit-acceptance-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.agent-edit-acceptance-compare article {
+  min-width: 0;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+}
+
+.agent-edit-acceptance-compare h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+
+.agent-edit-acceptance-compare pre {
+  max-height: 180px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
 }
 
 .agent-section-actions {
@@ -11694,12 +11938,14 @@ select:hover {
 }
 
 .agent-section-workqueue small,
+.agent-edit-acceptance-queue small,
 .agent-lifecycle-board small {
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .agent-section-workqueue ul,
+.agent-edit-acceptance-queue ul,
 .agent-lifecycle-board ul {
   display: grid;
   gap: 4px;
@@ -13180,6 +13426,7 @@ select:hover {
   .agent-control-grid,
   .agent-reviewer-grid,
   .agent-audit-grid,
+  .agent-edit-acceptance-compare,
   .agent-section-workqueue li,
   .agent-history li,
   .agent-history dl,

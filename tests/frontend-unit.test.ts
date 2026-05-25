@@ -717,30 +717,64 @@ test("agentic workflow run proposes selection-aware revisions with review metada
   ok(run.revision?.revisionPasses.some((pass) => pass.mode === "brevity"));
   ok(run.revision?.revisionPasses.some((pass) => pass.mode === "humanization"));
   ok(run.revision?.revisionPasses.some((pass) => pass.mode === "legal-caution"));
+  equal(run.editAcceptanceQueue.length, 1);
+  equal(run.editAcceptanceQueue[0].scope, "selection");
+  ok(run.editAcceptanceQueue[0].riskNotes.some((note) => note.includes("June 1")));
   ok(!run.revision?.proposedText.includes("It is important to note"));
   ok(!run.revision?.proposedText.includes("leveraging"));
   ok(run.revision?.meaningDriftFindings.some((finding) => finding.kind === "date" && finding.original.includes("June 1")));
   ok(run.revision?.meaningDriftFindings.some((finding) => finding.kind === "commitment" && finding.original.includes("must approve")));
   ok(run.reviewChecklist.some((item) => item.includes("Compare the revision proposal")));
   ok(run.reviewChecklist.some((item) => item.includes("Complete revision passes")));
+  ok(run.reviewChecklist.some((item) => item.includes("edit acceptance queue")));
   ok(run.reviewChecklist.some((item) => item.includes("Resolve all meaning-drift findings")));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Selected text" && item.status === "available"));
   ok(run.controlCenter.governance.some((item) => item.label === "Revision audit" && item.status === "needs-review"));
   ok(run.controlCenter.nextActions.some((action) => action.lane === "revise"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-revision-proposal" && task.status === "blocked"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-revision-proposal" && task.evidence.some((item) => item.includes("Brevity pass"))));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-edit-acceptance-queue"));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("Compare the proposed revision"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("edit acceptance queue"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("revision pass checklist"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("meaning-drift"))));
   equal(run.auditTrail.applicationMode, "replace-selection");
   ok(run.auditTrail.rollbackPlan.some((item) => item.includes("editor undo")));
   ok(run.markdown.includes("Apply mode: replace-selection"));
   ok(run.markdown.includes("## Revision Proposal"));
+  ok(run.markdown.includes("## Edit Acceptance Queue"));
   ok(run.markdown.includes("### Planned Revision Modes"));
   ok(run.markdown.includes("### Revision Passes"));
   ok(run.markdown.includes("### Meaning Drift"));
   ok(run.markdown.includes("### Original Text"));
   ok(run.markdown.includes("### Proposed Text"));
+});
+
+test("agentic workflow creates section-level edit acceptance queues", () => {
+  const run = buildAgenticWorkflowRun({
+    instruction:
+      "Revise this report section by section, make it concise, check risks, and preserve evidence. audience: leadership owner: Strategy deadline: June 1 evidence: forecast",
+    documentTitle: "Operating Review",
+    documentText: [
+      "# Operating Review",
+      "",
+      "## Summary",
+      "",
+      "It is important to note that the plan increases ARR by 18%.",
+      "",
+      "## Risks",
+      "",
+      "The team must approve the migration by June 1 unless the vendor misses security review.",
+    ].join("\n"),
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  ok(run.editAcceptanceQueue.length >= 2);
+  ok(run.editAcceptanceQueue.some((item) => item.scope === "section" && item.heading === "Summary"));
+  ok(run.editAcceptanceQueue.some((item) => item.scope === "section" && item.heading === "Risks"));
+  ok(run.editAcceptanceQueue.every((item) => item.proposedText.includes("source=NEditor Agent Workspace")));
+  ok(run.markdown.includes("## Edit Acceptance Queue"));
+  ok(run.auditTrail.reviewEvents.some((event) => event.includes("Edit acceptance queue prepared")));
 });
 
 test("agentic workflow reviewers inspect current document evidence", () => {
@@ -1030,6 +1064,17 @@ test("workspace persistence migration versions and normalizes saved settings", (
             title: "Duplicate ignored",
           },
         ],
+        editAcceptanceStates: [
+          {
+            itemId: "accept-section-summary",
+            heading: " Summary ",
+            scope: "section",
+            status: "accepted",
+            note: " CFO accepted. ",
+            updatedAt: "2026-05-25T10:04:40.000Z",
+            appliedAt: "2026-05-25T10:04:50.000Z",
+          },
+        ],
         controlCenter: {
           status: "blocked",
           readinessScore: -20,
@@ -1223,6 +1268,17 @@ test("workspace persistence migration versions and normalizes saved settings", (
         completedAt: "2026-05-25T10:04:30.000Z",
       },
     ],
+    editAcceptanceStates: [
+      {
+        itemId: "accept-section-summary",
+        heading: "Summary",
+        scope: "section",
+        status: "accepted",
+        note: "CFO accepted.",
+        updatedAt: "2026-05-25T10:04:40.000Z",
+        appliedAt: "2026-05-25T10:04:50.000Z",
+      },
+    ],
     controlCenter: {
       status: "blocked",
       readinessScore: 0,
@@ -1388,6 +1444,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentPlan.revisionModes"));
   ok(app.includes("Revision passes"));
   ok(app.includes("agent-revision-modes"));
+  ok(app.includes("Agent edit acceptance queue"));
+  ok(app.includes("agentEditAcceptanceRows"));
+  ok(app.includes("acceptedAgentEditCount"));
+  ok(app.includes("setAgentEditAcceptanceStatus"));
+  ok(app.includes("applyAcceptedAgentEdits"));
+  ok(app.includes("Revise"));
   ok(app.includes("agent-context-score"));
   ok(app.includes("agentRun"));
   ok(app.includes("agentContextAnswers"));

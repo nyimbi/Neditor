@@ -115,6 +115,18 @@ export interface AgentLifecycleTaskState {
   completedAt?: string;
 }
 
+export type AgentEditAcceptanceStatus = "queued" | "accepted" | "rejected" | "needs-revision";
+
+export interface AgentEditAcceptanceState {
+  itemId: string;
+  heading: string;
+  scope: "selection" | "section" | "document";
+  status: AgentEditAcceptanceStatus;
+  note?: string;
+  updatedAt: string;
+  appliedAt?: string;
+}
+
 export type AgentRunHistoryControlStatus = "ready" | "needs-input" | "blocked";
 export type AgentRunHistoryEvidenceStatus = "available" | "missing" | "needs-review";
 
@@ -206,6 +218,7 @@ export interface AgentRunHistoryItem {
   reviewerCount?: number;
   taskCount?: number;
   lifecycleTaskStates?: AgentLifecycleTaskState[];
+  editAcceptanceStates?: AgentEditAcceptanceState[];
   controlCenter?: AgentRunHistoryControlCenter;
   documentEvidence?: AgentRunHistoryDocumentEvidence;
   outlineCritique?: AgentRunHistoryOutlineCritiqueItem[];
@@ -500,6 +513,31 @@ function normalizeAgentLifecycleTaskStates(value: unknown): AgentLifecycleTaskSt
   return states;
 }
 
+function normalizeAgentEditAcceptanceStates(value: unknown): AgentEditAcceptanceState[] {
+  if (!Array.isArray(value)) return [];
+  const states: AgentEditAcceptanceState[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const itemId = normalizedString(item.itemId, 140);
+    if (!itemId || seen.has(itemId)) continue;
+    const scope = enumValue(item.scope, ["selection", "section", "document"] as const) || "section";
+    const status = enumValue(item.status, ["queued", "accepted", "rejected", "needs-revision"] as const) || "queued";
+    seen.add(itemId);
+    states.push({
+      itemId,
+      heading: normalizedString(item.heading, 180) || "Agent edit",
+      scope,
+      status,
+      note: normalizedString(item.note, 1_200) || undefined,
+      updatedAt: normalizedString(item.updatedAt, 40) || new Date(0).toISOString(),
+      appliedAt: normalizedString(item.appliedAt, 40) || undefined,
+    });
+    if (states.length >= 60) break;
+  }
+  return states;
+}
+
 function normalizeAgentRunHistoryControlItems(value: unknown): AgentRunHistoryControlItem[] {
   if (!Array.isArray(value)) return [];
   const items: AgentRunHistoryControlItem[] = [];
@@ -655,6 +693,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
         .slice(0, 12)
     : [];
   const lifecycleTaskStates = normalizeAgentLifecycleTaskStates(value.lifecycleTaskStates);
+  const editAcceptanceStates = normalizeAgentEditAcceptanceStates(value.editAcceptanceStates);
   const controlCenter = normalizeAgentRunHistoryControlCenter(value.controlCenter);
   const documentEvidence = normalizeAgentRunHistoryDocumentEvidence(value.documentEvidence);
   const outlineCritique = normalizeAgentRunHistoryOutlineCritique(value.outlineCritique);
@@ -682,6 +721,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
     taskCount: Math.max(numberValue(value.taskCount) ?? 0, 0),
     ...(lifecycleTaskStates.length ? { lifecycleTaskStates } : {}),
+    ...(editAcceptanceStates.length ? { editAcceptanceStates } : {}),
     ...(controlCenter ? { controlCenter } : {}),
     ...(documentEvidence ? { documentEvidence } : {}),
     ...(outlineCritique.length ? { outlineCritique } : {}),
