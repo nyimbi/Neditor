@@ -81,6 +81,7 @@ export interface AgenticDocumentEvidence {
   unresolvedPlaceholders: string[];
   citationTodos: string[];
   claimInventory: AgenticDocumentClaim[];
+  humanizationFindings: AgenticHumanizationFinding[];
   unreviewedAiMarkers: number;
   unresolvedComments: number;
   approvalMetadataMissing: string[];
@@ -92,6 +93,13 @@ export interface AgenticDocumentClaim {
   sourceLine: number;
   text: string;
   reason: string;
+}
+
+export interface AgenticHumanizationFinding {
+  kind: "generic-phrase" | "overconfident-claim" | "repetition" | "vague-transition";
+  sourceLine: number;
+  text: string;
+  recommendation: string;
 }
 
 export interface AgenticWorkflowRun {
@@ -355,6 +363,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    documentEvidence,
     outlineCritique,
     reviewChecklist,
     distributionChecklist,
@@ -884,6 +893,18 @@ function buildDocumentEvidenceLifecycleTasks(documentEvidence: AgenticDocumentEv
       nextStep: "Match each extracted claim to a source, citation, reviewer note, or explicit deferral before final approval.",
     });
   }
+  if (documentEvidence.humanizationFindings.length) {
+    tasks.push({
+      id: "task-evidence-humanization",
+      lane: "revise",
+      title: "Humanize current-document language",
+      owner: "Editorial Agent",
+      status: "needs-input",
+      action: "open-ai-paste",
+      evidence: documentEvidence.humanizationFindings.slice(0, 8).map((finding) => `Line ${finding.sourceLine}: ${finding.text}`),
+      nextStep: "Rewrite generic, repetitive, vague, or overconfident language into concrete owner-written prose before approval.",
+    });
+  }
   if (documentEvidence.unresolvedComments) {
     tasks.push({
       id: "task-evidence-comments",
@@ -1213,12 +1234,16 @@ function buildReviewerAgents(input: {
         outlineCritique.length
           ? `Outline critique found ${outlineCritique.length} structure, coverage, sequencing, duplication, or specificity item(s).`
           : "No outline critique items were detected.",
+        documentEvidence.humanizationFindings.length
+          ? `Humanization scan found ${documentEvidence.humanizationFindings.length} generic, repetitive, vague, or overconfident phrasing item(s).`
+          : "No obvious generic AI phrasing patterns were detected in the current document.",
         `Tone target: ${extractKeyValue(plan.placeholderText, "tone") || "professional and direct"}.`,
       ],
       requiredActions: [
         missingInputs.includes("audience") ? "Confirm the intended audience before approving voice, detail level, and calls to action." : "",
         outlineCritique.length ? "Resolve outline critique items before treating section drafting as locked." : "",
         revision ? "Compare the proposed revision to the source text for meaning drift and over-compression." : "",
+        documentEvidence.humanizationFindings.length ? "Rewrite current-document humanization findings before final reader review." : "",
         hasDraft ? "Run a humanization pass for generic AI phrasing, repetition, and claims that sound confident without support." : "",
         documentEvidence.unresolvedPlaceholders.length ? "Resolve or intentionally preserve current-document placeholders before final approval." : "",
       ],
@@ -1387,6 +1412,7 @@ function buildAuditTrail(input: {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
   reviewChecklist: string[];
   distributionChecklist: string[];
@@ -1403,6 +1429,7 @@ function buildAuditTrail(input: {
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    documentEvidence,
     outlineCritique,
     reviewChecklist,
     distributionChecklist,
@@ -1436,6 +1463,7 @@ function buildAuditTrail(input: {
       ...section.reviewerAgentIds,
     ]),
     ...outlineCritique.flatMap((item) => [item.severity, item.area, item.heading, item.detail, item.recommendation]),
+    ...documentEvidence.humanizationFindings.flatMap((item) => [item.kind, String(item.sourceLine), item.text, item.recommendation]),
     ...reviewChecklist,
     ...distributionChecklist,
     ...distributionTargetPlans.flatMap((target) => [target.target, target.label, ...target.preflightChecks, ...target.handoffSteps, ...target.evidenceRequired]),
@@ -1461,6 +1489,9 @@ function buildAuditTrail(input: {
       outlineCritique.length
         ? `Outline critique prepared ${outlineCritique.length} structure and coverage item(s).`
         : "Outline critique found no structure or coverage issues.",
+      documentEvidence.humanizationFindings.length
+        ? `Humanization scan prepared ${documentEvidence.humanizationFindings.length} phrasing item(s) for editorial cleanup.`
+        : "Humanization scan found no generic phrasing items.",
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
         : "No distribution target selected at packet generation time.",
@@ -1574,6 +1605,13 @@ function buildGovernanceItems(
       status: blockers.length || documentEvidence.unresolvedComments ? "needs-review" : "available",
     },
     {
+      label: "Humanization",
+      detail: documentEvidence.humanizationFindings.length
+        ? `${documentEvidence.humanizationFindings.length} current-document phrasing item(s) need humanization before reader review.`
+        : "No obvious generic AI phrasing patterns were detected.",
+      status: documentEvidence.humanizationFindings.length ? "needs-review" : "available",
+    },
+    {
       label: "Revision audit",
       detail: revision ? "Original text, proposed text, and change summary are captured for comparison." : "No selection-aware revision is part of this run.",
       status: revision ? "available" : "needs-review",
@@ -1660,6 +1698,15 @@ function buildNextActions(
       detail: `${documentEvidence.claimInventory.length} candidate claim(s) need source, citation, reviewer note, or deferral.`,
       lane: "review",
       action: "open-review",
+      status: "needs-input",
+    });
+  }
+  if (documentEvidence.humanizationFindings.length) {
+    actions.push({
+      label: "Humanize current document",
+      detail: `${documentEvidence.humanizationFindings.length} phrasing item(s) need concrete, owner-written language.`,
+      lane: "revise",
+      action: "open-ai-paste",
       status: "needs-input",
     });
   }
@@ -1826,11 +1873,13 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
     new Set([...documentText.matchAll(/\]\((?:TODO|TBD|#|https?:\/\/example\.com)[^)]*\)/gi)].map((match) => match[0])),
   ).slice(0, 12);
   const claimInventory = extractDocumentClaimInventory(documentText);
+  const humanizationFindings = extractHumanizationFindings(documentText);
 
   return {
     unresolvedPlaceholders,
     citationTodos,
     claimInventory,
+    humanizationFindings,
     unreviewedAiMarkers: unreviewedAiSources + unreviewedAiAssisted,
     unresolvedComments,
     approvalMetadataMissing,
@@ -1896,6 +1945,80 @@ function classifyClaimSignal(text: string): Pick<AgenticDocumentClaim, "kind" | 
     return { kind: "claim", reason: "Causal, performance, or risk claim needs evidence review." };
   }
   return null;
+}
+
+function extractHumanizationFindings(documentText: string): AgenticHumanizationFinding[] {
+  const findings: AgenticHumanizationFinding[] = [];
+  const seen = new Set<string>();
+  const sentenceStarts = new Map<string, { count: number; line: number; text: string }>();
+  let inFence = false;
+  const lines = documentText.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (/^```/.test(trimmed)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence || !trimmed || /^#{1,6}\s/.test(trimmed) || /^---$/.test(trimmed) || /^<!--/.test(trimmed)) continue;
+    const text = trimmed.replace(/^[-*+]\s+/, "").replace(/^\d+[.)]\s+/, "").replace(/\s+/g, " ").slice(0, 240);
+    const start = text.match(/^([A-Z][A-Za-z'-]{2,})(?:\s+[A-Za-z'-]{2,}){0,2}/)?.[0].toLowerCase();
+    if (start) {
+      const current = sentenceStarts.get(start) || { count: 0, line: index + 1, text };
+      sentenceStarts.set(start, { ...current, count: current.count + 1 });
+    }
+    for (const finding of classifyHumanizationLine(text, index + 1)) {
+      const key = `${finding.kind}:${finding.text.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      findings.push(finding);
+      if (findings.length >= 18) return findings;
+    }
+  }
+  for (const [start, value] of sentenceStarts) {
+    if (value.count >= 3 && !seen.has(`repetition:${start}`)) {
+      findings.push({
+        kind: "repetition",
+        sourceLine: value.line,
+        text: value.text,
+        recommendation: `Vary repeated sentence openings such as "${start}" so the section sounds intentionally written rather than templated.`,
+      });
+      if (findings.length >= 18) break;
+    }
+  }
+  return findings;
+}
+
+function classifyHumanizationLine(text: string, sourceLine: number): AgenticHumanizationFinding[] {
+  const findings: AgenticHumanizationFinding[] = [];
+  const genericPhrase = text.match(
+    /\b(?:in today's (?:fast-paced|ever-changing|dynamic) (?:world|landscape|environment)|it is important to note|it should be noted|this comprehensive (?:guide|overview|analysis)|delve into|unlock(?:ing)? the potential|seamless(?:ly)?|robust solution|cutting-edge|game[- ]changer|leverage synergies|at the end of the day)\b/i,
+  )?.[0];
+  if (genericPhrase) {
+    findings.push({
+      kind: "generic-phrase",
+      sourceLine,
+      text,
+      recommendation: `Replace "${genericPhrase}" with specific context, actor, action, or evidence from this document.`,
+    });
+  }
+  if (/\b(?:clearly|obviously|undoubtedly|certainly|always|never|guaranteed|proves?|will definitely)\b/i.test(text) && !/\b(source|evidence|according to|because|citation|data)\b/i.test(text)) {
+    findings.push({
+      kind: "overconfident-claim",
+      sourceLine,
+      text,
+      recommendation: "Qualify confident language or attach evidence so the claim does not sound unsupported.",
+    });
+  }
+  const vagueTransition = text.match(/^(?:Furthermore|Moreover|Additionally|In conclusion|Overall|Ultimately|It is worth noting)\b/i)?.[0];
+  if (vagueTransition) {
+    findings.push({
+      kind: "vague-transition",
+      sourceLine,
+      text,
+      recommendation: `Replace "${vagueTransition}" with a transition that names the business reason, contrast, or next decision.`,
+    });
+  }
+  return findings;
 }
 
 function inferApplicationMode(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSelection: boolean): AgenticWorkflowRun["applicationMode"] {
@@ -1984,6 +2107,7 @@ function buildRunMarkdown(input: {
   lines.push(...controlCenterMarkdown(controlCenter));
   lines.push(...outlineCritiqueMarkdown(outlineCritique));
   lines.push(...claimInventoryMarkdown(documentEvidence.claimInventory));
+  lines.push(...humanizationFindingsMarkdown(documentEvidence.humanizationFindings));
   lines.push(...lifecycleTasksMarkdown(lifecycleTasks));
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
@@ -2110,6 +2234,23 @@ function claimInventoryMarkdown(claimInventory: AgenticDocumentClaim[]) {
     ...claimInventory.map(
       (claim) =>
         `| ${claim.sourceLine} | ${claim.kind} | ${escapeTableCell(claim.reason)} | ${escapeTableCell(claim.text)} |`,
+    ),
+    "",
+  ];
+}
+
+function humanizationFindingsMarkdown(findings: AgenticHumanizationFinding[]) {
+  if (!findings.length) {
+    return ["## Humanization Findings", "", "No current-document humanization findings were detected.", ""];
+  }
+  return [
+    "## Humanization Findings",
+    "",
+    "| Line | Pattern | Text | Recommendation |",
+    "| ---: | --- | --- | --- |",
+    ...findings.map(
+      (finding) =>
+        `| ${finding.sourceLine} | ${finding.kind} | ${escapeTableCell(finding.text)} | ${escapeTableCell(finding.recommendation)} |`,
     ),
     "",
   ];

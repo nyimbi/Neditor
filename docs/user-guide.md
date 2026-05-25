@@ -95,18 +95,20 @@ grounding, governance state, and distribution state so reviewers can see what is
 safe to do next before applying generated text. The control center and reviewer
 agents inspect the current Markdown for unresolved placeholders, citation TODOs,
 candidate claims with line numbers, unreviewed AI provenance markers,
-unresolved comments, missing approval metadata, and placeholder links, so the
-agent review reflects the document in front of the user instead of only the
-prompt. Those findings also become
+humanization findings for generic or overconfident phrasing, unresolved
+comments, missing approval metadata, and placeholder links, so the agent review
+reflects the document in front of the user instead of only the prompt. Those
+findings also become
 concrete next actions and lifecycle tasks, so evidence cleanup can be assigned,
 run, noted, and completed from the same agent board. The same packet includes named
 reviewer agents for editorial quality, evidence grounding, risk, citations,
 governance, and export readiness so each review lane has findings and required
 actions instead of one undifferentiated checklist. It also includes deterministic
 outline critique for coverage, sequencing, duplicated headings, excessive depth,
-and generic section names before drafting starts, plus a section-by-section work
-queue with drafting instructions, completion criteria, and assigned reviewer
-agents so a team can build the document systematically
+and generic section names before drafting starts, deterministic humanization
+findings for stale AI phrasing and vague transitions, plus a section-by-section
+work queue with drafting instructions, completion criteria, and assigned
+reviewer agents so a team can build the document systematically
 from outline to reviewed sections. Each queued section can insert a visible work
 brief into the Markdown source or open Docs Live preloaded with that section's
 instruction, criteria, placeholders, and reviewer agents for focused drafting.

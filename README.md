@@ -204,13 +204,15 @@ web app.
   complete agent packet with a Docs Live draft, selection-aware revision
   proposal, QA gates, named reviewer agents for editorial, evidence, risk,
   citation, governance, and export readiness, deterministic outline critique
-  for coverage, sequencing, duplication, depth, and specificity, a
+  for coverage, sequencing, duplication, depth, and specificity, deterministic
+  humanization findings for generic, repetitive, vague, or overconfident
+  language, a
   section-by-section work queue with drafting instructions, completion criteria, assigned reviewers, per-section
   work-brief insertion, and focused Docs Live handoff that can replace the
   matching Markdown section instead of appending duplicate section copy, an
   **AI Control Center** for readiness score, source grounding, governance
   state, current-document placeholders, citation TODOs, unresolved comments,
-  extracted claim inventory, unreviewed AI markers, approval metadata gaps,
+  extracted claim inventory, humanization findings, unreviewed AI markers, approval metadata gaps,
   placeholder links, next actions that route document evidence into concrete remediation work, an
   agentic lifecycle task board that turns creation,
   composition, editing, revision, review, and distribution into runnable
