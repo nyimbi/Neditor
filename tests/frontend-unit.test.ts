@@ -1888,6 +1888,16 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Help: Docs Live"));
   ok(app.includes("Help: Export and publishing"));
   ok(app.includes("Help: AI-first composition"));
+  ok(app.includes('aria-label="Index manager"'));
+  ok(app.includes("indexTermDraft"));
+  ok(app.includes("indexExcludeDraft"));
+  ok(app.includes("indexExclusionTerms"));
+  ok(app.includes("insertIndexMarkerFromDraft"));
+  ok(app.includes("addIndexExclusion"));
+  ok(app.includes("removeIndexExclusion"));
+  ok(app.includes("upsertFrontMatterListField"));
+  ok(app.includes("frontMatterListValues"));
+  ok(app.includes("Index exclusions"));
   ok(app.includes("openHelp(\"keyboard-shortcuts\")"));
   ok(app.includes("Docs Live"));
   ok(app.includes("openDocsLiveFromOutline"));

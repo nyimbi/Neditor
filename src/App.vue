@@ -848,6 +848,26 @@
               <button type="button" @click="insertBlock(indexSnippet)">Insert generated index</button>
               <button type="button" @click="setFrontMatterField('index', 'true')">Enable front matter index</button>
             </div>
+            <div class="reference-inline-form">
+              <label>
+                Add index term
+                <input v-model="indexTermDraft" placeholder="Liquidity, Working Capital, Client Name" />
+              </label>
+              <button type="button" :disabled="!indexTermDraft.trim()" @click="insertIndexMarkerFromDraft">Add marker</button>
+            </div>
+            <div class="reference-inline-form">
+              <label>
+                Exclude term
+                <input v-model="indexExcludeDraft" placeholder="Internal Draft, Secret Plan" />
+              </label>
+              <button type="button" :disabled="!indexExcludeDraft.trim()" @click="addIndexExclusion">Exclude term</button>
+            </div>
+            <section v-if="indexExclusionTerms.length" class="reference-chip-list" aria-label="Index exclusions">
+              <span v-for="term in indexExclusionTerms" :key="term">
+                {{ term }}
+                <button type="button" :aria-label="`Remove ${term} from index exclusions`" @click="removeIndexExclusion(term)">Remove</button>
+              </span>
+            </section>
             <p v-if="!indexTerms.length" class="sidebar-hint">No index terms detected.</p>
             <button v-for="term in indexTerms" :key="term" class="outline-row" type="button" @click="goToSearchTerm(term)">
               {{ term }}
@@ -3707,6 +3727,8 @@ const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue -
 const equationSnippet = "$$\nE = mc^2\n$$ {#eq:energy}\n";
 const tocSnippet = "[TOC]\n";
 const indexSnippet = "[INDEX]\n";
+const indexTermDraft = ref("");
+const indexExcludeDraft = ref("");
 const bibliographySnippet = "[BIBLIOGRAPHY]\n";
 const bibliographyTemplateSnippet = "```bibtex\n@misc{source2026,\n  title = {Source title},\n  author = {Author},\n  year = {2026}\n}\n```\n";
 const listOfFiguresSnippet = "[LIST_OF_FIGURES]\n";
@@ -4048,6 +4070,7 @@ const glossaryEntries = computed(() =>
     .sort((left, right) => left.term.localeCompare(right.term)),
 );
 const indexTerms = computed(() => [...(active.value.compile?.index_terms || [])].sort((left, right) => left.localeCompare(right)));
+const indexExclusionTerms = computed(() => frontMatterListValues(active.value.text, "indexExclude"));
 const reviewSummary = computed(() => {
   const semantic = active.value.compile?.semantic;
   const comments = semantic?.comments || [];
@@ -9070,6 +9093,53 @@ function upsertFrontMatterField(text: string, key: string, value: string) {
   return lines.join("\n");
 }
 
+function upsertFrontMatterListField(text: string, key: string, values: string[]) {
+  const uniqueValues = Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+  const block = uniqueValues.length
+    ? [`${key}:`, ...uniqueValues.map((value) => `  - ${yamlInlineString(value)}`)]
+    : [`${key}: []`];
+  const lines = text.startsWith("---\n") ? text.split("\n") : ["---", "---", "", ...text.split("\n")];
+  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
+  if (endIndex <= 0) return `---\n${block.join("\n")}\n---\n\n${text}`;
+  const startIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
+  if (startIndex > 0) {
+    let deleteCount = 1;
+    while (startIndex + deleteCount < endIndex && /^\s+-\s+/.test(lines[startIndex + deleteCount])) deleteCount += 1;
+    lines.splice(startIndex, deleteCount, ...block);
+  } else {
+    lines.splice(endIndex, 0, ...block);
+  }
+  return lines.join("\n");
+}
+
+function frontMatterListValues(text: string, key: string) {
+  if (!text.startsWith("---\n")) return [];
+  const lines = text.split("\n");
+  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
+  if (endIndex <= 0) return [];
+  const startIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
+  if (startIndex <= 0) return [];
+  const inlineValue = lines[startIndex].split(":").slice(1).join(":").trim();
+  if (inlineValue.startsWith("[") && inlineValue.endsWith("]")) {
+    return inlineValue
+      .slice(1, -1)
+      .split(",")
+      .map((value) => value.trim().replace(/^["']|["']$/g, ""))
+      .filter(Boolean);
+  }
+  const values: string[] = [];
+  for (let index = startIndex + 1; index < endIndex; index += 1) {
+    const match = lines[index].match(/^\s+-\s+(.+?)\s*$/);
+    if (!match) break;
+    values.push(match[1].trim().replace(/^["']|["']$/g, ""));
+  }
+  return Array.from(new Set(values));
+}
+
+function yamlInlineString(value: string) {
+  return JSON.stringify(value);
+}
+
 function clampUiLineHeight(value: number) {
   return Math.min(Math.max(Number(value) || 1.55, 1), 2.4);
 }
@@ -10076,6 +10146,29 @@ function insertFigureSnippet(position: FigureCropPosition = "center") {
 
 function insertIndexMarkerForTerm(term: string) {
   insertBlock(`#index:${term}`);
+}
+
+function insertIndexMarkerFromDraft() {
+  const term = indexTermDraft.value.trim();
+  if (!term) return;
+  insertIndexMarkerForTerm(term);
+  indexTermDraft.value = "";
+  store.statusMessage = `Inserted index marker for ${term}`;
+}
+
+function addIndexExclusion() {
+  const term = indexExcludeDraft.value.trim();
+  if (!term) return;
+  const nextTerms = [...indexExclusionTerms.value, term];
+  store.updateText(upsertFrontMatterListField(active.value.text, "indexExclude", nextTerms));
+  indexExcludeDraft.value = "";
+  store.statusMessage = `Excluded ${term} from generated index`;
+}
+
+function removeIndexExclusion(term: string) {
+  const nextTerms = indexExclusionTerms.value.filter((value) => value !== term);
+  store.updateText(upsertFrontMatterListField(active.value.text, "indexExclude", nextTerms));
+  store.statusMessage = `Removed ${term} from index exclusions`;
 }
 
 function formatFigureSnippet(position: FigureCropPosition) {
@@ -11892,6 +11985,32 @@ select:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.reference-inline-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: end;
+}
+
+.reference-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reference-chip-list span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #2d3746;
+  font-size: 12px;
 }
 
 .workspace-root {

@@ -146,6 +146,9 @@ be written quickly, reviewed carefully, exported consistently, and audited later
 - **Business-document aware:** front matter, release status, approval metadata,
   comments, citations, glossary terms, index terms, variables, formulas, and
   layout directives are first-class concepts.
+- **Reference-ready:** the References sidebar helps manage citations, glossary
+  entries, explicit index markers, generated indexes, and index exclusions
+  without hand-editing every front matter block.
 - **Repeatable exports:** every export can carry a manifest with source hashes,
   include hashes, options, diagnostics, app version, output path, and output
   hash evidence.

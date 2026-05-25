@@ -361,6 +361,9 @@ Research and business documents can keep reference metadata near the source.
   `glossarySection: true` in front matter.
 - Add `[INDEX]` where the generated index should appear, or set `index: true`
   / `index.enabled: true` in front matter.
+- Use the Index manager to add explicit `{#index:Term}` markers, enable the
+  generated index, exclude internal or irrelevant terms through `indexExclude`,
+  and remove exclusions as the document moves toward release.
 - Use labels and cross references for headings, figures, tables, equations,
   appendices, and decisions.
 
