@@ -1756,8 +1756,12 @@
               <option value="replace">Replace document</option>
               <option value="append">Append to document</option>
               <option value="selection">Replace selection</option>
+              <option value="section">Replace matching section</option>
             </select>
           </label>
+          <p v-if="docsLiveTargetSection" class="sidebar-hint">
+            Target section: {{ docsLiveTargetSection.heading }}. Apply draft will replace that matching Markdown section when it exists, or append the generated section when it does not.
+          </p>
         </section>
 
         <section v-if="docsLiveDraft?.issues.length" class="issue-list">
@@ -2532,6 +2536,7 @@ import {
 } from "./lib/docsLive";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
 import { markdownListContinuation } from "./lib/markdownEditing";
+import { replaceOrAppendMarkdownSection } from "./lib/markdownSectionMerge";
 import {
   blankCustomTransformTemplate,
   builtinTransformTemplates,
@@ -2664,7 +2669,8 @@ const docsLiveQuestionnaireAnswerText = ref("");
 const docsLiveGeneratedMarkdown = ref("");
 const docsLiveDraft = ref<DocsLiveDraft | null>(null);
 const docsLiveDraftingDepth = ref<DocsLiveDraftDepth>("standard");
-const docsLiveInsertMode = ref<"replace" | "append" | "selection">("replace");
+const docsLiveInsertMode = ref<"replace" | "append" | "selection" | "section">("replace");
+const docsLiveTargetSection = ref<AgenticSectionWorkItem | null>(null);
 const docsLiveListening = ref(false);
 const docsLiveSpeechStatus = ref("Voice ready");
 const docsLiveRuntimeChecking = ref(false);
@@ -4267,6 +4273,7 @@ function applyAgentMarkdown(markdown: string, mode: AgenticWorkflowRun["applicat
 function hydrateDocsLiveFromAgentPlan() {
   const plan = agentPlan.value;
   if (!plan) return;
+  docsLiveTargetSection.value = null;
   docsLiveDocumentType.value = plan.documentType;
   docsLiveTitle.value = plan.title;
   docsLiveOutlineText.value = plan.suggestedOutline;
@@ -4314,7 +4321,8 @@ function draftAgentSectionWithDocsLive(section: AgenticSectionWorkItem) {
   docsLivePlaceholderText.value = run.plan.placeholderText;
   docsLiveQuestionnaireAnswerText.value = `Draft only this section first: ${section.heading}. Keep unresolved facts visible and preserve reviewer handoff notes.`;
   docsLiveDraftingDepth.value = "detailed";
-  docsLiveInsertMode.value = "append";
+  docsLiveInsertMode.value = "section";
+  docsLiveTargetSection.value = section;
   refreshDocsLiveQuestionnaire();
   closeAgentWorkspace();
   docsLiveOpen.value = true;
@@ -4426,6 +4434,7 @@ function startAiDocumentCreation() {
   docsLiveDocumentType.value = docsLiveDocumentType.value || "business-brief";
   docsLiveDraftingDepth.value = "standard";
   docsLiveInsertMode.value = "replace";
+  docsLiveTargetSection.value = null;
   if (!docsLiveContext.value.trim()) {
     docsLiveContext.value = "Describe the outcome, audience, decision needed, evidence, constraints, tone, and review expectations.";
   }
@@ -7245,12 +7254,14 @@ function appendOutlineToDocument() {
 }
 
 function openDocsLiveFromOutline() {
+  docsLiveTargetSection.value = null;
   docsLiveOutlineText.value = outlineDraftText.value;
   docsLiveTitle.value = outlineDraftTitle.value || active.value.title.replace(/\.[^.]+$/, "");
   openDocsLive();
 }
 
 function openDocsLiveFromDocumentOutline() {
+  docsLiveTargetSection.value = null;
   docsLiveOutlineText.value = outlinePlanFromMarkdown(active.value.text) || outlineDraftText.value;
   docsLiveTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
   openDocsLive();
@@ -8091,6 +8102,8 @@ function closeDocsLive() {
   stopDocsLiveDictation();
   docsLiveOpen.value = false;
   docsLiveInterimTranscript.value = "";
+  docsLiveTargetSection.value = null;
+  if (docsLiveInsertMode.value === "section") docsLiveInsertMode.value = "append";
 }
 
 async function checkDocsLiveRuntime() {
@@ -8158,11 +8171,20 @@ function applyDocsLiveDraft() {
     editorView.focus();
   } else if (docsLiveInsertMode.value === "append") {
     store.updateText(`${active.value.text.trimEnd()}\n\n${markdown}`);
+  } else if (docsLiveInsertMode.value === "section") {
+    const target = docsLiveTargetSection.value;
+    const fallbackSection = docsLiveDraft.value?.sections[0];
+    const heading = target?.heading || fallbackSection?.title || docsLiveTitle.value;
+    const preferredLevel = target ? target.level + 1 : fallbackSection ? fallbackSection.level + 1 : undefined;
+    const nextText = replaceOrAppendMarkdownSection(active.value.text, markdown, heading, preferredLevel);
+    store.updateText(nextText);
   } else {
     store.updateText(markdown);
   }
   store.sidebar = "review";
-  store.statusMessage = "Applied Docs Live draft for review";
+  store.statusMessage = docsLiveInsertMode.value === "section"
+    ? `Applied Docs Live draft to ${docsLiveTargetSection.value?.heading || docsLiveDraft.value?.sections[0]?.title || "matching section"} for review`
+    : "Applied Docs Live draft for review";
   closeDocsLive();
 }
 

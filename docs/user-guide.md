@@ -101,6 +101,10 @@ and assigned reviewer agents so a team can build the document systematically
 from outline to reviewed sections. Each queued section can insert a visible work
 brief into the Markdown source or open Docs Live preloaded with that section's
 instruction, criteria, placeholders, and reviewer agents for focused drafting.
+When the section title already exists in the Markdown source, applying that
+focused Docs Live draft replaces the matching section for review instead of
+duplicating the work at the end of the document; if the section does not exist,
+NEditor appends the generated section as a new review block.
 The same packet includes a **Lifecycle Task Board** that turns the whole
 document workflow into owned tasks across creation, composition, editing,
 revision, review, and distribution. Use **Run task** when a task should route

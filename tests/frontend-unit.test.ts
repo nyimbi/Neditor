@@ -34,6 +34,7 @@ import {
 } from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
+import { extractMarkdownSection, findMarkdownSectionRange, replaceOrAppendMarkdownSection } from "../src/lib/markdownSectionMerge.js";
 import {
   builtinTransformTemplates,
   normalizeCustomTransformTemplates,
@@ -390,6 +391,48 @@ test("Docs Live covers business technical legal marketing and customer document 
   ok(draft.questionnaire.includes("commercial, legal, operational, or data terms"));
   ok(draft.markdown.includes("Contract brief"));
   ok(draft.reviewPacket.sectionRunbook.some((item) => item.includes("Commercial Terms")));
+});
+
+test("Docs Live section drafts can replace matching Markdown sections", () => {
+  const source = [
+    "# Capital Allocation Memo",
+    "",
+    "<!-- ai-assisted: status=needs-review | source=old | promptSummary=old section -->",
+    "## Current Ask",
+    "",
+    "Old draft text.",
+    "",
+    "## Risks",
+    "",
+    "Keep this risk section.",
+    "",
+  ].join("\n");
+  const draft = buildDocsLiveDraft({
+    documentType: "board-memo",
+    title: "Capital Allocation Memo - Current Ask",
+    outline: "- Current Ask",
+    context: "audience: board. evidence: audited forecast. owner: Finance.",
+    placeholders: "audience: board\nowner: Finance\ndeadline: June 1\nevidence: audited forecast",
+    draftingDepth: "detailed",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  const extracted = extractMarkdownSection(draft.markdown, "Current Ask", 2);
+  ok(extracted.includes("source=NEditor Docs Live"));
+  ok(extracted.includes("## Current Ask"));
+  ok(extracted.includes("Section QA"));
+  const existing = findMarkdownSectionRange(source, "Current Ask");
+  equal(existing?.level, 2);
+  const merged = replaceOrAppendMarkdownSection(source, draft.markdown, "Current Ask", 2);
+
+  ok(!merged.includes("Old draft text."));
+  ok(!merged.includes("promptSummary=old section"));
+  ok(merged.includes("audited forecast"));
+  ok(merged.includes("## Risks\n\nKeep this risk section."));
+
+  const appended = replaceOrAppendMarkdownSection("# Capital Allocation Memo\n\nNo matching section yet.\n", draft.markdown, "Current Ask", 2);
+  ok(appended.includes("No matching section yet."));
+  ok(appended.includes("## Current Ask"));
 });
 
 test("AI runtime readiness reports voice and clipboard capability without storing clipboard content", async () => {
@@ -1093,6 +1136,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("section.completionCriteria"));
   ok(app.includes("insertAgentSectionBrief"));
   ok(app.includes("draftAgentSectionWithDocsLive"));
+  ok(app.includes("docsLiveTargetSection"));
+  ok(app.includes("Replace matching section"));
+  ok(app.includes("replaceOrAppendMarkdownSection"));
+  ok(app.includes("Applied Docs Live draft to"));
   ok(app.includes("Draft in Docs Live"));
   ok(app.includes('aria-label="Agent audit trail"'));
   ok(app.includes("agentRun.auditTrail"));

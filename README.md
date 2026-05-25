@@ -205,8 +205,9 @@ web app.
   proposal, QA gates, named reviewer agents for editorial, evidence, risk,
   citation, governance, and export readiness, a section-by-section work queue
   with drafting instructions, completion criteria, assigned reviewers, per-section
-  work-brief insertion, and focused Docs Live handoff, an **AI Control Center**
-  for readiness score, source grounding, governance
+  work-brief insertion, and focused Docs Live handoff that can replace the
+  matching Markdown section instead of appending duplicate section copy, an
+  **AI Control Center** for readiness score, source grounding, governance
   state, next actions, an agentic lifecycle task board that turns creation,
   composition, editing, revision, review, and distribution into runnable
   owned tasks with insertable/copyable Markdown task briefs, target-specific
