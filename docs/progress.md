@@ -50,6 +50,12 @@ Recent pushed checkpoints visible in current git history:
   accountable owner, risk level, and done criteria into the Agent Workspace UI,
   Docs Live section brief, generated packet, lifecycle task evidence, release
   evidence bundle, and audit fingerprints.
+- Agent plans now generate outline variants for comparison before drafting.
+  Executive-first, problem-solution, evidence-led, risk-first, and
+  channel-specific structures include summaries, best-fit use cases, tradeoffs,
+  risks, full outline text, release evidence, lifecycle tasks, AI Control Center
+  grounding, generated packet content, and UI actions to load a variant into
+  Docs Live or the outline planner.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,

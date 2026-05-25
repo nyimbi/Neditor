@@ -783,6 +783,9 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.plan.documentIntent.fields.some((field) => field.key === "evidence" && field.value === "CRM forecast"));
   ok(run.markdown.includes("### Document-Type Quality Gates"));
   ok(run.markdown.includes("Client Need"));
+  ok(run.markdown.includes("### Outline Variants"));
+  ok(run.markdown.includes("#### Executive-first"));
+  ok(run.markdown.includes("Strategy: executive-first"));
   ok(run.markdown.includes("## Review Comment Resolution Queue"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-quality-gates"));
   ok(run.markdown.includes("## Distribution"));
@@ -806,6 +809,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Release Evidence Bundle"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent audit trail" && item.status === "available"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Document intent sheet" && item.requiredBeforeRelease));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Outline variant comparison" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Section contract cards" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Substack newsletter package evidence" && item.requiredBeforeRelease));
@@ -836,11 +840,13 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.controlCenter.status === "needs-input" || run.controlCenter.status === "ready");
   ok(run.controlCenter.nextActions.some((action) => action.label === "Verify target artifacts"));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Document intent sheet"));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Outline variants" && item.status === "available"));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.status === "available"));
   ok(run.controlCenter.governance.some((item) => item.label === "AI provenance" && item.status === "available"));
   ok(run.controlCenter.distribution.some((item) => item.label === "Substack newsletter package"));
   ok(run.lifecycleTasks.length >= run.sectionWorkQueue.length + run.reviewerAgents.length);
   ok(run.lifecycleTasks.some((task) => task.title.includes("Resolve intent") && task.owner === "Planner Agent"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-outline-variants" && task.evidence.some((item) => item.includes("Executive-first"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-intake-context" && task.evidence.some((item) => item.includes("Document intent"))));
   ok(run.lifecycleTasks.some((task) => task.owner === "Docs Live Section Agent" && task.action === "generate-docs-live-draft" && task.sectionId));
   ok(run.lifecycleTasks.some((task) => task.owner === "Distribution Agent" && task.lane === "distribute" && task.target === "substack"));
@@ -850,6 +856,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("Google Docs collaboration package"))));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Reviewer agents prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Lifecycle task board prepared")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline variant comparison prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline critique prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Humanization scan")));
   ok(run.sectionWorkQueue.length >= 5);
@@ -865,6 +872,11 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.sectionWorkQueue.every((section) => section.contract.evidenceExpectations.length >= 1));
   ok(run.sectionWorkQueue.every((section) => section.contract.doneCriteria.length >= 4));
   ok(run.sectionWorkQueue.some((section) => section.contract.riskLevel === "high"));
+  equal(run.plan.outlineVariants.length, 5);
+  ok(run.plan.outlineVariants.some((variant) => variant.strategy === "executive-first" && variant.outline.includes("Decision Snapshot")));
+  ok(run.plan.outlineVariants.some((variant) => variant.strategy === "evidence-led" && variant.tradeoffs.length >= 2));
+  ok(run.plan.outlineVariants.every((variant) => variant.bestFor.length >= 3));
+  ok(run.plan.outlineVariants.every((variant) => variant.risks.length >= 2));
   ok(run.markdown.includes("Drafting depth:"));
   const sectionBrief = buildAgenticSectionWorkBrief(run.sectionWorkQueue[0], run.reviewerAgents);
   ok(sectionBrief.includes("```ai-section-task"));
@@ -2031,6 +2043,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent section work queue"'));
   ok(app.includes("agentRun.sectionWorkQueue"));
   ok(app.includes("agentSectionDraftingDepthOptions"));
+  ok(app.includes("agentPlan.outlineVariants"));
+  ok(app.includes("hydrateDocsLiveFromOutlineVariant"));
+  ok(app.includes("loadOutlineVariantInPlanner"));
+  ok(app.includes("Outline variants"));
   ok(app.includes("section.draftingDepth"));
   ok(app.includes("section.contract.purpose"));
   ok(app.includes("section.contract.targetReader"));

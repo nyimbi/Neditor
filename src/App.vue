@@ -2501,6 +2501,34 @@
               <h3>Suggested outline</h3>
               <pre>{{ agentPlan.suggestedOutline }}</pre>
             </article>
+            <article class="agent-outline-variants">
+              <h3>Outline variants</h3>
+              <p>{{ agentPlan.outlineVariants.length }} structures ready for comparison before drafting.</p>
+              <div v-for="variant in agentPlan.outlineVariants" :key="variant.id" class="agent-outline-variant">
+                <strong>{{ variant.label }}</strong>
+                <small>{{ variant.strategy }}</small>
+                <p>{{ variant.summary }}</p>
+                <pre>{{ variant.outline }}</pre>
+                <dl>
+                  <div>
+                    <dt>Best for</dt>
+                    <dd>{{ variant.bestFor.join(", ") }}</dd>
+                  </div>
+                  <div>
+                    <dt>Tradeoffs</dt>
+                    <dd>{{ variant.tradeoffs.join(" ") }}</dd>
+                  </div>
+                  <div>
+                    <dt>Risks</dt>
+                    <dd>{{ variant.risks.join(" ") }}</dd>
+                  </div>
+                </dl>
+                <div class="agent-outline-variant-actions">
+                  <button type="button" @click="hydrateDocsLiveFromOutlineVariant(variant)">Use in Docs Live</button>
+                  <button type="button" @click="loadOutlineVariantInPlanner(variant)">Load in outline planner</button>
+                </div>
+              </div>
+            </article>
             <article>
               <h3>Revision instruction</h3>
               <p>{{ agentPlan.revisionInstruction }}</p>
@@ -3446,6 +3474,7 @@ import {
   type AgenticSectionWorkItem,
   type AgenticWorkflowStep,
   type AgenticNextAction,
+  type AgenticOutlineVariant,
 } from "./lib/agenticWorkflows";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import {
@@ -6200,6 +6229,45 @@ function hydrateDocsLiveFromAgentPlan() {
   closeAgentWorkspace();
   docsLiveOpen.value = true;
   store.statusMessage = "Sent agent plan to Docs Live";
+}
+function hydrateDocsLiveFromOutlineVariant(variant: AgenticOutlineVariant) {
+  const plan = agentPlan.value;
+  if (!plan) return;
+  docsLiveTargetSection.value = null;
+  docsLiveDocumentType.value = plan.documentType;
+  docsLiveTitle.value = `${plan.title} - ${variant.label}`;
+  docsLiveOutlineText.value = variant.outline;
+  docsLiveContext.value = [
+    plan.context,
+    "",
+    `Selected outline variant: ${variant.label} (${variant.strategy})`,
+    variant.summary,
+    "",
+    "Best for:",
+    ...variant.bestFor.map((item) => `- ${item}`),
+    "",
+    "Tradeoffs:",
+    ...variant.tradeoffs.map((item) => `- ${item}`),
+    "",
+    "Risks:",
+    ...variant.risks.map((item) => `- ${item}`),
+    plan.sourcePack.markdown ? `\nManaged source pack:\n${plan.sourcePack.markdown}` : "",
+  ].filter(Boolean).join("\n");
+  docsLivePlaceholderText.value = plan.placeholderText;
+  docsLiveQuestionnaireAnswerText.value = `Use the ${variant.label} outline variant. Resolve tradeoffs and risks before drafting section bodies.`;
+  refreshDocsLiveQuestionnaire();
+  closeAgentWorkspace();
+  docsLiveOpen.value = true;
+  store.statusMessage = `Sent ${variant.label} outline variant to Docs Live`;
+}
+function loadOutlineVariantInPlanner(variant: AgenticOutlineVariant) {
+  const plan = agentPlan.value;
+  outlineDraftTitle.value = plan?.title || active.value.title.replace(/\.[^.]+$/, "");
+  outlineDraftText.value = variant.outline;
+  store.mode = "outline";
+  store.sidebar = "outline";
+  closeAgentWorkspace();
+  store.statusMessage = `Loaded ${variant.label} outline variant in planner`;
 }
 function insertAgentSectionBrief(section: AgenticSectionWorkItem) {
   const run = agentRun.value;
@@ -14534,6 +14602,66 @@ select:hover {
   margin-top: 6px;
 }
 
+.agent-outline-variants {
+  align-content: start;
+}
+
+.agent-outline-variant {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d8e5ea;
+  border-radius: 6px;
+  padding: 8px;
+  background: #ffffff;
+}
+
+.agent-outline-variant + .agent-outline-variant {
+  margin-top: 8px;
+}
+
+.agent-outline-variant small {
+  color: #526171;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.agent-outline-variant dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.agent-outline-variant dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-outline-variant dt {
+  color: #526171;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.agent-outline-variant dd {
+  margin: 0;
+  color: #2d3746;
+  font-size: 12px;
+}
+
+.agent-outline-variant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-outline-variant-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
 .app-shell[data-theme="dark"] .agent-section-contract div {
   border-color: #34465a;
   background: #223248;
@@ -14544,6 +14672,20 @@ select:hover {
 }
 
 .app-shell[data-theme="dark"] .agent-section-contract dd {
+  color: #dce7f3;
+}
+
+.app-shell[data-theme="dark"] .agent-outline-variant {
+  border-color: #34465a;
+  background: #223248;
+}
+
+.app-shell[data-theme="dark"] .agent-outline-variant small,
+.app-shell[data-theme="dark"] .agent-outline-variant dt {
+  color: #aebdcc;
+}
+
+.app-shell[data-theme="dark"] .agent-outline-variant dd {
   color: #dce7f3;
 }
 

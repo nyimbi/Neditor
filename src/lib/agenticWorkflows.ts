@@ -58,6 +58,7 @@ export interface AgenticWorkflowPlan {
   memoryText: string;
   documentMemory: AgenticDocumentMemory;
   suggestedOutline: string;
+  outlineVariants: AgenticOutlineVariant[];
   context: string;
   placeholderText: string;
   contextCompleteness: AgenticContextCompleteness;
@@ -292,6 +293,17 @@ export interface AgenticOutlineCritiqueItem {
   heading: string;
   detail: string;
   recommendation: string;
+}
+
+export interface AgenticOutlineVariant {
+  id: string;
+  label: string;
+  strategy: "executive-first" | "problem-solution" | "evidence-led" | "risk-first" | "technical-deep" | "publishing-narrative";
+  summary: string;
+  outline: string;
+  bestFor: string[];
+  tradeoffs: string[];
+  risks: string[];
 }
 
 export interface AgenticDistributionTargetPlan {
@@ -546,6 +558,15 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     contextCompleteness,
   });
   const suggestedOutline = buildSuggestedOutline(request, primaryLane, documentType);
+  const outlineVariants = buildOutlineVariants({
+    suggestedOutline,
+    documentType,
+    distributionTargets,
+    contextCompleteness,
+    documentIntent,
+    sourcePack,
+    documentMemory,
+  });
   const missingInputs = buildMissingInputs(corpus, lanes, distributionTargets);
   const revisionInstruction = buildRevisionInstruction(instruction, lanes, request.selectedText);
   const revisionModes = detectRevisionModes(corpus, lanes, documentType);
@@ -565,6 +586,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     memoryText,
     documentMemory,
     suggestedOutline,
+    outlineVariants,
     context,
     placeholderText,
     contextCompleteness,
@@ -1666,6 +1688,94 @@ function buildSuggestedOutline(request: AgenticWorkflowRequest, primaryLane: Age
   return [`- ${typeLabel}`, ...sections.map((section) => `  - ${section}`)].join("\n");
 }
 
+function buildOutlineVariants(input: {
+  suggestedOutline: string;
+  documentType: DocsLiveDocumentType;
+  distributionTargets: ExportTarget[];
+  contextCompleteness: AgenticContextCompleteness;
+  documentIntent: AgenticDocumentIntentSheet;
+  sourcePack: AgenticSourcePack;
+  documentMemory: AgenticDocumentMemory;
+}): AgenticOutlineVariant[] {
+  const baseSections = parseOutlineSections(input.suggestedOutline);
+  const root = baseSections[0]?.heading || docsLiveDocumentTypes.find((type) => type.id === input.documentType)?.label || titleCase(input.documentType);
+  const content = baseSections.length > 1 ? baseSections.slice(1).map((section) => section.heading) : baseSections.map((section) => section.heading);
+  const evidenceAnchor = content.find((heading) => /\b(evidence|findings|analysis|financial|data|metrics?|source|proof)\b/i.test(heading)) || "Evidence And Findings";
+  const riskAnchor = content.find((heading) => /\b(risks?|assumptions?|constraints?|mitigation|legal|compliance)\b/i.test(heading)) || "Risks And Assumptions";
+  const actionAnchor = content.find((heading) => /\b(recommendation|decision|approval|ask|next steps?|handoff|distribution)\b/i.test(heading)) || "Recommendation And Next Steps";
+  const contextAnchor = content.find((heading) => /\b(context|background|current state|problem|need)\b/i.test(heading)) || "Context And Reader Need";
+  const hasPublishingTarget = input.distributionTargets.some((target) => target === "blog" || target === "substack" || target === "html");
+  const hasTechnicalTarget = input.distributionTargets.some((target) => target === "latex" || target === "google-docs") || /\b(technical|architecture|research|paper|spec)\b/i.test(input.documentType);
+  const sourceDetail = input.sourcePack.claims.length ? `${input.sourcePack.claims.length} managed claim(s)` : input.contextCompleteness.present.includes("evidence") ? "provided evidence" : "evidence still to confirm";
+  const memoryDetail = input.documentMemory.entries.length ? "document memory" : "current context";
+
+  const variants: Array<Omit<AgenticOutlineVariant, "id">> = [
+    {
+      label: "Executive-first",
+      strategy: "executive-first",
+      summary: "Lead with the decision, then give context, evidence, risk, and handoff details.",
+      outline: outlineVariantText(root, ["Decision Snapshot", actionAnchor, contextAnchor, evidenceAnchor, riskAnchor, "Approval And Handoff"]),
+      bestFor: ["board review", "executive committee", "time-constrained approvers"],
+      tradeoffs: ["Fastest route to the ask.", "May feel abrupt if the audience needs more context first."],
+      risks: ["Weak if decision language is not backed by source evidence.", `Requires ${sourceDetail} to be checked before release.`],
+    },
+    {
+      label: "Problem-solution",
+      strategy: "problem-solution",
+      summary: "Build agreement around the problem before introducing the solution and next actions.",
+      outline: outlineVariantText(root, [contextAnchor, "Impact And Stakes", "Options Considered", actionAnchor, riskAnchor, "Implementation Plan"]),
+      bestFor: ["client proposals", "strategy memos", "change management"],
+      tradeoffs: ["Creates narrative buy-in.", "Takes longer to reach the recommendation."],
+      risks: ["Can bury the ask if the recommendation section is too late.", "Needs explicit owner and deadline before approval."],
+    },
+    {
+      label: "Evidence-led",
+      strategy: "evidence-led",
+      summary: "Put source-backed findings before interpretation, recommendation, and distribution.",
+      outline: outlineVariantText(root, ["Source Basis", evidenceAnchor, "Interpretation", actionAnchor, riskAnchor, "Review Questions"]),
+      bestFor: ["research briefs", "financial cases", "claims-heavy documents"],
+      tradeoffs: ["Makes audit and citation review easier.", "Can read dry without a strong executive framing section."],
+      risks: [`Depends on ${sourceDetail}.`, "Unsupported claims should remain citation TODOs until verified."],
+    },
+    {
+      label: "Risk-first",
+      strategy: "risk-first",
+      summary: "Surface constraints, approvals, and sensitive assumptions before asking for action.",
+      outline: outlineVariantText(root, ["Approval Context", riskAnchor, contextAnchor, evidenceAnchor, actionAnchor, "Controls And Follow-up"]),
+      bestFor: ["policies", "regulated material", "high-stakes approvals"],
+      tradeoffs: ["Reduces review surprise.", "Can feel defensive if risks are not tied to decisions."],
+      risks: ["Needs governance review before publishing.", "May slow drafting until owner and reviewer are named."],
+    },
+    {
+      label: hasTechnicalTarget ? "Technical-deep" : "Publishing narrative",
+      strategy: hasTechnicalTarget ? "technical-deep" : "publishing-narrative",
+      summary: hasTechnicalTarget
+        ? "Separate method, architecture, evidence, and submission details for technical review."
+        : "Use a reader-friendly narrative arc for blog, newsletter, or web publishing.",
+      outline: hasTechnicalTarget
+        ? outlineVariantText(root, ["Abstract", "Method Or Architecture", evidenceAnchor, "Implementation Details", riskAnchor, "References And Submission Notes"])
+        : outlineVariantText(root, ["Hook", contextAnchor, evidenceAnchor, "What This Means", actionAnchor, "Publishing Metadata"]),
+      bestFor: hasTechnicalTarget ? ["technical papers", "architecture docs", "LaTeX exports"] : ["blog posts", "Substack", "public web pages"],
+      tradeoffs: hasTechnicalTarget
+        ? ["Improves technical review and export handoff.", "Requires more source discipline before drafting."]
+        : ["Improves reader momentum.", "Needs careful humanization to avoid generic thought-leadership tone."],
+      risks: hasPublishingTarget
+        ? [`Must apply ${memoryDetail} to preserve voice and rejected directions.`, "Publishing metadata and link checks remain required."]
+        : [`Must apply ${memoryDetail} to terminology and reviewer preferences.`, "References, labels, and equations need export checks when present."],
+    },
+  ];
+
+  return variants.map((variant) => ({
+    ...variant,
+    id: `outline-${variant.strategy}-${stableFingerprint([variant.label, variant.outline, input.documentType].join("\n")).slice(0, 10)}`,
+  }));
+}
+
+function outlineVariantText(root: string, headings: string[]) {
+  const uniqueHeadings = Array.from(new Set(headings.map((heading) => heading.trim()).filter(Boolean)));
+  return [`- ${root}`, ...uniqueHeadings.map((heading) => `  - ${heading}`)].join("\n");
+}
+
 function buildMissingInputs(corpus: string, lanes: AgenticWorkflowLane[], targets: ExportTarget[]) {
   const missing = placeholderNames.filter((name) => !new RegExp(`\\b${name}\\b\\s*(?:is|=|:)`, "i").test(corpus));
   if (lanes.includes("review") && !/\b(source|evidence|citation|reference|data)\b/i.test(corpus)) missing.push("source evidence or citation expectations");
@@ -1978,6 +2088,19 @@ function buildLifecycleTasks(input: {
     evidence: plan.suggestedOutline.trim() ? parseOutlineSections(plan.suggestedOutline).slice(0, 6).map((section) => section.heading) : ["No outline supplied."],
     nextStep: "Review the outline in outline mode before drafting body text.",
   });
+
+  if (plan.outlineVariants.length) {
+    tasks.push({
+      id: "task-outline-variants",
+      lane: "compose",
+      title: "Compare outline variants before drafting",
+      owner: "Composition Agent",
+      status: "needs-input",
+      action: "open-outline",
+      evidence: plan.outlineVariants.map((variant) => `${variant.label}: ${variant.summary}`),
+      nextStep: "Choose the outline structure that best matches the audience, evidence, risk, and distribution channel before generating section drafts.",
+    });
+  }
 
   if (outlineCritique.length) {
     tasks.push({
@@ -2921,6 +3044,7 @@ function buildAuditTrail(input: {
     plan.sourcePack.markdown,
     plan.placeholderText,
     plan.suggestedOutline,
+    ...plan.outlineVariants.flatMap((variant) => [variant.label, variant.strategy, variant.summary, variant.outline, ...variant.tradeoffs, ...variant.risks]),
     plan.revisionInstruction,
     plan.revisionModes.join(", "),
   ].join("\n---\n");
@@ -2954,6 +3078,16 @@ function buildAuditTrail(input: {
     ...plan.documentIntent.reviewPrompts,
     plan.documentMemory.summary,
     ...plan.documentMemory.entries.flatMap((entry) => [entry.kind, entry.label, entry.detail, entry.source]),
+    ...plan.outlineVariants.flatMap((variant) => [
+      variant.id,
+      variant.label,
+      variant.strategy,
+      variant.summary,
+      variant.outline,
+      ...variant.bestFor,
+      ...variant.tradeoffs,
+      ...variant.risks,
+    ]),
     ...plan.sourcePack.items.flatMap((item) => [item.kind, item.label, item.detail]),
     ...sectionWorkQueue.flatMap((section) => [
       section.id,
@@ -3003,6 +3137,7 @@ function buildAuditTrail(input: {
       blockers.length ? `Human review required before release because ${blockers.length} blocker item(s) remain.` : "No blocker items detected at packet generation time.",
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
       `Lifecycle task board prepared for ${lifecycleTasks.length} task(s) across ${Array.from(new Set(lifecycleTasks.map((task) => task.lane))).map(titleCase).join(", ")}.`,
+      `Outline variant comparison prepared ${plan.outlineVariants.length} alternative structure(s) for user selection before drafting.`,
       `Section work queue prepared for ${sectionWorkQueue.length} outline item(s).`,
       `Section contract cards prepared for ${sectionWorkQueue.length} outline item(s) with purpose, reader, evidence, owner, risk, and done criteria.`,
       outlineCritique.length
@@ -3082,6 +3217,15 @@ function buildReleaseEvidenceBundle(input: {
         ? `${plan.documentMemory.entries.length} reusable terminology, style, decision, review, or distribution memory item(s) are attached.`
         : "No reusable document memory has been captured for future agent runs.",
       false,
+    ),
+    releaseEvidenceItem(
+      "Outline variant comparison",
+      "Composition Agent",
+      plan.outlineVariants.length ? "needs-review" : "missing",
+      plan.outlineVariants.length
+        ? `${plan.outlineVariants.length} alternative outline structure(s) are available for executive-first, problem-solution, evidence-led, risk-first, and channel-specific comparison.`
+        : "No outline variants were generated for comparison.",
+      true,
     ),
     releaseEvidenceItem(
       "Section contract cards",
@@ -3244,6 +3388,13 @@ function buildSourceGrounding(
           ? "Outline is available as the composition work queue."
           : "No outline is available for section-by-section drafting.",
       status: !plan.suggestedOutline.trim() ? "missing" : outlineCritique.length ? "needs-review" : "available",
+    },
+    {
+      label: "Outline variants",
+      detail: plan.outlineVariants.length
+        ? `${plan.outlineVariants.length} alternative outline structure(s) are ready for comparison before section drafting.`
+        : "No outline variants are available for comparison.",
+      status: plan.outlineVariants.length ? "available" : "missing",
     },
     {
       label: "Context completeness",
@@ -4049,6 +4200,8 @@ function buildRunMarkdown(input: {
     "",
   ];
 
+  lines.push(...outlineVariantsMarkdown(plan.outlineVariants));
+
   if (plan.revisionModes.length) {
     lines.push("### Planned Revision Modes", "", ...plan.revisionModes.map((mode) => `- ${revisionPassProfile(mode).label}`), "");
   }
@@ -4219,6 +4372,35 @@ function controlCenterMarkdown(controlCenter: AgenticControlCenter) {
     ...controlCenter.distribution.map((item) => `- ${item.label} [${item.status}]: ${item.detail}`),
     "",
   ];
+}
+
+function outlineVariantsMarkdown(variants: AgenticOutlineVariant[]) {
+  const lines = ["### Outline Variants", ""];
+  if (!variants.length) {
+    return [...lines, "No outline variants were generated.", ""];
+  }
+  for (const variant of variants) {
+    lines.push(
+      `#### ${variant.label}`,
+      "",
+      `Strategy: ${variant.strategy}`,
+      "",
+      variant.summary,
+      "",
+      "Best for:",
+      ...variant.bestFor.map((item) => `- ${item}`),
+      "",
+      "Tradeoffs:",
+      ...variant.tradeoffs.map((item) => `- ${item}`),
+      "",
+      "Risks:",
+      ...variant.risks.map((item) => `- ${item}`),
+      "",
+      fencedBlock("text", variant.outline),
+      "",
+    );
+  }
+  return lines;
 }
 
 function outlineCritiqueMarkdown(outlineCritique: AgenticOutlineCritiqueItem[]) {
