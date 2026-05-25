@@ -1494,7 +1494,9 @@ Finish:
   workflow.
 - Clear UX for missing documents during restore. Browser archived workflow run `26148828614`
   covers this workflow.
-- Matrix entry that split editor panes are deferred/later if not implemented.
+- Split source editor panes are implemented as a persisted dual-source toggle;
+  remaining work is browser/native workflow proof for dual-pane editing and
+  long-document ergonomics.
 
 ### 10. Editor Ergonomics
 

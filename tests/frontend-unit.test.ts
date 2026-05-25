@@ -1361,6 +1361,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     toolbarDisplay: "icons",
     toolbarTextSize: 20,
     toolbarCollapsedRows: ["file", "view", "file", "", 42],
+    splitSourcePanes: true,
     editorKeymapMode: "vim",
     codeFolding: false,
     editorPaneRatio: 0.95,
@@ -1651,6 +1652,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.toolbarDisplay, "icons");
   equal(migrated.toolbarTextSize, 15);
   deepEqual(migrated.toolbarCollapsedRows, ["file", "view"]);
+  equal(migrated.splitSourcePanes, true);
   equal(migrated.editorKeymapMode, "vim");
   equal(migrated.codeFolding, false);
   equal(migrated.editorPaneRatio, 0.75);
@@ -2588,6 +2590,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('store.sidebar === \'templates\''));
   ok(store.includes("toolbarTextSize: 10"));
   ok(store.includes("toolbarCollapsedRows: []"));
+  ok(store.includes("splitSourcePanes: false"));
+  ok(app.includes('v-model="store.splitSourcePanes"'));
+  ok(app.includes('ref="secondaryEditorHost"'));
+  ok(app.includes("syncPeerEditorViews"));
+  ok(app.includes("Toggle split source panes"));
   ok(store.includes('editorKeymapMode: "default"'));
   ok(app.includes('v-model="store.editorKeymapMode"'));
   ok(app.includes("emacsStyleKeymap"));

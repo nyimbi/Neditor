@@ -226,6 +226,10 @@
           />
           <output v-show="!isToolbarCollapsed('view')" aria-label="Current toolbar text size">{{ store.toolbarTextSize }}px</output>
         </label>
+        <label v-show="!isToolbarCollapsed('view')" class="compact-check">
+          <input v-model="store.splitSourcePanes" type="checkbox" aria-label="Split source editor panes" />
+          <span>Dual source</span>
+        </label>
         <button v-show="!isToolbarCollapsed('view')" class="compact-toolbar-toggle" type="button" @click="setAllCommandToolbarsCollapsed(!anyCommandToolbarsCollapsed)">
           <span class="command-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
@@ -1627,6 +1631,7 @@
           <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
           <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
           <label><input v-model="store.codeFolding" type="checkbox" /> Code folding</label>
+          <label><input v-model="store.splitSourcePanes" type="checkbox" /> Split source editor panes</label>
           <label>
             Editor keybindings
             <select v-model="store.editorKeymapMode">
@@ -1852,7 +1857,10 @@
       </aside>
 
       <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" aria-label="Markdown source" tabindex="-1">
-        <div ref="editorHost" class="editor-host"></div>
+        <div class="editor-split-grid" :data-split-source="store.splitSourcePanes ? 'true' : 'false'">
+          <div ref="editorHost" class="editor-host editor-host-primary" aria-label="Primary Markdown source pane"></div>
+          <div v-if="store.splitSourcePanes" ref="secondaryEditorHost" class="editor-host editor-host-secondary" aria-label="Secondary Markdown source pane"></div>
+        </div>
       </section>
 
       <button
@@ -3882,6 +3890,7 @@ const agentControlActions: AgenticWorkflowAction[] = [
   "open-exports",
 ];
 const editorHost = ref<HTMLElement | null>(null);
+const secondaryEditorHost = ref<HTMLElement | null>(null);
 const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
 const aiPasteDialog = ref<HTMLElement | null>(null);
@@ -3891,6 +3900,7 @@ const guidedDemoDialog = ref<HTMLElement | null>(null);
 const commandPaletteDialog = ref<HTMLElement | null>(null);
 const conflictDialog = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
+let secondaryEditorView: EditorView | null = null;
 let syncingEditorFromStore = false;
 const vimInputMode = ref<"insert" | "normal">("insert");
 const previewTextCommit = createDebouncedTextCommit((text) => store.updateText(text), {
@@ -7259,6 +7269,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Show toolbar icons and text", group: "View", run: () => (store.toolbarDisplay = "both") },
   { name: "Show toolbar icons only", group: "View", run: () => (store.toolbarDisplay = "icons") },
   { name: "Show toolbar text only", group: "View", run: () => (store.toolbarDisplay = "text") },
+  { name: "Toggle split source panes", group: "View", run: () => (store.splitSourcePanes = !store.splitSourcePanes) },
   { name: "Collapse all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(true) },
   { name: "Expand all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(false) },
   { name: "Bold selection", group: "Markdown", run: () => wrapSelection("**") },
@@ -7593,6 +7604,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   recordActiveScrollPosition(true);
   editorView?.destroy();
+  secondaryEditorView?.destroy();
   previewTextCommit.cancel();
   window.clearTimeout(autosaveHandle);
   window.clearTimeout(autoSnapshotHandle);
@@ -7630,15 +7642,7 @@ watch(
 watch(
   () => active.value.text,
   (text) => {
-    if (!editorView || editorView.state.doc.toString() === text) return;
-    syncingEditorFromStore = true;
-    try {
-      editorView.dispatch({
-        changes: { from: 0, to: editorView.state.doc.length, insert: text },
-      });
-    } finally {
-      syncingEditorFromStore = false;
-    }
+    syncEditorViewsToText(text);
   },
 );
 
@@ -7680,6 +7684,7 @@ watch(
     store.wordWrap,
     store.lineNumbers,
     store.codeFolding,
+    store.splitSourcePanes,
     store.editorKeymapMode,
     store.theme,
     store.previewTheme,
@@ -7695,16 +7700,18 @@ watch(
     store.previewFontSize,
     store.previewLineHeight,
   ],
-  () => {
+  async () => {
     if (store.editorKeymapMode !== "vim") vimInputMode.value = "insert";
+    await nextTick();
     buildEditor();
     void store.persistWorkspace();
   },
 );
 
 watch(vimInputMode, (mode) => {
-  if (!editorView) return;
-  editorView.contentDOM.setAttribute("data-vim-mode", store.editorKeymapMode === "vim" ? mode : "");
+  for (const view of editorViews()) {
+    view.contentDOM.setAttribute("data-vim-mode", store.editorKeymapMode === "vim" ? mode : "");
+  }
 });
 
 watch(
@@ -9446,7 +9453,7 @@ watch(
   { immediate: true },
 );
 
-function editorExtensions() {
+function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
   return [
     ...(store.lineNumbers ? [lineNumbers()] : []),
     ...(store.codeFolding ? [foldGutter(), codeFolding({ placeholderText: " folded " })] : []),
@@ -9459,7 +9466,7 @@ function editorExtensions() {
     closeBrackets(),
     EditorView.contentAttributes.of({
       role: "textbox",
-      "aria-label": "Markdown editor",
+      "aria-label": label,
       "aria-multiline": "true",
       "data-keymap-mode": store.editorKeymapMode,
       "data-vim-mode": store.editorKeymapMode === "vim" ? vimInputMode.value : "",
@@ -9486,14 +9493,16 @@ function editorExtensions() {
         return handleVimNormalKey(event, view);
       },
       scroll: () => {
-        syncPreviewScrollFromEditor();
+        if (syncPreviewScroll) syncPreviewScrollFromEditor();
       },
     }),
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
       if (syncingEditorFromStore) return;
-      previewTextCommit.schedule(update.state.doc.toString());
+      const text = update.state.doc.toString();
+      syncPeerEditorViews(update.view, text);
+      previewTextCommit.schedule(text);
     }),
     EditorView.theme({
       "&": {
@@ -9839,26 +9848,61 @@ function escapePreviewAttribute(value: string) {
   return escapePreviewHtml(value).replace(/"/g, "&quot;");
 }
 
-function buildEditor() {
-  if (!editorHost.value) return;
-  editorView?.destroy();
-  editorView = new EditorView({
+function editorViews() {
+  return [editorView, secondaryEditorView].filter((view): view is EditorView => Boolean(view));
+}
+
+function createEditorView(parent: HTMLElement, label: string, syncPreviewScroll: boolean) {
+  return new EditorView({
     state: EditorState.create({
       doc: active.value.text,
-      extensions: editorExtensions(),
+      extensions: editorExtensions(label, syncPreviewScroll),
     }),
-    parent: editorHost.value,
+    parent,
   });
+}
+
+function buildEditor() {
+  editorView?.destroy();
+  secondaryEditorView?.destroy();
+  editorView = editorHost.value ? createEditorView(editorHost.value, "Primary Markdown editor", true) : null;
+  secondaryEditorView = store.splitSourcePanes && secondaryEditorHost.value
+    ? createEditorView(secondaryEditorHost.value, "Secondary Markdown editor", false)
+    : null;
   void nextTick(() => restoreActiveScrollPosition());
 }
 
 function syncEditorViewFromActiveDocument() {
-  if (!editorView || editorView.state.doc.toString() === active.value.text) return;
+  syncEditorViewsToText(active.value.text);
+}
+
+function syncEditorViewsToText(text: string) {
+  const views = editorViews();
+  if (!views.length || views.every((view) => view.state.doc.toString() === text)) return;
   syncingEditorFromStore = true;
   try {
-    editorView.dispatch({
-      changes: { from: 0, to: editorView.state.doc.length, insert: active.value.text },
-    });
+    for (const view of views) {
+      if (view.state.doc.toString() === text) continue;
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: text },
+      });
+    }
+  } finally {
+    syncingEditorFromStore = false;
+  }
+}
+
+function syncPeerEditorViews(source: EditorView, text: string) {
+  const peers = editorViews().filter((view) => view !== source);
+  if (!peers.length || peers.every((view) => view.state.doc.toString() === text)) return;
+  syncingEditorFromStore = true;
+  try {
+    for (const view of peers) {
+      if (view.state.doc.toString() === text) continue;
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: text },
+      });
+    }
   } finally {
     syncingEditorFromStore = false;
   }
@@ -16878,10 +16922,29 @@ select:hover {
 
 .editor-pane {
   background: #ffffff;
+  overflow: hidden;
+}
+
+.editor-split-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-split-grid[data-split-source="true"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .editor-host {
   height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-host-secondary {
+  border-left: 1px solid #d7dee7;
 }
 
 .preview-pane {
@@ -17972,6 +18035,16 @@ select:hover {
     min-height: 320px;
     border-right: 0;
     border-bottom: 1px solid #c9d2dc;
+  }
+
+  .editor-split-grid[data-split-source="true"] {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, minmax(240px, 1fr));
+  }
+
+  .editor-host-secondary {
+    border-top: 1px solid #d7dee7;
+    border-left: 0;
   }
 
   .preview-document {

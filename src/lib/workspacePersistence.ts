@@ -330,6 +330,7 @@ export interface PersistedWorkspace {
   toolbarTextSize?: number;
   toolbarCollapsedRows?: string[];
   editorPaneRatio?: number;
+  splitSourcePanes?: boolean;
   editorKeymapMode?: EditorKeymapMode;
   wordWrap?: boolean;
   lineNumbers?: boolean;
@@ -1050,6 +1051,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   }
   const editorPaneRatio = numberValue(raw.editorPaneRatio);
   if (editorPaneRatio !== undefined) migrated.editorPaneRatio = clampPaneRatio(editorPaneRatio);
+  const splitSourcePanes = booleanValue(raw.splitSourcePanes);
+  if (splitSourcePanes !== undefined) migrated.splitSourcePanes = splitSourcePanes;
   const editorKeymapMode = enumValue(raw.editorKeymapMode, ["default", "emacs", "vim"] as const);
   if (editorKeymapMode) migrated.editorKeymapMode = editorKeymapMode;
   for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot"] as const) {
