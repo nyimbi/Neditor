@@ -1067,6 +1067,12 @@ Required maintenance:
 - Link requirement rows to exact code paths, tests, local command output, manual artifacts,
   or screenshots.
 - Record failed verification as directly as passed verification.
+- The recommended first milestone is now closed in the matrix because current
+  baseline evidence proves each milestone item: Tauri shell, editor/preview,
+  file open/save, front matter, includes, TOC, transform registry,
+  Mermaid/Graphviz/CSV transforms, HTML/PDF export, manifests, and external
+  file refresh. This does not close later release-host, manual sign-off, or
+  broader production evidence gaps.
 
 Completion criteria:
 

@@ -31,6 +31,12 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- The specification matrix now treats the recommended first milestone as
+  complete with requirement-mapped evidence for the Tauri shell, editor/preview,
+  file operations, front matter/includes/TOC, transform registry, Mermaid,
+  Graphviz, CSV tables, HTML/PDF exports, export manifests, and external file
+  refresh. Later release-host and manual sign-off gaps remain visible
+  separately.
 - The Templates browser workflow now proves safe business and structured API
   transform insertion beyond calculations and charts: timeline, roadmap, ADR,
   QR, OpenAPI endpoint, and JSON Schema object built-in templates are inserted
