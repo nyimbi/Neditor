@@ -14,6 +14,7 @@ const quickCommands = [
   command("Project structure guard", "pnpm", ["run", "check:structure"]),
   command("Accessibility guard", "pnpm", ["run", "check:a11y"]),
   command("Dependency/license admission", "pnpm", ["run", "check:deps"]),
+  command("External transform documentation contract", "pnpm", ["run", "check:external-transform-docs"]),
   command("AI-first roadmap contract", "pnpm", ["run", "check:ai-roadmap"]),
   command("AI provider evidence contract", "pnpm", ["run", "check:ai-provider"]),
   command("AI runtime evidence contract", "pnpm", ["run", "check:ai-runtime"]),

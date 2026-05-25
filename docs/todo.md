@@ -1374,6 +1374,9 @@ Finish:
   proving the trusted file-mode sidecar path and PNG data URL artifact.
 - Add Windows manual evidence for all optional engines using the external
   evidence template contract.
+- Keep `pnpm run check:external-transform-docs` passing so Windows setup docs
+  continue to include Graphviz, D2, Java/PlantUML, Rust/Pikchr CLI, explicit
+  `.exe` paths, shim guidance, and the PowerShell `NEDITOR_TEST_PIKCHR` probe.
 - Confirm Windows `.exe` paths and package-manager shims.
 - Confirm PlantUML SVG and PNG file mode on all platforms.
 - Confirm Pikchr stdin/file/argument mode for each supported executable shape

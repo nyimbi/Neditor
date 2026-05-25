@@ -2599,6 +2599,7 @@ test("local verification scripts expose local baseline checks", () => {
   const performanceProfile = readFileSync("scripts/check-performance-profile-evidence.mjs", "utf8");
   const signingCollector = readFileSync("scripts/collect-release-signing-evidence.mjs", "utf8");
   const releaseSigning = readFileSync("scripts/check-release-signing.mjs", "utf8");
+  const externalTransformDocs = readFileSync("scripts/check-external-transform-docs.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:ai-roadmap"], "node scripts/check-ai-first-roadmap.mjs");
@@ -2610,6 +2611,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:deps"], "node scripts/check-dependency-admission.mjs");
   equal(scripts["check:docs"], "node scripts/check-markdown-links.mjs");
   equal(scripts["check:engines"], "node scripts/check-external-engines.mjs");
+  equal(scripts["check:external-transform-docs"], "node scripts/check-external-transform-docs.mjs");
   equal(scripts["check:e2e-env"], "node scripts/check-e2e-environment.mjs");
   equal(scripts["check:google-docs-import"], "node scripts/check-google-docs-import-evidence.mjs");
   equal(scripts["check:platform-evidence"], "node scripts/check-platform-evidence.mjs");
@@ -2640,6 +2642,10 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
   ok(verification.includes('command("Browser workflow environment", "node", ["scripts/check-e2e-environment.mjs"])'));
   ok(verification.includes('command("Browser workflow suite", "node", ["scripts/run-e2e.mjs"])'));
+  ok(verification.includes('command("External transform documentation contract", "pnpm", ["run", "check:external-transform-docs"])'));
+  ok(externalTransformDocs.includes("neditor.external-transform-docs.v1"));
+  ok(externalTransformDocs.includes("winget install Graphviz.Graphviz"));
+  ok(externalTransformDocs.includes("C:\\\\Users\\\\<you>\\\\.cargo\\\\bin\\\\pikchr-cli.exe"));
   ok(verification.includes('command("Accessibility runtime audit", "pnpm", ["run", "check:a11y:runtime"])'));
   ok(verification.includes('command("Accessibility manual review contract", "pnpm", ["run", "check:a11y:manual"])'));
   ok(verification.includes('command("Google Docs import evidence contract", "pnpm", ["run", "check:google-docs-import"])'));

@@ -18,6 +18,7 @@
     "check:deps": "node scripts/check-dependency-admission.mjs",
     "check:docs": "node scripts/check-markdown-links.mjs",
     "check:engines": "node scripts/check-external-engines.mjs",
+    "check:external-transform-docs": "node scripts/check-external-transform-docs.mjs",
     "check:e2e-env": "node scripts/check-e2e-environment.mjs",
     "check:google-docs-import": "node scripts/check-google-docs-import-evidence.mjs",
     "check:platform-evidence": "node scripts/check-platform-evidence.mjs",

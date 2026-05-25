@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Windows external-transform setup is now guarded by
+  `pnpm run check:external-transform-docs`: the Windows docs cover Graphviz,
+  D2, Java/PlantUML, Rust/Pikchr CLI, explicit `.exe` paths, shim guidance, and
+  the PowerShell `NEDITOR_TEST_PIKCHR` probe path. The matrix now treats that
+  row as Partial pending actual Windows-host evidence.
 - Current macOS optional-engine evidence now includes Pikchr again: the
   workspace-built executable under `.tmp/pikchr-build/` passes
   `NEDITOR_TEST_PIKCHR=... pnpm run check:engines`, writes `pikchr.svg`, and

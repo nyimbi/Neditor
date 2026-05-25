@@ -87,6 +87,8 @@ winget install Graphviz.Graphviz
 winget install Terrastruct.D2
 winget install EclipseAdoptium.Temurin.21.JRE
 winget install PlantUML.PlantUML
+winget install Rustlang.Rustup
+cargo install pikchr-cli --locked
 ```
 
 Typical paths vary by installer. Prefer explicit executable paths such as:
@@ -100,9 +102,15 @@ C:\Program Files\Graphviz\bin\osage.exe
 C:\Program Files\Graphviz\bin\twopi.exe
 C:\Users\<you>\AppData\Local\Microsoft\WinGet\Packages\...\d2.exe
 C:\Program Files\PlantUML\plantuml.exe
+C:\Users\<you>\.cargo\bin\pikchr-cli.exe
 ```
 
-If an engine is installed through a package manager shim, verify that the shim works from a normal terminal before trusting it in NEditor.
+If an engine is installed through a package manager shim, verify that the shim works from a normal terminal before trusting it in NEditor. For Pikchr proof through Cargo, run the probe with the explicit executable path:
+
+```powershell
+$env:NEDITOR_TEST_PIKCHR="C:\Users\<you>\.cargo\bin\pikchr-cli.exe"
+pnpm run check:engines
+```
 
 ## Engine Defaults
 
