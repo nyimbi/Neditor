@@ -209,8 +209,8 @@ web app.
   matching Markdown section instead of appending duplicate section copy, an
   **AI Control Center** for readiness score, source grounding, governance
   state, current-document placeholders, citation TODOs, unresolved comments,
-  unreviewed AI markers, approval metadata gaps, placeholder links, next
-  actions that route document evidence into concrete remediation work, an
+  extracted claim inventory, unreviewed AI markers, approval metadata gaps,
+  placeholder links, next actions that route document evidence into concrete remediation work, an
   agentic lifecycle task board that turns creation,
   composition, editing, revision, review, and distribution into runnable
   owned tasks with dedicated evidence-fix tasks, persistent

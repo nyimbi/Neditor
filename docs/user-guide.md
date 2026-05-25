@@ -94,9 +94,10 @@ shows an **AI Control Center** with readiness score, next actions, source
 grounding, governance state, and distribution state so reviewers can see what is
 safe to do next before applying generated text. The control center and reviewer
 agents inspect the current Markdown for unresolved placeholders, citation TODOs,
-unreviewed AI provenance markers, unresolved comments, missing approval
-metadata, and placeholder links, so the agent review reflects the document in
-front of the user instead of only the prompt. Those findings also become
+candidate claims with line numbers, unreviewed AI provenance markers,
+unresolved comments, missing approval metadata, and placeholder links, so the
+agent review reflects the document in front of the user instead of only the
+prompt. Those findings also become
 concrete next actions and lifecycle tasks, so evidence cleanup can be assigned,
 run, noted, and completed from the same agent board. The same packet includes named
 reviewer agents for editorial quality, evidence grounding, risk, citations,

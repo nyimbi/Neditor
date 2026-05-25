@@ -588,6 +588,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("### Target Runbooks"));
   ok(run.markdown.includes("## AI Control Center"));
   ok(run.markdown.includes("### Source Grounding"));
+  ok(run.markdown.includes("## Claim Inventory"));
   ok(run.markdown.includes("## Review Agents"));
   ok(run.markdown.includes("### Editorial Reviewer"));
   ok(run.markdown.includes("### Export Reviewer"));
@@ -702,8 +703,10 @@ test("agentic workflow reviewers inspect current document evidence", () => {
 
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Document placeholders" && item.status === "needs-review"));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.detail.includes("citation TODO")));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Claim inventory" && item.status === "needs-review"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Resolve document placeholders" && action.action === "open-ai-paste"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Review evidence and governance blockers" && action.detail.includes("citation TODO")));
+  ok(run.controlCenter.nextActions.some((action) => action.label === "Verify claim inventory" && action.detail.includes("candidate claim")));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Repair distribution blockers" && action.action === "prepare-export"));
   ok(run.controlCenter.governance.some((item) => item.label === "AI provenance" && item.status === "needs-review"));
   ok(run.controlCenter.governance.some((item) => item.label === "Human review" && item.detail.includes("unresolved current-document review comment")));
@@ -711,12 +714,14 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.controlCenter.distribution.some((item) => item.detail.includes("placeholder or suspicious link")));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-placeholders" && task.evidence.some((item) => item.includes("{{client_name}}"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-citations" && task.owner === "Evidence Agent"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-claim-inventory" && task.evidence.some((item) => item.includes("ARR grows by 18%"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-comments" && task.nextStep.includes("Resolve")));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-ai-review" && task.owner === "Governance Agent"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-links" && task.action === "prepare-export"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata" && task.evidence.some((item) => item.includes("approvedAt"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.findings.some((item) => item.includes("{{client_name}}"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.findings.some((item) => item.includes("citation TODO"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.requiredActions.some((item) => item.includes("claim inventory"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("review comments"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "governance" && agent.requiredActions.some((item) => item.includes("human-reviewed"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("approvedAt"))));

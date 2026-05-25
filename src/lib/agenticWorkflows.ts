@@ -80,10 +80,18 @@ export interface AgenticWorkflowRevision {
 export interface AgenticDocumentEvidence {
   unresolvedPlaceholders: string[];
   citationTodos: string[];
+  claimInventory: AgenticDocumentClaim[];
   unreviewedAiMarkers: number;
   unresolvedComments: number;
   approvalMetadataMissing: string[];
   brokenLinkHints: string[];
+}
+
+export interface AgenticDocumentClaim {
+  kind: "number" | "date" | "commitment" | "quote" | "claim";
+  sourceLine: number;
+  text: string;
+  reason: string;
 }
 
 export interface AgenticWorkflowRun {
@@ -349,6 +357,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     draftMarkdown: draft?.markdown || "",
     revision,
     controlCenter,
+    documentEvidence,
     auditTrail,
     lifecycleTasks,
     reviewerAgents,
@@ -836,6 +845,18 @@ function buildDocumentEvidenceLifecycleTasks(documentEvidence: AgenticDocumentEv
       nextStep: "Attach source references to each citation TODO or keep the unresolved citations as explicit release blockers.",
     });
   }
+  if (documentEvidence.claimInventory.length) {
+    tasks.push({
+      id: "task-evidence-claim-inventory",
+      lane: "review",
+      title: "Verify claim inventory",
+      owner: "Evidence Agent",
+      status: "needs-input",
+      action: "open-review",
+      evidence: documentEvidence.claimInventory.slice(0, 8).map((claim) => `Line ${claim.sourceLine}: ${claim.text}`),
+      nextStep: "Match each extracted claim to a source, citation, reviewer note, or explicit deferral before final approval.",
+    });
+  }
   if (documentEvidence.unresolvedComments) {
     tasks.push({
       id: "task-evidence-comments",
@@ -1000,10 +1021,14 @@ function buildReviewerAgents(input: {
         documentEvidence.citationTodos.length
           ? `Current document has citation TODOs: ${documentEvidence.citationTodos.slice(0, 4).join(", ")}.`
           : "No citation TODO markers were found in the current document.",
+        documentEvidence.claimInventory.length
+          ? `Claim inventory captured ${documentEvidence.claimInventory.length} number, date, quote, commitment, or factual claim candidate(s).`
+          : "No obvious claim inventory candidates were detected in the current document.",
       ],
       requiredActions: [
         hasSpecificEvidence ? "Verify every material claim against the supplied evidence before final export." : "Supply source evidence, data references, or citation expectations before final approval.",
         "Mark unsupported claims with citation TODOs instead of letting them ship as confident assertions.",
+        documentEvidence.claimInventory.length ? "Review the current-document claim inventory and attach sources or deferrals to each material item." : "",
         documentEvidence.citationTodos.length ? "Resolve current-document citation TODOs or keep them as explicit blockers in the review record." : "",
       ],
     }),
@@ -1283,6 +1308,13 @@ function buildSourceGrounding(
       status: documentEvidence.citationTodos.length ? "needs-review" : evidenceValue && !/^TBD\b/i.test(evidenceValue) ? "available" : "needs-review",
     },
     {
+      label: "Claim inventory",
+      detail: documentEvidence.claimInventory.length
+        ? `${documentEvidence.claimInventory.length} candidate claim(s) extracted for source review.`
+        : "No current-document claims were detected for source review.",
+      status: documentEvidence.claimInventory.length ? "needs-review" : "available",
+    },
+    {
       label: "Document placeholders",
       detail: documentEvidence.unresolvedPlaceholders.length
         ? `Unresolved placeholders detected: ${documentEvidence.unresolvedPlaceholders.slice(0, 5).join(", ")}.`
@@ -1391,6 +1423,15 @@ function buildNextActions(
       ]
         .filter(Boolean)
         .join(", "),
+      lane: "review",
+      action: "open-review",
+      status: "needs-input",
+    });
+  }
+  if (documentEvidence.claimInventory.length) {
+    actions.push({
+      label: "Verify claim inventory",
+      detail: `${documentEvidence.claimInventory.length} candidate claim(s) need source, citation, reviewer note, or deferral.`,
       lane: "review",
       action: "open-review",
       status: "needs-input",
@@ -1558,15 +1599,77 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
   const brokenLinkHints = Array.from(
     new Set([...documentText.matchAll(/\]\((?:TODO|TBD|#|https?:\/\/example\.com)[^)]*\)/gi)].map((match) => match[0])),
   ).slice(0, 12);
+  const claimInventory = extractDocumentClaimInventory(documentText);
 
   return {
     unresolvedPlaceholders,
     citationTodos,
+    claimInventory,
     unreviewedAiMarkers: unreviewedAiSources + unreviewedAiAssisted,
     unresolvedComments,
     approvalMetadataMissing,
     brokenLinkHints,
   };
+}
+
+function extractDocumentClaimInventory(documentText: string): AgenticDocumentClaim[] {
+  const claims: AgenticDocumentClaim[] = [];
+  const seen = new Set<string>();
+  let inFence = false;
+  const lines = documentText.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
+    const trimmed = rawLine.trim();
+    if (/^```/.test(trimmed)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (
+      inFence ||
+      !trimmed ||
+      /^---$/.test(trimmed) ||
+      /^#{1,6}\s/.test(trimmed) ||
+      /^<!--/.test(trimmed) ||
+      /^\|?[\s:|-]+\|/.test(trimmed)
+    ) {
+      continue;
+    }
+    const text = trimmed
+      .replace(/^[-*+]\s+/, "")
+      .replace(/^\d+[.)]\s+/, "")
+      .replace(/\s+/g, " ")
+      .slice(0, 220);
+    const signal = classifyClaimSignal(text);
+    if (!signal) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    claims.push({
+      kind: signal.kind,
+      sourceLine: index + 1,
+      text,
+      reason: signal.reason,
+    });
+    if (claims.length >= 18) break;
+  }
+  return claims;
+}
+
+function classifyClaimSignal(text: string): Pick<AgenticDocumentClaim, "kind" | "reason"> | null {
+  if (/"[^"]{8,}"/.test(text) || /'[^']{8,}'/.test(text)) return { kind: "quote", reason: "Quoted material should be traceable to a source." };
+  if (/\b(?:will|must|shall|commit(?:s|ted)?|guarantee(?:s|d)?|approve(?:s|d)?|deliver(?:s|ed)?|launch(?:es|ed)?)\b/i.test(text)) {
+    return { kind: "commitment", reason: "Commitment or obligation needs owner and approval review." };
+  }
+  if (/(?:[$€£]\s?\d|\b\d+(?:\.\d+)?\s?%|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b|\b\d+(?:\.\d+)?x\b)/i.test(text)) {
+    return { kind: "number", reason: "Number, currency, percentage, or multiplier needs source verification." };
+  }
+  if (/\b(?:Q[1-4]\s+FY\d{2,4}|FY\d{2,4}|20\d{2}|Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\b/i.test(text)) {
+    return { kind: "date", reason: "Date or time-bound statement needs source and freshness review." };
+  }
+  if (/\b(?:increase(?:s|d)?|decrease(?:s|d)?|reduce(?:s|d)?|grow(?:s|th)?|improve(?:s|d)?|outperform(?:s|ed)?|risk(?:s)?|because|therefore|shows?|proves?)\b/i.test(text)) {
+    return { kind: "claim", reason: "Causal, performance, or risk claim needs evidence review." };
+  }
+  return null;
 }
 
 function inferApplicationMode(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSelection: boolean): AgenticWorkflowRun["applicationMode"] {
@@ -1581,6 +1684,7 @@ function buildRunMarkdown(input: {
   draftMarkdown: string;
   revision: AgenticWorkflowRevision | null;
   controlCenter: AgenticControlCenter;
+  documentEvidence: AgenticDocumentEvidence;
   auditTrail: AgenticAuditTrail;
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
@@ -1596,6 +1700,7 @@ function buildRunMarkdown(input: {
     draftMarkdown,
     revision,
     controlCenter,
+    documentEvidence,
     auditTrail,
     lifecycleTasks,
     reviewerAgents,
@@ -1649,6 +1754,7 @@ function buildRunMarkdown(input: {
     lines.push("### Blockers", "", ...blockers.map((blocker) => `- [ ] ${blocker}`), "");
   }
   lines.push(...controlCenterMarkdown(controlCenter));
+  lines.push(...claimInventoryMarkdown(documentEvidence.claimInventory));
   lines.push(...lifecycleTasksMarkdown(lifecycleTasks));
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
@@ -1746,6 +1852,23 @@ function controlCenterMarkdown(controlCenter: AgenticControlCenter) {
   ];
 }
 
+function claimInventoryMarkdown(claimInventory: AgenticDocumentClaim[]) {
+  if (!claimInventory.length) {
+    return ["## Claim Inventory", "", "No current-document claims were detected for source review.", ""];
+  }
+  return [
+    "## Claim Inventory",
+    "",
+    "| Line | Type | Review trigger | Claim text |",
+    "| ---: | --- | --- | --- |",
+    ...claimInventory.map(
+      (claim) =>
+        `| ${claim.sourceLine} | ${claim.kind} | ${escapeTableCell(claim.reason)} | ${escapeTableCell(claim.text)} |`,
+    ),
+    "",
+  ];
+}
+
 function reviewerAgentsMarkdown(reviewerAgents: AgenticReviewerAgent[]) {
   const lines = ["## Review Agents", ""];
   for (const agent of reviewerAgents) {
@@ -1821,6 +1944,10 @@ function auditTrailMarkdown(auditTrail: AgenticAuditTrail) {
 
 function fencedBlock(language: string, value: string) {
   return ["```" + language, value.trim() || "(empty)", "```"].join("\n");
+}
+
+function escapeTableCell(value: string) {
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
 }
 
 function distributionTargetRunbookMarkdown(targetPlans: AgenticDistributionTargetPlan[]) {
