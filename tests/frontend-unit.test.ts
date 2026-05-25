@@ -19,8 +19,10 @@ import {
   agenticWorkflowPlaybooks,
   buildAgenticLifecycleTaskBrief,
   buildAgenticSectionWorkBrief,
+  buildAgenticSourcePack,
   buildAgenticWorkflowPlan,
   buildAgenticWorkflowRun,
+  serializeAgenticSourcePackItem,
 } from "../src/lib/agenticWorkflows.js";
 import {
   bibliographyEntryStub,
@@ -597,6 +599,46 @@ test("agentic workflow planner uses context answers to close missing inputs", ()
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.status === "available"));
 });
 
+test("agentic source pack builder structures notes urls files claims and reviewer comments", () => {
+  const sourcePack = buildAgenticSourcePack(
+    [
+      "[claim] ARR forecast: ARR grows 18% in Q2 according to finance workbook",
+      "[url] Pricing page: https://example.com/pricing",
+      "[file] Finance workbook: /workspace/finance.xlsx",
+      "[reviewer-comment] CFO: Confirm renewal risk before board review",
+      "Source: Gartner report on market demand",
+      serializeAgenticSourcePackItem("note", "Workshop", "Customer success wants a plain-language rollout note."),
+    ].join("\n"),
+  );
+
+  equal(sourcePack.items.length, 6);
+  equal(sourcePack.claims.length, 1);
+  equal(sourcePack.urls.length, 1);
+  equal(sourcePack.files.length, 1);
+  equal(sourcePack.reviewerComments.length, 1);
+  equal(sourcePack.references.length, 1);
+  ok(sourcePack.markdown.includes("[claim] ARR forecast"));
+
+  const run = buildAgenticWorkflowRun({
+    instruction: "Create a board memo, review evidence, and prepare PDF. audience: board owner: CFO deadline: June 1",
+    sourcePackText: sourcePack.markdown,
+    documentTitle: "Board Memo",
+    documentText: "# Board Memo\n\nARR grows by 18%.",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+  const providerPackage = buildAiProviderRequestPackage(run, { profileId: "manual-review" });
+
+  ok(run.plan.context.includes("User source pack: 6 item"));
+  ok(run.plan.sourcePack.claims.some((item) => item.detail.includes("ARR grows 18%")));
+  ok(run.markdown.includes("### User Source Pack"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-source-pack-review"));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "User source pack" && item.status === "available"));
+  ok(providerPackage.sourcePack.userSources.some((item) => item.includes("Pricing page")));
+  ok(providerPackage.sourcePack.claimReview.some((item) => item.includes("User source claim")));
+  ok(formatAiProviderSourcePack(providerPackage.sourcePack).includes("User-managed source pack:"));
+  ok(providerPackage.userPrompt.includes("User-managed source pack:"));
+});
+
 test("agentic workflow playbooks cover common business and publishing starts", () => {
   ok(agenticWorkflowPlaybooks.length >= 6);
   ok(agenticWorkflowPlaybooks.some((playbook) => playbook.id === "board-memo-to-approval"));
@@ -1034,6 +1076,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         updatedAt: "2026-05-25T10:05:00.000Z",
         instruction: "Create a board memo",
         contextAnswers: "audience: board\nowner: CFO\nevidence: audited forecast",
+        sourcePackText: "[claim] Forecast: Revenue grew 18%.",
         documentType: "board-memo",
         lanes: ["create", "review", "create"],
         distributionTargets: ["pdf", "bad-target"],
@@ -1115,6 +1158,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         ],
         sourcePack: {
           contextSources: ["Current document"],
+          userSources: ["[claim] Forecast: Revenue grew 18%."],
           claimReview: ["Line 4: Revenue grew 18%."],
           cleanupBlockers: ["Placeholder [client]"],
           governanceBlockers: ["Missing approvedBy"],
@@ -1242,6 +1286,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     updatedAt: "2026-05-25T10:05:00.000Z",
     instruction: "Create a board memo",
     contextAnswers: "audience: board\nowner: CFO\nevidence: audited forecast",
+    sourcePackText: "[claim] Forecast: Revenue grew 18%.",
     documentType: "board-memo",
     lanes: ["create", "review"],
     distributionTargets: ["pdf"],
@@ -1319,6 +1364,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     ],
     sourcePack: {
       contextSources: ["Current document"],
+      userSources: ["[claim] Forecast: Revenue grew 18%."],
       claimReview: ["Line 4: Revenue grew 18%."],
       cleanupBlockers: ["Placeholder [client]"],
       governanceBlockers: ["Missing approvedBy"],
@@ -1453,6 +1499,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agent-context-score"));
   ok(app.includes("agentRun"));
   ok(app.includes("agentContextAnswers"));
+  ok(app.includes("agentSourcePackText"));
+  ok(app.includes("Source Pack Builder"));
+  ok(app.includes("agentSourcePackPreview"));
+  ok(app.includes("addAgentSourcePackItem"));
+  ok(app.includes("removeAgentSourcePackItem"));
   ok(app.includes("commandAgentInstructionAvailable"));
   ok(app.includes("runCommandPaletteAgentInstruction"));
   ok(app.includes('aria-label="AI command route"'));

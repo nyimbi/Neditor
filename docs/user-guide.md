@@ -88,7 +88,10 @@ When the plan lists missing inputs, answer them in **Context answers and
 constraints** and choose **Replan with answers**. Those answers become part of
 the context pack, placeholder resolution, generated agent packet, Docs Live
 handoff, provider request package, and saved run history instead of living only
-in a separate chat note. The plan also scores context completeness across
+in a separate chat note. Use **Source Pack Builder** to add source notes, claims,
+URLs, file paths, references, and reviewer comments before planning or provider
+handoff; those managed items become part of the context pack, generated packet,
+reviewer tasks, provider source evidence pack, and saved run history. The plan also scores context completeness across
 audience, evidence, constraints, examples, tone, and approval context, with
 recommendations for missing grounding before users generate a first draft.
 

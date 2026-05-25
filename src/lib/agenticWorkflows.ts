@@ -16,6 +16,7 @@ export type AgenticWorkflowAction =
 export interface AgenticWorkflowRequest {
   instruction: string;
   contextAnswers?: string;
+  sourcePackText?: string;
   documentTitle?: string;
   documentText?: string;
   selectedText?: string;
@@ -50,6 +51,8 @@ export interface AgenticWorkflowPlan {
   primaryLane: AgenticWorkflowLane;
   lanes: AgenticWorkflowLane[];
   contextAnswers: string;
+  sourcePackText: string;
+  sourcePack: AgenticSourcePack;
   suggestedOutline: string;
   context: string;
   placeholderText: string;
@@ -67,6 +70,26 @@ export interface AgenticContextCompleteness {
   present: string[];
   missing: string[];
   recommendations: string[];
+}
+
+export type AgenticSourcePackItemKind = "note" | "url" | "file" | "reference" | "reviewer-comment" | "claim";
+
+export interface AgenticSourcePackItem {
+  id: string;
+  kind: AgenticSourcePackItemKind;
+  label: string;
+  detail: string;
+}
+
+export interface AgenticSourcePack {
+  items: AgenticSourcePackItem[];
+  urls: AgenticSourcePackItem[];
+  files: AgenticSourcePackItem[];
+  references: AgenticSourcePackItem[];
+  reviewerComments: AgenticSourcePackItem[];
+  claims: AgenticSourcePackItem[];
+  notes: AgenticSourcePackItem[];
+  markdown: string;
 }
 
 export interface AgenticWorkflowPlaybook {
@@ -357,7 +380,9 @@ const placeholderNames = ["audience", "owner", "deadline", "tone", "evidence", "
 export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): AgenticWorkflowPlan {
   const instruction = request.instruction.trim();
   const contextAnswers = request.contextAnswers?.trim() || "";
-  const corpus = [instruction, contextAnswers, request.documentTitle, request.documentText, request.selectedText].filter(Boolean).join("\n");
+  const sourcePackText = request.sourcePackText?.trim() || "";
+  const sourcePack = buildAgenticSourcePack(sourcePackText);
+  const corpus = [instruction, contextAnswers, sourcePackText, request.documentTitle, request.documentText, request.selectedText].filter(Boolean).join("\n");
   const lanes = detectLanes(corpus);
   const primaryLane = lanes[0] || "create";
   const documentType = normalizeDocsLiveDocumentType(corpus);
@@ -379,6 +404,8 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     primaryLane,
     lanes,
     contextAnswers,
+    sourcePackText,
+    sourcePack,
     suggestedOutline,
     context,
     placeholderText,
@@ -562,6 +589,78 @@ export function buildAgenticLifecycleTaskBrief(task: AgenticLifecycleTask): stri
     "- [ ] Preserve AI provenance and run identifiers until human approval is complete.",
     "",
   ].join("\n");
+}
+
+export function buildAgenticSourcePack(sourcePackText: string): AgenticSourcePack {
+  const items = parseAgenticSourcePackItems(sourcePackText).slice(0, 80);
+  const byKind = (kind: AgenticSourcePackItemKind) => items.filter((item) => item.kind === kind);
+  return {
+    items,
+    urls: byKind("url"),
+    files: byKind("file"),
+    references: byKind("reference"),
+    reviewerComments: byKind("reviewer-comment"),
+    claims: byKind("claim"),
+    notes: byKind("note"),
+    markdown: formatAgenticSourcePack(items),
+  };
+}
+
+export function serializeAgenticSourcePackItem(kind: AgenticSourcePackItemKind, label: string, detail: string) {
+  const cleanKind = kind || "note";
+  const cleanLabel = label.trim() || titleCase(cleanKind);
+  const cleanDetail = detail.trim();
+  return `[${cleanKind}] ${cleanLabel}${cleanDetail ? `: ${cleanDetail}` : ""}`;
+}
+
+function parseAgenticSourcePackItems(sourcePackText: string): AgenticSourcePackItem[] {
+  const items: AgenticSourcePackItem[] = [];
+  const seen = new Set<string>();
+  for (const rawLine of sourcePackText.split(/\r?\n/)) {
+    const line = rawLine.trim().replace(/^[-*]\s+/, "");
+    if (!line) continue;
+    const item = parseAgenticSourcePackLine(line);
+    const key = `${item.kind}:${item.label.toLowerCase()}:${item.detail.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(item);
+  }
+  return items;
+}
+
+function parseAgenticSourcePackLine(line: string): AgenticSourcePackItem {
+  const tagged = line.match(/^\[(note|url|file|reference|reviewer-comment|claim)\]\s*([^:]+)?(?::\s*([\s\S]+))?$/i);
+  if (tagged) {
+    const kind = tagged[1].toLowerCase() as AgenticSourcePackItemKind;
+    const label = (tagged[2] || titleCase(kind)).trim();
+    const detail = (tagged[3] || "").trim();
+    return sourcePackItem(kind, label, detail || label);
+  }
+  const url = line.match(/\bhttps?:\/\/\S+/i)?.[0];
+  if (url) return sourcePackItem("url", url.replace(/[),.;]+$/, ""), line);
+  if (/\b(?:file|path|attachment)\s*[:=]/i.test(line) || /(?:^|\/)[\w .-]+\.(?:md|pdf|docx|xlsx|csv|txt|png|jpe?g)$/i.test(line)) {
+    return sourcePackItem("file", line.replace(/\b(?:file|path|attachment)\s*[:=]\s*/i, "").slice(0, 120), line);
+  }
+  if (/\b(?:reviewer|comment|feedback|note from)\b/i.test(line)) return sourcePackItem("reviewer-comment", line.slice(0, 120), line);
+  if (/\b(?:source|reference|citation|doi|isbn|author|paper|report)\b/i.test(line)) return sourcePackItem("reference", line.slice(0, 120), line);
+  if (classifyClaimSignal(line)) return sourcePackItem("claim", line.slice(0, 120), line);
+  return sourcePackItem("note", line.slice(0, 120), line);
+}
+
+function sourcePackItem(kind: AgenticSourcePackItemKind, label: string, detail: string): AgenticSourcePackItem {
+  const safeLabel = label.trim() || titleCase(kind);
+  const safeDetail = detail.trim() || safeLabel;
+  return {
+    id: `source-${kind}-${stableFingerprint(`${kind}\n${safeLabel}\n${safeDetail}`).slice(0, 12)}`,
+    kind,
+    label: safeLabel.slice(0, 180),
+    detail: safeDetail.slice(0, 1_200),
+  };
+}
+
+function formatAgenticSourcePack(items: AgenticSourcePackItem[]) {
+  if (!items.length) return "";
+  return items.map((item) => `- [${item.kind}] ${item.label}: ${item.detail}`).join("\n");
 }
 
 function detectLanes(corpus: string): AgenticWorkflowLane[] {
@@ -949,9 +1048,14 @@ function inferTitle(request: AgenticWorkflowRequest, documentType: DocsLiveDocum
 }
 
 function buildContext(request: AgenticWorkflowRequest, lanes: AgenticWorkflowLane[], targets: ExportTarget[]) {
+  const sourcePack = buildAgenticSourcePack(request.sourcePackText || "");
   return [
     `User intent: ${request.instruction.trim() || "Create and improve the current document."}`,
     request.contextAnswers?.trim() ? `Agent context answers: ${request.contextAnswers.trim().slice(0, 1600)}` : "",
+    sourcePack.items.length
+      ? `User source pack: ${sourcePack.items.length} item(s), including ${sourcePack.claims.length} claim(s), ${sourcePack.urls.length} URL(s), ${sourcePack.files.length} file(s), ${sourcePack.references.length} reference(s), and ${sourcePack.reviewerComments.length} reviewer comment(s).`
+      : "",
+    sourcePack.markdown ? `Structured source pack:\n${sourcePack.markdown.slice(0, 2200)}` : "",
     request.documentTitle ? `Current document: ${request.documentTitle}` : "",
     request.selectedText?.trim() ? `Selected text to act on: ${request.selectedText.trim().slice(0, 1200)}` : "",
     request.documentText?.trim() ? `Current document context available: ${Math.min(request.documentText.trim().length, 2000)} characters.` : "No current document body supplied.",
@@ -1231,6 +1335,19 @@ function buildLifecycleTasks(input: {
         .slice(0, 8)
         .map((item) => `${titleCase(item.scope)} ${item.heading}: ${item.recommendation}`),
       nextStep: "Accept, reject, or request another revision for each queued edit before applying accepted changes.",
+    });
+  }
+
+  if (plan.sourcePack.items.length) {
+    tasks.push({
+      id: "task-source-pack-review",
+      lane: "review",
+      title: "Validate user source pack",
+      owner: "Evidence Agent",
+      status: "needs-input",
+      action: "open-review",
+      evidence: plan.sourcePack.items.slice(0, 8).map((item) => `${titleCase(item.kind)} ${item.label}: ${item.detail}`),
+      nextStep: "Confirm each source-pack note, URL, file, reference, reviewer comment, and claim is safe and relevant before provider handoff.",
     });
   }
 
@@ -1707,6 +1824,9 @@ function buildReviewerAgents(input: {
       mandate: "Trace claims, numbers, dates, and decisions back to named source material before approval.",
       findings: [
         hasSpecificEvidence ? `Evidence expectation captured: ${evidenceValue}.` : "Evidence is still generic or missing.",
+        plan.sourcePack.items.length
+          ? `User source pack contributes ${plan.sourcePack.items.length} structured item(s): ${plan.sourcePack.items.slice(0, 4).map((item) => `${item.kind} ${item.label}`).join(", ")}.`
+          : "No user-managed source pack items were supplied.",
         controlCenter.sourceGrounding.some((item) => item.label === "Current document" && item.status === "available")
           ? "Current document context is available for source comparison."
           : "Current document source text is not available for full grounding.",
@@ -1719,6 +1839,7 @@ function buildReviewerAgents(input: {
       ],
       requiredActions: [
         hasSpecificEvidence ? "Verify every material claim against the supplied evidence before final export." : "Supply source evidence, data references, or citation expectations before final approval.",
+        plan.sourcePack.items.length ? "Validate source-pack items and preserve relevant source labels in provider handoff or review notes." : "",
         "Mark unsupported claims with citation TODOs instead of letting them ship as confident assertions.",
         documentEvidence.claimInventory.length ? "Review the current-document claim inventory and attach sources or deferrals to each material item." : "",
         documentEvidence.citationTodos.length ? "Resolve current-document citation TODOs or keep them as explicit blockers in the review record." : "",
@@ -1897,7 +2018,15 @@ function buildAuditTrail(input: {
     applicationMode,
     generatedAt,
   } = input;
-  const contextPayload = [plan.context, plan.placeholderText, plan.suggestedOutline, plan.revisionInstruction, plan.revisionModes.join(", ")].join("\n---\n");
+  const contextPayload = [
+    plan.context,
+    plan.sourcePackText,
+    plan.sourcePack.markdown,
+    plan.placeholderText,
+    plan.suggestedOutline,
+    plan.revisionInstruction,
+    plan.revisionModes.join(", "),
+  ].join("\n---\n");
   const sourcePayload = [request.documentTitle || "", request.documentText || "", request.selectedText || ""].join("\n---\n");
   const outputPayload = [
     draftMarkdown,
@@ -1923,6 +2052,7 @@ function buildAuditTrail(input: {
       ...item.riskNotes,
       item.recommendation,
     ]),
+    ...plan.sourcePack.items.flatMap((item) => [item.kind, item.label, item.detail]),
     ...sectionWorkQueue.flatMap((section) => [
       section.id,
       section.heading,
@@ -1966,6 +2096,9 @@ function buildAuditTrail(input: {
       editAcceptanceQueue.length
         ? `Edit acceptance queue prepared ${editAcceptanceQueue.length} item(s) for item-by-item approval.`
         : "No edit acceptance queue was needed for this run.",
+      plan.sourcePack.items.length
+        ? `User source pack included ${plan.sourcePack.items.length} structured item(s) for provider and reviewer grounding.`
+        : "No user-managed source pack items were supplied.",
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
         : "No distribution target selected at packet generation time.",
@@ -2032,6 +2165,13 @@ function buildSourceGrounding(
       label: "Context completeness",
       detail: `${plan.contextCompleteness.score}/100 (${plan.contextCompleteness.status}); missing ${plan.contextCompleteness.missing.join(", ") || "none"}.`,
       status: plan.contextCompleteness.status === "thin" ? "needs-review" : "available",
+    },
+    {
+      label: "User source pack",
+      detail: plan.sourcePack.items.length
+        ? `${plan.sourcePack.items.length} user-managed source item(s): ${plan.sourcePack.claims.length} claim(s), ${plan.sourcePack.urls.length} URL(s), ${plan.sourcePack.files.length} file(s), ${plan.sourcePack.references.length} reference(s), ${plan.sourcePack.reviewerComments.length} reviewer comment(s).`
+        : "No user-managed source pack items were supplied.",
+      status: plan.sourcePack.items.length ? "available" : "needs-review",
     },
     {
       label: "Evidence",
@@ -2583,6 +2723,16 @@ function buildRunMarkdown(input: {
     `Missing: ${plan.contextCompleteness.missing.join(", ") || "none"}`,
     "",
     ...plan.contextCompleteness.recommendations.map((item) => `- [ ] ${item}`),
+    "",
+    "### User Source Pack",
+    "",
+    ...(plan.sourcePack.items.length
+      ? [
+          `Items: ${plan.sourcePack.items.length}; claims: ${plan.sourcePack.claims.length}; URLs: ${plan.sourcePack.urls.length}; files: ${plan.sourcePack.files.length}; references: ${plan.sourcePack.references.length}; reviewer comments: ${plan.sourcePack.reviewerComments.length}.`,
+          "",
+          ...plan.sourcePack.items.map((item) => `- [${item.kind}] ${item.label}: ${item.detail}`),
+        ]
+      : ["No user-managed source pack items were supplied."]),
     "",
     "### Placeholders",
     "",

@@ -189,6 +189,7 @@ export interface AgentRunHistoryOutlineCritiqueItem {
 
 export interface AgentRunHistorySourcePack {
   contextSources: string[];
+  userSources: string[];
   claimReview: string[];
   cleanupBlockers: string[];
   governanceBlockers: string[];
@@ -202,6 +203,7 @@ export interface AgentRunHistoryItem {
   updatedAt: string;
   instruction: string;
   contextAnswers?: string;
+  sourcePackText?: string;
   documentType: string;
   lanes: string[];
   distributionTargets: ExportTarget[];
@@ -671,6 +673,7 @@ function normalizeAgentRunHistorySourcePack(value: unknown): AgentRunHistorySour
   if (!isRecord(value)) return undefined;
   return {
     contextSources: stringArray(value.contextSources, 80) || [],
+    userSources: stringArray(value.userSources, 120) || [],
     claimReview: stringArray(value.claimReview, 120) || [],
     cleanupBlockers: stringArray(value.cleanupBlockers, 120) || [],
     governanceBlockers: stringArray(value.governanceBlockers, 80) || [],
@@ -705,6 +708,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     updatedAt: normalizedString(value.updatedAt, 40),
     instruction: normalizedString(value.instruction, 500),
     contextAnswers: normalizedString(value.contextAnswers, 4_000) || undefined,
+    sourcePackText: normalizedString(value.sourcePackText, 8_000) || undefined,
     documentType: normalizedString(value.documentType, 80),
     lanes: stringArray(value.lanes, 12) || [],
     distributionTargets,

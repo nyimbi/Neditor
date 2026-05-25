@@ -2006,6 +2006,57 @@
             placeholder="Answer missing inputs, add source facts, target reviewer, approvals, distribution constraints, tone, deadlines, or placeholder values. These answers feed the next plan, packet, Docs Live handoff, and provider request."
           ></textarea>
         </label>
+        <section class="agent-source-pack-builder" aria-label="Agent source pack builder">
+          <header>
+            <div>
+              <strong>Source Pack Builder</strong>
+              <span>
+                {{ agentSourcePackPreview.items.length }} items |
+                {{ agentSourcePackPreview.claims.length }} claims |
+                {{ agentSourcePackPreview.urls.length }} URLs |
+                {{ agentSourcePackPreview.files.length }} files |
+                {{ agentSourcePackPreview.reviewerComments.length }} reviewer comments
+              </span>
+            </div>
+          </header>
+          <div class="agent-source-pack-add">
+            <label>
+              Type
+              <select v-model="agentSourcePackKind">
+                <option value="note">Note</option>
+                <option value="claim">Claim</option>
+                <option value="url">URL</option>
+                <option value="file">File</option>
+                <option value="reference">Reference</option>
+                <option value="reviewer-comment">Reviewer comment</option>
+              </select>
+            </label>
+            <label>
+              Label
+              <input v-model="agentSourcePackLabel" placeholder="Q2 forecast, CFO comment, research URL" />
+            </label>
+            <label>
+              Detail
+              <textarea v-model="agentSourcePackDetail" rows="3" placeholder="Paste the fact, link, file path, reviewer note, or citation detail."></textarea>
+            </label>
+            <button type="button" :disabled="!agentSourcePackLabel.trim() && !agentSourcePackDetail.trim()" @click="addAgentSourcePackItem">Add source</button>
+          </div>
+          <label>
+            Managed source pack
+            <textarea
+              v-model="agentSourcePackText"
+              rows="6"
+              placeholder="[claim] ARR forecast: ARR grows 18% in Q2 according to finance workbook&#10;[url] Pricing source: https://example.com/pricing&#10;[reviewer-comment] CFO: Check renewal risk before board review"
+            ></textarea>
+          </label>
+          <ul v-if="agentSourcePackPreview.items.length" class="agent-source-pack-list">
+            <li v-for="item in agentSourcePackPreview.items" :key="item.id">
+              <strong>{{ item.kind }} | {{ item.label }}</strong>
+              <span>{{ item.detail }}</span>
+              <button type="button" @click="removeAgentSourcePackItem(item.id)">Remove</button>
+            </li>
+          </ul>
+        </section>
         <section class="agent-playbooks" aria-label="Agent workflow playbooks">
           <header>
             <div>
@@ -2074,6 +2125,13 @@
             <article>
               <h3>Placeholders</h3>
               <pre>{{ agentPlan.placeholderText }}</pre>
+            </article>
+            <article class="agent-plan-source-pack">
+              <h3>Source pack</h3>
+              <p>{{ agentPlan.sourcePack.items.length }} managed source items</p>
+              <ul>
+                <li v-for="item in agentPlan.sourcePack.items.slice(0, 6)" :key="item.id">{{ item.kind }}: {{ item.label }}</li>
+              </ul>
             </article>
             <article>
               <h3>Suggested outline</h3>
@@ -2760,9 +2818,12 @@ import {
   agenticWorkflowPlaybooks,
   buildAgenticLifecycleTaskBrief,
   buildAgenticSectionWorkBrief,
+  buildAgenticSourcePack,
   buildAgenticWorkflowPlan,
   buildAgenticWorkflowRun,
+  serializeAgenticSourcePackItem,
   stableFingerprint,
+  type AgenticSourcePackItemKind,
   type AgenticWorkflowPlaybook,
   type AgenticWorkflowLane,
   type AgenticWorkflowPlan,
@@ -2909,6 +2970,10 @@ const aiPreviewSignature = ref("");
 const agentWorkspaceOpen = ref(false);
 const agentInstruction = ref("");
 const agentContextAnswers = ref("");
+const agentSourcePackText = ref("");
+const agentSourcePackKind = ref<AgenticSourcePackItemKind>("note");
+const agentSourcePackLabel = ref("");
+const agentSourcePackDetail = ref("");
 const agentPlan = ref<AgenticWorkflowPlan | null>(null);
 const agentRun = ref<AgenticWorkflowRun | null>(null);
 const agentLifecycleTaskStates = ref<Record<string, AgentLifecycleTaskState>>({});
@@ -3336,6 +3401,7 @@ const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
 });
+const agentSourcePackPreview = computed(() => buildAgenticSourcePack(agentSourcePackText.value));
 const agentProviderSourcePackMarkdown = computed(() =>
   agentProviderPackage.value ? formatAiProviderSourcePack(agentProviderPackage.value.sourcePack) : "",
 );
@@ -4434,6 +4500,7 @@ function buildAgentWorkspacePlan() {
   agentPlan.value = buildAgenticWorkflowPlan({
     instruction: agentInstruction.value,
     contextAnswers: agentContextAnswers.value,
+    sourcePackText: agentSourcePackText.value,
     documentTitle: active.value.compile?.semantic.title || active.value.title,
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
@@ -4451,6 +4518,7 @@ function generateAgentWorkspaceRun() {
   agentRun.value = buildAgenticWorkflowRun({
     instruction: agentInstruction.value,
     contextAnswers: agentContextAnswers.value,
+    sourcePackText: agentSourcePackText.value,
     documentTitle: active.value.compile?.semantic.title || active.value.title,
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
@@ -4482,6 +4550,7 @@ function agentRunHistoryItem(
     updatedAt: now,
     instruction: run.plan.instruction,
     contextAnswers: run.plan.contextAnswers,
+    sourcePackText: run.plan.sourcePackText,
     documentType: run.plan.documentType,
     lanes: run.plan.lanes,
     distributionTargets: run.plan.distributionTargets,
@@ -4592,6 +4661,7 @@ function setAgentLifecycleTaskNote(task: AgenticLifecycleTask, note: string) {
 function replanAgentHistoryRun(item: AgentRunHistoryItem) {
   agentInstruction.value = item.instruction;
   agentContextAnswers.value = item.contextAnswers || "";
+  agentSourcePackText.value = item.sourcePackText || "";
   agentRun.value = null;
   agentLifecycleTaskStates.value = Object.fromEntries((item.lifecycleTaskStates || []).map((state) => [state.taskId, state]));
   agentEditAcceptanceStates.value = Object.fromEntries((item.editAcceptanceStates || []).map((state) => [state.itemId, state]));
@@ -4599,6 +4669,20 @@ function replanAgentHistoryRun(item: AgentRunHistoryItem) {
   agentProviderResult.value = null;
   buildAgentWorkspacePlan();
   store.statusMessage = `Replanned saved agent run ${item.runId}`;
+}
+function addAgentSourcePackItem() {
+  const serialized = serializeAgenticSourcePackItem(agentSourcePackKind.value, agentSourcePackLabel.value, agentSourcePackDetail.value);
+  agentSourcePackText.value = [agentSourcePackText.value.trim(), serialized].filter(Boolean).join("\n");
+  agentSourcePackLabel.value = "";
+  agentSourcePackDetail.value = "";
+  buildAgentWorkspacePlan();
+  store.statusMessage = "Added item to agent source pack";
+}
+function removeAgentSourcePackItem(itemId: string) {
+  const kept = agentSourcePackPreview.value.items.filter((item) => item.id !== itemId);
+  agentSourcePackText.value = kept.map((item) => serializeAgenticSourcePackItem(item.kind, item.label, item.detail)).join("\n");
+  buildAgentWorkspacePlan();
+  store.statusMessage = "Removed item from agent source pack";
 }
 function setAgentEditAcceptanceStatus(item: AgenticEditAcceptanceItem, status: AgentEditAcceptanceStatus) {
   const now = new Date().toISOString();
@@ -4680,6 +4764,7 @@ function agentRunHistorySourcePackSummary(item: AgentRunHistoryItem) {
   if (!sourcePack) return "none captured";
   const count =
     sourcePack.contextSources.length +
+    (sourcePack.userSources?.length || 0) +
     sourcePack.claimReview.length +
     sourcePack.cleanupBlockers.length +
     sourcePack.governanceBlockers.length +
@@ -4849,7 +4934,7 @@ function hydrateDocsLiveFromAgentPlan() {
   docsLiveDocumentType.value = plan.documentType;
   docsLiveTitle.value = plan.title;
   docsLiveOutlineText.value = plan.suggestedOutline;
-  docsLiveContext.value = plan.context;
+  docsLiveContext.value = [plan.context, plan.sourcePack.markdown ? `\nManaged source pack:\n${plan.sourcePack.markdown}` : ""].filter(Boolean).join("\n");
   docsLivePlaceholderText.value = plan.placeholderText;
   docsLiveQuestionnaireAnswerText.value = plan.contextAnswers
     ? `Agent context answers:\n${plan.contextAnswers}`
@@ -9683,6 +9768,8 @@ select:hover {
 .app-shell[data-theme="dark"] .guided-demo-card,
 .app-shell[data-theme="dark"] .guided-demo-steps span,
 .app-shell[data-theme="dark"] .agent-playbooks,
+.app-shell[data-theme="dark"] .agent-source-pack-builder,
+.app-shell[data-theme="dark"] .agent-source-pack-list li,
 .app-shell[data-theme="dark"] .agent-playbook-grid article,
 .app-shell[data-theme="dark"] .agent-plan > header,
 .app-shell[data-theme="dark"] .agent-plan-grid article,
@@ -9726,6 +9813,8 @@ select:hover {
 .app-shell[data-theme="dark"] .guided-demo-card small,
 .app-shell[data-theme="dark"] .agent-workspace-modal header p,
 .app-shell[data-theme="dark"] .agent-playbooks > header span,
+.app-shell[data-theme="dark"] .agent-source-pack-builder > header span,
+.app-shell[data-theme="dark"] .agent-source-pack-list span,
 .app-shell[data-theme="dark"] .agent-playbook-grid header span,
 .app-shell[data-theme="dark"] .agent-playbook-grid dt,
 .app-shell[data-theme="dark"] .agent-playbook-grid dd,
@@ -9806,6 +9895,8 @@ select:hover {
   .app-shell[data-theme="system"] .guided-demo-card,
   .app-shell[data-theme="system"] .guided-demo-steps span,
   .app-shell[data-theme="system"] .agent-playbooks,
+  .app-shell[data-theme="system"] .agent-source-pack-builder,
+  .app-shell[data-theme="system"] .agent-source-pack-list li,
   .app-shell[data-theme="system"] .agent-playbook-grid article,
   .app-shell[data-theme="system"] .agent-plan > header,
   .app-shell[data-theme="system"] .agent-plan-grid article,
@@ -9849,6 +9940,8 @@ select:hover {
   .app-shell[data-theme="system"] .guided-demo-card small,
   .app-shell[data-theme="system"] .agent-workspace-modal header p,
   .app-shell[data-theme="system"] .agent-playbooks > header span,
+  .app-shell[data-theme="system"] .agent-source-pack-builder > header span,
+  .app-shell[data-theme="system"] .agent-source-pack-list span,
   .app-shell[data-theme="system"] .agent-playbook-grid header span,
   .app-shell[data-theme="system"] .agent-playbook-grid dt,
   .app-shell[data-theme="system"] .agent-playbook-grid dd,
@@ -9914,6 +10007,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .guided-demo-card,
 .app-shell[data-high-contrast="true"] .guided-demo-steps span,
 .app-shell[data-high-contrast="true"] .agent-playbooks,
+.app-shell[data-high-contrast="true"] .agent-source-pack-builder,
+.app-shell[data-high-contrast="true"] .agent-source-pack-list li,
 .app-shell[data-high-contrast="true"] .agent-playbook-grid article,
 .app-shell[data-high-contrast="true"] .agent-plan > header,
 .app-shell[data-high-contrast="true"] .agent-plan-grid article,
@@ -11378,6 +11473,58 @@ select:hover {
   border: 1px solid #d8e0e8;
   border-left: 3px solid #6857a8;
   background: #fbfaff;
+}
+
+.agent-source-pack-builder {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d8e0e8;
+  border-left: 3px solid #526f4f;
+  background: #f8fcf7;
+}
+
+.agent-source-pack-builder > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-source-pack-builder > header div,
+.agent-source-pack-add,
+.agent-source-pack-list {
+  display: grid;
+  gap: 8px;
+}
+
+.agent-source-pack-builder > header span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-source-pack-add {
+  grid-template-columns: minmax(120px, 0.3fr) minmax(160px, 0.45fr) minmax(220px, 1fr) auto;
+  align-items: end;
+}
+
+.agent-source-pack-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-source-pack-list li {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+}
+
+.agent-source-pack-list span {
+  color: #2d3746;
+  font-size: 12px;
 }
 
 .agent-playbooks > header {
@@ -13423,6 +13570,8 @@ select:hover {
 
   .agent-plan-grid,
   .agent-playbook-grid,
+  .agent-source-pack-add,
+  .agent-source-pack-list li,
   .agent-control-grid,
   .agent-reviewer-grid,
   .agent-audit-grid,

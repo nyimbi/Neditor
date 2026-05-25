@@ -200,7 +200,10 @@ web app.
   gives users a dedicated **Context answers and constraints** field plus
   **Replan with answers** action so missing-input answers become part of the
   context pack, placeholders, packet, Docs Live handoff, provider package, and
-  saved run history. Plans include a context completeness score across
+  saved run history. It also includes a **Source Pack Builder** for managing
+  pasted notes, claims, URLs, file paths, references, and reviewer comments as
+  structured grounding that flows into the agent plan, packet, Docs Live handoff,
+  provider source pack, and saved history. Plans include a context completeness score across
   audience, evidence, constraints, examples, tone, and approval context so
   users know whether a responsible first draft has enough grounding. Revision
   plans also name the exact pass stack, including clarity, brevity, tone,

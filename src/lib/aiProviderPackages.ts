@@ -34,6 +34,7 @@ export interface AiProviderRequestPackage {
 
 export interface AiProviderSourcePack {
   contextSources: string[];
+  userSources: string[];
   claimReview: string[];
   cleanupBlockers: string[];
   governanceBlockers: string[];
@@ -280,7 +281,9 @@ function buildAiProviderSourcePack(run: AgenticWorkflowRun): AiProviderSourcePac
     `Application mode: ${run.applicationMode}`,
     `Control-center readiness: ${run.controlCenter.readinessScore}/100 (${run.controlCenter.status})`,
   ];
+  const userSources = run.plan.sourcePack.items.map((item) => `[${item.kind}] ${item.label}: ${item.detail}`);
   const claimReview = [
+    ...run.plan.sourcePack.claims.slice(0, 12).map((item) => `User source claim: ${item.label}: ${item.detail}`),
     ...evidence.claimInventory.slice(0, 12).map((claim) => `Line ${claim.sourceLine} [${claim.kind}]: ${claim.text} (${claim.reason})`),
     ...evidence.citationTodos.slice(0, 8).map((todo) => `Citation TODO: ${todo}`),
   ];
@@ -302,6 +305,7 @@ function buildAiProviderSourcePack(run: AgenticWorkflowRun): AiProviderSourcePac
 
   return {
     contextSources,
+    userSources,
     claimReview,
     cleanupBlockers,
     governanceBlockers,
@@ -313,6 +317,9 @@ export function formatAiProviderSourcePack(sourcePack: AiProviderSourcePack) {
   return [
     "Context sources:",
     ...sourcePack.contextSources.map((item) => `- ${item}`),
+    "",
+    "User-managed source pack:",
+    ...(sourcePack.userSources.length ? sourcePack.userSources.map((item) => `- ${item}`) : ["- No user-managed source pack items."]),
     "",
     "Claims and citation review:",
     ...(sourcePack.claimReview.length ? sourcePack.claimReview.map((item) => `- ${item}`) : ["- No extracted claims or citation TODOs."]),
@@ -446,7 +453,11 @@ function buildCurl(profile: AiProviderProfile, headers: Record<string, string>, 
 
 function buildChecklist(profile: AiProviderProfile, keyEnv: string, sourcePack: AiProviderSourcePack) {
   const sourcePackItems =
-    sourcePack.claimReview.length + sourcePack.cleanupBlockers.length + sourcePack.governanceBlockers.length + sourcePack.distributionBlockers.length;
+    sourcePack.userSources.length +
+    sourcePack.claimReview.length +
+    sourcePack.cleanupBlockers.length +
+    sourcePack.governanceBlockers.length +
+    sourcePack.distributionBlockers.length;
   return [
     "Confirm your organization approves this provider and model for the document classification.",
     profile.endpoint ? "Review the endpoint before sending any content." : "Paste the prompt only into an approved provider workspace.",
