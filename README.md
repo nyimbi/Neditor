@@ -206,7 +206,9 @@ web app.
   saved run history. It also includes a **Source Pack Builder** for managing
   pasted notes, claims, URLs, file paths, references, and reviewer comments as
   structured grounding that flows into the agent plan, packet, Docs Live handoff,
-  provider source pack, and saved history. Plans include a context completeness score across
+  provider source pack, and saved history. Generated packets can be copied or
+  appended as review material directly from the live run before users apply a
+  replacement-mode output. Plans include a context completeness score across
   audience, evidence, constraints, examples, tone, and approval context so
   users know whether a responsible first draft has enough grounding. Revision
   plans also name the exact pass stack, including clarity, brevity, tone,

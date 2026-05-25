@@ -1679,6 +1679,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("deferCitationTodoItem"));
   ok(app.includes("Generate agent packet"));
   ok(app.includes("Apply agent output"));
+  ok(app.includes("appendAgentWorkspacePacket"));
+  ok(app.includes("copyAgentWorkspacePacket"));
+  ok(app.includes("Appended agent packet for review"));
+  ok(app.includes("Copied current agent packet"));
+  ok(app.includes("agent-run-packet-actions"));
   ok(app.includes('aria-label="Agent generated output"'));
   ok(app.includes('aria-label="AI control center"'));
   ok(app.includes('aria-label="Persistent AI control center"'));

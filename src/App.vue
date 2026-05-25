@@ -2268,6 +2268,10 @@
                 <span>Apply mode: {{ agentRun.applicationMode }}</span>
               </div>
               <small>{{ agentRun.blockers.length }} blockers</small>
+              <div class="agent-run-packet-actions">
+                <button type="button" @click="appendAgentWorkspacePacket">Append packet</button>
+                <button type="button" @click="copyAgentWorkspacePacket">Copy packet</button>
+              </div>
             </header>
             <section class="agent-control-center" :data-status="agentRun.controlCenter.status" aria-label="AI control center">
               <header>
@@ -5343,6 +5347,23 @@ function applyAgentWorkspaceRun() {
   recordAgentRunHistory(run, "applied");
   store.statusMessage = "Applied agent output for human review";
   closeAgentWorkspace();
+}
+function appendAgentWorkspacePacket() {
+  const run = agentRun.value;
+  if (!run) return;
+  applyAgentMarkdown(run.markdown, "append-packet");
+  recordAgentRunHistory(run, "applied");
+  store.statusMessage = "Appended agent packet for review";
+}
+async function copyAgentWorkspacePacket() {
+  const run = agentRun.value;
+  if (!run) return;
+  try {
+    await navigator.clipboard?.writeText(run.markdown);
+    store.statusMessage = "Copied current agent packet";
+  } catch {
+    store.statusMessage = "Current agent packet is ready to copy";
+  }
 }
 function applyAcceptedAgentEdits() {
   const run = agentRun.value;
@@ -12178,6 +12199,19 @@ select:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.agent-run-packet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.agent-run-packet-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .agent-playbooks {
