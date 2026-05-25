@@ -1094,19 +1094,19 @@
 
         <template v-else-if="store.sidebar === 'review'">
           <h2>Review</h2>
-          <section v-if="agentRun" class="agent-control-center persistent-agent-control" :data-status="agentRun.controlCenter.status" aria-label="Persistent AI control center">
+          <section v-if="activeAgentControlCenter" class="agent-control-center persistent-agent-control" :data-status="activeAgentControlCenter.status" aria-label="Persistent AI control center">
             <header>
               <div>
                 <strong>AI Control Center</strong>
-                <span>{{ agentRun.controlCenter.summary }}</span>
+                <span>{{ activeAgentControlCenter.summary }}</span>
               </div>
-              <small>{{ agentRun.controlCenter.readinessScore }}/100 readiness</small>
+              <small>{{ activeAgentControlCenter.readinessScore }}/100 readiness</small>
             </header>
             <section class="agent-control-grid">
               <article>
                 <h3>Next actions</h3>
                 <ul>
-                  <li v-for="action in agentRun.controlCenter.nextActions" :key="`persistent-${action.lane}-${action.label}`">
+                  <li v-for="action in activeAgentControlCenter.nextActions" :key="`persistent-${action.lane}-${action.label}`">
                     <strong>{{ action.label }}</strong>
                     <span>{{ action.lane }} | {{ action.status }}</span>
                     <p>{{ action.detail }}</p>
@@ -1116,7 +1116,7 @@
               <article>
                 <h3>Source grounding</h3>
                 <ul>
-                  <li v-for="item in agentRun.controlCenter.sourceGrounding" :key="`persistent-source-${item.label}`" :data-status="item.status">
+                  <li v-for="item in activeAgentControlCenter.sourceGrounding" :key="`persistent-source-${item.label}`" :data-status="item.status">
                     <strong>{{ item.label }}</strong>
                     <span>{{ item.status }}</span>
                     <p>{{ item.detail }}</p>
@@ -1126,7 +1126,7 @@
               <article>
                 <h3>Governance</h3>
                 <ul>
-                  <li v-for="item in agentRun.controlCenter.governance" :key="`persistent-governance-${item.label}`" :data-status="item.status">
+                  <li v-for="item in activeAgentControlCenter.governance" :key="`persistent-governance-${item.label}`" :data-status="item.status">
                     <strong>{{ item.label }}</strong>
                     <span>{{ item.status }}</span>
                     <p>{{ item.detail }}</p>
@@ -1136,7 +1136,7 @@
               <article>
                 <h3>Distribution state</h3>
                 <ul>
-                  <li v-for="item in agentRun.controlCenter.distribution" :key="`persistent-distribution-${item.label}`" :data-status="item.status">
+                  <li v-for="item in activeAgentControlCenter.distribution" :key="`persistent-distribution-${item.label}`" :data-status="item.status">
                     <strong>{{ item.label }}</strong>
                     <span>{{ item.status }}</span>
                     <p>{{ item.detail }}</p>
@@ -2303,6 +2303,10 @@
                   <span>{{ item.status }} | {{ item.applicationMode }} | {{ item.readinessScore }}/100</span>
                   <small>{{ item.runId }} | {{ item.updatedAt }}</small>
                   <p v-if="item.packetPreview">{{ item.packetPreview }}</p>
+                  <p v-if="item.controlCenter">Control: {{ item.controlCenter.status }} | {{ item.controlCenter.summary }}</p>
+                  <p v-if="item.documentEvidence">Evidence: {{ agentRunHistoryEvidenceSummary(item) }}</p>
+                  <p v-if="item.outlineCritique?.length">Outline: {{ agentRunHistoryOutlineSummary(item) }}</p>
+                  <p v-if="item.sourcePack">Source pack: {{ agentRunHistorySourcePackSummary(item) }}</p>
                   <p v-if="item.lifecycleTaskStates?.length">Task states: {{ agentRunHistoryTaskStateSummary(item) }}</p>
                   <div class="agent-history-actions">
                     <button type="button" @click="replanAgentHistoryRun(item)">Replan</button>
@@ -2609,6 +2613,7 @@ import {
   type AiProviderExecutionResult,
   type AiProviderProfileId,
   type AiProviderRequestPackage,
+  type AiProviderSourcePack,
 } from "./lib/aiProviderPackages";
 import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
@@ -3162,6 +3167,8 @@ const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
 });
+const latestAgentRunHistory = computed(() => store.agentRunHistory[0] || null);
+const activeAgentControlCenter = computed(() => agentRun.value?.controlCenter || latestAgentRunHistory.value?.controlCenter || null);
 const agentTaskLaneOptions: Array<"all" | AgenticWorkflowLane> = ["all", "create", "compose", "edit", "revise", "review", "distribute"];
 const agentTaskStatusOptions: Array<"all" | AgentLifecycleExecutionStatus> = ["all", "queued", "in-progress", "needs-review", "complete", "blocked"];
 const agentLifecycleTaskRows = computed(() =>
@@ -4276,6 +4283,7 @@ function agentRunHistoryItem(
   status: AgentRunHistoryItem["status"],
   providerProfile = "",
   packetMarkdownOverride = "",
+  sourcePack?: AiProviderSourcePack,
 ): AgentRunHistoryItem {
   const now = new Date().toISOString();
   const packetMarkdown = packetMarkdownOverride || run.markdown;
@@ -4302,6 +4310,10 @@ function agentRunHistoryItem(
     reviewerCount: run.reviewerAgents.length,
     taskCount: run.lifecycleTasks.length,
     lifecycleTaskStates: agentLifecycleTaskStateList(),
+    controlCenter: run.controlCenter,
+    documentEvidence: run.documentEvidence,
+    outlineCritique: run.outlineCritique,
+    sourcePack,
     appliedAt: status === "generated" ? undefined : now,
     providerProfile: providerProfile || undefined,
   };
@@ -4331,10 +4343,16 @@ function persistAgentLifecycleTaskStates() {
   if (!agentRun.value) return;
   const existing = store.agentRunHistory.find((item) => item.runId === agentRun.value?.auditTrail.runId);
   const packetMarkdownOverride = existing?.packetMarkdown && existing.packetMarkdown !== agentRun.value.markdown ? existing.packetMarkdown : "";
-  recordAgentRunHistory(agentRun.value, existing?.status || "generated", existing?.providerProfile || "", packetMarkdownOverride);
+  recordAgentRunHistory(agentRun.value, existing?.status || "generated", existing?.providerProfile || "", packetMarkdownOverride, existing?.sourcePack);
 }
-function recordAgentRunHistory(run: AgenticWorkflowRun, status: AgentRunHistoryItem["status"], providerProfile = "", packetMarkdownOverride = "") {
-  store.recordAgentRunHistory(agentRunHistoryItem(run, status, providerProfile, packetMarkdownOverride));
+function recordAgentRunHistory(
+  run: AgenticWorkflowRun,
+  status: AgentRunHistoryItem["status"],
+  providerProfile = "",
+  packetMarkdownOverride = "",
+  sourcePack?: AiProviderSourcePack,
+) {
+  store.recordAgentRunHistory(agentRunHistoryItem(run, status, providerProfile, packetMarkdownOverride, sourcePack));
 }
 function setAgentLifecycleTaskStatus(task: AgenticLifecycleTask, status: AgentLifecycleExecutionStatus) {
   const now = new Date().toISOString();
@@ -4397,6 +4415,41 @@ function agentRunHistoryTaskStateSummary(item: AgentRunHistoryItem) {
     .map((status) => `${counts.get(status)} ${status}`)
     .join(", ");
 }
+function agentRunHistoryEvidenceSummary(item: AgentRunHistoryItem) {
+  const evidence = item.documentEvidence;
+  if (!evidence) return "none captured";
+  const parts = [
+    evidence.unresolvedPlaceholders.length ? `${evidence.unresolvedPlaceholders.length} placeholders` : "",
+    evidence.citationTodos.length ? `${evidence.citationTodos.length} citation TODOs` : "",
+    evidence.claimInventory.length ? `${evidence.claimInventory.length} claims` : "",
+    evidence.humanizationFindings.length ? `${evidence.humanizationFindings.length} humanization notes` : "",
+    evidence.unresolvedComments ? `${evidence.unresolvedComments} comments` : "",
+    evidence.unreviewedAiMarkers ? `${evidence.unreviewedAiMarkers} AI markers` : "",
+    evidence.brokenLinkHints.length ? `${evidence.brokenLinkHints.length} link checks` : "",
+  ].filter(Boolean);
+  return parts.join(", ") || "no blockers";
+}
+function agentRunHistoryOutlineSummary(item: AgentRunHistoryItem) {
+  const counts = new Map<string, number>();
+  for (const critique of item.outlineCritique || []) {
+    counts.set(critique.severity, (counts.get(critique.severity) || 0) + 1);
+  }
+  return ["blocker", "warning", "info"]
+    .filter((severity) => counts.has(severity))
+    .map((severity) => `${counts.get(severity)} ${severity}`)
+    .join(", ");
+}
+function agentRunHistorySourcePackSummary(item: AgentRunHistoryItem) {
+  const sourcePack = item.sourcePack;
+  if (!sourcePack) return "none captured";
+  const count =
+    sourcePack.contextSources.length +
+    sourcePack.claimReview.length +
+    sourcePack.cleanupBlockers.length +
+    sourcePack.governanceBlockers.length +
+    sourcePack.distributionBlockers.length;
+  return `${count} provider handoff item${count === 1 ? "" : "s"}`;
+}
 function buildAgentProviderPackage() {
   if (!agentRun.value) generateAgentWorkspaceRun();
   if (!agentRun.value) return;
@@ -4406,6 +4459,14 @@ function buildAgentProviderPackage() {
     model: agentProviderModel.value,
     keyEnv: agentProviderKeyEnv.value,
   });
+  const existing = store.agentRunHistory.find((item) => item.runId === agentRun.value?.auditTrail.runId);
+  recordAgentRunHistory(
+    agentRun.value,
+    existing?.status || "generated",
+    existing?.providerProfile || agentProviderPackage.value.profile.label,
+    existing?.packetMarkdown && existing.packetMarkdown !== agentRun.value.markdown ? existing.packetMarkdown : "",
+    agentProviderPackage.value.sourcePack,
+  );
   agentProviderResult.value = null;
   store.statusMessage = `Built ${agentProviderPackage.value.profile.label} request package`;
 }
@@ -4431,7 +4492,9 @@ function applyAgentProviderResponse() {
     runId: agentRun.value?.auditTrail.runId,
   });
   applyAgentMarkdown(reviewMarkdown, agentRun.value?.applicationMode || "append-packet");
-  if (agentRun.value) recordAgentRunHistory(agentRun.value, "provider-applied", agentProviderPackage.value?.profile.label || "", reviewMarkdown);
+  if (agentRun.value) {
+    recordAgentRunHistory(agentRun.value, "provider-applied", agentProviderPackage.value?.profile.label || "", reviewMarkdown, agentProviderPackage.value?.sourcePack);
+  }
   store.statusMessage = "Applied provider response for human review";
   closeAgentWorkspace();
 }

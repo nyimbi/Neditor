@@ -959,6 +959,51 @@ test("workspace persistence migration versions and normalizes saved settings", (
             title: "Duplicate ignored",
           },
         ],
+        controlCenter: {
+          status: "blocked",
+          readinessScore: -20,
+          summary: " Resolve source gaps ",
+          nextActions: [
+            {
+              label: " Attach evidence ",
+              detail: " Add audited source links before provider handoff. ",
+              lane: "review",
+              action: "open-review",
+              status: "needs-input",
+            },
+          ],
+          sourceGrounding: [{ label: " Current document ", detail: " Claims found. ", status: "needs-review" }],
+          governance: [{ label: " Approval ", detail: " Missing approval metadata. ", status: "missing" }],
+          distribution: [{ label: " Substack ", detail: " Preflight pending. ", status: "needs-review" }],
+        },
+        documentEvidence: {
+          unresolvedPlaceholders: ["[client]", "[client]"],
+          citationTodos: ["TODO citation"],
+          claimInventory: [{ kind: "number", sourceLine: 4.8, text: " Revenue grew 18%. ", reason: " metric " }],
+          humanizationFindings: [
+            { kind: "generic-phrase", sourceLine: 7, text: " It is important to note. ", recommendation: " Use specific owner language. " },
+          ],
+          unreviewedAiMarkers: 2,
+          unresolvedComments: 1,
+          approvalMetadataMissing: ["approvedBy"],
+          brokenLinkHints: ["https://example.com/tbd"],
+        },
+        outlineCritique: [
+          {
+            severity: "warning",
+            area: "coverage",
+            heading: " Findings ",
+            detail: " Add decision section. ",
+            recommendation: " Include requested decision before appendices. ",
+          },
+        ],
+        sourcePack: {
+          contextSources: ["Current document"],
+          claimReview: ["Line 4: Revenue grew 18%."],
+          cleanupBlockers: ["Placeholder [client]"],
+          governanceBlockers: ["Missing approvedBy"],
+          distributionBlockers: ["Substack preflight pending"],
+        },
         appliedAt: "2026-05-25T10:06:00.000Z",
         providerProfile: " local ",
       },
@@ -1107,6 +1152,51 @@ test("workspace persistence migration versions and normalizes saved settings", (
         completedAt: "2026-05-25T10:04:30.000Z",
       },
     ],
+    controlCenter: {
+      status: "blocked",
+      readinessScore: 0,
+      summary: "Resolve source gaps",
+      nextActions: [
+        {
+          label: "Attach evidence",
+          detail: "Add audited source links before provider handoff.",
+          lane: "review",
+          action: "open-review",
+          status: "needs-input",
+        },
+      ],
+      sourceGrounding: [{ label: "Current document", detail: "Claims found.", status: "needs-review" }],
+      governance: [{ label: "Approval", detail: "Missing approval metadata.", status: "missing" }],
+      distribution: [{ label: "Substack", detail: "Preflight pending.", status: "needs-review" }],
+    },
+    documentEvidence: {
+      unresolvedPlaceholders: ["[client]"],
+      citationTodos: ["TODO citation"],
+      claimInventory: [{ kind: "number", sourceLine: 4, text: "Revenue grew 18%.", reason: "metric" }],
+      humanizationFindings: [
+        { kind: "generic-phrase", sourceLine: 7, text: "It is important to note.", recommendation: "Use specific owner language." },
+      ],
+      unreviewedAiMarkers: 2,
+      unresolvedComments: 1,
+      approvalMetadataMissing: ["approvedBy"],
+      brokenLinkHints: ["https://example.com/tbd"],
+    },
+    outlineCritique: [
+      {
+        severity: "warning",
+        area: "coverage",
+        heading: "Findings",
+        detail: "Add decision section.",
+        recommendation: "Include requested decision before appendices.",
+      },
+    ],
+    sourcePack: {
+      contextSources: ["Current document"],
+      claimReview: ["Line 4: Revenue grew 18%."],
+      cleanupBlockers: ["Placeholder [client]"],
+      governanceBlockers: ["Missing approvedBy"],
+      distributionBlockers: ["Substack preflight pending"],
+    },
     appliedAt: "2026-05-25T10:06:00.000Z",
     providerProfile: "local",
   });
@@ -1232,6 +1322,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="AI control center"'));
   ok(app.includes('aria-label="Persistent AI control center"'));
   ok(app.includes("persistent-agent-control"));
+  ok(app.includes("activeAgentControlCenter"));
   ok(app.includes("agentRun.controlCenter"));
   ok(app.includes('aria-label="Agent lifecycle task board"'));
   ok(app.includes('aria-label="Filter agent lifecycle tasks"'));
@@ -1242,6 +1333,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentTaskQuery"));
   ok(app.includes("agentLifecycleTaskStates"));
   ok(app.includes("agentRunHistoryTaskStateSummary"));
+  ok(app.includes("agentRunHistoryEvidenceSummary"));
+  ok(app.includes("agentRunHistoryOutlineSummary"));
+  ok(app.includes("agentRunHistorySourcePackSummary"));
+  ok(app.includes("item.controlCenter"));
+  ok(app.includes("item.documentEvidence"));
+  ok(app.includes("item.sourcePack"));
   ok(app.includes("Task states:"));
   ok(app.includes("setAgentLifecycleTaskStatus"));
   ok(app.includes("setAgentLifecycleTaskNote"));

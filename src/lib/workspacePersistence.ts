@@ -115,6 +115,74 @@ export interface AgentLifecycleTaskState {
   completedAt?: string;
 }
 
+export type AgentRunHistoryControlStatus = "ready" | "needs-input" | "blocked";
+export type AgentRunHistoryEvidenceStatus = "available" | "missing" | "needs-review";
+
+export interface AgentRunHistoryControlItem {
+  label: string;
+  detail: string;
+  status: AgentRunHistoryEvidenceStatus;
+}
+
+export interface AgentRunHistoryNextAction {
+  label: string;
+  detail: string;
+  lane: string;
+  action: string;
+  status: AgentRunHistoryControlStatus;
+}
+
+export interface AgentRunHistoryControlCenter {
+  status: AgentRunHistoryControlStatus;
+  readinessScore: number;
+  summary: string;
+  nextActions: AgentRunHistoryNextAction[];
+  sourceGrounding: AgentRunHistoryControlItem[];
+  governance: AgentRunHistoryControlItem[];
+  distribution: AgentRunHistoryControlItem[];
+}
+
+export interface AgentRunHistoryDocumentClaim {
+  kind: "number" | "date" | "commitment" | "quote" | "claim";
+  sourceLine: number;
+  text: string;
+  reason: string;
+}
+
+export interface AgentRunHistoryHumanizationFinding {
+  kind: "generic-phrase" | "overconfident-claim" | "repetition" | "vague-transition";
+  sourceLine: number;
+  text: string;
+  recommendation: string;
+}
+
+export interface AgentRunHistoryDocumentEvidence {
+  unresolvedPlaceholders: string[];
+  citationTodos: string[];
+  claimInventory: AgentRunHistoryDocumentClaim[];
+  humanizationFindings: AgentRunHistoryHumanizationFinding[];
+  unreviewedAiMarkers: number;
+  unresolvedComments: number;
+  approvalMetadataMissing: string[];
+  brokenLinkHints: string[];
+}
+
+export interface AgentRunHistoryOutlineCritiqueItem {
+  severity: "info" | "warning" | "blocker";
+  area: "coverage" | "sequence" | "duplication" | "depth" | "specificity";
+  heading: string;
+  detail: string;
+  recommendation: string;
+}
+
+export interface AgentRunHistorySourcePack {
+  contextSources: string[];
+  claimReview: string[];
+  cleanupBlockers: string[];
+  governanceBlockers: string[];
+  distributionBlockers: string[];
+}
+
 export interface AgentRunHistoryItem {
   runId: string;
   title: string;
@@ -138,6 +206,10 @@ export interface AgentRunHistoryItem {
   reviewerCount?: number;
   taskCount?: number;
   lifecycleTaskStates?: AgentLifecycleTaskState[];
+  controlCenter?: AgentRunHistoryControlCenter;
+  documentEvidence?: AgentRunHistoryDocumentEvidence;
+  outlineCritique?: AgentRunHistoryOutlineCritiqueItem[];
+  sourcePack?: AgentRunHistorySourcePack;
   appliedAt?: string;
   providerProfile?: string;
 }
@@ -428,6 +500,146 @@ function normalizeAgentLifecycleTaskStates(value: unknown): AgentLifecycleTaskSt
   return states;
 }
 
+function normalizeAgentRunHistoryControlItems(value: unknown): AgentRunHistoryControlItem[] {
+  if (!Array.isArray(value)) return [];
+  const items: AgentRunHistoryControlItem[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const label = normalizedString(item.label, 80);
+    const detail = normalizedString(item.detail, 500);
+    if (!label || !detail) continue;
+    items.push({
+      label,
+      detail,
+      status: enumValue(item.status, ["available", "missing", "needs-review"] as const) || "needs-review",
+    });
+    if (items.length >= 20) break;
+  }
+  return items;
+}
+
+function normalizeAgentRunHistoryNextActions(value: unknown): AgentRunHistoryNextAction[] {
+  if (!Array.isArray(value)) return [];
+  const actions: AgentRunHistoryNextAction[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const label = normalizedString(item.label, 100);
+    const detail = normalizedString(item.detail, 500);
+    if (!label || !detail) continue;
+    actions.push({
+      label,
+      detail,
+      lane:
+        enumValue(item.lane, ["create", "compose", "edit", "revise", "review", "distribute"] as const) ||
+        normalizedString(item.lane, 40) ||
+        "review",
+      action:
+        enumValue(
+          item.action,
+          ["open-docs-live", "generate-docs-live-draft", "open-outline", "open-ai-paste", "open-review", "prepare-export", "open-exports"] as const,
+        ) ||
+        normalizedString(item.action, 80) ||
+        "open-review",
+      status: enumValue(item.status, ["ready", "needs-input", "blocked"] as const) || "needs-input",
+    });
+    if (actions.length >= 20) break;
+  }
+  return actions;
+}
+
+function normalizeAgentRunHistoryControlCenter(value: unknown): AgentRunHistoryControlCenter | undefined {
+  if (!isRecord(value)) return undefined;
+  return {
+    status: enumValue(value.status, ["ready", "needs-input", "blocked"] as const) || "needs-input",
+    readinessScore: Math.min(Math.max(numberValue(value.readinessScore) ?? 0, 0), 100),
+    summary: normalizedString(value.summary, 500) || "AI control center snapshot",
+    nextActions: normalizeAgentRunHistoryNextActions(value.nextActions),
+    sourceGrounding: normalizeAgentRunHistoryControlItems(value.sourceGrounding),
+    governance: normalizeAgentRunHistoryControlItems(value.governance),
+    distribution: normalizeAgentRunHistoryControlItems(value.distribution),
+  };
+}
+
+function normalizeAgentRunHistoryDocumentClaims(value: unknown): AgentRunHistoryDocumentClaim[] {
+  if (!Array.isArray(value)) return [];
+  const claims: AgentRunHistoryDocumentClaim[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const text = normalizedString(item.text, 500);
+    if (!text) continue;
+    claims.push({
+      kind: enumValue(item.kind, ["number", "date", "commitment", "quote", "claim"] as const) || "claim",
+      sourceLine: Math.max(Math.floor(numberValue(item.sourceLine) ?? 0), 0),
+      text,
+      reason: normalizedString(item.reason, 240) || "Needs source review",
+    });
+    if (claims.length >= 80) break;
+  }
+  return claims;
+}
+
+function normalizeAgentRunHistoryHumanizationFindings(value: unknown): AgentRunHistoryHumanizationFinding[] {
+  if (!Array.isArray(value)) return [];
+  const findings: AgentRunHistoryHumanizationFinding[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const text = normalizedString(item.text, 500);
+    if (!text) continue;
+    findings.push({
+      kind: enumValue(item.kind, ["generic-phrase", "overconfident-claim", "repetition", "vague-transition"] as const) || "generic-phrase",
+      sourceLine: Math.max(Math.floor(numberValue(item.sourceLine) ?? 0), 0),
+      text,
+      recommendation: normalizedString(item.recommendation, 320) || "Rewrite in concrete, reader-centered language.",
+    });
+    if (findings.length >= 80) break;
+  }
+  return findings;
+}
+
+function normalizeAgentRunHistoryDocumentEvidence(value: unknown): AgentRunHistoryDocumentEvidence | undefined {
+  if (!isRecord(value)) return undefined;
+  return {
+    unresolvedPlaceholders: stringArray(value.unresolvedPlaceholders, 80) || [],
+    citationTodos: stringArray(value.citationTodos, 80) || [],
+    claimInventory: normalizeAgentRunHistoryDocumentClaims(value.claimInventory),
+    humanizationFindings: normalizeAgentRunHistoryHumanizationFindings(value.humanizationFindings),
+    unreviewedAiMarkers: Math.max(Math.floor(numberValue(value.unreviewedAiMarkers) ?? 0), 0),
+    unresolvedComments: Math.max(Math.floor(numberValue(value.unresolvedComments) ?? 0), 0),
+    approvalMetadataMissing: stringArray(value.approvalMetadataMissing, 20) || [],
+    brokenLinkHints: stringArray(value.brokenLinkHints, 80) || [],
+  };
+}
+
+function normalizeAgentRunHistoryOutlineCritique(value: unknown): AgentRunHistoryOutlineCritiqueItem[] {
+  if (!Array.isArray(value)) return [];
+  const items: AgentRunHistoryOutlineCritiqueItem[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const detail = normalizedString(item.detail, 500);
+    if (!detail) continue;
+    items.push({
+      severity: enumValue(item.severity, ["info", "warning", "blocker"] as const) || "warning",
+      area: enumValue(item.area, ["coverage", "sequence", "duplication", "depth", "specificity"] as const) || "coverage",
+      heading: normalizedString(item.heading, 140) || "Document outline",
+      detail,
+      recommendation: normalizedString(item.recommendation, 500) || "Review this outline issue before drafting.",
+    });
+    if (items.length >= 60) break;
+  }
+  return items;
+}
+
+function normalizeAgentRunHistorySourcePack(value: unknown): AgentRunHistorySourcePack | undefined {
+  if (!isRecord(value)) return undefined;
+  return {
+    contextSources: stringArray(value.contextSources, 80) || [],
+    claimReview: stringArray(value.claimReview, 120) || [],
+    cleanupBlockers: stringArray(value.cleanupBlockers, 120) || [],
+    governanceBlockers: stringArray(value.governanceBlockers, 80) || [],
+    distributionBlockers: stringArray(value.distributionBlockers, 80) || [],
+  };
+}
+
 function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | null {
   if (!isRecord(value)) return null;
   const runId = normalizedString(value.runId, 80);
@@ -443,6 +655,10 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
         .slice(0, 12)
     : [];
   const lifecycleTaskStates = normalizeAgentLifecycleTaskStates(value.lifecycleTaskStates);
+  const controlCenter = normalizeAgentRunHistoryControlCenter(value.controlCenter);
+  const documentEvidence = normalizeAgentRunHistoryDocumentEvidence(value.documentEvidence);
+  const outlineCritique = normalizeAgentRunHistoryOutlineCritique(value.outlineCritique);
+  const sourcePack = normalizeAgentRunHistorySourcePack(value.sourcePack);
   return {
     runId,
     title: normalizedString(value.title, 120) || "Agent run",
@@ -466,6 +682,10 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
     taskCount: Math.max(numberValue(value.taskCount) ?? 0, 0),
     ...(lifecycleTaskStates.length ? { lifecycleTaskStates } : {}),
+    ...(controlCenter ? { controlCenter } : {}),
+    ...(documentEvidence ? { documentEvidence } : {}),
+    ...(outlineCritique.length ? { outlineCritique } : {}),
+    ...(sourcePack ? { sourcePack } : {}),
     appliedAt: normalizedString(value.appliedAt, 40) || undefined,
     providerProfile: normalizedString(value.providerProfile, 120) || undefined,
   };
