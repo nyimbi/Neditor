@@ -100,7 +100,10 @@ comments, missing approval metadata, and placeholder links, so the agent review
 reflects the document in front of the user instead of only the prompt. Those
 findings also become
 concrete next actions and lifecycle tasks, so evidence cleanup can be assigned,
-run, noted, and completed from the same agent board. The same packet includes named
+run, noted, and completed from the same agent board. After a packet is generated,
+the latest AI Control Center also appears in the Review sidebar so readiness,
+next actions, grounding, governance, and distribution state remain visible while
+the user edits the document. The same packet includes named
 reviewer agents for editorial quality, evidence grounding, risk, citations,
 governance, and export readiness so each review lane has findings and required
 actions instead of one undifferentiated checklist. It also includes deterministic

@@ -1212,6 +1212,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Apply agent output"));
   ok(app.includes('aria-label="Agent generated output"'));
   ok(app.includes('aria-label="AI control center"'));
+  ok(app.includes('aria-label="Persistent AI control center"'));
+  ok(app.includes("persistent-agent-control"));
   ok(app.includes("agentRun.controlCenter"));
   ok(app.includes('aria-label="Agent lifecycle task board"'));
   ok(app.includes('aria-label="Filter agent lifecycle tasks"'));

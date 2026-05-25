@@ -1094,6 +1094,62 @@
 
         <template v-else-if="store.sidebar === 'review'">
           <h2>Review</h2>
+          <section v-if="agentRun" class="agent-control-center persistent-agent-control" :data-status="agentRun.controlCenter.status" aria-label="Persistent AI control center">
+            <header>
+              <div>
+                <strong>AI Control Center</strong>
+                <span>{{ agentRun.controlCenter.summary }}</span>
+              </div>
+              <small>{{ agentRun.controlCenter.readinessScore }}/100 readiness</small>
+            </header>
+            <section class="agent-control-grid">
+              <article>
+                <h3>Next actions</h3>
+                <ul>
+                  <li v-for="action in agentRun.controlCenter.nextActions" :key="`persistent-${action.lane}-${action.label}`">
+                    <strong>{{ action.label }}</strong>
+                    <span>{{ action.lane }} | {{ action.status }}</span>
+                    <p>{{ action.detail }}</p>
+                  </li>
+                </ul>
+              </article>
+              <article>
+                <h3>Source grounding</h3>
+                <ul>
+                  <li v-for="item in agentRun.controlCenter.sourceGrounding" :key="`persistent-source-${item.label}`" :data-status="item.status">
+                    <strong>{{ item.label }}</strong>
+                    <span>{{ item.status }}</span>
+                    <p>{{ item.detail }}</p>
+                  </li>
+                </ul>
+              </article>
+              <article>
+                <h3>Governance</h3>
+                <ul>
+                  <li v-for="item in agentRun.controlCenter.governance" :key="`persistent-governance-${item.label}`" :data-status="item.status">
+                    <strong>{{ item.label }}</strong>
+                    <span>{{ item.status }}</span>
+                    <p>{{ item.detail }}</p>
+                  </li>
+                </ul>
+              </article>
+              <article>
+                <h3>Distribution state</h3>
+                <ul>
+                  <li v-for="item in agentRun.controlCenter.distribution" :key="`persistent-distribution-${item.label}`" :data-status="item.status">
+                    <strong>{{ item.label }}</strong>
+                    <span>{{ item.status }}</span>
+                    <p>{{ item.detail }}</p>
+                  </li>
+                </ul>
+              </article>
+            </section>
+            <div class="agent-section-actions">
+              <button type="button" @click="openAgentWorkspace()">Open agent workspace</button>
+              <button type="button" @click="runAgentPlanReview">Review readiness</button>
+              <button type="button" @click="runAgentPlanDistribution">Distribution prep</button>
+            </div>
+          </section>
           <h3>Summary</h3>
           <article class="snapshot-row">
             <p>{{ reviewSummary.status }} | {{ reviewSummary.unresolved }} unresolved | {{ reviewSummary.resolved }} resolved</p>
@@ -11063,6 +11119,10 @@ select:hover {
 
 .agent-control-center[data-status="blocked"] {
   border-left-color: #b34040;
+}
+
+.persistent-agent-control .agent-control-grid {
+  grid-template-columns: 1fr;
 }
 
 .agent-control-center > header {
