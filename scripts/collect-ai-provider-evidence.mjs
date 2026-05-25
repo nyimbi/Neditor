@@ -17,14 +17,15 @@ const outputPath = resolve(args.output || process.env.NEDITOR_AI_PROVIDER_EVIDEN
 const prompt = promptText();
 const sourceCommit = gitCommit();
 const sourceTreeClean = gitTreeClean();
+const localProviderProfiles = new Set(["local-http", "local-openai", "private-openai"]);
 
 const issues = [];
-if (!["openai-compatible", "anthropic-compatible", "gemini-compatible", "local-http"].includes(providerProfile)) {
+if (!["openai-compatible", "anthropic-compatible", "gemini-compatible", "local-http", "local-openai", "private-openai"].includes(providerProfile)) {
   issues.push(`Unsupported provider profile: ${providerProfile}`);
 }
 if (!endpoint) issues.push("Missing endpoint. Pass --endpoint or set NEDITOR_AI_PROVIDER_ENDPOINT.");
 if (!model) issues.push("Missing model. Pass --model or set NEDITOR_AI_PROVIDER_MODEL.");
-if (providerProfile !== "local-http" && !apiKeyEnv) issues.push("Missing API key environment variable name. Pass --api-key-env or set NEDITOR_AI_PROVIDER_API_KEY_ENV.");
+if (!localProviderProfiles.has(providerProfile) && !apiKeyEnv) issues.push("Missing API key environment variable name. Pass --api-key-env or set NEDITOR_AI_PROVIDER_API_KEY_ENV.");
 if (apiKeyEnv && !process.env[apiKeyEnv]) issues.push(`API key environment variable is not set: ${apiKeyEnv}`);
 if (!sourceTreeClean) issues.push("AI provider evidence must be collected from a clean Git tree.");
 
@@ -60,7 +61,7 @@ const evidence = {
   secretMaterialStored: false,
   request: {
     startedAt,
-    apiKeyEnv: providerProfile === "local-http" ? null : apiKeyEnv,
+    apiKeyEnv: localProviderProfiles.has(providerProfile) ? null : apiKeyEnv,
     promptSha256: sha256(prompt),
     bodyShape: request.bodyShape,
   },
@@ -88,7 +89,7 @@ function buildRequest() {
   const baseHeaders = {
     "content-type": "application/json",
   };
-  if (providerProfile === "local-http") {
+  if (localProviderProfiles.has(providerProfile)) {
     return {
       headers: baseHeaders,
       bodyShape: "openai-compatible-chat-completions",

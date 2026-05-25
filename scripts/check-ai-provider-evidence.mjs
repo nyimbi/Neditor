@@ -16,7 +16,8 @@ const explicitEvidence = process.env.NEDITOR_AI_PROVIDER_EVIDENCE ? [resolve(pro
 const currentSourceCommit = gitCommit();
 const currentSourceTreeClean = gitTreeClean();
 const requiredMarker = "NEDITOR_PROVIDER_EVIDENCE_OK";
-const supportedProfiles = new Set(["openai-compatible", "anthropic-compatible", "gemini-compatible", "local-http"]);
+const supportedProfiles = new Set(["openai-compatible", "anthropic-compatible", "gemini-compatible", "local-http", "local-openai", "private-openai"]);
+const localProviderProfiles = new Set(["local-http", "local-openai", "private-openai"]);
 const issues = [];
 
 mkdirSync(outputDir, { recursive: true });
@@ -73,8 +74,8 @@ function validateEvidenceFile(path) {
   requireValue(!String(evidence.endpointHost).includes("@"), "endpointHost must not include credentials", itemIssues);
   requireValue(typeof evidence.model === "string" && evidence.model.length > 0, "model is required", itemIssues);
   requireValue(evidence.secretMaterialStored === false, "secretMaterialStored must be false", itemIssues);
-  if (evidence.providerProfile === "local-http") {
-    requireValue(evidence.request?.apiKeyEnv === null, "local-http evidence must not record an API key environment variable", itemIssues);
+  if (localProviderProfiles.has(evidence.providerProfile)) {
+    requireValue(evidence.request?.apiKeyEnv === null, `${evidence.providerProfile} evidence must not record an API key environment variable`, itemIssues);
   } else {
     requireValue(evidence.request?.apiKeyEnv && !String(evidence.request.apiKeyEnv).includes("sk-"), "request.apiKeyEnv must name an environment variable, not a secret", itemIssues);
   }

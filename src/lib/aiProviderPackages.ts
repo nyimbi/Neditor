@@ -1,6 +1,13 @@
 import type { AgenticWorkflowRun } from "./agenticWorkflows.js";
 
-export type AiProviderProfileId = "manual-review" | "openai-compatible" | "anthropic-compatible" | "gemini-compatible" | "local-http";
+export type AiProviderProfileId =
+  | "manual-review"
+  | "openai-compatible"
+  | "anthropic-compatible"
+  | "gemini-compatible"
+  | "local-http"
+  | "local-openai"
+  | "private-openai";
 export type AiProviderBodyStyle = "messages" | "system-and-messages" | "contents" | "prompt";
 
 export interface AiProviderProfile {
@@ -109,6 +116,24 @@ export const aiProviderProfiles: AiProviderProfile[] = [
     bodyStyle: "prompt",
     authHeader: "",
     summary: "Creates a local HTTP prompt package for private model gateways.",
+  },
+  {
+    id: "local-openai",
+    label: "Local OpenAI-compatible gateway",
+    endpoint: "http://127.0.0.1:1234/v1/chat/completions",
+    model: "local-document-model",
+    bodyStyle: "messages",
+    authHeader: "",
+    summary: "Creates a no-secret localhost chat-completions package for LM Studio, Ollama OpenAI mode, or other local gateways.",
+  },
+  {
+    id: "private-openai",
+    label: "Private network OpenAI-compatible gateway",
+    endpoint: "http://192.168.1.10:8080/v1/chat/completions",
+    model: "private-document-model",
+    bodyStyle: "messages",
+    authHeader: "",
+    summary: "Creates a no-secret private-network chat-completions package for approved internal model gateways.",
   },
 ];
 

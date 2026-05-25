@@ -10,6 +10,7 @@ import {
 } from "../src/lib/asyncGuards.js";
 import { inspectAiRuntimeReadiness } from "../src/lib/aiRuntimeReadiness.js";
 import {
+  aiProviderProfiles,
   buildAiProviderRequestPackage,
   buildAiProviderResponseReviewMarkdown,
   executeAiProviderRequestPackage,
@@ -966,6 +967,16 @@ test("AI provider packages redact secrets and preserve agent governance context"
   ok(providerPackage.markdown.includes("Safety Checklist"));
   ok(providerPackage.checklist.some((item) => item.includes("source-pack review item")));
   ok(providerPackage.checklist.some((item) => item.includes("approves this provider")));
+
+  const localProfiles = aiProviderProfiles.filter((profile) => profile.id === "local-openai" || profile.id === "private-openai");
+  equal(localProfiles.length, 2);
+  for (const profile of localProfiles) {
+    const localPackage = buildAiProviderRequestPackage(run, { profileId: profile.id });
+    equal(Object.keys(localPackage.redactedHeaders).includes("Authorization"), false);
+    equal(localPackage.profile.authHeader, "");
+    ok(localPackage.profile.summary.includes("gateway"));
+    ok(JSON.stringify(localPackage.requestBody).includes(localPackage.profile.model));
+  }
 });
 
 test("AI provider execution extracts Markdown without persisting secrets", async () => {
@@ -1876,12 +1887,16 @@ test("local verification scripts expose local baseline checks", () => {
   ok(aiProviderEvidence.includes("sourceCommit must match current git commit"));
   ok(aiProviderEvidence.includes("sourceTreeClean must be true"));
   ok(aiProviderEvidence.includes("evidence must not contain API key-looking secrets"));
+  ok(aiProviderEvidence.includes("local-openai"));
+  ok(aiProviderEvidence.includes("private-openai"));
   ok(aiProviderCollector.includes("NEDITOR_AI_PROVIDER_PROFILE"));
   ok(aiProviderCollector.includes("NEDITOR_AI_PROVIDER_ENDPOINT"));
   ok(aiProviderCollector.includes("NEDITOR_AI_PROVIDER_MODEL"));
   ok(aiProviderCollector.includes("NEDITOR_AI_PROVIDER_API_KEY_ENV"));
   ok(aiProviderCollector.includes("AI provider evidence must be collected from a clean Git tree"));
   ok(aiProviderCollector.includes("secretMaterialStored: false"));
+  ok(aiProviderCollector.includes("local-openai"));
+  ok(aiProviderCollector.includes("private-openai"));
   ok(aiProviderCollector.includes("anthropic-version"));
   ok(aiProviderCollector.includes("gemini-generate-content"));
   ok(aiRuntimeEvidence.includes("neditor.ai-runtime-evidence.v1"));
