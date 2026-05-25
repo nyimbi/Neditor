@@ -1,6 +1,6 @@
 # External Transform Platform Evidence
 
-Updated: 2026-05-23
+Updated: 2026-05-25
 
 NEditor keeps external transform engines optional. This page records current
 platform evidence for configured local engines and the repeatable command used
@@ -10,6 +10,12 @@ to refresh that evidence.
 
 ```sh
 pnpm run check:engines
+```
+
+On this macOS host, Pikchr is verified with the workspace-built executable:
+
+```sh
+NEDITOR_TEST_PIKCHR=/Users/nyimbiodero/src/pjs/tooling/neditor/.tmp/pikchr-build/pikchr-trunk/pikchr pnpm run check:engines
 ```
 
 The probe reports installed/missing optional engines without failing solely
@@ -49,42 +55,42 @@ Latest local command results:
 Graphviz / DOT: installed
   command: dot
   path: /opt/homebrew/bin/dot
-  version: dot - graphviz version 14.1.5 (20260411.2331)
+  version: dot - graphviz version 15.0.0 (20260523.1842)
   smoke: passed
   artifact: .tmp/external-engines/artifacts/dot.svg
   bytes: 1553
 Graphviz / circo: installed
   command: circo
   path: /opt/homebrew/bin/circo
-  version: circo - graphviz version 14.1.5 (20260411.2331)
+  version: circo - graphviz version 15.0.0 (20260523.1842)
   smoke: passed
   artifact: .tmp/external-engines/artifacts/circo.svg
   bytes: 1467
 Graphviz / neato: installed
   command: neato
   path: /opt/homebrew/bin/neato
-  version: neato - graphviz version 14.1.5 (20260411.2331)
+  version: neato - graphviz version 15.0.0 (20260523.1842)
   smoke: passed
   artifact: .tmp/external-engines/artifacts/neato.svg
   bytes: 1495
 Graphviz / fdp: installed
   command: fdp
   path: /opt/homebrew/bin/fdp
-  version: fdp - graphviz version 14.1.5 (20260411.2331)
+  version: fdp - graphviz version 15.0.0 (20260523.1842)
   smoke: passed
   artifact: .tmp/external-engines/artifacts/fdp.svg
   bytes: 1507
 Graphviz / osage: installed
   command: osage
   path: /opt/homebrew/bin/osage
-  version: osage - graphviz version 14.1.5 (20260411.2331)
+  version: osage - graphviz version 15.0.0 (20260523.1842)
   smoke: passed
   artifact: .tmp/external-engines/artifacts/osage.svg
   bytes: 1460
 Graphviz / twopi: installed
   command: twopi
   path: /opt/homebrew/bin/twopi
-  version: twopi - graphviz version 14.1.5 (20260411.2331)
+  version: twopi - graphviz version 15.0.0 (20260523.1842)
   smoke: passed
   artifact: .tmp/external-engines/artifacts/twopi.svg
   bytes: 1455
@@ -102,38 +108,40 @@ PlantUML: installed
   smoke: passed
   artifact: .tmp/external-engines/artifacts/plantuml.svg
   bytes: 3289
-Pikchr: missing
-  command: pikchr or pikchr-cli
-  note: Set NEDITOR_TEST_PIKCHR to an absolute executable path to force a probe.
+Pikchr: installed
+  command: /Users/nyimbiodero/src/pjs/tooling/neditor/.tmp/pikchr-build/pikchr-trunk/pikchr
+  path: /Users/nyimbiodero/src/pjs/tooling/neditor/.tmp/pikchr-build/pikchr-trunk/pikchr
+  version: pikchr 1.0 20260403102956
+  smoke: passed
+  artifact: .tmp/external-engines/artifacts/pikchr.svg
+  bytes: 1420
 ```
 
 Rust conformance evidence:
 
 ```text
-cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture
-external transform conformance verified: dot, circo, neato, fdp, osage, twopi, d2, plantuml; skipped: pikchr
+NEDITOR_TEST_PIKCHR=/Users/nyimbiodero/src/pjs/tooling/neditor/.tmp/pikchr-build/pikchr-trunk/pikchr cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture
+external transform conformance verified: dot, circo, neato, fdp, osage, twopi, d2, plantuml, pikchr; skipped:
 ```
 
 Interpretation:
 
 - Graphviz/DOT, Graphviz layout engines (`circo`, `neato`, `fdp`, `osage`,
-  `twopi`), D2, and PlantUML are verified on this macOS host through the
-  standalone engine probe and through the same Rust external transform execution
-  path used by NEditor.
+  `twopi`), D2, PlantUML, and Pikchr are verified on this macOS host through
+  the standalone engine probe and through the same Rust external transform
+  execution path used by NEditor.
 - The standalone probe now produces inspectable SVG smoke artifacts for every
   installed engine and fails if an installed engine cannot render the expected
   smoke output.
 - External evidence templates now make copied Linux, Windows, or alternate
   macOS optional-engine proof auditable instead of relying on prose notes.
 - PlantUML file-mode execution is verified locally and Java is available.
-- Pikchr remains a macOS evidence gap on this host because neither `pikchr` nor
-  `pikchr-cli` is installed and no accepted copied Pikchr evidence has been
-  supplied.
+- Pikchr remains optional and unbundled; this host verifies it through
+  `NEDITOR_TEST_PIKCHR` because the executable lives under `.tmp/pikchr-build/`
+  rather than on `PATH`.
 
 ## Remaining Platform Evidence Gaps
 
-- Install and verify Pikchr on macOS, or supply accepted
-  `pikchr.json` external evidence from a supported host.
 - Refresh Linux installed-engine evidence locally when those engines are
   available outside retired remote workflows.
 - Add Windows evidence for Graphviz, D2, PlantUML, Java, and Pikchr executable

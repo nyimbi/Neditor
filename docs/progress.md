@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Current macOS optional-engine evidence now includes Pikchr again: the
+  workspace-built executable under `.tmp/pikchr-build/` passes
+  `NEDITOR_TEST_PIKCHR=... pnpm run check:engines`, writes `pikchr.svg`, and
+  passes Rust installed-engine conformance through NEditor's external transform
+  execution path.
 - The specification matrix now treats the recommended first milestone as
   complete with requirement-mapped evidence for the Tauri shell, editor/preview,
   file operations, front matter/includes/TOC, transform registry, Mermaid,
