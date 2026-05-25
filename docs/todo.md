@@ -1293,7 +1293,10 @@ Readiness should validate and report:
   readiness audit test coverage exists for export settings; focused readiness
   coverage now proves configured engine paths must be executable files before
   export, while disabled engines remain ignored. External transform tests cover
-  runtime stderr, missing output, output limits, and cache identity.
+  runtime stderr, missing output, output limits, and cache identity. Browser
+  workflow coverage now inserts timeline, roadmap, ADR, and QR built-in
+  templates from the Templates sidebar and verifies them in the transform
+  artifact preview.
 - Export target options and target-specific blockers. Focused Rust coverage now
   proves the PPTX approved-metadata blocker, malformed brand/citation option
   shapes, disabled option matrix parity, and enabled option matrix parity across

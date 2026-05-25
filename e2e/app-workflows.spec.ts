@@ -569,7 +569,7 @@ async function installTauriMock(page: Page, stateKey: string) {
       }> = [];
       const lines = text.split(/\r?\n/);
       for (let index = 0; index < lines.length; index += 1) {
-        const fence = lines[index].match(/^```(chart|d2|mermaid|timeline|json|yaml)\s*$/);
+        const fence = lines[index].match(/^```(chart|d2|mermaid|timeline|roadmap|adr|qr|json|yaml|openapi|json-schema)(?:\s.*)?$/);
         if (!fence) continue;
         const body: string[] = [];
         let cursor = index + 1;
@@ -2997,6 +2997,44 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await chartTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain("```chart");
   await expect.poll(() => editorText(page)).toContain("title: Quarterly KPI plan");
+
+  await templateFilters.getByLabel("Category").selectOption("Business");
+  await templateFilters.getByLabel("Transform").selectOption("timeline");
+  await templateFilters.getByLabel("Search").fill("launch");
+  const timelineTemplate = sidebar.getByRole("listitem").filter({ hasText: "Launch timeline" });
+  await expect(timelineTemplate).toContainText("Business | timeline | builtin");
+  await timelineTemplate.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => editorText(page)).toContain("2026-06-15: Pilot launch");
+
+  await templateFilters.getByLabel("Transform").selectOption("roadmap");
+  await templateFilters.getByLabel("Search").fill("quarterly");
+  const roadmapTemplate = sidebar.getByRole("listitem").filter({ hasText: "Quarterly roadmap" });
+  await expect(roadmapTemplate).toContainText("Business | roadmap | builtin");
+  await roadmapTemplate.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => editorText(page)).toContain("Now: Harden editor ergonomics");
+
+  await templateFilters.getByLabel("Transform").selectOption("adr");
+  await templateFilters.getByLabel("Search").fill("architecture");
+  const adrTemplate = sidebar.getByRole("listitem").filter({ hasText: "Architecture decision" });
+  await expect(adrTemplate).toContainText("Business | adr | builtin");
+  await adrTemplate.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => editorText(page)).toContain("Consequences: List expected benefits");
+
+  await templateFilters.getByLabel("Transform").selectOption("qr");
+  await templateFilters.getByLabel("Search").fill("release");
+  const qrTemplate = sidebar.getByRole("listitem").filter({ hasText: "Release QR code" });
+  await expect(qrTemplate).toContainText("Business | qr | builtin");
+  await qrTemplate.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => editorText(page)).toContain("https://example.com/releases/neditor-report");
+
+  await page.getByLabel("View mode").selectOption("preview");
+  const transformPreview = page.getByRole("region", { name: "Transform artifact preview" });
+  await expect(transformPreview).toContainText("chart");
+  await expect(transformPreview).toContainText("timeline");
+  await expect(transformPreview).toContainText("roadmap");
+  await expect(transformPreview).toContainText("adr");
+  await expect(transformPreview).toContainText("qr");
+  await page.getByLabel("View mode").selectOption("split");
 
   const customEditor = page.getByRole("region", { name: "Custom transform template editor" });
   await customEditor.getByLabel("Name").fill("Custom Safety Margin");
