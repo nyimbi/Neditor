@@ -250,8 +250,9 @@ web app.
   history with status, lane, and target filters, run IDs, readiness, apply
   mode, provider, fingerprints, section/reviewer counts, a bounded packet
   snapshot that can be appended or copied later, filtered audit packages that
-  can be inserted or copied for review evidence, and a replan action that
-  restarts from the saved instruction against the current document context.
+  can be inserted or copied for review evidence, per-run removal, full history
+  clearing, and a replan action that restarts from the saved instruction
+  against the current document context.
   Provider handoff packages turn that run into
   redacted prompts, source evidence packs with extracted claims, citation TODOs,
   humanization findings, outline critique, governance blockers, distribution
@@ -288,7 +289,8 @@ web app.
   standalone audit handoff, and generated drafts can be copied or appended as
   review material without replacing the current document. Recent drafts are
   kept in a bounded local history with append/copy and packet handoff actions
-  so a generated first draft remains recoverable after the modal is closed.
+  plus remove/clear controls so a generated first draft remains recoverable
+  after the modal is closed without trapping stale AI output forever.
   **Check AI runtime** produces a content-free
   readiness report for secure context, Web Speech availability, microphone
   permission, and clipboard read/write support so business users can confirm

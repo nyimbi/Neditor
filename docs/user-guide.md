@@ -169,7 +169,9 @@ packet snapshot that can be appended back into the document or copied for
 review. The current live packet can also be copied or appended immediately from
 the generated output header when the team wants review material without using
 the packet's replacement mode. Use **Replan** on a saved run when you want to
-restart from the same instruction with the current document context.
+restart from the same instruction with the current document context. Remove a
+single saved run or clear the local run history when old AI artifacts should no
+longer remain in workspace preferences.
 **Apply agent output** uses the packet's safe apply mode: replace a new
 document, replace the selected text, or append a review packet to the current
 source.
@@ -225,6 +227,8 @@ append it as review material, or apply it with the selected
 replace/append/selection/section mode. NEditor keeps recent Docs Live drafts in
 a bounded local history so you can append or copy a saved draft, or insert or
 copy its review packet later without rebuilding the first draft.
+Remove stale saved drafts or clear the local Docs Live history when a draft is
+no longer useful or should not remain in workspace preferences.
 
 Before relying on dictation or clipboard-assisted cleanup, use **Check AI
 runtime** in Docs Live. The report checks secure runtime context, Web Speech,

@@ -2048,6 +2048,7 @@
               <strong>Recent Docs Live drafts</strong>
               <span>{{ store.docsLiveDraftHistory.length }} saved locally for reuse</span>
             </div>
+            <button type="button" @click="clearDocsLiveDraftHistory">Clear history</button>
           </header>
           <article v-for="item in store.docsLiveDraftHistory.slice(0, 6)" :key="item.draftId">
             <div>
@@ -2060,6 +2061,7 @@
               <button type="button" @click="copyDocsLiveHistoryDraft(item)">Copy draft</button>
               <button type="button" @click="insertDocsLiveHistoryReviewPacket(item)">Insert packet</button>
               <button type="button" @click="copyDocsLiveHistoryReviewPacket(item)">Copy packet</button>
+              <button type="button" @click="removeDocsLiveHistoryDraft(item)">Remove</button>
             </div>
           </article>
         </section>
@@ -2731,6 +2733,7 @@
               <div class="agent-history-audit-actions">
                 <button type="button" :disabled="!filteredAgentRunHistory.length" @click="insertAgentHistoryAudit">Insert audit</button>
                 <button type="button" :disabled="!filteredAgentRunHistory.length" @click="copyAgentHistoryAudit">Copy audit</button>
+                <button type="button" @click="clearAgentHistory">Clear history</button>
               </div>
             </header>
             <section class="agent-history-filters" aria-label="Filter agent run history">
@@ -2782,6 +2785,7 @@
                     <button type="button" @click="replanAgentHistoryRun(item)">Replan</button>
                     <button type="button" :disabled="!item.packetMarkdown" @click="appendAgentHistoryPacket(item)">Append packet</button>
                     <button type="button" :disabled="!item.packetMarkdown" @click="copyAgentHistoryPacket(item)">Copy packet</button>
+                    <button type="button" @click="removeAgentHistoryRun(item)">Remove</button>
                   </div>
                 </div>
                 <dl>
@@ -5260,6 +5264,14 @@ async function copyAgentHistoryPacket(item: AgentRunHistoryItem) {
   } catch {
     store.statusMessage = `Saved agent packet ${item.runId} is ready to copy`;
   }
+}
+function removeAgentHistoryRun(item: AgentRunHistoryItem) {
+  store.removeAgentRunHistory(item.runId);
+  store.statusMessage = `Removed saved agent run ${item.runId}`;
+}
+function clearAgentHistory() {
+  store.clearAgentRunHistory();
+  store.statusMessage = "Cleared saved agent run history";
 }
 function agentHistoryAuditMarkdown() {
   const runs = filteredAgentRunHistory.value;
@@ -9811,6 +9823,16 @@ async function copyDocsLiveHistoryReviewPacket(item: DocsLiveDraftHistoryItem) {
   } catch {
     store.statusMessage = `Saved Docs Live review packet ${item.title} is ready to copy`;
   }
+}
+
+function removeDocsLiveHistoryDraft(item: DocsLiveDraftHistoryItem) {
+  store.removeDocsLiveDraftHistory(item.draftId);
+  store.statusMessage = `Removed saved Docs Live draft ${item.title}`;
+}
+
+function clearDocsLiveDraftHistory() {
+  store.clearDocsLiveDraftHistory();
+  store.statusMessage = "Cleared saved Docs Live draft history";
 }
 
 function openDocsLiveHistory() {

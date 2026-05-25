@@ -1655,10 +1655,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentHistoryAuditMarkdown"));
   ok(app.includes("insertAgentHistoryAudit"));
   ok(app.includes("copyAgentHistoryAudit"));
+  ok(app.includes("removeAgentHistoryRun"));
+  ok(app.includes("clearAgentHistory"));
   ok(app.includes("## Agent Run History Audit"));
   ok(app.includes("```ai-audit"));
   ok(app.includes("Inserted agent history audit"));
   ok(app.includes("Copied agent history audit"));
+  ok(app.includes("Removed saved agent run"));
+  ok(app.includes("Cleared saved agent run history"));
   ok(app.includes("No agent runs match the current history filters."));
   ok(app.includes("Workflow Playbooks"));
   ok(app.includes("Agent Workspace playbooks"));
@@ -1816,6 +1820,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("copyDocsLiveHistoryDraft"));
   ok(app.includes("insertDocsLiveHistoryReviewPacket"));
   ok(app.includes("copyDocsLiveHistoryReviewPacket"));
+  ok(app.includes("removeDocsLiveHistoryDraft"));
+  ok(app.includes("clearDocsLiveDraftHistory"));
   ok(app.includes("latestDocsLiveDraftHistory"));
   ok(app.includes("openDocsLiveHistory"));
   ok(app.includes("appendLatestDocsLiveDraft"));
@@ -1831,6 +1837,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Copied Docs Live review packet"));
   ok(app.includes("Appended saved Docs Live draft"));
   ok(app.includes("Copied saved Docs Live review packet"));
+  ok(app.includes("Removed saved Docs Live draft"));
+  ok(app.includes("Cleared saved Docs Live draft history"));
   ok(app.includes("docs-live-draft-actions"));
   ok(app.includes("docs-live-history"));
   ok(app.includes("Draft in Docs Live"));
@@ -1917,6 +1925,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(store.includes("deleteExportProfile"));
   ok(store.includes("docsLiveDraftHistory"));
   ok(store.includes("recordDocsLiveDraftHistory"));
+  ok(store.includes("removeDocsLiveDraftHistory"));
+  ok(store.includes("clearDocsLiveDraftHistory"));
+  ok(store.includes("removeAgentRunHistory"));
+  ok(store.includes("clearAgentRunHistory"));
   ok(store.includes("normalizeDocsLiveDraftHistory"));
   ok(app.includes('listen<string>("neditor-menu-command"'));
   ok(app.includes('"neditor-export-html": "html"'));

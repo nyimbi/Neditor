@@ -618,11 +618,27 @@ export const useDocumentsStore = defineStore("documents", {
       ]);
       void this.persistWorkspace();
     },
+    removeAgentRunHistory(runId: string) {
+      this.agentRunHistory = this.agentRunHistory.filter((entry) => entry.runId !== runId);
+      void this.persistWorkspace();
+    },
+    clearAgentRunHistory() {
+      this.agentRunHistory = [];
+      void this.persistWorkspace();
+    },
     recordDocsLiveDraftHistory(item: DocsLiveDraftHistoryItem) {
       this.docsLiveDraftHistory = normalizeDocsLiveDraftHistory([
         item,
         ...this.docsLiveDraftHistory.filter((entry) => entry.draftId !== item.draftId),
       ]);
+      void this.persistWorkspace();
+    },
+    removeDocsLiveDraftHistory(draftId: string) {
+      this.docsLiveDraftHistory = this.docsLiveDraftHistory.filter((entry) => entry.draftId !== draftId);
+      void this.persistWorkspace();
+    },
+    clearDocsLiveDraftHistory() {
+      this.docsLiveDraftHistory = [];
       void this.persistWorkspace();
     },
     recordGuidedDemoStepComplete(stepId: string) {
