@@ -51,6 +51,12 @@ Recent pushed checkpoints visible in current git history:
   and app/test evidence for Docs Live, Agent Workspace, workflow playbooks,
   source packs, lifecycle tasks, provider handoff, AI runtime readiness, and the
   guided demo.
+- The roadmap has been expanded from a checklist into an AI-first product
+  blueprint. It now defines a durable capability model covering understanding,
+  planning, composition, revision, verification, distribution, and learning,
+  then maps 50 concrete changes across intent capture, outline architecture,
+  section drafting, editing, evidence, transforms, QA, publishing packages,
+  provider operations, governance, reusable memory, and enterprise readiness.
 - The Help Center now exposes an in-app "AI-first platform roadmap" topic so
   users can discover how intent capture, outline-first planning, agentic
   editing, grounding, review, provider handoff, distribution, and release
