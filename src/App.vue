@@ -1213,6 +1213,9 @@
                     <strong>{{ action.label }}</strong>
                     <span>{{ action.lane }} | {{ action.status }}</span>
                     <p>{{ action.detail }}</p>
+                    <div class="agent-lifecycle-actions">
+                      <button type="button" @click="runAgentControlAction(action)">Run action</button>
+                    </div>
                   </li>
                 </ul>
               </article>
@@ -2399,6 +2402,9 @@
                       <strong>{{ action.label }}</strong>
                       <span>{{ action.lane }} | {{ action.status }}</span>
                       <p>{{ action.detail }}</p>
+                      <div class="agent-lifecycle-actions">
+                        <button type="button" @click="runAgentControlAction(action)">Run action</button>
+                      </div>
                     </li>
                   </ul>
                 </article>
@@ -3217,6 +3223,7 @@ import {
   type AgenticSourcePackItemKind,
   type AgenticWorkflowPlaybook,
   type AgenticWorkflowLane,
+  type AgenticWorkflowAction,
   type AgenticWorkflowPlan,
   type AgenticWorkflowRun,
   type AgenticLifecycleTask,
@@ -3224,6 +3231,7 @@ import {
   type AgenticReviewCommentResolution,
   type AgenticSectionWorkItem,
   type AgenticWorkflowStep,
+  type AgenticNextAction,
 } from "./lib/agenticWorkflows";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import {
@@ -3270,6 +3278,7 @@ import {
   type AgentLifecycleExecutionStatus,
   type AgentLifecycleTaskState,
   type AgentRunHistoryItem,
+  type AgentRunHistoryNextAction,
   type DocsLiveDraftHistoryItem,
 } from "./lib/workspacePersistence";
 import {
@@ -3330,6 +3339,16 @@ function getWindowTitleTarget(): WindowTitleTarget | null {
 }
 
 const appWindow = getWindowTitleTarget();
+const agentControlLanes: AgenticWorkflowLane[] = ["create", "compose", "edit", "revise", "review", "distribute"];
+const agentControlActions: AgenticWorkflowAction[] = [
+  "open-docs-live",
+  "generate-docs-live-draft",
+  "open-outline",
+  "open-ai-paste",
+  "open-review",
+  "prepare-export",
+  "open-exports",
+];
 const editorHost = ref<HTMLElement | null>(null);
 const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
@@ -5883,6 +5902,33 @@ function runAgentPlanDistribution() {
   store.mode = "export";
   store.sidebar = "exports";
   void prepareForExport();
+}
+function ensureAgentPlanForControlAction() {
+  if (agentRun.value || !latestAgentRunHistory.value) return;
+  const item = latestAgentRunHistory.value;
+  agentInstruction.value = item.instruction;
+  agentContextAnswers.value = item.contextAnswers || "";
+  agentSourcePackText.value = item.sourcePackText || "";
+  buildAgentWorkspacePlan();
+}
+function normalizeAgentControlLane(lane: string): AgenticWorkflowLane {
+  return agentControlLanes.includes(lane as AgenticWorkflowLane) ? (lane as AgenticWorkflowLane) : "review";
+}
+function normalizeAgentControlWorkflowAction(action: string): AgenticWorkflowAction {
+  return agentControlActions.includes(action as AgenticWorkflowAction) ? (action as AgenticWorkflowAction) : "open-review";
+}
+function runAgentControlAction(action: AgenticNextAction | AgentRunHistoryNextAction) {
+  ensureAgentPlanForControlAction();
+  const lane = normalizeAgentControlLane(action.lane);
+  const workflowAction = normalizeAgentControlWorkflowAction(action.action);
+  runAgenticStep({
+    id: `control-${stableFingerprint(`${lane}:${workflowAction}:${action.label}`).slice(0, 10)}`,
+    lane,
+    title: action.label,
+    detail: action.detail,
+    action: workflowAction,
+    status: action.status === "ready" ? "ready" : "needs-input",
+  });
 }
 function runAgenticStep(step: AgenticWorkflowStep) {
   switch (step.action) {

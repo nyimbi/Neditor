@@ -172,6 +172,10 @@ the packet's replacement mode. Use **Replan** on a saved run when you want to
 restart from the same instruction with the current document context. Remove a
 single saved run or clear the local run history when old AI artifacts should no
 longer remain in workspace preferences.
+The AI Control Center's next actions are directly runnable from Agent Workspace
+and from the Review sidebar, so a recommendation can open Docs Live, start a
+section draft, route to review readiness, prepare export, or launch AI Paste
+without translating the agent's instruction into separate UI steps.
 **Apply agent output** uses the packet's safe apply mode: replace a new
 document, replace the selected text, or append a review packet to the current
 source.

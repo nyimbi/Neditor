@@ -1885,6 +1885,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("startAiDocumentCreation"));
   ok(app.includes('id: "ai-create", label: "AI Create"'));
   ok(app.includes('id: "agent", label: "Agent"'));
+  ok(app.includes("runAgentControlAction"));
+  ok(app.includes("ensureAgentPlanForControlAction"));
+  ok(app.includes("normalizeAgentControlLane"));
+  ok(app.includes("normalizeAgentControlWorkflowAction"));
+  ok(app.includes("AgenticNextAction"));
+  ok(app.includes("AgentRunHistoryNextAction"));
+  ok(app.includes("Run action"));
   ok(app.includes("Help: Docs Live"));
   ok(app.includes("Help: Export and publishing"));
   ok(app.includes("Help: AI-first composition"));
