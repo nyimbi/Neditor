@@ -2083,6 +2083,12 @@
               <h3>Revision instruction</h3>
               <p>{{ agentPlan.revisionInstruction }}</p>
             </article>
+            <article v-if="agentPlan.revisionModes.length" class="agent-revision-modes">
+              <h3>Revision passes</h3>
+              <ul>
+                <li v-for="mode in agentPlan.revisionModes" :key="mode">{{ mode }}</li>
+              </ul>
+            </article>
           </section>
           <section v-if="agentPlan.missingInputs.length" class="agent-missing-inputs" aria-label="Agent missing inputs">
             <strong>Missing inputs</strong>

@@ -78,6 +78,8 @@ The AI Agent Workspace converts that instruction into a visible plan:
 - placeholder values to pass into Docs Live;
 - a suggested outline or the current document outline;
 - revision instructions for selected text or the whole document;
+- planned revision passes such as clarity, brevity, tone, evidence, legal
+  caution, executive summary, accessibility, and humanization;
 - requested export targets such as PDF, Substack, LaTeX, or Google Docs;
 - runnable next steps that open Docs Live, AI Paste cleanup, Review, or Export
   readiness.
@@ -94,8 +96,9 @@ Choose **Generate agent packet** when the instruction should become a reviewable
 artifact immediately. NEditor creates an auditable packet with AI provenance,
 the generated draft when creation or composition is requested, a
 selection-aware revision proposal when editing or revision is requested,
-meaning-drift findings for changed or removed numbers, dates, commitments, and
-caveats, QA gates, distribution gates, and blockers for missing inputs. The packet also
+the planned revision pass checklist, meaning-drift findings for changed or
+removed numbers, dates, commitments, and caveats, QA gates, distribution gates,
+and blockers for missing inputs. The packet also
 shows an **AI Control Center** with readiness score, next actions, source
 grounding, governance state, and distribution state so reviewers can see what is
 safe to do next before applying generated text. The control center and reviewer

@@ -202,7 +202,10 @@ web app.
   context pack, placeholders, packet, Docs Live handoff, provider package, and
   saved run history. Plans include a context completeness score across
   audience, evidence, constraints, examples, tone, and approval context so
-  users know whether a responsible first draft has enough grounding. It can also generate a
+  users know whether a responsible first draft has enough grounding. Revision
+  plans also name the exact pass stack, including clarity, brevity, tone,
+  evidence, legal caution, executive summary, accessibility, and humanization
+  modes, so edits are auditable instead of opaque rewrites. It can also generate a
   complete agent packet with a Docs Live draft, selection-aware revision
   proposal, meaning-drift checks for changed numbers, dates, commitments, and
   caveats, QA gates, named reviewer agents for editorial, evidence, risk,

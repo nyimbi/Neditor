@@ -55,6 +55,7 @@ export interface AgenticWorkflowPlan {
   placeholderText: string;
   contextCompleteness: AgenticContextCompleteness;
   revisionInstruction: string;
+  revisionModes: AgenticRevisionMode[];
   distributionTargets: ExportTarget[];
   missingInputs: string[];
   steps: AgenticWorkflowStep[];
@@ -85,7 +86,25 @@ export interface AgenticWorkflowRevision {
   originalText: string;
   proposedText: string;
   changeSummary: string[];
+  revisionPasses: AgenticRevisionPass[];
   meaningDriftFindings: AgenticMeaningDriftFinding[];
+}
+
+export type AgenticRevisionMode =
+  | "clarity"
+  | "brevity"
+  | "tone"
+  | "evidence"
+  | "legal-caution"
+  | "executive-summary"
+  | "accessibility"
+  | "humanization";
+
+export interface AgenticRevisionPass {
+  mode: AgenticRevisionMode;
+  label: string;
+  rationale: string;
+  checklist: string[];
 }
 
 export interface AgenticMeaningDriftFinding {
@@ -301,6 +320,17 @@ const laneSignals: Array<[AgenticWorkflowLane, RegExp]> = [
   ["distribute", /\b(export|publish|send|distribute|deliver|package|substack|blog|google docs?|pdf|docx|pptx|latex|html)\b/i],
 ];
 
+const revisionModeSignals: Array<[AgenticRevisionMode, RegExp]> = [
+  ["clarity", /\b(clear|clarity|clarify|simplify|plain|make sense|readable)\b/i],
+  ["brevity", /\b(shorten|concise|brief|crisp|tighten|summari[sz]e|less wordy)\b/i],
+  ["tone", /\b(tone|voice|style|formal|friendly|professional|humanize|reader)\b/i],
+  ["evidence", /\b(evidence|source|citation|fact.?check|verify|claim|data|reference)\b/i],
+  ["legal-caution", /\b(legal|risks?|compliance|policy|obligations?|liability|approve|approval|must|shall)\b/i],
+  ["executive-summary", /\b(executive|board|ceo|cfo|leadership|director|decision|recommendation)\b/i],
+  ["accessibility", /\b(accessib|screen reader|plain language|non-technical|layperson|jargon)\b/i],
+  ["humanization", /\b(humanize|less ai|natural|generic|robotic|bland|stale)\b/i],
+];
+
 const defaultOutlineByLane: Record<AgenticWorkflowLane, string[]> = {
   create: ["Executive Summary", "Context", "Recommendation", "Risks", "Next Steps"],
   compose: ["Executive Summary", "Section Work Queue", "Quality Checks", "Review Handoff"],
@@ -327,6 +357,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
   const suggestedOutline = buildSuggestedOutline(request, primaryLane, documentType);
   const missingInputs = buildMissingInputs(corpus, lanes, distributionTargets);
   const revisionInstruction = buildRevisionInstruction(instruction, lanes, request.selectedText);
+  const revisionModes = detectRevisionModes(corpus, lanes, documentType);
   const steps = buildPlanSteps(lanes, missingInputs, distributionTargets, Boolean(request.documentText?.trim()), Boolean(request.selectedText?.trim()));
 
   return {
@@ -341,6 +372,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     placeholderText,
     contextCompleteness,
     revisionInstruction,
+    revisionModes,
     distributionTargets,
     missingInputs,
     steps,
@@ -515,10 +547,12 @@ function detectDistributionTargets(corpus: string): ExportTarget[] {
 
 function buildRevision(request: AgenticWorkflowRunRequest, plan: AgenticWorkflowPlan): AgenticWorkflowRevision {
   const originalText = (request.selectedText || request.documentText || "").trim();
-  const proposedText = reviseText(originalText, plan.revisionInstruction, plan.placeholderText);
+  const revisionPasses = buildRevisionPasses(plan.revisionModes);
+  const proposedText = reviseText(originalText, plan.revisionInstruction, plan.placeholderText, revisionPasses);
   const meaningDriftFindings = findMeaningDrift(originalText, proposedText);
   const changeSummary = [
     "Preserved the user's intent while making the requested revision explicit.",
+    revisionPasses.length ? `Applied revision passes: ${revisionPasses.map((pass) => pass.label).join(", ")}.` : "",
     "Added AI-assisted review metadata so the change remains governable before export.",
     meaningDriftFindings.length
       ? `Meaning-drift scan found ${meaningDriftFindings.length} number, date, commitment, or caveat item(s) that need reviewer confirmation.`
@@ -530,8 +564,76 @@ function buildRevision(request: AgenticWorkflowRunRequest, plan: AgenticWorkflow
     originalText,
     proposedText,
     changeSummary,
+    revisionPasses,
     meaningDriftFindings,
   };
+}
+
+function detectRevisionModes(corpus: string, lanes: AgenticWorkflowLane[], documentType: DocsLiveDocumentType): AgenticRevisionMode[] {
+  if (!lanes.some((lane) => lane === "edit" || lane === "revise")) return [];
+  const detected = revisionModeSignals.flatMap(([mode, signal]) => (signal.test(corpus) ? [mode] : []));
+  if (lanes.includes("review") && !detected.includes("evidence")) detected.push("evidence");
+  if (documentType === "board-memo" && !detected.includes("executive-summary")) detected.push("executive-summary");
+  if (!detected.includes("clarity")) detected.unshift("clarity");
+  return Array.from(new Set(detected)).slice(0, 8);
+}
+
+function buildRevisionPasses(modes: AgenticRevisionMode[]): AgenticRevisionPass[] {
+  return modes.map((mode) => revisionPassProfile(mode));
+}
+
+function revisionPassProfile(mode: AgenticRevisionMode): AgenticRevisionPass {
+  const profiles: Record<AgenticRevisionMode, AgenticRevisionPass> = {
+    clarity: {
+      mode,
+      label: "Clarity",
+      rationale: "Make the reader purpose, decision, and sentence flow easier to understand.",
+      checklist: ["Remove ambiguous phrasing.", "Make the reader outcome explicit.", "Keep terminology consistent."],
+    },
+    brevity: {
+      mode,
+      label: "Brevity",
+      rationale: "Compress the text without silently dropping facts, caveats, owners, or obligations.",
+      checklist: ["Remove filler and repeated setup.", "Preserve material numbers, dates, owners, and commitments.", "Flag any compression risk."],
+    },
+    tone: {
+      mode,
+      label: "Tone",
+      rationale: "Match voice, formality, and level of detail to the named audience.",
+      checklist: ["Adapt sentence style to the audience.", "Avoid overstatement.", "Keep the document voice consistent."],
+    },
+    evidence: {
+      mode,
+      label: "Evidence",
+      rationale: "Keep factual claims source-aware and leave unresolved claims visible.",
+      checklist: ["Preserve source-sensitive claims.", "Add or retain citation TODOs for unsupported facts.", "Avoid inventing evidence."],
+    },
+    "legal-caution": {
+      mode,
+      label: "Legal Caution",
+      rationale: "Surface obligations, approvals, risks, and policy-sensitive wording before acceptance.",
+      checklist: ["Preserve commitments and caveats.", "Flag approval or compliance language.", "Avoid creating new obligations."],
+    },
+    "executive-summary": {
+      mode,
+      label: "Executive Summary",
+      rationale: "Lead with the decision, financial/risk implication, and next action.",
+      checklist: ["Put the recommendation early.", "Name the risk or tradeoff.", "State the next action or owner."],
+    },
+    accessibility: {
+      mode,
+      label: "Accessibility",
+      rationale: "Make the revision usable for non-technical readers and assistive workflows.",
+      checklist: ["Prefer plain language.", "Avoid unexplained jargon.", "Keep structure scannable."],
+    },
+    humanization: {
+      mode,
+      label: "Humanization",
+      rationale: "Remove generic AI phrasing and make the draft sound like accountable human prose.",
+      checklist: ["Remove stale AI phrases.", "Use concrete nouns and verbs.", "Keep confidence proportional to evidence."],
+    },
+  };
+  return profiles[mode];
 }
 
 function findMeaningDrift(originalText: string, proposedText: string): AgenticMeaningDriftFinding[] {
@@ -609,23 +711,33 @@ function stripAiReviewMetadata(text: string) {
   return text.replace(/<!--\s*ai-assisted:[\s\S]*?-->/g, "").trim();
 }
 
-function reviseText(text: string, instruction: string, placeholders: string) {
+function reviseText(text: string, instruction: string, placeholders: string, revisionPasses: AgenticRevisionPass[]) {
   const cleaned = humanizeText(text || "Draft the requested change here with verified facts and named owners.");
   const lowerInstruction = instruction.toLowerCase();
+  const modes = new Set(revisionPasses.map((pass) => pass.mode));
   let proposed = cleaned;
-  if (/\b(shorten|concise|brief|crisp|executive)\b/.test(lowerInstruction)) {
+  if (modes.has("clarity")) {
+    proposed = clarifyText(proposed);
+  }
+  if (modes.has("brevity") || /\b(shorten|concise|brief|crisp|executive)\b/.test(lowerInstruction)) {
     proposed = shortenText(proposed);
   }
   if (/\b(expand|detail|flesh out|elaborate)\b/.test(lowerInstruction)) {
     proposed = expandText(proposed, placeholders);
   }
-  if (/\b(cfo|finance|financial|budget|investment|roi)\b/.test(lowerInstruction)) {
+  if (modes.has("executive-summary") && /\b(cfo|finance|financial|budget|investment|roi)\b/.test(lowerInstruction)) {
     proposed = addFinanceFrame(proposed);
-  } else if (/\b(board|executive|ceo|leadership)\b/.test(lowerInstruction)) {
+  } else if (modes.has("executive-summary") || /\b(board|executive|ceo|leadership)\b/.test(lowerInstruction)) {
     proposed = addExecutiveFrame(proposed);
   }
-  if (/\b(humanize|natural|less ai|plain language|non-technical)\b/.test(lowerInstruction)) {
+  if (modes.has("accessibility")) {
+    proposed = accessibilityText(proposed);
+  }
+  if (modes.has("humanization") || /\b(humanize|natural|less ai|plain language|non-technical)\b/.test(lowerInstruction)) {
     proposed = humanizeText(proposed);
+  }
+  if (modes.has("legal-caution") || modes.has("evidence")) {
+    proposed = addRevisionReviewNote(proposed, modes);
   }
   return [
     "<!-- ai-assisted: status=needs-review | reviewedBy= | reviewedAt= | source=NEditor Agent Workspace | promptSummary=Agentic revision proposal -->",
@@ -642,6 +754,32 @@ function humanizeText(text: string) {
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function clarifyText(text: string) {
+  return text
+    .replace(/\bcan be\b/gi, "is")
+    .replace(/\bthis section\b/gi, "this section")
+    .replace(/\bopportunities\b/gi, "options")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function accessibilityText(text: string) {
+  return text
+    .replace(/\bARR\b/g, "ARR")
+    .replace(/\bROI\b/g, "ROI")
+    .replace(/\butilisation\b/gi, "use")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function addRevisionReviewNote(text: string, modes: Set<AgenticRevisionMode>) {
+  const notes = [
+    modes.has("evidence") ? "Evidence pass: verify every factual claim or keep a citation TODO before acceptance." : "",
+    modes.has("legal-caution") ? "Legal caution pass: confirm obligations, approvals, risks, and caveats with the responsible reviewer." : "",
+  ].filter(Boolean);
+  return notes.length ? `${text}\n\n_Review note: ${notes.join(" ")}_` : text;
 }
 
 function shortenText(text: string) {
@@ -825,6 +963,7 @@ function buildReviewChecklist(plan: AgenticWorkflowPlan, revision: AgenticWorkfl
     "Check each factual claim against the evidence or add a citation TODO before export.",
     "Mark every AI source block and AI-assisted section human-reviewed only after a person verifies it.",
     revision ? "Compare the revision proposal against the original text before applying final edits." : "",
+    revision?.revisionPasses.length ? `Complete revision passes before acceptance: ${revision.revisionPasses.map((pass) => pass.label).join(", ")}.` : "",
     revision?.meaningDriftFindings.length ? "Resolve all meaning-drift findings before accepting the revision." : "",
     plan.distributionTargets.length ? "Run export readiness for every requested distribution target." : "",
   ].filter(Boolean);
@@ -931,6 +1070,7 @@ function buildLifecycleTasks(input: {
       action: "open-ai-paste",
       evidence: [
         ...revision.changeSummary,
+        ...revision.revisionPasses.map((pass) => `${pass.label} pass: ${pass.rationale}`),
         ...revision.meaningDriftFindings.map((finding) => `${titleCase(finding.kind)} ${finding.severity}: ${finding.detail}`),
       ],
       nextStep: revision.meaningDriftFindings.length
@@ -1394,6 +1534,7 @@ function buildReviewerAgents(input: {
         missingInputs.includes("audience") ? "Confirm the intended audience before approving voice, detail level, and calls to action." : "",
         outlineCritique.length ? "Resolve outline critique items before treating section drafting as locked." : "",
         revision ? "Compare the proposed revision to the source text for meaning drift and over-compression." : "",
+        revision?.revisionPasses.length ? `Complete the ${revision.revisionPasses.map((pass) => pass.label).join(", ")} revision pass checklist before sign-off.` : "",
         revision?.meaningDriftFindings.length ? "Resolve meaning-drift findings before accepting the proposed revision." : "",
         documentEvidence.humanizationFindings.length ? "Rewrite current-document humanization findings before final reader review." : "",
         hasDraft ? "Run a humanization pass for generic AI phrasing, repetition, and claims that sound confident without support." : "",
@@ -1594,7 +1735,7 @@ function buildAuditTrail(input: {
     applicationMode,
     generatedAt,
   } = input;
-  const contextPayload = [plan.context, plan.placeholderText, plan.suggestedOutline, plan.revisionInstruction].join("\n---\n");
+  const contextPayload = [plan.context, plan.placeholderText, plan.suggestedOutline, plan.revisionInstruction, plan.revisionModes.join(", ")].join("\n---\n");
   const sourcePayload = [request.documentTitle || "", request.documentText || "", request.selectedText || ""].join("\n---\n");
   const outputPayload = [
     draftMarkdown,
@@ -1611,6 +1752,7 @@ function buildAuditTrail(input: {
       ...task.evidence,
     ]),
     ...reviewerAgents.flatMap((agent) => [agent.id, agent.label, agent.mandate, agent.status, ...agent.findings, ...agent.requiredActions]),
+    ...(revision?.revisionPasses.flatMap((pass) => [pass.mode, pass.label, pass.rationale, ...pass.checklist]) || []),
     ...sectionWorkQueue.flatMap((section) => [
       section.id,
       section.heading,
@@ -1648,6 +1790,9 @@ function buildAuditTrail(input: {
       documentEvidence.humanizationFindings.length
         ? `Humanization scan prepared ${documentEvidence.humanizationFindings.length} phrasing item(s) for editorial cleanup.`
         : "Humanization scan found no generic phrasing items.",
+      revision?.revisionPasses.length
+        ? `Revision pass plan prepared for ${revision.revisionPasses.map((pass) => pass.label).join(", ")}.`
+        : "No explicit revision pass plan was needed for this run.",
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
         : "No distribution target selected at packet generation time.",
@@ -1776,8 +1921,8 @@ function buildGovernanceItems(
       label: "Revision audit",
       detail: revision
         ? revision.meaningDriftFindings.length
-          ? `Original and proposed text are captured, with ${revision.meaningDriftFindings.length} meaning-drift item(s) requiring review.`
-          : "Original text, proposed text, change summary, and meaning-drift scan are captured for comparison."
+          ? `Original and proposed text are captured, with ${revision.revisionPasses.length} revision pass(es) and ${revision.meaningDriftFindings.length} meaning-drift item(s) requiring review.`
+          : `Original text, proposed text, ${revision.revisionPasses.length} revision pass(es), change summary, and meaning-drift scan are captured for comparison.`
         : "No selection-aware revision is part of this run.",
       status: revision ? (revision.meaningDriftFindings.length ? "needs-review" : "available") : "needs-review",
     },
@@ -2274,6 +2419,9 @@ function buildRunMarkdown(input: {
     "",
   ];
 
+  if (plan.revisionModes.length) {
+    lines.push("### Planned Revision Modes", "", ...plan.revisionModes.map((mode) => `- ${revisionPassProfile(mode).label}`), "");
+  }
   if (blockers.length) {
     lines.push("### Blockers", "", ...blockers.map((blocker) => `- [ ] ${blocker}`), "");
   }
@@ -2295,6 +2443,10 @@ function buildRunMarkdown(input: {
       "### Change Summary",
       "",
       ...revision.changeSummary.map((item) => `- ${item}`),
+      "",
+      "### Revision Passes",
+      "",
+      ...revisionPassesMarkdown(revision.revisionPasses),
       "",
       "### Meaning Drift",
       "",
@@ -2326,6 +2478,14 @@ function buildRunMarkdown(input: {
     "",
   );
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+function revisionPassesMarkdown(revisionPasses: AgenticRevisionPass[]) {
+  if (!revisionPasses.length) return ["- No explicit revision passes were detected for this run."];
+  return revisionPasses.flatMap((pass) => [
+    `- [ ] ${pass.label}: ${pass.rationale}`,
+    ...pass.checklist.map((item) => `  - ${item}`),
+  ]);
 }
 
 function meaningDriftMarkdown(findings: AgenticMeaningDriftFinding[]) {
