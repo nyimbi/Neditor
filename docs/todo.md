@@ -1500,8 +1500,11 @@ Finish:
 - Split source editor panes are implemented as a persisted dual-source toggle;
   focused browser proof now covers dual-pane editing from both panes,
   peer-pane/live-preview synchronization, primary preview-scroll sync, and
-  secondary-pane scroll isolation on a long document. Remaining work is native
-  desktop dual-pane editing and pointer/scroll ergonomics proof.
+  secondary-pane scroll isolation on a long document. Launched desktop smoke
+  now records mounted primary/secondary panes, bidirectional pane sync,
+  live-preview sync, primary preview-scroll sync, and secondary-pane scroll
+  isolation. Remaining work is broader platform and native pointer ergonomics
+  proof beyond the current macOS launched-webview smoke.
 
 ### 10. Editor Ergonomics
 
@@ -1548,8 +1551,8 @@ Finish:
 - Markdown syntax highlighting.
 - Diagnostics gutter/range visual-state local browser/native execution proof.
 - Broader Markdown shortcut edge cases.
-- Native Vim/Emacs keybinding execution proof and broader modal-editing parity
-  beyond the focused browser workflow.
+- Broader Vim/Emacs modal-editing parity beyond the focused browser and
+  launched-webview smoke coverage.
 
 ### 11. Preview Ergonomics
 

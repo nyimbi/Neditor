@@ -462,6 +462,17 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow continued markdown list in editor",
     "native workflow inserted paired bracket in editor",
     "native workflow edited multiple cursors in editor",
+    "native workflow mounted split source panes",
+    "native workflow synced secondary split pane to primary and preview",
+    "native workflow synced primary split pane back to secondary",
+    "native workflow primary split pane scroll synced preview",
+    "native workflow kept secondary split scroll isolated from preview",
+    "native workflow applied Emacs keybinding mode",
+    "native workflow edited with Emacs-style line commands",
+    "native workflow applied Vim keybinding mode",
+    "native workflow blocked printable Vim normal keys",
+    "native workflow edited with Vim normal insert and append",
+    "native workflow persisted Vim keybinding mode",
     "native workflow navigated outline heading to source",
     "native workflow opened command palette",
     "native workflow found dose template",
@@ -650,6 +661,50 @@ function validateNativeWorkflowReport(launchReport) {
     editorErgonomicsEvidence.multiCursor?.inserted !== true
   ) {
     issues.push(`native workflow report did not include editor ergonomics evidence: ${JSON.stringify(editorErgonomicsEvidence)}`);
+  }
+  const splitSourcePaneEvidence = payload.splitSourcePaneEvidence || {};
+  if (
+    splitSourcePaneEvidence.mount?.splitSourcePanes !== true ||
+    splitSourcePaneEvidence.mount?.primaryMounted !== true ||
+    splitSourcePaneEvidence.mount?.secondaryMounted !== true ||
+    splitSourcePaneEvidence.mount?.contentCount !== 2 ||
+    splitSourcePaneEvidence.mount?.dataSplitSource !== "true" ||
+    splitSourcePaneEvidence.secondaryEdit?.activeUpdated !== true ||
+    splitSourcePaneEvidence.secondaryEdit?.primaryUpdated !== true ||
+    splitSourcePaneEvidence.secondaryEdit?.secondaryUpdated !== true ||
+    splitSourcePaneEvidence.secondaryEdit?.previewUpdated !== true ||
+    splitSourcePaneEvidence.primaryEdit?.activeUpdated !== true ||
+    splitSourcePaneEvidence.primaryEdit?.primaryUpdated !== true ||
+    splitSourcePaneEvidence.primaryEdit?.secondaryUpdated !== true ||
+    splitSourcePaneEvidence.primaryEdit?.previewUpdated !== true ||
+    Number(splitSourcePaneEvidence.scroll?.primaryScrollTop || 0) <= 0 ||
+    Number(splitSourcePaneEvidence.scroll?.secondaryScrollTop || 0) <= 0 ||
+    Number(splitSourcePaneEvidence.scroll?.previewAfterPrimaryScroll || 0) <= 20 ||
+    Math.abs(Number(splitSourcePaneEvidence.scroll?.previewAfterSecondaryScroll || 0) - Number(splitSourcePaneEvidence.scroll?.previewAfterPrimaryScroll || 0)) >= 2
+  ) {
+    issues.push(`native workflow report did not include split source pane evidence: ${JSON.stringify(splitSourcePaneEvidence)}`);
+  }
+  const editorKeybindingEvidence = payload.editorKeybindingEvidence || {};
+  if (
+    editorKeybindingEvidence.emacsMode?.mode !== "emacs" ||
+    editorKeybindingEvidence.emacsMode?.status !== "Emacs-style keys" ||
+    editorKeybindingEvidence.emacsMode?.keymapAttribute !== "emacs" ||
+    editorKeybindingEvidence.emacsEdit?.edited !== true ||
+    editorKeybindingEvidence.emacsEdit?.text !== "Start Emacs target End" ||
+    editorKeybindingEvidence.vimMode?.mode !== "vim" ||
+    editorKeybindingEvidence.vimMode?.status !== "Vim insert mode" ||
+    editorKeybindingEvidence.vimMode?.keymapAttribute !== "vim" ||
+    editorKeybindingEvidence.vimMode?.vimAttribute !== "insert" ||
+    editorKeybindingEvidence.vimBlocked?.blocked !== true ||
+    editorKeybindingEvidence.vimBlocked?.textUnchanged !== true ||
+    editorKeybindingEvidence.vimBlocked?.status !== "Vim normal mode" ||
+    editorKeybindingEvidence.vimEdit?.edited !== true ||
+    editorKeybindingEvidence.vimEdit?.text !== "VIM Vim target done" ||
+    editorKeybindingEvidence.vimEdit?.status !== "Vim insert mode" ||
+    editorKeybindingEvidence.persistence?.mode !== "vim" ||
+    editorKeybindingEvidence.persistence?.status !== "Vim insert mode"
+  ) {
+    issues.push(`native workflow report did not include editor keybinding evidence: ${JSON.stringify(editorKeybindingEvidence)}`);
   }
   const outlineNavigationEvidence = payload.outlineNavigationEvidence?.outline || {};
   if (

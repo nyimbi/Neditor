@@ -7907,9 +7907,15 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     const editorErgonomicsEvidence = await collectNativeEditorErgonomicsEvidence(record);
     smokePhase = "editor-ergonomics";
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence });
+    const splitSourcePaneEvidence = await collectNativeSplitSourcePaneEvidence(record);
+    smokePhase = "split-source-panes";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence });
+    const editorKeybindingEvidence = await collectNativeEditorKeybindingEvidence(record);
+    smokePhase = "editor-keybindings";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence });
     const outlineNavigationEvidence = await collectNativeOutlineNavigationEvidence(record);
     smokePhase = "outline-navigation";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence });
 
     commandPaletteOpen.value = true;
     await nextTick();
@@ -8003,7 +8009,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       JSON.stringify(nativeMenuExportResult),
     );
     smokePhase = "html-export";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult });
     const editorSnippet = smokeSnippetAround(active.value.text, "weight_kg = 72");
     const previewSnippet = text("#live-preview").slice(0, 2000);
     const exportReadinessEvidence = store.exportReadiness
@@ -8016,12 +8022,12 @@ async function runDesktopWorkflowSmokeIfEnabled() {
         }
       : null;
     smokePhase = "export-profile-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult });
     const exportProfileEvidence = await collectNativeExportProfileEvidence(record);
     smokePhase = "export-profile";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     smokePhase = "theme-accessibility-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
     smokePhase = "theme-accessibility";
     await writeNativeWorkflowProgress(smokePhase, assertions, {
@@ -8029,6 +8035,8 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       snapshotEvidence,
       modeEvidence,
       editorErgonomicsEvidence,
+      splitSourcePaneEvidence,
+      editorKeybindingEvidence,
       outlineNavigationEvidence,
       exportResult,
       nativeMenuExportResult,
@@ -8059,6 +8067,8 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       sidebar: store.sidebar,
       modeEvidence,
       editorErgonomicsEvidence,
+      splitSourcePaneEvidence,
+      editorKeybindingEvidence,
       outlineNavigationEvidence,
       editorSnippet,
       previewSnippet,
@@ -9285,6 +9295,302 @@ async function collectNativeEditorErgonomicsEvidence(record: (name: string, pass
     store.codeFolding = original.codeFolding;
     await setNativeWorkflowText(original.text);
     await store.compileActive();
+    await nextTick();
+  }
+}
+
+async function collectNativeSplitSourcePaneEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const original = {
+    text: active.value.text,
+    mode: store.mode,
+    sidebar: store.sidebar,
+    splitSourcePanes: store.splitSourcePanes,
+  };
+  const evidence: Record<string, unknown> = {};
+  const surfaceText = (selector: string) => document.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim() || "";
+  try {
+    await setNativeWorkflowText(
+      [
+        "---",
+        "title: Native Split Source Proof",
+        "status: draft",
+        "---",
+        "",
+        "# Native Split Source Proof",
+        "",
+        "Opening native split-pane context.",
+        "",
+        ...Array.from({ length: 36 }, (_, index) => [`## Native Split Section ${index + 1}`, "", `Native split body ${index + 1}.`, ""]).flat(),
+      ].join("\n"),
+    );
+    await store.compileActive();
+    store.mode = "split";
+    store.sidebar = "outline";
+    store.splitSourcePanes = true;
+    await nextTick();
+    await waitForNativeWorkflowCondition(() => Boolean(editorView && secondaryEditorView), 1200);
+
+    const splitGrid = document.querySelector(".editor-split-grid") as HTMLElement | null;
+    evidence.mount = {
+      splitSourcePanes: store.splitSourcePanes,
+      primaryMounted: Boolean(editorView),
+      secondaryMounted: Boolean(secondaryEditorView),
+      contentCount: document.querySelectorAll(".editor-host .cm-content").length,
+      dataSplitSource: splitGrid?.dataset.splitSource || "",
+      primaryLabel: editorView?.contentDOM.getAttribute("aria-label") || "",
+      secondaryLabel: secondaryEditorView?.contentDOM.getAttribute("aria-label") || "",
+    };
+    record(
+      "native workflow mounted split source panes",
+      Boolean(
+        store.splitSourcePanes &&
+          editorView &&
+          secondaryEditorView &&
+          document.querySelectorAll(".editor-host .cm-content").length === 2 &&
+          splitGrid?.dataset.splitSource === "true",
+      ),
+      JSON.stringify(evidence.mount),
+    );
+
+    if (secondaryEditorView) {
+      secondaryEditorView.dispatch({
+        changes: { from: secondaryEditorView.state.doc.length, insert: "\n\n## Native Secondary Pane Draft\nSecondary native pane edit." },
+      });
+      previewTextCommit.flush(secondaryEditorView.state.doc.toString());
+      await waitForNativeWorkflowCondition(() => active.value.text.includes("Secondary native pane edit."), 1200);
+      await store.compileActive();
+      await nextTick();
+    }
+    evidence.secondaryEdit = {
+      activeUpdated: active.value.text.includes("Secondary native pane edit."),
+      primaryUpdated: editorView?.state.doc.toString().includes("## Native Secondary Pane Draft") || false,
+      secondaryUpdated: secondaryEditorView?.state.doc.toString().includes("Secondary native pane edit.") || false,
+      previewUpdated: surfaceText("#live-preview").includes("Secondary native pane edit."),
+    };
+    record(
+      "native workflow synced secondary split pane to primary and preview",
+      Boolean(
+        (evidence.secondaryEdit as { activeUpdated: boolean }).activeUpdated &&
+          (evidence.secondaryEdit as { primaryUpdated: boolean }).primaryUpdated &&
+          (evidence.secondaryEdit as { secondaryUpdated: boolean }).secondaryUpdated &&
+          (evidence.secondaryEdit as { previewUpdated: boolean }).previewUpdated,
+      ),
+      JSON.stringify(evidence.secondaryEdit),
+    );
+
+    if (editorView) {
+      editorView.dispatch({
+        changes: { from: editorView.state.doc.length, insert: "\n\n## Native Primary Pane Revision\nPrimary native pane edit." },
+      });
+      flushEditorTextToStore();
+      await waitForNativeWorkflowCondition(() => active.value.text.includes("Primary native pane edit."), 1200);
+      await store.compileActive();
+      await nextTick();
+    }
+    evidence.primaryEdit = {
+      activeUpdated: active.value.text.includes("Primary native pane edit."),
+      primaryUpdated: editorView?.state.doc.toString().includes("## Native Primary Pane Revision") || false,
+      secondaryUpdated: secondaryEditorView?.state.doc.toString().includes("Primary native pane edit.") || false,
+      previewUpdated: surfaceText("#live-preview").includes("Primary native pane edit."),
+    };
+    record(
+      "native workflow synced primary split pane back to secondary",
+      Boolean(
+        (evidence.primaryEdit as { activeUpdated: boolean }).activeUpdated &&
+          (evidence.primaryEdit as { primaryUpdated: boolean }).primaryUpdated &&
+          (evidence.primaryEdit as { secondaryUpdated: boolean }).secondaryUpdated &&
+          (evidence.primaryEdit as { previewUpdated: boolean }).previewUpdated,
+      ),
+      JSON.stringify(evidence.primaryEdit),
+    );
+
+    const previewPane = document.querySelector(".preview-pane") as HTMLElement | null;
+    if (editorView?.scrollDOM && secondaryEditorView?.scrollDOM && previewPane) {
+      editorView.scrollDOM.scrollTop = editorView.scrollDOM.scrollHeight * 0.82;
+      editorView.scrollDOM.dispatchEvent(new Event("scroll", { bubbles: true }));
+      await waitForNativeWorkflowCondition(() => previewPane.scrollTop > 20, 1200);
+      const previewAfterPrimaryScroll = previewPane.scrollTop;
+      secondaryEditorView.scrollDOM.scrollTop = secondaryEditorView.scrollDOM.scrollHeight * 0.18;
+      secondaryEditorView.scrollDOM.dispatchEvent(new Event("scroll", { bubbles: true }));
+      await nativeWorkflowDelay(240);
+      evidence.scroll = {
+        primaryScrollTop: editorView.scrollDOM.scrollTop,
+        secondaryScrollTop: secondaryEditorView.scrollDOM.scrollTop,
+        previewAfterPrimaryScroll,
+        previewAfterSecondaryScroll: previewPane.scrollTop,
+      };
+    } else {
+      evidence.scroll = { primaryScrollTop: 0, secondaryScrollTop: 0, previewAfterPrimaryScroll: 0, previewAfterSecondaryScroll: 0 };
+    }
+    const scroll = evidence.scroll as {
+      primaryScrollTop: number;
+      secondaryScrollTop: number;
+      previewAfterPrimaryScroll: number;
+      previewAfterSecondaryScroll: number;
+    };
+    record(
+      "native workflow primary split pane scroll synced preview",
+      scroll.primaryScrollTop > 0 && scroll.previewAfterPrimaryScroll > 20,
+      JSON.stringify(evidence.scroll),
+    );
+    record(
+      "native workflow kept secondary split scroll isolated from preview",
+      scroll.secondaryScrollTop > 0 && Math.abs(scroll.previewAfterSecondaryScroll - scroll.previewAfterPrimaryScroll) < 2,
+      JSON.stringify(evidence.scroll),
+    );
+
+    return evidence;
+  } finally {
+    store.mode = original.mode;
+    store.sidebar = original.sidebar;
+    store.splitSourcePanes = original.splitSourcePanes;
+    await nextTick();
+    await setNativeWorkflowText(original.text);
+    await store.compileActive();
+    await nextTick();
+  }
+}
+
+async function collectNativeEditorKeybindingEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const original = {
+    text: active.value.text,
+    mode: store.mode,
+    sidebar: store.sidebar,
+    editorKeymapMode: store.editorKeymapMode,
+  };
+  const evidence: Record<string, unknown> = {};
+  const insertAtSelection = (view: EditorView, text: string) => {
+    const transaction = view.state.changeByRange((range) => ({
+      changes: { from: range.from, to: range.to, insert: text },
+      range: EditorSelection.cursor(range.from + text.length),
+    }));
+    view.dispatch(transaction);
+    flushEditorTextToStore();
+  };
+  try {
+    store.mode = "split";
+    store.sidebar = "settings";
+    store.editorKeymapMode = "emacs";
+    await nextTick();
+    await waitForNativeWorkflowCondition(() => editorView?.contentDOM.getAttribute("data-keymap-mode") === "emacs", 1200);
+    const emacsMode = {
+      mode: store.editorKeymapMode,
+      status: editorKeymapStatus.value,
+      keymapAttribute: editorView?.contentDOM.getAttribute("data-keymap-mode") || "",
+    };
+    evidence.emacsMode = emacsMode;
+    record(
+      "native workflow applied Emacs keybinding mode",
+      emacsMode.mode === "emacs" && emacsMode.status === "Emacs-style keys" && emacsMode.keymapAttribute === "emacs",
+      JSON.stringify(emacsMode),
+    );
+
+    await setNativeWorkflowText("Emacs target");
+    await nextTick();
+    if (editorView) {
+      editorView.dispatch({ selection: { anchor: editorView.state.doc.length } });
+      cursorLineStart(editorView);
+      insertAtSelection(editorView, "Start ");
+      cursorLineEnd(editorView);
+      insertAtSelection(editorView, " End");
+    }
+    evidence.emacsEdit = {
+      text: active.value.text,
+      edited: active.value.text === "Start Emacs target End",
+    };
+    record(
+      "native workflow edited with Emacs-style line commands",
+      (evidence.emacsEdit as { edited: boolean }).edited,
+      JSON.stringify(evidence.emacsEdit),
+    );
+
+    store.editorKeymapMode = "vim";
+    await nextTick();
+    await waitForNativeWorkflowCondition(() => editorView?.contentDOM.getAttribute("data-keymap-mode") === "vim", 1200);
+    const vimMode = {
+      mode: store.editorKeymapMode,
+      status: editorKeymapStatus.value,
+      keymapAttribute: editorView?.contentDOM.getAttribute("data-keymap-mode") || "",
+      vimAttribute: editorView?.contentDOM.getAttribute("data-vim-mode") || "",
+    };
+    evidence.vimMode = vimMode;
+    record(
+      "native workflow applied Vim keybinding mode",
+      vimMode.mode === "vim" && vimMode.status === "Vim insert mode" && vimMode.keymapAttribute === "vim" && vimMode.vimAttribute === "insert",
+      JSON.stringify(vimMode),
+    );
+
+    await setNativeWorkflowText("Vim target");
+    await nextTick();
+    if (editorView) {
+      editorView.dispatch({ selection: { anchor: editorView.state.doc.length } });
+      vimInputMode.value = "normal";
+      await nextTick();
+      const beforeBlockedKey = active.value.text;
+      const blockedEvent = new KeyboardEvent("keydown", { key: "z", bubbles: true });
+      const blocked = handleVimNormalKey(blockedEvent, editorView);
+      evidence.vimBlocked = {
+        blocked,
+        textUnchanged: active.value.text === beforeBlockedKey,
+        status: editorKeymapStatus.value,
+        vimAttribute: editorView.contentDOM.getAttribute("data-vim-mode") || "",
+      };
+      record(
+        "native workflow blocked printable Vim normal keys",
+        Boolean(
+          (evidence.vimBlocked as { blocked: boolean }).blocked &&
+            (evidence.vimBlocked as { textUnchanged: boolean }).textUnchanged &&
+            (evidence.vimBlocked as { status: string }).status === "Vim normal mode",
+        ),
+        JSON.stringify(evidence.vimBlocked),
+      );
+
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "0", bubbles: true }), editorView);
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "i", bubbles: true }), editorView);
+      await nextTick();
+      insertAtSelection(editorView, "VIM ");
+      vimInputMode.value = "normal";
+      await nextTick();
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "$", bubbles: true }), editorView);
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "a", bubbles: true }), editorView);
+      await nextTick();
+      insertAtSelection(editorView, " done");
+    }
+    evidence.vimEdit = {
+      text: active.value.text,
+      edited: active.value.text === "VIM Vim target done",
+      status: editorKeymapStatus.value,
+    };
+    record(
+      "native workflow edited with Vim normal insert and append",
+      Boolean((evidence.vimEdit as { edited: boolean }).edited && (evidence.vimEdit as { status: string }).status === "Vim insert mode"),
+      JSON.stringify(evidence.vimEdit),
+    );
+
+    store.editorKeymapMode = "vim";
+    await store.persistWorkspace();
+    await store.loadPreferences();
+    await nextTick();
+    const persistedKeymapMode = String(store.editorKeymapMode);
+    evidence.persistence = {
+      mode: persistedKeymapMode,
+      status: editorKeymapStatus.value,
+    };
+    record(
+      "native workflow persisted Vim keybinding mode",
+      persistedKeymapMode === "vim" && editorKeymapStatus.value === "Vim insert mode",
+      JSON.stringify(evidence.persistence),
+    );
+
+    return evidence;
+  } finally {
+    store.mode = original.mode;
+    store.sidebar = original.sidebar;
+    store.editorKeymapMode = original.editorKeymapMode;
+    await nextTick();
+    await setNativeWorkflowText(original.text);
+    await store.compileActive();
+    await store.persistWorkspace();
     await nextTick();
   }
 }

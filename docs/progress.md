@@ -38,7 +38,10 @@ Recent pushed checkpoints visible in current git history:
   focused Chromium workflow now opens a long document, edits from both panes,
   verifies peer-pane/live-preview synchronization, and checks that primary-pane
   scroll drives preview sync without secondary-pane scroll hijacking the
-  preview position.
+  preview position. The launched desktop smoke now records the same class of
+  proof in `.tmp/desktop-smoke/native-workflow-report.json` with mounted
+  primary/secondary CodeMirror panes, bidirectional pane sync, live-preview
+  sync, and scroll-isolation evidence.
 - Editor keybinding modes are no longer deferred. Settings now persists
   Default, Emacs-style, and Vim-style modes; Emacs mode uses CodeMirror's
   native Emacs keymap, and Vim-style mode adds visible insert/normal state plus
@@ -48,7 +51,9 @@ Recent pushed checkpoints visible in current git history:
   Chromium workflow now proves Emacs line-start/line-end editing, Vim
   insert/normal status transitions, normal-mode character blocking,
   line-start insertion, line-end append editing, and persisted Vim mode after
-  reload.
+  reload. The launched desktop smoke now records Emacs and Vim mode
+  attributes/status, Emacs line editing, Vim normal-mode blocking, Vim
+  insert/append editing, and persisted Vim preference reload.
 - Smart Markdown list continuation now covers more business-writing edge cases:
   tab-indented lists, zero-padded ordered lists, uppercase checked task lists,
   and nested blockquoted numbered lists, with width-preserving ordered-list
