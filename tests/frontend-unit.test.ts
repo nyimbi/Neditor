@@ -962,6 +962,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agenticWorkflowPlaybooks"));
   ok(app.includes("applyAgentWorkflowPlaybook"));
   ok(app.includes("Workflow Playbooks"));
+  ok(app.includes("Agent Workspace playbooks"));
+  ok(app.includes("agent-playbooks"));
+  ok(app.includes("Run a workflow playbook"));
   ok(app.includes("buildAgenticWorkflowPlan"));
   ok(app.includes("buildAgenticWorkflowRun"));
   ok(app.includes("agentPlan"));

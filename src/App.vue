@@ -3338,10 +3338,10 @@ const helpTopics = computed<HelpTopic[]>(() => [
     id: "ai-first-composition",
     title: "AI-first document creation",
     category: "writing",
-    summary: "Use Docs Live as the agentic composer for outlines, context gathering, drafting, QA, and review preparation.",
+    summary: "Use Docs Live and Agent Workspace playbooks for outlines, context gathering, drafting, QA, review, and distribution preparation.",
     when: "Use this when you want to start from a business outcome instead of a blank page.",
     steps: [
-      "Open AI Create or Docs Live and choose the document type.",
+      "Open AI Create, Docs Live, or Agent Workspace and choose a workflow playbook when the work matches a common business pattern.",
       "Give the agent the audience, outcome, constraints, source facts, tone, and placeholder values.",
       "Let the AI-created questionnaire expose missing context before drafting.",
       "Generate the draft section by section, then use the QA register and humanization checklist before applying it.",
@@ -3357,6 +3357,29 @@ const helpTopics = computed<HelpTopic[]>(() => [
       { label: "Review AI governance", run: () => (store.sidebar = "review") },
     ],
     keywords: ["AI first", "agentic", "create", "compose", "questionnaire", "QA", "humanize"],
+  },
+  {
+    id: "agent-workspace",
+    title: "Agent Workspace playbooks",
+    category: "writing",
+    summary: "Start complex document work from reusable AI playbooks, then generate governed packets with reviewers, section work queues, and export runbooks.",
+    when: "Use this when the document needs more than one step, such as creation plus revision, evidence review, approval, provider handoff, and distribution.",
+    steps: [
+      "Open Agent Workspace and choose a playbook such as Board Memo To Approval, Client Proposal Package, SOP From Outline, Technical Paper With LaTeX, Publish To Blog And Substack, or Executive Revision Pass.",
+      "Edit the generated instruction so it names the audience, owner, deadline, evidence, reviewer, and target delivery channels.",
+      "Plan the workflow to inspect lanes, missing inputs, placeholders, outline, and next actions.",
+      "Generate the agent packet, then review the AI Control Center, reviewer agents, section work queue, audit trail, and distribution runbooks before applying or sending to a provider.",
+    ],
+    tips: [
+      "Playbooks are starting points, not hidden automation: the full instruction remains editable before generation.",
+      "Provider handoff packages include reviewer agents and section work queues so an approved model can continue the same governed workflow.",
+    ],
+    actions: [
+      { label: "Open Agent Workspace", run: () => openAgentWorkspace() },
+      { label: "Board memo playbook", run: () => openAgentWorkspace(agenticWorkflowPlaybooks[0]?.instruction || "") },
+      { label: "Publishing playbook", run: () => openAgentWorkspace(agenticWorkflowPlaybooks.find((playbook) => playbook.id === "publish-to-blog-and-substack")?.instruction || "") },
+    ],
+    keywords: ["agent", "playbook", "workflow", "board memo", "proposal", "SOP", "substack", "provider"],
   },
   {
     id: "guided-demo",
@@ -3686,6 +3709,19 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Add placeholders such as client, audience, owner, deadline, and required evidence.",
     ],
     run: () => startAiDocumentCreation(),
+  },
+  {
+    id: "agent-playbooks",
+    title: "Run a workflow playbook",
+    mode: "Agent Workspace",
+    summary: "Start common business workflows from reusable agent instructions.",
+    detail: "Agent Workspace playbooks turn board approvals, proposals, SOPs, technical papers, publishing packages, and executive revision passes into editable governed workflows.",
+    points: [
+      "Choose a playbook and adjust the instruction for the current document.",
+      "Inspect missing inputs, reviewer agents, and section work queue before applying output.",
+      "Build a provider package when an approved model should continue the workflow.",
+    ],
+    run: () => openAgentWorkspace(agenticWorkflowPlaybooks[0]?.instruction || ""),
   },
   {
     id: "outline",
