@@ -217,9 +217,10 @@ web app.
   a replan action that restarts from the saved instruction against the current
   document context.
   Provider handoff packages turn that run into
-  redacted prompts, JSON request bodies, headers, cURL starters, and safety
-  checklists for approved AI providers or local model gateways without storing
-  secrets in the document. If policy allows direct calls, users can run the
+  redacted prompts, lifecycle task-board context, reviewer/section work queues,
+  JSON request bodies, headers, cURL starters, and safety checklists for
+  approved AI providers or local model gateways without storing secrets in the
+  document. If policy allows direct calls, users can run the
   request with a session-only API key, preview the provider's Markdown response,
   and apply it as review material without persisting the secret.
 - AI Create makes Docs Live the default first step for intent-led drafting,

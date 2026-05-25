@@ -118,9 +118,10 @@ Use **Build provider request** when your team wants a credentialed model to
 continue the work outside the local deterministic planner. Choose the approved
 provider profile, model, endpoint, and API-key environment variable. NEditor
 creates a redacted handoff package with system prompt, user prompt, JSON body,
-headers, cURL starter, and a safety checklist. The package is designed for
-review before it leaves the local document workspace; it does not place API
-keys or provider secrets into Markdown.
+headers, cURL starter, lifecycle task-board context, reviewer assignments,
+section work queue, and a safety checklist. The package is designed for review
+before it leaves the local document workspace; it does not place API keys or
+provider secrets into Markdown.
 
 If policy allows direct execution, enter the API key in **Session API key** and
 choose **Run provider request**. The key is held only in the open dialog, is not

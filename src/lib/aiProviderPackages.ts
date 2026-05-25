@@ -185,6 +185,8 @@ function buildUserPrompt(run: AgenticWorkflowRun) {
     "",
     `Reviewer agents:\n${run.reviewerAgents.map((agent) => `- ${agent.label} [${agent.status}]: ${agent.mandate}`).join("\n")}`,
     "",
+    `Lifecycle task board:\n${run.lifecycleTasks.map(formatLifecycleTask).join("\n")}`,
+    "",
     `Section work queue:\n${run.sectionWorkQueue
       .map((section) => `- ${section.order}. ${section.heading} (${section.lane}; reviewers: ${section.reviewerAgentIds.join(", ")}): ${section.draftingInstruction}`)
       .join("\n")}`,
@@ -199,6 +201,18 @@ function buildUserPrompt(run: AgenticWorkflowRun) {
     "- Preserve or add ai-source and ai-assisted review metadata.",
     "- Include a final QA checklist and review handoff.",
   ].join("\n");
+}
+
+function formatLifecycleTask(task: AgenticWorkflowRun["lifecycleTasks"][number]) {
+  const routing = [task.sectionId ? `section=${task.sectionId}` : "", task.target ? `target=${task.target}` : ""].filter(Boolean).join("; ");
+  const evidence = task.evidence.slice(0, 3).join(" | ");
+  return [
+    `- ${task.title} (${task.lane}; ${task.status}; owner: ${task.owner}; action: ${task.action}${routing ? `; ${routing}` : ""})`,
+    task.nextStep ? `  Next: ${task.nextStep}` : "",
+    evidence ? `  Evidence: ${evidence}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function concreteHeaders(headers: Record<string, string>, apiKey: string) {

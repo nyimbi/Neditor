@@ -615,6 +615,8 @@ test("AI provider packages redact secrets and preserve agent governance context"
   ok(providerPackage.systemPrompt.includes("preserve Markdown structure"));
   ok(providerPackage.userPrompt.includes("Capital Allocation Memo"));
   ok(providerPackage.userPrompt.includes("Reviewer agents:"));
+  ok(providerPackage.userPrompt.includes("Lifecycle task board:"));
+  ok(providerPackage.userPrompt.includes("Final human approval and release readiness"));
   ok(providerPackage.userPrompt.includes("Section work queue:"));
   ok(providerPackage.userPrompt.includes("Required response"));
   ok(JSON.stringify(providerPackage.requestBody).includes("approved-doc-model"));
