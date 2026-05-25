@@ -2477,10 +2477,10 @@
         />
         <section v-if="commandAgentInstructionAvailable" class="command-agent-route" aria-label="AI command route">
           <div>
-            <strong>Run as agent instruction</strong>
-            <span>Create, edit, review, or prepare distribution from this typed request.</span>
+            <strong>Generate with AI agent</strong>
+            <span>Plan the workflow, create a governed packet, and keep it ready for review or distribution.</span>
           </div>
-          <button type="button" @click="runCommandPaletteAgentInstruction">Open Agent</button>
+          <button type="button" @click="runCommandPaletteAgentInstruction">Generate Packet</button>
         </section>
         <button
           v-for="command in filteredCommands"
@@ -8576,7 +8576,8 @@ async function runCommandPaletteAgentInstruction() {
   closeCommandPalette();
   await nextTick();
   openAgentWorkspace(instruction);
-  store.statusMessage = "Routed command palette instruction to the AI agent workspace";
+  generateAgentWorkspaceRun();
+  store.statusMessage = "Generated agent packet from command palette instruction";
 }
 
 function toolbarIconPaths(icon: ToolbarIconName) {
