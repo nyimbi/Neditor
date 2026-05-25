@@ -105,7 +105,8 @@ where each selected-text, document, or section edit can be accepted, rejected,
 sent for another revision pass, and applied only after approval. The packet also
 includes document-type quality gates for board memos, proposals, policies, SOPs,
 research/technical papers, publishing drafts, and other supported documents, plus
-distribution gates and blockers for missing inputs, and
+distribution gates, a review comment resolution queue with per-comment required
+actions, resolution options, task notes, and blocker status, and missing-input blockers. It
 shows an **AI Control Center** with readiness score, next actions, source
 grounding, governance state, and distribution state so reviewers can see what is
 safe to do next before applying generated text. The control center and reviewer

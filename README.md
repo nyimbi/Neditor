@@ -214,7 +214,9 @@ web app.
   caveats, an edit acceptance queue for accepting, rejecting, revising, and
   applying only approved edits item by item, document-type quality gates for
   board memos, proposals, policies, SOPs, research/technical documents,
-  publishing drafts, and other supported business documents, named reviewer agents for editorial, evidence, risk,
+  publishing drafts, and other supported business documents, a review comment
+  resolution queue with per-comment required actions, resolution options, task
+  notes, and blocker status, named reviewer agents for editorial, evidence, risk,
   citation, governance, and export readiness, deterministic outline critique
   for coverage, sequencing, duplication, depth, and specificity, deterministic
   humanization findings for generic, repetitive, vague, or overconfident

@@ -168,11 +168,23 @@ export interface AgentRunHistoryHumanizationFinding {
   recommendation: string;
 }
 
+export interface AgentRunHistoryReviewCommentResolution {
+  id: string;
+  line: number;
+  author: string;
+  createdAt: string;
+  excerpt: string;
+  requiredAction: string;
+  resolutionOptions: string[];
+  blocker: boolean;
+}
+
 export interface AgentRunHistoryDocumentEvidence {
   unresolvedPlaceholders: string[];
   citationTodos: string[];
   claimInventory: AgentRunHistoryDocumentClaim[];
   humanizationFindings: AgentRunHistoryHumanizationFinding[];
+  reviewCommentResolutions: AgentRunHistoryReviewCommentResolution[];
   unreviewedAiMarkers: number;
   unresolvedComments: number;
   approvalMetadataMissing: string[];
@@ -636,15 +648,54 @@ function normalizeAgentRunHistoryHumanizationFindings(value: unknown): AgentRunH
   return findings;
 }
 
+function normalizeAgentRunHistoryReviewCommentResolutions(value: unknown): AgentRunHistoryReviewCommentResolution[] {
+  if (!Array.isArray(value)) return [];
+  const comments: AgentRunHistoryReviewCommentResolution[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const excerpt = normalizedString(item.excerpt, 500);
+    if (!excerpt) continue;
+    const line = Math.max(Math.floor(numberValue(item.line) ?? 0), 0);
+    comments.push({
+      id: normalizedString(item.id, 120) || `review-comment-${line}-${comments.length + 1}`,
+      line,
+      author: normalizedString(item.author, 120) || "Reviewer",
+      createdAt: normalizedString(item.createdAt, 120) || "",
+      excerpt,
+      requiredAction: normalizedString(item.requiredAction, 500) || "Answer, resolve, or carry forward this review comment.",
+      resolutionOptions: normalizedStringArray(item.resolutionOptions, 10, 300),
+      blocker: booleanValue(item.blocker) || false,
+    });
+    if (comments.length >= 80) break;
+  }
+  return comments;
+}
+
+function normalizedStringArray(value: unknown, limit: number, itemLimit: number) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of value) {
+    const normalized = normalizedString(item, itemLimit);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
 function normalizeAgentRunHistoryDocumentEvidence(value: unknown): AgentRunHistoryDocumentEvidence | undefined {
   if (!isRecord(value)) return undefined;
+  const reviewCommentResolutions = normalizeAgentRunHistoryReviewCommentResolutions(value.reviewCommentResolutions);
   return {
     unresolvedPlaceholders: stringArray(value.unresolvedPlaceholders, 80) || [],
     citationTodos: stringArray(value.citationTodos, 80) || [],
     claimInventory: normalizeAgentRunHistoryDocumentClaims(value.claimInventory),
     humanizationFindings: normalizeAgentRunHistoryHumanizationFindings(value.humanizationFindings),
+    reviewCommentResolutions,
     unreviewedAiMarkers: Math.max(Math.floor(numberValue(value.unreviewedAiMarkers) ?? 0), 0),
-    unresolvedComments: Math.max(Math.floor(numberValue(value.unresolvedComments) ?? 0), 0),
+    unresolvedComments: Math.max(Math.floor(numberValue(value.unresolvedComments) ?? reviewCommentResolutions.length), 0),
     approvalMetadataMissing: stringArray(value.approvalMetadataMissing, 20) || [],
     brokenLinkHints: stringArray(value.brokenLinkHints, 80) || [],
   };

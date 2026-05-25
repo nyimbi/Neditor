@@ -687,6 +687,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Quality Assurance"));
   ok(run.markdown.includes("### Document-Type Quality Gates"));
   ok(run.markdown.includes("Client Need"));
+  ok(run.markdown.includes("## Review Comment Resolution Queue"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-quality-gates"));
   ok(run.markdown.includes("## Distribution"));
   ok(run.markdown.includes("### Target Runbooks"));
@@ -863,6 +864,7 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Claim inventory" && item.status === "needs-review"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Resolve document placeholders" && action.action === "open-ai-paste"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Review evidence and governance blockers" && action.detail.includes("citation TODO")));
+  ok(run.controlCenter.nextActions.some((action) => action.label === "Resolve review comments" && action.status === "blocked"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Verify claim inventory" && action.detail.includes("candidate claim")));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Humanize current document" && action.action === "open-ai-paste"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Repair distribution blockers" && action.action === "prepare-export"));
@@ -876,7 +878,8 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-citations" && task.owner === "Evidence Agent"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-claim-inventory" && task.evidence.some((item) => item.includes("ARR grows by 18%"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-humanization" && task.evidence.some((item) => item.includes("comprehensive analysis"))));
-  ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-comments" && task.nextStep.includes("Resolve")));
+  ok(run.documentEvidence.reviewCommentResolutions.some((comment) => comment.excerpt.includes("Confirm finance source") && comment.requiredAction.includes("source evidence")));
+  ok(run.lifecycleTasks.some((task) => task.id.startsWith("task-review-comment-") && task.nextStep.includes("source evidence")));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-ai-review" && task.owner === "Governance Agent"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-links" && task.action === "prepare-export"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata" && task.evidence.some((item) => item.includes("approvedAt"))));
@@ -885,7 +888,7 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("humanization findings"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.findings.some((item) => item.includes("citation TODO"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.requiredActions.some((item) => item.includes("claim inventory"))));
-  ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("review comments"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("review comment resolution queue"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "governance" && agent.requiredActions.some((item) => item.includes("human-reviewed"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("approvedAt"))));
 });
@@ -1148,6 +1151,18 @@ test("workspace persistence migration versions and normalizes saved settings", (
           humanizationFindings: [
             { kind: "generic-phrase", sourceLine: 7, text: " It is important to note. ", recommendation: " Use specific owner language. " },
           ],
+          reviewCommentResolutions: [
+            {
+              id: " review-comment-9-abc ",
+              line: 9.7,
+              author: " CFO ",
+              createdAt: " 2026-05-25 ",
+              excerpt: " Confirm forecast basis. ",
+              requiredAction: " Attach source evidence. ",
+              resolutionOptions: [" Resolve with source ", " Resolve with source "],
+              blocker: true,
+            },
+          ],
           unreviewedAiMarkers: 2,
           unresolvedComments: 1,
           approvalMetadataMissing: ["approvedBy"],
@@ -1354,6 +1369,18 @@ test("workspace persistence migration versions and normalizes saved settings", (
       humanizationFindings: [
         { kind: "generic-phrase", sourceLine: 7, text: "It is important to note.", recommendation: "Use specific owner language." },
       ],
+      reviewCommentResolutions: [
+        {
+          id: "review-comment-9-abc",
+          line: 9,
+          author: "CFO",
+          createdAt: "2026-05-25",
+          excerpt: "Confirm forecast basis.",
+          requiredAction: "Attach source evidence.",
+          resolutionOptions: ["Resolve with source"],
+          blocker: true,
+        },
+      ],
       unreviewedAiMarkers: 2,
       unresolvedComments: 1,
       approvalMetadataMissing: ["approvedBy"],
@@ -1504,6 +1531,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("acceptedAgentEditCount"));
   ok(app.includes("setAgentEditAcceptanceStatus"));
   ok(app.includes("applyAcceptedAgentEdits"));
+  ok(app.includes("Review Comment Resolution Queue"));
+  ok(app.includes("agentRun.documentEvidence.reviewCommentResolutions"));
+  ok(app.includes("setAgentReviewCommentStatus"));
   ok(app.includes("Revise"));
   ok(app.includes("agent-context-score"));
   ok(app.includes("agentRun"));

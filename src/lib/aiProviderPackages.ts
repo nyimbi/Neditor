@@ -295,6 +295,9 @@ function buildAiProviderSourcePack(run: AgenticWorkflowRun): AiProviderSourcePac
   const governanceBlockers = [
     evidence.unreviewedAiMarkers ? `${evidence.unreviewedAiMarkers} AI provenance marker(s) need human review.` : "",
     evidence.unresolvedComments ? `${evidence.unresolvedComments} unresolved review comment(s) remain.` : "",
+    ...evidence.reviewCommentResolutions
+      .slice(0, 8)
+      .map((comment) => `Review comment line ${comment.line}: ${comment.excerpt} | Required action: ${comment.requiredAction}`),
     ...run.blockers,
   ].filter(Boolean);
   const distributionBlockers = [

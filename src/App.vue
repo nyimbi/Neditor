@@ -2231,6 +2231,54 @@
                 </article>
               </section>
             </section>
+            <section
+              v-if="agentRun.documentEvidence.reviewCommentResolutions.length"
+              class="agent-review-comment-queue"
+              aria-label="Review comment resolution queue"
+            >
+              <header>
+                <div>
+                  <strong>Review Comment Resolution Queue</strong>
+                  <span>Turn unresolved comments into reviewer-owned decisions with notes before release.</span>
+                </div>
+                <small>{{ agentRun.documentEvidence.reviewCommentResolutions.length }} unresolved</small>
+              </header>
+              <ol>
+                <li
+                  v-for="comment in agentRun.documentEvidence.reviewCommentResolutions"
+                  :key="comment.id"
+                  :data-blocker="comment.blocker"
+                  :data-status="agentReviewCommentState(comment)?.status || 'queued'"
+                >
+                  <div>
+                    <small>
+                      Line {{ comment.line }} | {{ comment.author }} | {{ agentReviewCommentState(comment)?.status || "queued" }}
+                    </small>
+                    <strong>{{ comment.excerpt }}</strong>
+                    <p>{{ comment.requiredAction }}</p>
+                    <p v-if="agentReviewCommentState(comment)?.note" class="sidebar-hint">
+                      Resolution note: {{ agentReviewCommentState(comment)?.note }}
+                    </p>
+                  </div>
+                  <ul>
+                    <li v-for="option in comment.resolutionOptions" :key="option">{{ option }}</li>
+                  </ul>
+                  <div class="agent-lifecycle-actions">
+                    <button type="button" @click="setAgentReviewCommentStatus(comment, 'in-progress')">Start</button>
+                    <button type="button" @click="setAgentReviewCommentStatus(comment, 'needs-review')">Carry forward</button>
+                    <button type="button" @click="setAgentReviewCommentStatus(comment, 'complete')">Resolve</button>
+                  </div>
+                  <label>
+                    Resolution note
+                    <input
+                      :value="agentReviewCommentState(comment)?.note || ''"
+                      placeholder="Decision, source, owner, date, or carry-forward reason"
+                      @change="setAgentReviewCommentNote(comment, inputValue($event))"
+                    />
+                  </label>
+                </li>
+              </ol>
+            </section>
             <section v-if="agentRun.editAcceptanceQueue.length" class="agent-edit-acceptance-queue" aria-label="Agent edit acceptance queue">
               <header>
                 <div>
@@ -2837,6 +2885,7 @@ import {
   type AgenticWorkflowRun,
   type AgenticLifecycleTask,
   type AgenticEditAcceptanceItem,
+  type AgenticReviewCommentResolution,
   type AgenticSectionWorkItem,
   type AgenticWorkflowStep,
 } from "./lib/agenticWorkflows";
@@ -4718,6 +4767,24 @@ function setAgentEditAcceptanceNote(item: AgenticEditAcceptanceItem, note: strin
   persistAgentEditAcceptanceStates();
   store.statusMessage = `Updated ${item.heading} acceptance note`;
 }
+function agentReviewCommentTask(comment: AgenticReviewCommentResolution) {
+  return agentRun.value?.lifecycleTasks.find((task) => task.id === `task-${comment.id}`) || null;
+}
+function agentReviewCommentState(comment: AgenticReviewCommentResolution) {
+  const task = agentReviewCommentTask(comment);
+  if (!task) return null;
+  return agentLifecycleTaskStates.value[task.id] || defaultAgentLifecycleTaskState(task);
+}
+function setAgentReviewCommentStatus(comment: AgenticReviewCommentResolution, status: AgentLifecycleExecutionStatus) {
+  const task = agentReviewCommentTask(comment);
+  if (!task) return;
+  setAgentLifecycleTaskStatus(task, status);
+}
+function setAgentReviewCommentNote(comment: AgenticReviewCommentResolution, note: string) {
+  const task = agentReviewCommentTask(comment);
+  if (!task) return;
+  setAgentLifecycleTaskNote(task, note);
+}
 function appendAgentHistoryPacket(item: AgentRunHistoryItem) {
   if (!item.packetMarkdown) return;
   applyAgentMarkdown(item.packetMarkdown, "append-packet");
@@ -4750,7 +4817,7 @@ function agentRunHistoryEvidenceSummary(item: AgentRunHistoryItem) {
     evidence.citationTodos.length ? `${evidence.citationTodos.length} citation TODOs` : "",
     evidence.claimInventory.length ? `${evidence.claimInventory.length} claims` : "",
     evidence.humanizationFindings.length ? `${evidence.humanizationFindings.length} humanization notes` : "",
-    evidence.unresolvedComments ? `${evidence.unresolvedComments} comments` : "",
+    evidence.reviewCommentResolutions.length ? `${evidence.reviewCommentResolutions.length} comment queue items` : evidence.unresolvedComments ? `${evidence.unresolvedComments} comments` : "",
     evidence.unreviewedAiMarkers ? `${evidence.unreviewedAiMarkers} AI markers` : "",
     evidence.brokenLinkHints.length ? `${evidence.brokenLinkHints.length} link checks` : "",
   ].filter(Boolean);
@@ -9786,6 +9853,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-run-output,
 .app-shell[data-theme="dark"] .agent-control-center,
 .app-shell[data-theme="dark"] .agent-control-grid article,
+.app-shell[data-theme="dark"] .agent-review-comment-queue,
+.app-shell[data-theme="dark"] .agent-review-comment-queue li,
 .app-shell[data-theme="dark"] .agent-reviewer-agents,
 .app-shell[data-theme="dark"] .agent-reviewer-grid article,
 .app-shell[data-theme="dark"] .agent-section-workqueue,
@@ -9830,6 +9899,10 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-step-list small,
 .app-shell[data-theme="dark"] .agent-run-output > header span,
 .app-shell[data-theme="dark"] .agent-run-output > header small,
+.app-shell[data-theme="dark"] .agent-review-comment-queue > header span,
+.app-shell[data-theme="dark"] .agent-review-comment-queue > header small,
+.app-shell[data-theme="dark"] .agent-review-comment-queue small,
+.app-shell[data-theme="dark"] .agent-review-comment-queue ul,
 .app-shell[data-theme="dark"] .agent-reviewer-agents > header span,
 .app-shell[data-theme="dark"] .agent-reviewer-agents > header small,
 .app-shell[data-theme="dark"] .agent-reviewer-grid article header span,
@@ -9913,6 +9986,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-run-output,
   .app-shell[data-theme="system"] .agent-control-center,
   .app-shell[data-theme="system"] .agent-control-grid article,
+  .app-shell[data-theme="system"] .agent-review-comment-queue,
+  .app-shell[data-theme="system"] .agent-review-comment-queue li,
   .app-shell[data-theme="system"] .agent-reviewer-agents,
   .app-shell[data-theme="system"] .agent-reviewer-grid article,
   .app-shell[data-theme="system"] .agent-section-workqueue,
@@ -9957,6 +10032,10 @@ select:hover {
   .app-shell[data-theme="system"] .agent-step-list small,
   .app-shell[data-theme="system"] .agent-run-output > header span,
   .app-shell[data-theme="system"] .agent-run-output > header small,
+  .app-shell[data-theme="system"] .agent-review-comment-queue > header span,
+  .app-shell[data-theme="system"] .agent-review-comment-queue > header small,
+  .app-shell[data-theme="system"] .agent-review-comment-queue small,
+  .app-shell[data-theme="system"] .agent-review-comment-queue ul,
   .app-shell[data-theme="system"] .agent-reviewer-agents > header span,
   .app-shell[data-theme="system"] .agent-reviewer-agents > header small,
   .app-shell[data-theme="system"] .agent-reviewer-grid article header span,
@@ -10025,6 +10104,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-run-output,
 .app-shell[data-high-contrast="true"] .agent-control-center,
 .app-shell[data-high-contrast="true"] .agent-control-grid article,
+.app-shell[data-high-contrast="true"] .agent-review-comment-queue,
+.app-shell[data-high-contrast="true"] .agent-review-comment-queue li,
 .app-shell[data-high-contrast="true"] .agent-reviewer-agents,
 .app-shell[data-high-contrast="true"] .agent-reviewer-grid article,
 .app-shell[data-high-contrast="true"] .agent-section-workqueue,
@@ -11642,6 +11723,8 @@ select:hover {
 .agent-run-output,
 .agent-control-center,
 .agent-control-grid article,
+.agent-review-comment-queue,
+.agent-review-comment-queue li,
 .agent-reviewer-agents,
 .agent-reviewer-grid article,
 .agent-section-workqueue,
@@ -11922,6 +12005,13 @@ select:hover {
   background: #fbfcf4;
 }
 
+.agent-review-comment-queue {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #8c5a2f;
+  background: #fff8f1;
+}
+
 .agent-lifecycle-board {
   display: grid;
   gap: 10px;
@@ -11930,6 +12020,7 @@ select:hover {
 }
 
 .agent-section-workqueue > header,
+.agent-review-comment-queue > header,
 .agent-edit-acceptance-queue > header,
 .agent-lifecycle-board > header {
   display: flex;
@@ -11939,6 +12030,8 @@ select:hover {
 
 .agent-section-workqueue > header div,
 .agent-section-workqueue li > div,
+.agent-review-comment-queue > header div,
+.agent-review-comment-queue li > div,
 .agent-edit-acceptance-queue > header div,
 .agent-edit-acceptance-queue li > div,
 .agent-lifecycle-board > header div,
@@ -11951,6 +12044,9 @@ select:hover {
 .agent-section-workqueue > header small,
 .agent-section-workqueue small,
 .agent-section-workqueue span,
+.agent-review-comment-queue > header span,
+.agent-review-comment-queue > header small,
+.agent-review-comment-queue small,
 .agent-edit-acceptance-queue > header span,
 .agent-edit-acceptance-queue > header small,
 .agent-edit-acceptance-queue small,
@@ -11989,6 +12085,7 @@ select:hover {
 }
 
 .agent-section-workqueue ol,
+.agent-review-comment-queue ol,
 .agent-edit-acceptance-queue ol,
 .agent-lifecycle-board ol {
   display: grid;
@@ -12012,6 +12109,21 @@ select:hover {
   border-left: 3px solid #c09a55;
 }
 
+.agent-review-comment-queue li {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.7fr) minmax(0, 1fr);
+  gap: 10px;
+  border-left: 3px solid #b5854f;
+}
+
+.agent-review-comment-queue li[data-blocker="true"] {
+  border-left-color: #b34040;
+}
+
+.agent-review-comment-queue li[data-status="complete"] {
+  border-left-color: #2f7d4c;
+}
+
 .agent-edit-acceptance-queue li {
   display: grid;
   gap: 10px;
@@ -12032,6 +12144,8 @@ select:hover {
 
 .agent-section-workqueue p,
 .agent-section-workqueue ul,
+.agent-review-comment-queue p,
+.agent-review-comment-queue ul,
 .agent-edit-acceptance-queue p,
 .agent-edit-acceptance-queue ul,
 .agent-lifecycle-board p,
@@ -12092,6 +12206,7 @@ select:hover {
 }
 
 .agent-section-workqueue small,
+.agent-review-comment-queue small,
 .agent-edit-acceptance-queue small,
 .agent-lifecycle-board small {
   font-weight: 800;
@@ -12099,6 +12214,7 @@ select:hover {
 }
 
 .agent-section-workqueue ul,
+.agent-review-comment-queue ul,
 .agent-edit-acceptance-queue ul,
 .agent-lifecycle-board ul {
   display: grid;
@@ -13583,6 +13699,7 @@ select:hover {
   .agent-reviewer-grid,
   .agent-audit-grid,
   .agent-edit-acceptance-compare,
+  .agent-review-comment-queue li,
   .agent-section-workqueue li,
   .agent-history li,
   .agent-history dl,

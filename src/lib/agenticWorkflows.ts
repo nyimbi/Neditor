@@ -164,6 +164,7 @@ export interface AgenticDocumentEvidence {
   citationTodos: string[];
   claimInventory: AgenticDocumentClaim[];
   humanizationFindings: AgenticHumanizationFinding[];
+  reviewCommentResolutions: AgenticReviewCommentResolution[];
   unreviewedAiMarkers: number;
   unresolvedComments: number;
   approvalMetadataMissing: string[];
@@ -182,6 +183,17 @@ export interface AgenticHumanizationFinding {
   sourceLine: number;
   text: string;
   recommendation: string;
+}
+
+export interface AgenticReviewCommentResolution {
+  id: string;
+  line: number;
+  author: string;
+  createdAt: string;
+  excerpt: string;
+  requiredAction: string;
+  resolutionOptions: string[];
+  blocker: boolean;
 }
 
 export interface AgenticWorkflowRun {
@@ -450,12 +462,12 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
         generatedAt,
       })
     : null;
-  const reviewChecklist = buildReviewChecklist(plan, revision, editAcceptanceQueue);
   const distributionTargetPlans = buildDistributionTargetPlans(plan);
   const distributionChecklist = buildDistributionChecklist(plan, distributionTargetPlans);
   const blockers = buildRunBlockers(plan, hasDocument, hasSelection);
   const applicationMode = inferApplicationMode(plan, hasDocument, hasSelection);
   const documentEvidence = analyzeAgenticDocumentEvidence(request.documentText || "", plan);
+  const reviewChecklist = buildReviewChecklist(plan, revision, editAcceptanceQueue, documentEvidence);
   const outlineCritique = buildOutlineCritique(plan);
   const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence, outlineCritique });
   const reviewerAgents = buildReviewerAgents({
@@ -1209,6 +1221,7 @@ function buildReviewChecklist(
   plan: AgenticWorkflowPlan,
   revision: AgenticWorkflowRevision | null,
   editAcceptanceQueue: AgenticEditAcceptanceItem[],
+  documentEvidence: AgenticDocumentEvidence,
 ) {
   return [
     "Confirm the document has a clear audience, decision, owner, deadline, and review status.",
@@ -1219,6 +1232,7 @@ function buildReviewChecklist(
     revision?.revisionPasses.length ? `Complete revision passes before acceptance: ${revision.revisionPasses.map((pass) => pass.label).join(", ")}.` : "",
     editAcceptanceQueue.length ? "Accept, reject, or request revision for each edit acceptance queue item before applying changes." : "",
     ...plan.qualityGates.map((gate) => `${gate.label}: ${gate.detail}`),
+    documentEvidence.reviewCommentResolutions.length ? "Resolve, answer, or deliberately carry forward every review comment resolution queue item before release." : "",
     revision?.meaningDriftFindings.length ? "Resolve all meaning-drift findings before accepting the revision." : "",
     plan.distributionTargets.length ? "Run export readiness for every requested distribution target." : "",
   ].filter(Boolean);
@@ -1625,16 +1639,35 @@ function buildDocumentEvidenceLifecycleTasks(documentEvidence: AgenticDocumentEv
     });
   }
   if (documentEvidence.unresolvedComments) {
-    tasks.push({
-      id: "task-evidence-comments",
-      lane: "review",
-      title: "Close unresolved review comments",
-      owner: "Risk Reviewer",
-      status: "needs-input",
-      action: "open-review",
-      evidence: [`${documentEvidence.unresolvedComments} unresolved review comment(s) detected.`],
-      nextStep: "Resolve, answer, or deliberately carry forward each review comment before release handoff.",
-    });
+    const comments = documentEvidence.reviewCommentResolutions.slice(0, 8);
+    for (const comment of comments) {
+      tasks.push({
+        id: `task-${comment.id}`,
+        lane: "review",
+        title: `Resolve review comment on line ${comment.line}`,
+        owner: "Risk Reviewer",
+        status: comment.blocker ? "blocked" : "needs-input",
+        action: "open-review",
+        evidence: [
+          `Line ${comment.line}${comment.author ? ` by ${comment.author}` : ""}: ${comment.excerpt}`,
+          `Required action: ${comment.requiredAction}`,
+          ...comment.resolutionOptions.slice(0, 3).map((option) => `Option: ${option}`),
+        ],
+        nextStep: comment.requiredAction,
+      });
+    }
+    if (documentEvidence.unresolvedComments > comments.length) {
+      tasks.push({
+        id: "task-evidence-comments-overflow",
+        lane: "review",
+        title: "Close remaining unresolved review comments",
+        owner: "Risk Reviewer",
+        status: "needs-input",
+        action: "open-review",
+        evidence: [`${documentEvidence.unresolvedComments - comments.length} additional unresolved review comment(s) need triage.`],
+        nextStep: "Resolve, answer, or deliberately carry forward every remaining review comment before release handoff.",
+      });
+    }
   }
   if (documentEvidence.unreviewedAiMarkers) {
     tasks.push({
@@ -2015,7 +2048,10 @@ function buildReviewerAgents(input: {
       findings: [
         blockers.length ? `${blockers.length} blocker or missing-input item(s) remain.` : "No blocker items were generated for this packet.",
         documentEvidence.unresolvedComments
-          ? `${documentEvidence.unresolvedComments} unresolved review comment(s) remain in the current document.`
+          ? `${documentEvidence.unresolvedComments} unresolved review comment(s) remain in the current document: ${documentEvidence.reviewCommentResolutions
+              .slice(0, 3)
+              .map((comment) => `line ${comment.line} ${comment.excerpt}`)
+              .join("; ")}.`
           : "No unresolved review comments were detected in the current document.",
         revision?.meaningDriftFindings.length
           ? `${revision.meaningDriftFindings.filter((item) => item.severity === "blocker").length} blocker meaning-drift item(s) require approval.`
@@ -2026,7 +2062,7 @@ function buildReviewerAgents(input: {
         ...hardBlockers,
         blockers.length && !hardBlockers.length ? "Resolve all missing-input blockers before marking the packet approved." : "",
         revision?.meaningDriftFindings.length ? "Approve, restore, or explicitly document every meaning-drift finding before release handoff." : "",
-        documentEvidence.unresolvedComments ? "Resolve current-document review comments before release handoff." : "",
+        documentEvidence.reviewCommentResolutions.length ? "Work through the review comment resolution queue with resolution notes before release handoff." : "",
         plan.lanes.includes("distribute") ? "Confirm approval status, reviewer, and release owner before any external handoff." : "",
       ],
     }),
@@ -2225,6 +2261,16 @@ function buildAuditTrail(input: {
     ]),
     ...outlineCritique.flatMap((item) => [item.severity, item.area, item.heading, item.detail, item.recommendation]),
     ...documentEvidence.humanizationFindings.flatMap((item) => [item.kind, String(item.sourceLine), item.text, item.recommendation]),
+    ...documentEvidence.reviewCommentResolutions.flatMap((item) => [
+      item.id,
+      String(item.line),
+      item.author,
+      item.createdAt,
+      item.excerpt,
+      item.requiredAction,
+      String(item.blocker),
+      ...item.resolutionOptions,
+    ]),
     ...reviewChecklist,
     ...distributionChecklist,
     ...distributionTargetPlans.flatMap((target) => [target.target, target.label, ...target.preflightChecks, ...target.handoffSteps, ...target.evidenceRequired]),
@@ -2263,6 +2309,9 @@ function buildAuditTrail(input: {
         ? `User source pack included ${plan.sourcePack.items.length} structured item(s) for provider and reviewer grounding.`
         : "No user-managed source pack items were supplied.",
       `Document-type quality gates staged: ${plan.qualityGates.map((gate) => gate.label).join(", ")}.`,
+      documentEvidence.reviewCommentResolutions.length
+        ? `Review comment resolution queue staged for ${documentEvidence.reviewCommentResolutions.length} unresolved comment(s).`
+        : "No review comment resolution queue was needed.",
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
         : "No distribution target selected at packet generation time.",
@@ -2479,6 +2528,16 @@ function buildNextActions(
       status: "needs-input",
     });
   }
+  if (documentEvidence.reviewCommentResolutions.length) {
+    const blockerCount = documentEvidence.reviewCommentResolutions.filter((comment) => comment.blocker).length;
+    actions.push({
+      label: "Resolve review comments",
+      detail: `${documentEvidence.reviewCommentResolutions.length} comment(s) need resolution notes${blockerCount ? `, including ${blockerCount} blocker-risk comment(s)` : ""}.`,
+      lane: "review",
+      action: "open-review",
+      status: blockerCount ? "blocked" : "needs-input",
+    });
+  }
   if (documentEvidence.claimInventory.length) {
     actions.push({
       label: "Verify claim inventory",
@@ -2650,7 +2709,8 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
   const citationTodos = Array.from(new Set(extractCitationTodoItems(documentText).map((item) => item.excerpt))).slice(0, 12);
   const unreviewedAiSources = [...documentText.matchAll(/```ai-source[\s\S]*?```/g)].filter((block) => !/\bstatus:\s*human-reviewed\b/i.test(block[0])).length;
   const unreviewedAiAssisted = [...documentText.matchAll(/<!--\s*ai-assisted:[\s\S]*?-->/g)].filter((marker) => !/\bstatus\s*=\s*human-reviewed\b/i.test(marker[0])).length;
-  const unresolvedComments = [...documentText.matchAll(/<!--\s*comment:\s*unresolved\b/gi)].length;
+  const reviewCommentResolutions = extractReviewCommentResolutions(documentText);
+  const unresolvedComments = reviewCommentResolutions.length;
   const approvalMetadataMissing = plan.distributionTargets.length
     ? ["status", "reviewer", "approvedAt"].filter((key) => !new RegExp(`^${key}:\\s*\\S`, "im").test(documentText))
     : [];
@@ -2665,11 +2725,109 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
     citationTodos,
     claimInventory,
     humanizationFindings,
+    reviewCommentResolutions,
     unreviewedAiMarkers: unreviewedAiSources + unreviewedAiAssisted,
     unresolvedComments,
     approvalMetadataMissing,
     brokenLinkHints,
   };
+}
+
+function extractReviewCommentResolutions(documentText: string): AgenticReviewCommentResolution[] {
+  const comments: AgenticReviewCommentResolution[] = [];
+  const seen = new Set<string>();
+  const pattern = /<!--\s*comment:\s*unresolved\b([\s\S]*?)-->/gi;
+  for (const match of documentText.matchAll(pattern)) {
+    const raw = (match[1] || "").replace(/\s+/g, " ").trim();
+    const parsed = parseReviewCommentBody(raw);
+    const line = sourceLineForIndex(documentText, match.index || 0);
+    const excerpt = parsed.excerpt || "Unresolved review comment";
+    const key = `${line}:${excerpt.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    comments.push({
+      id: `review-comment-${line}-${stableFingerprint(`${line}\n${parsed.author}\n${excerpt}`).slice(0, 8)}`,
+      line,
+      author: parsed.author,
+      createdAt: parsed.createdAt,
+      excerpt,
+      requiredAction: reviewCommentRequiredAction(excerpt),
+      resolutionOptions: reviewCommentResolutionOptions(excerpt),
+      blocker: reviewCommentIsBlocker(excerpt),
+    });
+    if (comments.length >= 24) break;
+  }
+  return comments;
+}
+
+function parseReviewCommentBody(raw: string) {
+  const segments = raw
+    .replace(/^\|/, "")
+    .split("|")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  let author = "Reviewer";
+  let createdAt = "";
+  const notes: string[] = [];
+  for (const segment of segments) {
+    const keyValue = segment.match(/^([a-z][a-z0-9_-]*)\s*:\s*(.+)$/i);
+    if (keyValue) {
+      const key = keyValue[1].toLowerCase();
+      const value = keyValue[2].trim();
+      if (key === "author" || key === "reviewer" || key === "by") {
+        author = value;
+      } else if (key === "at" || key === "date" || key === "created") {
+        createdAt = value;
+      } else if (key === "note" || key === "comment" || key === "text") {
+        notes.push(value);
+      }
+      continue;
+    }
+    notes.push(segment);
+  }
+  return {
+    author: author.slice(0, 80),
+    createdAt: createdAt.slice(0, 80),
+    excerpt: (notes.join(" | ") || raw || "Unresolved review comment").slice(0, 240),
+  };
+}
+
+function reviewCommentRequiredAction(excerpt: string) {
+  if (/\b(source|citation|evidence|proof|data|metric|finance|forecast|basis)\b/i.test(excerpt)) {
+    return "Attach source evidence, add a citation TODO, or document why the claim is being carried forward.";
+  }
+  if (/\b(approval|approved|legal|contract|compliance|policy|risk)\b/i.test(excerpt)) {
+    return "Get the named approval or record a risk owner and explicit carry-forward decision.";
+  }
+  if (/\b(tone|clarity|rewrite|wording|audience|concise)\b/i.test(excerpt)) {
+    return "Revise the wording, then record whether the reviewer accepted the change.";
+  }
+  return "Answer the reviewer, apply the requested change, or carry the comment forward with owner and date.";
+}
+
+function reviewCommentResolutionOptions(excerpt: string) {
+  const options = [
+    "Resolve after applying the requested document change.",
+    "Answer with a reviewer-visible resolution note.",
+    "Carry forward intentionally with owner, date, and release impact.",
+  ];
+  if (/\b(source|citation|evidence|proof|data|metric|finance|forecast|basis)\b/i.test(excerpt)) {
+    options.unshift("Attach source evidence or a citation TODO next to the affected claim.");
+  }
+  if (/\b(approval|approved|legal|contract|compliance|policy|risk)\b/i.test(excerpt)) {
+    options.unshift("Route to the approving reviewer before distribution.");
+  }
+  return Array.from(new Set(options)).slice(0, 5);
+}
+
+function reviewCommentIsBlocker(excerpt: string) {
+  return /\b(block(?:er|ing)?|must|required|approval|approved|legal|contract|compliance|policy|risk|source|citation|evidence|finance|forecast|basis)\b/i.test(
+    excerpt,
+  );
+}
+
+function sourceLineForIndex(text: string, index: number) {
+  return text.slice(0, index).split(/\r?\n/).length;
 }
 
 function extractDocumentClaimInventory(documentText: string): AgenticDocumentClaim[] {
@@ -2922,6 +3080,7 @@ function buildRunMarkdown(input: {
   lines.push(...outlineCritiqueMarkdown(outlineCritique));
   lines.push(...claimInventoryMarkdown(documentEvidence.claimInventory));
   lines.push(...humanizationFindingsMarkdown(documentEvidence.humanizationFindings));
+  lines.push(...reviewCommentResolutionsMarkdown(documentEvidence.reviewCommentResolutions));
   lines.push(...editAcceptanceQueueMarkdown(editAcceptanceQueue));
   lines.push(...lifecycleTasksMarkdown(lifecycleTasks));
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
@@ -3128,6 +3287,23 @@ function humanizationFindingsMarkdown(findings: AgenticHumanizationFinding[]) {
     ...findings.map(
       (finding) =>
         `| ${finding.sourceLine} | ${finding.kind} | ${escapeTableCell(finding.text)} | ${escapeTableCell(finding.recommendation)} |`,
+    ),
+    "",
+  ];
+}
+
+function reviewCommentResolutionsMarkdown(comments: AgenticReviewCommentResolution[]) {
+  if (!comments.length) {
+    return ["## Review Comment Resolution Queue", "", "No unresolved current-document review comments were detected.", ""];
+  }
+  return [
+    "## Review Comment Resolution Queue",
+    "",
+    "| Line | Author | Blocker | Comment | Required action | Resolution options |",
+    "| ---: | --- | --- | --- | --- | --- |",
+    ...comments.map(
+      (comment) =>
+        `| ${comment.line} | ${escapeTableCell(comment.author)} | ${comment.blocker ? "yes" : "no"} | ${escapeTableCell(comment.excerpt)} | ${escapeTableCell(comment.requiredAction)} | ${escapeTableCell(comment.resolutionOptions.join("; "))} |`,
     ),
     "",
   ];
