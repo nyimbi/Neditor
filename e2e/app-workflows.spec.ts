@@ -513,6 +513,55 @@ async function installTauriMock(page: Page, stateKey: string) {
       return artifacts;
     }
 
+    function figureBlocksFromMarkdown(text: string, sourceFile: string) {
+      return text.split(/\r?\n/).flatMap((line, index) => {
+        const match = line.match(/^!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?/);
+        if (!match) return [];
+        const attrs = parseFigureAttributes(match[3] || "");
+        return [
+          {
+            kind: "figure",
+            line: index + 1,
+            end_line: index + 1,
+            id: attrs.id || null,
+            src: match[2].trim(),
+            alt: match[1].trim(),
+            caption: attrs.caption || null,
+            float: attrs.float || null,
+            fit: attrs.fit || null,
+            position: attrs.position || null,
+            source: {
+              source_file: sourceFile,
+              source_line: index + 1,
+              end_source_line: index + 1,
+            },
+          },
+        ];
+      });
+    }
+
+    function parseFigureAttributes(raw: string) {
+      const attrs: Record<string, string> = {};
+      const id = raw.match(/#([A-Za-z0-9_.:-]+)/)?.[1];
+      if (id) attrs.id = id;
+      for (const match of raw.matchAll(/\b(caption|float|fit|position)=["']([^"']+)["']/g)) {
+        attrs[match[1]] = match[2];
+      }
+      return attrs;
+    }
+
+    function mediaFilesFromFigures(figures: Array<{ src: string | null; source: { source_file: string } | null }>) {
+      const seen = new Set<string>();
+      return figures.flatMap((figure) => {
+        const src = figure.src || "";
+        if (!src || src.startsWith("data:") || src.includes("://") || src.startsWith("#")) return [];
+        const path = resolveRelativePath(figure.source?.source_file || "/workspace/market.md", src);
+        if (seen.has(path)) return [];
+        seen.add(path);
+        return [{ path, hash: hash(src) }];
+      });
+    }
+
     function mockTransformEngines() {
       return [
         {
@@ -603,6 +652,7 @@ async function installTauriMock(page: Page, stateKey: string) {
       const aiSources = aiSourcesFromMarkdown(compiled);
       const aiAssistedSections = aiAssistedSectionsFromMarkdown(compiled);
       const transformArtifacts = transformArtifactsFromMarkdown(compiled, filePath);
+      const figureBlocks = figureBlocksFromMarkdown(compiled, filePath);
       const sourceHash = hash(text);
       const frontMatterScalars = frontMatterScalarMap(text);
       const projectVariables = projectVariableScalars(filePath);
@@ -641,7 +691,7 @@ async function installTauriMock(page: Page, stateKey: string) {
         output_path: null,
         output_hash: null,
         included_files: expanded.includedFiles,
-        media_files: [],
+        media_files: mediaFilesFromFigures(figureBlocks),
         layout_sections: [],
         export_target: "html",
         export_options: {},
@@ -669,7 +719,7 @@ async function installTauriMock(page: Page, stateKey: string) {
           outline: headings,
           tables: (text.match(/^\|/gm) || []).length ? 1 : 0,
           table_summaries: [],
-          figures: 0,
+          figures: figureBlocks.length,
           equations: 0,
           citations: citationReferences,
           citation_references: citationReferences,
@@ -685,15 +735,18 @@ async function installTauriMock(page: Page, stateKey: string) {
         },
         document_ast: {
           metadata: { ...metadata, source_hash: sourceHash },
-          blocks: headings.map((heading) => ({
-            kind: "heading",
-            level: heading.level,
-            text: heading.text,
-            anchor: heading.anchor,
-            line: heading.line,
-            end_line: heading.line,
-            source: null,
-          })),
+          blocks: [
+            ...headings.map((heading) => ({
+              kind: "heading",
+              level: heading.level,
+              text: heading.text,
+              anchor: heading.anchor,
+              line: heading.line,
+              end_line: heading.line,
+              source: null,
+            })),
+            ...figureBlocks,
+          ],
         },
         paged_document: { sections: [] },
         diagnostics,
@@ -2303,6 +2356,8 @@ test("navigates compiler diagnostics to the source range", async ({ page }) => {
     "# Diagnostic Navigation",
     "",
     ...Array.from({ length: 20 }, (_, index) => [`## Section ${index + 1}`, "", `Context paragraph ${index + 1}.`, ""]).flat(),
+    '![Architecture diagram](assets/architecture.png){#fig:architecture caption="Architecture diagram" fit="cover" position="top"}',
+    "",
     "## Diagnostic Target",
     "",
     "This line contains DIAGNOSTIC_TARGET for source navigation.",
@@ -2329,6 +2384,8 @@ test("navigates compiler diagnostics to the source range", async ({ page }) => {
   await expect(diagnosticInventory).toContainText("Source map");
   await expect(diagnosticInventory).toContainText("Export manifest");
   await expect(diagnosticInventory.locator(".snapshot-row").filter({ hasText: "Transform artifacts" })).toContainText("artifacts");
+  await expect(diagnosticInventory.locator(".snapshot-row").filter({ hasText: "Media map" })).toContainText("1 media files");
+  await expect(diagnosticInventory.locator(".snapshot-row").filter({ hasText: "Figure media uses" })).toContainText("1 figure uses");
 
   const diagnosticsList = page.getByRole("list", { name: "Compiler diagnostics" });
   const diagnostic = diagnosticsList.getByRole("listitem", { name: /warning diagnostic: Mock diagnostic target needs review/ });

@@ -1679,6 +1679,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("compilerOutputInventory"));
   ok(app.includes("outputInventoryItem"));
   ok(app.includes("Compiled Markdown"));
+  ok(app.includes('outputInventoryItem("Media map"'));
+  ok(app.includes('outputInventoryItem("Figure media uses"'));
   ok(app.includes("Export manifest"));
   ok(app.includes('aria-label="Git-free versioning guidance"'));
   ok(app.includes("Snapshot-first document history"));

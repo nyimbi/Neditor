@@ -4278,6 +4278,7 @@ const compilerOutputInventory = computed<CompilerOutputInventoryItem[]>(() => {
   const compile = active.value.compile;
   const metadataKeys = Object.keys(compile?.metadata || {});
   const manifest = compile?.export_manifest;
+  const figureMediaUses = (compile?.document_ast.blocks || []).filter((block) => block.kind === "figure" && Boolean(block.src));
   return [
     outputInventoryItem("Compiled Markdown", compile?.compiled_markdown, (value) => `${value.length} characters`),
     outputInventoryItem("HTML preview", compile?.html, (value) => `${value.length} characters`),
@@ -4292,6 +4293,8 @@ const compilerOutputInventory = computed<CompilerOutputInventoryItem[]>(() => {
     outputInventoryItem("Index terms", compile?.index_terms, (value) => `${value.length} terms`),
     outputInventoryItem("Formula graph", compile?.formula_graph, (value) => `${value.length} formulas`),
     outputInventoryItem("Transform artifacts", compile?.transform_artifacts, (value) => `${value.length} artifacts`),
+    outputInventoryItem("Media map", manifest?.media_files, (value) => `${value.length} media files`),
+    outputInventoryItem("Figure media uses", figureMediaUses, (value) => `${value.length} figure uses`),
     outputInventoryItem("Export manifest", manifest, (value) => `${value.included_files.length} files, ${value.transform_artifacts.length} transforms`),
   ];
 });

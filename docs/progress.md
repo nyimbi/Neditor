@@ -2800,6 +2800,13 @@ AI lifecycle task preservation verification:
 | --- | --- | --- |
 | `pnpm run test:unit` | Pass | 45 frontend unit tests passed, including a long-outline, evidence-heavy, nine-target agentic release run proving the bounded lifecycle task board preserves every target-specific distribution task plus final release readiness while keeping section drafting and evidence tasks present. |
 
+Compiler media inventory verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | Frontend static coverage now requires the Compiler output inventory to expose explicit Media map and Figure media uses rows. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "navigates compiler diagnostics" --project chromium` | Pass | The browser workflow opens a document with a figure and diagnostic target, then proves the Diagnostics sidebar reports `Media map` with one media file and `Figure media uses` with one figure use beside the source-ranged diagnostic inventory. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
