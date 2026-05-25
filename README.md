@@ -248,7 +248,8 @@ web app.
   Recent generated/applied agent runs are kept in searchable local workspace
   history with status, lane, and target filters, run IDs, readiness, apply
   mode, provider, fingerprints, section/reviewer counts, a bounded packet
-  snapshot that can be appended or copied later, and a replan action that
+  snapshot that can be appended or copied later, filtered audit packages that
+  can be inserted or copied for review evidence, and a replan action that
   restarts from the saved instruction against the current document context.
   Provider handoff packages turn that run into
   redacted prompts, source evidence packs with extracted claims, citation TODOs,

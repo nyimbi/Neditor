@@ -2692,6 +2692,10 @@
                 <span>Local audit records for generated and applied agent work.</span>
               </div>
               <small>{{ filteredAgentRunHistory.length }} of {{ store.agentRunHistory.length }} saved</small>
+              <div class="agent-history-audit-actions">
+                <button type="button" :disabled="!filteredAgentRunHistory.length" @click="insertAgentHistoryAudit">Insert audit</button>
+                <button type="button" :disabled="!filteredAgentRunHistory.length" @click="copyAgentHistoryAudit">Copy audit</button>
+              </div>
             </header>
             <section class="agent-history-filters" aria-label="Filter agent run history">
               <label>
@@ -5217,6 +5221,72 @@ async function copyAgentHistoryPacket(item: AgentRunHistoryItem) {
     store.statusMessage = `Copied saved agent packet ${item.runId}`;
   } catch {
     store.statusMessage = `Saved agent packet ${item.runId} is ready to copy`;
+  }
+}
+function agentHistoryAuditMarkdown() {
+  const runs = filteredAgentRunHistory.value;
+  const generatedAt = new Date().toISOString();
+  const filters = [
+    agentHistoryQuery.value.trim() ? `query=${agentHistoryQuery.value.trim()}` : "",
+    agentHistoryStatusFilter.value !== "all" ? `status=${agentHistoryStatusFilter.value}` : "",
+    agentHistoryLaneFilter.value !== "all" ? `lane=${agentHistoryLaneFilter.value}` : "",
+    agentHistoryTargetFilter.value !== "all" ? `target=${agentHistoryTargetFilter.value}` : "",
+  ].filter(Boolean);
+  const lines = [
+    "## Agent Run History Audit",
+    "",
+    "```ai-audit",
+    "type: agent-run-history",
+    `generatedAt: ${generatedAt}`,
+    `runs: ${runs.length}`,
+    `filters: ${filters.join("; ") || "all"}`,
+    "source: NEditor Agent Workspace",
+    "```",
+    "",
+    "| Run | Status | Lanes | Targets | Readiness | Provider | Evidence | Tasks |",
+    "| --- | --- | --- | --- | ---: | --- | --- | --- |",
+    ...runs.slice(0, 24).map((item) =>
+      [
+        agentAuditTableCell(`${item.title} (${item.runId})`),
+        agentAuditTableCell(item.status),
+        agentAuditTableCell(item.lanes.join(", ")),
+        agentAuditTableCell(item.distributionTargets.join(", ") || "review"),
+        `${item.readinessScore}`,
+        agentAuditTableCell(item.providerProfile || "local planner"),
+        agentAuditTableCell(agentRunHistoryEvidenceSummary(item)),
+        agentAuditTableCell(agentRunHistoryTaskStateSummary(item) || `${item.taskCount || 0} tasks`),
+      ].join(" | ").replace(/^/, "| ").replace(/$/, " |"),
+    ),
+    "",
+    "### Run Notes",
+    "",
+    ...runs.slice(0, 24).flatMap((item) => [
+      `- **${agentAuditInline(item.title)}** (${agentAuditInline(item.runId)}): ${agentAuditInline(item.controlCenter?.summary || item.packetPreview || "No summary captured.")}`,
+      item.outlineCritique?.length ? `  - Outline: ${agentAuditInline(agentRunHistoryOutlineSummary(item))}` : "",
+      item.sourcePack ? `  - Source pack: ${agentAuditInline(agentRunHistorySourcePackSummary(item))}` : "",
+    ].filter(Boolean)),
+  ];
+  return lines.join("\n");
+}
+function agentAuditTableCell(value: string) {
+  return (value || "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
+}
+function agentAuditInline(value: string) {
+  return (value || "").replace(/\r?\n/g, " ").trim();
+}
+function insertAgentHistoryAudit() {
+  if (!filteredAgentRunHistory.value.length) return;
+  insertBlock(agentHistoryAuditMarkdown());
+  store.statusMessage = `Inserted agent history audit for ${filteredAgentRunHistory.value.length} runs`;
+}
+async function copyAgentHistoryAudit() {
+  if (!filteredAgentRunHistory.value.length) return;
+  const audit = agentHistoryAuditMarkdown();
+  try {
+    await navigator.clipboard?.writeText(audit);
+    store.statusMessage = `Copied agent history audit for ${filteredAgentRunHistory.value.length} runs`;
+  } catch {
+    store.statusMessage = "Agent history audit is ready to copy";
   }
 }
 function agentRunHistoryTaskStateSummary(item: AgentRunHistoryItem) {
@@ -13059,7 +13129,20 @@ select:hover {
   gap: 12px;
 }
 
-.agent-history > header div,
+.agent-history-audit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.agent-history-audit-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.agent-history > header div:not(.agent-history-audit-actions),
 .agent-history li > div {
   display: grid;
   gap: 2px;

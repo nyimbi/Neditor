@@ -1603,6 +1603,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentHistoryStatusFilter"));
   ok(app.includes("agentHistoryLaneFilter"));
   ok(app.includes("agentHistoryTargetFilter"));
+  ok(app.includes("agentHistoryAuditMarkdown"));
+  ok(app.includes("insertAgentHistoryAudit"));
+  ok(app.includes("copyAgentHistoryAudit"));
+  ok(app.includes("## Agent Run History Audit"));
+  ok(app.includes("```ai-audit"));
+  ok(app.includes("Inserted agent history audit"));
+  ok(app.includes("Copied agent history audit"));
   ok(app.includes("No agent runs match the current history filters."));
   ok(app.includes("Workflow Playbooks"));
   ok(app.includes("Agent Workspace playbooks"));

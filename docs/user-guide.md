@@ -96,7 +96,9 @@ reviewer tasks, provider source evidence pack, and saved run history. The run
 history can be searched and filtered by status, workflow lane, or output target
 so generated packets, applied revisions, provider-applied drafts, evidence
 blockers, and distribution handoffs remain recoverable after the workspace
-accumulates multiple agent runs. The plan also scores context completeness across
+accumulates multiple agent runs. Use **Insert audit** or **Copy audit** to turn
+the filtered history into a Markdown evidence package for reviewers, release
+notes, or customer handoff records. The plan also scores context completeness across
 audience, evidence, constraints, examples, tone, and approval context, with
 recommendations for missing grounding before users generate a first draft.
 
