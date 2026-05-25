@@ -490,6 +490,8 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Review Agents"));
   ok(run.markdown.includes("### Editorial Reviewer"));
   ok(run.markdown.includes("### Export Reviewer"));
+  ok(run.markdown.includes("## Section Work Queue"));
+  ok(run.markdown.includes("Completion criteria:"));
   ok(run.markdown.includes("## Agent Audit Trail"));
   ok(run.markdown.includes("### Rollback Plan"));
   ok(run.markdown.includes("Substack newsletter package"));
@@ -511,6 +513,10 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.requiredActions.some((item) => item.includes("Verify every material claim"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("Google Docs collaboration package"))));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Reviewer agents prepared")));
+  ok(run.sectionWorkQueue.length >= 5);
+  ok(run.sectionWorkQueue.every((section) => section.completionCriteria.length >= 4));
+  ok(run.sectionWorkQueue.some((section) => section.reviewerAgentIds.includes("export")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Section work queue prepared")));
   ok(run.distributionChecklist.some((item) => item.startsWith("Substack newsletter package:")));
   ok(run.reviewChecklist.some((item) => item.includes("human-reviewed")));
 });
@@ -941,6 +947,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent reviewer agents"'));
   ok(app.includes("agentRun.reviewerAgents"));
   ok(app.includes("reviewer.requiredActions"));
+  ok(app.includes('aria-label="Agent section work queue"'));
+  ok(app.includes("agentRun.sectionWorkQueue"));
+  ok(app.includes("section.completionCriteria"));
   ok(app.includes('aria-label="Agent audit trail"'));
   ok(app.includes("agentRun.auditTrail"));
   ok(app.includes("Rollback plan"));

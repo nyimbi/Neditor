@@ -62,6 +62,7 @@ export interface AgenticWorkflowRun {
   controlCenter: AgenticControlCenter;
   auditTrail: AgenticAuditTrail;
   reviewerAgents: AgenticReviewerAgent[];
+  sectionWorkQueue: AgenticSectionWorkItem[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -127,6 +128,17 @@ export interface AgenticReviewerAgent {
   status: AgenticReviewerAgentStatus;
   findings: string[];
   requiredActions: string[];
+}
+
+export interface AgenticSectionWorkItem {
+  id: string;
+  order: number;
+  heading: string;
+  level: number;
+  lane: AgenticWorkflowLane;
+  draftingInstruction: string;
+  completionCriteria: string[];
+  reviewerAgentIds: AgenticReviewerAgentId[];
 }
 
 const agentPlannerVersion = "agentic-workflow-v3-control-audit";
@@ -221,12 +233,14 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const applicationMode = inferApplicationMode(plan, hasDocument, hasSelection);
   const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans });
   const reviewerAgents = buildReviewerAgents({ plan, draftMarkdown: draft?.markdown || "", revision, controlCenter, distributionTargetPlans, blockers });
+  const sectionWorkQueue = buildSectionWorkQueue(plan, reviewerAgents);
   const auditTrail = buildAuditTrail({
     plan,
     request,
     revision,
     draftMarkdown: draft?.markdown || "",
     reviewerAgents,
+    sectionWorkQueue,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -241,6 +255,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     controlCenter,
     auditTrail,
     reviewerAgents,
+    sectionWorkQueue,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -257,6 +272,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     controlCenter,
     auditTrail,
     reviewerAgents,
+    sectionWorkQueue,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -520,6 +536,70 @@ function buildDistributionChecklist(plan: AgenticWorkflowPlan, targetPlans: Agen
   ]);
 }
 
+function buildSectionWorkQueue(plan: AgenticWorkflowPlan, reviewerAgents: AgenticReviewerAgent[]): AgenticSectionWorkItem[] {
+  const sections = parseOutlineSections(plan.suggestedOutline);
+  const audience = extractKeyValue(plan.placeholderText, "audience") || "the intended audience";
+  const evidence = extractKeyValue(plan.placeholderText, "evidence") || "verified source material";
+  const owner = extractKeyValue(plan.placeholderText, "owner") || "the accountable owner";
+  const activeReviewerIds = new Set(reviewerAgents.map((agent) => agent.id));
+  return sections.slice(0, 18).map((section, index) => {
+    const reviewerAgentIds = sectionReviewerIds(section.heading, plan).filter((id) => activeReviewerIds.has(id));
+    return {
+      id: `section-${String(index + 1).padStart(2, "0")}-${stableFingerprint(section.heading).slice(0, 8)}`,
+      order: index + 1,
+      heading: section.heading,
+      level: section.level,
+      lane: plan.lanes.includes("compose") || plan.lanes.includes("create") ? "compose" : plan.primaryLane,
+      draftingInstruction: [
+        `Draft or revise "${section.heading}" for ${audience}.`,
+        `Use ${evidence} for material claims and name ${owner} where accountability or follow-through is required.`,
+        plan.distributionTargets.length ? `Preserve structure and metadata needed for ${plan.distributionTargets.join(", ")} distribution.` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      completionCriteria: [
+        "Section has a clear reader purpose, plain-language opening, and no unresolved placeholders.",
+        "Material claims are tied to evidence or marked with citation TODOs.",
+        "Tone matches the requested audience and avoids generic AI phrasing.",
+        "Reviewer notes identify any remaining decision, source, or approval dependency.",
+      ],
+      reviewerAgentIds,
+    };
+  });
+}
+
+function parseOutlineSections(outline: string) {
+  const parsed = outline
+    .split(/\r?\n/)
+    .map((line) => {
+      const heading = line
+        .trim()
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/^[-*+]\s+/, "")
+        .replace(/^\d+[.)]\s+/, "")
+        .trim();
+      if (!heading) return null;
+      const markdownLevel = line.trim().match(/^(#{1,6})\s+/)?.[1]?.length;
+      const indentLevel = Math.floor((line.match(/^\s*/)?.[0].length || 0) / 2) + 1;
+      return {
+        heading,
+        level: markdownLevel || indentLevel,
+      };
+    })
+    .filter((section): section is { heading: string; level: number } => Boolean(section));
+  return parsed.length ? parsed : [{ heading: "Document", level: 1 }];
+}
+
+function sectionReviewerIds(heading: string, plan: AgenticWorkflowPlan): AgenticReviewerAgentId[] {
+  const ids: AgenticReviewerAgentId[] = ["editor", "evidence", "governance"];
+  if (/\b(risk|assumption|constraint|approval|decision|legal|compliance)\b/i.test(heading)) ids.push("risk");
+  if (/\b(source|citation|reference|bibliography|evidence|data|metric|equation)\b/i.test(heading) || plan.distributionTargets.includes("latex")) {
+    ids.push("citation");
+  }
+  if (plan.distributionTargets.length || /\b(distribution|publish|handoff|export|next steps)\b/i.test(heading)) ids.push("export");
+  return Array.from(new Set(ids));
+}
+
 function buildReviewerAgents(input: {
   plan: AgenticWorkflowPlan;
   draftMarkdown: string;
@@ -686,6 +766,7 @@ function buildAuditTrail(input: {
   revision: AgenticWorkflowRevision | null;
   draftMarkdown: string;
   reviewerAgents: AgenticReviewerAgent[];
+  sectionWorkQueue: AgenticSectionWorkItem[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -699,6 +780,7 @@ function buildAuditTrail(input: {
     revision,
     draftMarkdown,
     reviewerAgents,
+    sectionWorkQueue,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -712,6 +794,13 @@ function buildAuditTrail(input: {
     draftMarkdown,
     revision?.proposedText || "",
     ...reviewerAgents.flatMap((agent) => [agent.id, agent.label, agent.mandate, agent.status, ...agent.findings, ...agent.requiredActions]),
+    ...sectionWorkQueue.flatMap((section) => [
+      section.id,
+      section.heading,
+      section.draftingInstruction,
+      ...section.completionCriteria,
+      ...section.reviewerAgentIds,
+    ]),
     ...reviewChecklist,
     ...distributionChecklist,
     ...distributionTargetPlans.flatMap((target) => [target.target, target.label, ...target.preflightChecks, ...target.handoffSteps, ...target.evidenceRequired]),
@@ -732,6 +821,7 @@ function buildAuditTrail(input: {
       "AI provenance metadata attached to generated packet.",
       blockers.length ? `Human review required before release because ${blockers.length} blocker item(s) remain.` : "No blocker items detected at packet generation time.",
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
+      `Section work queue prepared for ${sectionWorkQueue.length} outline item(s).`,
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
         : "No distribution target selected at packet generation time.",
@@ -992,6 +1082,7 @@ function buildRunMarkdown(input: {
   controlCenter: AgenticControlCenter;
   auditTrail: AgenticAuditTrail;
   reviewerAgents: AgenticReviewerAgent[];
+  sectionWorkQueue: AgenticSectionWorkItem[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -1005,6 +1096,7 @@ function buildRunMarkdown(input: {
     controlCenter,
     auditTrail,
     reviewerAgents,
+    sectionWorkQueue,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -1055,6 +1147,7 @@ function buildRunMarkdown(input: {
   }
   lines.push(...controlCenterMarkdown(controlCenter));
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
+  lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
   lines.push(...auditTrailMarkdown(auditTrail));
   if (draftMarkdown.trim()) {
     lines.push("## Generated Draft", "", draftMarkdown.trim(), "");
@@ -1139,6 +1232,28 @@ function reviewerAgentsMarkdown(reviewerAgents: AgenticReviewerAgent[]) {
       "",
       "Required actions:",
       ...agent.requiredActions.map((item) => `- [ ] ${item}`),
+      "",
+    );
+  }
+  return lines;
+}
+
+function sectionWorkQueueMarkdown(sectionWorkQueue: AgenticSectionWorkItem[]) {
+  const lines = ["## Section Work Queue", ""];
+  for (const section of sectionWorkQueue) {
+    lines.push(
+      `### ${section.order}. ${section.heading}`,
+      "",
+      `Level: ${section.level}`,
+      "",
+      `Lane: ${section.lane}`,
+      "",
+      `Reviewers: ${section.reviewerAgentIds.join(", ")}`,
+      "",
+      section.draftingInstruction,
+      "",
+      "Completion criteria:",
+      ...section.completionCriteria.map((item) => `- [ ] ${item}`),
       "",
     );
   }

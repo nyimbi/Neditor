@@ -87,7 +87,10 @@ grounding, governance state, and distribution state so reviewers can see what is
 safe to do next before applying generated text. The same packet includes named
 reviewer agents for editorial quality, evidence grounding, risk, citations,
 governance, and export readiness so each review lane has findings and required
-actions instead of one undifferentiated checklist. The packet also includes an
+actions instead of one undifferentiated checklist. It also includes a
+section-by-section work queue with drafting instructions, completion criteria,
+and assigned reviewer agents so a team can build the document systematically
+from outline to reviewed sections. The packet also includes an
 **Agent Audit Trail** with run ID, deterministic fingerprints for instruction,
 context, source, and output payloads, rollback guidance, and review events.
 Generated and applied runs are also saved in local workspace history so a user

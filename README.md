@@ -197,9 +197,11 @@ web app.
   Live, AI Paste cleanup, Review, or Export readiness. It can also generate a
   complete agent packet with a Docs Live draft, selection-aware revision
   proposal, QA gates, named reviewer agents for editorial, evidence, risk,
-  citation, governance, and export readiness, an **AI Control Center** for
-  readiness score, source grounding, governance state, next actions,
-  target-specific distribution runbooks, AI provenance, blockers, an Agent Audit Trail with run ID,
+  citation, governance, and export readiness, a section-by-section work queue
+  with drafting instructions, completion criteria, and assigned reviewers, an
+  **AI Control Center** for readiness score, source grounding, governance
+  state, next actions, target-specific distribution runbooks, AI provenance,
+  blockers, an Agent Audit Trail with run ID,
   fingerprints, rollback plan, review events, and safe apply behavior for
   replacing a document, replacing selected text, or appending a review packet.
   Recent generated/applied agent runs are kept in local workspace history with

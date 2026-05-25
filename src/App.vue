@@ -2014,6 +2014,28 @@
                 </article>
               </section>
             </section>
+            <section class="agent-section-workqueue" aria-label="Agent section work queue">
+              <header>
+                <div>
+                  <strong>Section Work Queue</strong>
+                  <span>Draft and review the document section by section with assigned reviewer agents.</span>
+                </div>
+                <small>{{ agentRun.sectionWorkQueue.length }} sections</small>
+              </header>
+              <ol>
+                <li v-for="section in agentRun.sectionWorkQueue" :key="section.id">
+                  <div>
+                    <small>Level {{ section.level }} | {{ section.lane }}</small>
+                    <strong>{{ section.heading }}</strong>
+                    <p>{{ section.draftingInstruction }}</p>
+                    <span>Reviewers: {{ section.reviewerAgentIds.join(", ") }}</span>
+                  </div>
+                  <ul>
+                    <li v-for="item in section.completionCriteria" :key="item">{{ item }}</li>
+                  </ul>
+                </li>
+              </ol>
+            </section>
             <section class="agent-audit-trail" aria-label="Agent audit trail">
               <header>
                 <div>
@@ -8655,6 +8677,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-control-grid article,
 .app-shell[data-theme="dark"] .agent-reviewer-agents,
 .app-shell[data-theme="dark"] .agent-reviewer-grid article,
+.app-shell[data-theme="dark"] .agent-section-workqueue,
+.app-shell[data-theme="dark"] .agent-section-workqueue li,
 .app-shell[data-theme="dark"] .agent-audit-trail,
 .app-shell[data-theme="dark"] .agent-audit-grid article,
 .app-shell[data-theme="dark"] .agent-history,
@@ -8692,6 +8716,11 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-reviewer-agents > header small,
 .app-shell[data-theme="dark"] .agent-reviewer-grid article header span,
 .app-shell[data-theme="dark"] .agent-reviewer-grid ul,
+.app-shell[data-theme="dark"] .agent-section-workqueue > header span,
+.app-shell[data-theme="dark"] .agent-section-workqueue > header small,
+.app-shell[data-theme="dark"] .agent-section-workqueue small,
+.app-shell[data-theme="dark"] .agent-section-workqueue span,
+.app-shell[data-theme="dark"] .agent-section-workqueue ul,
 .app-shell[data-theme="dark"] .agent-run-columns ul,
 .app-shell[data-theme="dark"] .agent-distribution-runbooks ul,
 .app-shell[data-theme="dark"] .agent-provider-panel header span,
@@ -8763,6 +8792,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-control-grid article,
   .app-shell[data-theme="system"] .agent-reviewer-agents,
   .app-shell[data-theme="system"] .agent-reviewer-grid article,
+  .app-shell[data-theme="system"] .agent-section-workqueue,
+  .app-shell[data-theme="system"] .agent-section-workqueue li,
   .app-shell[data-theme="system"] .agent-audit-trail,
   .app-shell[data-theme="system"] .agent-audit-grid article,
   .app-shell[data-theme="system"] .agent-history,
@@ -8800,6 +8831,11 @@ select:hover {
   .app-shell[data-theme="system"] .agent-reviewer-agents > header small,
   .app-shell[data-theme="system"] .agent-reviewer-grid article header span,
   .app-shell[data-theme="system"] .agent-reviewer-grid ul,
+  .app-shell[data-theme="system"] .agent-section-workqueue > header span,
+  .app-shell[data-theme="system"] .agent-section-workqueue > header small,
+  .app-shell[data-theme="system"] .agent-section-workqueue small,
+  .app-shell[data-theme="system"] .agent-section-workqueue span,
+  .app-shell[data-theme="system"] .agent-section-workqueue ul,
   .app-shell[data-theme="system"] .agent-run-columns ul,
   .app-shell[data-theme="system"] .agent-distribution-runbooks ul,
   .app-shell[data-theme="system"] .agent-provider-panel header span,
@@ -8856,6 +8892,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-control-grid article,
 .app-shell[data-high-contrast="true"] .agent-reviewer-agents,
 .app-shell[data-high-contrast="true"] .agent-reviewer-grid article,
+.app-shell[data-high-contrast="true"] .agent-section-workqueue,
+.app-shell[data-high-contrast="true"] .agent-section-workqueue li,
 .app-shell[data-high-contrast="true"] .agent-audit-trail,
 .app-shell[data-high-contrast="true"] .agent-audit-grid article,
 .app-shell[data-high-contrast="true"] .agent-history,
@@ -10340,6 +10378,8 @@ select:hover {
 .agent-control-grid article,
 .agent-reviewer-agents,
 .agent-reviewer-grid article,
+.agent-section-workqueue,
+.agent-section-workqueue li,
 .agent-audit-trail,
 .agent-audit-grid article,
 .agent-history,
@@ -10579,6 +10619,66 @@ select:hover {
 }
 
 .agent-reviewer-grid ul {
+  display: grid;
+  gap: 4px;
+  padding-left: 18px;
+  color: #2d3746;
+  font-size: 12px;
+}
+
+.agent-section-workqueue {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #2f6f7e;
+  background: #f8fcfb;
+}
+
+.agent-section-workqueue > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-section-workqueue > header div,
+.agent-section-workqueue li > div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-section-workqueue > header span,
+.agent-section-workqueue > header small,
+.agent-section-workqueue small,
+.agent-section-workqueue span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-section-workqueue ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-section-workqueue li {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.6fr) minmax(0, 1fr);
+  gap: 10px;
+  border-left: 3px solid #7fa2cd;
+}
+
+.agent-section-workqueue p,
+.agent-section-workqueue ul {
+  margin: 0;
+}
+
+.agent-section-workqueue small {
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.agent-section-workqueue ul {
   display: grid;
   gap: 4px;
   padding-left: 18px;
@@ -11970,6 +12070,7 @@ select:hover {
   .agent-control-grid,
   .agent-reviewer-grid,
   .agent-audit-grid,
+  .agent-section-workqueue li,
   .agent-history li,
   .agent-history dl,
   .agent-run-columns,
