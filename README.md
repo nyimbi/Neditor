@@ -366,6 +366,14 @@ of becoming stale marketing samples. The tests also keep the README links in
 sync and prove each example's audience metadata and representative features
 survive HTML, PDF, DOCX, PPTX, and Markdown bundle exports.
 
+## Planning Documents
+
+- [AI-first platform roadmap](docs/ai-first-platform-roadmap.md): 50 concrete
+  changes for making composition, document creation, editing, revision, review,
+  distribution, governance, provider handoff, and verification agentic.
+- [Specification completion matrix](docs/spec-completion-matrix.md): current
+  implementation evidence and remaining release risks against the product spec.
+
 ## Developer Quick Start
 
 ```sh
