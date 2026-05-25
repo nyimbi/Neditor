@@ -95,6 +95,9 @@ uses it.
 
 - Long reports, proposals, business cases, strategy papers, research briefs, and
   technical documents.
+- AI-guided document blueprints for board memos, operating procedures,
+  technical architectures, ADRs, release notes, contract briefs, marketing
+  briefs, and customer case studies.
 - Documents that need structured outlines before the body text is written.
 - AI-first workflows where a business instruction should become a planned set
   of creation, editing, revision, review, and distribution actions.

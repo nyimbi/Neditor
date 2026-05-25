@@ -9,6 +9,14 @@ export const docsLiveDocumentTypes = [
   { id: "research-brief", label: "Research brief" },
   { id: "policy", label: "Policy" },
   { id: "meeting-brief", label: "Meeting brief" },
+  { id: "business-case", label: "Business case" },
+  { id: "operating-procedure", label: "Operating procedure" },
+  { id: "technical-architecture", label: "Technical architecture" },
+  { id: "adr", label: "Architecture decision record" },
+  { id: "release-notes", label: "Release notes" },
+  { id: "contract-brief", label: "Contract brief" },
+  { id: "marketing-brief", label: "Marketing brief" },
+  { id: "customer-case-study", label: "Customer case study" },
 ] as const;
 
 export type DocsLiveDocumentType = (typeof docsLiveDocumentTypes)[number]["id"];
@@ -181,9 +189,105 @@ const blueprints: Record<DocsLiveDocumentType, DocsLiveBlueprint> = {
     ],
     sectionFocus: ["purpose", "people", "agenda", "materials", "decisions", "actions"],
   },
+  "business-case": {
+    label: "Business case",
+    defaultOutline: ["Executive Summary", "Problem", "Options", "Financial Case", "Risks", "Recommendation", "Implementation Plan"],
+    questions: [
+      "What decision should the business case enable?",
+      "Which options should be compared?",
+      "What investment, benefit, risk, or ROI assumptions must be included?",
+      "What implementation constraints or dependencies matter?",
+    ],
+    sectionFocus: ["decision", "problem", "options", "financials", "risk", "recommendation", "execution"],
+  },
+  "operating-procedure": {
+    label: "Operating procedure",
+    defaultOutline: ["Purpose", "Scope", "Prerequisites", "Procedure", "Controls", "Exceptions", "Revision History"],
+    questions: [
+      "Who performs the procedure and when?",
+      "What systems, permissions, materials, or inputs are required?",
+      "What controls, checks, or approvals prevent mistakes?",
+      "What exceptions or escalation paths should be documented?",
+    ],
+    sectionFocus: ["purpose", "scope", "inputs", "steps", "controls", "exceptions", "change control"],
+  },
+  "technical-architecture": {
+    label: "Technical architecture",
+    defaultOutline: ["Overview", "Goals", "Context", "Components", "Data Flow", "Security", "Operations", "Open Decisions"],
+    questions: [
+      "What system, product, or platform is being described?",
+      "What architectural goals and non-goals should constrain the design?",
+      "Which components, integrations, data flows, and trust boundaries matter?",
+      "What operational, security, or migration risks require review?",
+    ],
+    sectionFocus: ["overview", "goals", "context", "components", "data", "security", "operations", "decisions"],
+  },
+  adr: {
+    label: "Architecture decision record",
+    defaultOutline: ["Status", "Context", "Decision", "Consequences", "Alternatives", "Follow-ups"],
+    questions: [
+      "What decision needs to be recorded?",
+      "What context, constraints, or forces shaped the decision?",
+      "Which alternatives were considered and rejected?",
+      "What consequences or follow-up actions should future readers know?",
+    ],
+    sectionFocus: ["status", "context", "decision", "tradeoffs", "alternatives", "follow-ups"],
+  },
+  "release-notes": {
+    label: "Release notes",
+    defaultOutline: ["Release Summary", "Highlights", "New Features", "Fixes", "Known Issues", "Upgrade Notes", "Support"],
+    questions: [
+      "Who is the release audience?",
+      "What changed and why does it matter?",
+      "Which upgrade steps, compatibility notes, or known issues are required?",
+      "What support or rollback information should be included?",
+    ],
+    sectionFocus: ["audience", "value", "features", "fixes", "known issues", "upgrade", "support"],
+  },
+  "contract-brief": {
+    label: "Contract brief",
+    defaultOutline: ["Purpose", "Parties", "Commercial Terms", "Obligations", "Risks", "Approvals", "Open Questions"],
+    questions: [
+      "Which agreement or transaction is being summarized?",
+      "Who are the parties and accountable reviewers?",
+      "Which commercial, legal, operational, or data terms need attention?",
+      "What risks, approvals, or open questions must remain visible?",
+    ],
+    sectionFocus: ["purpose", "parties", "commercials", "obligations", "risk", "approvals", "questions"],
+  },
+  "marketing-brief": {
+    label: "Marketing brief",
+    defaultOutline: ["Objective", "Audience", "Positioning", "Message", "Channels", "Assets", "Success Measures"],
+    questions: [
+      "What campaign, launch, or message is being briefed?",
+      "Who is the audience and what should they believe or do?",
+      "What positioning, proof points, and claims are approved?",
+      "Which channels, assets, dates, and measures define success?",
+    ],
+    sectionFocus: ["objective", "audience", "positioning", "message", "channels", "assets", "measures"],
+  },
+  "customer-case-study": {
+    label: "Customer case study",
+    defaultOutline: ["Customer Snapshot", "Challenge", "Solution", "Implementation", "Results", "Quote Prompts", "Review Approvals"],
+    questions: [
+      "Which customer, industry, and use case should the story feature?",
+      "What problem did the customer need to solve?",
+      "What solution, implementation path, and measurable results can be verified?",
+      "Which quotes, approvals, and confidentiality constraints apply?",
+    ],
+    sectionFocus: ["customer", "challenge", "solution", "implementation", "results", "quotes", "approvals"],
+  },
 };
 
 const explicitTypeSignals: Array<[DocsLiveDocumentType, RegExp]> = [
+  ["business-case", /\b(business case|roi|return on investment|cost benefit|financial case)\b/i],
+  ["operating-procedure", /\b(sop|standard operating procedure|operating procedure|runbook|work instruction)\b/i],
+  ["technical-architecture", /\b(technical architecture|architecture document|system design|data flow|trust boundaries?)\b/i],
+  ["adr", /\b(adr|architecture decision record|decision record)\b/i],
+  ["release-notes", /\b(release notes?|changelog|upgrade notes?|known issues?)\b/i],
+  ["contract-brief", /\b(contract brief|agreement summary|legal brief|commercial terms|obligations)\b/i],
+  ["marketing-brief", /\b(marketing brief|campaign brief|positioning|messaging|channels?)\b/i],
+  ["customer-case-study", /\b(case study|customer story|success story|customer proof)\b/i],
   ["board-memo", /\b(board|directors?|approval)\b/i],
   ["proposal", /\b(proposal|scope of work|client|pricing|investment)\b/i],
   ["strategy-plan", /\b(strategy|market|roadmap|strategic)\b/i],

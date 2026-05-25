@@ -19,7 +19,13 @@ import {
 } from "../src/lib/bibliographyManager.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
-import { buildDocsLiveDraft, buildDocsLiveQuestionnaire, extractDocsLivePlaceholders } from "../src/lib/docsLive.js";
+import {
+  buildDocsLiveDraft,
+  buildDocsLiveQuestionnaire,
+  docsLiveDocumentTypes,
+  extractDocsLivePlaceholders,
+  normalizeDocsLiveDocumentType,
+} from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
 import {
@@ -345,6 +351,39 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.markdown.includes("Commercial team should verify"));
   ok(draft.markdown.includes("The reader should approve renewal"));
   ok(draft.markdown.includes("Commercial team"));
+});
+
+test("Docs Live covers business technical legal marketing and customer document blueprints", () => {
+  for (const id of [
+    "business-case",
+    "operating-procedure",
+    "technical-architecture",
+    "adr",
+    "release-notes",
+    "contract-brief",
+    "marketing-brief",
+    "customer-case-study",
+  ]) {
+    ok(docsLiveDocumentTypes.some((type) => type.id === id), `missing ${id}`);
+  }
+
+  equal(normalizeDocsLiveDocumentType("Draft a standard operating procedure for month end close"), "operating-procedure");
+  equal(normalizeDocsLiveDocumentType("Create release notes with known issues and upgrade notes"), "release-notes");
+  equal(normalizeDocsLiveDocumentType("Write a customer case study with verified results"), "customer-case-study");
+
+  const draft = buildDocsLiveDraft({
+    documentType: "contract brief",
+    title: "Vendor Renewal Contract Brief",
+    context: "audience is legal reviewers. owner is Procurement. evidence is signed term sheet.",
+    placeholders: "approver: General Counsel",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  equal(draft.documentType, "contract-brief");
+  ok(draft.outlineText.includes("Commercial Terms"));
+  ok(draft.questionnaire.includes("commercial, legal, operational, or data terms"));
+  ok(draft.markdown.includes("Contract brief"));
+  ok(draft.reviewPacket.sectionRunbook.some((item) => item.includes("Commercial Terms")));
 });
 
 test("AI runtime readiness reports voice and clipboard capability without storing clipboard content", async () => {

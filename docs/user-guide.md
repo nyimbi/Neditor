@@ -107,6 +107,13 @@ opens Docs Live with an intent-first workflow: document type, outline, spoken or
 typed context, placeholder values, AI-created questionnaire, section-by-section
 drafting, QA, humanization, and review handoff.
 
+Docs Live includes blueprints for business briefs, board memos, proposals,
+strategy plans, project plans, research briefs, policies, meeting briefs,
+business cases, operating procedures, technical architecture documents, ADRs,
+release notes, contract briefs, marketing briefs, and customer case studies.
+Each blueprint supplies a default outline, context questions, section focus, QA
+prompts, humanization tasks, and reviewer handoff notes.
+
 Before relying on dictation or clipboard-assisted cleanup, use **Check AI
 runtime** in Docs Live. The report checks secure runtime context, Web Speech,
 microphone permission, and clipboard read/write support, and records only
