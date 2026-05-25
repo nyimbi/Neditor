@@ -242,6 +242,23 @@ export interface AgentRunHistoryItem {
   providerProfile?: string;
 }
 
+export interface DocsLiveDraftHistoryItem {
+  draftId: string;
+  title: string;
+  generatedAt: string;
+  updatedAt: string;
+  documentType: string;
+  sectionCount: number;
+  issueCount: number;
+  outlineText?: string;
+  instruction?: string;
+  markdown: string;
+  markdownPreview?: string;
+  reviewPacketMarkdown?: string;
+  reviewPacketPreview?: string;
+  outputFingerprint: string;
+}
+
 export interface PersistedScrollPosition {
   editor?: number;
   preview?: number;
@@ -299,6 +316,7 @@ export interface PersistedWorkspace {
   customTransformTemplates?: CustomTransformTemplate[];
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
   agentRunHistory?: Partial<AgentRunHistoryItem>[];
+  docsLiveDraftHistory?: Partial<DocsLiveDraftHistoryItem>[];
   guidedDemoCompletedStepIds?: string[];
 }
 
@@ -803,6 +821,43 @@ export function normalizeAgentRunHistory(value: unknown): AgentRunHistoryItem[] 
   return history;
 }
 
+function normalizeDocsLiveDraftHistoryItem(value: unknown): DocsLiveDraftHistoryItem | null {
+  if (!isRecord(value)) return null;
+  const draftId = normalizedString(value.draftId, 100);
+  const markdown = normalizedString(value.markdown, 48_000);
+  if (!draftId || !markdown) return null;
+  return {
+    draftId,
+    title: normalizedString(value.title, 160) || "Docs Live draft",
+    generatedAt: normalizedString(value.generatedAt, 40) || new Date(0).toISOString(),
+    updatedAt: normalizedString(value.updatedAt, 40) || normalizedString(value.generatedAt, 40) || new Date(0).toISOString(),
+    documentType: normalizedString(value.documentType, 80) || "business-brief",
+    sectionCount: Math.max(Math.floor(numberValue(value.sectionCount) ?? 0), 0),
+    issueCount: Math.max(Math.floor(numberValue(value.issueCount) ?? 0), 0),
+    outlineText: normalizedString(value.outlineText, 8_000) || undefined,
+    instruction: normalizedString(value.instruction, 4_000) || undefined,
+    markdown,
+    markdownPreview: normalizedString(value.markdownPreview, 1_200) || undefined,
+    reviewPacketMarkdown: normalizedString(value.reviewPacketMarkdown, 18_000) || undefined,
+    reviewPacketPreview: normalizedString(value.reviewPacketPreview, 1_200) || undefined,
+    outputFingerprint: normalizedString(value.outputFingerprint, 32) || draftId,
+  };
+}
+
+export function normalizeDocsLiveDraftHistory(value: unknown): DocsLiveDraftHistoryItem[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const history: DocsLiveDraftHistoryItem[] = [];
+  for (const entry of value) {
+    const item = normalizeDocsLiveDraftHistoryItem(entry);
+    if (!item || seen.has(item.draftId)) continue;
+    seen.add(item.draftId);
+    history.push(item);
+    if (history.length >= 30) break;
+  }
+  return history;
+}
+
 function normalizeScrollPositions(value: unknown) {
   if (!isRecord(value)) return undefined;
   const positions: Record<string, PersistedScrollPosition> = {};
@@ -884,6 +939,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (isRecord(raw.aiCleanupDefaults)) migrated.aiCleanupDefaults = normalizeAiCleanupDefaults(raw.aiCleanupDefaults);
   const agentRunHistory = normalizeAgentRunHistory(raw.agentRunHistory);
   if (agentRunHistory.length) migrated.agentRunHistory = agentRunHistory;
+  const docsLiveDraftHistory = normalizeDocsLiveDraftHistory(raw.docsLiveDraftHistory);
+  if (docsLiveDraftHistory.length) migrated.docsLiveDraftHistory = docsLiveDraftHistory;
   migrated.guidedDemoCompletedStepIds = stringArray(raw.guidedDemoCompletedStepIds, 40);
   migrated.recentFiles = stringArray(raw.recentFiles, 20);
   migrated.recentFolders = stringArray(raw.recentFolders, 12);

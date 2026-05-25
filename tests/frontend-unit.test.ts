@@ -60,7 +60,13 @@ import {
   transformTemplateFillFields,
   transformTemplateMarkdown,
 } from "../src/lib/transformTemplates.js";
-import { migratePersistedWorkspace, normalizeAgentRunHistory, normalizeCitationStyle, WORKSPACE_SCHEMA_VERSION } from "../src/lib/workspacePersistence.js";
+import {
+  migratePersistedWorkspace,
+  normalizeAgentRunHistory,
+  normalizeCitationStyle,
+  normalizeDocsLiveDraftHistory,
+  WORKSPACE_SCHEMA_VERSION,
+} from "../src/lib/workspacePersistence.js";
 import {
   appendConflictMergeLine,
   appendConflictMergePart,
@@ -1257,6 +1263,31 @@ test("workspace persistence migration versions and normalizes saved settings", (
         title: "Duplicate ignored",
       },
     ],
+    docsLiveDraftHistory: [
+      {
+        draftId: " docs-live-1 ",
+        title: " Market Plan ",
+        generatedAt: "2026-05-25T11:00:00.000Z",
+        updatedAt: "2026-05-25T11:01:00.000Z",
+        documentType: "marketing-brief",
+        sectionCount: 3.8,
+        issueCount: 2.2,
+        outlineText: "# Outline\n\n## Launch",
+        instruction: " Build a first draft ",
+        markdown: "# Market Plan\n\nDraft body",
+        markdownPreview: " Draft body preview ",
+        reviewPacketMarkdown: "## Docs Live Review Packet\n\n- Check sources",
+        reviewPacketPreview: " Check sources ",
+        outputFingerprint: "4444444444444444",
+      },
+      {
+        draftId: "docs-live-1",
+        markdown: "# Duplicate ignored",
+      },
+      {
+        draftId: "missing-markdown",
+      },
+    ],
     guidedDemoCompletedStepIds: ["ai-create", "", "export", "ai-create", 42],
     recentFiles: ["/a.md", 42, "/a.md", "/b.md"],
     recentFolders: ["/workspace", ""],
@@ -1474,6 +1505,24 @@ test("workspace persistence migration versions and normalizes saved settings", (
   });
   equal(migrated.agentRunHistory?.length, 1);
   equal(normalizeAgentRunHistory([{ runId: "" }]).length, 0);
+  deepEqual(migrated.docsLiveDraftHistory?.[0], {
+    draftId: "docs-live-1",
+    title: "Market Plan",
+    generatedAt: "2026-05-25T11:00:00.000Z",
+    updatedAt: "2026-05-25T11:01:00.000Z",
+    documentType: "marketing-brief",
+    sectionCount: 3,
+    issueCount: 2,
+    outlineText: "# Outline\n\n## Launch",
+    instruction: "Build a first draft",
+    markdown: "# Market Plan\n\nDraft body",
+    markdownPreview: "Draft body preview",
+    reviewPacketMarkdown: "## Docs Live Review Packet\n\n- Check sources",
+    reviewPacketPreview: "Check sources",
+    outputFingerprint: "4444444444444444",
+  });
+  equal(migrated.docsLiveDraftHistory?.length, 1);
+  equal(normalizeDocsLiveDraftHistory([{ draftId: "missing-markdown" }]).length, 0);
   deepEqual(migrated.guidedDemoCompletedStepIds, ["ai-create", "export"]);
   deepEqual(migrated.recentFiles, ["/a.md", "/b.md"]);
   deepEqual(migrated.recentFolders, ["/workspace"]);
@@ -1760,11 +1809,21 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("copyDocsLiveReviewPacket"));
   ok(app.includes("## Docs Live Review Packet"));
   ok(app.includes("type: docs-live-review-packet"));
+  ok(app.includes("store.recordDocsLiveDraftHistory"));
+  ok(app.includes("docsLiveDraftHistoryItem"));
+  ok(app.includes("docsLiveHistoryPreview"));
+  ok(app.includes("appendDocsLiveHistoryDraft"));
+  ok(app.includes("copyDocsLiveHistoryDraft"));
+  ok(app.includes("insertDocsLiveHistoryReviewPacket"));
+  ok(app.includes("copyDocsLiveHistoryReviewPacket"));
   ok(app.includes("Appended Docs Live draft for review"));
   ok(app.includes("Copied Docs Live draft"));
   ok(app.includes("Inserted Docs Live review packet"));
   ok(app.includes("Copied Docs Live review packet"));
+  ok(app.includes("Appended saved Docs Live draft"));
+  ok(app.includes("Copied saved Docs Live review packet"));
   ok(app.includes("docs-live-draft-actions"));
+  ok(app.includes("docs-live-history"));
   ok(app.includes("Draft in Docs Live"));
   ok(app.includes('aria-label="Agent audit trail"'));
   ok(app.includes("agentRun.auditTrail"));
@@ -1821,6 +1880,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("docs-live-review-actions"));
   ok(app.includes("Docs Live review preparation packet"));
   ok(app.includes("Review preparation packet"));
+  ok(app.includes("Recent Docs Live drafts"));
   ok(app.includes("Section runbook"));
   ok(app.includes("QA register"));
   ok(app.includes("Humanization checklist"));
@@ -1846,6 +1906,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(store.includes("saveCurrentExportProfile"));
   ok(store.includes("applyExportProfile"));
   ok(store.includes("deleteExportProfile"));
+  ok(store.includes("docsLiveDraftHistory"));
+  ok(store.includes("recordDocsLiveDraftHistory"));
+  ok(store.includes("normalizeDocsLiveDraftHistory"));
   ok(app.includes('listen<string>("neditor-menu-command"'));
   ok(app.includes('"neditor-export-html": "html"'));
   ok(app.includes("collectNativeMenuCommandEvidence"));

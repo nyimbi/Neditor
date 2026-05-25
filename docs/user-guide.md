@@ -219,7 +219,9 @@ Each blueprint supplies a default outline, context questions, section focus, QA
 prompts, humanization tasks, and reviewer handoff notes. After generation, copy
 the draft for external review, insert or copy the standalone review packet,
 append it as review material, or apply it with the selected
-replace/append/selection/section mode.
+replace/append/selection/section mode. NEditor keeps recent Docs Live drafts in
+a bounded local history so you can append or copy a saved draft, or insert or
+copy its review packet later without rebuilding the first draft.
 
 Before relying on dictation or clipboard-assisted cleanup, use **Check AI
 runtime** in Docs Live. The report checks secure runtime context, Web Speech,
@@ -388,7 +390,8 @@ NEditor is built for drafts that need evidence before publication.
   drafting plan, review packet, QA checks, humanization tasks, and reviewer
   handoff prompts. The review packet summarizes context sources, the section
   work queue, assumptions to verify, cleanup checks, and reviewer ownership,
-  and can be inserted or copied as a standalone audit handoff.
+  and can be inserted or copied as a standalone audit handoff. Recent Docs Live
+  drafts remain available locally for later append/copy and packet handoff.
 - Use Agent Workspace packets for multi-step document work that combines
   drafting, revision, review, and distribution. The packet records blockers,
   QA gates, and distribution gates before the output is accepted.

@@ -285,7 +285,9 @@ web app.
   work queue, assumption register, humanization checklist, and reviewer handoff
   before the draft is applied. The packet itself can be inserted or copied as a
   standalone audit handoff, and generated drafts can be copied or appended as
-  review material without replacing the current document.
+  review material without replacing the current document. Recent drafts are
+  kept in a bounded local history with append/copy and packet handoff actions
+  so a generated first draft remains recoverable after the modal is closed.
   **Check AI runtime** produces a content-free
   readiness report for secure context, Web Speech availability, microphone
   permission, and clipboard read/write support so business users can confirm

@@ -2042,6 +2042,28 @@
           <textarea :value="docsLiveGeneratedMarkdown" rows="12" readonly aria-label="Docs Live generated Markdown"></textarea>
         </section>
 
+        <section v-if="store.docsLiveDraftHistory.length" class="docs-live-history" aria-label="Docs Live draft history">
+          <header>
+            <div>
+              <strong>Recent Docs Live drafts</strong>
+              <span>{{ store.docsLiveDraftHistory.length }} saved locally for reuse</span>
+            </div>
+          </header>
+          <article v-for="item in store.docsLiveDraftHistory.slice(0, 6)" :key="item.draftId">
+            <div>
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.sectionCount }} sections / {{ item.documentType }}</span>
+              <p>{{ item.markdownPreview }}</p>
+            </div>
+            <div class="docs-live-history-actions">
+              <button type="button" @click="appendDocsLiveHistoryDraft(item)">Append draft</button>
+              <button type="button" @click="copyDocsLiveHistoryDraft(item)">Copy draft</button>
+              <button type="button" @click="insertDocsLiveHistoryReviewPacket(item)">Insert packet</button>
+              <button type="button" @click="copyDocsLiveHistoryReviewPacket(item)">Copy packet</button>
+            </div>
+          </article>
+        </section>
+
         <footer>
           <button type="button" @click="closeDocsLive">Cancel</button>
           <button type="button" @click="refreshDocsLiveQuestionnaire">Build questionnaire</button>
@@ -3172,6 +3194,7 @@ import {
   type AgentLifecycleExecutionStatus,
   type AgentLifecycleTaskState,
   type AgentRunHistoryItem,
+  type DocsLiveDraftHistoryItem,
 } from "./lib/workspacePersistence";
 import {
   appendConflictMergePart,
@@ -9618,6 +9641,7 @@ function generateDocsLiveDraft() {
   docsLiveGeneratedMarkdown.value = draft.markdown;
   docsLiveOutlineText.value = draft.outlineText;
   docsLiveTitle.value = draft.title;
+  store.recordDocsLiveDraftHistory(docsLiveDraftHistoryItem(draft));
   store.statusMessage = `Docs Live generated ${draft.sections.length} section draft with QA and humanization`;
 }
 
@@ -9668,11 +9692,48 @@ async function copyDocsLiveDraft() {
   }
 }
 
+function docsLiveDraftHistoryItem(draft: DocsLiveDraft): DocsLiveDraftHistoryItem {
+  const generatedAt = new Date().toISOString();
+  const outputFingerprint = stableFingerprint(draft.markdown);
+  const reviewPacketMarkdown = docsLiveReviewPacketMarkdownFor(draft, generatedAt);
+  return {
+    draftId: `docs-live-${outputFingerprint.slice(0, 16)}`,
+    title: draft.title,
+    generatedAt,
+    updatedAt: generatedAt,
+    documentType: draft.documentType,
+    sectionCount: draft.sections.length,
+    issueCount: draft.issues.length,
+    outlineText: draft.outlineText,
+    instruction: docsLiveAuditInline(
+      [docsLiveContext.value, docsLiveTranscript.value, docsLiveQuestionnaireAnswerText.value].filter(Boolean).join("\n\n"),
+    ).slice(0, 4_000),
+    markdown: draft.markdown,
+    markdownPreview: docsLiveHistoryPreview(draft.markdown),
+    reviewPacketMarkdown,
+    reviewPacketPreview: docsLiveHistoryPreview(reviewPacketMarkdown),
+    outputFingerprint,
+  };
+}
+
+function docsLiveHistoryPreview(value: string) {
+  return (
+    value
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/[#>*_`[\]-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 220) || "No preview captured."
+  );
+}
+
 function docsLiveReviewPacketMarkdown() {
   const draft = docsLiveDraft.value;
-  if (!draft) return "";
+  return draft ? docsLiveReviewPacketMarkdownFor(draft, new Date().toISOString()) : "";
+}
+
+function docsLiveReviewPacketMarkdownFor(draft: DocsLiveDraft, generatedAt: string) {
   const packet = draft.reviewPacket;
-  const generatedAt = new Date().toISOString();
   const lines = [
     "## Docs Live Review Packet",
     "",
@@ -9710,6 +9771,40 @@ function docsLiveReviewPacketMarkdown() {
 
 function docsLiveAuditInline(value: string) {
   return (value || "").replace(/\r?\n/g, " ").trim();
+}
+
+function appendDocsLiveHistoryDraft(item: DocsLiveDraftHistoryItem) {
+  if (!item.markdown.trim()) return;
+  store.updateText(`${active.value.text.trimEnd()}\n\n${item.markdown}`);
+  store.sidebar = "review";
+  store.statusMessage = `Appended saved Docs Live draft ${item.title}`;
+}
+
+async function copyDocsLiveHistoryDraft(item: DocsLiveDraftHistoryItem) {
+  if (!item.markdown.trim()) return;
+  try {
+    await navigator.clipboard?.writeText(item.markdown);
+    store.statusMessage = `Copied saved Docs Live draft ${item.title}`;
+  } catch {
+    store.statusMessage = `Saved Docs Live draft ${item.title} is ready to copy`;
+  }
+}
+
+function insertDocsLiveHistoryReviewPacket(item: DocsLiveDraftHistoryItem) {
+  if (!item.reviewPacketMarkdown?.trim()) return;
+  insertBlock(item.reviewPacketMarkdown);
+  store.sidebar = "review";
+  store.statusMessage = `Inserted saved Docs Live review packet ${item.title}`;
+}
+
+async function copyDocsLiveHistoryReviewPacket(item: DocsLiveDraftHistoryItem) {
+  if (!item.reviewPacketMarkdown?.trim()) return;
+  try {
+    await navigator.clipboard?.writeText(item.reviewPacketMarkdown);
+    store.statusMessage = `Copied saved Docs Live review packet ${item.title}`;
+  } catch {
+    store.statusMessage = `Saved Docs Live review packet ${item.title} is ready to copy`;
+  }
 }
 
 function insertDocsLiveReviewPacket() {
@@ -14395,6 +14490,50 @@ select:hover {
 .docs-live-preview {
   display: grid;
   gap: 8px;
+}
+
+.docs-live-history {
+  display: grid;
+  gap: 8px;
+}
+
+.docs-live-history > header,
+.docs-live-history article {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #d7dee7;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.docs-live-history > header {
+  background: #f8fafc;
+}
+
+.docs-live-history article > div:first-child,
+.docs-live-history > header > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.docs-live-history span,
+.docs-live-history p {
+  margin: 0;
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.docs-live-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 min(260px, 40%);
 }
 
 .modal textarea,

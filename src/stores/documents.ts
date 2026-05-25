@@ -20,10 +20,12 @@ import {
   normalizeBibliographyDefaults,
   normalizeBrandProfileDefaults,
   normalizeCitationStyle,
+  normalizeDocsLiveDraftHistory,
   normalizeExportDefaults,
   normalizeExportProfiles,
   normalizeGitIntegrationPreferences,
   normalizePersistedWorkspaceForSave,
+  type DocsLiveDraftHistoryItem,
   type ExportDefaults,
   type ExportProfile,
   type ExportTarget,
@@ -385,6 +387,7 @@ export const useDocumentsStore = defineStore("documents", {
     gitIntegration: normalizeGitIntegrationPreferences({}),
     aiCleanupDefaults: normalizeAiCleanupDefaults({}),
     agentRunHistory: [] as AgentRunHistoryItem[],
+    docsLiveDraftHistory: [] as DocsLiveDraftHistoryItem[],
     guidedDemoCompletedStepIds: [] as string[],
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
@@ -508,6 +511,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.gitIntegration) this.gitIntegration = normalizeGitIntegrationPreferences(persisted.gitIntegration);
         if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
         this.agentRunHistory = normalizeAgentRunHistory(persisted.agentRunHistory);
+        this.docsLiveDraftHistory = normalizeDocsLiveDraftHistory(persisted.docsLiveDraftHistory);
         this.guidedDemoCompletedStepIds = persisted.guidedDemoCompletedStepIds || [];
         this.recentFiles = persisted.recentFiles || [];
         this.recentFolders = persisted.recentFolders || [];
@@ -573,6 +577,7 @@ export const useDocumentsStore = defineStore("documents", {
         gitIntegration: this.gitIntegration,
         aiCleanupDefaults: this.aiCleanupDefaults,
         agentRunHistory: this.agentRunHistory,
+        docsLiveDraftHistory: this.docsLiveDraftHistory,
         guidedDemoCompletedStepIds: this.guidedDemoCompletedStepIds,
         recentFiles: this.recentFiles.slice(0, 20),
         recentFolders: this.recentFolders.slice(0, 12),
@@ -610,6 +615,13 @@ export const useDocumentsStore = defineStore("documents", {
       this.agentRunHistory = normalizeAgentRunHistory([
         item,
         ...this.agentRunHistory.filter((entry) => entry.runId !== item.runId),
+      ]);
+      void this.persistWorkspace();
+    },
+    recordDocsLiveDraftHistory(item: DocsLiveDraftHistoryItem) {
+      this.docsLiveDraftHistory = normalizeDocsLiveDraftHistory([
+        item,
+        ...this.docsLiveDraftHistory.filter((entry) => entry.draftId !== item.draftId),
       ]);
       void this.persistWorkspace();
     },
