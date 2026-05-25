@@ -327,8 +327,8 @@ Current major verification gaps:
   `.tmp/release-readiness/report.json`: all required current-host reports are
   accepted, while Windows/Linux package artifacts, Windows/Linux WebDriver
   execution, signing/notarization, AI provider live endpoint proof, Google Docs
-  live import/readback, optional Pikchr, and human reviewer sign-offs remain
-  explicit external evidence gaps.
+  live import/readback, optional engines without accepted host proof, and human
+  reviewer sign-offs remain explicit external evidence gaps.
 - The AI provider evidence contract now writes
   `.tmp/ai-provider-evidence/report.json`, validates live endpoint evidence for
   current source, response hashes, required markers, and secret-free reports,
@@ -349,6 +349,10 @@ Current major verification gaps:
   connector session, but it turns live import/readback proof into validated
   readiness evidence and prevents malformed import claims from satisfying
   readiness.
+- The optional external engine evidence contract now writes SVG smoke artifacts
+  and engine-specific templates under `.tmp/external-engines/`, accepts returned
+  proof from `NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR` or the release evidence
+  ingest path, and prevents malformed engine claims from satisfying readiness.
 - The external platform evidence contract now writes
   `.tmp/platform-evidence/report.json` and templates for Windows/Linux package
   artifact plus Tauri WebDriver proof. This does not replace supported-host
