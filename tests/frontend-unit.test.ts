@@ -686,7 +686,7 @@ test("agentic workflow run proposes selection-aware revisions with review metada
     documentTitle: "Expansion Options",
     documentText: "# Expansion Options\n\nDraft body.",
     selectedText:
-      "It is important to note that leveraging various growth opportunities can be robust. The plan increases ARR by 24%. This paragraph is too long.",
+      "It is important to note that leveraging various growth opportunities can be robust. The plan increases ARR by 24%. The CFO must approve by June 1.",
     generatedAt: "2026-05-24T10:00:00.000Z",
   });
 
@@ -696,16 +696,21 @@ test("agentic workflow run proposes selection-aware revisions with review metada
   ok(run.revision?.proposedText.includes("Finance review focus"));
   ok(!run.revision?.proposedText.includes("It is important to note"));
   ok(!run.revision?.proposedText.includes("leveraging"));
+  ok(run.revision?.meaningDriftFindings.some((finding) => finding.kind === "date" && finding.original.includes("June 1")));
+  ok(run.revision?.meaningDriftFindings.some((finding) => finding.kind === "commitment" && finding.original.includes("must approve")));
   ok(run.reviewChecklist.some((item) => item.includes("Compare the revision proposal")));
+  ok(run.reviewChecklist.some((item) => item.includes("Resolve all meaning-drift findings")));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Selected text" && item.status === "available"));
-  ok(run.controlCenter.governance.some((item) => item.label === "Revision audit" && item.status === "available"));
+  ok(run.controlCenter.governance.some((item) => item.label === "Revision audit" && item.status === "needs-review"));
   ok(run.controlCenter.nextActions.some((action) => action.lane === "revise"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-revision-proposal" && task.status === "blocked"));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("Compare the proposed revision"))));
-  ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.findings.some((item) => item.includes("No blocker"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("meaning-drift"))));
   equal(run.auditTrail.applicationMode, "replace-selection");
   ok(run.auditTrail.rollbackPlan.some((item) => item.includes("editor undo")));
   ok(run.markdown.includes("Apply mode: replace-selection"));
   ok(run.markdown.includes("## Revision Proposal"));
+  ok(run.markdown.includes("### Meaning Drift"));
   ok(run.markdown.includes("### Original Text"));
   ok(run.markdown.includes("### Proposed Text"));
 });

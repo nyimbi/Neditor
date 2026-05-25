@@ -202,7 +202,8 @@ web app.
   context pack, placeholders, packet, Docs Live handoff, provider package, and
   saved run history. It can also generate a
   complete agent packet with a Docs Live draft, selection-aware revision
-  proposal, QA gates, named reviewer agents for editorial, evidence, risk,
+  proposal, meaning-drift checks for changed numbers, dates, commitments, and
+  caveats, QA gates, named reviewer agents for editorial, evidence, risk,
   citation, governance, and export readiness, deterministic outline critique
   for coverage, sequencing, duplication, depth, and specificity, deterministic
   humanization findings for generic, repetitive, vague, or overconfident

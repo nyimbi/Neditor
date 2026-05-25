@@ -76,6 +76,16 @@ export interface AgenticWorkflowRevision {
   originalText: string;
   proposedText: string;
   changeSummary: string[];
+  meaningDriftFindings: AgenticMeaningDriftFinding[];
+}
+
+export interface AgenticMeaningDriftFinding {
+  kind: "number" | "date" | "commitment" | "caveat";
+  severity: "warning" | "blocker";
+  original: string;
+  proposed: string;
+  detail: string;
+  recommendation: string;
 }
 
 export interface AgenticDocumentEvidence {
@@ -495,9 +505,13 @@ function detectDistributionTargets(corpus: string): ExportTarget[] {
 function buildRevision(request: AgenticWorkflowRunRequest, plan: AgenticWorkflowPlan): AgenticWorkflowRevision {
   const originalText = (request.selectedText || request.documentText || "").trim();
   const proposedText = reviseText(originalText, plan.revisionInstruction, plan.placeholderText);
+  const meaningDriftFindings = findMeaningDrift(originalText, proposedText);
   const changeSummary = [
     "Preserved the user's intent while making the requested revision explicit.",
     "Added AI-assisted review metadata so the change remains governable before export.",
+    meaningDriftFindings.length
+      ? `Meaning-drift scan found ${meaningDriftFindings.length} number, date, commitment, or caveat item(s) that need reviewer confirmation.`
+      : "Meaning-drift scan did not find changed numbers, dates, commitments, or caveats.",
     plan.lanes.includes("review") ? "Prepared QA prompts for evidence, tone, and reviewer sign-off." : "",
   ].filter(Boolean);
 
@@ -505,7 +519,83 @@ function buildRevision(request: AgenticWorkflowRunRequest, plan: AgenticWorkflow
     originalText,
     proposedText,
     changeSummary,
+    meaningDriftFindings,
   };
+}
+
+function findMeaningDrift(originalText: string, proposedText: string): AgenticMeaningDriftFinding[] {
+  const proposedBody = stripAiReviewMetadata(proposedText);
+  return [
+    ...missingMeaningTokens("number", originalText, proposedBody, /\b\d+(?:[.,]\d+)*(?:\s?%|\s?[A-Za-z]{1,4})?\b/g),
+    ...missingMeaningTokens(
+      "date",
+      originalText,
+      proposedBody,
+      /\b(?:20\d{2}|19\d{2}|Q[1-4]\s+20\d{2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:,\s*\d{4})?|\d{4}-\d{2}-\d{2})\b/gi,
+    ),
+    ...missingMeaningSentences(
+      "commitment",
+      originalText,
+      proposedBody,
+      /\b(?:must|shall|required|commits?|guarantees?|will|deadline|approve|approval|due)\b/i,
+    ),
+    ...missingMeaningSentences("caveat", originalText, proposedBody, /\b(?:unless|except|subject to|may|might|could|risk|assumption|caveat)\b/i),
+  ].slice(0, 12);
+}
+
+function missingMeaningTokens(
+  kind: AgenticMeaningDriftFinding["kind"],
+  originalText: string,
+  proposedText: string,
+  pattern: RegExp,
+): AgenticMeaningDriftFinding[] {
+  const originalTokens = uniqueMatches(originalText, pattern);
+  const proposedTokens = new Set(uniqueMatches(proposedText, pattern).map((item) => item.toLowerCase()));
+  return originalTokens
+    .filter((token) => !proposedTokens.has(token.toLowerCase()))
+    .map((token) => ({
+      kind,
+      severity: "blocker" as const,
+      original: token,
+      proposed: "Missing from proposed revision",
+      detail: `The original ${kind} "${token}" is not present in the proposed revision.`,
+      recommendation: `Confirm whether "${token}" should be preserved, intentionally removed, or replaced with sourced reviewer approval.`,
+    }));
+}
+
+function missingMeaningSentences(
+  kind: "commitment" | "caveat",
+  originalText: string,
+  proposedText: string,
+  signal: RegExp,
+): AgenticMeaningDriftFinding[] {
+  const originalSentences = splitSentences(originalText).filter((sentence) => signal.test(sentence));
+  const proposedLower = proposedText.toLowerCase();
+  return originalSentences
+    .filter((sentence) => !proposedLower.includes(sentence.toLowerCase()))
+    .map((sentence) => ({
+      kind,
+      severity: kind === "commitment" ? ("blocker" as const) : ("warning" as const),
+      original: sentence,
+      proposed: "Missing or materially rewritten in proposed revision",
+      detail: `The original ${kind} statement may have been removed or compressed.`,
+      recommendation: `Review this ${kind} statement before accepting the revision: ${sentence}`,
+    }));
+}
+
+function splitSentences(text: string) {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function uniqueMatches(text: string, pattern: RegExp) {
+  return Array.from(new Set([...text.matchAll(pattern)].map((match) => match[0].replace(/\s+/g, " ").trim()).filter(Boolean)));
+}
+
+function stripAiReviewMetadata(text: string) {
+  return text.replace(/<!--\s*ai-assisted:[\s\S]*?-->/g, "").trim();
 }
 
 function reviseText(text: string, instruction: string, placeholders: string) {
@@ -695,6 +785,7 @@ function buildReviewChecklist(plan: AgenticWorkflowPlan, revision: AgenticWorkfl
     "Check each factual claim against the evidence or add a citation TODO before export.",
     "Mark every AI source block and AI-assisted section human-reviewed only after a person verifies it.",
     revision ? "Compare the revision proposal against the original text before applying final edits." : "",
+    revision?.meaningDriftFindings.length ? "Resolve all meaning-drift findings before accepting the revision." : "",
     plan.distributionTargets.length ? "Run export readiness for every requested distribution target." : "",
   ].filter(Boolean);
 }
@@ -789,10 +880,15 @@ function buildLifecycleTasks(input: {
       lane: plan.lanes.includes("revise") ? "revise" : "edit",
       title: "Compare and apply the revision proposal",
       owner: "Revision Agent",
-      status: baseStatus,
+      status: revision.meaningDriftFindings.length ? "blocked" : baseStatus,
       action: "open-ai-paste",
-      evidence: revision.changeSummary,
-      nextStep: "Compare original and proposed text before accepting the replacement.",
+      evidence: [
+        ...revision.changeSummary,
+        ...revision.meaningDriftFindings.map((finding) => `${titleCase(finding.kind)} ${finding.severity}: ${finding.detail}`),
+      ],
+      nextStep: revision.meaningDriftFindings.length
+        ? "Resolve meaning-drift findings for changed numbers, dates, commitments, or caveats before accepting the replacement."
+        : "Compare original and proposed text before accepting the replacement.",
     });
   }
 
@@ -1237,6 +1333,11 @@ function buildReviewerAgents(input: {
         outlineCritique.length
           ? `Outline critique found ${outlineCritique.length} structure, coverage, sequencing, duplication, or specificity item(s).`
           : "No outline critique items were detected.",
+        revision?.meaningDriftFindings.length
+          ? `Meaning-drift scan found ${revision.meaningDriftFindings.length} changed or missing number, date, commitment, or caveat item(s).`
+          : revision
+            ? "Meaning-drift scan did not flag changed numbers, dates, commitments, or caveats."
+            : "",
         documentEvidence.humanizationFindings.length
           ? `Humanization scan found ${documentEvidence.humanizationFindings.length} generic, repetitive, vague, or overconfident phrasing item(s).`
           : "No obvious generic AI phrasing patterns were detected in the current document.",
@@ -1246,6 +1347,7 @@ function buildReviewerAgents(input: {
         missingInputs.includes("audience") ? "Confirm the intended audience before approving voice, detail level, and calls to action." : "",
         outlineCritique.length ? "Resolve outline critique items before treating section drafting as locked." : "",
         revision ? "Compare the proposed revision to the source text for meaning drift and over-compression." : "",
+        revision?.meaningDriftFindings.length ? "Resolve meaning-drift findings before accepting the proposed revision." : "",
         documentEvidence.humanizationFindings.length ? "Rewrite current-document humanization findings before final reader review." : "",
         hasDraft ? "Run a humanization pass for generic AI phrasing, repetition, and claims that sound confident without support." : "",
         documentEvidence.unresolvedPlaceholders.length ? "Resolve or intentionally preserve current-document placeholders before final approval." : "",
@@ -1283,11 +1385,15 @@ function buildReviewerAgents(input: {
         documentEvidence.unresolvedComments
           ? `${documentEvidence.unresolvedComments} unresolved review comment(s) remain in the current document.`
           : "No unresolved review comments were detected in the current document.",
+        revision?.meaningDriftFindings.length
+          ? `${revision.meaningDriftFindings.filter((item) => item.severity === "blocker").length} blocker meaning-drift item(s) require approval.`
+          : "No blocker meaning-drift items were detected in the revision proposal.",
         plan.lanes.includes("distribute") ? "Distribution is in scope, so approval and release risk must be checked explicitly." : "Distribution is not currently in scope.",
       ],
       requiredActions: [
         ...hardBlockers,
         blockers.length && !hardBlockers.length ? "Resolve all missing-input blockers before marking the packet approved." : "",
+        revision?.meaningDriftFindings.length ? "Approve, restore, or explicitly document every meaning-drift finding before release handoff." : "",
         documentEvidence.unresolvedComments ? "Resolve current-document review comments before release handoff." : "",
         plan.lanes.includes("distribute") ? "Confirm approval status, reviewer, and release owner before any external handoff." : "",
       ],
@@ -1616,8 +1722,12 @@ function buildGovernanceItems(
     },
     {
       label: "Revision audit",
-      detail: revision ? "Original text, proposed text, and change summary are captured for comparison." : "No selection-aware revision is part of this run.",
-      status: revision ? "available" : "needs-review",
+      detail: revision
+        ? revision.meaningDriftFindings.length
+          ? `Original and proposed text are captured, with ${revision.meaningDriftFindings.length} meaning-drift item(s) requiring review.`
+          : "Original text, proposed text, change summary, and meaning-drift scan are captured for comparison."
+        : "No selection-aware revision is part of this run.",
+      status: revision ? (revision.meaningDriftFindings.length ? "needs-review" : "available") : "needs-review",
     },
     {
       label: "Approval metadata",
@@ -2124,6 +2234,10 @@ function buildRunMarkdown(input: {
       "",
       ...revision.changeSummary.map((item) => `- ${item}`),
       "",
+      "### Meaning Drift",
+      "",
+      ...meaningDriftMarkdown(revision.meaningDriftFindings),
+      "",
       "### Original Text",
       "",
       fencedBlock("markdown", revision.originalText || "(No source text supplied.)"),
@@ -2150,6 +2264,14 @@ function buildRunMarkdown(input: {
     "",
   );
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+function meaningDriftMarkdown(findings: AgenticMeaningDriftFinding[]) {
+  if (!findings.length) return ["- No changed or missing numbers, dates, commitments, or caveats were detected."];
+  return findings.map(
+    (finding) =>
+      `- [ ] ${titleCase(finding.kind)} ${finding.severity}: ${finding.detail} Recommendation: ${finding.recommendation}`,
+  );
 }
 
 function lifecycleTasksMarkdown(lifecycleTasks: AgenticLifecycleTask[]) {
