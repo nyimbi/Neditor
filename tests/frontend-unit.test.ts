@@ -1197,7 +1197,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="AI control center"'));
   ok(app.includes("agentRun.controlCenter"));
   ok(app.includes('aria-label="Agent lifecycle task board"'));
+  ok(app.includes('aria-label="Filter agent lifecycle tasks"'));
   ok(app.includes("agentLifecycleTaskRows"));
+  ok(app.includes("agentLifecycleTaskTotal"));
+  ok(app.includes("agentTaskLaneFilter"));
+  ok(app.includes("agentTaskStatusFilter"));
+  ok(app.includes("agentTaskQuery"));
   ok(app.includes("agentLifecycleTaskStates"));
   ok(app.includes("agentRunHistoryTaskStateSummary"));
   ok(app.includes("Task states:"));

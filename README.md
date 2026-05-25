@@ -214,7 +214,7 @@ web app.
   agentic lifecycle task board that turns creation,
   composition, editing, revision, review, and distribution into runnable
   owned tasks with dedicated evidence-fix tasks, persistent
-  queued/in-progress/needs-review/complete status,
+  queued/in-progress/needs-review/complete status, lane/status/search filters,
   task notes, insertable/copyable Markdown task briefs, target-specific
   distribution runbooks, AI provenance,
   blockers, an Agent Audit Trail with run ID,

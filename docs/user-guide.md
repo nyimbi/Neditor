@@ -115,7 +115,9 @@ The same packet includes a **Lifecycle Task Board** that turns the whole
 document workflow into owned tasks across creation, composition, editing,
 revision, review, and distribution. Use **Run task** when a task should route
 you to Docs Live, Outline, AI Paste, Review, or Export readiness from the
-agent's plan. Use **Start**, **Needs review**, and **Complete** to persist each
+agent's plan. Filter the task board by lane, status, or freeform search when a
+packet has many section, reviewer, evidence, and distribution tasks. Use
+**Start**, **Needs review**, and **Complete** to persist each
 task's execution state in local run history, and use the task note field for
 evidence, blockers, reviewers, or completion notes. Use **Insert brief** or
 **Copy brief** when a task should become a durable Markdown work order for a

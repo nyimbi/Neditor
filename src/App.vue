@@ -2031,9 +2031,28 @@
                   <strong>Lifecycle Task Board</strong>
                   <span>Operational tasks for creating, composing, editing, revising, reviewing, and distributing the document.</span>
                 </div>
-                <small>{{ agentLifecycleTaskRows.length }} tasks</small>
+                <small>{{ agentLifecycleTaskRows.length }} of {{ agentLifecycleTaskTotal }} tasks</small>
               </header>
-              <ol>
+              <section class="agent-lifecycle-filters" aria-label="Filter agent lifecycle tasks">
+                <label>
+                  Lane
+                  <select v-model="agentTaskLaneFilter">
+                    <option v-for="lane in agentTaskLaneOptions" :key="lane" :value="lane">{{ lane === "all" ? "All lanes" : lane }}</option>
+                  </select>
+                </label>
+                <label>
+                  Status
+                  <select v-model="agentTaskStatusFilter">
+                    <option v-for="status in agentTaskStatusOptions" :key="status" :value="status">{{ status === "all" ? "All statuses" : status }}</option>
+                  </select>
+                </label>
+                <label>
+                  Search tasks
+                  <input v-model="agentTaskQuery" placeholder="owner, section, evidence, target" />
+                </label>
+              </section>
+              <p v-if="!agentLifecycleTaskRows.length" class="sidebar-hint">No lifecycle tasks match the current filters.</p>
+              <ol v-else>
                 <li v-for="row in agentLifecycleTaskRows" :key="row.task.id" :data-lane="row.task.lane" :data-status="row.state.status">
                   <div>
                     <small>{{ row.task.lane }} | {{ row.state.status }} | {{ row.task.owner }}</small>
@@ -2531,6 +2550,7 @@ import {
   buildAgenticWorkflowRun,
   stableFingerprint,
   type AgenticWorkflowPlaybook,
+  type AgenticWorkflowLane,
   type AgenticWorkflowPlan,
   type AgenticWorkflowRun,
   type AgenticLifecycleTask,
@@ -2668,6 +2688,9 @@ const agentProviderPackage = ref<AiProviderRequestPackage | null>(null);
 const agentProviderApiKey = ref("");
 const agentProviderBusy = ref(false);
 const agentProviderResult = ref<AiProviderExecutionResult | null>(null);
+const agentTaskLaneFilter = ref<"all" | AgenticWorkflowLane>("all");
+const agentTaskStatusFilter = ref<"all" | AgentLifecycleExecutionStatus>("all");
+const agentTaskQuery = ref("");
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const guidedDemoStepIndex = ref(0);
@@ -3069,12 +3092,35 @@ const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
 });
+const agentTaskLaneOptions: Array<"all" | AgenticWorkflowLane> = ["all", "create", "compose", "edit", "revise", "review", "distribute"];
+const agentTaskStatusOptions: Array<"all" | AgentLifecycleExecutionStatus> = ["all", "queued", "in-progress", "needs-review", "complete", "blocked"];
 const agentLifecycleTaskRows = computed(() =>
-  (agentRun.value?.lifecycleTasks || []).map((task) => ({
-    task,
-    state: agentLifecycleTaskStates.value[task.id] || defaultAgentLifecycleTaskState(task),
-  })),
+  (agentRun.value?.lifecycleTasks || [])
+    .map((task) => ({
+      task,
+      state: agentLifecycleTaskStates.value[task.id] || defaultAgentLifecycleTaskState(task),
+    }))
+    .filter((row) => {
+      const query = agentTaskQuery.value.trim().toLowerCase();
+      const laneMatches = agentTaskLaneFilter.value === "all" || row.task.lane === agentTaskLaneFilter.value;
+      const statusMatches = agentTaskStatusFilter.value === "all" || row.state.status === agentTaskStatusFilter.value;
+      const searchable = [
+        row.task.title,
+        row.task.owner,
+        row.task.lane,
+        row.state.status,
+        row.task.sectionId || "",
+        row.task.target || "",
+        row.task.nextStep,
+        row.state.note || "",
+        ...row.task.evidence,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return laneMatches && statusMatches && (!query || searchable.includes(query));
+    }),
 );
+const agentLifecycleTaskTotal = computed(() => agentRun.value?.lifecycleTasks.length || 0);
 const previewDocumentLabel = computed(() => {
   const title = active.value.compile?.semantic.title || active.value.title || "Untitled document";
   const status = active.value.compile?.semantic.status || "draft";
@@ -11196,6 +11242,33 @@ select:hover {
 .agent-lifecycle-board small {
   color: #526171;
   font-size: 12px;
+}
+
+.agent-lifecycle-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.agent-lifecycle-filters label {
+  display: grid;
+  gap: 4px;
+  color: #526171;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agent-lifecycle-filters select,
+.agent-lifecycle-filters input {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid #cbd5df;
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: #ffffff;
+  color: #182230;
+  font: inherit;
 }
 
 .agent-section-workqueue ol,
