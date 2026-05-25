@@ -1585,6 +1585,14 @@ test("supports keyboard-only operation for deep workbench controls", async ({ pa
   await page.keyboard.press("Enter");
   await page.getByLabel("Sidebar panel").selectOption("diagnostics");
 
+  const inventory = page.getByLabel("Compiler output inventory");
+  await expect(inventory).toContainText("Compiled Markdown");
+  await expect(inventory).toContainText("HTML preview");
+  await expect(inventory).toContainText("Semantic model");
+  await expect(inventory).toContainText("Source map");
+  await expect(inventory).toContainText("Export manifest");
+  await expect(inventory.locator(".snapshot-row").filter({ hasText: "Transform artifacts" })).toContainText("artifacts");
+
   const diagnosticsList = page.getByRole("list", { name: "Compiler diagnostics" });
   const diagnostic = diagnosticsList.getByRole("listitem", { name: /warning diagnostic: Mock diagnostic target needs review/ });
   const diagnosticJump = diagnostic.getByRole("button", { name: "Go to source" });
@@ -2222,6 +2230,14 @@ test("navigates compiler diagnostics to the source range", async ({ page }) => {
   await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
 
   await page.getByLabel("Sidebar panel").selectOption("diagnostics");
+
+  const diagnosticInventory = page.getByLabel("Compiler output inventory");
+  await expect(diagnosticInventory).toContainText("Compiled Markdown");
+  await expect(diagnosticInventory).toContainText("HTML preview");
+  await expect(diagnosticInventory).toContainText("Semantic model");
+  await expect(diagnosticInventory).toContainText("Source map");
+  await expect(diagnosticInventory).toContainText("Export manifest");
+  await expect(diagnosticInventory.locator(".snapshot-row").filter({ hasText: "Transform artifacts" })).toContainText("artifacts");
 
   const diagnosticsList = page.getByRole("list", { name: "Compiler diagnostics" });
   const diagnostic = diagnosticsList.getByRole("listitem", { name: /warning diagnostic: Mock diagnostic target needs review/ });

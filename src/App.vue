@@ -352,6 +352,12 @@
 
         <template v-else-if="store.sidebar === 'diagnostics'">
           <h2>Diagnostics</h2>
+          <section class="compiler-output-inventory" aria-label="Compiler output inventory">
+            <article v-for="item in compilerOutputInventory" :key="item.label" class="snapshot-row" :data-status="item.status">
+              <p>{{ item.label }}</p>
+              <small>{{ item.status }} | {{ item.detail }}</small>
+            </article>
+          </section>
           <section role="list" aria-label="Compiler diagnostics">
             <article
               v-for="diagnostic in active.compile?.diagnostics || []"
@@ -3698,6 +3704,12 @@ interface ReferenceLabelRow {
   source_file?: string | null;
 }
 
+interface CompilerOutputInventoryItem {
+  label: string;
+  status: "present" | "empty";
+  detail: string;
+}
+
 type SupportedDataSourceKind = "csv" | "tsv" | "json" | "yaml";
 type FrontMatterDataSourceKind = SupportedDataSourceKind | string;
 type FrontMatterDataSourceStatus = "ready" | "missing-path" | "unsupported-type" | "blocked-path";
@@ -4161,6 +4173,27 @@ const previewDiagnostics = computed<PreviewDiagnosticItem[]>(() => {
     .sort((left, right) => left.generatedLine - right.generatedLine || (left.line || 0) - (right.line || 0));
 });
 const previewHtmlWithDiagnostics = computed(() => inlinePreviewDiagnostics(active.value.compile?.html || "", previewDiagnostics.value));
+const compilerOutputInventory = computed<CompilerOutputInventoryItem[]>(() => {
+  const compile = active.value.compile;
+  const metadataKeys = Object.keys(compile?.metadata || {});
+  const manifest = compile?.export_manifest;
+  return [
+    outputInventoryItem("Compiled Markdown", compile?.compiled_markdown, (value) => `${value.length} characters`),
+    outputInventoryItem("HTML preview", compile?.html, (value) => `${value.length} characters`),
+    outputInventoryItem("Semantic model", compile?.semantic, (value) => `${value.outline.length} headings, ${value.comments.length} comments`),
+    outputInventoryItem("Document AST", compile?.document_ast.blocks, (value) => `${value.length} blocks`),
+    outputInventoryItem("Paged document", compile?.paged_document.sections, (value) => `${value.length} layout sections`),
+    outputInventoryItem("Diagnostics", compile?.diagnostics, (value) => `${value.length} diagnostics`),
+    outputInventoryItem("Include graph", compile?.include_graph, (value) => `${value.length} includes`),
+    outputInventoryItem("Source map", compile?.source_map, (value) => `${value.length} mappings`),
+    outputInventoryItem("Metadata", metadataKeys, (value) => `${value.length} fields`),
+    outputInventoryItem("Bibliography", compile?.bibliography, (value) => `${value.length} entries`),
+    outputInventoryItem("Index terms", compile?.index_terms, (value) => `${value.length} terms`),
+    outputInventoryItem("Formula graph", compile?.formula_graph, (value) => `${value.length} formulas`),
+    outputInventoryItem("Transform artifacts", compile?.transform_artifacts, (value) => `${value.length} artifacts`),
+    outputInventoryItem("Export manifest", manifest, (value) => `${value.included_files.length} files, ${value.transform_artifacts.length} transforms`),
+  ];
+});
 const exportPreviewSummary = computed(() => {
   const manifest = store.exportReadiness?.manifest || active.value.compile?.export_manifest;
   const readiness = store.exportReadiness;
@@ -4276,6 +4309,18 @@ function externalEngineSetupStatus(engine: TransformEngineMetadata) {
   return {
     status: "ready",
     message: "External executable path is trusted; run Probe after upgrades or path changes to refresh diagnostic proof.",
+  };
+}
+function outputInventoryItem<T>(
+  label: string,
+  value: T | null | undefined,
+  detail: (value: NonNullable<T>) => string,
+): CompilerOutputInventoryItem {
+  const present = Array.isArray(value) ? value.length > 0 : Boolean(value);
+  return {
+    label,
+    status: present ? "present" : "empty",
+    detail: present && value !== null && value !== undefined ? detail(value as NonNullable<T>) : "No current compiler output",
   };
 }
 const manifestPreview = computed(() => JSON.stringify(store.exportReadiness?.manifest || active.value.compile?.export_manifest || {}, null, 2));
