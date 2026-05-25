@@ -89,6 +89,12 @@ const evidenceItems = [
     "accessibility-human-review/manual-review-signoff.json",
     "manual-review-signoff.json",
   ]),
+  item("external-engine-pikchr", ".tmp/external-engines/external/pikchr.json", "external-engine", [
+    "external-engines/external/pikchr.json",
+    "external-engines/pikchr.json",
+    "optional-engines/pikchr.json",
+    "pikchr.json",
+  ]),
 ];
 
 if (listOnly) {
@@ -181,6 +187,7 @@ function runValidations(categories) {
   if (categories.has("google-docs")) commands.push(command("Google Docs import evidence", "pnpm", ["run", "check:google-docs-import"]));
   if (categories.has("ai-provider")) commands.push(command("AI provider evidence", "pnpm", ["run", "check:ai-provider"]));
   if (categories.has("ai-runtime")) commands.push(command("AI runtime evidence", "pnpm", ["run", "check:ai-runtime"]));
+  if (categories.has("external-engine")) commands.push(command("external engine evidence", "pnpm", ["run", "check:engines"]));
   if (categories.has("rendered-signoff")) {
     commands.push(
       command("rendered export signoff", "pnpm", ["run", "test:rendered-exports", "--", "--validate-signoff-only"], {

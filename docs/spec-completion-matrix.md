@@ -180,10 +180,10 @@ current app version, Git commit, and clean source tree.
 | Setup doc section | Requirement area | Current status | Evidence | Remaining gap |
 | --- | --- | --- | --- | --- |
 | Safety model | Real executable paths, per-engine trust, bounded execution, cache keys, fallback | Partial | `transforms/external.rs`; external transform tests; `prepare_for_export_validates_transform_engine_paths_before_export`; `compiler_skips_disabled_external_transform_without_trust_warning`; `external_transform_cache_invalidates_when_trusted_executable_changes`; archived browser workflow run `26157446711` covers settings-level path change trust clearing, trust prompts, denied trust reset, input mode/timeout probe details, cache identity display, and missing-executable diagnostics | Cross-platform process proof and deeper executable edge cases. |
-| macOS setup | Graphviz, D2, Pikchr, Java/PlantUML paths | Partial | `docs/external-transform-platform-evidence.md`; `pnpm run check:engines` reports Graphviz `dot`, `circo`, `neato`, `fdp`, `osage`, `twopi`, D2, PlantUML, and Java on this Darwin arm64 host, writes passing adapter-shaped SVG smoke artifacts for every installed engine under `.tmp/external-engines/artifacts/`, emits external evidence templates under `.tmp/external-engines/templates/`, accepts valid copied `neditor.external-engine-evidence.v1` proof from `NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR`, and fails malformed supplied evidence; `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture` verified those Graphviz engines, D2, and PlantUML through the external transform execution path | Install and verify Pikchr on macOS, or supply accepted Pikchr evidence from a supported host. |
+| macOS setup | Graphviz, D2, Pikchr, Java/PlantUML paths | Partial | `docs/external-transform-platform-evidence.md`; `pnpm run check:engines` reports Graphviz `dot`, `circo`, `neato`, `fdp`, `osage`, `twopi`, D2, PlantUML, Java, and Pikchr on this Darwin arm64 host, writes passing adapter-shaped SVG smoke artifacts for every installed engine under `.tmp/external-engines/artifacts/`, emits external evidence templates under `.tmp/external-engines/templates/`, accepts valid copied `neditor.external-engine-evidence.v1` proof from `NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR`, and fails malformed supplied evidence; `cargo test --locked external_transform_conformance_runs_installed_engines --lib -- --nocapture` verified those Graphviz engines, D2, and PlantUML through the external transform execution path | Keep cross-platform optional-engine proof current, especially Windows evidence and full Pikchr conformance beyond smoke proof. |
 | Linux setup | Packages and optional engines | Partial | Historical workflow installed Linux engines; current proof requires local installed-engine checks | Keep installed-engine conformance stable. |
 | Windows setup | Winget paths and shim guidance | Unverified | Documentation exists | Add manual evidence on Windows. |
-| Engine defaults | stdin/file modes by engine | Partial | Adapter profiles and tests; `compiler_uses_dot_settings_for_graphviz_alias` proves `graphviz` fences inherit the configured `dot` path, trust, and input mode; macOS installed-engine conformance verified Graphviz stdin, D2 stdin, and PlantUML file-mode smoke artifacts in `docs/external-transform-platform-evidence.md`; Graphviz variant metadata now exposes separate default commands/version probes for `circo`, `neato`, `fdp`, `osage`, and `twopi`; external evidence templates record per-engine smoke kind, version arguments, SVG smoke hashes, and required markers for copied proof | Cross-platform confirmation and macOS Pikchr proof. |
+| Engine defaults | stdin/file modes by engine | Partial | Adapter profiles and tests; `compiler_uses_dot_settings_for_graphviz_alias` proves `graphviz` fences inherit the configured `dot` path, trust, and input mode; macOS installed-engine conformance verified Graphviz stdin, D2 stdin, and PlantUML file-mode smoke artifacts in `docs/external-transform-platform-evidence.md`; Graphviz variant metadata now exposes separate default commands/version probes for `circo`, `neato`, `fdp`, `osage`, and `twopi`; external evidence templates record per-engine smoke kind, version arguments, SVG smoke hashes, and required markers for copied proof, and the release evidence kit now routes optional Pikchr proof back through ingest plus `check:engines` | Cross-platform confirmation and deeper Pikchr conformance beyond smoke proof. |
 | Troubleshooting | Permission, empty output, timeout, trust disabled, cache stale | Partial | Diagnostics/failure hints; external transform tests now cover missing engine path, permission, timeout, stderr, missing output, output limit, disabled-engine, and cache-stale diagnostics | UI docs and platform-specific cases. |
 
 ## Verification Coverage Summary
@@ -300,10 +300,14 @@ Current major verification gaps:
   `manual-review.html`, and the rich-block/option-heavy HTML review cases.
   Broader cross-platform native viewer/platform manual QA remains under-proven.
 - Optional external transform engine evidence now includes current macOS
-  Graphviz/DOT variants, D2, and PlantUML version plus SVG smoke artifact proof
-  via `pnpm run check:engines`, `.tmp/external-engines/probe-report.json`, and
-  `.tmp/external-engines/artifacts/`; macOS Pikchr and Windows optional-engine
-  evidence remain open.
+  Graphviz/DOT variants, D2, PlantUML, and Pikchr version plus SVG smoke
+  artifact proof via `pnpm run check:engines`,
+  `.tmp/external-engines/probe-report.json`, and
+  `.tmp/external-engines/artifacts/`; the release evidence kit now packages a
+  Pikchr template and optional external-engine runbook, and
+  `pnpm run ingest:evidence` validates returned optional-engine proof through
+  `pnpm run check:engines`. Windows optional-engine evidence remains open when
+  a Windows host lacks accepted returned proof.
 - Accessibility has a structured static guard report at
   `.tmp/accessibility/report.json`, a focused runtime workflow report at
   `.tmp/accessibility/runtime-report.json`, a manual review template and

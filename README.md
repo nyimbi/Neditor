@@ -522,6 +522,14 @@ manually when release readiness needs supported-host proof, then download the
 uploaded evidence artifacts and import returned completed sign-offs locally with
 `pnpm run ingest:evidence -- --source /path/to/unpacked-artifacts`.
 
+`pnpm run collect:evidence-kit` packages the current release-readiness gaps into
+a reviewer-friendly bundle with runbooks, templates, and return paths for
+platform evidence, signing, live AI provider/runtime proof, Google Docs import,
+human review sign-offs, and optional external engines such as Pikchr. The ingest
+tool recognizes returned optional-engine proof under paths such as
+`external-engines/external/pikchr.json` and validates it through
+`pnpm run check:engines`.
+
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`
 and the Tauri package build. It scans real installer/package artifacts, copies

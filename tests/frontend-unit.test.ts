@@ -2221,6 +2221,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("google-docs-live-import-readback"));
   ok(evidenceKitCollector.includes("rendered-export-native-viewer-human-signoff"));
   ok(evidenceKitCollector.includes("accessibility-assistive-technology-human-signoff"));
+  ok(evidenceKitCollector.includes("optional-external-engines"));
   ok(evidenceKitCollector.includes("sourceTreeClean"));
   ok(evidenceKitCollector.includes("staleTemplates"));
   ok(evidenceKitCollector.includes("inspectTemplateFreshness"));
@@ -2230,12 +2231,15 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("runtime-evidence.template.json"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
+  ok(evidenceKitCollector.includes("pikchr.template.json"));
+  ok(evidenceKitCollector.includes("gapWorkItems"));
   ok(evidenceKitCollector.includes("pnpm run ingest:evidence"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit.v1"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit-report.v1"));
   ok(evidenceKitChecker.includes("runbooks/ai-provider-endpoint.md"));
   ok(evidenceKitChecker.includes("runbooks/ai-runtime-device.md"));
-  ok(evidenceKitChecker.includes("expectedTemplateCount = 12"));
+  ok(evidenceKitChecker.includes("runbooks/optional-external-engines.md"));
+  ok(evidenceKitChecker.includes("expectedTemplateCount = 13"));
   ok(evidenceKitChecker.includes("report.json"));
   ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
   ok(evidenceKitChecker.includes("current source tree must be clean"));
@@ -2250,6 +2254,9 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceIngest.includes("ai-runtime/runtime-evidence.json"));
   ok(evidenceIngest.includes("NEDITOR_RENDERED_EXPORT_SIGNOFF"));
   ok(evidenceIngest.includes("NEDITOR_ACCESSIBILITY_SIGNOFF"));
+  ok(evidenceIngest.includes("external-engine-pikchr"));
+  ok(evidenceIngest.includes("external-engines/external/pikchr.json"));
+  ok(evidenceIngest.includes("check:engines"));
   ok(evidenceIngest.includes("pnpm"));
   ok(evidenceIngest.includes("check:release-signing"));
   ok(evidenceIngest.includes("check:ai-provider"));

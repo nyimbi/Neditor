@@ -25,6 +25,7 @@ const templateCopies = [
   [".tmp/google-docs-import/import-evidence.template.json", "templates/google-docs/import-evidence.template.json"],
   [".tmp/rendered-export-audit/visual-review-signoff.template.json", "templates/rendered-export/visual-review-signoff.template.json"],
   [".tmp/accessibility/manual-review-template.json", "templates/accessibility/manual-review-template.json"],
+  [".tmp/external-engines/templates/pikchr.template.json", "templates/external-engines/pikchr.template.json"],
 ];
 
 const runbooks = [
@@ -156,6 +157,22 @@ const runbooks = [
     ],
     returns: ["completed accessibility manual-review signoff JSON"],
   },
+  {
+    file: "runbooks/optional-external-engines.md",
+    title: "Optional External Engine Proof",
+    gaps: ["optional-external-engines"],
+    commands: [
+      "git fetch --all --tags",
+      `git checkout ${sourceCommit || "<source-commit>"}`,
+      "git status --porcelain",
+      "pnpm install --frozen-lockfile",
+      "Install or build the missing optional engine, such as Pikchr, on the verifier host.",
+      "Run pnpm run check:engines with the engine path environment variable when needed, for example NEDITOR_TEST_PIKCHR=/absolute/path/to/pikchr pnpm run check:engines.",
+      "Copy the matching completed template from .tmp/external-engines/templates/ to .tmp/external-engines/external/, for example pikchr.json.",
+      "NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR=.tmp/external-engines/external pnpm run check:engines",
+    ],
+    returns: [".tmp/external-engines/external/pikchr.json"],
+  },
 ];
 
 rmSync(outputDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
@@ -185,6 +202,7 @@ const manifest = {
     gaps: runbook.gaps,
     returns: runbook.returns,
   })),
+  gapWorkItems: gapWorkItems(),
 };
 
 writeRunbooks();
@@ -287,6 +305,15 @@ function readme(manifest) {
     ? manifest.gaps.map((gap) => `- \`${gap.id}\`: ${gap.detail}`).join("\n")
     : "- No external gaps were present in the current release readiness report.";
   const runbookLines = manifest.runbooks.map((runbook) => `- [${runbook.title}](${runbook.path})`).join("\n");
+  const workItemLines = manifest.gapWorkItems.length
+    ? manifest.gapWorkItems
+        .map((item) => [
+          `- [ ] \`${item.id}\`: ${item.detail || "See release readiness report."}`,
+          ...item.runbooks.map((runbook) => `  - Runbook: [${runbook.title}](${runbook.path})`),
+          ...item.returns.map((returned) => `  - Return: \`${returned}\``),
+        ].join("\n"))
+        .join("\n")
+    : "- No external work items are required by the current release readiness report.";
   const missingLines = manifest.missingTemplates.length
     ? manifest.missingTemplates.map((template) => `- \`${template.source}\``).join("\n")
     : "- None.";
@@ -310,6 +337,10 @@ function readme(manifest) {
     "",
     runbookLines,
     "",
+    "## Gap Work Items",
+    "",
+    workItemLines,
+    "",
     "## Missing Templates",
     "",
     missingLines,
@@ -326,6 +357,26 @@ function readme(manifest) {
     "Completed evidence must match the current app version, source commit, and clean source-tree requirements enforced by the validators.",
     "",
   ].join("\n")}\n`;
+}
+
+function gapWorkItems() {
+  return gaps.map((gap) => {
+    const id = gap.id || gap.check || gap.name || "unknown-gap";
+    const matchingRunbooks = runbooks
+      .filter((runbook) => runbook.gaps.includes(id))
+      .map((runbook) => ({
+        title: runbook.title,
+        path: runbook.file,
+      }));
+    return {
+      id,
+      status: gap.status || "pending",
+      detail: gap.detail || gap.reason || gap.message || "",
+      evidence: gap.evidence || null,
+      runbooks: matchingRunbooks,
+      returns: Array.from(new Set(runbooks.filter((runbook) => runbook.gaps.includes(id)).flatMap((runbook) => runbook.returns))),
+    };
+  });
 }
 
 function readJson(path) {

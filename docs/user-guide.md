@@ -444,6 +444,12 @@ exact executable paths in settings, probe the engine, and trust only the engine
 you intend to use. Execution is bounded by timeout and output-size limits, and
 no engine is invoked through interpolated shell strings.
 
+For release evidence, optional engines can be proven on another workstation.
+Run the release evidence kit, fill the returned engine template such as
+`external-engines/external/pikchr.json`, and import it with
+`pnpm run ingest:evidence`; NEditor validates the returned proof through the
+same external-engine checker before release readiness accepts it.
+
 See [External transform setup](external-transforms.md) for platform-specific
 install paths and troubleshooting.
 
