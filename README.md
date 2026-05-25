@@ -184,9 +184,9 @@ web app.
 - CodeMirror editing with Markdown highlighting, diagnostics gutter, line
   numbers, word wrap, find/replace, smart list continuation, bracket pairing,
   word count, character count, and reading-time status.
-- Command palette for app actions plus document-aware navigation across
-  headings, citations, glossary terms, index terms, open documents, and
-  workspace files.
+- Command palette for app actions, natural-language AI agent instructions, and
+  document-aware navigation across headings, citations, glossary terms, index
+  terms, open documents, and workspace files.
 - First-class outline planning in the Outline panel: draft a document structure
   with indented bullets, numbers, or Markdown headings, then create or append a
   Markdown document skeleton before writing the body text.

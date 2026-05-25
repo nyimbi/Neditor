@@ -1219,6 +1219,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentPlan"));
   ok(app.includes("agentRun"));
   ok(app.includes("agentContextAnswers"));
+  ok(app.includes("commandAgentInstructionAvailable"));
+  ok(app.includes("runCommandPaletteAgentInstruction"));
+  ok(app.includes('aria-label="AI command route"'));
+  ok(app.includes("Routed command palette instruction to the AI agent workspace"));
   ok(app.includes("Context answers and constraints"));
   ok(app.includes("Replan with answers"));
   ok(app.includes("These answers feed the next plan, packet, Docs Live handoff, and provider request."));

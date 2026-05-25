@@ -2458,7 +2458,21 @@
           <h2>Command Palette</h2>
           <button type="button" aria-label="Close command palette" @click="closeCommandPalette">x</button>
         </header>
-        <input v-model="commandQuery" autofocus data-initial-focus aria-label="Search commands, headings, citations, glossary, and index terms" placeholder="Search commands, headings, citations, glossary, index terms" />
+        <input
+          v-model="commandQuery"
+          autofocus
+          data-initial-focus
+          aria-label="Search commands, headings, citations, glossary, index terms, or enter an AI instruction"
+          placeholder="Search commands or tell NEditor what to do"
+          @keydown.enter.prevent="runCommandPaletteAgentInstruction"
+        />
+        <section v-if="commandAgentInstructionAvailable" class="command-agent-route" aria-label="AI command route">
+          <div>
+            <strong>Run as agent instruction</strong>
+            <span>Create, edit, review, or prepare distribution from this typed request.</span>
+          </div>
+          <button type="button" @click="runCommandPaletteAgentInstruction">Open Agent</button>
+        </section>
         <button
           v-for="command in filteredCommands"
           :key="command.name"
@@ -4784,6 +4798,11 @@ const filteredCommands = computed(() => {
   const query = commandQuery.value.trim().toLowerCase();
   if (!query) return commands.value;
   return commands.value.filter((command) => `${command.name} ${command.group}`.toLowerCase().includes(query));
+});
+const commandAgentInstructionAvailable = computed(() => {
+  const query = commandQuery.value.trim();
+  if (query.length < 8) return false;
+  return /\b(ai|agent|create|draft|write|revise|edit|review|summari[sz]e|publish|export|prepare|make|turn|improve|humanize|outline|compose)\b/i.test(query);
 });
 
 async function bindNativeMenuCommands() {
@@ -8468,6 +8487,15 @@ async function runCommand(run: () => unknown) {
   closeCommandPalette();
   await nextTick();
   run();
+}
+
+async function runCommandPaletteAgentInstruction() {
+  const instruction = commandQuery.value.trim();
+  if (!instruction) return;
+  closeCommandPalette();
+  await nextTick();
+  openAgentWorkspace(instruction);
+  store.statusMessage = "Routed command palette instruction to the AI agent workspace";
 }
 
 function toolbarIconPaths(icon: ToolbarIconName) {
@@ -12546,6 +12574,28 @@ select:hover {
 
 .command-modal {
   align-content: start;
+}
+
+.command-agent-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #b9d4ec;
+  border-left: 3px solid #275da8;
+  border-radius: 6px;
+  padding: 10px;
+  background: #f5faff;
+}
+
+.command-agent-route div {
+  display: grid;
+  gap: 2px;
+}
+
+.command-agent-route span {
+  color: #526171;
+  font-size: 12px;
 }
 
 .command-row {

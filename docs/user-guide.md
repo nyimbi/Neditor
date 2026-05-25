@@ -48,7 +48,10 @@ pairing, word count, character count, reading-time status, and source navigation
 from diagnostics.
 
 The command palette searches app actions, headings, citations, glossary terms,
-index terms, open documents, and workspace files.
+index terms, open documents, and workspace files. It also accepts typed
+AI-first instructions such as "revise this for the board and prepare PDF"; press
+Enter or choose **Open Agent** to send that request directly into the Agent
+Workspace.
 
 The top command bar is grouped around document, management, writing, navigation,
 insertion, review, and view workflows. Use Navigate for search, previous/next
