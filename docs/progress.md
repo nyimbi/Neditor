@@ -131,7 +131,9 @@ Recent pushed checkpoints visible in current git history:
   Global compiler diagnostics and per-artifact diagnostics both carry the
   transform name, source-range breadcrumb, start/end lines, and column bounds,
   so preview/sidebar jumps and export manifests have a more precise repair
-  target.
+  target. Row-level CSV/TSV formula diagnostics are now translated from
+  transform-body row numbers to absolute Markdown source lines, with the
+  diagnostic ending on the exact bad data row instead of the whole fence.
 - The status bar now reports live preview update telemetry, including elapsed
   compile time and compiled character count. The large-document browser
   workflow verifies that a 120-section edit reaches the preview within the

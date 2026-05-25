@@ -1379,7 +1379,8 @@ Finish:
   not attempted.
 - Transform diagnostics now carry fenced-block column bounds plus `transform:`
   and `source range:` related context in both compiler diagnostics and
-  per-artifact diagnostics.
+  per-artifact diagnostics. Row-level CSV/TSV formula diagnostics now point at
+  the absolute Markdown source row that needs repair.
 - Prepare-for-export readiness now rejects configured missing, directory, and
   non-executable external engine paths before export, while still ignoring
   disabled engine paths.

@@ -106,14 +106,28 @@ fn attach_transform_diagnostic_source(
     source_line: Option<usize>,
     end_source_line: Option<usize>,
 ) {
+    let should_translate_relative_line = diagnostic.source_file.is_none();
+    let had_line = diagnostic.line.is_some();
     if diagnostic.source_file.is_none() {
         diagnostic.source_file = source_file.map(ToString::to_string);
+    }
+    if should_translate_relative_line {
+        if let (Some(source_line), Some(line)) = (source_line, diagnostic.line) {
+            diagnostic.line = Some(source_line + line);
+        }
+        if let (Some(source_line), Some(end_line)) = (source_line, diagnostic.end_line) {
+            diagnostic.end_line = Some(source_line + end_line);
+        }
     }
     if diagnostic.line.is_none() {
         diagnostic.line = source_line;
     }
     if diagnostic.end_line.is_none() {
-        diagnostic.end_line = end_source_line;
+        diagnostic.end_line = if had_line {
+            diagnostic.line
+        } else {
+            end_source_line
+        };
     }
     if diagnostic.column.is_none() {
         diagnostic.column = Some(1);

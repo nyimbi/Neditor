@@ -82,6 +82,49 @@ fn csv_and_tsv_transforms_evaluate_table_formula_cells() {
 }
 
 #[test]
+fn csv_formula_diagnostics_report_absolute_fence_source_lines() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Bad CSV Formula\nstatus: draft\n---\n# Bad CSV Formula\n```csv\nMetric,Value\nBad,=UNKNOWN(1)\n```\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    let diagnostic = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("Table formula error"))
+        .expect("csv formula diagnostic");
+    assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(diagnostic.line, Some(8));
+    assert_eq!(diagnostic.end_line, Some(8));
+    assert_eq!(diagnostic.column, Some(1));
+    assert_eq!(diagnostic.end_column, Some(4));
+    assert!(diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("CSV/TSV cells")));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "transform: csv"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "source range: 6-9"));
+
+    let artifact_diagnostic = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "csv")
+        .and_then(|artifact| artifact.diagnostics.first())
+        .expect("csv artifact diagnostic");
+    assert_eq!(artifact_diagnostic.line, Some(8));
+    assert_eq!(artifact_diagnostic.end_line, Some(8));
+    assert_eq!(artifact_diagnostic.column, Some(1));
+    assert_eq!(artifact_diagnostic.end_column, Some(4));
+}
+
+#[test]
 fn table_formulas_resolve_forward_refs_and_report_cycles() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Formula Cycles\nstatus: approved\napprovedBy: QA\n---\n# Formula Cycles\n| Metric | Value |\n| --- | ---: |\n| Forward | =B2 |\n| Source | 42 |\n| Cycle A | =B4 |\n| Cycle B | =B3 |\n".to_string(),
