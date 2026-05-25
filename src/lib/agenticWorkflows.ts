@@ -2218,6 +2218,35 @@ function qualityGateProfiles(): Record<DocsLiveDocumentType, Array<Omit<AgenticQ
       qualityGate("Scope Discipline", "In-scope, out-of-scope, timeline, dependencies, and acceptance criteria are explicit.", ["Scope boundaries present", "Acceptance criteria present"]),
       qualityGate("Commercial Review", "Pricing, assumptions, obligations, and approval terms are checked before client handoff.", ["Investment reviewed", "Terms and assumptions reviewed"]),
     ],
+    "rfp-response": [
+      qualityGate("Requirement Mirror", "The response maps buyer requirements, evaluation criteria, and mandatory attachments into a visible compliance matrix.", [
+        "Compliance matrix present",
+        "Mandatory requirements checked",
+      ]),
+      qualityGate("Evidence Differentiation", "Claims, prior experience, certifications, and differentiators are source-backed and easy to evaluate.", ["Proof points sourced", "Differentiators tied to criteria"]),
+      qualityGate("Submission Readiness", "Deadline, format, approvals, exceptions, and required appendices are ready before bid handoff.", ["Submission checklist complete", "Approvals named"]),
+    ],
+    "rfq-response": [
+      qualityGate("Quotation Clarity", "Quoted items, quantities, units, pricing basis, taxes, inclusions, and exclusions are explicit.", [
+        "Pricing table present",
+        "Inclusions and exclusions named",
+      ]),
+      qualityGate("Commercial Validity", "Validity date, payment terms, delivery schedule, and acceptance path are visible.", ["Validity date present", "Terms reviewed"]),
+      qualityGate("Buyer Fit", "The quotation answers the buyer's requested items without adding ambiguous scope.", ["Requirements mirrored", "Scope ambiguity reviewed"]),
+    ],
+    "tender-response": [
+      qualityGate("Mandatory Compliance", "Tender instructions, eligibility evidence, declarations, and attachments are tracked before submission.", [
+        "Mandatory checklist present",
+        "Eligibility evidence attached or marked",
+      ]),
+      qualityGate("Method and Delivery", "Technical method, work plan, quality controls, key personnel, and risks are specific.", ["Method statement complete", "Risk controls listed"]),
+      qualityGate("Bid Governance", "Authorized approver, final review status, deadline, and submission channel are explicit.", ["Approver named", "Submission channel present"]),
+    ],
+    tutorial: [
+      qualityGate("Learner Outcome", "Learning goals, target audience, prerequisites, and completion checks are stated.", ["Learning goals present", "Prerequisites listed"]),
+      qualityGate("Step Usability", "Instructions are ordered, testable, and include checks, examples, and failure guidance.", ["Steps are action-oriented", "Troubleshooting present"]),
+      qualityGate("Review Readiness", "Screenshots, examples, permissions, and terminology are marked for verification before publishing.", ["Examples reviewed", "Terminology checked"]),
+    ],
     "strategy-plan": [
       qualityGate("Strategic Choice", "The plan names the strategic bet, alternatives rejected, and tradeoffs.", ["Choice stated", "Rejected alternatives captured"]),
       qualityGate("Execution Measures", "Roadmap, owners, milestones, and measurable outcomes are tied to evidence.", ["Owners and milestones present", "Metrics source-backed"]),

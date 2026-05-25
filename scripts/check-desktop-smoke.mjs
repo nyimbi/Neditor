@@ -480,6 +480,8 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow jumped sidebar diagnostic to source range",
     "native workflow jumped preview table artifact to source",
     "native workflow jumped preview equation artifact to source",
+    "native workflow rendered numbered toc from marker and front matter",
+    "native workflow jumped toc preview link to source",
     "native workflow opened command palette",
     "native workflow found dose template",
     "native workflow inserted calc template into source",
@@ -771,6 +773,27 @@ function validateNativeWorkflowReport(launchReport) {
     ).includes("ARR = Revenue")
   ) {
     issues.push(`native workflow report did not include preview source-map evidence: ${JSON.stringify(previewSourceMapEvidence)}`);
+  }
+  const tocNavigationEvidence = payload.tocNavigationEvidence || {};
+  const tocLinks = Array.isArray(tocNavigationEvidence.rendered?.links) ? tocNavigationEvidence.rendered.links : [];
+  const tocLinkText = tocLinks.map((link) => `${link?.href || ""} ${link?.text || ""}`).join("\n");
+  if (
+    tocNavigationEvidence.rendered?.previewPaneVisible !== true ||
+    tocNavigationEvidence.rendered?.headingVisible !== true ||
+    tocNavigationEvidence.rendered?.metadata?.toc !== true ||
+    Number(tocNavigationEvidence.rendered?.metadata?.tocDepth || 0) !== 2 ||
+    tocNavigationEvidence.rendered?.metadata?.tocNumbered !== true ||
+    !tocLinkText.includes("#native-toc-navigation 1 Native TOC Navigation") ||
+    !tocLinkText.includes("#native-toc-target 1.1 Native TOC Target") ||
+    !tocLinkText.includes("#native-toc-follow-up 1.2 Native TOC Follow-up") ||
+    tocNavigationEvidence.rendered?.hiddenDetailExcluded !== true ||
+    tocNavigationEvidence.sourceJump?.targetLinkVisible !== true ||
+    !String(tocNavigationEvidence.sourceJump?.href || "").includes("#native-toc-navigation") ||
+    !String(
+      `${tocNavigationEvidence.sourceJump?.selection?.lineText || ""}\n${tocNavigationEvidence.sourceJump?.selection?.nearbyText || ""}`,
+    ).includes("# Native TOC Navigation")
+  ) {
+    issues.push(`native workflow report did not include toc navigation evidence: ${JSON.stringify(tocNavigationEvidence)}`);
   }
   const snapshotEvidence = payload.snapshotEvidence || {};
   if (

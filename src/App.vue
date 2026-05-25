@@ -677,6 +677,122 @@
 
         <template v-else-if="store.sidebar === 'templates'">
           <h2>Templates <small>{{ filteredTransformTemplates.length }}</small></h2>
+          <section class="business-template-hub" aria-label="Business document creation">
+            <header>
+              <div>
+                <strong>Business identity</strong>
+                <span>Saved sender, company, address, website, and voice values for repeatable documents.</span>
+              </div>
+              <small>{{ businessProfileCompletion }}</small>
+            </header>
+            <div class="template-actions">
+              <button type="button" title="Set up the business identity values reused in proposals, tenders, RFQs, and snippets" @click="openBusinessProfile">
+                <span class="button-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path v-for="path in toolbarIconPaths('settings')" :key="path" :d="path"></path>
+                  </svg>
+                </span>
+                Business info
+              </button>
+              <button
+                type="button"
+                title="Insert the saved contact block into the current document"
+                @click="insertBusinessSnippet(businessDocumentSnippets[0])"
+              >
+                <span class="button-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path v-for="path in toolbarIconPaths('templates')" :key="path" :d="path"></path>
+                  </svg>
+                </span>
+                Contact block
+              </button>
+            </div>
+            <p class="sidebar-hint">
+              {{ store.businessProfile.companyName || "No company saved yet" }}
+              <span v-if="store.businessProfile.email"> | {{ store.businessProfile.email }}</span>
+              <span v-if="store.businessProfile.website"> | {{ store.businessProfile.website }}</span>
+            </p>
+          </section>
+          <section class="business-template-hub" aria-label="AI document creation wizard">
+            <header>
+              <div>
+                <strong>Document creation wizard</strong>
+                <span>Start common business documents with identity, placeholders, outline, QA, humanization, and agent handoff.</span>
+              </div>
+            </header>
+            <label>
+              Find a document type
+              <input v-model="businessTemplateQuery" placeholder="proposal, RFP, RFQ, tender, tutorial" />
+            </label>
+            <div class="business-template-list" role="list" aria-label="Business development document templates">
+              <article v-for="template in filteredBusinessTemplates" :key="template.id" class="template-card business-document-card" role="listitem">
+                <header class="template-card-header">
+                  <div>
+                    <strong>{{ template.label }}</strong>
+                    <small>{{ template.summary }}</small>
+                  </div>
+                  <span class="template-source">wizard</span>
+                </header>
+                <div class="template-tags" aria-label="Best-fit uses">
+                  <small v-for="item in template.bestFor" :key="`${template.id}-${item}`">{{ item }}</small>
+                </div>
+                <details>
+                  <summary>Outline</summary>
+                  <ol>
+                    <li v-for="heading in template.outline" :key="`${template.id}-${heading}`">{{ heading }}</li>
+                  </ol>
+                </details>
+                <div class="template-actions">
+                  <button type="button" :title="`Insert a fillable ${template.label} Markdown template`" @click="insertBusinessTemplate(template)">
+                    <span class="button-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path v-for="path in toolbarIconPaths('new')" :key="path" :d="path"></path>
+                      </svg>
+                    </span>
+                    Insert
+                  </button>
+                  <button type="button" :title="`Open Docs Live wizard for ${template.label}`" @click="startBusinessDocumentWizard(template)">
+                    <span class="button-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path v-for="path in toolbarIconPaths('ai')" :key="path" :d="path"></path>
+                      </svg>
+                    </span>
+                    AI wizard
+                  </button>
+                  <button type="button" :title="`Prepare Claude Code, Codex, or OpenCode handoff for ${template.label}`" @click="openAgentWorkspaceForBusinessTemplate(template)">
+                    <span class="button-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path v-for="path in toolbarIconPaths('agent')" :key="path" :d="path"></path>
+                      </svg>
+                    </span>
+                    Agent handoff
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
+          <section class="business-template-hub" aria-label="Reusable document parts">
+            <header>
+              <div>
+                <strong>Reusable document parts</strong>
+                <span>Insert standard sections without starting a full template.</span>
+              </div>
+            </header>
+            <label>
+              Find a part
+              <input v-model="businessSnippetQuery" placeholder="scope, pricing, compliance, risk, review" />
+            </label>
+            <div class="snippet-list" role="list" aria-label="Standard document snippets">
+              <article v-for="snippet in filteredBusinessSnippets" :key="snippet.id" class="snippet-card" role="listitem">
+                <div>
+                  <strong>{{ snippet.label }}</strong>
+                  <small>{{ snippet.kind }} | {{ snippet.summary }}</small>
+                </div>
+                <button type="button" :title="`Insert ${snippet.label} into the document`" @click="insertBusinessSnippet(snippet)">Insert</button>
+              </article>
+            </div>
+          </section>
+          <h3>Calculation and transform templates</h3>
           <section class="template-filters" aria-label="Transform template filters">
             <label>
               Search
@@ -2053,6 +2169,65 @@
     </section>
 
     <section
+      v-if="businessProfileOpen"
+      ref="businessProfileDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Business identity setup"
+      tabindex="-1"
+      @keydown="handleModalKeydown('business-profile', $event)"
+    >
+      <form class="modal business-profile-modal" @submit.prevent="saveBusinessProfile">
+        <header>
+          <h2>Business Identity</h2>
+          <button type="button" aria-label="Close business identity setup" @click="closeBusinessProfile">x</button>
+        </header>
+        <section class="business-profile-grid" aria-label="Business identity fields">
+          <label v-for="field in businessProfileFields" :key="field.key">
+            {{ field.label }}
+            <textarea
+              v-if="field.key === 'companyAddress' || field.key === 'brandVoice'"
+              v-model="businessProfileDraft[field.key]"
+              :placeholder="field.placeholder"
+              rows="3"
+            ></textarea>
+            <input
+              v-else
+              v-model="businessProfileDraft[field.key]"
+              :placeholder="field.placeholder"
+              :data-initial-focus="field.key === 'fullName' ? '' : null"
+            />
+          </label>
+        </section>
+        <section class="business-profile-preview" aria-label="Business identity placeholder preview">
+          <header>
+            <strong>Reusable placeholders</strong>
+            <span>These values flow into templates, snippets, Docs Live, and agent handoff packages.</span>
+          </header>
+          <textarea :value="businessProfilePlaceholderText(businessProfileDraft)" rows="8" readonly></textarea>
+        </section>
+        <section class="business-profile-preview" aria-label="Local agent integrations">
+          <header>
+            <strong>Local agent handoff options</strong>
+            <span>Use these when your team drafts with local tools instead of direct API calls.</span>
+          </header>
+          <ul>
+            <li v-for="integration in agenticCliIntegrations" :key="integration.id">
+              <strong>{{ integration.label }}</strong>
+              <code>{{ integration.command }}</code>
+              <span>{{ integration.summary }}</span>
+            </li>
+          </ul>
+        </section>
+        <footer>
+          <button type="button" @click="closeBusinessProfile">Cancel</button>
+          <button type="submit">Save business identity</button>
+        </footer>
+      </form>
+    </section>
+
+    <section
       v-if="docsLiveOpen"
       ref="docsLiveDialog"
       class="modal-backdrop"
@@ -2102,6 +2277,26 @@
                   @change="updateDocsLiveIntentField(field.key, inputValue($event))"
                 />
               </label>
+            </div>
+          </section>
+          <section class="docs-live-intent-brief docs-live-wide" aria-label="AI document creation wizard stages">
+            <header>
+              <div>
+                <strong>Creation Wizard</strong>
+                <span>Identity, intent, outline, section drafting, QA, humanization, and review handoff.</span>
+              </div>
+            </header>
+            <ol class="wizard-step-list">
+              <li v-for="step in aiDocumentWizardSteps" :key="step.id">
+                <strong>{{ step.label }}</strong>
+                <span>{{ step.prompt }}</span>
+              </li>
+            </ol>
+            <div class="agent-cli-list" aria-label="Agentic local integrations">
+              <span v-for="integration in agenticCliIntegrations" :key="integration.id">
+                {{ integration.label }}
+                <code>{{ integration.command }}</code>
+              </span>
             </div>
           </section>
           <label class="docs-live-wide">
@@ -3782,10 +3977,26 @@ import {
 } from "./lib/citationTodoWorkflow";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import {
+  agenticCliIntegrations,
+  aiDocumentWizardSteps,
+  businessDocumentSnippets,
+  businessDocumentTemplates,
+  businessProfileFields,
+  businessProfilePlaceholderText,
+  businessSnippetMarkdown,
+  businessTemplateMarkdown,
+  businessWizardContext,
+  normalizeBusinessProfile,
+  type BusinessDocumentSnippet,
+  type BusinessDocumentTemplate,
+  type BusinessProfile,
+} from "./lib/businessDocuments";
+import {
   buildDocsLiveDraft,
   buildDocsLiveQuestionnaire,
   docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
+  normalizeDocsLiveDocumentType,
   removeDocsLivePlaceholder,
   upsertDocsLivePlaceholder,
   type DocsLiveDocumentType,
@@ -3895,6 +4106,7 @@ const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
 const aiPasteDialog = ref<HTMLElement | null>(null);
 const docsLiveDialog = ref<HTMLElement | null>(null);
+const businessProfileDialog = ref<HTMLElement | null>(null);
 const agentWorkspaceDialog = ref<HTMLElement | null>(null);
 const guidedDemoDialog = ref<HTMLElement | null>(null);
 const commandPaletteDialog = ref<HTMLElement | null>(null);
@@ -4055,6 +4267,10 @@ const templateCategory = ref("all");
 const templateTransform = ref("all");
 const customTemplateDraft = ref<CustomTransformTemplate>(blankCustomTransformTemplate());
 const editingCustomTemplateId = ref("");
+const businessProfileOpen = ref(false);
+const businessProfileDraft = ref<BusinessProfile>(normalizeBusinessProfile({}));
+const businessTemplateQuery = ref("");
+const businessSnippetQuery = ref("");
 const draggedTabId = ref("");
 const exportProfileName = ref("Client delivery");
 const helpQuery = ref("");
@@ -4264,7 +4480,9 @@ type ToolbarIconName =
   | "snapshot"
   | "export"
   | "ai"
+  | "agent"
   | "mic"
+  | "settings"
   | "commands"
   | "bold"
   | "italic"
@@ -4353,7 +4571,9 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   snapshot: ["M4 7h3l2-2h6l2 2h3v12H4z", "M12 10a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"],
   export: ["M12 3v12", "M7 8l5-5 5 5", "M5 15v4h14v-4"],
   ai: ["M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z", "M5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8z"],
+  agent: ["M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z", "M9 12h6", "M12 9v6"],
   mic: ["M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z", "M5 11a7 7 0 0 0 14 0", "M12 18v3", "M8 21h8"],
+  settings: ["M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z", "M4 12h2", "M18 12h2", "M12 4v2", "M12 18v2", "M6.6 6.6l1.4 1.4", "M16 16l1.4 1.4", "M17.4 6.6 16 8", "M8 16l-1.4 1.4"],
   commands: ["M4 7h16", "M4 12h16", "M4 17h10", "M17 15l3 2-3 2"],
   bold: ["M8 5h5a3 3 0 0 1 0 6H8z", "M8 11h6a3 3 0 0 1 0 6H8z", "M8 5v12"],
   italic: ["M10 5h8", "M6 19h8", "M14 5l-4 14"],
@@ -5217,6 +5437,24 @@ const filteredTransformTemplates = computed(() => {
     return [template.name, template.category, template.transform, template.summary, ...template.tags].join(" ").toLowerCase().includes(query);
   });
 });
+const filteredBusinessTemplates = computed(() => {
+  const query = businessTemplateQuery.value.trim().toLowerCase();
+  return businessDocumentTemplates.filter((template) => {
+    if (!query) return true;
+    return [template.label, template.summary, template.docsLiveType, ...template.bestFor, ...template.outline].join(" ").toLowerCase().includes(query);
+  });
+});
+const filteredBusinessSnippets = computed(() => {
+  const query = businessSnippetQuery.value.trim().toLowerCase();
+  return businessDocumentSnippets.filter((snippet) => {
+    if (!query) return true;
+    return [snippet.label, snippet.kind, snippet.summary, snippet.body].join(" ").toLowerCase().includes(query);
+  });
+});
+const businessProfileCompletion = computed(() => {
+  const completed = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
+  return `${completed}/${businessProfileFields.length} fields`;
+});
 const customTemplateTags = computed({
   get: () => customTemplateDraft.value.tags.join(", "),
   set: (value: string) => {
@@ -5892,6 +6130,8 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     label: "Write",
     actions: [
       { id: "docs-live", label: "Docs Live", title: "Open voice-guided document drafting", icon: "mic", primary: true, run: () => openDocsLive() },
+      { id: "biz-wizard", label: "Wizard", title: "Open the AI document creation wizard for common business documents", icon: "ai", primary: true, run: () => startBusinessDocumentWizard(businessDocumentTemplates[1]) },
+      { id: "biz-identity", label: "Identity", title: "Set up reusable business identity values", icon: "settings", run: () => openBusinessProfile() },
       { id: "bold", label: "Bold", title: "Bold selection", icon: "bold", run: () => wrapSelection("**") },
       { id: "italic", label: "Italic", title: "Italic selection", icon: "italic", run: () => wrapSelection("*") },
       { id: "code", label: "Code", title: "Inline code selection", icon: "code", run: () => wrapSelection("`") },
@@ -5921,6 +6161,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "figure", label: "Figure", title: "Insert figure", icon: "figure", run: () => insertFigureSnippet() },
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
+      { id: "biz-part", label: "Part", title: "Insert a reusable business document part", icon: "templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
       { id: "equation", label: "Equation", title: "Insert equation", icon: "equation", run: () => insertBlock(equationSnippet) },
       { id: "toc", label: "TOC", title: "Insert table of contents", icon: "toc", run: () => insertBlock(tocSnippet) },
       { id: "ai-source", label: "AI Source", title: "Insert AI source block", icon: "ai", run: () => insertBlock(aiSnippet) },
@@ -7220,6 +7461,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
   { name: "Open AI agent workspace", group: "AI", run: () => openAgentWorkspace() },
   { name: "AI: Create document", group: "AI", run: () => startAiDocumentCreation() },
+  { name: "AI: Document creation wizard", group: "AI", run: () => startBusinessDocumentWizard(businessDocumentTemplates[1]) },
   { name: "AI: Compose from outline", group: "AI", run: () => openDocsLiveFromOutline() },
   { name: "AI: Review and clean pasted text", group: "AI", run: () => openAiPaste() },
   { name: "Open Docs Live", group: "AI", run: () => openDocsLive() },
@@ -7280,6 +7522,22 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Add review comment", group: "Review", run: () => (store.sidebar = "review") },
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
   { name: "Open transform templates", group: "Transforms", run: () => openTransformTemplates() },
+  { name: "Set up business identity", group: "Templates", run: () => openBusinessProfile() },
+  { name: "Insert company contact block", group: "Templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
+  ...businessDocumentTemplates.map((template) => ({
+    name: `Wizard: ${template.label}`,
+    group: "Templates",
+    description: template.summary,
+    keywords: [template.id, template.docsLiveType, ...template.bestFor],
+    run: () => startBusinessDocumentWizard(template),
+  })),
+  ...businessDocumentSnippets.map((snippet) => ({
+    name: `Insert part: ${snippet.label}`,
+    group: "Templates",
+    description: snippet.summary,
+    keywords: [snippet.kind, snippet.id],
+    run: () => insertBusinessSnippet(snippet),
+  })),
   { name: "Insert code fence", group: "Snippet", run: () => insertBlock(codeFenceSnippet) },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
   { name: "Insert cover figure", group: "Snippet", run: () => insertFigureSnippet() },
@@ -7627,6 +7885,7 @@ onBeforeUnmount(() => {
 watch(aiPasteOpen, (open) => handleModalStateChange(open, aiPasteDialog));
 watch(agentWorkspaceOpen, (open) => handleModalStateChange(open, agentWorkspaceDialog));
 watch(docsLiveOpen, (open) => handleModalStateChange(open, docsLiveDialog));
+watch(businessProfileOpen, (open) => handleModalStateChange(open, businessProfileDialog));
 watch(guidedDemoOpen, (open) => handleModalStateChange(open, guidedDemoDialog));
 watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteDialog));
 watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
@@ -7924,6 +8183,9 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     const previewSourceMapEvidence = await collectNativePreviewSourceMapEvidence(record);
     smokePhase = "preview-source-map";
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence });
+    const tocNavigationEvidence = await collectNativeTocNavigationEvidence(record);
+    smokePhase = "toc-navigation";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence });
 
     commandPaletteOpen.value = true;
     await nextTick();
@@ -8017,7 +8279,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       JSON.stringify(nativeMenuExportResult),
     );
     smokePhase = "html-export";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, exportResult, nativeMenuExportResult });
     const editorSnippet = smokeSnippetAround(active.value.text, "weight_kg = 72");
     const previewSnippet = text("#live-preview").slice(0, 2000);
     const exportReadinessEvidence = store.exportReadiness
@@ -8030,12 +8292,12 @@ async function runDesktopWorkflowSmokeIfEnabled() {
         }
       : null;
     smokePhase = "export-profile-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, exportResult, nativeMenuExportResult });
     const exportProfileEvidence = await collectNativeExportProfileEvidence(record);
     smokePhase = "export-profile";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     smokePhase = "theme-accessibility-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
     smokePhase = "theme-accessibility";
     await writeNativeWorkflowProgress(smokePhase, assertions, {
@@ -8048,6 +8310,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       outlineNavigationEvidence,
       diagnosticNavigationEvidence,
       previewSourceMapEvidence,
+      tocNavigationEvidence,
       exportResult,
       nativeMenuExportResult,
       exportProfileEvidence,
@@ -8082,6 +8345,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       outlineNavigationEvidence,
       diagnosticNavigationEvidence,
       previewSourceMapEvidence,
+      tocNavigationEvidence,
       editorSnippet,
       previewSnippet,
       themeAccessibility,
@@ -9967,6 +10231,124 @@ async function collectNativePreviewSourceMapEvidence(record: (name: string, pass
   }
 }
 
+async function collectNativeTocNavigationEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const original = {
+    text: active.value.text,
+    mode: store.mode,
+    sidebar: store.sidebar,
+  };
+  const evidence: Record<string, unknown> = {};
+  const sourceSelection = () => {
+    if (!editorView) return { line: 0, lineText: "", selectedText: "", nearbyText: "" };
+    const selection = editorView.state.selection.main;
+    const line = editorView.state.doc.lineAt(selection.from);
+    const nearbyEndLine = editorView.state.doc.line(Math.min(editorView.state.doc.lines, line.number + 2));
+    return {
+      line: line.number,
+      lineText: line.text,
+      selectedText: editorView.state.sliceDoc(selection.from, selection.to),
+      nearbyText: editorView.state.sliceDoc(line.from, nearbyEndLine.to),
+    };
+  };
+
+  try {
+    await setNativeWorkflowText(
+      [
+        "---",
+        "title: Native TOC Navigation",
+        "status: approved",
+        "toc: true",
+        "tocDepth: 2",
+        "tocNumbered: true",
+        "---",
+        "",
+        "# Native TOC Navigation",
+        "",
+        "[TOC]",
+        "",
+        "## Native TOC Target",
+        "",
+        "Target body.",
+        "",
+        "### Native TOC Hidden Detail",
+        "",
+        "Hidden due to tocDepth 2.",
+        "",
+        "## Native TOC Follow-up",
+        "",
+        "Follow-up body.",
+      ].join("\n"),
+    );
+    await store.compileActive();
+    store.mode = "split";
+    store.sidebar = "outline";
+    await nextTick();
+    await nextTick();
+
+    const previewPaneElement = document.querySelector(".preview-pane") as HTMLElement | null;
+    const tocHeading = Array.from(document.querySelectorAll<HTMLElement>("#live-preview h2")).find((heading) =>
+      heading.textContent?.includes("Table of Contents"),
+    );
+    const tocLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>("#live-preview a[href^='#native-toc']"));
+    const tocText = document.querySelector("#live-preview")?.textContent?.replace(/\s+/g, " ").trim() || "";
+    const targetLink = tocLinks.find((link) => link.getAttribute("href") === "#native-toc-navigation") || null;
+    evidence.rendered = {
+      previewPaneVisible: Boolean(previewPaneElement),
+      metadata: {
+        toc: active.value.compile?.metadata?.toc,
+        tocDepth: active.value.compile?.metadata?.tocDepth,
+        tocNumbered: active.value.compile?.metadata?.tocNumbered,
+      },
+      headingVisible: Boolean(tocHeading),
+      links: tocLinks.map((link) => ({
+        href: link.getAttribute("href") || "",
+        text: link.textContent?.replace(/\s+/g, " ").trim() || "",
+      })),
+      hiddenDetailExcluded: !tocText.includes("1.1.1 Native TOC Hidden Detail"),
+    };
+    record(
+      "native workflow rendered numbered toc from marker and front matter",
+      Boolean(
+        previewPaneElement &&
+          tocHeading &&
+          tocLinks.some((link) => link.getAttribute("href") === "#native-toc-navigation" && /1\s+Native TOC Navigation/.test(link.textContent || "")) &&
+          tocLinks.some((link) => link.getAttribute("href") === "#native-toc-target" && /1\.1\s+Native TOC Target/.test(link.textContent || "")) &&
+          tocLinks.some((link) => link.getAttribute("href") === "#native-toc-follow-up" && /1\.2\s+Native TOC Follow-up/.test(link.textContent || "")) &&
+          (evidence.rendered as { hiddenDetailExcluded: boolean }).hiddenDetailExcluded,
+      ),
+      JSON.stringify(evidence.rendered),
+    );
+
+    targetLink?.click();
+    await waitForNativeWorkflowCondition(
+      () => sourceSelection().lineText.includes("# Native TOC Navigation") || sourceSelection().nearbyText.includes("# Native TOC Navigation"),
+      1200,
+    );
+    evidence.sourceJump = {
+      targetLinkVisible: Boolean(targetLink),
+      href: targetLink?.getAttribute("href") || "",
+      selection: sourceSelection(),
+    };
+    record(
+      "native workflow jumped toc preview link to source",
+      Boolean(
+        targetLink &&
+          ((evidence.sourceJump as { selection: { lineText: string; nearbyText: string } }).selection.lineText.includes("# Native TOC Navigation") ||
+            (evidence.sourceJump as { selection: { lineText: string; nearbyText: string } }).selection.nearbyText.includes("# Native TOC Navigation")),
+      ),
+      JSON.stringify(evidence.sourceJump),
+    );
+
+    return evidence;
+  } finally {
+    store.mode = original.mode;
+    store.sidebar = original.sidebar;
+    await setNativeWorkflowText(original.text);
+    await store.compileActive();
+    await nextTick();
+  }
+}
+
 function smokeSnippetAround(text: string, needle: string) {
   const index = text.indexOf(needle);
   if (index < 0) return text.slice(0, 800);
@@ -10736,7 +11118,7 @@ function restoreModalFocus() {
   }
 }
 
-function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
+function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.preventDefault();
     closeModal(kind);
@@ -10762,13 +11144,15 @@ function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" |
   }
 }
 
-function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "guided-demo" | "command-palette" | "conflict") {
+function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "guided-demo" | "command-palette" | "conflict") {
   if (kind === "ai-paste") {
     closeAiPaste();
   } else if (kind === "agent-workspace") {
     closeAgentWorkspace();
   } else if (kind === "docs-live") {
     closeDocsLive();
+  } else if (kind === "business-profile") {
+    closeBusinessProfile();
   } else if (kind === "guided-demo") {
     closeGuidedDemo();
   } else if (kind === "command-palette") {
@@ -10932,6 +11316,61 @@ function templateFillFields(template: Pick<TransformTemplate, "body" | "transfor
 function insertTransformTemplate(template: TransformTemplate) {
   insertBlock(transformTemplateMarkdown(template));
   store.statusMessage = `Inserted ${template.name} template`;
+}
+
+function openBusinessProfile() {
+  businessProfileDraft.value = normalizeBusinessProfile(store.businessProfile);
+  businessProfileOpen.value = true;
+}
+
+function closeBusinessProfile() {
+  businessProfileOpen.value = false;
+}
+
+function saveBusinessProfile() {
+  store.saveBusinessProfile(businessProfileDraft.value);
+  businessProfileOpen.value = false;
+  store.statusMessage = "Saved business identity profile";
+}
+
+function insertBusinessTemplate(template: BusinessDocumentTemplate) {
+  insertBlock(businessTemplateMarkdown(template, store.businessProfile));
+  store.statusMessage = `Inserted ${template.label} document template`;
+}
+
+function insertBusinessSnippet(snippet: BusinessDocumentSnippet) {
+  insertBlock(businessSnippetMarkdown(snippet, store.businessProfile));
+  store.statusMessage = `Inserted ${snippet.label} document part`;
+}
+
+function startBusinessDocumentWizard(template: BusinessDocumentTemplate) {
+  docsLiveDocumentType.value = normalizeDocsLiveDocumentType(template.docsLiveType);
+  docsLiveTitle.value = `${template.label} for ${store.businessProfile.defaultClientName || "Client"}`;
+  docsLiveOutlineText.value = template.outline.map((item) => `- ${item}`).join("\n");
+  docsLiveContext.value = businessWizardContext(template, store.businessProfile);
+  docsLivePlaceholderText.value = businessProfilePlaceholderText(store.businessProfile);
+  docsLiveDraftingDepth.value = template.id === "tender" || template.id === "rfp" ? "detailed" : "standard";
+  docsLiveInsertMode.value = "replace";
+  docsLiveTargetSection.value = null;
+  openDocsLive();
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = `Started AI document creation wizard for ${template.label}`;
+}
+
+function openAgentWorkspaceForBusinessTemplate(template: BusinessDocumentTemplate) {
+  const instruction = [
+    `Create a ${template.label}.`,
+    template.aiPrompt,
+    "Use the saved business identity, create an outline first, draft section by section, run QA, humanize the document, and prepare a review handoff.",
+    "Support provider handoff to Claude Code, Codex, or OpenCode if a local agent is preferred.",
+  ].join(" ");
+  selectAgentProviderProfileForInstruction(template.id === "tender" || template.id === "rfp" ? "Claude Code" : "Codex");
+  openAgentWorkspace(instruction);
+  agentContextAnswers.value = businessWizardContext(template, store.businessProfile);
+  buildAgentWorkspacePlan();
+  generateAgentWorkspaceRun();
+  buildAgentProviderPackage();
+  store.statusMessage = `Prepared local-agent handoff for ${template.label}`;
 }
 
 function startNewCustomTemplate() {
@@ -12900,7 +13339,10 @@ async function runCommandPaletteAgentRoute(routeId: CommandAgentRouteId) {
 function selectAgentProviderProfileForInstruction(instruction: string) {
   const text = instruction.toLowerCase();
   let providerId: AiProviderProfileId | null = null;
-  if (/\b(gemini|google ai)\b/.test(text)) providerId = "gemini-compatible";
+  if (/\b(claude code)\b/.test(text)) providerId = "claude-code-cli";
+  else if (/\b(codex cli|openai codex|codex)\b/.test(text)) providerId = "codex-cli";
+  else if (/\b(opencode|open code)\b/.test(text)) providerId = "opencode-cli";
+  else if (/\b(gemini|google ai)\b/.test(text)) providerId = "gemini-compatible";
   else if (/\b(anthropic|claude)\b/.test(text)) providerId = "anthropic-compatible";
   else if (/\b(localhost|ollama|lm studio|local gateway|local model)\b/.test(text)) providerId = "local-openai";
   else if (/\b(private network|internal gateway|intranet)\b/.test(text)) providerId = "private-openai";
@@ -15343,6 +15785,132 @@ select:hover {
 
 .template-filters {
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.business-template-hub {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid #c9d2dc;
+  border-left: 3px solid #566b2f;
+  border-radius: 7px;
+  background: #fbfcf8;
+}
+
+.business-template-hub header,
+.business-profile-preview header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.business-template-hub header div,
+.business-profile-preview header {
+  min-width: 0;
+}
+
+.business-template-hub header div,
+.business-template-hub label,
+.business-profile-preview {
+  display: grid;
+  gap: 4px;
+}
+
+.business-template-hub header span,
+.business-template-hub .sidebar-hint,
+.business-profile-preview header span,
+.snippet-card small,
+.wizard-step-list span,
+.agent-cli-list {
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.business-template-list,
+.snippet-list {
+  display: grid;
+  gap: 8px;
+}
+
+.business-document-card details ol {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.snippet-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+}
+
+.snippet-card div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.snippet-card strong,
+.snippet-card small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.business-profile-modal {
+  max-width: 900px;
+}
+
+.business-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.business-profile-preview {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #d8e0e8;
+}
+
+.business-profile-preview ul,
+.wizard-step-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.business-profile-preview li {
+  display: grid;
+  gap: 3px;
+}
+
+.business-profile-preview code,
+.agent-cli-list code {
+  padding: 1px 5px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.agent-cli-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-cli-list span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 3px 6px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
 }
 
 .template-list {

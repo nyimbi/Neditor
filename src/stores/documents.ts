@@ -4,6 +4,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/plugin-fs";
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
+import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessDocuments";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "../lib/transformTemplates";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import {
@@ -385,6 +386,7 @@ export const useDocumentsStore = defineStore("documents", {
     } as ExportDefaults,
     bibliographyDefaults: normalizeBibliographyDefaults({}),
     brandProfileDefaults: normalizeBrandProfileDefaults({}),
+    businessProfile: normalizeBusinessProfile({}) as BusinessProfile,
     exportProfiles: [] as ExportProfile[],
     activeExportProfileId: "",
     gitIntegration: normalizeGitIntegrationPreferences({}),
@@ -513,6 +515,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.exportDefaults) this.exportDefaults = normalizeExportDefaults(persisted.exportDefaults);
         if (persisted.bibliographyDefaults) this.bibliographyDefaults = normalizeBibliographyDefaults(persisted.bibliographyDefaults);
         if (persisted.brandProfileDefaults) this.brandProfileDefaults = normalizeBrandProfileDefaults(persisted.brandProfileDefaults);
+        this.businessProfile = normalizeBusinessProfile(persisted.businessProfile);
         this.exportProfiles = normalizeExportProfiles(persisted.exportProfiles);
         this.activeExportProfileId =
           persisted.activeExportProfileId && this.exportProfiles.some((profile) => profile.id === persisted.activeExportProfileId)
@@ -584,6 +587,7 @@ export const useDocumentsStore = defineStore("documents", {
         exportDefaults: this.exportDefaults,
         bibliographyDefaults: this.bibliographyDefaults,
         brandProfileDefaults: this.brandProfileDefaults,
+        businessProfile: this.businessProfile,
         exportProfiles: this.exportProfiles,
         activeExportProfileId: this.activeExportProfileId,
         gitIntegration: this.gitIntegration,
@@ -651,6 +655,10 @@ export const useDocumentsStore = defineStore("documents", {
     },
     clearDocsLiveDraftHistory() {
       this.docsLiveDraftHistory = [];
+      void this.persistWorkspace();
+    },
+    saveBusinessProfile(profile: Partial<BusinessProfile>) {
+      this.businessProfile = normalizeBusinessProfile(profile);
       void this.persistWorkspace();
     },
     recordGuidedDemoStepComplete(stepId: string) {

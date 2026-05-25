@@ -38,6 +38,16 @@ import {
 } from "../src/lib/bibliographyManager.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import {
+  agenticCliIntegrations,
+  businessDocumentSnippets,
+  businessDocumentTemplates,
+  businessProfilePlaceholderText,
+  businessSnippetMarkdown,
+  businessTemplateMarkdown,
+  businessWizardContext,
+  normalizeBusinessProfile,
+} from "../src/lib/businessDocuments.js";
+import {
   citationTodoAuditMarkdown,
   citationTodoComment,
   deferCitationTodo,
@@ -453,6 +463,10 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
 test("Docs Live covers business technical legal marketing and customer document blueprints", () => {
   for (const id of [
     "business-case",
+    "rfp-response",
+    "rfq-response",
+    "tender-response",
+    "tutorial",
     "operating-procedure",
     "technical-architecture",
     "adr",
@@ -467,6 +481,10 @@ test("Docs Live covers business technical legal marketing and customer document 
   equal(normalizeDocsLiveDocumentType("Draft a standard operating procedure for month end close"), "operating-procedure");
   equal(normalizeDocsLiveDocumentType("Create release notes with known issues and upgrade notes"), "release-notes");
   equal(normalizeDocsLiveDocumentType("Write a customer case study with verified results"), "customer-case-study");
+  equal(normalizeDocsLiveDocumentType("Build an RFP response with a compliance matrix"), "rfp-response");
+  equal(normalizeDocsLiveDocumentType("Prepare an RFQ quotation response"), "rfq-response");
+  equal(normalizeDocsLiveDocumentType("Create a tender submission checklist"), "tender-response");
+  equal(normalizeDocsLiveDocumentType("Write a tutorial walkthrough"), "tutorial");
 
   const draft = buildDocsLiveDraft({
     documentType: "contract brief",
@@ -481,6 +499,55 @@ test("Docs Live covers business technical legal marketing and customer document 
   ok(draft.questionnaire.includes("commercial, legal, operational, or data terms"));
   ok(draft.markdown.includes("Contract brief"));
   ok(draft.reviewPacket.sectionRunbook.some((item) => item.includes("Commercial Terms")));
+});
+
+test("business document helpers fill identity templates snippets and wizard context", () => {
+  const profile = normalizeBusinessProfile({
+    fullName: "Jane Doe",
+    email: "jane@example.com",
+    roleTitle: "Managing Partner",
+    companyName: "Acme Advisory",
+    companyAddress: "123 Market Street",
+    website: "https://acme.example",
+    industry: "strategy consulting",
+    defaultClientName: "Globex",
+    brandVoice: "clear and practical",
+  });
+  const proposal = businessDocumentTemplates.find((template) => template.id === "proposal")!;
+  const tender = businessDocumentTemplates.find((template) => template.id === "tender")!;
+  const contact = businessDocumentSnippets.find((snippet) => snippet.id === "company-contact-block")!;
+  ok(proposal);
+  ok(tender);
+  ok(contact);
+  ok(businessDocumentTemplates.some((template) => template.id === "rfp"));
+  ok(businessDocumentTemplates.some((template) => template.id === "rfq"));
+  ok(businessDocumentTemplates.some((template) => template.id === "tutorial"));
+  ok(agenticCliIntegrations.some((integration) => integration.command === "claude"));
+  ok(agenticCliIntegrations.some((integration) => integration.command === "codex"));
+  ok(agenticCliIntegrations.some((integration) => integration.command === "opencode"));
+
+  const markdown = businessTemplateMarkdown(proposal, profile);
+  ok(markdown.includes("title: \"Client proposal for Globex\""));
+  ok(markdown.includes("Prepared by:** Jane Doe"));
+  ok(markdown.includes("## Scope of Work"));
+  ok(markdown.includes("## AI Drafting Brief"));
+  ok(markdown.includes("Create a proposal that is client-centered"));
+  ok(!markdown.includes("{{companyName}}"));
+
+  const snippet = businessSnippetMarkdown(contact, profile);
+  ok(snippet.includes("Jane Doe"));
+  ok(snippet.includes("Acme Advisory"));
+  ok(snippet.includes("https://acme.example"));
+
+  const placeholderText = businessProfilePlaceholderText(profile);
+  ok(placeholderText.includes("companyName: Acme Advisory"));
+  ok(placeholderText.includes("defaultClientName: Globex"));
+
+  const context = businessWizardContext(tender, profile);
+  ok(context.includes("Document builder: Tender response"));
+  ok(context.includes("Creation Wizard") || context.includes("Wizard workflow"));
+  ok(context.includes("Claude Code"));
+  ok(context.includes("OpenCode"));
 });
 
 test("Docs Live section drafts can replace matching Markdown sections", () => {
@@ -1263,6 +1330,14 @@ test("AI provider packages redact secrets and preserve agent governance context"
     ok(localPackage.profile.summary.includes("gateway"));
     ok(JSON.stringify(localPackage.requestBody).includes(localPackage.profile.model));
   }
+
+  for (const profileId of ["claude-code-cli", "codex-cli", "opencode-cli"] as const) {
+    const cliPackage = buildAiProviderRequestPackage(run, { profileId });
+    equal(cliPackage.profile.endpoint, "");
+    equal(cliPackage.profile.authHeader, "");
+    ok(cliPackage.markdown.includes("## Local Agent Handoff"));
+    ok(cliPackage.checklist.some((item) => item.includes("approved provider workspace")));
+  }
 });
 
 test("AI provider execution extracts Markdown without persisting secrets", async () => {
@@ -1381,6 +1456,17 @@ test("workspace persistence migration versions and normalizes saved settings", (
     },
     bibliographyDefaults: { citationStyle: "APA" },
     brandProfileDefaults: { color: "  #123456  ", watermark: "Draft" },
+    businessProfile: {
+      fullName: " Jane Doe ",
+      email: " jane@example.com ",
+      companyName: " Acme Advisory ",
+      companyAddress: " 123 Market Street ",
+      website: " https://acme.example ",
+      roleTitle: " Managing Partner ",
+      defaultClientName: " Globex ",
+      brandVoice: " practical ",
+      ignored: "field",
+    },
     activeExportProfileId: "client-pdf",
     exportProfiles: [
       {
@@ -1682,6 +1768,9 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(normalizeCitationStyle("unknown-style"), "title");
   equal(migrated.brandProfileDefaults?.color, "#123456");
   equal(migrated.brandProfileDefaults?.watermark, "Draft");
+  equal(migrated.businessProfile?.fullName, "Jane Doe");
+  equal(migrated.businessProfile?.companyName, "Acme Advisory");
+  equal(migrated.businessProfile?.defaultClientName, "Globex");
   equal(migrated.activeExportProfileId, "client-pdf");
   deepEqual(migrated.exportProfiles?.map((profile) => profile.id), ["client-pdf", "client-html"]);
   deepEqual(migrated.exportProfiles?.[0], {
@@ -1983,6 +2072,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const app = readFileSync("src/App.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
+  const businessDocs = readFileSync("src/lib/businessDocuments.ts", "utf8");
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
   const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
 
@@ -2002,6 +2092,18 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Select another matching word or phrase for simultaneous editing."));
   ok(app.includes('<small v-if="command.description">{{ command.description }}</small>'));
   ok(app.includes("Help Center"));
+  ok(app.includes('aria-label="Business document creation"'));
+  ok(app.includes('aria-label="AI document creation wizard"'));
+  ok(app.includes('aria-label="Reusable document parts"'));
+  ok(app.includes('aria-label="Business identity setup"'));
+  ok(app.includes("businessProfileFields"));
+  ok(app.includes("businessDocumentTemplates"));
+  ok(app.includes("businessDocumentSnippets"));
+  ok(app.includes("startBusinessDocumentWizard"));
+  ok(app.includes("openAgentWorkspaceForBusinessTemplate"));
+  ok(businessDocs.includes("Claude Code"));
+  ok(businessDocs.includes("Codex"));
+  ok(businessDocs.includes("OpenCode"));
   ok(app.includes('aria-label="Help center"'));
   ok(app.includes("filteredHelpTopics"));
   ok(app.includes("External transform troubleshooting"));
@@ -3321,6 +3423,9 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("collectNativePreviewSourceMapEvidence"));
   ok(app.includes("native workflow jumped preview table artifact to source"));
   ok(app.includes("native workflow jumped preview equation artifact to source"));
+  ok(app.includes("collectNativeTocNavigationEvidence"));
+  ok(app.includes("native workflow rendered numbered toc from marker and front matter"));
+  ok(app.includes("native workflow jumped toc preview link to source"));
   ok(smoke.includes("native workflow report did not include editor ergonomics evidence"));
   ok(smoke.includes("foldedPlaceholderCount"));
   ok(smoke.includes("native workflow report did not include split source pane evidence"));
@@ -3328,6 +3433,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native workflow report did not include outline navigation evidence"));
   ok(smoke.includes("native workflow report did not include diagnostic navigation evidence"));
   ok(smoke.includes("native workflow report did not include preview source-map evidence"));
+  ok(smoke.includes("native workflow report did not include toc navigation evidence"));
   ok(smoke.includes("native workflow report did not include rendered outline-mode structure"));
   ok(smoke.includes("native workflow report did not include rendered export-mode content"));
   ok(smoke.includes("native workflow report did not include rendered review-mode governance content"));

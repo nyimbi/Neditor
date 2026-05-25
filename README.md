@@ -81,8 +81,9 @@ uses it.
 | Ask the app to plan and run the whole document workflow | Use **Agent** or **AI Agent Workspace**, describe the outcome in plain language, generate an agent packet, then apply the governed creation, revision, QA, and distribution output for human review. |
 | Draft a board paper, proposal, report, or briefing note | Start in **Outline** mode, create the structure, then fill in each section. |
 | Start from an AI-first document brief | Use **AI Create** to open Docs Live with an intent-first workflow for document type, outline, context, placeholders, QA, humanization, and review handoff. |
+| Start a proposal, RFP, RFQ, tender, or tutorial | Open **Templates**, set up **Business info**, then use the **Document creation wizard** to insert a fillable template, open Docs Live, or prepare a Claude Code, Codex, or OpenCode handoff package. |
 | Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, run **Check AI runtime** when you want proof that voice and clipboard capabilities are available, dictate the intent, add placeholder values, generate an outline-aware questionnaire if helpful, answer it in the dialog, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
-| Reuse a company format | Start from an approved Markdown template or example document, then save a copy for the new engagement. |
+| Reuse a company format | Save your name, email, company, address, website, industry, client, and brand voice in **Business info**, then insert reusable document parts such as contact blocks, company overview, scope, pricing assumptions, compliance matrix, risk register, and review handoff. |
 | Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
 | Send a client-facing document | Export to PDF or DOCX, depending on what the recipient expects. |
 | Prepare slides or an executive handoff | Export to PPTX or use presentation mode to review the section flow. |
@@ -97,7 +98,11 @@ uses it.
   technical documents.
 - AI-guided document blueprints for board memos, operating procedures,
   technical architectures, ADRs, release notes, contract briefs, marketing
-  briefs, and customer case studies.
+  briefs, customer case studies, tutorials, proposals, RFP responses, RFQ
+  responses, and tender responses.
+- Repeated business identity values and reusable document parts for standard
+  proposals, procurement documents, tutorials, statements of work, capability
+  statements, case studies, executive briefs, and review handoffs.
 - Documents that need structured outlines before the body text is written.
 - AI-first workflows where a business instruction should become a planned set
   of creation, editing, revision, review, and distribution actions.
@@ -119,6 +124,8 @@ Ask IT, a release manager, or a technical teammate when you need:
 - Help with a security warning during first launch.
 - Company templates, brand profiles, export defaults, or approved cover-page
   settings.
+- Approved local-agent usage policies for Claude Code, Codex, OpenCode, or
+  other AI tools if your team wants agentic document co-writing.
 - Optional diagram engines such as Graphviz, D2, PlantUML, or Pikchr.
 - A shared folder, backup location, or Git repository for important documents.
 - Signed or notarized installers for internal company distribution.
@@ -326,6 +333,12 @@ web app.
   permission, and clipboard read/write support so business users can confirm
   that dictation and clipboard-assisted AI workflows are usable on the current
   machine without storing clipboard text.
+- The Templates panel now includes a business identity setup dialog for your
+  name, email, phone, role, company, address, website, industry, default client,
+  and brand voice; common business-development document builders for tutorials,
+  proposals, RFPs, RFQs, tenders, statements of work, capability statements,
+  case studies, business cases, and executive briefs; reusable semi-template
+  document parts; and handoff options for Claude Code, Codex, and OpenCode.
 - Separate preferences for theme, preview theme, typography, editor behavior,
   autosave, snapshots, export defaults, bibliography defaults, brand defaults,
   Git integration, AI cleanup, and transform engines.

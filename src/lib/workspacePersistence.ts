@@ -1,4 +1,5 @@
 import type { AiCleanupOptions } from "../types.js";
+import { normalizeBusinessProfile, type BusinessProfile } from "./businessDocuments.js";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "./transformTemplates.js";
 
 export const WORKSPACE_SCHEMA_VERSION = 2;
@@ -355,6 +356,7 @@ export interface PersistedWorkspace {
   };
   bibliographyDefaults?: Partial<BibliographyDefaults>;
   brandProfileDefaults?: Partial<BrandProfileDefaults>;
+  businessProfile?: Partial<BusinessProfile>;
   exportProfiles?: Partial<ExportProfile>[];
   activeExportProfileId?: string;
   gitIntegration?: Partial<GitIntegrationPreferences>;
@@ -1092,6 +1094,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (isRecord(raw.exportDefaults)) migrated.exportDefaults = normalizeExportDefaults(raw.exportDefaults);
   if (isRecord(raw.bibliographyDefaults)) migrated.bibliographyDefaults = normalizeBibliographyDefaults(raw.bibliographyDefaults);
   if (isRecord(raw.brandProfileDefaults)) migrated.brandProfileDefaults = normalizeBrandProfileDefaults(raw.brandProfileDefaults);
+  migrated.businessProfile = normalizeBusinessProfile(raw.businessProfile);
   const exportProfiles = normalizeExportProfiles(raw.exportProfiles);
   if (exportProfiles.length) {
     migrated.exportProfiles = exportProfiles;

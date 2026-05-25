@@ -3044,6 +3044,21 @@ Native fold visual-state proof:
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | App-authored launched-webview smoke passed with 103 assertions. The report records `editorErgonomicsEvidence.foldState` with `beforeFold: 0`, `foldedPlaceholderCount: 2`, `afterUnfold: 0`, placeholder text visible while folded, and restored Metrics/list text after unfold. |
 | `pnpm run test:tauri-webdriver` | Pass | macOS WebDriver remains an official skip, and the script refreshed the native launch fallback proof against the current smoke artifacts. |
 
+Business identity, document wizard, snippets, and local-agent handoff:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 48 frontend unit tests passed after adding `src/lib/businessDocuments.ts`, persistent business profile normalization, business-development templates for tutorials/proposals/RFPs/RFQs/tenders and related document types, reusable document-part snippets, Docs Live blueprint support for procurement/tutorial documents, and Claude Code/Codex/OpenCode provider handoff profiles. |
+| `pnpm run check` | Pass | Vue typecheck passed after wiring the business identity modal, Templates-sidebar document wizard/snippets, Docs Live wizard stages, and provider handoff command routing. |
+| `pnpm run build` | Pass | Production Vite build passed after the UI, store, provider profile, and shared library updates. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting business identity, document builders, reusable parts, and Claude Code/Codex/OpenCode handoff; all local links resolved. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Release-profile Tauri binary rebuilt with the updated workbench bundle and native smoke path. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | App-authored launched-webview smoke passed after adding `tocNavigationEvidence`; the validator now requires numbered/depth-limited TOC rendering plus TOC preview link-to-source navigation. |
+| `pnpm run test:tauri-webdriver` | Pass | macOS WebDriver remains an official skip, and the script refreshed the native launch fallback proof against the current binary and smoke artifacts. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after the native fallback refresh. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` with current evidence rows for this slice. |
+| `git diff --check` | Pass | No whitespace errors in the business wizard, native TOC, docs, tests, and validator diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

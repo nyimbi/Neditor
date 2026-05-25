@@ -7,7 +7,10 @@ export type AiProviderProfileId =
   | "gemini-compatible"
   | "local-http"
   | "local-openai"
-  | "private-openai";
+  | "private-openai"
+  | "claude-code-cli"
+  | "codex-cli"
+  | "opencode-cli";
 export type AiProviderBodyStyle = "messages" | "system-and-messages" | "contents" | "prompt";
 
 export interface AiProviderProfile {
@@ -134,6 +137,33 @@ export const aiProviderProfiles: AiProviderProfile[] = [
     bodyStyle: "messages",
     authHeader: "",
     summary: "Creates a no-secret private-network chat-completions package for approved internal model gateways.",
+  },
+  {
+    id: "claude-code-cli",
+    label: "Claude Code CLI handoff",
+    endpoint: "",
+    model: "claude-code",
+    bodyStyle: "prompt",
+    authHeader: "",
+    summary: "Creates a governed prompt package for Claude Code to use against the local Markdown document workspace.",
+  },
+  {
+    id: "codex-cli",
+    label: "Codex CLI handoff",
+    endpoint: "",
+    model: "codex",
+    bodyStyle: "prompt",
+    authHeader: "",
+    summary: "Creates a governed prompt package for Codex to draft, revise, review, and return Markdown changes locally.",
+  },
+  {
+    id: "opencode-cli",
+    label: "OpenCode CLI handoff",
+    endpoint: "",
+    model: "opencode",
+    bodyStyle: "prompt",
+    authHeader: "",
+    summary: "Creates a governed prompt package for OpenCode document-agent workflows in the project folder.",
   },
 ];
 
@@ -554,6 +584,12 @@ function buildMarkdown(
     "",
     fencedBlock("json", JSON.stringify(requestBody, null, 2)),
     "",
+    cliHandoffCommand(profile) ? "## Local Agent Handoff" : "",
+    cliHandoffCommand(profile) ? "" : "",
+    cliHandoffCommand(profile) ? "Start the local agent from the document workspace, paste this package, and ask it to return Markdown plus a review note:" : "",
+    cliHandoffCommand(profile) ? "" : "",
+    cliHandoffCommand(profile) ? fencedBlock("bash", cliHandoffCommand(profile)) : "",
+    cliHandoffCommand(profile) ? "" : "",
     curl ? "## cURL Starter" : "",
     curl ? "" : "",
     curl ? fencedBlock("bash", curl) : "",
@@ -562,6 +598,13 @@ function buildMarkdown(
     .filter((line, index, lines) => line || lines[index - 1] !== "")
     .join("\n")
     .trimEnd() + "\n";
+}
+
+function cliHandoffCommand(profile: AiProviderProfile) {
+  if (profile.id === "claude-code-cli") return "claude";
+  if (profile.id === "codex-cli") return "codex";
+  if (profile.id === "opencode-cli") return "opencode";
+  return "";
 }
 
 function fencedBlock(language: string, value: string) {
