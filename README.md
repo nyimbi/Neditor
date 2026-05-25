@@ -189,7 +189,8 @@ web app.
 - Tabs, pinned documents, recent files, recently closed documents, recent
   folders, workspace folder browsing, restart-style workspace restore, and
   first-class document-set management for assigning, renaming, and removing
-  open deliverable packs directly from the Files sidebar.
+  open deliverable packs directly from the Files sidebar, with insertable or
+  copyable Markdown manifests for reviewer and export handoff.
 - CodeMirror editing with Markdown highlighting, diagnostics gutter, line
   numbers, word wrap, find/replace, smart list continuation, bracket pairing,
   word count, character count, and reading-time status.

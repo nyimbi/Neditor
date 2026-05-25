@@ -3195,6 +3195,10 @@ test("groups documents by document set and folder", async ({ page }) => {
   await expect(boardPacket).toContainText("3");
   await expect(page.getByLabel("Board Pack tabs")).toHaveCount(0);
   await expect.poll(() => editorText(page)).toContain("documentSet: Board Packet");
+  await documentSetManager.getByRole("button", { name: "Insert manifest" }).click();
+  await expect.poll(() => editorText(page)).toContain("## Document Set Manifest: Board Packet");
+  await expect.poll(() => editorText(page)).toContain("Risk Register");
+  await expect.poll(() => editorText(page)).toContain("Review Handoff");
 
   await documentSetManager.getByRole("button", { name: "Remove active" }).click();
   await expect(boardPacket).toContainText("2");

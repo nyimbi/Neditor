@@ -38,7 +38,10 @@ Recent pushed checkpoints visible in current git history:
   in the active set, removes the active document from a set, normalizes legacy
   `document_set`/`set` aliases to `documentSet`, and groups tabs immediately
   from current front matter text so inactive documents do not wait for a
-  recompilation before moving.
+  recompilation before moving. Document sets can now also insert or copy a
+  Markdown manifest with source, generated timestamp, workspace, active
+  document, open document count, document paths, statuses, save state, pinned
+  state, and review handoff instructions.
 - The Agent Workspace now builds a structured document intent sheet before
   drafting or distribution. The sheet extracts document type, working title,
   audience, outcome, owner, deadline, tone, evidence, reviewer, approval
@@ -2920,9 +2923,9 @@ Document-set manager verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `pnpm run check` | Pass | Vue typecheck passed after adding the Files-sidebar Document Sets manager, current-text front matter grouping, set assignment, set renaming, and active-document removal controls. |
-| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards for the Document Sets manager and current front matter grouping helpers. |
-| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "groups documents by document set"` | Pass | Focused Chromium workflow opened folder/document-set groups, dragged a loose document into a set, saved generated `documentSet` front matter, renamed the open set, verified immediate regrouping, removed the active document from the set, and closed the remaining group without disturbing another folder group. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the Files-sidebar Document Sets manager, current-text front matter grouping, set assignment, set renaming, active-document removal controls, and Markdown manifest generation. |
+| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards for the Document Sets manager, current front matter grouping helpers, and manifest command surface. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "groups documents by document set"` | Pass | Focused Chromium workflow opened folder/document-set groups, dragged a loose document into a set, saved generated `documentSet` front matter, renamed the open set, verified immediate regrouping, inserted a Document Set Manifest with set members and review handoff, removed the active document from the set, and closed the remaining group without disturbing another folder group. |
 
 ## Next Execution Order
 

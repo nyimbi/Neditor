@@ -322,6 +322,10 @@
             >
               Rename all open set tabs
             </button>
+            <div v-if="activeDocumentSet" class="document-set-actions">
+              <button type="button" @click="insertActiveDocumentSetManifest">Insert manifest</button>
+              <button type="button" @click="copyActiveDocumentSetManifest">Copy manifest</button>
+            </div>
             <div v-if="documentSetGroups.length" class="document-set-list" role="list" aria-label="Open document sets">
               <article v-for="group in documentSetGroups" :key="group.key" role="listitem">
                 <div>
@@ -7047,6 +7051,7 @@ const commands = computed(() => [
   { name: "Open document", group: "File", run: () => void openDocument() },
   { name: "Open folder", group: "Workspace", run: () => void openFolder() },
   { name: "Save workspace", group: "Workspace", run: () => void saveWorkspace() },
+  { name: "Insert document set manifest", group: "Workspace", run: () => insertActiveDocumentSetManifest() },
   { name: "Save document", group: "File", run: () => void saveDocument() },
   { name: "Save as", group: "File", run: () => void saveDocumentAs() },
   { name: "Revert to saved", group: "File", run: () => void store.revertActive() },
@@ -10133,6 +10138,84 @@ function renameActiveDocumentSet() {
   store.statusMessage = `Renamed ${changed} open ${oldName} document${changed === 1 ? "" : "s"} to ${newName}`;
 }
 
+function activeDocumentSetManifest() {
+  const setName = activeDocumentSet.value;
+  if (!setName) return "";
+  return buildDocumentSetManifest(setName);
+}
+
+function insertActiveDocumentSetManifest() {
+  const manifest = activeDocumentSetManifest();
+  if (!manifest) {
+    store.statusMessage = "Assign the active document to a set before inserting a manifest";
+    return;
+  }
+  insertBlock(manifest);
+  store.statusMessage = `Inserted ${activeDocumentSet.value} manifest`;
+}
+
+async function copyActiveDocumentSetManifest() {
+  const manifest = activeDocumentSetManifest();
+  if (!manifest) {
+    store.statusMessage = "Assign the active document to a set before copying a manifest";
+    return;
+  }
+  try {
+    await navigator.clipboard?.writeText(manifest);
+    store.statusMessage = `Copied ${activeDocumentSet.value} manifest`;
+  } catch {
+    store.statusMessage = `${activeDocumentSet.value} manifest is ready to copy`;
+  }
+}
+
+function buildDocumentSetManifest(setName: string) {
+  const group = documentSetGroups.value.find((candidate) => candidate.label === setName);
+  const documents = group?.documents || store.documents.filter((document) => documentSetName(document) === setName);
+  const generatedAt = new Date().toISOString();
+  const rows = documents.map((document) =>
+    [
+      documentSetTableCell(document.title),
+      documentSetTableCell(document.path ? displayDocumentPath(document.path) : "Unsaved draft"),
+      documentSetTableCell(documentReleaseStatus(document)),
+      documentSetTableCell(document.dirty ? "unsaved" : "saved"),
+      documentSetTableCell(document.pinned ? "yes" : "no"),
+    ].join(" | "),
+  );
+  return [
+    `## Document Set Manifest: ${setName}`,
+    "",
+    "```yaml",
+    "source: NEditor Document Sets",
+    `generatedAt: ${generatedAt}`,
+    `workspace: ${store.workspaceRoot ? displayDocumentPath(store.workspaceRoot) : "unsaved-workspace"}`,
+    `activeDocument: ${active.value.path ? displayDocumentPath(active.value.path) : active.value.title}`,
+    `openDocuments: ${documents.length}`,
+    "```",
+    "",
+    "| Document | Path | Status | Save state | Pinned |",
+    "| --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${row} |`),
+    "",
+    "### Review Handoff",
+    "",
+    "- Confirm every document belongs in this deliverable set.",
+    "- Save unsaved documents before export or distribution.",
+    "- Verify approval metadata, source grounding, and review comments for every open document.",
+    "",
+  ].join("\n");
+}
+
+function documentSetTableCell(value: string) {
+  return value.replace(/\|/g, "\\|").replace(/\n/g, " ").trim() || " ";
+}
+
+function documentReleaseStatus(document: OpenDocument) {
+  const metadata = document.compile?.metadata || {};
+  const textStatus = frontMatterScalarFromText(document.text, "status");
+  const status = textStatus || (typeof metadata.status === "string" ? metadata.status : "");
+  return status.trim() || "draft";
+}
+
 function applyTextToDocument(document: OpenDocument, text: string, compileActiveDocument = true) {
   document.text = text;
   document.dirty = typeof document.savedText === "string" ? text !== document.savedText : true;
@@ -10189,12 +10272,18 @@ function documentSetName(document: OpenDocument) {
 }
 
 function documentSetNameFromText(text: string) {
+  return frontMatterScalarFromText(text, "documentSet", "document_set", "set");
+}
+
+function frontMatterScalarFromText(text: string, ...keys: string[]) {
   if (!text.startsWith("---\n")) return "";
   const lines = text.split("\n");
   const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
   if (endIndex <= 0) return "";
+  const keyPattern = keys.map((key) => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const pattern = new RegExp(`^\\s*(${keyPattern})\\s*:\\s*(.+?)\\s*$`);
   for (let index = 1; index < endIndex; index += 1) {
-    const match = lines[index].match(/^\s*(documentSet|document_set|set)\s*:\s*(.+?)\s*$/);
+    const match = lines[index].match(pattern);
     if (!match) continue;
     return match[2].replace(/^['"]|['"]$/g, "").trim();
   }

@@ -2008,6 +2008,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("assignActiveDocumentSet"));
   ok(app.includes("renameActiveDocumentSet"));
   ok(app.includes("clearDocumentSetFrontMatter"));
+  ok(app.includes("buildDocumentSetManifest"));
+  ok(app.includes("Insert document set manifest"));
+  ok(app.includes("Document Set Manifest"));
   ok(app.includes('aria-label="Compiler output inventory"'));
   ok(app.includes("compilerOutputInventory"));
   ok(app.includes("outputInventoryItem"));
