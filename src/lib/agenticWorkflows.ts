@@ -266,6 +266,7 @@ export interface AgenticWorkflowRun {
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
+  dataNarrativeLinks: AgenticDataNarrativeLink[];
   automationQueue: AgenticAutomationTask[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
@@ -356,6 +357,20 @@ export interface AgenticTransformRecommendation {
   evidenceRequired: string[];
   riskLevel: "low" | "medium" | "high";
   suggestedMarkdown: string;
+  owner: string;
+}
+
+export interface AgenticDataNarrativeLink {
+  id: string;
+  sourceKind: AgenticTransformRecommendationKind | AgenticDocumentClaim["kind"] | "source-pack" | "metadata";
+  sourceLabel: string;
+  affectedSection: string;
+  sectionId?: string;
+  changeSignal: string;
+  narrativeRisk: string;
+  reviewAction: string;
+  evidenceRequired: string[];
+  status: "watch" | "needs-review" | "blocked";
   owner: string;
 }
 
@@ -736,6 +751,12 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     documentEvidence,
     distributionTargetPlans,
   });
+  const dataNarrativeLinks = buildDataNarrativeLinks({
+    plan,
+    sectionWorkQueue,
+    documentEvidence,
+    transformRecommendations,
+  });
   const preReviewRehearsal = buildPreReviewRehearsal({
     plan,
     reviewerAgents,
@@ -762,6 +783,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionWorkQueue,
     sectionDraftHistory,
     transformRecommendations,
+    dataNarrativeLinks,
     automationQueue,
     preReviewRehearsal,
     distributionTargetPlans,
@@ -780,6 +802,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionWorkQueue,
     sectionDraftHistory,
     transformRecommendations,
+    dataNarrativeLinks,
     automationQueue,
     preReviewRehearsal,
     documentEvidence,
@@ -800,6 +823,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionWorkQueue,
     sectionDraftHistory,
     transformRecommendations,
+    dataNarrativeLinks,
     automationQueue,
     preReviewRehearsal,
     distributionTargetPlans,
@@ -820,6 +844,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionWorkQueue,
     sectionDraftHistory,
     transformRecommendations,
+    dataNarrativeLinks,
     automationQueue,
     outlineCritique,
     preReviewRehearsal,
@@ -846,6 +871,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionWorkQueue,
     sectionDraftHistory,
     transformRecommendations,
+    dataNarrativeLinks,
     automationQueue,
     outlineCritique,
     preReviewRehearsal,
@@ -971,6 +997,42 @@ export function buildAgenticTransformRecommendationMarkdown(item: AgenticTransfo
   ].join("\n");
 }
 
+export function buildAgenticDataNarrativeAuditMarkdown(items: AgenticDataNarrativeLink[]): string {
+  return [
+    "## Data-to-Narrative Review Queue",
+    "",
+    "```ai-data-narrative-bridge",
+    `links: ${items.length}`,
+    "status: needs-review",
+    "```",
+    "",
+    ...(items.length
+      ? [
+          "| Source | Affected section | Status | Review action |",
+          "| --- | --- | --- | --- |",
+          ...items.map(
+            (item) =>
+              `| ${escapeTableCell(`${item.sourceKind}: ${item.sourceLabel}`)} | ${escapeTableCell(item.affectedSection)} | ${item.status} | ${escapeTableCell(item.reviewAction)} |`,
+          ),
+          "",
+          ...items.flatMap((item) => [
+            `### ${item.sourceLabel}`,
+            "",
+            `Change signal: ${item.changeSignal}`,
+            "",
+            `Narrative risk: ${item.narrativeRisk}`,
+            "",
+            `Owner: ${item.owner}`,
+            "",
+            "Evidence required:",
+            ...item.evidenceRequired.map((evidence) => `- [ ] ${evidence}`),
+            "",
+          ]),
+        ]
+      : ["No data-to-narrative links were prepared."]),
+  ].join("\n");
+}
+
 export function buildAgenticReleaseEvidenceAuditPackage(run: AgenticWorkflowRun): string {
   return [
     "## NEditor Release Evidence Audit Package",
@@ -989,6 +1051,7 @@ export function buildAgenticReleaseEvidenceAuditPackage(run: AgenticWorkflowRun)
     ...reviewerAgentsMarkdown(run.reviewerAgents),
     ...sectionDraftHistoryMarkdown(run.sectionDraftHistory),
     ...transformRecommendationsMarkdown(run.transformRecommendations),
+    ...dataNarrativeLinksMarkdown(run.dataNarrativeLinks),
     ...automationQueueMarkdown(run.automationQueue),
     ...lifecycleTasksMarkdown(run.lifecycleTasks),
     ...(run.distributionTargetPlans.length ? distributionTargetRunbookMarkdown(run.distributionTargetPlans) : ["## Distribution Runbooks", "", "No distribution target runbooks were staged for this run.", ""]),
@@ -2221,6 +2284,7 @@ function buildLifecycleTasks(input: {
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
+  dataNarrativeLinks: AgenticDataNarrativeLink[];
   automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -2228,7 +2292,7 @@ function buildLifecycleTasks(input: {
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticLifecycleTask[] {
-  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, automationQueue, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
+  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, dataNarrativeLinks, automationQueue, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const tasks: AgenticLifecycleTask[] = [];
   const hasBlockers = blockers.length > 0;
   const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
@@ -2426,6 +2490,19 @@ function buildLifecycleTasks(input: {
     });
   }
 
+  if (dataNarrativeLinks.length) {
+    tasks.push({
+      id: "task-data-narrative-bridge",
+      lane: "review",
+      title: "Review data-to-narrative dependencies",
+      owner: "Data Narrative Agent",
+      status: dataNarrativeLinks.some((item) => item.status === "blocked" || item.status === "needs-review") ? "needs-input" : "ready",
+      action: "open-review",
+      evidence: dataNarrativeLinks.slice(0, 10).map((item) => `${titleCase(item.sourceKind)} ${item.sourceLabel}: ${item.reviewAction}`),
+      nextStep: "Confirm changed claims, calculations, charts, tables, timelines, schemas, or publishing metadata trigger review of every dependent narrative section before export.",
+    });
+  }
+
   if (automationQueue.length) {
     tasks.push({
       id: "task-agent-automation-scheduler",
@@ -2484,6 +2561,7 @@ function buildLifecycleTasks(input: {
   return limitLifecycleTasks(tasks, [
     "task-agent-automation-scheduler",
     "task-agent-transform-recommendations",
+    "task-data-narrative-bridge",
     "task-section-draft-history",
     "task-pre-review-rehearsal",
     "task-final-release-readiness",
@@ -3010,6 +3088,128 @@ function buildTransformRecommendations(input: {
   }
 
   return recommendations.slice(0, 10);
+}
+
+function buildDataNarrativeLinks(input: {
+  plan: AgenticWorkflowPlan;
+  sectionWorkQueue: AgenticSectionWorkItem[];
+  documentEvidence: AgenticDocumentEvidence;
+  transformRecommendations: AgenticTransformRecommendation[];
+}): AgenticDataNarrativeLink[] {
+  const { plan, sectionWorkQueue, documentEvidence, transformRecommendations } = input;
+  const links: AgenticDataNarrativeLink[] = [];
+  const seen = new Set<string>();
+  const add = (item: Omit<AgenticDataNarrativeLink, "id">) => {
+    const id = `data-narrative-${stableFingerprint([item.sourceKind, item.sourceLabel, item.affectedSection, item.changeSignal].join("\n")).slice(0, 12)}`;
+    if (seen.has(id)) return;
+    seen.add(id);
+    links.push({ id, ...item });
+  };
+  const targetFor = (candidate: { sectionId?: string; insertionTarget?: string; sourceLabel?: string; sourceText?: string }) => {
+    const explicit = candidate.sectionId ? sectionWorkQueue.find((section) => section.id === candidate.sectionId) : null;
+    if (explicit) return explicit;
+    const targetText = [candidate.insertionTarget, candidate.sourceLabel, candidate.sourceText].filter(Boolean).join(" ");
+    return (
+      sectionWorkQueue.find((section) => {
+        const sectionText = `${section.heading} ${section.contract.purpose} ${section.contract.desiredDecision}`;
+        return sharesNarrativeSignal(targetText, sectionText);
+      }) ||
+      sectionWorkQueue.find((section) => /\b(summary|recommendation|decision|evidence|analysis|findings|risk|next steps?)\b/i.test(section.heading)) ||
+      sectionWorkQueue[0]
+    );
+  };
+
+  for (const recommendation of transformRecommendations) {
+    const section = targetFor({
+      sectionId: recommendation.sectionId,
+      insertionTarget: recommendation.insertionTarget,
+      sourceLabel: recommendation.label,
+      sourceText: recommendation.purpose,
+    });
+    add({
+      sourceKind: recommendation.kind,
+      sourceLabel: recommendation.label,
+      affectedSection: section ? `Section ${section.order}: ${section.heading}` : recommendation.insertionTarget,
+      sectionId: section?.id,
+      changeSignal: recommendation.sourceSignal,
+      narrativeRisk: recommendation.narrativeReviewTrigger,
+      reviewAction: `After inserting or changing this ${recommendation.kind} block, review ${section?.heading || recommendation.insertionTarget} and any executive summary or recommendation language that depends on it.`,
+      evidenceRequired: [
+        ...recommendation.evidenceRequired.slice(0, 3),
+        "Narrative review note confirms dependent prose still matches the structured block.",
+      ],
+      status: recommendation.riskLevel === "high" ? "needs-review" : "watch",
+      owner: recommendation.owner,
+    });
+  }
+
+  for (const claim of documentEvidence.claimInventory.slice(0, 10)) {
+    const section = targetFor({ sourceLabel: titleCase(claim.kind), sourceText: claim.text });
+    add({
+      sourceKind: claim.kind,
+      sourceLabel: claim.text,
+      affectedSection: section ? `Section ${section.order}: ${section.heading}` : "Current document",
+      sectionId: section?.id,
+      changeSignal: `${claim.reason} Line ${claim.sourceLine}.`,
+      narrativeRisk: "If the claim source, value, date, owner, or confidence changes, the related summary, recommendation, risk, and export-readiness prose may become stale.",
+      reviewAction: `Verify the claim source and reread ${section?.heading || "the affected narrative"} before accepting or distributing the document.`,
+      evidenceRequired: ["Source or owner for the claim", "Verification status", "Narrative note confirming dependent prose was reviewed"],
+      status: claim.kind === "commitment" || claim.kind === "number" || claim.kind === "date" ? "needs-review" : "watch",
+      owner: "Evidence Agent",
+    });
+  }
+
+  if (plan.sourcePack.items.length && links.length < 12) {
+    const sourceItem = plan.sourcePack.items[0];
+    const section = targetFor({ sourceLabel: sourceItem.label, sourceText: sourceItem.detail });
+    add({
+      sourceKind: "source-pack",
+      sourceLabel: sourceItem.label,
+      affectedSection: section ? `Section ${section.order}: ${section.heading}` : "Current document",
+      sectionId: section?.id,
+      changeSignal: `Source pack item ${sourceItem.kind}: ${sourceItem.detail}`,
+      narrativeRisk: "Changing or rejecting a source-pack item can invalidate claims, examples, reviewer responses, or distribution metadata.",
+      reviewAction: "Refresh the source pack and review dependent claims before provider handoff or export.",
+      evidenceRequired: ["Updated source-pack item", "Reviewer confirmation", "Dependent narrative review note"],
+      status: "watch",
+      owner: "Evidence Agent",
+    });
+  }
+
+  if (!links.length) {
+    const section = sectionWorkQueue[0];
+    add({
+      sourceKind: "metadata",
+      sourceLabel: "Document evidence state",
+      affectedSection: section ? `Section ${section.order}: ${section.heading}` : plan.title,
+      sectionId: section?.id,
+      changeSignal: "No structured data, claim, or source signal was detected yet.",
+      narrativeRisk: "If evidence is added later, dependent prose must be reviewed before export.",
+      reviewAction: "Create at least one source, claim, table, calculation, or transform link before release if the document makes factual claims.",
+      evidenceRequired: ["Source or claim inventory", "Narrative dependency note", "Final reviewer confirmation"],
+      status: "watch",
+      owner: "Governance Agent",
+    });
+  }
+
+  return links.slice(0, 18);
+}
+
+function sharesNarrativeSignal(left: string, right: string) {
+  const stopwords = new Set(["the", "and", "for", "with", "from", "this", "that", "section", "document", "agent"]);
+  const words = (value: string) =>
+    new Set(
+      value
+        .toLowerCase()
+        .match(/\b[a-z0-9]{4,}\b/g)
+        ?.filter((word) => !stopwords.has(word)) || [],
+    );
+  const leftWords = words(left);
+  if (!leftWords.size) return false;
+  for (const word of words(right)) {
+    if (leftWords.has(word)) return true;
+  }
+  return false;
 }
 
 function buildSectionContract(
@@ -3838,6 +4038,7 @@ function buildAuditTrail(input: {
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
+  dataNarrativeLinks: AgenticDataNarrativeLink[];
   automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   documentEvidence: AgenticDocumentEvidence;
@@ -3860,6 +4061,7 @@ function buildAuditTrail(input: {
     sectionWorkQueue,
     sectionDraftHistory,
     transformRecommendations,
+    dataNarrativeLinks,
     automationQueue,
     preReviewRehearsal,
     documentEvidence,
@@ -3927,6 +4129,19 @@ function buildAuditTrail(input: {
       item.riskLevel,
       item.owner,
       item.suggestedMarkdown,
+      ...item.evidenceRequired,
+    ]),
+    ...dataNarrativeLinks.flatMap((item) => [
+      item.id,
+      item.sourceKind,
+      item.sourceLabel,
+      item.affectedSection,
+      item.sectionId || "",
+      item.changeSignal,
+      item.narrativeRisk,
+      item.reviewAction,
+      item.status,
+      item.owner,
       ...item.evidenceRequired,
     ]),
     ...automationQueue.flatMap((item) => [
@@ -4026,6 +4241,7 @@ function buildAuditTrail(input: {
       `Lifecycle task board prepared for ${lifecycleTasks.length} task(s) across ${Array.from(new Set(lifecycleTasks.map((task) => task.lane))).map(titleCase).join(", ")}.`,
       `Section draft history preserved ${sectionDraftHistory.length} composable draft restore point(s).`,
       `Transform recommendations prepared ${transformRecommendations.length} agent-selected structured block(s) for calc, chart, table, diagram, timeline, schema, equation, or publishing work.`,
+      `Data-to-narrative bridge prepared ${dataNarrativeLinks.length} dependency link(s) between claims, structured blocks, source signals, and affected narrative sections.`,
       `Automation scheduler queued ${automationQueue.length} safe local check(s) with destructive actions kept manual.`,
       `Pre-review rehearsal prepared ${preReviewRehearsal.length} likely reviewer question, objection, redline, or missing-evidence prompt(s).`,
       `Outline variant comparison prepared ${plan.outlineVariants.length} alternative structure(s) for user selection before drafting.`,
@@ -4069,13 +4285,14 @@ function buildReleaseEvidenceBundle(input: {
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
+  dataNarrativeLinks: AgenticDataNarrativeLink[];
   automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   documentEvidence: AgenticDocumentEvidence;
   blockers: string[];
 }): AgenticReleaseEvidenceBundle {
-  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, automationQueue, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
+  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, dataNarrativeLinks, automationQueue, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
   const taskBlockers = lifecycleTasks.filter((task) => task.status === "blocked" || task.status === "needs-input");
   const reviewerBlockers = reviewerAgents.filter((agent) => agent.status !== "ready");
   const items: AgenticReleaseEvidenceItem[] = [
@@ -4147,6 +4364,15 @@ function buildReleaseEvidenceBundle(input: {
       transformRecommendations.length
         ? `${transformRecommendations.length} recommended calc, chart, table, diagram, timeline, schema, equation, or publishing block(s) are linked to source signals and narrative review triggers.`
         : "No agent-selected structured transform recommendations were prepared.",
+      true,
+    ),
+    releaseEvidenceItem(
+      "Data-to-narrative bridge",
+      "Data Narrative Agent",
+      dataNarrativeLinks.some((item) => item.status === "blocked" || item.status === "needs-review") ? "needs-review" : "available",
+      dataNarrativeLinks.length
+        ? `${dataNarrativeLinks.length} structured dependency link(s) connect source changes to affected narrative sections and review actions.`
+        : "No data-to-narrative dependency links were prepared.",
       true,
     ),
     releaseEvidenceItem(
@@ -5016,6 +5242,7 @@ function buildRunMarkdown(input: {
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
+  dataNarrativeLinks: AgenticDataNarrativeLink[];
   automationQueue: AgenticAutomationTask[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
@@ -5039,6 +5266,7 @@ function buildRunMarkdown(input: {
     sectionWorkQueue,
     sectionDraftHistory,
     transformRecommendations,
+    dataNarrativeLinks,
     automationQueue,
     outlineCritique,
     preReviewRehearsal,
@@ -5155,6 +5383,7 @@ function buildRunMarkdown(input: {
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
   lines.push(...sectionDraftHistoryMarkdown(sectionDraftHistory));
   lines.push(...transformRecommendationsMarkdown(transformRecommendations));
+  lines.push(...dataNarrativeLinksMarkdown(dataNarrativeLinks));
   lines.push(...automationQueueMarkdown(automationQueue));
   lines.push(...auditTrailMarkdown(auditTrail));
   lines.push(...releaseEvidenceBundleMarkdown(releaseEvidenceBundle));
@@ -5561,6 +5790,38 @@ function transformRecommendationsMarkdown(items: AgenticTransformRecommendation[
     );
   }
   return lines;
+}
+
+function dataNarrativeLinksMarkdown(items: AgenticDataNarrativeLink[]) {
+  if (!items.length) {
+    return ["## Data-to-Narrative Bridge", "", "No data-to-narrative dependency links were prepared.", ""];
+  }
+  return [
+    "## Data-to-Narrative Bridge",
+    "",
+    "| Source | Affected section | Status | Review action |",
+    "| --- | --- | --- | --- |",
+    ...items.map(
+      (item) =>
+        `| ${escapeTableCell(`${item.sourceKind}: ${item.sourceLabel}`)} | ${escapeTableCell(item.affectedSection)} | ${item.status} | ${escapeTableCell(item.reviewAction)} |`,
+    ),
+    "",
+    "### Dependency Details",
+    "",
+    ...items.flatMap((item) => [
+      `#### ${item.sourceLabel}`,
+      "",
+      `Change signal: ${item.changeSignal}`,
+      "",
+      `Narrative risk: ${item.narrativeRisk}`,
+      "",
+      `Owner: ${item.owner}`,
+      "",
+      "Evidence required:",
+      ...item.evidenceRequired.map((evidence) => `- [ ] ${evidence}`),
+      "",
+    ]),
+  ];
 }
 
 function automationQueueMarkdown(items: AgenticAutomationTask[]) {

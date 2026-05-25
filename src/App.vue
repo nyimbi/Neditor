@@ -3018,6 +3018,34 @@
                 </li>
               </ol>
             </section>
+            <section class="agent-data-narrative-bridge" aria-label="Agent data-to-narrative bridge">
+              <header>
+                <div>
+                  <strong>Data-to-Narrative Bridge</strong>
+                  <span>Links claims, calculations, charts, tables, timelines, schemas, and publishing metadata to narrative review actions.</span>
+                </div>
+                <small>{{ agentRun.dataNarrativeLinks.length }} links</small>
+                <div class="agent-section-actions">
+                  <button type="button" @click="insertAgentDataNarrativeAudit">Insert audit</button>
+                  <button type="button" @click="copyAgentDataNarrativeAudit">Copy audit</button>
+                </div>
+              </header>
+              <ol>
+                <li v-for="item in agentRun.dataNarrativeLinks" :key="item.id" :data-status="item.status">
+                  <div>
+                    <small>{{ item.sourceKind }} | {{ item.owner }} | {{ item.status }}</small>
+                    <strong>{{ item.sourceLabel }}</strong>
+                    <p>Affects: {{ item.affectedSection }}</p>
+                    <p>{{ item.changeSignal }}</p>
+                    <p>{{ item.narrativeRisk }}</p>
+                    <p class="sidebar-hint">{{ item.reviewAction }}</p>
+                  </div>
+                  <ul>
+                    <li v-for="evidence in item.evidenceRequired" :key="evidence">{{ evidence }}</li>
+                  </ul>
+                </li>
+              </ol>
+            </section>
             <section class="agent-audit-trail" aria-label="Agent audit trail">
               <header>
                 <div>
@@ -3193,6 +3221,7 @@
                   <p v-if="item.outlineCritique?.length">Outline: {{ agentRunHistoryOutlineSummary(item) }}</p>
                   <p v-if="item.sectionDraftHistory?.length">Section drafts: {{ agentRunHistorySectionDraftSummary(item) }}</p>
                   <p v-if="item.transformRecommendationCount">Transforms: {{ item.transformRecommendationCount }} agent-selected recommendations</p>
+                  <p v-if="item.dataNarrativeLinkCount">Narrative links: {{ item.dataNarrativeLinkCount }} data-to-narrative dependencies</p>
                   <p v-if="item.automationTaskCount">Automation: {{ item.automationTaskCount }} scheduled checks</p>
                   <p v-if="item.sourcePack">Source pack: {{ agentRunHistorySourcePackSummary(item) }}</p>
                   <p v-if="item.lifecycleTaskStates?.length">Task states: {{ agentRunHistoryTaskStateSummary(item) }}</p>
@@ -3560,6 +3589,7 @@ import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
   agenticWorkflowPlaybooks,
+  buildAgenticDataNarrativeAuditMarkdown,
   buildAgenticLifecycleTaskBrief,
   buildAgenticReleaseEvidenceAuditPackage,
   buildAgenticSectionWorkBrief,
@@ -5845,6 +5875,7 @@ function agentRunHistoryItem(
       restorePointMarkdown: item.restorePointMarkdown.slice(0, 8_000),
     })),
     transformRecommendationCount: run.transformRecommendations.length,
+    dataNarrativeLinkCount: run.dataNarrativeLinks.length,
     automationTaskCount: run.automationQueue.length,
     reviewerCount: run.reviewerAgents.length,
     preReviewPromptCount: run.preReviewRehearsal.length,
@@ -6078,6 +6109,7 @@ function agentHistoryAuditMarkdown() {
       item.outlineCritique?.length ? `  - Outline: ${agentAuditInline(agentRunHistoryOutlineSummary(item))}` : "",
       item.sectionDraftHistory?.length ? `  - Section drafts: ${agentAuditInline(agentRunHistorySectionDraftSummary(item))}` : "",
       item.transformRecommendationCount ? `  - Transforms: ${item.transformRecommendationCount} agent-selected recommendations` : "",
+      item.dataNarrativeLinkCount ? `  - Narrative links: ${item.dataNarrativeLinkCount} data-to-narrative dependencies` : "",
       item.documentIntent ? `  - Intent: ${agentAuditInline(agentRunHistoryIntentSummary(item))}` : "",
       item.sourcePack ? `  - Source pack: ${agentAuditInline(agentRunHistorySourcePackSummary(item))}` : "",
     ].filter(Boolean)),
@@ -6507,6 +6539,25 @@ async function copyAgentTransformRecommendation(item: AgenticTransformRecommenda
 function openTransformTemplatesFromAgent() {
   openTransformTemplates();
   store.statusMessage = "Opened templates for agent-selected transforms";
+}
+function insertAgentDataNarrativeAudit() {
+  const run = agentRun.value;
+  if (!run) return;
+  insertBlock(buildAgenticDataNarrativeAuditMarkdown(run.dataNarrativeLinks));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted data-to-narrative bridge audit";
+}
+async function copyAgentDataNarrativeAudit() {
+  const run = agentRun.value;
+  if (!run) return;
+  const audit = buildAgenticDataNarrativeAuditMarkdown(run.dataNarrativeLinks);
+  try {
+    await navigator.clipboard?.writeText(audit);
+    store.statusMessage = "Copied data-to-narrative bridge audit";
+  } catch {
+    store.statusMessage = "Data-to-narrative bridge audit is ready to copy";
+  }
 }
 function runAgentLifecycleTask(task: AgenticLifecycleTask) {
   setAgentLifecycleTaskStatus(task, "in-progress");
@@ -12259,6 +12310,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-section-draft-history li,
 .app-shell[data-theme="dark"] .agent-transform-recommendations,
 .app-shell[data-theme="dark"] .agent-transform-recommendations li,
+.app-shell[data-theme="dark"] .agent-data-narrative-bridge,
+.app-shell[data-theme="dark"] .agent-data-narrative-bridge li,
 .app-shell[data-theme="dark"] .agent-audit-trail,
 .app-shell[data-theme="dark"] .agent-audit-grid article,
 .app-shell[data-theme="dark"] .agent-release-evidence,
@@ -12336,6 +12389,11 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-transform-recommendations small,
 .app-shell[data-theme="dark"] .agent-transform-recommendations p,
 .app-shell[data-theme="dark"] .agent-transform-recommendations ul,
+.app-shell[data-theme="dark"] .agent-data-narrative-bridge > header span,
+.app-shell[data-theme="dark"] .agent-data-narrative-bridge > header small,
+.app-shell[data-theme="dark"] .agent-data-narrative-bridge small,
+.app-shell[data-theme="dark"] .agent-data-narrative-bridge p,
+.app-shell[data-theme="dark"] .agent-data-narrative-bridge ul,
 .app-shell[data-theme="dark"] .agent-release-evidence > header span,
 .app-shell[data-theme="dark"] .agent-release-evidence > header small,
 .app-shell[data-theme="dark"] .agent-release-evidence-grid small,
@@ -12428,6 +12486,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-section-draft-history li,
   .app-shell[data-theme="system"] .agent-transform-recommendations,
   .app-shell[data-theme="system"] .agent-transform-recommendations li,
+  .app-shell[data-theme="system"] .agent-data-narrative-bridge,
+  .app-shell[data-theme="system"] .agent-data-narrative-bridge li,
   .app-shell[data-theme="system"] .agent-audit-trail,
   .app-shell[data-theme="system"] .agent-audit-grid article,
   .app-shell[data-theme="system"] .agent-release-evidence,
@@ -12505,6 +12565,11 @@ select:hover {
   .app-shell[data-theme="system"] .agent-transform-recommendations small,
   .app-shell[data-theme="system"] .agent-transform-recommendations p,
   .app-shell[data-theme="system"] .agent-transform-recommendations ul,
+  .app-shell[data-theme="system"] .agent-data-narrative-bridge > header span,
+  .app-shell[data-theme="system"] .agent-data-narrative-bridge > header small,
+  .app-shell[data-theme="system"] .agent-data-narrative-bridge small,
+  .app-shell[data-theme="system"] .agent-data-narrative-bridge p,
+  .app-shell[data-theme="system"] .agent-data-narrative-bridge ul,
   .app-shell[data-theme="system"] .agent-release-evidence > header span,
   .app-shell[data-theme="system"] .agent-release-evidence > header small,
   .app-shell[data-theme="system"] .agent-release-evidence-grid small,
@@ -12582,6 +12647,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-section-draft-history li,
 .app-shell[data-high-contrast="true"] .agent-transform-recommendations,
 .app-shell[data-high-contrast="true"] .agent-transform-recommendations li,
+.app-shell[data-high-contrast="true"] .agent-data-narrative-bridge,
+.app-shell[data-high-contrast="true"] .agent-data-narrative-bridge li,
 .app-shell[data-high-contrast="true"] .agent-audit-trail,
 .app-shell[data-high-contrast="true"] .agent-audit-grid article,
 .app-shell[data-high-contrast="true"] .agent-release-evidence,
@@ -14376,6 +14443,8 @@ select:hover {
 .agent-section-draft-history li,
 .agent-transform-recommendations,
 .agent-transform-recommendations li,
+.agent-data-narrative-bridge,
+.agent-data-narrative-bridge li,
 .agent-audit-trail,
 .agent-audit-grid article,
 .agent-release-evidence,
@@ -14816,6 +14885,7 @@ select:hover {
 .agent-section-workqueue > header,
 .agent-section-draft-history > header,
 .agent-transform-recommendations > header,
+.agent-data-narrative-bridge > header,
 .agent-review-comment-queue > header,
 .agent-edit-acceptance-queue > header,
 .agent-lifecycle-board > header {
@@ -14830,6 +14900,8 @@ select:hover {
 .agent-section-draft-history li > div,
 .agent-transform-recommendations > header div,
 .agent-transform-recommendations li > div,
+.agent-data-narrative-bridge > header div,
+.agent-data-narrative-bridge li > div,
 .agent-review-comment-queue > header div,
 .agent-review-comment-queue li > div,
 .agent-edit-acceptance-queue > header div,
@@ -14850,6 +14922,9 @@ select:hover {
 .agent-transform-recommendations > header span,
 .agent-transform-recommendations > header small,
 .agent-transform-recommendations small,
+.agent-data-narrative-bridge > header span,
+.agent-data-narrative-bridge > header small,
+.agent-data-narrative-bridge small,
 .agent-review-comment-queue > header span,
 .agent-review-comment-queue > header small,
 .agent-review-comment-queue small,
@@ -14893,6 +14968,7 @@ select:hover {
 .agent-section-workqueue ol,
 .agent-section-draft-history ol,
 .agent-transform-recommendations ol,
+.agent-data-narrative-bridge ol,
 .agent-review-comment-queue ol,
 .agent-edit-acceptance-queue ol,
 .agent-lifecycle-board ol {
@@ -14956,6 +15032,35 @@ select:hover {
 
 .agent-transform-recommendations p,
 .agent-transform-recommendations ul {
+  margin: 0;
+  color: #394756;
+  font-size: 12px;
+}
+
+.agent-data-narrative-bridge {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #7a3f91;
+  background: #fbf5ff;
+}
+
+.agent-data-narrative-bridge li {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.72fr) minmax(0, 1fr);
+  gap: 10px;
+  border-left: 3px solid #9b5db3;
+}
+
+.agent-data-narrative-bridge li[data-status="needs-review"] {
+  border-left-color: #b7791f;
+}
+
+.agent-data-narrative-bridge li[data-status="blocked"] {
+  border-left-color: #b42318;
+}
+
+.agent-data-narrative-bridge p,
+.agent-data-narrative-bridge ul {
   margin: 0;
   color: #394756;
   font-size: 12px;

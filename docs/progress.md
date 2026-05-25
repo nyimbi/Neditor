@@ -2859,6 +2859,13 @@ Agent-selected transform recommendation verification:
 | `pnpm run test:unit` | Pass | 46 frontend unit tests passed, including agentic runs that produce source-grounded calc, chart, table, timeline/schema/equation/publishing recommendations with suggested Markdown, lifecycle tasks, audit events, release evidence, UI insertion/copy actions, and persisted run-history counts. |
 | `pnpm run check:ai-roadmap` | Pass | The AI-first roadmap verifier treats Agent-Selected Transforms as a required product surface for roadmap items 29 and 30 and passed the 50-change roadmap contract. |
 
+Data-to-narrative bridge verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 46 frontend unit tests passed, including agentic runs that link claims, calculations, charts, tables, timelines, schemas, equations, and publishing metadata to affected narrative sections with review actions, release evidence, audit events, UI insert/copy actions, and persisted run-history counts. |
+| `pnpm run check:ai-roadmap` | Pass | The AI-first roadmap verifier treats the Data-to-Narrative Bridge as a required product surface for roadmap item 30 and passed the 50-change roadmap contract. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

@@ -212,7 +212,8 @@ Current direct evidence:
   reusable document memory packs, outline variants, section contract cards,
   composable section draft history, Agent-Selected Transforms for source-grounded
   calc/chart/table/diagram/timeline/schema/equation/publishing blocks,
-  automation scheduler, pre-review rehearsal,
+  Data-to-Narrative Bridge dependency links between structured values, claims,
+  source signals, affected sections, and review actions, automation scheduler, pre-review rehearsal,
   playbooks, lifecycle tasks, provider handoff, runtime readiness, and guided
   demo.
 - `pnpm run check:a11y` now checks static Vue template accessibility guardrails

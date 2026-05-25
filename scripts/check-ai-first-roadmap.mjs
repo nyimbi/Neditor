@@ -61,6 +61,7 @@ const productSurfaceChecks = [
   ["Section contract", app],
   ["Section Draft History", app],
   ["Agent-Selected Transforms", app],
+  ["Data-to-Narrative Bridge", app],
   ["Outline variants", app],
   ["Agent workflow playbooks", app],
   ["AI control center", app],

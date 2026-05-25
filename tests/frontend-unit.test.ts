@@ -18,6 +18,7 @@ import {
 } from "../src/lib/aiProviderPackages.js";
 import {
   agenticWorkflowPlaybooks,
+  buildAgenticDataNarrativeAuditMarkdown,
   buildAgenticDocumentMemory,
   buildAgenticLifecycleTaskBrief,
   buildAgenticReleaseEvidenceAuditPackage,
@@ -808,6 +809,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Section Draft History"));
   ok(run.markdown.includes("```ai-section-draft"));
   ok(run.markdown.includes("## Agent-Selected Transforms"));
+  ok(run.markdown.includes("## Data-to-Narrative Bridge"));
   ok(run.markdown.includes("Section contract:"));
   ok(run.markdown.includes("Contract risk:"));
   ok(run.markdown.includes("Completion criteria:"));
@@ -820,6 +822,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Section contract cards" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Composable section draft history" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent-selected transforms" && item.requiredBeforeRelease));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Data-to-narrative bridge" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent automation scheduler" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Pre-review rehearsal" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
@@ -837,6 +840,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(releaseAuditPackage.includes("## Agent Audit Trail"));
   ok(releaseAuditPackage.includes("## Section Draft History"));
   ok(releaseAuditPackage.includes("## Agent-Selected Transforms"));
+  ok(releaseAuditPackage.includes("## Data-to-Narrative Bridge"));
   ok(releaseAuditPackage.includes("## Agent Lifecycle Task Board"));
   ok(releaseAuditPackage.includes("### Target Runbooks"));
   ok(run.markdown.includes("Substack newsletter package"));
@@ -863,6 +867,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.lifecycleTasks.some((task) => task.id === "task-section-draft-history" && task.evidence.some((item) => item.includes("v01"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-agent-automation-scheduler" && task.evidence.some((item) => item.includes("export"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-agent-transform-recommendations" && task.evidence.some((item) => item.includes("Decision comparison"))));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-data-narrative-bridge" && task.evidence.some((item) => item.includes("review"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-outline-variants" && task.evidence.some((item) => item.includes("Executive-first"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-intake-context" && task.evidence.some((item) => item.includes("Document intent"))));
   ok(run.lifecycleTasks.some((task) => task.owner === "Docs Live Section Agent" && task.action === "generate-docs-live-draft" && task.sectionId));
@@ -876,6 +881,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Section draft history preserved")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Automation scheduler queued")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Transform recommendations prepared")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Data-to-narrative bridge prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Pre-review rehearsal prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline variant comparison prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline critique prepared")));
@@ -909,6 +915,14 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(transformBrief.includes("```ai-transform-recommendation"));
   ok(transformBrief.includes("workflow: agent-selected-transform"));
   ok(transformBrief.includes("Narrative review trigger:"));
+  ok(run.dataNarrativeLinks.length >= run.transformRecommendations.length);
+  ok(run.dataNarrativeLinks.some((item) => item.sourceKind === "calc" && item.status === "needs-review"));
+  ok(run.dataNarrativeLinks.some((item) => item.sourceKind === "publishing"));
+  ok(run.dataNarrativeLinks.every((item) => item.evidenceRequired.length >= 3));
+  ok(run.dataNarrativeLinks.every((item) => item.reviewAction.includes("review") || item.reviewAction.includes("Review")));
+  const dataNarrativeAudit = buildAgenticDataNarrativeAuditMarkdown(run.dataNarrativeLinks);
+  ok(dataNarrativeAudit.includes("```ai-data-narrative-bridge"));
+  ok(dataNarrativeAudit.includes("Narrative risk:"));
   equal(run.automationQueue.length, 6);
   ok(run.automationQueue.every((item) => item.safeToAutoRun));
   ok(run.automationQueue.some((item) => item.kind === "export-preflight" && item.action === "prepare-export"));
@@ -1376,6 +1390,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         ],
         automationTaskCount: 6,
         transformRecommendationCount: 5,
+        dataNarrativeLinkCount: 9,
         reviewerCount: 6,
         preReviewPromptCount: 7,
         taskCount: 14,
@@ -1672,6 +1687,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     ],
     automationTaskCount: 6,
     transformRecommendationCount: 5,
+    dataNarrativeLinkCount: 9,
     reviewerCount: 6,
     preReviewPromptCount: 7,
     taskCount: 14,
@@ -2149,6 +2165,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("openTransformTemplatesFromAgent"));
   ok(app.includes("buildAgenticTransformRecommendationMarkdown"));
   ok(app.includes("transformRecommendationCount"));
+  ok(app.includes('aria-label="Agent data-to-narrative bridge"'));
+  ok(app.includes("agentRun.dataNarrativeLinks"));
+  ok(app.includes("Data-to-Narrative Bridge"));
+  ok(app.includes("insertAgentDataNarrativeAudit"));
+  ok(app.includes("copyAgentDataNarrativeAudit"));
+  ok(app.includes("buildAgenticDataNarrativeAuditMarkdown"));
+  ok(app.includes("dataNarrativeLinkCount"));
   ok(app.includes("agentSectionDraftingDepthOptions"));
   ok(app.includes("agentPlan.outlineVariants"));
   ok(app.includes("hydrateDocsLiveFromOutlineVariant"));
