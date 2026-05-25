@@ -814,6 +814,23 @@
             </label>
             <p class="sidebar-hint">{{ tocManagerSummary }}</p>
           </section>
+          <h3>Captions and Lists</h3>
+          <section class="reference-manager" aria-label="Captions and generated lists manager">
+            <div class="reference-actions">
+              <button type="button" @click="insertBlock(listOfFiguresSnippet)">Insert list of figures</button>
+              <button type="button" @click="insertBlock(listOfTablesSnippet)">Insert list of tables</button>
+            </div>
+            <p class="sidebar-hint">{{ captionManagerSummary }}</p>
+            <article v-for="item in captionedReferenceItems" :key="`${item.kind}-${item.line}-${item.label}`" class="snapshot-row" :data-status="item.status">
+              <p>{{ item.label }}</p>
+              <small>{{ item.kind }} | {{ item.status }} | line {{ item.line }}</small>
+              <div class="reference-actions">
+                <button type="button" @click="goToSourceTarget(item)">Go to source</button>
+                <button v-if="item.id" type="button" @click="insertBlock(`See {@${item.id}}.`)">Insert reference</button>
+              </div>
+            </article>
+            <p v-if="!captionedReferenceItems.length" class="sidebar-hint">No tables, figures, or equations detected for generated lists.</p>
+          </section>
           <template v-if="resolvedCitationEntries.length">
             <h3>Resolved references</h3>
             <article v-for="entry in resolvedCitationEntries" :key="entry.key" class="snapshot-row">
@@ -3542,6 +3559,17 @@ interface FigureListItem {
   source_file?: string | null;
 }
 
+interface CaptionedReferenceItem {
+  kind: "figure" | "table" | "equation";
+  id?: string | null;
+  caption?: string | null;
+  label: string;
+  status: "ready" | "missing-label" | "missing-caption";
+  line: number;
+  end_line: number;
+  source_file?: string | null;
+}
+
 type HelpCategory = "basics" | "writing" | "structure" | "content" | "review" | "export" | "settings";
 
 interface HelpTopicAction {
@@ -4098,6 +4126,39 @@ const tocManagerSummary = computed(() => {
   const depth = frontMatterScalarValue(active.value.text, "tocDepth") || "default";
   const numbered = frontMatterScalarValue(active.value.text, "tocNumbered") || frontMatterScalarValue(active.value.text, "numberedHeadings") || "false";
   return `Front matter TOC: ${tocEnabled || "not set"} | depth: ${depth} | numbered: ${numbered}`;
+});
+const captionedReferenceItems = computed<CaptionedReferenceItem[]>(() =>
+  (active.value.compile?.document_ast.blocks || []).flatMap((block: DocumentBlock) => {
+    if (block.kind !== "figure" && block.kind !== "table" && block.kind !== "equation") return [];
+    const sourceLine = block.source?.source_line || block.line;
+    const id = block.id || null;
+    const caption = block.caption || null;
+    const label = caption || id || `${captionKindLabel(block.kind)} on line ${sourceLine}`;
+    const status: CaptionedReferenceItem["status"] = !id ? "missing-label" : !caption ? "missing-caption" : "ready";
+    return [
+      {
+        kind: block.kind,
+        id,
+        caption,
+        label,
+        status,
+        line: sourceLine,
+        end_line: block.source?.end_source_line || block.end_line,
+        source_file: block.source?.source_file || null,
+      },
+    ];
+  }),
+);
+const captionManagerSummary = computed(() => {
+  const counts = captionedReferenceItems.value.reduce(
+    (totals, item) => {
+      totals[item.kind] += 1;
+      if (item.status !== "ready") totals.needsMetadata += 1;
+      return totals;
+    },
+    { figure: 0, table: 0, equation: 0, needsMetadata: 0 },
+  );
+  return `${counts.figure} figures, ${counts.table} tables, ${counts.equation} equations | ${counts.needsMetadata} need label or caption metadata`;
 });
 const indexTerms = computed(() => [...(active.value.compile?.index_terms || [])].sort((left, right) => left.localeCompare(right)));
 const indexExclusionTerms = computed(() => frontMatterListValues(active.value.text, "indexExclude"));
@@ -9913,6 +9974,10 @@ function docsLiveReviewPacketMarkdownFor(draft: DocsLiveDraft, generatedAt: stri
 
 function docsLiveAuditInline(value: string) {
   return (value || "").replace(/\r?\n/g, " ").trim();
+}
+
+function captionKindLabel(kind: CaptionedReferenceItem["kind"]) {
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
 }
 
 function appendDocsLiveHistoryDraft(item: DocsLiveDraftHistoryItem) {

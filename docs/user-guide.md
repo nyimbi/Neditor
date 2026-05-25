@@ -369,6 +369,9 @@ Research and business documents can keep reference metadata near the source.
   and remove exclusions as the document moves toward release.
 - Use labels and cross references for headings, figures, tables, equations,
   appendices, and decisions.
+- Use the Captions and Lists manager to insert lists of figures and tables,
+  inspect tables, figures, and equations that need labels or captions, jump to
+  their source, and insert cross-reference text for labeled items.
 
 The references panel surfaces resolved bibliography entries, missing citation
 keys, duplicate bibliography keys, and citation TODO blockers. The Citation

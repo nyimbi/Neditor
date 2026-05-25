@@ -1897,6 +1897,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("applyTocSettings"));
   ok(app.includes("frontMatterScalarValue"));
   ok(app.includes("Applied TOC settings"));
+  ok(app.includes('aria-label="Captions and generated lists manager"'));
+  ok(app.includes("captionedReferenceItems"));
+  ok(app.includes("captionManagerSummary"));
+  ok(app.includes("CaptionedReferenceItem"));
+  ok(app.includes("captionKindLabel"));
+  ok(app.includes("Insert list of figures"));
+  ok(app.includes("Insert list of tables"));
+  ok(app.includes("Insert reference"));
   ok(app.includes('aria-label="Index manager"'));
   ok(app.includes("indexTermDraft"));
   ok(app.includes("indexExcludeDraft"));
