@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-23
+Updated: 2026-05-25
 
 ## Active Goal
 
@@ -32,6 +32,12 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- The AI-first platform roadmap is now an executable release contract. The
+  roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
+  verifies the item count, ten five-item sections, README/spec-matrix linkage,
+  and app/test evidence for Docs Live, Agent Workspace, workflow playbooks,
+  source packs, lifecycle tasks, provider handoff, AI runtime readiness, and the
+  guided demo.
 - The Outline panel is now an editable planning surface, not only a generated
   heading navigator. Users can draft an outline with indented bullets, numbered
   lines, or Markdown heading marks, then create a document skeleton with front

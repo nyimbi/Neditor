@@ -2061,6 +2061,7 @@ test("local verification scripts expose local baseline checks", () => {
   const e2eEnvironment = readFileSync("scripts/check-e2e-environment.mjs", "utf8");
   const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
   const accessibilityGuard = readFileSync("scripts/check-accessibility.mjs", "utf8");
+  const aiRoadmap = readFileSync("scripts/check-ai-first-roadmap.mjs", "utf8");
   const aiProviderEvidence = readFileSync("scripts/check-ai-provider-evidence.mjs", "utf8");
   const aiProviderCollector = readFileSync("scripts/collect-ai-provider-evidence.mjs", "utf8");
   const aiRuntimeEvidence = readFileSync("scripts/check-ai-runtime-evidence.mjs", "utf8");
@@ -2081,6 +2082,7 @@ test("local verification scripts expose local baseline checks", () => {
   const releaseSigning = readFileSync("scripts/check-release-signing.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
+  equal(scripts["check:ai-roadmap"], "node scripts/check-ai-first-roadmap.mjs");
   equal(scripts["check:ai-provider"], "node scripts/check-ai-provider-evidence.mjs");
   equal(scripts["check:ai-runtime"], "node scripts/check-ai-runtime-evidence.mjs");
   equal(scripts["check:a11y"], "node scripts/check-accessibility.mjs");
@@ -2122,6 +2124,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Accessibility runtime audit", "pnpm", ["run", "check:a11y:runtime"])'));
   ok(verification.includes('command("Accessibility manual review contract", "pnpm", ["run", "check:a11y:manual"])'));
   ok(verification.includes('command("Google Docs import evidence contract", "pnpm", ["run", "check:google-docs-import"])'));
+  ok(verification.includes('command("AI-first roadmap contract", "pnpm", ["run", "check:ai-roadmap"])'));
   ok(verification.includes('command("AI provider evidence contract", "pnpm", ["run", "check:ai-provider"])'));
   ok(verification.includes('command("AI runtime evidence contract", "pnpm", ["run", "check:ai-runtime"])'));
   ok(verification.includes('command("Security review evidence contract", "pnpm", ["run", "check:security-review"])'));
@@ -2148,6 +2151,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(accessibilityGuard.includes("data-help fallback"));
   ok(accessibilityGuard.includes("disabled help fallback"));
   ok(accessibilityGuard.includes("role\\s*=\\s*[\"']tooltip"));
+  ok(aiRoadmap.includes("neditor.ai-first-roadmap-report.v1"));
+  ok(aiRoadmap.includes("roadmap must contain exactly 50 numbered changes"));
+  ok(aiRoadmap.includes("docs/ai-first-platform-roadmap.md"));
+  ok(aiRoadmap.includes("AI Agent Workspace"));
+  ok(aiRoadmap.includes("NEditor guided demo"));
   ok(aiProviderEvidence.includes("neditor.ai-provider-evidence.v1"));
   ok(aiProviderEvidence.includes("NEDITOR_AI_PROVIDER_EVIDENCE_DIR"));
   ok(aiProviderEvidence.includes("pending-live-provider-evidence"));

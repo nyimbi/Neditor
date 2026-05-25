@@ -1,6 +1,6 @@
 # NEditor Specification Completion Matrix
 
-Updated: 2026-05-23
+Updated: 2026-05-25
 
 Status vocabulary:
 
@@ -205,6 +205,11 @@ Current direct evidence:
 - `pnpm run check:docs` now discovers README plus all top-level docs Markdown
   files and checks local links, including the user guide, Markdown extensions
   reference, and `docs/specification.md` architecture figure target.
+- `docs/ai-first-platform-roadmap.md` captures the 50-change AI-first roadmap;
+  `pnpm run check:ai-roadmap` verifies the exact 50-item structure, README and
+  matrix linkage, and implemented/tested AI surfaces for Docs Live, Agent
+  Workspace, playbooks, lifecycle tasks, provider handoff, runtime readiness,
+  and guided demo.
 - `pnpm run check:a11y` now checks static Vue template accessibility guardrails
   for accessible control names, dialog labeling, dialog focusability/keyboard
   handling, required skip-link targets, and status/progress live regions.
