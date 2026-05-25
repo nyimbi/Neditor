@@ -467,6 +467,37 @@ test("agentic workflow planner coordinates creation revision review and distribu
   ok(plan.steps.some((step) => step.action === "prepare-export"));
 });
 
+test("agentic workflow planner uses context answers to close missing inputs", () => {
+  const plan = buildAgenticWorkflowPlan({
+    instruction: "Create a board memo, review risks, and prepare PDF distribution.",
+    contextAnswers:
+      "audience: board\nowner: Finance\ndeadline: June 1\ntone: direct\nevidence: audited forecast\nreviewer: CFO\nstatus: approved for review",
+    documentTitle: "Capital Allocation Memo",
+    documentText: "# Capital Allocation Memo\n\n## Current Ask\n\nDraft notes.",
+  });
+
+  equal(plan.contextAnswers.includes("audience: board"), true);
+  ok(plan.context.includes("Agent context answers:"));
+  ok(plan.placeholderText.includes("audience: board"));
+  ok(plan.placeholderText.includes("owner: Finance"));
+  ok(plan.placeholderText.includes("evidence: audited forecast"));
+  ok(plan.distributionTargets.includes("pdf"));
+  ok(!plan.missingInputs.includes("evidence"));
+  ok(!plan.missingInputs.includes("approval status for distribution"));
+
+  const run = buildAgenticWorkflowRun({
+    instruction: plan.instruction,
+    contextAnswers: plan.contextAnswers,
+    documentTitle: "Capital Allocation Memo",
+    documentText: "# Capital Allocation Memo\n\n## Current Ask\n\nDraft notes.",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  ok(run.markdown.includes("Agent context answers:"));
+  ok(run.auditTrail.contextFingerprint.length === 16);
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.status === "available"));
+});
+
 test("agentic workflow playbooks cover common business and publishing starts", () => {
   ok(agenticWorkflowPlaybooks.length >= 6);
   ok(agenticWorkflowPlaybooks.some((playbook) => playbook.id === "board-memo-to-approval"));
@@ -770,6 +801,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         generatedAt: "2026-05-25T10:00:00.000Z",
         updatedAt: "2026-05-25T10:05:00.000Z",
         instruction: "Create a board memo",
+        contextAnswers: "audience: board\nowner: CFO\nevidence: audited forecast",
         documentType: "board-memo",
         lanes: ["create", "review", "create"],
         distributionTargets: ["pdf", "bad-target"],
@@ -906,6 +938,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     generatedAt: "2026-05-25T10:00:00.000Z",
     updatedAt: "2026-05-25T10:05:00.000Z",
     instruction: "Create a board memo",
+    contextAnswers: "audience: board\nowner: CFO\nevidence: audited forecast",
     documentType: "board-memo",
     lanes: ["create", "review"],
     distributionTargets: ["pdf"],
@@ -1032,6 +1065,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("buildAgenticWorkflowRun"));
   ok(app.includes("agentPlan"));
   ok(app.includes("agentRun"));
+  ok(app.includes("agentContextAnswers"));
+  ok(app.includes("Context answers and constraints"));
+  ok(app.includes("Replan with answers"));
+  ok(app.includes("These answers feed the next plan, packet, Docs Live handoff, and provider request."));
   ok(app.includes("Generate agent packet"));
   ok(app.includes("Apply agent output"));
   ok(app.includes('aria-label="Agent generated output"'));

@@ -79,6 +79,12 @@ The AI Agent Workspace converts that instruction into a visible plan:
 - runnable next steps that open Docs Live, AI Paste cleanup, Review, or Export
   readiness.
 
+When the plan lists missing inputs, answer them in **Context answers and
+constraints** and choose **Replan with answers**. Those answers become part of
+the context pack, placeholder resolution, generated agent packet, Docs Live
+handoff, provider request package, and saved run history instead of living only
+in a separate chat note.
+
 Choose **Generate agent packet** when the instruction should become a reviewable
 artifact immediately. NEditor creates an auditable packet with AI provenance,
 the generated draft when creation or composition is requested, a

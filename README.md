@@ -197,7 +197,10 @@ web app.
   revision passes, then identifies lanes, missing inputs, placeholder values,
   suggested outline, revision intent, export targets, and runnable next steps
   that route into Docs Live, AI Paste cleanup, Review, or Export readiness. It
-  can also generate a
+  gives users a dedicated **Context answers and constraints** field plus
+  **Replan with answers** action so missing-input answers become part of the
+  context pack, placeholders, packet, Docs Live handoff, provider package, and
+  saved run history. It can also generate a
   complete agent packet with a Docs Live draft, selection-aware revision
   proposal, QA gates, named reviewer agents for editorial, evidence, risk,
   citation, governance, and export readiness, a section-by-section work queue

@@ -1869,6 +1869,14 @@
             placeholder="Create a board memo for the executive team, revise it for the CFO, check evidence gaps, and prepare PDF plus Google Docs distribution."
           ></textarea>
         </label>
+        <label>
+          Context answers and constraints
+          <textarea
+            v-model="agentContextAnswers"
+            rows="4"
+            placeholder="Answer missing inputs, add source facts, target reviewer, approvals, distribution constraints, tone, deadlines, or placeholder values. These answers feed the next plan, packet, Docs Live handoff, and provider request."
+          ></textarea>
+        </label>
         <section class="agent-playbooks" aria-label="Agent workflow playbooks">
           <header>
             <div>
@@ -1942,6 +1950,7 @@
             <ul>
               <li v-for="input in agentPlan.missingInputs" :key="input">{{ input }}</li>
             </ul>
+            <button type="button" @click="buildAgentWorkspacePlan">Replan with answers</button>
           </section>
           <ol class="agent-step-list" aria-label="Agent workflow steps">
             <li v-for="step in agentPlan.steps" :key="step.id" :data-lane="step.lane">
@@ -2628,6 +2637,7 @@ const aiPreviewBusy = ref(false);
 const aiPreviewSignature = ref("");
 const agentWorkspaceOpen = ref(false);
 const agentInstruction = ref("");
+const agentContextAnswers = ref("");
 const agentPlan = ref<AgenticWorkflowPlan | null>(null);
 const agentRun = ref<AgenticWorkflowRun | null>(null);
 const defaultAgentProviderProfile = aiProviderProfiles[0];
@@ -4062,6 +4072,7 @@ function currentEditorSelectionText() {
 function openAgentWorkspace(seedInstruction = "") {
   if (seedInstruction.trim()) {
     agentInstruction.value = seedInstruction.trim();
+    agentContextAnswers.value = "";
   } else if (!agentInstruction.value.trim()) {
     agentInstruction.value = "Create or improve this document, revise it for the audience, run review readiness, and prepare the right distribution package.";
   }
@@ -4074,6 +4085,7 @@ function closeAgentWorkspace() {
 }
 function applyAgentWorkflowPlaybook(playbook: AgenticWorkflowPlaybook) {
   agentInstruction.value = playbook.instruction;
+  agentContextAnswers.value = "";
   buildAgentWorkspacePlan();
   store.statusMessage = `Loaded ${playbook.label} playbook`;
 }
@@ -4088,6 +4100,7 @@ function buildAgentWorkspacePlan() {
   flushEditorTextToStore();
   agentPlan.value = buildAgenticWorkflowPlan({
     instruction: agentInstruction.value,
+    contextAnswers: agentContextAnswers.value,
     documentTitle: active.value.compile?.semantic.title || active.value.title,
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
@@ -4102,6 +4115,7 @@ function generateAgentWorkspaceRun() {
   if (!agentPlan.value) buildAgentWorkspacePlan();
   agentRun.value = buildAgenticWorkflowRun({
     instruction: agentInstruction.value,
+    contextAnswers: agentContextAnswers.value,
     documentTitle: active.value.compile?.semantic.title || active.value.title,
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
@@ -4125,6 +4139,7 @@ function agentRunHistoryItem(
     generatedAt: run.auditTrail.generatedAt,
     updatedAt: now,
     instruction: run.plan.instruction,
+    contextAnswers: run.plan.contextAnswers,
     documentType: run.plan.documentType,
     lanes: run.plan.lanes,
     distributionTargets: run.plan.distributionTargets,
@@ -4157,6 +4172,7 @@ function recordAgentRunHistory(run: AgenticWorkflowRun, status: AgentRunHistoryI
 }
 function replanAgentHistoryRun(item: AgentRunHistoryItem) {
   agentInstruction.value = item.instruction;
+  agentContextAnswers.value = item.contextAnswers || "";
   agentRun.value = null;
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
@@ -4256,9 +4272,11 @@ function hydrateDocsLiveFromAgentPlan() {
   docsLiveOutlineText.value = plan.suggestedOutline;
   docsLiveContext.value = plan.context;
   docsLivePlaceholderText.value = plan.placeholderText;
-  docsLiveQuestionnaireAnswerText.value = plan.missingInputs.length
-    ? `Missing inputs to resolve:\n${plan.missingInputs.map((input) => `- ${input}`).join("\n")}`
-    : docsLiveQuestionnaireAnswerText.value;
+  docsLiveQuestionnaireAnswerText.value = plan.contextAnswers
+    ? `Agent context answers:\n${plan.contextAnswers}`
+    : plan.missingInputs.length
+      ? `Missing inputs to resolve:\n${plan.missingInputs.map((input) => `- ${input}`).join("\n")}`
+      : docsLiveQuestionnaireAnswerText.value;
   refreshDocsLiveQuestionnaire();
   closeAgentWorkspace();
   docsLiveOpen.value = true;

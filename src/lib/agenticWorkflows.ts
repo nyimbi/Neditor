@@ -14,6 +14,7 @@ export type AgenticWorkflowAction =
 
 export interface AgenticWorkflowRequest {
   instruction: string;
+  contextAnswers?: string;
   documentTitle?: string;
   documentText?: string;
   selectedText?: string;
@@ -47,6 +48,7 @@ export interface AgenticWorkflowPlan {
   documentType: DocsLiveDocumentType;
   primaryLane: AgenticWorkflowLane;
   lanes: AgenticWorkflowLane[];
+  contextAnswers: string;
   suggestedOutline: string;
   context: string;
   placeholderText: string;
@@ -257,7 +259,8 @@ const placeholderNames = ["audience", "owner", "deadline", "tone", "evidence", "
 
 export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): AgenticWorkflowPlan {
   const instruction = request.instruction.trim();
-  const corpus = [instruction, request.documentTitle, request.documentText, request.selectedText].filter(Boolean).join("\n");
+  const contextAnswers = request.contextAnswers?.trim() || "";
+  const corpus = [instruction, contextAnswers, request.documentTitle, request.documentText, request.selectedText].filter(Boolean).join("\n");
   const lanes = detectLanes(corpus);
   const primaryLane = lanes[0] || "create";
   const documentType = normalizeDocsLiveDocumentType(corpus);
@@ -276,6 +279,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     documentType,
     primaryLane,
     lanes,
+    contextAnswers,
     suggestedOutline,
     context,
     placeholderText,
@@ -530,6 +534,7 @@ function inferTitle(request: AgenticWorkflowRequest, documentType: DocsLiveDocum
 function buildContext(request: AgenticWorkflowRequest, lanes: AgenticWorkflowLane[], targets: ExportTarget[]) {
   return [
     `User intent: ${request.instruction.trim() || "Create and improve the current document."}`,
+    request.contextAnswers?.trim() ? `Agent context answers: ${request.contextAnswers.trim().slice(0, 1600)}` : "",
     request.documentTitle ? `Current document: ${request.documentTitle}` : "",
     request.selectedText?.trim() ? `Selected text to act on: ${request.selectedText.trim().slice(0, 1200)}` : "",
     request.documentText?.trim() ? `Current document context available: ${Math.min(request.documentText.trim().length, 2000)} characters.` : "No current document body supplied.",
