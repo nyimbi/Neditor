@@ -798,12 +798,15 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Agent Lifecycle Task Board"));
   ok(run.markdown.includes("Final human approval and release readiness"));
   ok(run.markdown.includes("## Section Work Queue"));
+  ok(run.markdown.includes("Section contract:"));
+  ok(run.markdown.includes("Contract risk:"));
   ok(run.markdown.includes("Completion criteria:"));
   ok(run.markdown.includes("## Agent Audit Trail"));
   ok(run.markdown.includes("### Rollback Plan"));
   ok(run.markdown.includes("## Release Evidence Bundle"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent audit trail" && item.status === "available"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Document intent sheet" && item.requiredBeforeRelease));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Section contract cards" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Substack newsletter package evidence" && item.requiredBeforeRelease));
   ok(
@@ -853,12 +856,22 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.sectionWorkQueue.every((section) => section.completionCriteria.length >= 4));
   ok(run.sectionWorkQueue.some((section) => section.reviewerAgentIds.includes("export")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Section work queue prepared")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Section contract cards prepared")));
   ok(run.sectionWorkQueue.every((section) => section.draftingDepth));
   ok(run.sectionWorkQueue.some((section) => section.draftingDepth === "detailed"));
+  ok(run.sectionWorkQueue.every((section) => section.contract.purpose.length > 20));
+  ok(run.sectionWorkQueue.every((section) => section.contract.targetReader.length > 0));
+  ok(run.sectionWorkQueue.every((section) => section.contract.desiredDecision.length > 0));
+  ok(run.sectionWorkQueue.every((section) => section.contract.evidenceExpectations.length >= 1));
+  ok(run.sectionWorkQueue.every((section) => section.contract.doneCriteria.length >= 4));
+  ok(run.sectionWorkQueue.some((section) => section.contract.riskLevel === "high"));
   ok(run.markdown.includes("Drafting depth:"));
   const sectionBrief = buildAgenticSectionWorkBrief(run.sectionWorkQueue[0], run.reviewerAgents);
   ok(sectionBrief.includes("```ai-section-task"));
   ok(sectionBrief.includes("draftingDepth:"));
+  ok(sectionBrief.includes("riskLevel:"));
+  ok(sectionBrief.includes("### Section Contract"));
+  ok(sectionBrief.includes("Evidence expectations:"));
   ok(sectionBrief.includes("### Drafting Instruction"));
   ok(sectionBrief.includes("### Completion Criteria"));
   ok(sectionBrief.includes("### Assigned Reviewers"));
@@ -2019,6 +2032,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentRun.sectionWorkQueue"));
   ok(app.includes("agentSectionDraftingDepthOptions"));
   ok(app.includes("section.draftingDepth"));
+  ok(app.includes("section.contract.purpose"));
+  ok(app.includes("section.contract.targetReader"));
+  ok(app.includes("Section contract evidence expectations"));
   ok(app.includes("section.completionCriteria"));
   ok(app.includes("insertAgentSectionBrief"));
   ok(app.includes("draftAgentSectionWithDocsLive"));

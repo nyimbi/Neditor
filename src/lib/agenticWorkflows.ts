@@ -362,9 +362,20 @@ export interface AgenticSectionWorkItem {
   level: number;
   lane: AgenticWorkflowLane;
   draftingDepth: DocsLiveDraftDepth;
+  contract: AgenticSectionContract;
   draftingInstruction: string;
   completionCriteria: string[];
   reviewerAgentIds: AgenticReviewerAgentId[];
+}
+
+export interface AgenticSectionContract {
+  purpose: string;
+  targetReader: string;
+  desiredDecision: string;
+  evidenceExpectations: string[];
+  owner: string;
+  riskLevel: "low" | "medium" | "high";
+  doneCriteria: string[];
 }
 
 const agentPlannerVersion = "agentic-workflow-v3-control-audit";
@@ -642,6 +653,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     controlCenter,
     lifecycleTasks,
     reviewerAgents,
+    sectionWorkQueue,
     distributionTargetPlans,
     documentEvidence,
     blockers,
@@ -699,9 +711,26 @@ export function buildAgenticSectionWorkBrief(section: AgenticSectionWorkItem, re
     `level: ${section.level}`,
     `lane: ${section.lane}`,
     `draftingDepth: ${section.draftingDepth}`,
+    `riskLevel: ${section.contract.riskLevel}`,
     `reviewers: ${section.reviewerAgentIds.join(", ")}`,
     "status: needs-draft",
     "```",
+    "",
+    "### Section Contract",
+    "",
+    `Purpose: ${section.contract.purpose}`,
+    "",
+    `Target reader: ${section.contract.targetReader}`,
+    "",
+    `Desired decision or outcome: ${section.contract.desiredDecision}`,
+    "",
+    `Accountable owner: ${section.contract.owner}`,
+    "",
+    "Evidence expectations:",
+    ...section.contract.evidenceExpectations.map((item) => `- [ ] ${item}`),
+    "",
+    "Done criteria:",
+    ...section.contract.doneCriteria.map((item) => `- [ ] ${item}`),
     "",
     "### Drafting Instruction",
     "",
@@ -2048,8 +2077,14 @@ function buildLifecycleTasks(input: {
       status: baseStatus,
       action: "generate-docs-live-draft",
       sectionId: section.id,
-      evidence: section.completionCriteria,
-      nextStep: "Draft the section, then route it through assigned reviewer agents.",
+      evidence: [
+        `Purpose: ${section.contract.purpose}`,
+        `Target reader: ${section.contract.targetReader}`,
+        `Desired outcome: ${section.contract.desiredDecision}`,
+        `Risk level: ${section.contract.riskLevel}`,
+        ...section.completionCriteria,
+      ],
+      nextStep: "Draft the section against its contract, then route it through assigned reviewer agents.",
     });
   }
 
@@ -2243,13 +2278,12 @@ function buildDocumentEvidenceLifecycleTasks(documentEvidence: AgenticDocumentEv
 
 function buildSectionWorkQueue(plan: AgenticWorkflowPlan, reviewerAgents: AgenticReviewerAgent[]): AgenticSectionWorkItem[] {
   const sections = parseOutlineSections(plan.suggestedOutline);
-  const audience = extractKeyValue(plan.placeholderText, "audience") || "the intended audience";
   const evidence = extractKeyValue(plan.placeholderText, "evidence") || "verified source material";
-  const owner = extractKeyValue(plan.placeholderText, "owner") || "the accountable owner";
   const activeReviewerIds = new Set(reviewerAgents.map((agent) => agent.id));
   return sections.slice(0, 18).map((section, index) => {
     const reviewerAgentIds = sectionReviewerIds(section.heading, plan).filter((id) => activeReviewerIds.has(id));
     const draftingDepth = sectionDraftingDepth(section.heading, section.level, plan);
+    const contract = buildSectionContract(section.heading, section.level, draftingDepth, plan, reviewerAgentIds);
     return {
       id: `section-${String(index + 1).padStart(2, "0")}-${stableFingerprint(section.heading).slice(0, 8)}`,
       order: index + 1,
@@ -2257,22 +2291,131 @@ function buildSectionWorkQueue(plan: AgenticWorkflowPlan, reviewerAgents: Agenti
       level: section.level,
       lane: plan.lanes.includes("compose") || plan.lanes.includes("create") ? "compose" : plan.primaryLane,
       draftingDepth,
+      contract,
       draftingInstruction: [
-        `Draft or revise "${section.heading}" for ${audience} at ${draftingDepth} depth.`,
-        `Use ${evidence} for material claims and name ${owner} where accountability or follow-through is required.`,
+        `Draft or revise "${section.heading}" for ${contract.targetReader} at ${draftingDepth} depth.`,
+        contract.purpose,
+        `Use ${evidence} for material claims and name ${contract.owner} where accountability or follow-through is required.`,
+        `Drive toward this outcome: ${contract.desiredDecision}`,
         plan.distributionTargets.length ? `Preserve structure and metadata needed for ${plan.distributionTargets.join(", ")} distribution.` : "",
       ]
         .filter(Boolean)
         .join(" "),
       completionCriteria: [
-        "Section has a clear reader purpose, plain-language opening, and no unresolved placeholders.",
-        "Material claims are tied to evidence or marked with citation TODOs.",
-        "Tone matches the requested audience and avoids generic AI phrasing.",
+        ...contract.doneCriteria,
+        ...contract.evidenceExpectations.map((item) => `Evidence: ${item}`),
         "Reviewer notes identify any remaining decision, source, or approval dependency.",
       ],
       reviewerAgentIds,
     };
   });
+}
+
+function buildSectionContract(
+  heading: string,
+  level: number,
+  draftingDepth: DocsLiveDraftDepth,
+  plan: AgenticWorkflowPlan,
+  reviewerAgentIds: AgenticReviewerAgentId[],
+): AgenticSectionContract {
+  const headingText = heading.toLowerCase();
+  const audience = extractKeyValue(plan.placeholderText, "audience") || extractIntentField(plan.documentIntent, "audience") || "the intended reader";
+  const owner = extractKeyValue(plan.placeholderText, "owner") || extractIntentField(plan.documentIntent, "owner") || "the accountable owner";
+  const outcome = extractKeyValue(plan.placeholderText, "outcome") || extractIntentField(plan.documentIntent, "outcome") || "a clear next decision";
+  const evidence = extractKeyValue(plan.placeholderText, "evidence") || extractIntentField(plan.documentIntent, "evidence") || "verified source material";
+  const purpose = sectionPurpose(heading, plan.documentType, outcome);
+  const desiredDecision = sectionDesiredDecision(heading, plan.documentType, outcome);
+  const evidenceExpectations = sectionEvidenceExpectations(heading, evidence, plan, reviewerAgentIds);
+  const riskLevel = sectionRiskLevel(headingText, level, draftingDepth, plan, reviewerAgentIds);
+  const doneCriteria = [
+    "Reader purpose is explicit in the opening sentence.",
+    "No unresolved placeholders remain unless they are intentionally marked for review.",
+    "Tone matches the audience and avoids generic AI phrasing.",
+    riskLevel === "high" ? "Risk, approval, or legal-sensitive language is reviewed before release." : "Reviewer handoff notes state any remaining dependency.",
+  ];
+
+  return {
+    purpose,
+    targetReader: audience,
+    desiredDecision,
+    evidenceExpectations,
+    owner,
+    riskLevel,
+    doneCriteria,
+  };
+}
+
+function extractIntentField(intent: AgenticDocumentIntentSheet, key: string) {
+  const field = intent.fields.find((item) => item.key === key);
+  return field && field.status !== "missing" ? field.value : "";
+}
+
+function sectionPurpose(heading: string, documentType: DocsLiveDocumentType, outcome: string) {
+  if (/\b(summary|overview|abstract|executive)\b/i.test(heading)) {
+    return `Orient the reader quickly and state what the ${titleCase(documentType)} is asking them to understand or approve.`;
+  }
+  if (/\b(context|background|current state|problem|need)\b/i.test(heading)) {
+    return "Establish the situation, constraints, and why the document matters now.";
+  }
+  if (/\b(evidence|findings|analysis|financial|data|metrics?|forecast|research)\b/i.test(heading)) {
+    return "Present the factual basis and make source-backed implications easy to inspect.";
+  }
+  if (/\b(recommendation|decision|approval|ask|next steps?|handoff)\b/i.test(heading)) {
+    return `Convert the preceding evidence into ${outcome}.`;
+  }
+  if (/\b(risks?|assumptions?|constraints?|mitigation|legal|compliance)\b/i.test(heading)) {
+    return "Make uncertainty, obligations, and mitigations visible before the document is approved or distributed.";
+  }
+  if (/\b(scope|deliverables?|timeline|implementation|steps?|procedure|workflow)\b/i.test(heading)) {
+    return "Define what will happen, who is responsible, and how execution boundaries are controlled.";
+  }
+  return `Advance the ${titleCase(documentType)} toward ${outcome}.`;
+}
+
+function sectionDesiredDecision(heading: string, documentType: DocsLiveDocumentType, outcome: string) {
+  if (/\b(summary|overview|abstract|executive)\b/i.test(heading)) return `Reader can identify the document's purpose and the requested outcome: ${outcome}.`;
+  if (/\b(context|background|current state|problem|need)\b/i.test(heading)) return "Reader agrees the problem framing and constraints are accurate.";
+  if (/\b(evidence|findings|analysis|financial|data|metrics?|forecast|research)\b/i.test(heading)) return "Reader trusts the source-backed evidence enough to continue to recommendations.";
+  if (/\b(recommendation|decision|approval|ask)\b/i.test(heading)) return `Reader can accept, reject, or revise the requested decision: ${outcome}.`;
+  if (/\b(risks?|assumptions?|constraints?|mitigation|legal|compliance)\b/i.test(heading)) return "Reviewer can confirm whether risks and obligations are acceptable.";
+  if (/\b(next steps?|handoff|publish|distribution|export)\b/i.test(heading)) return "Owner knows the exact follow-up actions, channel, and approval dependency.";
+  return `Reader has enough context to move the ${titleCase(documentType)} toward ${outcome}.`;
+}
+
+function sectionEvidenceExpectations(
+  heading: string,
+  evidence: string,
+  plan: AgenticWorkflowPlan,
+  reviewerAgentIds: AgenticReviewerAgentId[],
+) {
+  const expectations = [
+    `Use ${evidence} for material claims or mark missing support with citation TODOs.`,
+    plan.sourcePack.claims.length ? `Check against ${plan.sourcePack.claims.length} structured source-pack claim(s).` : "",
+    plan.documentMemory.entries.length ? "Apply relevant document memory for terminology, accepted decisions, and rejected directions." : "",
+    reviewerAgentIds.includes("citation") ? "Confirm citation, reference, table, equation, or source labels before release." : "",
+    /\b(financial|forecast|budget|pricing|investment|roi|metric|data|evidence|findings|analysis)\b/i.test(heading)
+      ? "State the source, date, and confidence for numbers, forecasts, metrics, or quoted facts."
+      : "",
+  ].filter(Boolean);
+  return Array.from(new Set(expectations)).slice(0, 5);
+}
+
+function sectionRiskLevel(
+  headingText: string,
+  level: number,
+  draftingDepth: DocsLiveDraftDepth,
+  plan: AgenticWorkflowPlan,
+  reviewerAgentIds: AgenticReviewerAgentId[],
+): AgenticSectionContract["riskLevel"] {
+  if (
+    reviewerAgentIds.includes("risk") ||
+    draftingDepth === "legal" ||
+    /\b(approval|approved|legal|contract|compliance|privacy|security|obligations?|risks?|liability|warranty|financial|forecast|investment|budget)\b/.test(headingText)
+  ) {
+    return "high";
+  }
+  if (plan.distributionTargets.length || level >= 3 || reviewerAgentIds.includes("citation")) return "medium";
+  return "low";
 }
 
 function sectionDraftingDepth(heading: string, level: number, plan: AgenticWorkflowPlan): DocsLiveDraftDepth {
@@ -2492,7 +2635,7 @@ function expectedOutlineSignals(plan: AgenticWorkflowPlan) {
 
 function sectionReviewerIds(heading: string, plan: AgenticWorkflowPlan): AgenticReviewerAgentId[] {
   const ids: AgenticReviewerAgentId[] = ["editor", "evidence", "governance"];
-  if (/\b(risk|assumption|constraint|approval|decision|legal|compliance)\b/i.test(heading)) ids.push("risk");
+  if (/\b(risks?|assumptions?|constraints?|approval|decision|legal|compliance)\b/i.test(heading)) ids.push("risk");
   if (/\b(source|citation|reference|bibliography|evidence|data|metric|equation)\b/i.test(heading) || plan.distributionTargets.includes("latex")) {
     ids.push("citation");
   }
@@ -2815,6 +2958,13 @@ function buildAuditTrail(input: {
     ...sectionWorkQueue.flatMap((section) => [
       section.id,
       section.heading,
+      section.contract.purpose,
+      section.contract.targetReader,
+      section.contract.desiredDecision,
+      section.contract.owner,
+      section.contract.riskLevel,
+      ...section.contract.evidenceExpectations,
+      ...section.contract.doneCriteria,
       section.draftingInstruction,
       ...section.completionCriteria,
       ...section.reviewerAgentIds,
@@ -2854,6 +3004,7 @@ function buildAuditTrail(input: {
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
       `Lifecycle task board prepared for ${lifecycleTasks.length} task(s) across ${Array.from(new Set(lifecycleTasks.map((task) => task.lane))).map(titleCase).join(", ")}.`,
       `Section work queue prepared for ${sectionWorkQueue.length} outline item(s).`,
+      `Section contract cards prepared for ${sectionWorkQueue.length} outline item(s) with purpose, reader, evidence, owner, risk, and done criteria.`,
       outlineCritique.length
         ? `Outline critique prepared ${outlineCritique.length} structure and coverage item(s).`
         : "Outline critique found no structure or coverage issues.",
@@ -2889,11 +3040,12 @@ function buildReleaseEvidenceBundle(input: {
   controlCenter: AgenticControlCenter;
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
+  sectionWorkQueue: AgenticSectionWorkItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   documentEvidence: AgenticDocumentEvidence;
   blockers: string[];
 }): AgenticReleaseEvidenceBundle {
-  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, distributionTargetPlans, documentEvidence, blockers } = input;
+  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, distributionTargetPlans, documentEvidence, blockers } = input;
   const taskBlockers = lifecycleTasks.filter((task) => task.status === "blocked" || task.status === "needs-input");
   const reviewerBlockers = reviewerAgents.filter((agent) => agent.status !== "ready");
   const items: AgenticReleaseEvidenceItem[] = [
@@ -2930,6 +3082,15 @@ function buildReleaseEvidenceBundle(input: {
         ? `${plan.documentMemory.entries.length} reusable terminology, style, decision, review, or distribution memory item(s) are attached.`
         : "No reusable document memory has been captured for future agent runs.",
       false,
+    ),
+    releaseEvidenceItem(
+      "Section contract cards",
+      "Planner Agent",
+      sectionWorkQueue.length ? "needs-review" : "missing",
+      sectionWorkQueue.length
+        ? `${sectionWorkQueue.length} section contract card(s) define purpose, reader, desired outcome, evidence expectations, owner, risk, and done criteria.`
+        : "No section contract cards were generated because no outline is available.",
+      true,
     ),
     releaseEvidenceItem(
       "Reference integrity",
@@ -4160,6 +4321,20 @@ function sectionWorkQueueMarkdown(sectionWorkQueue: AgenticSectionWorkItem[]) {
       `Lane: ${section.lane}`,
       "",
       `Drafting depth: ${section.draftingDepth}`,
+      "",
+      `Contract risk: ${section.contract.riskLevel}`,
+      "",
+      "Section contract:",
+      `- Purpose: ${section.contract.purpose}`,
+      `- Target reader: ${section.contract.targetReader}`,
+      `- Desired outcome: ${section.contract.desiredDecision}`,
+      `- Owner: ${section.contract.owner}`,
+      "",
+      "Evidence expectations:",
+      ...section.contract.evidenceExpectations.map((item) => `- [ ] ${item}`),
+      "",
+      "Contract done criteria:",
+      ...section.contract.doneCriteria.map((item) => `- [ ] ${item}`),
       "",
       `Reviewers: ${section.reviewerAgentIds.join(", ")}`,
       "",

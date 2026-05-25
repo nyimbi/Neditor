@@ -2849,6 +2849,31 @@
                       </select>
                     </label>
                     <p>{{ section.draftingInstruction }}</p>
+                    <dl class="agent-section-contract">
+                      <div>
+                        <dt>Purpose</dt>
+                        <dd>{{ section.contract.purpose }}</dd>
+                      </div>
+                      <div>
+                        <dt>Reader</dt>
+                        <dd>{{ section.contract.targetReader }}</dd>
+                      </div>
+                      <div>
+                        <dt>Outcome</dt>
+                        <dd>{{ section.contract.desiredDecision }}</dd>
+                      </div>
+                      <div>
+                        <dt>Owner</dt>
+                        <dd>{{ section.contract.owner }}</dd>
+                      </div>
+                      <div>
+                        <dt>Risk</dt>
+                        <dd>{{ section.contract.riskLevel }}</dd>
+                      </div>
+                    </dl>
+                    <ul class="agent-section-contract-list" aria-label="Section contract evidence expectations">
+                      <li v-for="item in section.contract.evidenceExpectations" :key="item">{{ item }}</li>
+                    </ul>
                     <span>Reviewers: {{ section.reviewerAgentIds.join(", ") }}</span>
                     <div class="agent-section-actions">
                       <button type="button" @click="insertAgentSectionBrief(section)">Insert brief</button>
@@ -14463,6 +14488,7 @@ select:hover {
 
 .agent-section-workqueue p,
 .agent-section-workqueue ul,
+.agent-section-workqueue dl,
 .agent-review-comment-queue p,
 .agent-review-comment-queue ul,
 .agent-edit-acceptance-queue p,
@@ -14470,6 +14496,55 @@ select:hover {
 .agent-lifecycle-board p,
 .agent-lifecycle-board ul {
   margin: 0;
+}
+
+.agent-section-contract {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.agent-section-contract div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid #d8e5ea;
+  border-radius: 6px;
+  padding: 6px;
+  background: #ffffff;
+}
+
+.agent-section-contract dt {
+  color: #526171;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.agent-section-contract dd {
+  min-width: 0;
+  margin: 0;
+  color: #182230;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.agent-section-contract-list {
+  margin-top: 6px;
+}
+
+.app-shell[data-theme="dark"] .agent-section-contract div {
+  border-color: #34465a;
+  background: #223248;
+}
+
+.app-shell[data-theme="dark"] .agent-section-contract dt {
+  color: #aebdcc;
+}
+
+.app-shell[data-theme="dark"] .agent-section-contract dd {
+  color: #dce7f3;
 }
 
 .agent-edit-acceptance-compare {

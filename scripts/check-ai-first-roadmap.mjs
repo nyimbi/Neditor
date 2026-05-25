@@ -58,6 +58,7 @@ const productSurfaceChecks = [
   ["AI Agent Workspace", app],
   ["Document intent sheet", app],
   ["Document memory", app],
+  ["Section contract", app],
   ["Agent workflow playbooks", app],
   ["AI control center", app],
   ["Agent lifecycle task board", app],

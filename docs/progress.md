@@ -45,6 +45,11 @@ Recent pushed checkpoints visible in current git history:
   distribution preferences. Memory items are parsed deterministically, included
   in the context pack, surfaced in the plan UI, carried into lifecycle tasks,
   AI Control Center grounding, release evidence, and run-history replanning.
+- Agent section work now includes first-class contract cards. Each outline item
+  carries purpose, target reader, desired outcome, evidence expectations,
+  accountable owner, risk level, and done criteria into the Agent Workspace UI,
+  Docs Live section brief, generated packet, lifecycle task evidence, release
+  evidence bundle, and audit fingerprints.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,
