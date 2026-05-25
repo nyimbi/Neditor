@@ -2018,6 +2018,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("buildDocumentSetManifest"));
   ok(app.includes("Insert document set manifest"));
   ok(app.includes("Document Set Manifest"));
+  ok(store.includes("moveDocument(id: string, targetId: string"));
+  ok(app.includes("moveTabWithinGroup"));
+  ok(app.includes("dropTabOnDocument"));
+  ok(app.includes("tab-drag-handle"));
+  ok(app.includes('aria-label="Move tab left"'));
+  ok(app.includes('aria-label="Move tab right"'));
   ok(app.includes('aria-label="Compiler output inventory"'));
   ok(app.includes("compilerOutputInventory"));
   ok(app.includes("outputInventoryItem"));

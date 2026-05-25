@@ -1758,6 +1758,22 @@ export const useDocumentsStore = defineStore("documents", {
       this.statusMessage = pinned ? `Pinned ${document.title}` : `Unpinned ${document.title}`;
       void this.persistWorkspace();
     },
+    moveDocument(id: string, targetId: string, placement: "before" | "after") {
+      if (id === targetId) return;
+      const fromIndex = this.documents.findIndex((document) => document.id === id);
+      const moving = this.documents[fromIndex];
+      if (fromIndex < 0 || !moving) return;
+      this.documents.splice(fromIndex, 1);
+      const targetIndex = this.documents.findIndex((document) => document.id === targetId);
+      if (targetIndex < 0) {
+        this.documents.splice(fromIndex, 0, moving);
+        return;
+      }
+      const insertionIndex = placement === "before" ? targetIndex : targetIndex + 1;
+      this.documents.splice(insertionIndex, 0, moving);
+      this.statusMessage = `Moved ${moving.title} tab ${placement} target`;
+      void this.persistWorkspace();
+    },
     rememberFile(path: string | null) {
       if (!path) return;
       this.recentFiles = [path, ...this.recentFiles.filter((recent) => recent !== path)].slice(0, 20);

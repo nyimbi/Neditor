@@ -3009,6 +3009,33 @@ test("switches tabs, guards dirty closes, and prunes stale recent document paths
   await expect(page.getByText("Removed missing recent file delete-after-close.md")).toBeVisible();
 });
 
+test("reorders open document tabs and restores the chosen order", async ({ page }) => {
+  await setMockFileText(page, "/workspace/order-a.md", "# Order A\n\nFirst ordered body.");
+  await setMockFileText(page, "/workspace/order-b.md", "# Order B\n\nSecond ordered body.");
+
+  await queueDialogSelection(page, "/workspace/order-a.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueDialogSelection(page, "/workspace/order-b.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const workspaceTabs = page.locator('.tab-group[aria-label="Workspace tabs"] .tab');
+  await expect(workspaceTabs).toHaveCount(2);
+  await expect(workspaceTabs.nth(0)).toContainText(/Order A|order-a\.md/);
+  await expect(workspaceTabs.nth(1)).toContainText(/Order B|order-b\.md/);
+
+  await workspaceTabs.nth(1).getByLabel("Move tab left").click();
+  await expect(workspaceTabs.nth(0)).toContainText(/Order B|order-b\.md/);
+  await expect(workspaceTabs.nth(1)).toContainText(/Order A|order-a\.md/);
+  await expect(page.locator(".status-bar")).toContainText("Moved Order B tab before target");
+
+  await page.reload();
+  const restoredWorkspaceTabs = page.locator('.tab-group[aria-label="Workspace tabs"] .tab');
+  await expect(restoredWorkspaceTabs).toHaveCount(2);
+  await expect(restoredWorkspaceTabs.nth(0)).toContainText(/Order B|order-b\.md/);
+  await expect(restoredWorkspaceTabs.nth(1)).toContainText(/Order A|order-a\.md/);
+  await expect(page.locator(".document-tabs .tab.active")).toContainText(/Order B|order-b\.md/);
+});
+
 test("reopens recent folders and prunes moved workspace paths", async ({ page }) => {
   await setMockFileText(page, "/client/project-a.md", "# Project A\n\nClient workspace body.");
   await setMockFileText(page, "/workspace/move-source.md", "# Move Source\n\nMove source body.");
@@ -3205,7 +3232,15 @@ test("groups documents by document set and folder", async ({ page }) => {
   await expect(researchGroup.getByRole("button", { name: /Interview Notes/ })).toBeVisible();
 
   const looseTab = page.locator(".document-tabs .tab").filter({ hasText: "Loose Note" });
-  await looseTab.dragTo(boardPack);
+  await looseTab.evaluate((source) => {
+    const target = document.querySelector('[aria-label="Board Pack tabs"]');
+    if (!target) throw new Error("Board Pack tab group missing");
+    const dataTransfer = new DataTransfer();
+    source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer }));
+    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer }));
+    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer }));
+    source.dispatchEvent(new DragEvent("dragend", { bubbles: true, cancelable: true, dataTransfer }));
+  });
   await expect(boardPack).toContainText("3");
   await expect(boardPack.getByRole("button", { name: /Loose Note/ })).toBeVisible();
   await expect.poll(() => editorText(page)).toContain("documentSet: Board Pack");

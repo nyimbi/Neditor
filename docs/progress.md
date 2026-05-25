@@ -31,6 +31,10 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Open document tabs now have accessible move-left and move-right controls in
+  addition to pointer drag behavior. Reordering is persisted through workspace
+  restore, and dragging one tab onto another aligns document-set/pinned grouping
+  before placing the moved tab next to the target.
 - The workbench now has a richer global shortcut layer for collapsed-toolbar
   and keyboard-first use. Cmd/Ctrl shortcuts cover save/save-as, new/open,
   open-folder, search, generic export, direct HTML export, formatting,
@@ -2940,9 +2944,9 @@ Document-set manager verification:
    the WebDriver report attaches that native fallback proof where WebDriver is
    officially unavailable.
 3. Use failures from workflow tests to drive implementation fixes.
-4. Continue expanding browser coverage for remaining preview modes, deeper
-   workspace grouping, AI review-state workflows, export progress edge cases,
-   table export modes, and cross-platform shortcut accelerators.
+4. Continue expanding browser coverage for remaining preview modes, AI
+   review-state workflows, export progress edge cases, table export modes, and
+   cross-platform shortcut/tab-pointer accelerators.
 5. Add macOS/Windows optional transform engine evidence.
 6. Only after behavior is locked, modularize oversized frontend/store/backend
    modules.

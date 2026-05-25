@@ -137,7 +137,7 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 58 Chromium browser workbench workflows
+- `pnpm run test:e2e`: passed all 59 Chromium browser workbench workflows
   locally on 2026-05-25 through the workspace-local Playwright Chromium cache
   at `.tmp/ms-playwright`, including collapsible toolbars, HTML, blog/Substack,
   LaTeX, Google Docs export-target handoffs, app-level shortcuts for search,
@@ -914,8 +914,10 @@ Required next coverage:
 
 - Remaining file/workspace flows: multi-tab watcher switching and native
   desktop dialog behavior.
-- Deeper workspace folder browsing, native document-set proof, and remaining
-  tab drag/reorder edge cases.
+- Deeper workspace folder browsing and native document-set proof. Tab ordering
+  now has accessible move-left/move-right controls, drag-to-tab reordering, and
+  browser restore proof; remaining work is native pointer proof across supported
+  OS hosts.
 - Focus, export, review, and presentation mode local browser/native execution proof.
 - Broader keyboard shortcut coverage now includes app-level accelerators for
   search, open folder, Docs Live, AI Agent Workspace, Review readiness, Export
@@ -1431,8 +1433,8 @@ Finish:
   matter text, active document assignment, open-set rename, and active document
   removal from a set, plus insertable Markdown manifests for set handoff.
 - Remaining document-set edge cases: saved workspace package evidence and
-  deeper pointer drag/reorder behavior beyond moving a loose tab into an
-  existing set.
+  native pointer proof beyond browser-covered move-left/move-right and
+  drag-to-tab reorder behavior.
 - Native execution proof: `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run
   test:desktop-smoke` now creates real `.tmp/desktop-smoke/native-workspace-*`
   Markdown files and records `workspaceTabEvidence` for document-set grouping,

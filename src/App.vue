@@ -25,7 +25,7 @@
           class="tab-group"
           :aria-label="`${group.label} tabs`"
           @dragover.prevent
-          @drop="dropTabOnGroup(group)"
+          @drop="dropTabOnGroup(group, $event)"
         >
           <header class="tab-group-header" :title="group.title">
             <span class="tab-group-title">
@@ -39,16 +39,26 @@
             </button>
           </header>
           <div
-            v-for="document in group.documents"
+            v-for="(document, tabIndex) in group.documents"
             :key="document.id"
             class="tab"
             :class="{ active: document.id === store.activeId }"
             :title="document.path || document.title"
             :data-document-path="document.path || ''"
             draggable="true"
-            @dragstart="draggedTabId = document.id"
+            @pointerdown="draggedTabId = document.id"
+            @dragstart="startTabDrag(document.id, $event)"
+            @dragover.prevent
+            @drop="dropTabOnDocument(document, $event)"
             @dragend="draggedTabId = ''"
           >
+            <span
+              class="tab-drag-handle"
+              draggable="true"
+              title="Drag tab"
+              aria-hidden="true"
+              @dragstart="startTabDrag(document.id, $event)"
+            >::</span>
             <button
               class="tab-main"
               type="button"
@@ -57,6 +67,30 @@
             >
               <span v-if="document.dirty" class="tab-dirty" aria-hidden="true"></span>
               <span>{{ document.title }}</span>
+            </button>
+            <button
+              class="tab-icon-button"
+              type="button"
+              aria-label="Move tab left"
+              :title="`Move ${document.title} tab left`"
+              :disabled="tabIndex === 0"
+              @click="moveTabWithinGroup(group, document.id, -1)"
+            >
+              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                <path v-for="path in toolbarIconPaths('previous')" :key="path" :d="path"></path>
+              </svg>
+            </button>
+            <button
+              class="tab-icon-button"
+              type="button"
+              aria-label="Move tab right"
+              :title="`Move ${document.title} tab right`"
+              :disabled="tabIndex === group.documents.length - 1"
+              @click="moveTabWithinGroup(group, document.id, 1)"
+            >
+              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                <path v-for="path in toolbarIconPaths('next')" :key="path" :d="path"></path>
+              </svg>
             </button>
             <button
               class="tab-icon-button"
@@ -10073,6 +10107,19 @@ function closeTabGroup(group: DocumentTabGroup) {
   }
 }
 
+function moveTabWithinGroup(group: DocumentTabGroup, documentId: string, direction: -1 | 1) {
+  const index = group.documents.findIndex((document) => document.id === documentId);
+  const target = group.documents[index + direction];
+  if (!target) return;
+  store.moveDocument(documentId, target.id, direction < 0 ? "before" : "after");
+}
+
+function startTabDrag(documentId: string, event: DragEvent) {
+  draggedTabId.value = documentId;
+  event.dataTransfer?.setData("text/plain", documentId);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+
 async function closeDocument(id: string) {
   const document = store.documents.find((item) => item.id === id);
   if (!document) return;
@@ -10089,9 +10136,14 @@ async function closeDocument(id: string) {
   store.closeDocument(id);
 }
 
-function dropTabOnGroup(group: DocumentTabGroup) {
-  if (!draggedTabId.value) return;
-  const document = store.documents.find((candidate) => candidate.id === draggedTabId.value);
+function tabIdFromDrop(event?: DragEvent) {
+  return draggedTabId.value || event?.dataTransfer?.getData("text/plain") || "";
+}
+
+function dropTabOnGroup(group: DocumentTabGroup, event?: DragEvent) {
+  const tabId = tabIdFromDrop(event);
+  if (!tabId) return;
+  const document = store.documents.find((candidate) => candidate.id === tabId);
   if (group.key.startsWith("set:") && document) {
     store.setPinned(document.id, false);
     store.setActiveDocument(document.id);
@@ -10100,9 +10152,35 @@ function dropTabOnGroup(group: DocumentTabGroup) {
     documentSetRenameDraft.value = group.label;
     store.statusMessage = `Added ${document.title} to ${group.label}`;
   } else {
-    store.setPinned(draggedTabId.value, group.key === "pinned");
+    store.setPinned(tabId, group.key === "pinned");
   }
   draggedTabId.value = "";
+}
+
+function dropTabOnDocument(target: OpenDocument, event: DragEvent) {
+  const tabId = tabIdFromDrop(event);
+  if (!tabId || tabId === target.id) return;
+  const document = store.documents.find((candidate) => candidate.id === tabId);
+  if (!document) return;
+  alignTabWithTargetGroup(document, target);
+  store.moveDocument(document.id, target.id, "before");
+  draggedTabId.value = "";
+}
+
+function alignTabWithTargetGroup(document: OpenDocument, target: OpenDocument) {
+  const targetGroup = tabGroupDescriptor(target);
+  if (targetGroup.key === "pinned") {
+    store.setPinned(document.id, true);
+    return;
+  }
+  if (document.pinned) store.setPinned(document.id, false);
+  if (targetGroup.key.startsWith("set:")) {
+    applyTextToDocument(document, setDocumentSetFrontMatter(document.text, targetGroup.label), document.id === store.activeId);
+    return;
+  }
+  if (documentSetName(document)) {
+    applyTextToDocument(document, clearDocumentSetFrontMatter(document.text), document.id === store.activeId);
+  }
 }
 
 function assignActiveDocumentSet(setName: string) {
@@ -13287,7 +13365,7 @@ select:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  max-width: 220px;
+  max-width: 280px;
   min-height: 30px;
   padding: 0 3px 0 0;
   border: 1px solid #bac4d1;
@@ -13303,6 +13381,18 @@ select:hover {
   border-color: #275da8;
   background: #ffffff;
   box-shadow: inset 0 -2px 0 #275da8;
+}
+
+.tab-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  padding: 0 2px 0 5px;
+  color: #7b8794;
+  cursor: grab;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .tab-main {
@@ -13350,6 +13440,11 @@ select:hover {
   border-color: #c5cfdb;
   background: #eef4fb;
   color: #174a88;
+}
+
+.tab-icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .window-meta,
