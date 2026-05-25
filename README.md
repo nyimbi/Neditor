@@ -283,8 +283,9 @@ web app.
   table before section-by-section drafting, QA gates, humanization cleanup, and
   review handoff notes. Its review packet shows the context sources, section
   work queue, assumption register, humanization checklist, and reviewer handoff
-  before the draft is applied, and generated drafts can be copied or appended
-  as review material without replacing the current document.
+  before the draft is applied. The packet itself can be inserted or copied as a
+  standalone audit handoff, and generated drafts can be copied or appended as
+  review material without replacing the current document.
   **Check AI runtime** produces a content-free
   readiness report for secure context, Web Speech availability, microphone
   permission, and clipboard read/write support so business users can confirm

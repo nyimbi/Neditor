@@ -217,8 +217,9 @@ business cases, operating procedures, technical architecture documents, ADRs,
 release notes, contract briefs, marketing briefs, and customer case studies.
 Each blueprint supplies a default outline, context questions, section focus, QA
 prompts, humanization tasks, and reviewer handoff notes. After generation, copy
-the draft for external review, append it as review material, or apply it with
-the selected replace/append/selection/section mode.
+the draft for external review, insert or copy the standalone review packet,
+append it as review material, or apply it with the selected
+replace/append/selection/section mode.
 
 Before relying on dictation or clipboard-assisted cleanup, use **Check AI
 runtime** in Docs Live. The report checks secure runtime context, Web Speech,
@@ -386,7 +387,8 @@ NEditor is built for drafts that need evidence before publication.
   and placeholder values, then generate a section-by-section draft with a
   drafting plan, review packet, QA checks, humanization tasks, and reviewer
   handoff prompts. The review packet summarizes context sources, the section
-  work queue, assumptions to verify, cleanup checks, and reviewer ownership.
+  work queue, assumptions to verify, cleanup checks, and reviewer ownership,
+  and can be inserted or copied as a standalone audit handoff.
 - Use Agent Workspace packets for multi-step document work that combines
   drafting, revision, review, and distribution. The packet records blockers,
   QA gates, and distribution gates before the output is accepted.

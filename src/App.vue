@@ -1987,6 +1987,16 @@
             </article>
           </div>
           <div class="docs-live-review-packet" aria-label="Docs Live review preparation packet">
+            <header class="docs-live-review-packet-header">
+              <div>
+                <strong>Review preparation packet</strong>
+                <span>Export the AI runbook, QA register, cleanup tasks, and reviewer prompts without replacing the draft.</span>
+              </div>
+              <div class="docs-live-review-actions">
+                <button type="button" @click="insertDocsLiveReviewPacket">Insert packet</button>
+                <button type="button" @click="copyDocsLiveReviewPacket">Copy packet</button>
+              </div>
+            </header>
             <section>
               <strong>Context package</strong>
               <ul>
@@ -9658,6 +9668,69 @@ async function copyDocsLiveDraft() {
   }
 }
 
+function docsLiveReviewPacketMarkdown() {
+  const draft = docsLiveDraft.value;
+  if (!draft) return "";
+  const packet = draft.reviewPacket;
+  const generatedAt = new Date().toISOString();
+  const lines = [
+    "## Docs Live Review Packet",
+    "",
+    "```ai-audit",
+    "type: docs-live-review-packet",
+    `generatedAt: ${generatedAt}`,
+    `title: ${docsLiveAuditInline(draft.title)}`,
+    `documentType: ${docsLiveAuditInline(draft.documentType)}`,
+    `sections: ${draft.sections.length}`,
+    "source: NEditor Docs Live",
+    "```",
+    "",
+    "### Context Package",
+    "",
+    ...packet.contextSources.map((source) => `- ${docsLiveAuditInline(source)}`),
+    "",
+    "### Section Work Queue",
+    "",
+    ...packet.sectionRunbook.map((item) => `- ${docsLiveAuditInline(item)}`),
+    "",
+    "### Assumption Register",
+    "",
+    ...packet.qaRegister.map((item) => `- [ ] ${docsLiveAuditInline(item)}`),
+    "",
+    "### Humanization Checklist",
+    "",
+    ...packet.humanizationChecklist.map((item) => `- [ ] ${docsLiveAuditInline(item)}`),
+    "",
+    "### Reviewer Handoff",
+    "",
+    ...packet.reviewerHandoff.map((item) => `- [ ] ${docsLiveAuditInline(item)}`),
+  ];
+  return lines.join("\n");
+}
+
+function docsLiveAuditInline(value: string) {
+  return (value || "").replace(/\r?\n/g, " ").trim();
+}
+
+function insertDocsLiveReviewPacket() {
+  const packet = docsLiveReviewPacketMarkdown();
+  if (!packet) return;
+  insertBlock(packet);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted Docs Live review packet";
+}
+
+async function copyDocsLiveReviewPacket() {
+  const packet = docsLiveReviewPacketMarkdown();
+  if (!packet) return;
+  try {
+    await navigator.clipboard?.writeText(packet);
+    store.statusMessage = "Copied Docs Live review packet";
+  } catch {
+    store.statusMessage = "Docs Live review packet is ready to copy";
+  }
+}
+
 function toggleDocsLiveDictation() {
   if (docsLiveListening.value) {
     stopDocsLiveDictation();
@@ -14264,6 +14337,38 @@ select:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 8px;
+}
+
+.docs-live-review-packet-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #d7dee7;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.docs-live-review-packet-header div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.docs-live-review-packet-header span {
+  color: #526071;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.docs-live-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
 }
 
 .docs-live-review-packet section {

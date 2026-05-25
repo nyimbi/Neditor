@@ -1755,8 +1755,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Applied Docs Live draft to"));
   ok(app.includes("appendDocsLiveDraftForReview"));
   ok(app.includes("copyDocsLiveDraft"));
+  ok(app.includes("docsLiveReviewPacketMarkdown"));
+  ok(app.includes("insertDocsLiveReviewPacket"));
+  ok(app.includes("copyDocsLiveReviewPacket"));
+  ok(app.includes("## Docs Live Review Packet"));
+  ok(app.includes("type: docs-live-review-packet"));
   ok(app.includes("Appended Docs Live draft for review"));
   ok(app.includes("Copied Docs Live draft"));
+  ok(app.includes("Inserted Docs Live review packet"));
+  ok(app.includes("Copied Docs Live review packet"));
   ok(app.includes("docs-live-draft-actions"));
   ok(app.includes("Draft in Docs Live"));
   ok(app.includes('aria-label="Agent audit trail"'));
@@ -1811,7 +1818,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("openDocsLiveFromDocumentOutline"));
   ok(app.includes("docs-live-section-stage-list"));
   ok(app.includes("docs-live-review-packet"));
+  ok(app.includes("docs-live-review-actions"));
   ok(app.includes("Docs Live review preparation packet"));
+  ok(app.includes("Review preparation packet"));
   ok(app.includes("Section runbook"));
   ok(app.includes("QA register"));
   ok(app.includes("Humanization checklist"));
