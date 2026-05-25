@@ -860,6 +860,21 @@ test("workspace persistence migration versions and normalizes saved settings", (
         sectionCount: 8,
         reviewerCount: 6,
         taskCount: 14,
+        lifecycleTaskStates: [
+          {
+            taskId: "task-intake-context",
+            title: " Resolve context ",
+            lane: "create",
+            status: "complete",
+            note: " Context approved ",
+            updatedAt: "2026-05-25T10:04:00.000Z",
+            completedAt: "2026-05-25T10:04:30.000Z",
+          },
+          {
+            taskId: "task-intake-context",
+            title: "Duplicate ignored",
+          },
+        ],
         appliedAt: "2026-05-25T10:06:00.000Z",
         providerProfile: " local ",
       },
@@ -997,6 +1012,17 @@ test("workspace persistence migration versions and normalizes saved settings", (
     sectionCount: 8,
     reviewerCount: 6,
     taskCount: 14,
+    lifecycleTaskStates: [
+      {
+        taskId: "task-intake-context",
+        title: "Resolve context",
+        lane: "create",
+        status: "complete",
+        note: "Context approved",
+        updatedAt: "2026-05-25T10:04:00.000Z",
+        completedAt: "2026-05-25T10:04:30.000Z",
+      },
+    ],
     appliedAt: "2026-05-25T10:06:00.000Z",
     providerProfile: "local",
   });
@@ -1118,7 +1144,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="AI control center"'));
   ok(app.includes("agentRun.controlCenter"));
   ok(app.includes('aria-label="Agent lifecycle task board"'));
-  ok(app.includes("agentRun.lifecycleTasks"));
+  ok(app.includes("agentLifecycleTaskRows"));
+  ok(app.includes("agentLifecycleTaskStates"));
+  ok(app.includes("agentRunHistoryTaskStateSummary"));
+  ok(app.includes("Task states:"));
+  ok(app.includes("setAgentLifecycleTaskStatus"));
+  ok(app.includes("setAgentLifecycleTaskNote"));
+  ok(app.includes("Task note"));
+  ok(app.includes("Needs review"));
+  ok(app.includes("Execution note"));
   ok(app.includes("runAgentLifecycleTask"));
   ok(app.includes("insertAgentLifecycleTaskBrief"));
   ok(app.includes("copyAgentLifecycleTaskBrief"));

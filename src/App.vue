@@ -2031,22 +2031,34 @@
                   <strong>Lifecycle Task Board</strong>
                   <span>Operational tasks for creating, composing, editing, revising, reviewing, and distributing the document.</span>
                 </div>
-                <small>{{ agentRun.lifecycleTasks.length }} tasks</small>
+                <small>{{ agentLifecycleTaskRows.length }} tasks</small>
               </header>
               <ol>
-                <li v-for="task in agentRun.lifecycleTasks" :key="task.id" :data-lane="task.lane" :data-status="task.status">
+                <li v-for="row in agentLifecycleTaskRows" :key="row.task.id" :data-lane="row.task.lane" :data-status="row.state.status">
                   <div>
-                    <small>{{ task.lane }} | {{ task.status }} | {{ task.owner }}</small>
-                    <strong>{{ task.title }}</strong>
-                    <p>{{ task.nextStep }}</p>
+                    <small>{{ row.task.lane }} | {{ row.state.status }} | {{ row.task.owner }}</small>
+                    <strong>{{ row.task.title }}</strong>
+                    <p>{{ row.task.nextStep }}</p>
+                    <p v-if="row.state.note" class="sidebar-hint">Execution note: {{ row.state.note }}</p>
                     <div class="agent-lifecycle-actions">
-                      <button type="button" @click="runAgentLifecycleTask(task)">Run task</button>
-                      <button type="button" @click="insertAgentLifecycleTaskBrief(task)">Insert brief</button>
-                      <button type="button" @click="copyAgentLifecycleTaskBrief(task)">Copy brief</button>
+                      <button type="button" @click="runAgentLifecycleTask(row.task)">Run task</button>
+                      <button type="button" @click="setAgentLifecycleTaskStatus(row.task, 'in-progress')">Start</button>
+                      <button type="button" @click="setAgentLifecycleTaskStatus(row.task, 'needs-review')">Needs review</button>
+                      <button type="button" @click="setAgentLifecycleTaskStatus(row.task, 'complete')">Complete</button>
+                      <button type="button" @click="insertAgentLifecycleTaskBrief(row.task)">Insert brief</button>
+                      <button type="button" @click="copyAgentLifecycleTaskBrief(row.task)">Copy brief</button>
                     </div>
+                    <label>
+                      Task note
+                      <input
+                        :value="row.state.note || ''"
+                        placeholder="Evidence, blocker, reviewer, or completion note"
+                        @change="setAgentLifecycleTaskNote(row.task, inputValue($event))"
+                      />
+                    </label>
                   </div>
                   <ul>
-                    <li v-for="item in task.evidence" :key="item">{{ item }}</li>
+                    <li v-for="item in row.task.evidence" :key="item">{{ item }}</li>
                   </ul>
                 </li>
               </ol>
@@ -2216,6 +2228,7 @@
                   <span>{{ item.status }} | {{ item.applicationMode }} | {{ item.readinessScore }}/100</span>
                   <small>{{ item.runId }} | {{ item.updatedAt }}</small>
                   <p v-if="item.packetPreview">{{ item.packetPreview }}</p>
+                  <p v-if="item.lifecycleTaskStates?.length">Task states: {{ agentRunHistoryTaskStateSummary(item) }}</p>
                   <div class="agent-history-actions">
                     <button type="button" @click="replanAgentHistoryRun(item)">Replan</button>
                     <button type="button" :disabled="!item.packetMarkdown" @click="appendAgentHistoryPacket(item)">Append packet</button>
@@ -2548,7 +2561,7 @@ import {
   type CustomTransformTemplate,
   type TransformTemplate,
 } from "./lib/transformTemplates";
-import { SUPPORTED_CITATION_STYLES, type AgentRunHistoryItem } from "./lib/workspacePersistence";
+import { SUPPORTED_CITATION_STYLES, type AgentLifecycleExecutionStatus, type AgentLifecycleTaskState, type AgentRunHistoryItem } from "./lib/workspacePersistence";
 import {
   appendConflictMergePart,
   moveConflictMergePart,
@@ -2645,6 +2658,7 @@ const agentInstruction = ref("");
 const agentContextAnswers = ref("");
 const agentPlan = ref<AgenticWorkflowPlan | null>(null);
 const agentRun = ref<AgenticWorkflowRun | null>(null);
+const agentLifecycleTaskStates = ref<Record<string, AgentLifecycleTaskState>>({});
 const defaultAgentProviderProfile = aiProviderProfiles[0];
 const agentProviderId = ref<AiProviderProfileId>("manual-review");
 const agentProviderEndpoint = ref(defaultAgentProviderProfile.endpoint);
@@ -3055,6 +3069,12 @@ const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
 });
+const agentLifecycleTaskRows = computed(() =>
+  (agentRun.value?.lifecycleTasks || []).map((task) => ({
+    task,
+    state: agentLifecycleTaskStates.value[task.id] || defaultAgentLifecycleTaskState(task),
+  })),
+);
 const previewDocumentLabel = computed(() => {
   const title = active.value.compile?.semantic.title || active.value.title || "Untitled document";
   const status = active.value.compile?.semantic.status || "draft";
@@ -4112,6 +4132,7 @@ function buildAgentWorkspacePlan() {
     selectedText: currentEditorSelectionText(),
   });
   agentRun.value = null;
+  agentLifecycleTaskStates.value = {};
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   store.statusMessage = `Planned ${agentPlan.value.steps.length} agent workflow steps`;
@@ -4126,6 +4147,9 @@ function generateAgentWorkspaceRun() {
     documentText: active.value.text,
     selectedText: currentEditorSelectionText(),
   });
+  agentLifecycleTaskStates.value = Object.fromEntries(
+    agentRun.value.lifecycleTasks.map((task) => [task.id, defaultAgentLifecycleTaskState(task)]),
+  );
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   recordAgentRunHistory(agentRun.value, "generated");
@@ -4161,6 +4185,7 @@ function agentRunHistoryItem(
     sectionCount: run.sectionWorkQueue.length,
     reviewerCount: run.reviewerAgents.length,
     taskCount: run.lifecycleTasks.length,
+    lifecycleTaskStates: agentLifecycleTaskStateList(),
     appliedAt: status === "generated" ? undefined : now,
     providerProfile: providerProfile || undefined,
   };
@@ -4173,13 +4198,60 @@ function agentPacketPreview(markdown: string) {
     .trim()
     .slice(0, 260);
 }
+function defaultAgentLifecycleTaskState(task: AgenticLifecycleTask): AgentLifecycleTaskState {
+  return {
+    taskId: task.id,
+    title: task.title,
+    lane: task.lane,
+    status: task.status === "blocked" ? "blocked" : task.status === "needs-input" ? "needs-review" : "queued",
+    updatedAt: agentRun.value?.auditTrail.generatedAt || new Date(0).toISOString(),
+  };
+}
+function agentLifecycleTaskStateList() {
+  if (!agentRun.value) return [];
+  return agentRun.value.lifecycleTasks.map((task) => agentLifecycleTaskStates.value[task.id] || defaultAgentLifecycleTaskState(task));
+}
+function persistAgentLifecycleTaskStates() {
+  if (!agentRun.value) return;
+  const existing = store.agentRunHistory.find((item) => item.runId === agentRun.value?.auditTrail.runId);
+  const packetMarkdownOverride = existing?.packetMarkdown && existing.packetMarkdown !== agentRun.value.markdown ? existing.packetMarkdown : "";
+  recordAgentRunHistory(agentRun.value, existing?.status || "generated", existing?.providerProfile || "", packetMarkdownOverride);
+}
 function recordAgentRunHistory(run: AgenticWorkflowRun, status: AgentRunHistoryItem["status"], providerProfile = "", packetMarkdownOverride = "") {
   store.recordAgentRunHistory(agentRunHistoryItem(run, status, providerProfile, packetMarkdownOverride));
+}
+function setAgentLifecycleTaskStatus(task: AgenticLifecycleTask, status: AgentLifecycleExecutionStatus) {
+  const now = new Date().toISOString();
+  agentLifecycleTaskStates.value = {
+    ...agentLifecycleTaskStates.value,
+    [task.id]: {
+      ...(agentLifecycleTaskStates.value[task.id] || defaultAgentLifecycleTaskState(task)),
+      status,
+      updatedAt: now,
+      completedAt: status === "complete" ? now : undefined,
+    },
+  };
+  persistAgentLifecycleTaskStates();
+  store.statusMessage = `Marked ${task.title} ${status}`;
+}
+function setAgentLifecycleTaskNote(task: AgenticLifecycleTask, note: string) {
+  const now = new Date().toISOString();
+  agentLifecycleTaskStates.value = {
+    ...agentLifecycleTaskStates.value,
+    [task.id]: {
+      ...(agentLifecycleTaskStates.value[task.id] || defaultAgentLifecycleTaskState(task)),
+      note: note.trim() || undefined,
+      updatedAt: now,
+    },
+  };
+  persistAgentLifecycleTaskStates();
+  store.statusMessage = `Updated ${task.title} task note`;
 }
 function replanAgentHistoryRun(item: AgentRunHistoryItem) {
   agentInstruction.value = item.instruction;
   agentContextAnswers.value = item.contextAnswers || "";
   agentRun.value = null;
+  agentLifecycleTaskStates.value = Object.fromEntries((item.lifecycleTaskStates || []).map((state) => [state.taskId, state]));
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   buildAgentWorkspacePlan();
@@ -4198,6 +4270,16 @@ async function copyAgentHistoryPacket(item: AgentRunHistoryItem) {
   } catch {
     store.statusMessage = `Saved agent packet ${item.runId} is ready to copy`;
   }
+}
+function agentRunHistoryTaskStateSummary(item: AgentRunHistoryItem) {
+  const counts = new Map<AgentLifecycleExecutionStatus, number>();
+  for (const state of item.lifecycleTaskStates || []) {
+    counts.set(state.status, (counts.get(state.status) || 0) + 1);
+  }
+  return (["queued", "in-progress", "needs-review", "complete", "blocked"] as AgentLifecycleExecutionStatus[])
+    .filter((status) => counts.has(status))
+    .map((status) => `${counts.get(status)} ${status}`)
+    .join(", ");
 }
 function buildAgentProviderPackage() {
   if (!agentRun.value) generateAgentWorkspaceRun();
@@ -4329,6 +4411,7 @@ function draftAgentSectionWithDocsLive(section: AgenticSectionWorkItem) {
   store.statusMessage = `Sent ${section.heading} to Docs Live`;
 }
 function runAgentLifecycleTask(task: AgenticLifecycleTask) {
+  setAgentLifecycleTaskStatus(task, "in-progress");
   const section = task.sectionId ? agentRun.value?.sectionWorkQueue.find((item) => item.id === task.sectionId) : null;
   if (section) {
     draftAgentSectionWithDocsLive(section);

@@ -103,6 +103,18 @@ export interface GitIntegrationPreferences {
   warnOnDirtyExport: boolean;
 }
 
+export type AgentLifecycleExecutionStatus = "queued" | "in-progress" | "needs-review" | "complete" | "blocked";
+
+export interface AgentLifecycleTaskState {
+  taskId: string;
+  title: string;
+  lane: string;
+  status: AgentLifecycleExecutionStatus;
+  note?: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
 export interface AgentRunHistoryItem {
   runId: string;
   title: string;
@@ -125,6 +137,7 @@ export interface AgentRunHistoryItem {
   sectionCount?: number;
   reviewerCount?: number;
   taskCount?: number;
+  lifecycleTaskStates?: AgentLifecycleTaskState[];
   appliedAt?: string;
   providerProfile?: string;
 }
@@ -391,6 +404,30 @@ export function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>):
   };
 }
 
+function normalizeAgentLifecycleTaskStates(value: unknown): AgentLifecycleTaskState[] {
+  if (!Array.isArray(value)) return [];
+  const states: AgentLifecycleTaskState[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const taskId = normalizedString(item.taskId, 120);
+    if (!taskId || seen.has(taskId)) continue;
+    const status = enumValue(item.status, ["queued", "in-progress", "needs-review", "complete", "blocked"] as const) || "queued";
+    seen.add(taskId);
+    states.push({
+      taskId,
+      title: normalizedString(item.title, 180) || "Agent lifecycle task",
+      lane: normalizedString(item.lane, 40) || "review",
+      status,
+      note: normalizedString(item.note, 1_200) || undefined,
+      updatedAt: normalizedString(item.updatedAt, 40) || new Date(0).toISOString(),
+      completedAt: normalizedString(item.completedAt, 40) || undefined,
+    });
+    if (states.length >= 60) break;
+  }
+  return states;
+}
+
 function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | null {
   if (!isRecord(value)) return null;
   const runId = normalizedString(value.runId, 80);
@@ -405,6 +442,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
         )
         .slice(0, 12)
     : [];
+  const lifecycleTaskStates = normalizeAgentLifecycleTaskStates(value.lifecycleTaskStates);
   return {
     runId,
     title: normalizedString(value.title, 120) || "Agent run",
@@ -427,6 +465,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     sectionCount: Math.max(numberValue(value.sectionCount) ?? 0, 0),
     reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
     taskCount: Math.max(numberValue(value.taskCount) ?? 0, 0),
+    ...(lifecycleTaskStates.length ? { lifecycleTaskStates } : {}),
     appliedAt: normalizedString(value.appliedAt, 40) || undefined,
     providerProfile: normalizedString(value.providerProfile, 120) || undefined,
   };
