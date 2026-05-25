@@ -74,7 +74,9 @@ Recent pushed checkpoints visible in current git history:
   now also keeps visible queued/running/complete/blocked state per check, runs
   the safe queue in place without dismissing the agent workspace, records
   per-check results, separates execution from "open surface" navigation, and
-  inserts or copies a Markdown automation audit table for review evidence.
+  persists the per-check queued/running/complete/blocked breakdown into local
+  run history so replanned runs, history summaries, and inserted/copied audit
+  packages keep durable automation evidence.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,
@@ -2904,8 +2906,8 @@ Agent automation scheduler execution verification:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm run check` | Pass | Vue typecheck passed after adding in-place automation queue execution state, run-safe-queue controls, per-check result reporting, surface navigation, and Markdown audit insertion/copy actions. |
-| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards for the Automation Scheduler run-safe-queue controls, execution rows, open-surface action, and audit artifact. |
-| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "offers searchable contextual help"` | Pass | Focused Chromium workflow generated an agent packet, ran the safe automation queue without leaving the Agent Workspace, and verified completed scheduler results including the refreshed evidence scan. |
+| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards and migration coverage for persisted Automation Scheduler task states in local run history. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "offers searchable contextual help"` | Pass | Focused Chromium workflow generated an agent packet, ran the safe automation queue without leaving the Agent Workspace, and verified persisted run-history automation summaries plus the refreshed evidence scan. |
 
 ## Next Execution Order
 

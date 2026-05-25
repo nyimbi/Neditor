@@ -260,7 +260,8 @@ web app.
   evidence scan, outline critique, transform validation, export preflight,
   accessibility review, and readiness-refresh queue without leaving the agent
   workspace, record per-check results, open the relevant remediation surface,
-  and insert or copy an automation audit table, AI provenance,
+  persist the queued/running/complete/blocked automation breakdown in saved run
+  history, and insert or copy an automation audit table, AI provenance,
   blockers, an Agent Audit Trail with run ID,
   fingerprints, rollback plan, review events, and safe apply behavior for
   replacing a document, replacing selected text, or appending a review packet.

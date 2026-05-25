@@ -3255,7 +3255,7 @@
                   <p v-if="item.transformRecommendationCount">Transforms: {{ item.transformRecommendationCount }} agent-selected recommendations</p>
                   <p v-if="item.dataNarrativeLinkCount">Narrative links: {{ item.dataNarrativeLinkCount }} data-to-narrative dependencies</p>
                   <p v-if="item.approvalGateStatus">Approval gate: {{ item.approvalGateStatus }}</p>
-                  <p v-if="item.automationTaskCount">Automation: {{ item.automationTaskCount }} scheduled checks</p>
+                  <p v-if="item.automationTaskCount">Automation: {{ agentRunHistoryAutomationSummary(item) }}</p>
                   <p v-if="item.sourcePack">Source pack: {{ agentRunHistorySourcePackSummary(item) }}</p>
                   <p v-if="item.lifecycleTaskStates?.length">Task states: {{ agentRunHistoryTaskStateSummary(item) }}</p>
                   <div class="agent-history-actions">
@@ -3691,6 +3691,8 @@ import {
 } from "./lib/transformTemplates";
 import {
   SUPPORTED_CITATION_STYLES,
+  type AgentAutomationExecutionStatus,
+  type AgentAutomationTaskState,
   type AgentEditAcceptanceState,
   type AgentEditAcceptanceStatus,
   type AgentLifecycleExecutionStatus,
@@ -3815,15 +3817,6 @@ const agentPlan = ref<AgenticWorkflowPlan | null>(null);
 const agentRun = ref<AgenticWorkflowRun | null>(null);
 const agentLifecycleTaskStates = ref<Record<string, AgentLifecycleTaskState>>({});
 const agentEditAcceptanceStates = ref<Record<string, AgentEditAcceptanceState>>({});
-type AgentAutomationExecutionStatus = "queued" | "running" | "complete" | "blocked";
-interface AgentAutomationTaskState {
-  taskId: string;
-  label: string;
-  status: AgentAutomationExecutionStatus;
-  result?: string;
-  updatedAt: string;
-  completedAt?: string;
-}
 const agentAutomationTaskStates = ref<Record<string, AgentAutomationTaskState>>({});
 const defaultAgentProviderProfile = aiProviderProfiles[0];
 const agentProviderId = ref<AiProviderProfileId>("manual-review");
@@ -5939,6 +5932,7 @@ function agentRunHistoryItem(
     dataNarrativeLinkCount: run.dataNarrativeLinks.length,
     approvalGateStatus: run.approvalGate.status,
     automationTaskCount: run.automationQueue.length,
+    automationTaskStates: agentAutomationTaskStateList(),
     reviewerCount: run.reviewerAgents.length,
     preReviewPromptCount: run.preReviewRehearsal.length,
     taskCount: run.lifecycleTasks.length,
@@ -5996,6 +5990,10 @@ function agentEditAcceptanceStateList() {
   if (!agentRun.value) return [];
   return agentRun.value.editAcceptanceQueue.map((item) => agentEditAcceptanceStates.value[item.id] || defaultAgentEditAcceptanceState(item));
 }
+function agentAutomationTaskStateList() {
+  if (!agentRun.value) return [];
+  return agentRun.value.automationQueue.map((task) => agentAutomationTaskStates.value[task.id] || defaultAgentAutomationTaskState(task));
+}
 function persistAgentLifecycleTaskStates() {
   if (!agentRun.value) return;
   const existing = store.agentRunHistory.find((item) => item.runId === agentRun.value?.auditTrail.runId);
@@ -6003,6 +6001,12 @@ function persistAgentLifecycleTaskStates() {
   recordAgentRunHistory(agentRun.value, existing?.status || "generated", existing?.providerProfile || "", packetMarkdownOverride, existing?.sourcePack);
 }
 function persistAgentEditAcceptanceStates() {
+  if (!agentRun.value) return;
+  const existing = store.agentRunHistory.find((item) => item.runId === agentRun.value?.auditTrail.runId);
+  const packetMarkdownOverride = existing?.packetMarkdown && existing.packetMarkdown !== agentRun.value.markdown ? existing.packetMarkdown : "";
+  recordAgentRunHistory(agentRun.value, existing?.status || "generated", existing?.providerProfile || "", packetMarkdownOverride, existing?.sourcePack);
+}
+function persistAgentAutomationTaskStates() {
   if (!agentRun.value) return;
   const existing = store.agentRunHistory.find((item) => item.runId === agentRun.value?.auditTrail.runId);
   const packetMarkdownOverride = existing?.packetMarkdown && existing.packetMarkdown !== agentRun.value.markdown ? existing.packetMarkdown : "";
@@ -6052,7 +6056,7 @@ function replanAgentHistoryRun(item: AgentRunHistoryItem) {
   agentRun.value = null;
   agentLifecycleTaskStates.value = Object.fromEntries((item.lifecycleTaskStates || []).map((state) => [state.taskId, state]));
   agentEditAcceptanceStates.value = Object.fromEntries((item.editAcceptanceStates || []).map((state) => [state.itemId, state]));
-  agentAutomationTaskStates.value = {};
+  agentAutomationTaskStates.value = Object.fromEntries((item.automationTaskStates || []).map((state) => [state.taskId, state]));
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   buildAgentWorkspacePlan();
@@ -6159,8 +6163,8 @@ function agentHistoryAuditMarkdown() {
     "source: NEditor Agent Workspace",
     "```",
     "",
-    "| Run | Status | Lanes | Targets | Readiness | Provider | Evidence | Tasks |",
-    "| --- | --- | --- | --- | ---: | --- | --- | --- |",
+    "| Run | Status | Lanes | Targets | Readiness | Provider | Evidence | Tasks | Automation |",
+    "| --- | --- | --- | --- | ---: | --- | --- | --- | --- |",
     ...runs.slice(0, 24).map((item) =>
       [
         agentAuditTableCell(`${item.title} (${item.runId})`),
@@ -6171,6 +6175,7 @@ function agentHistoryAuditMarkdown() {
         agentAuditTableCell(item.providerProfile || "local planner"),
         agentAuditTableCell(agentRunHistoryEvidenceSummary(item)),
         agentAuditTableCell(agentRunHistoryTaskStateSummary(item) || `${item.taskCount || 0} tasks`),
+        agentAuditTableCell(agentRunHistoryAutomationSummary(item)),
       ].join(" | ").replace(/^/, "| ").replace(/$/, " |"),
     ),
     "",
@@ -6183,6 +6188,7 @@ function agentHistoryAuditMarkdown() {
       item.sectionDraftHistory?.length ? `  - Section drafts: ${agentAuditInline(agentRunHistorySectionDraftSummary(item))}` : "",
       item.transformRecommendationCount ? `  - Transforms: ${item.transformRecommendationCount} agent-selected recommendations` : "",
       item.dataNarrativeLinkCount ? `  - Narrative links: ${item.dataNarrativeLinkCount} data-to-narrative dependencies` : "",
+      item.automationTaskStates?.length ? `  - Automation: ${agentAuditInline(agentRunHistoryAutomationSummary(item))}` : "",
       item.documentIntent ? `  - Intent: ${agentAuditInline(agentRunHistoryIntentSummary(item))}` : "",
       item.sourcePack ? `  - Source pack: ${agentAuditInline(agentRunHistorySourcePackSummary(item))}` : "",
     ].filter(Boolean)),
@@ -6263,6 +6269,15 @@ function agentRunHistorySectionDraftSummary(item: AgentRunHistoryItem) {
     .map((status) => `${statuses.get(status)} ${status}`)
     .join(", ");
   return `${drafts.length} restore point${drafts.length === 1 ? "" : "s"}${statusText ? `; ${statusText}` : ""}`;
+}
+function agentRunHistoryAutomationSummary(item: AgentRunHistoryItem) {
+  const states = item.automationTaskStates || [];
+  if (!states.length) return `${item.automationTaskCount || 0} scheduled checks`;
+  const counts = new Map<AgentAutomationExecutionStatus, number>();
+  for (const state of states) counts.set(state.status, (counts.get(state.status) || 0) + 1);
+  return (["complete", "running", "queued", "blocked"] as AgentAutomationExecutionStatus[])
+    .map((status) => `${counts.get(status) || 0} ${status}`)
+    .join(", ");
 }
 function agentRunHistorySourcePackSummary(item: AgentRunHistoryItem) {
   const sourcePack = item.sourcePack;
@@ -6757,6 +6772,7 @@ function setAgentAutomationTaskState(task: AgenticAutomationTask, status: AgentA
       completedAt: status === "complete" ? now : undefined,
     },
   };
+  persistAgentAutomationTaskStates();
 }
 async function runAgentAutomationTask(task: AgenticAutomationTask) {
   if (!task.safeToAutoRun || task.status === "blocked") {

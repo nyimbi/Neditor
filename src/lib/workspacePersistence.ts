@@ -127,6 +127,17 @@ export interface AgentEditAcceptanceState {
   appliedAt?: string;
 }
 
+export type AgentAutomationExecutionStatus = "queued" | "running" | "complete" | "blocked";
+
+export interface AgentAutomationTaskState {
+  taskId: string;
+  label: string;
+  status: AgentAutomationExecutionStatus;
+  result?: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
 export type AgentRunHistoryControlStatus = "ready" | "needs-input" | "blocked";
 export type AgentRunHistoryEvidenceStatus = "available" | "missing" | "needs-review";
 
@@ -273,6 +284,7 @@ export interface AgentRunHistoryItem {
   dataNarrativeLinkCount?: number;
   approvalGateStatus?: "ready" | "needs-review" | "blocked";
   automationTaskCount?: number;
+  automationTaskStates?: AgentAutomationTaskState[];
   reviewerCount?: number;
   preReviewPromptCount?: number;
   taskCount?: number;
@@ -617,6 +629,31 @@ function normalizeAgentEditAcceptanceStates(value: unknown): AgentEditAcceptance
   return states;
 }
 
+function normalizeAgentAutomationTaskStates(value: unknown): AgentAutomationTaskState[] {
+  if (!Array.isArray(value)) return [];
+  const states: AgentAutomationTaskState[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const taskId = normalizedString(item.taskId, 140);
+    if (!taskId || seen.has(taskId)) continue;
+    seen.add(taskId);
+    const status = enumValue(item.status, ["queued", "running", "complete", "blocked"] as const) || "queued";
+    const result = normalizedString(item.result, 1_500);
+    const completedAt = normalizedString(item.completedAt, 40);
+    states.push({
+      taskId,
+      label: normalizedString(item.label, 180) || "Agent automation check",
+      status,
+      updatedAt: normalizedString(item.updatedAt, 40) || new Date(0).toISOString(),
+      ...(result ? { result } : {}),
+      ...(completedAt ? { completedAt } : {}),
+    });
+    if (states.length >= 24) break;
+  }
+  return states;
+}
+
 function normalizeAgentRunHistoryControlItems(value: unknown): AgentRunHistoryControlItem[] {
   if (!Array.isArray(value)) return [];
   const items: AgentRunHistoryControlItem[] = [];
@@ -877,6 +914,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     : [];
   const lifecycleTaskStates = normalizeAgentLifecycleTaskStates(value.lifecycleTaskStates);
   const editAcceptanceStates = normalizeAgentEditAcceptanceStates(value.editAcceptanceStates);
+  const automationTaskStates = normalizeAgentAutomationTaskStates(value.automationTaskStates);
   const controlCenter = normalizeAgentRunHistoryControlCenter(value.controlCenter);
   const documentEvidence = normalizeAgentRunHistoryDocumentEvidence(value.documentEvidence);
   const outlineCritique = normalizeAgentRunHistoryOutlineCritique(value.outlineCritique);
@@ -910,7 +948,8 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     transformRecommendationCount: Math.max(numberValue(value.transformRecommendationCount) ?? 0, 0),
     dataNarrativeLinkCount: Math.max(numberValue(value.dataNarrativeLinkCount) ?? 0, 0),
     approvalGateStatus: enumValue(value.approvalGateStatus, ["ready", "needs-review", "blocked"] as const) || undefined,
-    automationTaskCount: Math.max(numberValue(value.automationTaskCount) ?? 0, 0),
+    automationTaskCount: Math.max(numberValue(value.automationTaskCount) ?? automationTaskStates.length, 0),
+    ...(automationTaskStates.length ? { automationTaskStates } : {}),
     reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
     preReviewPromptCount: Math.max(numberValue(value.preReviewPromptCount) ?? 0, 0),
     taskCount: Math.max(numberValue(value.taskCount) ?? 0, 0),

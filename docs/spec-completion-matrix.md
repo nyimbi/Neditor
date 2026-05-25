@@ -216,7 +216,8 @@ Current direct evidence:
   source signals, affected sections, and review actions, Approval Metadata Gate
   blockers for status, reviewer, owner, approvedAt, release target, source
   confidence, comments, and AI provenance, automation scheduler execution state
-  with run-safe-queue controls and insertable/copyable audit evidence, pre-review rehearsal,
+  with run-safe-queue controls, persisted run-history status breakdowns, and
+  insertable/copyable audit evidence, pre-review rehearsal,
   playbooks, lifecycle tasks, provider handoff, runtime readiness, and guided
   demo.
 - `pnpm run check:a11y` now checks static Vue template accessibility guardrails

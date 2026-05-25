@@ -1438,6 +1438,27 @@ test("workspace persistence migration versions and normalizes saved settings", (
           },
         ],
         automationTaskCount: 6,
+        automationTaskStates: [
+          {
+            taskId: "automation-evidence-scan",
+            label: " Refresh current-document evidence scan ",
+            status: "complete",
+            result: " Evidence scan refreshed: 1 claims ",
+            updatedAt: "2026-05-25T10:04:55.000Z",
+            completedAt: "2026-05-25T10:04:56.000Z",
+          },
+          {
+            taskId: "automation-evidence-scan",
+            label: "Duplicate ignored",
+          },
+          {
+            taskId: "automation-export-preflight",
+            label: " Export preflight ",
+            status: "bad-status",
+            result: "",
+            updatedAt: "",
+          },
+        ],
         transformRecommendationCount: 5,
         dataNarrativeLinkCount: 9,
         approvalGateStatus: "blocked",
@@ -1736,6 +1757,22 @@ test("workspace persistence migration versions and normalizes saved settings", (
       },
     ],
     automationTaskCount: 6,
+    automationTaskStates: [
+      {
+        taskId: "automation-evidence-scan",
+        label: "Refresh current-document evidence scan",
+        status: "complete",
+        result: "Evidence scan refreshed: 1 claims",
+        updatedAt: "2026-05-25T10:04:55.000Z",
+        completedAt: "2026-05-25T10:04:56.000Z",
+      },
+      {
+        taskId: "automation-export-preflight",
+        label: "Export preflight",
+        status: "queued",
+        updatedAt: "1970-01-01T00:00:00.000Z",
+      },
+    ],
     transformRecommendationCount: 5,
     dataNarrativeLinkCount: 9,
     approvalGateStatus: "blocked",
@@ -2196,6 +2233,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("runSafeAgentAutomationQueue"));
   ok(app.includes("agentAutomationRows"));
   ok(app.includes("Agent Automation Scheduler Audit"));
+  ok(app.includes("agentAutomationTaskStateList"));
+  ok(app.includes("persistAgentAutomationTaskStates"));
+  ok(app.includes("agentRunHistoryAutomationSummary"));
   ok(app.includes("Open surface"));
   ok(app.includes("Insert audit"));
   ok(app.includes('aria-label="Agent reviewer agents"'));
