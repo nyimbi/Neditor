@@ -896,6 +896,7 @@ test("agentic workflow reviewers inspect current document evidence", () => {
       "{{client_name}} must approve [OWNER].",
       "",
       "[placeholder link](https://example.com/review)",
+      "See {@missing-ref} before export.",
       "",
       "```ai-source",
       "provider: OpenAI",
@@ -913,11 +914,13 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Outline" && item.detail.includes("critique")));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.detail.includes("citation TODO")));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Claim inventory" && item.status === "needs-review"));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Reference integrity" && item.status === "needs-review"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Resolve document placeholders" && action.action === "open-ai-paste"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Review evidence and governance blockers" && action.detail.includes("citation TODO")));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Resolve review comments" && action.status === "blocked"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Verify claim inventory" && action.detail.includes("candidate claim")));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Humanize current document" && action.action === "open-ai-paste"));
+  ok(run.controlCenter.nextActions.some((action) => action.label === "Repair reference integrity" && action.action === "open-review"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Repair distribution blockers" && action.action === "prepare-export"));
   ok(run.controlCenter.governance.some((item) => item.label === "AI provenance" && item.status === "needs-review"));
   ok(run.controlCenter.governance.some((item) => item.label === "Humanization" && item.status === "needs-review"));
@@ -935,6 +938,7 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.lifecycleTasks.some((task) => task.id.startsWith("task-review-comment-") && task.nextStep.includes("source evidence")));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-ai-review" && task.owner === "Governance Agent"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-links" && task.action === "prepare-export"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-references" && task.evidence.some((item) => item.includes("missing-ref"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata" && task.evidence.some((item) => item.includes("approvedAt"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata" && task.nextStep.includes("owner")));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata" && task.evidence.some((item) => item.includes("releaseTarget"))));
@@ -943,6 +947,7 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("humanization findings"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.findings.some((item) => item.includes("citation TODO"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.requiredActions.some((item) => item.includes("claim inventory"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "citation" && agent.findings.some((item) => item.includes("reference integrity"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("review comment resolution queue"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "governance" && agent.requiredActions.some((item) => item.includes("human-reviewed"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("approvedAt"))));
@@ -1236,6 +1241,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
           unresolvedComments: 1,
           approvalMetadataMissing: ["approvedBy"],
           brokenLinkHints: ["https://example.com/tbd"],
+          referenceHints: ["Cross reference {@missing-ref} does not match a heading slug or {#missing-ref} label in the current source."],
         },
         outlineCritique: [
           {
@@ -1481,6 +1487,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       unresolvedComments: 1,
       approvalMetadataMissing: ["approvedBy"],
       brokenLinkHints: ["https://example.com/tbd"],
+      referenceHints: ["Cross reference {@missing-ref} does not match a heading slug or {#missing-ref} label in the current source."],
     },
     outlineCritique: [
       {

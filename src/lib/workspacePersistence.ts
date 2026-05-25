@@ -189,6 +189,7 @@ export interface AgentRunHistoryDocumentEvidence {
   unresolvedComments: number;
   approvalMetadataMissing: string[];
   brokenLinkHints: string[];
+  referenceHints: string[];
 }
 
 export interface AgentRunHistoryOutlineCritiqueItem {
@@ -718,6 +719,7 @@ function normalizeAgentRunHistoryDocumentEvidence(value: unknown): AgentRunHisto
     unresolvedComments: Math.max(Math.floor(numberValue(value.unresolvedComments) ?? reviewCommentResolutions.length), 0),
     approvalMetadataMissing: stringArray(value.approvalMetadataMissing, 20) || [],
     brokenLinkHints: stringArray(value.brokenLinkHints, 80) || [],
+    referenceHints: stringArray(value.referenceHints, 80) || [],
   };
 }
 

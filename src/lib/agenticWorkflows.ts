@@ -169,6 +169,7 @@ export interface AgenticDocumentEvidence {
   unresolvedComments: number;
   approvalMetadataMissing: string[];
   brokenLinkHints: string[];
+  referenceHints: string[];
 }
 
 export interface AgenticDocumentClaim {
@@ -1780,6 +1781,18 @@ function buildDocumentEvidenceLifecycleTasks(documentEvidence: AgenticDocumentEv
       nextStep: "Replace placeholder links with final URLs, anchors, or remove them before publishing.",
     });
   }
+  if (documentEvidence.referenceHints.length) {
+    tasks.push({
+      id: "task-evidence-references",
+      lane: "review",
+      title: "Repair cross-reference integrity",
+      owner: "Citation Reviewer",
+      status: "needs-input",
+      action: "open-review",
+      evidence: documentEvidence.referenceHints.slice(0, 8),
+      nextStep: "Fix missing, malformed, or ambiguous labels and cross references before publishing or external review.",
+    });
+  }
   if (documentEvidence.approvalMetadataMissing.length) {
     tasks.push({
       id: "task-evidence-approval-metadata",
@@ -2175,11 +2188,15 @@ function buildReviewerAgents(input: {
         documentEvidence.brokenLinkHints.length
           ? `Current document has link placeholders or suspicious links: ${documentEvidence.brokenLinkHints.slice(0, 4).join(", ")}.`
           : "No obvious placeholder links were found in the current document.",
+        documentEvidence.referenceHints.length
+          ? `Current document has reference integrity findings: ${documentEvidence.referenceHints.slice(0, 4).join("; ")}.`
+          : "No obvious malformed or unmatched cross references were found in the current document.",
         plan.distributionTargets.includes("latex") ? "LaTeX export requires bibliography, labels, equations, and cross-reference checks." : "No LaTeX-specific citation target is active.",
       ],
       requiredActions: [
         "Add citation TODOs beside factual claims that do not have a named source.",
         documentEvidence.brokenLinkHints.length ? "Repair placeholder or suspicious links before publishing." : "",
+        documentEvidence.referenceHints.length ? "Repair missing labels, malformed label syntax, or unmatched cross references before export handoff." : "",
         plan.distributionTargets.includes("html") || plan.distributionTargets.includes("blog") || plan.distributionTargets.includes("substack")
           ? "Check external links, canonical URL expectations, and visible source notes for web publishing."
           : "",
@@ -2452,6 +2469,15 @@ function buildReleaseEvidenceBundle(input: {
       true,
     ),
     releaseEvidenceItem(
+      "Reference integrity",
+      "Citation Reviewer",
+      documentEvidence.referenceHints.length ? "needs-review" : "available",
+      documentEvidence.referenceHints.length
+        ? `${documentEvidence.referenceHints.length} label or cross-reference issue(s) require repair before handoff.`
+        : "No obvious malformed or unmatched cross references were detected.",
+      Boolean(distributionTargetPlans.length),
+    ),
+    releaseEvidenceItem(
       "Human review closure",
       "Governance Agent",
       documentEvidence.unreviewedAiMarkers || documentEvidence.unresolvedComments || taskBlockers.length ? "needs-review" : "available",
@@ -2611,6 +2637,13 @@ function buildSourceGrounding(
       status: documentEvidence.claimInventory.length ? "needs-review" : "available",
     },
     {
+      label: "Reference integrity",
+      detail: documentEvidence.referenceHints.length
+        ? `${documentEvidence.referenceHints.length} label or cross-reference issue(s) need review.`
+        : "No obvious malformed or unmatched cross references were detected.",
+      status: documentEvidence.referenceHints.length ? "needs-review" : "available",
+    },
+    {
       label: "Document placeholders",
       detail: documentEvidence.unresolvedPlaceholders.length
         ? `Unresolved placeholders detected: ${documentEvidence.unresolvedPlaceholders.slice(0, 5).join(", ")}.`
@@ -2685,13 +2718,19 @@ function buildDistributionItems(
       },
     ];
   }
-  return targetPlans.map((targetPlan) => ({
-    label: targetPlan.label,
-    detail: documentEvidence.brokenLinkHints.length
-      ? `${targetPlan.preflightChecks.length} preflight checks staged; repair ${documentEvidence.brokenLinkHints.length} placeholder or suspicious link(s) before handoff.`
-      : `${targetPlan.preflightChecks.length} preflight checks, ${targetPlan.handoffSteps.length} handoff step, and ${targetPlan.evidenceRequired.length} evidence requirements are staged.`,
-    status: "needs-review" as const,
-  }));
+  return targetPlans.map((targetPlan) => {
+    const blockers = [
+      documentEvidence.brokenLinkHints.length ? `${documentEvidence.brokenLinkHints.length} placeholder or suspicious link(s)` : "",
+      documentEvidence.referenceHints.length ? `${documentEvidence.referenceHints.length} reference issue(s)` : "",
+    ].filter(Boolean);
+    return {
+      label: targetPlan.label,
+      detail: blockers.length
+        ? `${targetPlan.preflightChecks.length} preflight checks staged; repair ${blockers.join(" and ")} before handoff.`
+        : `${targetPlan.preflightChecks.length} preflight checks, ${targetPlan.handoffSteps.length} handoff step, and ${targetPlan.evidenceRequired.length} evidence requirements are staged.`,
+      status: "needs-review" as const,
+    };
+  });
 }
 
 function buildNextActions(
@@ -2760,6 +2799,15 @@ function buildNextActions(
       detail: `${documentEvidence.humanizationFindings.length} phrasing item(s) need concrete, owner-written language.`,
       lane: "revise",
       action: "open-ai-paste",
+      status: "needs-input",
+    });
+  }
+  if (documentEvidence.referenceHints.length) {
+    actions.push({
+      label: "Repair reference integrity",
+      detail: `${documentEvidence.referenceHints.length} malformed, missing, or unmatched label/reference issue(s) need review.`,
+      lane: "review",
+      action: "open-review",
       status: "needs-input",
     });
   }
@@ -2922,6 +2970,7 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
   const brokenLinkHints = Array.from(
     new Set([...documentText.matchAll(/\]\((?:TODO|TBD|#|https?:\/\/example\.com)[^)]*\)/gi)].map((match) => match[0])),
   ).slice(0, 12);
+  const referenceHints = analyzeReferenceIntegrity(documentText);
   const claimInventory = extractDocumentClaimInventory(documentText);
   const humanizationFindings = extractHumanizationFindings(documentText);
 
@@ -2935,7 +2984,51 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
     unresolvedComments,
     approvalMetadataMissing,
     brokenLinkHints,
+    referenceHints,
   };
+}
+
+function analyzeReferenceIntegrity(documentText: string) {
+  const labels = new Set<string>();
+  const hints = new Set<string>();
+  for (const heading of documentText.matchAll(/^(#{1,6})\s+(.+)$/gm)) {
+    const text = heading[2].replace(/\{#[^}]+\}/g, "").trim();
+    const slug = slugifyReferenceLabel(text);
+    if (slug) labels.add(slug);
+  }
+  for (const label of documentText.matchAll(/\{#([^}]+)\}/g)) {
+    const key = label[1].trim();
+    if (!key || key.toLowerCase().startsWith("index:")) continue;
+    if (!isReferenceKeyValid(key)) {
+      hints.add(`Label {#${key}} has invalid characters; use letters, numbers, colon, dash, underscore, or period.`);
+      continue;
+    }
+    labels.add(key);
+  }
+  for (const reference of documentText.matchAll(/\{@([^}]+)\}/g)) {
+    const key = reference[1].trim();
+    if (!key || !isReferenceKeyValid(key)) {
+      hints.add(`Cross reference {@${key || "?"}} has invalid or empty syntax.`);
+      continue;
+    }
+    if (!labels.has(key)) hints.add(`Cross reference {@${key}} does not match a heading slug or {#${key}} label in the current source.`);
+  }
+  for (const unclosed of documentText.matchAll(/\{[#@][^\n}]*$/gm)) {
+    hints.add(`Unclosed reference marker: ${unclosed[0].slice(0, 80)}`);
+  }
+  return Array.from(hints).slice(0, 12);
+}
+
+function isReferenceKeyValid(key: string) {
+  return /^[A-Za-z0-9_.:-]+$/.test(key);
+}
+
+function slugifyReferenceLabel(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
 }
 
 function releaseMetadataMissing(documentText: string) {

@@ -4029,6 +4029,7 @@ const filteredAgentRunHistory = computed(() => {
       ...(item.distributionTargets || []),
       ...(item.documentEvidence?.unresolvedPlaceholders || []),
       ...(item.documentEvidence?.citationTodos || []),
+      ...(item.documentEvidence?.referenceHints || []),
       ...(item.outlineCritique || []).map((critique) => `${critique.area} ${critique.heading} ${critique.detail} ${critique.recommendation}`),
       ...(item.sourcePack?.claimReview || []),
       ...(item.sourcePack?.cleanupBlockers || []),
@@ -5579,6 +5580,7 @@ function agentRunHistoryEvidenceSummary(item: AgentRunHistoryItem) {
     evidence.reviewCommentResolutions.length ? `${evidence.reviewCommentResolutions.length} comment queue items` : evidence.unresolvedComments ? `${evidence.unresolvedComments} comments` : "",
     evidence.unreviewedAiMarkers ? `${evidence.unreviewedAiMarkers} AI markers` : "",
     evidence.brokenLinkHints.length ? `${evidence.brokenLinkHints.length} link checks` : "",
+    evidence.referenceHints.length ? `${evidence.referenceHints.length} reference checks` : "",
   ].filter(Boolean);
   return parts.join(", ") || "no blockers";
 }

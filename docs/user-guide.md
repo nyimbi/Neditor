@@ -159,6 +159,10 @@ task's execution state in local run history, and use the task note field for
 evidence, blockers, reviewers, or completion notes. Use **Insert brief** or
 **Copy brief** when a task should become a durable Markdown work order for a
 reviewer, writer, or distribution owner.
+The evidence scan also checks label and cross-reference integrity, turning
+missing labels, malformed reference syntax, and unmatched `{@label}` links into
+review tasks, Control Center findings, provider handoff evidence, and release
+evidence blockers when distribution is in scope.
 The packet also includes an
 **Agent Audit Trail** with run ID, deterministic fingerprints for instruction,
 context, source, and output payloads, rollback guidance, and review events.

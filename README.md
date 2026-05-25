@@ -238,7 +238,7 @@ web app.
   matching Markdown section instead of appending duplicate section copy, an
   **AI Control Center** for readiness score, source grounding, governance
   state, current-document placeholders, citation TODOs, unresolved comments,
-  extracted claim inventory, humanization findings, unreviewed AI markers, approval metadata gaps,
+  extracted claim inventory, cross-reference integrity hints, humanization findings, unreviewed AI markers, approval metadata gaps,
   placeholder links, persistent review-sidebar visibility, runnable next
   actions in Agent Workspace and the Review sidebar that route document
   evidence into concrete remediation work, an

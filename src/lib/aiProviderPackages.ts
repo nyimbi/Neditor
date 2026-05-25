@@ -335,6 +335,7 @@ function buildAiProviderSourcePack(run: AgenticWorkflowRun): AiProviderSourcePac
   const distributionBlockers = [
     ...evidence.approvalMetadataMissing.map((item) => `Missing approval metadata: ${item}`),
     ...evidence.brokenLinkHints.slice(0, 8).map((item) => `Suspicious link: ${item}`),
+    ...evidence.referenceHints.slice(0, 8).map((item) => `Reference integrity: ${item}`),
     ...run.distributionTargetPlans.map((target) => `${target.label}: ${target.preflightChecks[0]}`),
   ];
   const releaseEvidence = [
