@@ -336,9 +336,20 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
     deadline: "June 1",
   });
   deepEqual(docsLivePlaceholderEntries("Client Name: Acme\nowner = Finance\nclient_name: duplicate ignored"), [
-    { key: "client name", value: "Acme" },
-    { key: "owner", value: "Finance" },
+    { key: "client name", value: "Acme", kind: "text", source: "", reviewStatus: "provided" },
+    { key: "owner", value: "Finance", kind: "text", source: "", reviewStatus: "provided" },
   ]);
+  deepEqual(docsLivePlaceholderEntries("budget: $250K | type=money | source=Finance workbook | status=verified"), [
+    { key: "budget", value: "$250K", kind: "money", source: "Finance workbook", reviewStatus: "verified" },
+  ]);
+  equal(
+    upsertDocsLivePlaceholder("client: Acme", "Budget", "$250K", {
+      kind: "money",
+      source: "Finance workbook",
+      reviewStatus: "needs-review",
+    }),
+    "client: Acme\nbudget: $250K | type=money | source=Finance workbook | status=needs-review",
+  );
   equal(upsertDocsLivePlaceholder("client: Acme", "Deadline", "June 1"), "client: Acme\ndeadline: June 1");
   equal(upsertDocsLivePlaceholder("client: Acme", "client", "Globex"), "client: Globex");
   equal(removeDocsLivePlaceholder("client: Acme\nowner: Finance", "client"), "owner: Finance");
@@ -361,7 +372,7 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
     transcript: "Create a client proposal for Acme. The audience is the executive team. Focus on a fast first draft.",
     context: "The goal is to renew the platform contract. Include a clear recommendation and review notes.",
     questionnaireAnswers: "The reader should approve renewal. Keep pricing assumptions marked for human review.",
-    placeholders: "client: Acme\nowner: Commercial team\ndeadline: June 1",
+    placeholders: "client: Acme | type=client | source=CRM | status=verified\nowner: Commercial team\ndeadline: June 1",
     draftingDepth: "detailed",
     generatedAt: "2026-05-23T09:00:00.000Z",
   });
@@ -388,6 +399,7 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.sections[0].humanizedAngle.includes("responsible subject-matter owner"));
   ok(draft.sections[0].reviewHandoff.includes("Commercial team should verify"));
   equal(draft.placeholders.client, "Acme");
+  ok(draft.markdown.includes("| Client | Acme | Client | CRM | verified |"));
   ok(draft.markdown.includes("provider: NEditor Docs Live"));
   ok(draft.markdown.includes("model: local-guided-drafting"));
   ok(draft.markdown.includes("workflow: outline-to-section-draft-qa-humanize-review"));
@@ -1557,6 +1569,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("docsLiveMissingPlaceholderKeys"));
   ok(app.includes("addDocsLivePlaceholder"));
   ok(app.includes("updateDocsLivePlaceholder"));
+  ok(app.includes("docsLivePlaceholderKindOptions"));
+  ok(app.includes("docsLivePlaceholderReviewStatusOptions"));
+  ok(app.includes("docsLivePlaceholderDraftSource"));
+  ok(app.includes("updateDocsLivePlaceholderMetadata"));
+  ok(app.includes("Review status for"));
   ok(app.includes("removeDocsLivePlaceholderValue"));
   ok(app.includes('aria-label="Agent workflow playbooks"'));
   ok(app.includes("agenticWorkflowPlaybooks"));

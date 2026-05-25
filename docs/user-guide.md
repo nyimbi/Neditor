@@ -196,8 +196,9 @@ typed context, managed placeholder values, AI-created questionnaire,
 section-by-section drafting, QA, humanization, and review handoff. Use the
 Placeholder Manager when you want a business-friendly table for clients,
 owners, dates, evidence, reviewers, numbers, sources, and repeated variables;
-it keeps the underlying plain-text placeholder block synchronized for Docs Live,
-agent packets, and provider handoffs.
+each row can carry a type, source or evidence note, and review status while the
+underlying plain-text placeholder block stays synchronized for Docs Live, agent
+packets, and provider handoffs.
 
 Docs Live includes blueprints for business briefs, board memos, proposals,
 strategy plans, project plans, research briefs, policies, meeting briefs,

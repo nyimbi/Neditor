@@ -1864,9 +1864,25 @@
               </label>
               <label>
                 Value
-                <input v-model="docsLivePlaceholderValue" placeholder="Acme, $250K, audited forecast" />
+                <input v-model="docsLivePlaceholderDraftValue" placeholder="Acme, $250K, audited forecast" />
               </label>
-              <button type="button" :disabled="!docsLivePlaceholderKey.trim() || !docsLivePlaceholderValue.trim()" @click="addDocsLivePlaceholder">
+              <label>
+                Type
+                <select v-model="docsLivePlaceholderDraftKind">
+                  <option v-for="kind in docsLivePlaceholderKindOptions" :key="kind.value" :value="kind.value">{{ kind.label }}</option>
+                </select>
+              </label>
+              <label>
+                Source
+                <input v-model="docsLivePlaceholderDraftSource" placeholder="Finance workbook, GC review, customer brief" />
+              </label>
+              <label>
+                Review
+                <select v-model="docsLivePlaceholderDraftStatus">
+                  <option v-for="status in docsLivePlaceholderReviewStatusOptions" :key="status.value" :value="status.value">{{ status.label }}</option>
+                </select>
+              </label>
+              <button type="button" :disabled="!docsLivePlaceholderKey.trim() || !docsLivePlaceholderDraftValue.trim()" @click="addDocsLivePlaceholder">
                 Add value
               </button>
             </div>
@@ -1874,6 +1890,9 @@
               <div class="docs-live-placeholder-head" role="row">
                 <span role="columnheader">Key</span>
                 <span role="columnheader">Value</span>
+                <span role="columnheader">Type</span>
+                <span role="columnheader">Source</span>
+                <span role="columnheader">Review</span>
                 <span role="columnheader">Action</span>
               </div>
               <div v-for="entry in docsLivePlaceholderRows" :key="entry.key" role="row">
@@ -1884,6 +1903,29 @@
                   :aria-label="`Value for ${entry.key}`"
                   @change="updateDocsLivePlaceholder(entry.key, inputValue($event))"
                 />
+                <select
+                  role="cell"
+                  :value="entry.kind"
+                  :aria-label="`Type for ${entry.key}`"
+                  @change="updateDocsLivePlaceholderKind(entry.key, inputValue($event))"
+                >
+                  <option v-for="kind in docsLivePlaceholderKindOptions" :key="kind.value" :value="kind.value">{{ kind.label }}</option>
+                </select>
+                <input
+                  role="cell"
+                  :value="entry.source"
+                  :aria-label="`Source for ${entry.key}`"
+                  placeholder="source or evidence"
+                  @change="updateDocsLivePlaceholderMetadata(entry.key, { source: inputValue($event) })"
+                />
+                <select
+                  role="cell"
+                  :value="entry.reviewStatus"
+                  :aria-label="`Review status for ${entry.key}`"
+                  @change="updateDocsLivePlaceholderReviewStatus(entry.key, inputValue($event))"
+                >
+                  <option v-for="status in docsLivePlaceholderReviewStatusOptions" :key="status.value" :value="status.value">{{ status.label }}</option>
+                </select>
                 <button type="button" role="cell" @click="removeDocsLivePlaceholderValue(entry.key)">Remove</button>
               </div>
             </div>
@@ -2992,6 +3034,9 @@ import {
   type DocsLiveDocumentType,
   type DocsLiveDraft,
   type DocsLiveDraftDepth,
+  type DocsLivePlaceholderEntry,
+  type DocsLivePlaceholderKind,
+  type DocsLivePlaceholderReviewStatus,
 } from "./lib/docsLive";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
 import { markdownListContinuation } from "./lib/markdownEditing";
@@ -3144,7 +3189,27 @@ const docsLiveInterimTranscript = ref("");
 const docsLiveContext = ref("");
 const docsLivePlaceholderText = ref("");
 const docsLivePlaceholderKey = ref("");
-const docsLivePlaceholderValue = ref("");
+const docsLivePlaceholderDraftValue = ref("");
+const docsLivePlaceholderDraftKind = ref<DocsLivePlaceholderKind>("text");
+const docsLivePlaceholderDraftSource = ref("");
+const docsLivePlaceholderDraftStatus = ref<DocsLivePlaceholderReviewStatus>("provided");
+const docsLivePlaceholderKindOptions: Array<{ value: DocsLivePlaceholderKind; label: string }> = [
+  { value: "text", label: "Text" },
+  { value: "client", label: "Client" },
+  { value: "person", label: "Person" },
+  { value: "reviewer", label: "Reviewer" },
+  { value: "date", label: "Date" },
+  { value: "money", label: "Money" },
+  { value: "number", label: "Number" },
+  { value: "source", label: "Source" },
+  { value: "decision", label: "Decision" },
+  { value: "channel", label: "Channel" },
+];
+const docsLivePlaceholderReviewStatusOptions: Array<{ value: DocsLivePlaceholderReviewStatus; label: string }> = [
+  { value: "provided", label: "Provided" },
+  { value: "needs-review", label: "Needs review" },
+  { value: "verified", label: "Verified" },
+];
 const docsLiveIntentFields = [
   { key: "audience", label: "Audience", placeholder: "executive team, board, customers" },
   { key: "outcome", label: "Outcome", placeholder: "approve renewal, align launch plan" },
@@ -9081,10 +9146,18 @@ function addDocsLivePlaceholder() {
   docsLivePlaceholderText.value = upsertDocsLivePlaceholder(
     docsLivePlaceholderText.value,
     docsLivePlaceholderKey.value,
-    docsLivePlaceholderValue.value,
+    docsLivePlaceholderDraftValue.value,
+    {
+      kind: docsLivePlaceholderDraftKind.value,
+      source: docsLivePlaceholderDraftSource.value,
+      reviewStatus: docsLivePlaceholderDraftStatus.value,
+    },
   );
   docsLivePlaceholderKey.value = "";
-  docsLivePlaceholderValue.value = "";
+  docsLivePlaceholderDraftValue.value = "";
+  docsLivePlaceholderDraftKind.value = "text";
+  docsLivePlaceholderDraftSource.value = "";
+  docsLivePlaceholderDraftStatus.value = "provided";
   refreshDocsLiveQuestionnaire();
   store.statusMessage = "Added Docs Live placeholder value";
 }
@@ -9102,9 +9175,38 @@ function updateDocsLiveIntentField(key: string, value: string) {
 }
 
 function updateDocsLivePlaceholder(key: string, value: string) {
-  docsLivePlaceholderText.value = upsertDocsLivePlaceholder(docsLivePlaceholderText.value, key, value);
+  const existing = docsLivePlaceholderRows.value.find((entry) => entry.key === key);
+  docsLivePlaceholderText.value = upsertDocsLivePlaceholder(docsLivePlaceholderText.value, key, value, {
+    kind: existing?.kind,
+    source: existing?.source,
+    reviewStatus: existing?.reviewStatus,
+  });
   refreshDocsLiveQuestionnaire();
   store.statusMessage = `Updated ${key} placeholder value`;
+}
+
+function updateDocsLivePlaceholderMetadata(key: string, metadata: Partial<Pick<DocsLivePlaceholderEntry, "kind" | "source" | "reviewStatus">>) {
+  const existing = docsLivePlaceholderRows.value.find((entry) => entry.key === key);
+  if (!existing) return;
+  docsLivePlaceholderText.value = upsertDocsLivePlaceholder(docsLivePlaceholderText.value, key, existing.value, {
+    kind: (metadata.kind as DocsLivePlaceholderKind | undefined) || existing.kind,
+    source: metadata.source ?? existing.source,
+    reviewStatus: (metadata.reviewStatus as DocsLivePlaceholderReviewStatus | undefined) || existing.reviewStatus,
+  });
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = `Updated ${key} placeholder metadata`;
+}
+
+function updateDocsLivePlaceholderKind(key: string, kind: string) {
+  const allowed = docsLivePlaceholderKindOptions.some((option) => option.value === kind);
+  updateDocsLivePlaceholderMetadata(key, { kind: allowed ? (kind as DocsLivePlaceholderKind) : "text" });
+}
+
+function updateDocsLivePlaceholderReviewStatus(key: string, reviewStatus: string) {
+  const allowed = docsLivePlaceholderReviewStatusOptions.some((option) => option.value === reviewStatus);
+  updateDocsLivePlaceholderMetadata(key, {
+    reviewStatus: allowed ? (reviewStatus as DocsLivePlaceholderReviewStatus) : "provided",
+  });
 }
 
 function removeDocsLivePlaceholderValue(key: string) {
@@ -13540,7 +13642,7 @@ select:hover {
 }
 
 .docs-live-placeholder-add {
-  grid-template-columns: minmax(120px, 0.4fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(105px, 0.55fr) minmax(150px, 1fr) minmax(110px, 0.55fr) minmax(150px, 1fr) minmax(120px, 0.6fr) auto;
 }
 
 .docs-live-placeholder-grid {
@@ -13549,7 +13651,7 @@ select:hover {
 }
 
 .docs-live-placeholder-grid [role="row"] {
-  grid-template-columns: minmax(100px, 0.35fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(90px, 0.45fr) minmax(150px, 1fr) minmax(105px, 0.55fr) minmax(150px, 1fr) minmax(115px, 0.6fr) auto;
 }
 
 .docs-live-placeholder-head {
@@ -13965,6 +14067,11 @@ select:hover {
   }
 
   .docs-live-intent-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .docs-live-placeholder-add,
+  .docs-live-placeholder-grid [role="row"] {
     grid-template-columns: 1fr;
   }
 

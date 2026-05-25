@@ -270,10 +270,12 @@ web app.
 - Docs Live can take that outline plus freeform context, outline-aware
   questionnaire answers, dictated direction, and placeholder values managed in
   a structured table for clients, owners, dates, evidence, reviewers, amounts,
-  and reusable variables, then work section by section through drafting, QA
-  gates, humanization cleanup, and review handoff notes. Its review packet
-  shows the context sources, section work queue, assumption register,
-  humanization checklist, and reviewer handoff before the draft is applied.
+  and reusable variables. Each placeholder can also carry a type, source or
+  evidence note, and review status, then flow into the generated draft inputs
+  table before section-by-section drafting, QA gates, humanization cleanup, and
+  review handoff notes. Its review packet shows the context sources, section
+  work queue, assumption register, humanization checklist, and reviewer handoff
+  before the draft is applied.
   **Check AI runtime** produces a content-free
   readiness report for secure context, Web Speech availability, microphone
   permission, and clipboard read/write support so business users can confirm

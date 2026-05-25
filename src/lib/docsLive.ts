@@ -42,10 +42,25 @@ export interface DocsLiveQuestionnaireRequest {
 }
 
 export type DocsLiveDraftDepth = "summary" | "standard" | "detailed" | "technical" | "legal" | "executive";
+export type DocsLivePlaceholderKind =
+  | "text"
+  | "person"
+  | "date"
+  | "money"
+  | "number"
+  | "source"
+  | "reviewer"
+  | "client"
+  | "decision"
+  | "channel";
+export type DocsLivePlaceholderReviewStatus = "provided" | "needs-review" | "verified";
 
 export interface DocsLivePlaceholderEntry {
   key: string;
   value: string;
+  kind: DocsLivePlaceholderKind;
+  source: string;
+  reviewStatus: DocsLivePlaceholderReviewStatus;
 }
 
 export interface DocsLiveDraft {
@@ -354,7 +369,9 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
   const documentType = inferDocumentType(request);
   const blueprint = blueprints[documentType];
   const contextInput = [request.transcript, request.context, request.questionnaireAnswers].filter(Boolean).join("\n");
-  const placeholders = extractDocsLivePlaceholders([request.placeholders, request.context, request.questionnaireAnswers, request.transcript].filter(Boolean).join("\n"));
+  const placeholderInput = [request.placeholders, request.context, request.questionnaireAnswers, request.transcript].filter(Boolean).join("\n");
+  const placeholders = extractDocsLivePlaceholders(placeholderInput);
+  const placeholderEntries = hydrateDocsLivePlaceholderEntries(placeholders, docsLivePlaceholderEntries(placeholderInput));
   const title = resolveTitle(request, blueprint, placeholders);
   const outlineText = resolveOutlineText(request, blueprint);
   const outlineItems = parseOutlinePlan(outlineText);
@@ -381,7 +398,7 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
       "",
       docsLiveSourceBlock(generatedAt, documentType, contextSentences),
       "",
-      placeholdersTable(placeholders),
+      placeholdersTable(placeholderEntries),
       "",
       docsLiveContextSummary(contextSentences),
       "",
@@ -459,24 +476,50 @@ export function docsLivePlaceholderEntries(input: string): DocsLivePlaceholderEn
     const key = normalizePlaceholderKey(pair[1]);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    entries.push({ key, value: pair[2].trim() });
+    const { value, kind, source, reviewStatus } = parsePlaceholderValueMetadata(pair[2]);
+    if (!value) continue;
+    entries.push({ key, value, kind, source, reviewStatus });
   }
   return entries;
 }
 
 export function serializeDocsLivePlaceholders(entries: DocsLivePlaceholderEntry[]) {
   return entries
-    .map((entry) => ({ key: normalizePlaceholderKey(entry.key), value: entry.value.trim() }))
+    .map((entry) => ({
+      key: normalizePlaceholderKey(entry.key),
+      value: entry.value.trim(),
+      kind: normalizePlaceholderKind(entry.kind),
+      source: entry.source.trim(),
+      reviewStatus: normalizePlaceholderReviewStatus(entry.reviewStatus),
+    }))
     .filter((entry) => entry.key && entry.value)
-    .map((entry) => `${entry.key}: ${entry.value}`)
+    .map((entry) => {
+      const metadata = [
+        entry.kind !== "text" ? `type=${entry.kind}` : "",
+        entry.source ? `source=${entry.source}` : "",
+        entry.reviewStatus !== "provided" ? `status=${entry.reviewStatus}` : "",
+      ].filter(Boolean);
+      return `${entry.key}: ${entry.value}${metadata.length ? ` | ${metadata.join(" | ")}` : ""}`;
+    })
     .join("\n");
 }
 
-export function upsertDocsLivePlaceholder(input: string, key: string, value: string) {
+export function upsertDocsLivePlaceholder(
+  input: string,
+  key: string,
+  value: string,
+  metadata: Partial<Pick<DocsLivePlaceholderEntry, "kind" | "source" | "reviewStatus">> = {},
+) {
   const normalizedKey = normalizePlaceholderKey(key);
   if (!normalizedKey || !value.trim()) return input.trim();
   const entries = docsLivePlaceholderEntries(input).filter((entry) => entry.key !== normalizedKey);
-  entries.push({ key: normalizedKey, value: value.trim() });
+  entries.push({
+    key: normalizedKey,
+    value: value.trim(),
+    kind: normalizePlaceholderKind(metadata.kind),
+    source: (metadata.source || "").trim(),
+    reviewStatus: normalizePlaceholderReviewStatus(metadata.reviewStatus),
+  });
   return serializeDocsLivePlaceholders(entries);
 }
 
@@ -677,15 +720,68 @@ function reviewPacketMarkdown(packet: DocsLiveReviewPacket) {
   ].join("\n");
 }
 
-function placeholdersTable(placeholders: Record<string, string>) {
-  const entries = Object.entries(placeholders);
+function parsePlaceholderValueMetadata(raw: string): Pick<DocsLivePlaceholderEntry, "value" | "kind" | "source" | "reviewStatus"> {
+  const [valuePart, ...metadataParts] = raw.split("|").map((part) => part.trim());
+  let kind: DocsLivePlaceholderKind = "text";
+  let source = "";
+  let reviewStatus: DocsLivePlaceholderReviewStatus = "provided";
+  for (const part of metadataParts) {
+    const pair = part.match(/^([A-Za-z][A-Za-z0-9 _-]{1,24})\s*=\s*(.+)$/);
+    if (!pair) continue;
+    const key = normalizePlaceholderKey(pair[1]);
+    const value = pair[2].trim();
+    if (key === "type" || key === "kind" || key === "category") kind = normalizePlaceholderKind(value);
+    if (key === "source" || key === "evidence") source = value;
+    if (key === "status" || key === "review" || key === "review status") reviewStatus = normalizePlaceholderReviewStatus(value);
+  }
+  return { value: valuePart.trim(), kind, source, reviewStatus };
+}
+
+function normalizePlaceholderKind(value: unknown): DocsLivePlaceholderKind {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase().replace(/[_ ]+/g, "-") : "";
+  if (
+    normalized === "person" ||
+    normalized === "date" ||
+    normalized === "money" ||
+    normalized === "number" ||
+    normalized === "source" ||
+    normalized === "reviewer" ||
+    normalized === "client" ||
+    normalized === "decision" ||
+    normalized === "channel"
+  ) {
+    return normalized;
+  }
+  return "text";
+}
+
+function normalizePlaceholderReviewStatus(value: unknown): DocsLivePlaceholderReviewStatus {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase().replace(/[_ ]+/g, "-") : "";
+  if (normalized === "needs-review" || normalized === "verified") return normalized;
+  return "provided";
+}
+
+function hydrateDocsLivePlaceholderEntries(placeholders: Record<string, string>, entries: DocsLivePlaceholderEntry[]) {
+  const byKey = new Map(entries.map((entry) => [entry.key, entry]));
+  return Object.entries(placeholders).map(([key, value]) => byKey.get(key) || {
+    key,
+    value,
+    kind: "text" as const,
+    source: "",
+    reviewStatus: "provided" as const,
+  });
+}
+
+function placeholdersTable(entries: DocsLivePlaceholderEntry[]) {
   if (!entries.length) return "<!-- Docs Live placeholders: add key facts before review. -->";
   return [
     "## Draft Inputs",
     "",
-    "| Placeholder | Value |",
-    "| --- | --- |",
-    ...entries.map(([key, value]) => `| ${titleCase(key)} | ${escapeTableCell(value)} |`),
+    "| Placeholder | Value | Type | Source | Review status |",
+    "| --- | --- | --- | --- | --- |",
+    ...entries.map((entry) =>
+      `| ${titleCase(entry.key)} | ${escapeTableCell(entry.value)} | ${titleCase(entry.kind)} | ${escapeTableCell(entry.source || "not supplied")} | ${entry.reviewStatus} |`,
+    ),
   ].join("\n");
 }
 
