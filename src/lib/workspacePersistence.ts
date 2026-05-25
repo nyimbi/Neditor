@@ -271,6 +271,7 @@ export interface AgentRunHistoryItem {
   sectionDraftHistory?: AgentRunHistorySectionDraftItem[];
   transformRecommendationCount?: number;
   dataNarrativeLinkCount?: number;
+  approvalGateStatus?: "ready" | "needs-review" | "blocked";
   automationTaskCount?: number;
   reviewerCount?: number;
   preReviewPromptCount?: number;
@@ -908,6 +909,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     ...(sectionDraftHistory.length ? { sectionDraftHistory } : {}),
     transformRecommendationCount: Math.max(numberValue(value.transformRecommendationCount) ?? 0, 0),
     dataNarrativeLinkCount: Math.max(numberValue(value.dataNarrativeLinkCount) ?? 0, 0),
+    approvalGateStatus: enumValue(value.approvalGateStatus, ["ready", "needs-review", "blocked"] as const) || undefined,
     automationTaskCount: Math.max(numberValue(value.automationTaskCount) ?? 0, 0),
     reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
     preReviewPromptCount: Math.max(numberValue(value.preReviewPromptCount) ?? 0, 0),

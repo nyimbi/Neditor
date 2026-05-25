@@ -2866,6 +2866,18 @@ Data-to-narrative bridge verification:
 | `pnpm run test:unit` | Pass | 46 frontend unit tests passed, including agentic runs that link claims, calculations, charts, tables, timelines, schemas, equations, and publishing metadata to affected narrative sections with review actions, release evidence, audit events, UI insert/copy actions, and persisted run-history counts. |
 | `pnpm run check:ai-roadmap` | Pass | The AI-first roadmap verifier treats the Data-to-Narrative Bridge as a required product surface for roadmap item 30 and passed the 50-change roadmap contract. |
 
+Approval metadata gate verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the shared Approval Metadata Gate run model, UI surface, release evidence, audit markdown, and persisted run-history status. |
+| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including blocked distribution runs with missing approval/source-confidence metadata and a ready run with complete status, reviewer, approvedAt, owner, releaseTarget, and sourceConfidence metadata. |
+| `pnpm run check:ai-roadmap` | Pass | The AI-first roadmap verifier now treats Approval Metadata Gate as a required product surface for roadmap item 48 and passed the 50-change roadmap contract. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting the distribution gate in README and the spec completion matrix; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | The spec completion matrix remains partial-with-release-risks while recording Approval Metadata Gate evidence for distribution blockers. |
+| `pnpm run check:a11y` | Pass | Static accessibility guardrails passed with the new Agent Workspace approval gate section and controls. |
+| `git diff --check` | Pass | The approval gate diff has no whitespace errors. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

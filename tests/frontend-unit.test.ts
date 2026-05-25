@@ -18,6 +18,7 @@ import {
 } from "../src/lib/aiProviderPackages.js";
 import {
   agenticWorkflowPlaybooks,
+  buildAgenticApprovalGateMarkdown,
   buildAgenticDataNarrativeAuditMarkdown,
   buildAgenticDocumentMemory,
   buildAgenticLifecycleTaskBrief,
@@ -810,6 +811,12 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("```ai-section-draft"));
   ok(run.markdown.includes("## Agent-Selected Transforms"));
   ok(run.markdown.includes("## Data-to-Narrative Bridge"));
+  ok(run.markdown.includes("## Approval Metadata Gate"));
+  ok(run.approvalGate.requiredBeforeDistribution);
+  equal(run.approvalGate.status, "blocked");
+  ok(run.approvalGate.fields.some((field) => field.key === "sourceConfidence"));
+  ok(run.approvalGate.blockers.some((blocker) => blocker.includes("Source confidence")));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-approval-gate" && task.status === "blocked"));
   ok(run.markdown.includes("Section contract:"));
   ok(run.markdown.includes("Contract risk:"));
   ok(run.markdown.includes("Completion criteria:"));
@@ -823,6 +830,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Composable section draft history" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent-selected transforms" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Data-to-narrative bridge" && item.requiredBeforeRelease));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Approval metadata gate" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent automation scheduler" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Pre-review rehearsal" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
@@ -841,6 +849,10 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(releaseAuditPackage.includes("## Section Draft History"));
   ok(releaseAuditPackage.includes("## Agent-Selected Transforms"));
   ok(releaseAuditPackage.includes("## Data-to-Narrative Bridge"));
+  ok(releaseAuditPackage.includes("## Approval Metadata Gate"));
+  const approvalGateMarkdown = buildAgenticApprovalGateMarkdown(run.approvalGate);
+  ok(approvalGateMarkdown.includes("```approval-gate"));
+  ok(approvalGateMarkdown.includes("sourceConfidence: needs-review"));
   ok(releaseAuditPackage.includes("## Agent Lifecycle Task Board"));
   ok(releaseAuditPackage.includes("### Target Runbooks"));
   ok(run.markdown.includes("Substack newsletter package"));
@@ -853,6 +865,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   equal(run.auditTrail.outputFingerprint.length, 16);
   ok(run.auditTrail.rollbackPlan.some((item) => item.includes("snapshot")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Distribution evidence requirements")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Approval gate prepared")));
   ok(run.controlCenter.readinessScore > 0);
   ok(run.controlCenter.status === "needs-input" || run.controlCenter.status === "ready");
   ok(run.controlCenter.nextActions.some((action) => action.label === "Verify target artifacts"));
@@ -1083,6 +1096,11 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata" && item.detail.includes("approvedAt")));
   ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata" && item.detail.includes("owner")));
   ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata" && item.detail.includes("releaseTarget")));
+  equal(run.approvalGate.status, "blocked");
+  ok(run.approvalGate.blockers.some((item) => item.includes("Status")));
+  ok(run.approvalGate.blockers.some((item) => item.includes("Reviewer")));
+  ok(run.approvalGate.blockers.some((item) => item.includes("Approved at")));
+  ok(run.approvalGate.blockers.some((item) => item.includes("Source confidence")));
   ok(run.controlCenter.distribution.some((item) => item.detail.includes("placeholder or suspicious link")));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-placeholders" && task.evidence.some((item) => item.includes("{{client_name}}"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-outline-critique" && task.action === "open-outline"));
@@ -1106,6 +1124,35 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("review comment resolution queue"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "governance" && agent.requiredActions.some((item) => item.includes("human-reviewed"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("approvedAt"))));
+});
+
+test("agentic approval gate accepts complete release metadata", () => {
+  const run = buildAgenticWorkflowRun({
+    instruction:
+      "Review and distribute the approved board memo as PDF. audience: board owner: Finance deadline: June 1 evidence: audited forecast",
+    documentTitle: "Approved Board Memo",
+    documentText: [
+      "---",
+      "status: approved",
+      "reviewer: CFO",
+      "approvedAt: 2026-05-24",
+      "owner: Finance",
+      "releaseTarget: pdf",
+      "sourceConfidence: verified",
+      "---",
+      "",
+      "# Approved Board Memo",
+      "",
+      "The recommendation is ready for release.",
+    ].join("\n"),
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  equal(run.approvalGate.status, "ready");
+  deepEqual(run.approvalGate.blockers, []);
+  ok(run.approvalGate.fields.every((field) => field.status === "present"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-approval-gate" && task.status === "ready"));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Approval metadata gate" && item.status === "available"));
 });
 
 test("agentic lifecycle task cap preserves distribution and release readiness tasks", () => {
@@ -1148,6 +1195,7 @@ test("agentic lifecycle task cap preserves distribution and release readiness ta
   ok(run.lifecycleTasks.some((task) => task.owner === "Docs Live Section Agent"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-citations"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-approval-gate"));
 });
 
 test("AI provider packages redact secrets and preserve agent governance context", () => {
@@ -1391,6 +1439,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         automationTaskCount: 6,
         transformRecommendationCount: 5,
         dataNarrativeLinkCount: 9,
+        approvalGateStatus: "blocked",
         reviewerCount: 6,
         preReviewPromptCount: 7,
         taskCount: 14,
@@ -1688,6 +1737,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     automationTaskCount: 6,
     transformRecommendationCount: 5,
     dataNarrativeLinkCount: 9,
+    approvalGateStatus: "blocked",
     reviewerCount: 6,
     preReviewPromptCount: 7,
     taskCount: 14,
@@ -2172,6 +2222,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("copyAgentDataNarrativeAudit"));
   ok(app.includes("buildAgenticDataNarrativeAuditMarkdown"));
   ok(app.includes("dataNarrativeLinkCount"));
+  ok(app.includes('aria-label="Agent approval metadata gate"'));
+  ok(app.includes("agentRun.approvalGate"));
+  ok(app.includes("Approval Metadata Gate"));
+  ok(app.includes("insertAgentApprovalGateScaffold"));
+  ok(app.includes("copyAgentApprovalGateScaffold"));
+  ok(app.includes("buildAgenticApprovalGateMarkdown"));
+  ok(app.includes("approvalGateStatus"));
   ok(app.includes("agentSectionDraftingDepthOptions"));
   ok(app.includes("agentPlan.outlineVariants"));
   ok(app.includes("hydrateDocsLiveFromOutlineVariant"));

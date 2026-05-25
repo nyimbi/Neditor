@@ -251,6 +251,32 @@ export interface AgenticReviewCommentResolution {
   blocker: boolean;
 }
 
+export type AgenticApprovalGateStatus = "ready" | "needs-review" | "blocked";
+export type AgenticApprovalGateFieldKey =
+  | "status"
+  | "reviewer"
+  | "approvedAt"
+  | "owner"
+  | "releaseTarget"
+  | "sourceConfidence";
+
+export interface AgenticApprovalGateField {
+  key: AgenticApprovalGateFieldKey;
+  label: string;
+  value: string;
+  status: "present" | "missing" | "needs-review";
+  guidance: string;
+}
+
+export interface AgenticApprovalGate {
+  status: AgenticApprovalGateStatus;
+  summary: string;
+  requiredBeforeDistribution: boolean;
+  fields: AgenticApprovalGateField[];
+  blockers: string[];
+  metadataScaffold: string;
+}
+
 export interface AgenticWorkflowRun {
   plan: AgenticWorkflowPlan;
   summary: string;
@@ -267,6 +293,7 @@ export interface AgenticWorkflowRun {
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
   dataNarrativeLinks: AgenticDataNarrativeLink[];
+  approvalGate: AgenticApprovalGate;
   automationQueue: AgenticAutomationTask[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
@@ -757,6 +784,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     documentEvidence,
     transformRecommendations,
   });
+  const approvalGate = buildApprovalGate(plan, documentEvidence, request.documentText || "");
   const preReviewRehearsal = buildPreReviewRehearsal({
     plan,
     reviewerAgents,
@@ -784,6 +812,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionDraftHistory,
     transformRecommendations,
     dataNarrativeLinks,
+    approvalGate,
     automationQueue,
     preReviewRehearsal,
     distributionTargetPlans,
@@ -803,6 +832,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionDraftHistory,
     transformRecommendations,
     dataNarrativeLinks,
+    approvalGate,
     automationQueue,
     preReviewRehearsal,
     documentEvidence,
@@ -824,6 +854,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionDraftHistory,
     transformRecommendations,
     dataNarrativeLinks,
+    approvalGate,
     automationQueue,
     preReviewRehearsal,
     distributionTargetPlans,
@@ -845,6 +876,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionDraftHistory,
     transformRecommendations,
     dataNarrativeLinks,
+    approvalGate,
     automationQueue,
     outlineCritique,
     preReviewRehearsal,
@@ -872,6 +904,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     sectionDraftHistory,
     transformRecommendations,
     dataNarrativeLinks,
+    approvalGate,
     automationQueue,
     outlineCritique,
     preReviewRehearsal,
@@ -1033,6 +1066,36 @@ export function buildAgenticDataNarrativeAuditMarkdown(items: AgenticDataNarrati
   ].join("\n");
 }
 
+export function buildAgenticApprovalGateMarkdown(gate: AgenticApprovalGate): string {
+  return [
+    "## Approval Metadata Gate",
+    "",
+    "```approval-gate",
+    `status: ${gate.status}`,
+    `requiredBeforeDistribution: ${gate.requiredBeforeDistribution ? "true" : "false"}`,
+    `blockers: ${gate.blockers.length}`,
+    "```",
+    "",
+    gate.summary,
+    "",
+    "| Field | Value | Status | Guidance |",
+    "| --- | --- | --- | --- |",
+    ...gate.fields.map(
+      (field) =>
+        `| ${escapeTableCell(field.label)} | ${escapeTableCell(field.value || "missing")} | ${field.status} | ${escapeTableCell(field.guidance)} |`,
+    ),
+    "",
+    "### Blockers",
+    "",
+    ...(gate.blockers.length ? gate.blockers.map((blocker) => `- [ ] ${blocker}`) : ["No approval metadata blockers are active."]),
+    "",
+    "### Metadata Scaffold",
+    "",
+    fencedBlock("yaml", gate.metadataScaffold),
+    "",
+  ].join("\n");
+}
+
 export function buildAgenticReleaseEvidenceAuditPackage(run: AgenticWorkflowRun): string {
   return [
     "## NEditor Release Evidence Audit Package",
@@ -1052,6 +1115,7 @@ export function buildAgenticReleaseEvidenceAuditPackage(run: AgenticWorkflowRun)
     ...sectionDraftHistoryMarkdown(run.sectionDraftHistory),
     ...transformRecommendationsMarkdown(run.transformRecommendations),
     ...dataNarrativeLinksMarkdown(run.dataNarrativeLinks),
+    ...buildAgenticApprovalGateMarkdown(run.approvalGate).split("\n"),
     ...automationQueueMarkdown(run.automationQueue),
     ...lifecycleTasksMarkdown(run.lifecycleTasks),
     ...(run.distributionTargetPlans.length ? distributionTargetRunbookMarkdown(run.distributionTargetPlans) : ["## Distribution Runbooks", "", "No distribution target runbooks were staged for this run.", ""]),
@@ -2276,6 +2340,152 @@ function buildDistributionChecklist(plan: AgenticWorkflowPlan, targetPlans: Agen
   ]);
 }
 
+function buildApprovalGate(plan: AgenticWorkflowPlan, documentEvidence: AgenticDocumentEvidence, documentText: string): AgenticApprovalGate {
+  const requiredBeforeDistribution = Boolean(plan.distributionTargets.length || plan.lanes.includes("distribute"));
+  const targets = plan.distributionTargets.join(", ");
+  const owner =
+    approvalMetadataValue(documentText, ["owner"]) ||
+    extractKeyValue(plan.placeholderText, "owner") ||
+    extractIntentField(plan.documentIntent, "owner");
+  const reviewer =
+    approvalMetadataValue(documentText, ["approvedBy", "reviewer"]) ||
+    extractKeyValue(plan.placeholderText, "reviewer") ||
+    extractIntentField(plan.documentIntent, "reviewer");
+  const releaseTarget =
+    approvalMetadataValue(documentText, ["releaseTarget"]) ||
+    extractKeyValue(plan.placeholderText, "releaseTarget") ||
+    extractIntentField(plan.documentIntent, "distribution") ||
+    targets;
+  const sourceConfidence =
+    approvalMetadataValue(documentText, ["sourceConfidence"]) ||
+    extractKeyValue(plan.placeholderText, "sourceConfidence") ||
+    extractKeyValue(plan.context, "sourceConfidence");
+  const fields: AgenticApprovalGateField[] = [
+    approvalStatusField(approvalMetadataValue(documentText, ["status"]) || extractKeyValue(plan.placeholderText, "status") || ""),
+    approvalRequiredField(
+      "reviewer",
+      "Reviewer or approver",
+      reviewer,
+      "Name the human reviewer or approver accountable for the final distribution decision.",
+    ),
+    approvalRequiredField("approvedAt", "Approved at", approvalMetadataValue(documentText, ["approvedAt"]), "Record the approval timestamp or date."),
+    approvalRequiredField("owner", "Owner", owner, "Identify the accountable business owner for the document."),
+    approvalRequiredField("releaseTarget", "Release target", releaseTarget, "Match the approval to the target export or publishing channel."),
+    approvalSourceConfidenceField(sourceConfidence || ""),
+  ];
+  const blockers = requiredBeforeDistribution
+    ? [
+        ...fields
+          .filter((field) => field.status !== "present")
+          .map((field) => `${field.label}: ${field.guidance}`),
+        ...(documentEvidence.unresolvedComments
+          ? [`Unresolved comments: close ${documentEvidence.unresolvedComments} review comment(s) before release approval.`]
+          : []),
+        ...(documentEvidence.unreviewedAiMarkers
+          ? [`AI provenance review: mark ${documentEvidence.unreviewedAiMarkers} AI-assisted marker(s) human-reviewed before release.`]
+          : []),
+        ...(documentEvidence.citationTodos.length
+          ? [`Source confidence: resolve ${documentEvidence.citationTodos.length} citation TODO marker(s) before declaring source confidence.`]
+          : []),
+      ]
+    : [];
+  const status: AgenticApprovalGateStatus = blockers.length ? "blocked" : fields.some((field) => field.status !== "present") ? "needs-review" : "ready";
+  return {
+    status,
+    requiredBeforeDistribution,
+    fields,
+    blockers,
+    summary: requiredBeforeDistribution
+      ? blockers.length
+        ? `${blockers.length} approval gate blocker(s) must be cleared before distribution to ${targets || "the selected target"}.`
+        : `Approval metadata is complete for distribution to ${targets || "the selected target"}.`
+      : status === "ready"
+        ? "Approval metadata is complete, though no distribution target is active."
+        : "Approval metadata is staged for review; it becomes required when a distribution target is selected.",
+    metadataScaffold: approvalGateMetadataScaffold({
+      status: approvalMetadataValue(documentText, ["status"]) || "needs-review",
+      reviewer,
+      approvedAt: approvalMetadataValue(documentText, ["approvedAt"]),
+      owner,
+      releaseTarget,
+      sourceConfidence: sourceConfidence || "needs-review",
+    }),
+  };
+}
+
+function approvalStatusField(value: string): AgenticApprovalGateField {
+  const normalized = value.trim();
+  const approved = /^(approved|published|ready|reviewed)$/i.test(normalized);
+  return {
+    key: "status",
+    label: "Status",
+    value: normalized,
+    status: approved ? "present" : normalized ? "needs-review" : "missing",
+    guidance: "Set status to approved, published, ready, or reviewed before distribution.",
+  };
+}
+
+function approvalRequiredField(
+  key: Exclude<AgenticApprovalGateFieldKey, "status" | "sourceConfidence">,
+  label: string,
+  value: string,
+  guidance: string,
+): AgenticApprovalGateField {
+  const normalized = value.trim();
+  return {
+    key,
+    label,
+    value: normalized,
+    status: normalized && !/^TBD\b|needs-review|unknown$/i.test(normalized) ? "present" : normalized ? "needs-review" : "missing",
+    guidance,
+  };
+}
+
+function approvalSourceConfidenceField(value: string): AgenticApprovalGateField {
+  const normalized = value.trim();
+  return {
+    key: "sourceConfidence",
+    label: "Source confidence",
+    value: normalized,
+    status: /^(verified|high|confirmed|source-checked|audited)$/i.test(normalized)
+      ? "present"
+      : normalized
+        ? "needs-review"
+        : "missing",
+    guidance: "State source confidence as verified, high, confirmed, source-checked, or audited.",
+  };
+}
+
+function approvalMetadataValue(documentText: string, keys: string[]) {
+  for (const key of keys) {
+    const match = documentText.match(new RegExp(`^${key}:\\s*(.+)$`, "im"));
+    const value = match?.[1]?.trim().replace(/^["']|["']$/g, "");
+    if (value) return value;
+  }
+  return "";
+}
+
+function approvalGateMetadataScaffold(values: {
+  status: string;
+  reviewer: string;
+  approvedAt: string;
+  owner: string;
+  releaseTarget: string;
+  sourceConfidence: string;
+}) {
+  return [
+    "---",
+    "# approval-gate: complete before export, publishing, or external handoff",
+    `status: ${values.status || "needs-review"}`,
+    `reviewer: ${values.reviewer || ""}`,
+    `approvedAt: ${values.approvedAt || ""}`,
+    `owner: ${values.owner || ""}`,
+    `releaseTarget: ${values.releaseTarget || ""}`,
+    `sourceConfidence: ${values.sourceConfidence || "needs-review"}`,
+    "---",
+  ].join("\n");
+}
+
 function buildLifecycleTasks(input: {
   plan: AgenticWorkflowPlan;
   revision: AgenticWorkflowRevision | null;
@@ -2285,6 +2495,7 @@ function buildLifecycleTasks(input: {
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
   dataNarrativeLinks: AgenticDataNarrativeLink[];
+  approvalGate: AgenticApprovalGate;
   automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -2292,7 +2503,7 @@ function buildLifecycleTasks(input: {
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticLifecycleTask[] {
-  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, dataNarrativeLinks, automationQueue, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
+  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, dataNarrativeLinks, approvalGate, automationQueue, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const tasks: AgenticLifecycleTask[] = [];
   const hasBlockers = blockers.length > 0;
   const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
@@ -2503,6 +2714,25 @@ function buildLifecycleTasks(input: {
     });
   }
 
+  if (approvalGate.requiredBeforeDistribution || approvalGate.blockers.length) {
+    tasks.push({
+      id: "task-approval-gate",
+      lane: approvalGate.requiredBeforeDistribution ? "distribute" : "review",
+      title: "Clear approval metadata gate",
+      owner: "Governance Agent",
+      status: approvalGate.status === "ready" ? "ready" : approvalGate.status === "blocked" ? "blocked" : "needs-input",
+      action: approvalGate.requiredBeforeDistribution ? "prepare-export" : "open-review",
+      evidence: [
+        approvalGate.summary,
+        ...approvalGate.fields.map((field) => `${field.label}: ${field.value || "missing"} (${field.status})`),
+        ...approvalGate.blockers.slice(0, 8),
+      ],
+      nextStep: approvalGate.blockers.length
+        ? "Complete the approval metadata scaffold, close unresolved comments, confirm source confidence, and regenerate export readiness before distribution."
+        : "Attach the approval gate evidence to the release record before final handoff.",
+    });
+  }
+
   if (automationQueue.length) {
     tasks.push({
       id: "task-agent-automation-scheduler",
@@ -2562,6 +2792,7 @@ function buildLifecycleTasks(input: {
     "task-agent-automation-scheduler",
     "task-agent-transform-recommendations",
     "task-data-narrative-bridge",
+    "task-approval-gate",
     "task-section-draft-history",
     "task-pre-review-rehearsal",
     "task-final-release-readiness",
@@ -4039,6 +4270,7 @@ function buildAuditTrail(input: {
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
   dataNarrativeLinks: AgenticDataNarrativeLink[];
+  approvalGate: AgenticApprovalGate;
   automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   documentEvidence: AgenticDocumentEvidence;
@@ -4062,6 +4294,7 @@ function buildAuditTrail(input: {
     sectionDraftHistory,
     transformRecommendations,
     dataNarrativeLinks,
+    approvalGate,
     automationQueue,
     preReviewRehearsal,
     documentEvidence,
@@ -4144,6 +4377,12 @@ function buildAuditTrail(input: {
       item.owner,
       ...item.evidenceRequired,
     ]),
+    approvalGate.status,
+    approvalGate.summary,
+    String(approvalGate.requiredBeforeDistribution),
+    ...approvalGate.fields.flatMap((field) => [field.key, field.label, field.value, field.status, field.guidance]),
+    ...approvalGate.blockers,
+    approvalGate.metadataScaffold,
     ...automationQueue.flatMap((item) => [
       item.id,
       item.kind,
@@ -4242,6 +4481,7 @@ function buildAuditTrail(input: {
       `Section draft history preserved ${sectionDraftHistory.length} composable draft restore point(s).`,
       `Transform recommendations prepared ${transformRecommendations.length} agent-selected structured block(s) for calc, chart, table, diagram, timeline, schema, equation, or publishing work.`,
       `Data-to-narrative bridge prepared ${dataNarrativeLinks.length} dependency link(s) between claims, structured blocks, source signals, and affected narrative sections.`,
+      `Approval gate prepared with ${approvalGate.status} status and ${approvalGate.blockers.length} blocker(s) before distribution.`,
       `Automation scheduler queued ${automationQueue.length} safe local check(s) with destructive actions kept manual.`,
       `Pre-review rehearsal prepared ${preReviewRehearsal.length} likely reviewer question, objection, redline, or missing-evidence prompt(s).`,
       `Outline variant comparison prepared ${plan.outlineVariants.length} alternative structure(s) for user selection before drafting.`,
@@ -4286,13 +4526,14 @@ function buildReleaseEvidenceBundle(input: {
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
   dataNarrativeLinks: AgenticDataNarrativeLink[];
+  approvalGate: AgenticApprovalGate;
   automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   documentEvidence: AgenticDocumentEvidence;
   blockers: string[];
 }): AgenticReleaseEvidenceBundle {
-  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, dataNarrativeLinks, automationQueue, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
+  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, dataNarrativeLinks, approvalGate, automationQueue, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
   const taskBlockers = lifecycleTasks.filter((task) => task.status === "blocked" || task.status === "needs-input");
   const reviewerBlockers = reviewerAgents.filter((agent) => agent.status !== "ready");
   const items: AgenticReleaseEvidenceItem[] = [
@@ -4374,6 +4615,15 @@ function buildReleaseEvidenceBundle(input: {
         ? `${dataNarrativeLinks.length} structured dependency link(s) connect source changes to affected narrative sections and review actions.`
         : "No data-to-narrative dependency links were prepared.",
       true,
+    ),
+    releaseEvidenceItem(
+      "Approval metadata gate",
+      "Governance Agent",
+      approvalGate.status === "ready" ? "available" : approvalGate.status === "blocked" ? "missing" : "needs-review",
+      approvalGate.blockers.length
+        ? `${approvalGate.summary} Blockers: ${approvalGate.blockers.slice(0, 4).join("; ")}.`
+        : approvalGate.summary,
+      approvalGate.requiredBeforeDistribution,
     ),
     releaseEvidenceItem(
       "Agent automation scheduler",
@@ -4980,13 +5230,14 @@ function slugifyReferenceLabel(text: string) {
 
 function releaseMetadataMissing(documentText: string) {
   const hasValue = (key: string) => new RegExp(`^${key}:\\s*\\S`, "im").test(documentText);
-  const statusApproved = /^status:\s*(approved|published)\b/im.test(documentText);
+  const statusApproved = /^status:\s*(approved|published|ready|reviewed)\b/im.test(documentText);
   return [
-    statusApproved ? "" : "status: approved or published",
+    statusApproved ? "" : "status: approved, published, ready, or reviewed",
     hasValue("approvedBy") || hasValue("reviewer") ? "" : "approvedBy or reviewer",
     hasValue("approvedAt") ? "" : "approvedAt",
     hasValue("owner") ? "" : "owner",
     hasValue("releaseTarget") ? "" : "releaseTarget",
+    hasValue("sourceConfidence") ? "" : "sourceConfidence",
   ].filter(Boolean);
 }
 
@@ -5243,6 +5494,7 @@ function buildRunMarkdown(input: {
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   transformRecommendations: AgenticTransformRecommendation[];
   dataNarrativeLinks: AgenticDataNarrativeLink[];
+  approvalGate: AgenticApprovalGate;
   automationQueue: AgenticAutomationTask[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
@@ -5267,6 +5519,7 @@ function buildRunMarkdown(input: {
     sectionDraftHistory,
     transformRecommendations,
     dataNarrativeLinks,
+    approvalGate,
     automationQueue,
     outlineCritique,
     preReviewRehearsal,
@@ -5384,6 +5637,7 @@ function buildRunMarkdown(input: {
   lines.push(...sectionDraftHistoryMarkdown(sectionDraftHistory));
   lines.push(...transformRecommendationsMarkdown(transformRecommendations));
   lines.push(...dataNarrativeLinksMarkdown(dataNarrativeLinks));
+  lines.push(...buildAgenticApprovalGateMarkdown(approvalGate).split("\n"));
   lines.push(...automationQueueMarkdown(automationQueue));
   lines.push(...auditTrailMarkdown(auditTrail));
   lines.push(...releaseEvidenceBundleMarkdown(releaseEvidenceBundle));
@@ -5930,7 +6184,22 @@ function distributionTargetRunbookMarkdown(targetPlans: AgenticDistributionTarge
 }
 
 function extractKeyValue(corpus: string, key: string) {
-  const keys = ["audience", "owner", "deadline", "tone", "evidence", "reviewer", "client", "company", "distribution"];
+  const keys = [
+    "audience",
+    "owner",
+    "deadline",
+    "tone",
+    "evidence",
+    "reviewer",
+    "approvedBy",
+    "approvedAt",
+    "status",
+    "releaseTarget",
+    "sourceConfidence",
+    "client",
+    "company",
+    "distribution",
+  ];
   const nextKey = keys.filter((item) => item !== key).join("|");
   return corpus.match(new RegExp(`\\b${key}\\s*(?:is|=|:)\\s*([^\\n.]+?)(?=\\s+(?:${nextKey})\\s*(?:is|=|:)|[.\\n]|$)`, "i"))?.[1]?.trim();
 }

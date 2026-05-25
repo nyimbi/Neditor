@@ -3046,6 +3046,30 @@
                 </li>
               </ol>
             </section>
+            <section class="agent-approval-gate" aria-label="Agent approval metadata gate" :data-status="agentRun.approvalGate.status">
+              <header>
+                <div>
+                  <strong>Approval Metadata Gate</strong>
+                  <span>{{ agentRun.approvalGate.summary }}</span>
+                </div>
+                <small>{{ agentRun.approvalGate.status }} | {{ agentRun.approvalGate.blockers.length }} blockers</small>
+                <div class="agent-section-actions">
+                  <button type="button" @click="insertAgentApprovalGateScaffold">Insert scaffold</button>
+                  <button type="button" @click="copyAgentApprovalGateScaffold">Copy scaffold</button>
+                </div>
+              </header>
+              <section class="agent-approval-gate-grid">
+                <article v-for="field in agentRun.approvalGate.fields" :key="field.key" :data-status="field.status">
+                  <small>{{ field.status }}</small>
+                  <strong>{{ field.label }}</strong>
+                  <p>{{ field.value || "Missing" }}</p>
+                  <p class="sidebar-hint">{{ field.guidance }}</p>
+                </article>
+              </section>
+              <ul v-if="agentRun.approvalGate.blockers.length">
+                <li v-for="blocker in agentRun.approvalGate.blockers" :key="blocker">{{ blocker }}</li>
+              </ul>
+            </section>
             <section class="agent-audit-trail" aria-label="Agent audit trail">
               <header>
                 <div>
@@ -3222,6 +3246,7 @@
                   <p v-if="item.sectionDraftHistory?.length">Section drafts: {{ agentRunHistorySectionDraftSummary(item) }}</p>
                   <p v-if="item.transformRecommendationCount">Transforms: {{ item.transformRecommendationCount }} agent-selected recommendations</p>
                   <p v-if="item.dataNarrativeLinkCount">Narrative links: {{ item.dataNarrativeLinkCount }} data-to-narrative dependencies</p>
+                  <p v-if="item.approvalGateStatus">Approval gate: {{ item.approvalGateStatus }}</p>
                   <p v-if="item.automationTaskCount">Automation: {{ item.automationTaskCount }} scheduled checks</p>
                   <p v-if="item.sourcePack">Source pack: {{ agentRunHistorySourcePackSummary(item) }}</p>
                   <p v-if="item.lifecycleTaskStates?.length">Task states: {{ agentRunHistoryTaskStateSummary(item) }}</p>
@@ -3589,6 +3614,7 @@ import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
   agenticWorkflowPlaybooks,
+  buildAgenticApprovalGateMarkdown,
   buildAgenticDataNarrativeAuditMarkdown,
   buildAgenticLifecycleTaskBrief,
   buildAgenticReleaseEvidenceAuditPackage,
@@ -4462,6 +4488,7 @@ const filteredAgentRunHistory = computed(() => {
       item.packetPreview || "",
       item.status,
       item.applicationMode,
+      item.approvalGateStatus || "",
       item.providerProfile || "",
       item.documentType,
       item.controlCenter?.summary || "",
@@ -5876,6 +5903,7 @@ function agentRunHistoryItem(
     })),
     transformRecommendationCount: run.transformRecommendations.length,
     dataNarrativeLinkCount: run.dataNarrativeLinks.length,
+    approvalGateStatus: run.approvalGate.status,
     automationTaskCount: run.automationQueue.length,
     reviewerCount: run.reviewerAgents.length,
     preReviewPromptCount: run.preReviewRehearsal.length,
@@ -6106,6 +6134,7 @@ function agentHistoryAuditMarkdown() {
     "",
     ...runs.slice(0, 24).flatMap((item) => [
       `- **${agentAuditInline(item.title)}** (${agentAuditInline(item.runId)}): ${agentAuditInline(item.controlCenter?.summary || item.packetPreview || "No summary captured.")}`,
+      item.approvalGateStatus ? `  - Approval gate: ${agentAuditInline(item.approvalGateStatus)}` : "",
       item.outlineCritique?.length ? `  - Outline: ${agentAuditInline(agentRunHistoryOutlineSummary(item))}` : "",
       item.sectionDraftHistory?.length ? `  - Section drafts: ${agentAuditInline(agentRunHistorySectionDraftSummary(item))}` : "",
       item.transformRecommendationCount ? `  - Transforms: ${item.transformRecommendationCount} agent-selected recommendations` : "",
@@ -6557,6 +6586,25 @@ async function copyAgentDataNarrativeAudit() {
     store.statusMessage = "Copied data-to-narrative bridge audit";
   } catch {
     store.statusMessage = "Data-to-narrative bridge audit is ready to copy";
+  }
+}
+function insertAgentApprovalGateScaffold() {
+  const run = agentRun.value;
+  if (!run) return;
+  insertBlock(buildAgenticApprovalGateMarkdown(run.approvalGate));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted approval metadata gate scaffold";
+}
+async function copyAgentApprovalGateScaffold() {
+  const run = agentRun.value;
+  if (!run) return;
+  const markdown = buildAgenticApprovalGateMarkdown(run.approvalGate);
+  try {
+    await navigator.clipboard?.writeText(markdown);
+    store.statusMessage = "Copied approval metadata gate scaffold";
+  } catch {
+    store.statusMessage = "Approval metadata gate scaffold is ready to copy";
   }
 }
 function runAgentLifecycleTask(task: AgenticLifecycleTask) {
@@ -12312,6 +12360,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-transform-recommendations li,
 .app-shell[data-theme="dark"] .agent-data-narrative-bridge,
 .app-shell[data-theme="dark"] .agent-data-narrative-bridge li,
+.app-shell[data-theme="dark"] .agent-approval-gate,
+.app-shell[data-theme="dark"] .agent-approval-gate-grid article,
 .app-shell[data-theme="dark"] .agent-audit-trail,
 .app-shell[data-theme="dark"] .agent-audit-grid article,
 .app-shell[data-theme="dark"] .agent-release-evidence,
@@ -12488,6 +12538,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-transform-recommendations li,
   .app-shell[data-theme="system"] .agent-data-narrative-bridge,
   .app-shell[data-theme="system"] .agent-data-narrative-bridge li,
+  .app-shell[data-theme="system"] .agent-approval-gate,
+  .app-shell[data-theme="system"] .agent-approval-gate-grid article,
   .app-shell[data-theme="system"] .agent-audit-trail,
   .app-shell[data-theme="system"] .agent-audit-grid article,
   .app-shell[data-theme="system"] .agent-release-evidence,
@@ -14886,6 +14938,7 @@ select:hover {
 .agent-section-draft-history > header,
 .agent-transform-recommendations > header,
 .agent-data-narrative-bridge > header,
+.agent-approval-gate > header,
 .agent-review-comment-queue > header,
 .agent-edit-acceptance-queue > header,
 .agent-lifecycle-board > header {
@@ -14902,6 +14955,8 @@ select:hover {
 .agent-transform-recommendations li > div,
 .agent-data-narrative-bridge > header div,
 .agent-data-narrative-bridge li > div,
+.agent-approval-gate > header div,
+.agent-approval-gate-grid article,
 .agent-review-comment-queue > header div,
 .agent-review-comment-queue li > div,
 .agent-edit-acceptance-queue > header div,
@@ -14925,6 +14980,9 @@ select:hover {
 .agent-data-narrative-bridge > header span,
 .agent-data-narrative-bridge > header small,
 .agent-data-narrative-bridge small,
+.agent-approval-gate > header span,
+.agent-approval-gate > header small,
+.agent-approval-gate small,
 .agent-review-comment-queue > header span,
 .agent-review-comment-queue > header small,
 .agent-review-comment-queue small,
@@ -15061,6 +15119,49 @@ select:hover {
 
 .agent-data-narrative-bridge p,
 .agent-data-narrative-bridge ul {
+  margin: 0;
+  color: #394756;
+  font-size: 12px;
+}
+
+.agent-approval-gate {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #2f5f7e;
+  background: #f3f9fc;
+}
+
+.agent-approval-gate[data-status="blocked"] {
+  border-left-color: #b42318;
+}
+
+.agent-approval-gate[data-status="needs-review"] {
+  border-left-color: #b7791f;
+}
+
+.agent-approval-gate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.agent-approval-gate-grid article {
+  padding: 10px;
+  border: 1px solid #d9e5ec;
+  border-left: 3px solid #2f7d4c;
+  background: #ffffff;
+}
+
+.agent-approval-gate-grid article[data-status="missing"] {
+  border-left-color: #b42318;
+}
+
+.agent-approval-gate-grid article[data-status="needs-review"] {
+  border-left-color: #b7791f;
+}
+
+.agent-approval-gate p,
+.agent-approval-gate ul {
   margin: 0;
   color: #394756;
   font-size: 12px;

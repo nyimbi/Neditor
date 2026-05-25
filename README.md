@@ -238,8 +238,10 @@ web app.
   for coverage, sequencing, duplication, depth, and specificity, deterministic
   humanization findings for generic, repetitive, vague, or overconfident
   language, a release evidence bundle for audit trail, source grounding, review
-  closure, approval metadata, provider proof, distribution artifact
-  requirements, and per-target export or publishing evidence obligations, a
+  closure, an Approval Metadata Gate that blocks distribution readiness until
+  status, reviewer, approvedAt, owner, release target, source confidence,
+  comments, and AI provenance are cleared, provider proof, distribution
+  artifact requirements, and per-target export or publishing evidence obligations, a
   section-by-section work queue with drafting instructions, completion criteria, assigned reviewers, per-section
   work-brief insertion, and focused Docs Live handoff that can replace the
   matching Markdown section instead of appending duplicate section copy, an
@@ -362,7 +364,9 @@ artifacts:
 ### Review, Release, And AI Governance
 
 - Release statuses such as draft, in-review, approved, published, and archived.
-- Approval metadata validation before release-grade exports.
+- Approval Metadata Gate validation before release-grade exports and publishing
+  handoffs, including an insertable scaffold for missing status, reviewer,
+  approvedAt, owner, release target, and source confidence fields.
 - Inline review comments, unresolved-comment validation, change notes, and
   export appendix options.
 - AI paste cleanup for chat output, code fences, bullets, tables, links,
