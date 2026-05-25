@@ -1524,6 +1524,10 @@ Finish:
   records `docsLive.open: true` from the Writing Tools menu. Remaining work is
   real browser/native microphone permission proof and accepted provider evidence
   from a credentialed host.
+- Agentic distribution runbooks. AI Agent Workspace now turns requested export
+  or publishing targets into target-specific preflight, handoff, and evidence
+  cards for HTML, PDF, DOCX, PPTX, Markdown bundles, blog, Substack, LaTeX, and
+  Google Docs instead of leaving distribution as a generic checklist.
 - Live AI provider evidence. `pnpm run check:ai-provider` now validates
   accepted provider proof for current app version, current source commit, clean
   source tree, response hashes, 2xx status, the

@@ -193,8 +193,9 @@ web app.
   revision intent, export targets, and runnable next steps that route into Docs
   Live, AI Paste cleanup, Review, or Export readiness. It can also generate a
   complete agent packet with a Docs Live draft, selection-aware revision
-  proposal, QA gates, distribution checklist, AI provenance, blockers, and
-  safe apply behavior for replacing a document, replacing selected text, or
+  proposal, QA gates, target-specific distribution runbooks, AI provenance,
+  blockers, and safe apply behavior for replacing a document, replacing selected
+  text, or
   appending a review packet. Provider handoff packages turn that run into
   redacted prompts, JSON request bodies, headers, cURL starters, and safety
   checklists for approved AI providers or local model gateways without storing

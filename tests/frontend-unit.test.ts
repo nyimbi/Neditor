@@ -436,13 +436,19 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.summary.includes("Create"));
   ok(run.plan.distributionTargets.includes("substack"));
   ok(run.plan.distributionTargets.includes("google-docs"));
+  equal(run.distributionTargetPlans.length, 2);
+  ok(run.distributionTargetPlans.some((plan) => plan.label === "Substack newsletter package"));
+  ok(run.distributionTargetPlans.some((plan) => plan.evidenceRequired.some((item) => item.includes("Google Drive import/readback"))));
   ok(run.markdown.includes("provider: NEditor Agent Workspace"));
   ok(run.markdown.includes("model: local-agentic-workflow"));
   ok(run.markdown.includes("## Generated Draft"));
   ok(run.markdown.includes("provider: NEditor Docs Live"));
   ok(run.markdown.includes("## Quality Assurance"));
   ok(run.markdown.includes("## Distribution"));
-  ok(run.distributionChecklist.some((item) => item.startsWith("substack:")));
+  ok(run.markdown.includes("### Target Runbooks"));
+  ok(run.markdown.includes("Substack newsletter package"));
+  ok(run.markdown.includes("Google Docs collaboration package"));
+  ok(run.distributionChecklist.some((item) => item.startsWith("Substack newsletter package:")));
   ok(run.reviewChecklist.some((item) => item.includes("human-reviewed")));
 });
 
@@ -813,6 +819,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Generate agent packet"));
   ok(app.includes("Apply agent output"));
   ok(app.includes('aria-label="Agent generated output"'));
+  ok(app.includes('aria-label="Agent distribution target runbooks"'));
+  ok(app.includes("distributionTargetPlans"));
   ok(app.includes("Build provider request"));
   ok(app.includes("Copy provider package"));
   ok(app.includes("Run provider request"));

@@ -1951,6 +1951,32 @@
                 </ul>
               </article>
             </section>
+            <section v-if="agentRun.distributionTargetPlans.length" class="agent-distribution-runbooks" aria-label="Agent distribution target runbooks">
+              <article v-for="targetPlan in agentRun.distributionTargetPlans" :key="targetPlan.target">
+                <header>
+                  <strong>{{ targetPlan.label }}</strong>
+                  <span>{{ targetPlan.purpose }}</span>
+                </header>
+                <div>
+                  <h3>Preflight</h3>
+                  <ul>
+                    <li v-for="item in targetPlan.preflightChecks" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3>Handoff</h3>
+                  <ul>
+                    <li v-for="item in targetPlan.handoffSteps" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3>Evidence</h3>
+                  <ul>
+                    <li v-for="item in targetPlan.evidenceRequired" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+              </article>
+            </section>
             <textarea :value="agentRun.markdown" rows="12" readonly aria-label="Agent generated Markdown"></textarea>
           </section>
           <section class="agent-provider-panel" aria-label="AI provider handoff">
@@ -8435,6 +8461,7 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-missing-inputs li,
 .app-shell[data-theme="dark"] .agent-run-output,
 .app-shell[data-theme="dark"] .agent-run-columns article,
+.app-shell[data-theme="dark"] .agent-distribution-runbooks article,
 .app-shell[data-theme="dark"] .agent-provider-panel,
 .app-shell[data-theme="dark"] .agent-provider-output,
 .app-shell[data-theme="dark"] .docs-live-runtime,
@@ -8463,6 +8490,7 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-run-output > header span,
 .app-shell[data-theme="dark"] .agent-run-output > header small,
 .app-shell[data-theme="dark"] .agent-run-columns ul,
+.app-shell[data-theme="dark"] .agent-distribution-runbooks ul,
 .app-shell[data-theme="dark"] .agent-provider-panel header span,
 .app-shell[data-theme="dark"] .agent-provider-output header span,
 .app-shell[data-theme="dark"] .agent-provider-output ul,
@@ -8529,6 +8557,7 @@ select:hover {
   .app-shell[data-theme="system"] .agent-missing-inputs li,
   .app-shell[data-theme="system"] .agent-run-output,
   .app-shell[data-theme="system"] .agent-run-columns article,
+  .app-shell[data-theme="system"] .agent-distribution-runbooks article,
   .app-shell[data-theme="system"] .agent-provider-panel,
   .app-shell[data-theme="system"] .agent-provider-output,
   .app-shell[data-theme="system"] .docs-live-runtime,
@@ -8557,6 +8586,7 @@ select:hover {
   .app-shell[data-theme="system"] .agent-run-output > header span,
   .app-shell[data-theme="system"] .agent-run-output > header small,
   .app-shell[data-theme="system"] .agent-run-columns ul,
+  .app-shell[data-theme="system"] .agent-distribution-runbooks ul,
   .app-shell[data-theme="system"] .agent-provider-panel header span,
   .app-shell[data-theme="system"] .agent-provider-output header span,
   .app-shell[data-theme="system"] .agent-provider-output ul,
@@ -8608,6 +8638,7 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-missing-inputs li,
 .app-shell[data-high-contrast="true"] .agent-run-output,
 .app-shell[data-high-contrast="true"] .agent-run-columns article,
+.app-shell[data-high-contrast="true"] .agent-distribution-runbooks article,
 .app-shell[data-high-contrast="true"] .agent-provider-panel,
 .app-shell[data-high-contrast="true"] .agent-provider-output,
 .app-shell[data-high-contrast="true"] .docs-live-runtime,
@@ -10083,6 +10114,7 @@ select:hover {
 .agent-step-list li,
 .agent-run-output,
 .agent-run-columns article,
+.agent-distribution-runbooks article,
 .agent-provider-panel,
 .agent-provider-output {
   padding: 10px;
@@ -10175,17 +10207,42 @@ select:hover {
   gap: 10px;
 }
 
+.agent-distribution-runbooks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .agent-run-columns article {
   display: grid;
   gap: 6px;
 }
 
+.agent-distribution-runbooks article {
+  display: grid;
+  gap: 8px;
+  border-left: 3px solid #7a5b2e;
+}
+
+.agent-distribution-runbooks header {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-distribution-runbooks header span {
+  color: #526171;
+  font-size: 12px;
+}
+
 .agent-run-columns h3,
-.agent-run-columns ul {
+.agent-run-columns ul,
+.agent-distribution-runbooks h3,
+.agent-distribution-runbooks ul {
   margin: 0;
 }
 
-.agent-run-columns ul {
+.agent-run-columns ul,
+.agent-distribution-runbooks ul {
   display: grid;
   gap: 4px;
   padding-left: 18px;
@@ -11391,6 +11448,7 @@ select:hover {
 
   .agent-plan-grid,
   .agent-run-columns,
+  .agent-distribution-runbooks,
   .agent-provider-grid,
   .agent-step-list li {
     grid-template-columns: 1fr;

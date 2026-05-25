@@ -61,7 +61,17 @@ export interface AgenticWorkflowRun {
   revision: AgenticWorkflowRevision | null;
   reviewChecklist: string[];
   distributionChecklist: string[];
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
+}
+
+export interface AgenticDistributionTargetPlan {
+  target: ExportTarget;
+  label: string;
+  purpose: string;
+  preflightChecks: string[];
+  handoffSteps: string[];
+  evidenceRequired: string[];
 }
 
 const exportSignals: Array<[ExportTarget, RegExp]> = [
@@ -147,7 +157,8 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
       })
     : null;
   const reviewChecklist = buildReviewChecklist(plan, revision);
-  const distributionChecklist = buildDistributionChecklist(plan);
+  const distributionTargetPlans = buildDistributionTargetPlans(plan);
+  const distributionChecklist = buildDistributionChecklist(plan, distributionTargetPlans);
   const blockers = buildRunBlockers(plan, hasDocument, hasSelection);
   const applicationMode = inferApplicationMode(plan, hasDocument, hasSelection);
   const markdown = buildRunMarkdown({
@@ -156,6 +167,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     revision,
     reviewChecklist,
     distributionChecklist,
+    distributionTargetPlans,
     blockers,
     generatedAt: request.generatedAt || new Date().toISOString(),
   });
@@ -168,6 +180,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     revision,
     reviewChecklist,
     distributionChecklist,
+    distributionTargetPlans,
     blockers,
   };
 }
@@ -395,14 +408,115 @@ function buildReviewChecklist(plan: AgenticWorkflowPlan, revision: AgenticWorkfl
   ].filter(Boolean);
 }
 
-function buildDistributionChecklist(plan: AgenticWorkflowPlan) {
+function buildDistributionTargetPlans(plan: AgenticWorkflowPlan): AgenticDistributionTargetPlan[] {
+  return plan.distributionTargets.map((target) => {
+    const profile = distributionProfile(target);
+    return {
+      target,
+      label: profile.label,
+      purpose: profile.purpose,
+      preflightChecks: [
+        "Confirm approval status, reviewer, approvedAt, and export metadata are present.",
+        "Run export readiness and resolve unresolved comments, AI review warnings, broken links, and missing assets.",
+        ...profile.preflightChecks,
+      ],
+      handoffSteps: profile.handoffSteps,
+      evidenceRequired: [
+        "Export manifest with target, version, source path, generatedAt, byte size, and SHA-256 where available.",
+        "Human reviewer note or checklist entry confirming the delivered artifact was inspected.",
+        ...profile.evidenceRequired,
+      ],
+    };
+  });
+}
+
+function buildDistributionChecklist(plan: AgenticWorkflowPlan, targetPlans: AgenticDistributionTargetPlan[]) {
   if (!plan.distributionTargets.length) {
     return ["Select distribution targets, then run export readiness before release."];
   }
-  return plan.distributionTargets.flatMap((target) => [
-    `${target}: confirm approval status, reviewer, metadata, brand settings, and manifest settings.`,
-    `${target}: export a review copy and inspect the package or artifact before publishing.`,
+  return targetPlans.flatMap((targetPlan) => [
+    `${targetPlan.label}: ${targetPlan.preflightChecks[0]}`,
+    `${targetPlan.label}: ${targetPlan.handoffSteps[0]}`,
+    `${targetPlan.label}: retain ${targetPlan.evidenceRequired[0].toLowerCase()}`,
   ]);
+}
+
+function distributionProfile(target: ExportTarget) {
+  const profiles: Record<
+    ExportTarget,
+    {
+      label: string;
+      purpose: string;
+      preflightChecks: string[];
+      handoffSteps: string[];
+      evidenceRequired: string[];
+    }
+  > = {
+    html: {
+      label: "HTML review copy",
+      purpose: "Browser-readable review, static publishing, and lightweight stakeholder circulation.",
+      preflightChecks: ["Set language, title, canonical URL if publishing, and visible export stylesheet."],
+      handoffSteps: ["Export standalone HTML, open it in a browser, and confirm headings, tables, links, and AI provenance render correctly."],
+      evidenceRequired: ["Browser screenshot or reviewer note for the generated HTML file."],
+    },
+    pdf: {
+      label: "PDF controlled copy",
+      purpose: "Board packs, signed approvals, print review, and fixed-layout circulation.",
+      preflightChecks: ["Confirm page size, cover, headers, footers, page numbers, watermark, and approval metadata."],
+      handoffSteps: ["Export PDF, inspect page count and text extraction, then send only after status is approved or published."],
+      evidenceRequired: ["PDF metadata/text proof or native-viewer sign-off for the final PDF."],
+    },
+    docx: {
+      label: "DOCX editable review",
+      purpose: "Word-based redlines, legal review, and stakeholder edits outside NEditor.",
+      preflightChecks: ["Confirm comments, change notes, AI provenance appendix, bibliography, and table formatting are review-ready."],
+      handoffSteps: ["Export DOCX, open in Word or an approved viewer, and ask reviewers to preserve tracked-review context."],
+      evidenceRequired: ["DOCX viewer note or extracted text proof for key sections and appendices."],
+    },
+    pptx: {
+      label: "PPTX executive handoff",
+      purpose: "Slide-based executive review and presentation-outline handoff.",
+      preflightChecks: ["Confirm agenda flow, section titles, speaker notes, figures, and decision slides."],
+      handoffSteps: ["Export PPTX, open the deck, and confirm each generated slide matches the intended narrative."],
+      evidenceRequired: ["PPTX viewer note or Office preview proof for the generated deck."],
+    },
+    "markdown-bundle": {
+      label: "Markdown source bundle",
+      purpose: "Auditable source package for teams that review or archive Markdown and assets.",
+      preflightChecks: ["Confirm included files, assets, transform artifacts, and manifest entries are complete."],
+      handoffSteps: ["Export the bundle, inspect the manifest, and archive it with the review record."],
+      evidenceRequired: ["Bundle manifest proof listing source files, assets, and transform artifacts."],
+    },
+    blog: {
+      label: "Blog publishing package",
+      purpose: "CMS or blog handoff with Markdown, HTML, text, assets, RSS seed, and publish metadata.",
+      preflightChecks: ["Confirm slug, excerpt, tags, canonical URL, images, alt text, and publish workflow metadata."],
+      handoffSteps: ["Export the blog package, copy the prepared content into the CMS, and keep the package manifest with the approval record."],
+      evidenceRequired: ["CMS preview note or package manifest with post.md, post.html, post.txt, and rss-item.xml."],
+    },
+    substack: {
+      label: "Substack newsletter package",
+      purpose: "Newsletter handoff with Substack-safe HTML, Markdown, text, assets, and publish metadata.",
+      preflightChecks: ["Confirm subject line, preview text, subscriber context, links, images, and call to action."],
+      handoffSteps: ["Export the Substack package, paste substack-copy.html or Markdown into Substack, and send a test preview before scheduling."],
+      evidenceRequired: ["Substack preview note or package manifest with substack-copy.html and publish metadata."],
+    },
+    latex: {
+      label: "LaTeX source export",
+      purpose: "Academic, technical, or formal typesetting handoff with inspectable TeX source.",
+      preflightChecks: ["Confirm equations, cross references, bibliography, labels, and document metadata compile cleanly."],
+      handoffSteps: ["Export LaTeX, compile with the approved TeX toolchain, and inspect warnings before sharing the PDF."],
+      evidenceRequired: ["TeX compile log summary and generated PDF hash when available."],
+    },
+    "google-docs": {
+      label: "Google Docs collaboration package",
+      purpose: "Google Docs import handoff for collaborative review while preserving a local source of truth.",
+      preflightChecks: ["Confirm DOCX, HTML, Markdown, text, assets, import metadata, and unresolved blockers are ready."],
+      handoffSteps: ["Export the Google Docs package, import document.docx into Google Docs, read back required text markers, and keep the Drive URL in the review record."],
+      evidenceRequired: ["Google Drive import/readback evidence with imported document URL and exported DOCX hash."],
+    },
+  };
+  return profiles[target];
 }
 
 function buildRunBlockers(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSelection: boolean) {
@@ -429,10 +543,11 @@ function buildRunMarkdown(input: {
   revision: AgenticWorkflowRevision | null;
   reviewChecklist: string[];
   distributionChecklist: string[];
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   generatedAt: string;
 }) {
-  const { plan, draftMarkdown, revision, reviewChecklist, distributionChecklist, blockers, generatedAt } = input;
+  const { plan, draftMarkdown, revision, reviewChecklist, distributionChecklist, distributionTargetPlans, blockers, generatedAt } = input;
   const lines = [
     "---",
     `title: ${yamlScalar(`${plan.title} Agent Run`)}`,
@@ -505,6 +620,7 @@ function buildRunMarkdown(input: {
     "",
     ...distributionChecklist.map((item) => `- [ ] ${item}`),
     "",
+    ...(distributionTargetPlans.length ? distributionTargetRunbookMarkdown(distributionTargetPlans) : []),
     "## Human Review Handoff",
     "",
     "A person should verify sources, numbers, tone, reviewer metadata, and export readiness before this agent run is accepted.",
@@ -515,6 +631,28 @@ function buildRunMarkdown(input: {
 
 function fencedBlock(language: string, value: string) {
   return ["```" + language, value.trim() || "(empty)", "```"].join("\n");
+}
+
+function distributionTargetRunbookMarkdown(targetPlans: AgenticDistributionTargetPlan[]) {
+  const lines = ["### Target Runbooks", ""];
+  for (const targetPlan of targetPlans) {
+    lines.push(
+      `#### ${targetPlan.label}`,
+      "",
+      `Purpose: ${targetPlan.purpose}`,
+      "",
+      "Preflight:",
+      ...targetPlan.preflightChecks.map((item) => `- [ ] ${item}`),
+      "",
+      "Handoff:",
+      ...targetPlan.handoffSteps.map((item) => `- [ ] ${item}`),
+      "",
+      "Evidence:",
+      ...targetPlan.evidenceRequired.map((item) => `- [ ] ${item}`),
+      "",
+    );
+  }
+  return lines;
 }
 
 function extractKeyValue(corpus: string, key: string) {
