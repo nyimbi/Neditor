@@ -1711,8 +1711,9 @@ Finish:
   `[INDEX]`, `index: true`, `index.enabled: true`, linked heading/glossary/bold/
   proper-noun/explicit terms, exclusion settings, marker stripping, and
   cross-target export artifacts. The References sidebar now provides an Index
-  manager for generated index insertion, front matter index enablement, and
-  detected-term navigation. Readiness now warns when a generated index is
+  manager for generated index insertion, front matter index enablement,
+  detected-term navigation, exclusion management, state summaries, and an
+  insertable index audit table. Readiness now warns when a generated index is
   requested without any terms, and copies the warning into export manifests;
   remaining work is native workflow execution and rendered/manual UX QA.
 - Glossary definition preview, hover behavior, generated-section marker,
@@ -1721,10 +1722,10 @@ Finish:
   front matter insertion, DOCX artifact text, export appendices, and command
   palette listing. The References sidebar now provides a Glossary manager for
   generated glossary insertion, definition templates, export glossary enablement,
-  term navigation, and adding glossary terms to the index. Readiness now warns
-  when a generated glossary is requested without entries, and copies the warning
-  into export manifests; remaining work is native workflow execution and
-  rendered/manual UX QA.
+  term navigation, adding glossary terms to the index, state summaries, and an
+  insertable glossary audit table. Readiness now warns when a generated glossary
+  is requested without entries, and copies the warning into export manifests;
+  remaining work is native workflow execution and rendered/manual UX QA.
 
 ### 15. Layout And Reflow
 

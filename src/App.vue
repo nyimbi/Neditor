@@ -1020,10 +1020,12 @@
           </template>
           <h3>Glossary</h3>
           <section class="reference-manager" aria-label="Glossary manager">
+            <p class="sidebar-hint">{{ glossaryManagerSummary }}</p>
             <div class="reference-actions">
               <button type="button" @click="insertBlock(glossarySectionSnippet)">Insert generated glossary</button>
               <button type="button" @click="insertBlock(glossarySnippet)">Insert glossary definitions</button>
               <button type="button" @click="store.exportDefaults.includeGlossary = true">Include glossary in exports</button>
+              <button type="button" @click="insertGlossaryAuditTable">Insert glossary audit</button>
             </div>
             <p v-if="!glossaryEntries.length" class="sidebar-hint">No glossary terms detected.</p>
             <article v-for="entry in glossaryEntries" :key="entry.term" class="snapshot-row">
@@ -1037,9 +1039,11 @@
           </section>
           <h3>Index</h3>
           <section class="reference-manager" aria-label="Index manager">
+            <p class="sidebar-hint">{{ indexManagerSummary }}</p>
             <div class="reference-actions">
               <button type="button" @click="insertBlock(indexSnippet)">Insert generated index</button>
               <button type="button" @click="setFrontMatterField('index', 'true')">Enable front matter index</button>
+              <button type="button" @click="insertIndexAuditTable">Insert index audit</button>
             </div>
             <div class="reference-inline-form">
               <label>
@@ -4825,6 +4829,11 @@ const glossaryEntries = computed(() =>
     .map(([term, definition]) => ({ term, definition }))
     .sort((left, right) => left.term.localeCompare(right.term)),
 );
+const glossaryManagerSummary = computed(() => {
+  const marker = active.value.text.includes("[GLOSSARY]") ? "marker present" : "marker missing";
+  const exportState = store.exportDefaults.includeGlossary ? "included in exports" : "not included in exports";
+  return `${glossaryEntries.value.length} glossary terms | ${marker} | ${exportState}`;
+});
 const tocManagerSummary = computed(() => {
   const tocEnabled = frontMatterScalarValue(active.value.text, "toc") || frontMatterScalarValue(active.value.text, "tableOfContents");
   const depth = frontMatterScalarValue(active.value.text, "tocDepth") || "default";
@@ -4880,6 +4889,11 @@ const captionManagerSummary = computed(() => {
 });
 const indexTerms = computed(() => [...(active.value.compile?.index_terms || [])].sort((left, right) => left.localeCompare(right)));
 const indexExclusionTerms = computed(() => frontMatterListValues(active.value.text, "indexExclude"));
+const indexManagerSummary = computed(() => {
+  const marker = active.value.text.includes("[INDEX]") ? "marker present" : "marker missing";
+  const frontMatterIndex = frontMatterScalarValue(active.value.text, "index") || "not set";
+  return `${indexTerms.value.length} index terms | ${indexExclusionTerms.value.length} exclusions | front matter index: ${frontMatterIndex} | ${marker}`;
+});
 const reviewSummary = computed(() => {
   const semantic = active.value.compile?.semantic;
   const comments = semantic?.comments || [];
@@ -12178,6 +12192,31 @@ function insertIndexMarkerFromDraft() {
   insertIndexMarkerForTerm(term);
   indexTermDraft.value = "";
   store.statusMessage = `Inserted index marker for ${term}`;
+}
+
+function insertGlossaryAuditTable() {
+  const rows = glossaryEntries.value.length
+    ? glossaryEntries.value.map((entry) => `| ${escapeMarkdownTableCell(entry.term)} | ${escapeMarkdownTableCell(entry.definition)} | review |`)
+    : ["| No glossary terms detected | Add glossary definitions before review | open |"];
+  insertBlock(["## Glossary Audit", "", "| Term | Definition | Review status |", "| --- | --- | --- |", ...rows].join("\n"));
+  store.statusMessage = "Inserted glossary audit table";
+}
+
+function insertIndexAuditTable() {
+  const rows = [
+    ...indexTerms.value.map((term) => `| ${escapeMarkdownTableCell(term)} | indexed | review |`),
+    ...indexExclusionTerms.value.map((term) => `| ${escapeMarkdownTableCell(term)} | excluded | confirm exclusion |`),
+  ];
+  insertBlock(
+    [
+      "## Index Audit",
+      "",
+      "| Term | Index state | Review status |",
+      "| --- | --- | --- |",
+      ...(rows.length ? rows : ["| No index terms detected | add terms | open |"]),
+    ].join("\n"),
+  );
+  store.statusMessage = "Inserted index audit table";
 }
 
 function addIndexExclusion() {

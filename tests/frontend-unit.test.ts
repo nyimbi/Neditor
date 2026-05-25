@@ -2480,6 +2480,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Insert another"));
   ok(app.includes("Go to label"));
   ok(app.includes('aria-label="Index manager"'));
+  ok(app.includes("glossaryManagerSummary"));
+  ok(app.includes("indexManagerSummary"));
+  ok(app.includes("Insert glossary audit"));
+  ok(app.includes("Insert index audit"));
+  ok(app.includes("insertGlossaryAuditTable"));
+  ok(app.includes("insertIndexAuditTable"));
+  ok(app.includes("escapeMarkdownTableCell"));
   ok(app.includes("indexTermDraft"));
   ok(app.includes("indexExcludeDraft"));
   ok(app.includes("indexExclusionTerms"));

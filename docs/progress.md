@@ -746,6 +746,10 @@ Recent pushed checkpoints visible in current git history:
   multi-cursor editing, so a non-technical query such as "multi cursor" exposes
   add-cursor-above, add-cursor-below, and select-next-occurrence before the
   browser workflow edits two lines through multiple cursors.
+- This update adds first-class Glossary and Index manager summaries plus
+  insertable audit tables, letting reviewers verify detected terms,
+  generated-section markers, export inclusion, and index exclusions from the
+  References panel.
 - This update extends the editor ergonomics workflow harness with an exact
   status-bar assertion for word count, character count, and reading-time
   metrics.

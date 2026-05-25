@@ -2797,19 +2797,40 @@ test("runs command palette citation glossary and index navigation", async ({ pag
   await expect(page.locator(".cm-line").filter({ hasText: "Working capital" })).toBeVisible();
 
   const glossaryManager = page.getByRole("region", { name: "Glossary manager" });
+  await expect(glossaryManager).toContainText("1 glossary terms");
+  await expect(glossaryManager).toContainText("marker missing");
   await expect(glossaryManager).toContainText("ARR");
   await expect(glossaryManager).toContainText("Annual recurring revenue.");
+  await glossaryManager.getByRole("button", { name: "Include glossary in exports" }).click();
+  await expect(glossaryManager).toContainText("included in exports");
   await glossaryManager.getByRole("button", { name: "Add ARR to index" }).click();
   await expect.poll(() => editorText(page)).toContain("#index:ARR");
+  await glossaryManager.getByRole("button", { name: "Insert glossary audit" }).click();
+  await expect.poll(() => editorText(page)).toContain("## Glossary Audit");
+  await expect.poll(() => editorText(page)).toContain("| ARR | Annual recurring revenue. | review |");
 
   const indexManager = page.getByRole("region", { name: "Index manager" });
+  await expect(indexManager).toContainText("2 index terms");
+  await expect(indexManager).toContainText("0 exclusions");
+  await expect(indexManager).toContainText("front matter index: not set");
   await indexManager.getByRole("button", { name: "Insert generated index" }).click();
   await expect.poll(() => editorText(page)).toContain("[INDEX]");
+  await expect(indexManager).toContainText("marker present");
   await indexManager.getByRole("button", { name: "Enable front matter index" }).click();
   await expect.poll(() => editorText(page)).toContain("index: true");
+  await expect(indexManager).toContainText("front matter index: true");
+  await indexManager.getByPlaceholder("Internal Draft, Secret Plan").fill("Internal Draft");
+  await indexManager.getByRole("button", { name: "Exclude term" }).click();
+  await expect(indexManager).toContainText("1 exclusions");
+  await expect(indexManager).toContainText("Internal Draft");
+  await indexManager.getByRole("button", { name: "Insert index audit" }).click();
+  await expect.poll(() => editorText(page)).toContain("## Index Audit");
+  await expect.poll(() => editorText(page)).toContain("| Working Capital | indexed | review |");
+  await expect.poll(() => editorText(page)).toContain("| Internal Draft | excluded | confirm exclusion |");
 
   await glossaryManager.getByRole("button", { name: "Insert generated glossary" }).click();
   await expect.poll(() => editorText(page)).toContain("[GLOSSARY]");
+  await expect(glossaryManager).toContainText("marker present");
 });
 
 test("manages front matter data sources from the references panel", async ({ page }) => {
