@@ -110,6 +110,7 @@ export interface AgenticWorkflowRun {
   revision: AgenticWorkflowRevision | null;
   controlCenter: AgenticControlCenter;
   auditTrail: AgenticAuditTrail;
+  documentEvidence: AgenticDocumentEvidence;
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
@@ -398,6 +399,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     revision,
     controlCenter,
     auditTrail,
+    documentEvidence,
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,

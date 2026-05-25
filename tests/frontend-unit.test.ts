@@ -744,7 +744,14 @@ test("AI provider packages redact secrets and preserve agent governance context"
     instruction:
       "Create a board memo, revise for the CFO, review evidence, and prepare PDF. audience: board owner: Finance deadline: June 1 evidence: audited forecast",
     documentTitle: "Capital Allocation Memo",
-    documentText: "# Capital Allocation Memo\n\nDraft.",
+    documentText: [
+      "# Capital Allocation Memo",
+      "",
+      "Revenue grows by 18%. citation TODO",
+      "Furthermore, this comprehensive analysis clearly unlocks the potential for growth.",
+      "{{client_name}} must approve the investment.",
+      "<!-- comment: unresolved | author: CFO | at: 2026-05-24 | Confirm revenue basis. -->",
+    ].join("\n"),
     selectedText: "The investment grows revenue by 18%.",
     generatedAt: "2026-05-24T10:00:00.000Z",
   });
@@ -758,6 +765,11 @@ test("AI provider packages redact secrets and preserve agent governance context"
   equal(providerPackage.redactedHeaders.Authorization, "Bearer ${CLIENT_AI_KEY}");
   ok(providerPackage.systemPrompt.includes("preserve Markdown structure"));
   ok(providerPackage.userPrompt.includes("Capital Allocation Memo"));
+  ok(providerPackage.userPrompt.includes("Source evidence pack:"));
+  ok(providerPackage.userPrompt.includes("Line 3 [number]: Revenue grows by 18%"));
+  ok(providerPackage.sourcePack.claimReview.some((item) => item.includes("Revenue grows by 18%")));
+  ok(providerPackage.sourcePack.cleanupBlockers.some((item) => item.includes("comprehensive analysis")));
+  ok(providerPackage.sourcePack.governanceBlockers.some((item) => item.includes("unresolved review comment")));
   ok(providerPackage.userPrompt.includes("Reviewer agents:"));
   ok(providerPackage.userPrompt.includes("Lifecycle task board:"));
   ok(providerPackage.userPrompt.includes("Final human approval and release readiness"));
@@ -767,7 +779,9 @@ test("AI provider packages redact secrets and preserve agent governance context"
   ok(providerPackage.curl.includes("${CLIENT_AI_KEY}"));
   ok(!providerPackage.curl.includes("client_ai_key"));
   ok(providerPackage.markdown.includes("OpenAI-compatible JSON Request Package"));
+  ok(providerPackage.markdown.includes("## Source Evidence Pack"));
   ok(providerPackage.markdown.includes("Safety Checklist"));
+  ok(providerPackage.checklist.some((item) => item.includes("source-pack review item")));
   ok(providerPackage.checklist.some((item) => item.includes("approves this provider")));
 });
 

@@ -24,11 +24,20 @@ export interface AiProviderRequestPackage {
   profile: AiProviderProfile;
   systemPrompt: string;
   userPrompt: string;
+  sourcePack: AiProviderSourcePack;
   requestBody: Record<string, unknown>;
   redactedHeaders: Record<string, string>;
   curl: string;
   checklist: string[];
   markdown: string;
+}
+
+export interface AiProviderSourcePack {
+  contextSources: string[];
+  claimReview: string[];
+  cleanupBlockers: string[];
+  governanceBlockers: string[];
+  distributionBlockers: string[];
 }
 
 export interface AiProviderExecutionResult {
@@ -117,17 +126,19 @@ export function buildAiProviderRequestPackage(
   };
   const keyEnv = normalizeEnvName(options.keyEnv) || "NEDITOR_AI_API_KEY";
   const systemPrompt = buildSystemPrompt(run);
-  const userPrompt = buildUserPrompt(run);
+  const sourcePack = buildAiProviderSourcePack(run);
+  const userPrompt = buildUserPrompt(run, sourcePack);
   const requestBody = buildRequestBody(profile, systemPrompt, userPrompt);
   const redactedHeaders = buildHeaders(profile, keyEnv);
   const curl = buildCurl(profile, redactedHeaders, requestBody);
-  const checklist = buildChecklist(profile, keyEnv);
-  const markdown = buildMarkdown(profile, systemPrompt, userPrompt, requestBody, redactedHeaders, curl, checklist);
+  const checklist = buildChecklist(profile, keyEnv, sourcePack);
+  const markdown = buildMarkdown(profile, systemPrompt, userPrompt, sourcePack, requestBody, redactedHeaders, curl, checklist);
 
   return {
     profile,
     systemPrompt,
     userPrompt,
+    sourcePack,
     requestBody,
     redactedHeaders,
     curl,
@@ -215,7 +226,7 @@ function buildSystemPrompt(run: AgenticWorkflowRun) {
   ].join("\n");
 }
 
-function buildUserPrompt(run: AgenticWorkflowRun) {
+function buildUserPrompt(run: AgenticWorkflowRun, sourcePack: AiProviderSourcePack) {
   return [
     `Instruction:\n${run.plan.instruction || "Improve this document."}`,
     "",
@@ -224,6 +235,8 @@ function buildUserPrompt(run: AgenticWorkflowRun) {
     `Placeholders:\n${run.plan.placeholderText}`,
     "",
     `Suggested outline:\n${run.plan.suggestedOutline}`,
+    "",
+    `Source evidence pack:\n${formatSourcePack(sourcePack)}`,
     "",
     `Reviewer agents:\n${run.reviewerAgents.map((agent) => `- ${agent.label} [${agent.status}]: ${agent.mandate}`).join("\n")}`,
     "",
@@ -255,6 +268,64 @@ function formatLifecycleTask(task: AgenticWorkflowRun["lifecycleTasks"][number])
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function buildAiProviderSourcePack(run: AgenticWorkflowRun): AiProviderSourcePack {
+  const evidence = run.documentEvidence;
+  const contextSources = [
+    `Run ID: ${run.auditTrail.runId}`,
+    `Source fingerprint: ${run.auditTrail.sourceFingerprint}`,
+    `Instruction fingerprint: ${run.auditTrail.instructionFingerprint}`,
+    `Document type: ${run.plan.documentType}`,
+    `Application mode: ${run.applicationMode}`,
+    `Control-center readiness: ${run.controlCenter.readinessScore}/100 (${run.controlCenter.status})`,
+  ];
+  const claimReview = [
+    ...evidence.claimInventory.slice(0, 12).map((claim) => `Line ${claim.sourceLine} [${claim.kind}]: ${claim.text} (${claim.reason})`),
+    ...evidence.citationTodos.slice(0, 8).map((todo) => `Citation TODO: ${todo}`),
+  ];
+  const cleanupBlockers = [
+    ...evidence.unresolvedPlaceholders.slice(0, 8).map((item) => `Placeholder: ${item}`),
+    ...evidence.humanizationFindings.slice(0, 8).map((finding) => `Line ${finding.sourceLine} [${finding.kind}]: ${finding.text} (${finding.recommendation})`),
+    ...run.outlineCritique.slice(0, 8).map((item) => `Outline ${item.area} [${item.severity}]: ${item.detail} (${item.recommendation})`),
+  ];
+  const governanceBlockers = [
+    evidence.unreviewedAiMarkers ? `${evidence.unreviewedAiMarkers} AI provenance marker(s) need human review.` : "",
+    evidence.unresolvedComments ? `${evidence.unresolvedComments} unresolved review comment(s) remain.` : "",
+    ...run.blockers,
+  ].filter(Boolean);
+  const distributionBlockers = [
+    ...evidence.approvalMetadataMissing.map((item) => `Missing approval metadata: ${item}`),
+    ...evidence.brokenLinkHints.slice(0, 8).map((item) => `Suspicious link: ${item}`),
+    ...run.distributionTargetPlans.map((target) => `${target.label}: ${target.preflightChecks[0]}`),
+  ];
+
+  return {
+    contextSources,
+    claimReview,
+    cleanupBlockers,
+    governanceBlockers,
+    distributionBlockers,
+  };
+}
+
+function formatSourcePack(sourcePack: AiProviderSourcePack) {
+  return [
+    "Context sources:",
+    ...sourcePack.contextSources.map((item) => `- ${item}`),
+    "",
+    "Claims and citation review:",
+    ...(sourcePack.claimReview.length ? sourcePack.claimReview.map((item) => `- ${item}`) : ["- No extracted claims or citation TODOs."]),
+    "",
+    "Cleanup blockers:",
+    ...(sourcePack.cleanupBlockers.length ? sourcePack.cleanupBlockers.map((item) => `- ${item}`) : ["- No placeholder, outline, or humanization blockers."]),
+    "",
+    "Governance blockers:",
+    ...(sourcePack.governanceBlockers.length ? sourcePack.governanceBlockers.map((item) => `- ${item}`) : ["- No governance blockers detected."]),
+    "",
+    "Distribution blockers:",
+    ...(sourcePack.distributionBlockers.length ? sourcePack.distributionBlockers.map((item) => `- ${item}`) : ["- No distribution blockers detected."]),
+  ].join("\n");
 }
 
 function concreteHeaders(headers: Record<string, string>, apiKey: string) {
@@ -373,12 +444,15 @@ function buildCurl(profile: AiProviderProfile, headers: Record<string, string>, 
     .join("\n");
 }
 
-function buildChecklist(profile: AiProviderProfile, keyEnv: string) {
+function buildChecklist(profile: AiProviderProfile, keyEnv: string, sourcePack: AiProviderSourcePack) {
+  const sourcePackItems =
+    sourcePack.claimReview.length + sourcePack.cleanupBlockers.length + sourcePack.governanceBlockers.length + sourcePack.distributionBlockers.length;
   return [
     "Confirm your organization approves this provider and model for the document classification.",
     profile.endpoint ? "Review the endpoint before sending any content." : "Paste the prompt only into an approved provider workspace.",
     profile.authHeader ? `Store the API key outside NEditor source as ${keyEnv}; never paste secrets into Markdown.` : "",
     "Remove sensitive client data unless the provider contract allows it.",
+    sourcePackItems ? `Resolve or preserve ${sourcePackItems} source-pack review item(s) before accepting provider output.` : "",
     "Save the provider response as a review draft, not as approved final content.",
     "Run NEditor review readiness and export readiness after importing the response.",
   ].filter(Boolean);
@@ -388,6 +462,7 @@ function buildMarkdown(
   profile: AiProviderProfile,
   systemPrompt: string,
   userPrompt: string,
+  sourcePack: AiProviderSourcePack,
   requestBody: Record<string, unknown>,
   headers: Record<string, string>,
   curl: string,
@@ -409,6 +484,10 @@ function buildMarkdown(
     "## User Prompt",
     "",
     fencedBlock("text", userPrompt),
+    "",
+    "## Source Evidence Pack",
+    "",
+    fencedBlock("text", formatSourcePack(sourcePack)),
     "",
     "## Redacted Headers",
     "",
