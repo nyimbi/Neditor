@@ -1633,6 +1633,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Preview updated in"));
   ok(store.includes("lastPreviewCompileDurationMs"));
   ok(store.includes("lastPreviewCompiledCharacters"));
+  ok(app.includes('aria-label="Git-free versioning guidance"'));
+  ok(app.includes("Snapshot-first document history"));
+  ok(app.includes("versioningModeLabel"));
+  ok(app.includes("gitFreeVersioningPlan"));
+  ok(app.includes("createRecoverySnapshot"));
+  ok(store.includes("if (status.inside_repo && this.activeDocument?.path)"));
+  ok(store.includes(`this.gitHistory = [];
+          this.gitDiffText = "";`));
   ok(app.includes("NEditor Guided Demo"));
   ok(app.includes("guidedDemoSteps"));
   ok(app.includes("guidedDemoCompletionSummary"));

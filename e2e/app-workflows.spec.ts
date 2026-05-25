@@ -837,6 +837,15 @@ async function installTauriMock(page: Page, stateKey: string) {
           .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)));
       }
       if (cmd === "get_git_status") {
+        const path = args.path ? normalizePath(args.path as string) : "";
+        if (path.includes("/no-git/") || path.endsWith("/no-git.md")) {
+          return {
+            inside_repo: false,
+            branch: null,
+            dirty: false,
+            summary: ["outside Git repository"],
+          };
+        }
         return {
           inside_repo: true,
           branch: "main",
@@ -2660,6 +2669,27 @@ test("runs snapshot restore and release tagging workflows", async ({ page }) => 
   await sidebar.getByLabel("Release tag").fill("v2.0.0");
   await sidebar.getByRole("button", { name: "Tag release" }).click();
   await expect(page.locator(".status-bar")).toContainText("Tagged release v2.0.0");
+});
+
+test("guides Git-free users through snapshot-first versioning", async ({ page }) => {
+  await setMockFileText(page, "/workspace/no-git/board-brief.md", "# Board Brief\n\nGit-free draft.");
+  await queueDialogSelection(page, "/workspace/no-git/board-brief.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByLabel("Sidebar panel").selectOption("versioning");
+
+  const sidebar = page.locator(".sidebar");
+  await expect(sidebar.getByLabel("Git-free versioning guidance")).toContainText("Snapshot-first document history");
+  await expect(sidebar.getByLabel("Git-free versioning guidance")).toContainText("Git-free recovery in private app data");
+  await expect(sidebar.getByRole("button", { name: "Commit document" })).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: "Tag release" })).toHaveCount(0);
+  await expect(sidebar).not.toContainText("Mock diff for browser workflow");
+
+  await sidebar.getByLabel("Versioning snapshot storage").selectOption("project-local");
+  await expect(sidebar.getByLabel("Git-free versioning guidance")).toContainText("Project-local snapshots travel with the folder");
+  await sidebar.getByRole("button", { name: "Create recovery snapshot" }).click();
+  await expect(page.locator(".status-bar")).toContainText("Snapshot saved to");
+  await expect(sidebar.locator(".snapshot-row").filter({ hasText: "recovery" })).toBeVisible();
+  await expect(sidebar.locator(".snapshot-row").filter({ hasText: ".neditor/snapshots" })).toBeVisible();
 });
 
 test("switches tabs, guards dirty closes, and prunes stale recent document paths", async ({ page }) => {

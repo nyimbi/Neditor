@@ -1164,32 +1164,62 @@
             <p>{{ store.gitStatus.branch || "detached" }} | {{ store.gitStatus.dirty ? "dirty" : "clean" }}</p>
             <small v-for="line in store.gitStatus.summary" :key="line">{{ line }}</small>
           </article>
-          <p v-else>Current document is not inside a Git repository.</p>
-          <label>
-            Commit message
-            <input v-model="store.commitMessage" placeholder="Update document" />
-          </label>
-          <button type="button" @click="store.commitActive()">Commit document</button>
-          <label>
-            Release tag
-            <input v-model="store.releaseTag" placeholder="v1.0.0" />
-          </label>
-          <button type="button" @click="store.tagActiveRelease()">Tag release</button>
-          <button type="button" @click="store.refreshGitDiff">Refresh diff</button>
-          <h3>Diff</h3>
-          <pre>{{ store.gitDiffText || "No uncommitted diff." }}</pre>
-          <h3>History</h3>
-          <article v-for="entry in store.gitHistory" :key="entry.revision" class="snapshot-row">
-            <p>{{ entry.subject }}</p>
-            <small>{{ entry.revision.slice(0, 12) }} | {{ entry.author }} | {{ entry.date }}</small>
-            <button type="button" @click="store.restoreGitRevision(entry.revision)">Restore</button>
-          </article>
+          <section v-else class="git-free-versioning" aria-label="Git-free versioning guidance">
+            <header>
+              <strong>Snapshot-first document history</strong>
+              <span>{{ versioningModeLabel }}</span>
+            </header>
+            <p>
+              This document is outside Git, so NEditor keeps recovery points locally. Use snapshots for business drafts,
+              approvals, and pre-export rollback without configuring developer tooling.
+            </p>
+            <ol>
+              <li v-for="step in gitFreeVersioningPlan" :key="step">{{ step }}</li>
+            </ol>
+            <section class="git-free-controls" aria-label="Snapshot recovery controls">
+              <label>
+                Snapshot storage
+                <select v-model="store.snapshotStorage" aria-label="Versioning snapshot storage">
+                  <option value="app-data">Private app data</option>
+                  <option value="project-local">Project .neditor folder</option>
+                </select>
+              </label>
+              <label><input v-model="store.autoSnapshot" type="checkbox" /> Automatic recovery snapshots</label>
+              <label>
+                Recovery interval
+                <input v-model.number="store.snapshotIntervalMs" type="number" min="30000" max="3600000" step="30000" />
+              </label>
+            </section>
+            <button type="button" @click="createRecoverySnapshot">Create recovery snapshot</button>
+          </section>
+          <template v-if="store.gitStatus?.inside_repo">
+            <label>
+              Commit message
+              <input v-model="store.commitMessage" placeholder="Update document" />
+            </label>
+            <button type="button" @click="store.commitActive()">Commit document</button>
+            <label>
+              Release tag
+              <input v-model="store.releaseTag" placeholder="v1.0.0" />
+            </label>
+            <button type="button" @click="store.tagActiveRelease()">Tag release</button>
+            <button type="button" @click="store.refreshGitDiff">Refresh diff</button>
+            <h3>Diff</h3>
+            <pre>{{ store.gitDiffText || "No uncommitted diff." }}</pre>
+            <h3>History</h3>
+            <article v-for="entry in store.gitHistory" :key="entry.revision" class="snapshot-row">
+              <p>{{ entry.subject }}</p>
+              <small>{{ entry.revision.slice(0, 12) }} | {{ entry.author }} | {{ entry.date }}</small>
+              <button type="button" @click="store.restoreGitRevision(entry.revision)">Restore</button>
+            </article>
+          </template>
           <h3>Snapshots</h3>
           <button type="button" @click="snapshotActive">Create snapshot</button>
           <button type="button" @click="store.listSnapshots">Refresh snapshots</button>
           <article v-for="snapshot in store.snapshots" :key="`version-${snapshot.snapshot_path}`" class="snapshot-row">
             <p>{{ snapshot.label || "snapshot" }}</p>
             <small>{{ snapshot.created_at || snapshot.snapshot_path }}</small>
+            <small>{{ snapshot.snapshot_path }}</small>
             <small>{{ snapshot.document_version || "unversioned" }} | {{ snapshot.status || "unknown" }} | {{ snapshot.author || "unknown author" }}</small>
             <button type="button" @click="restoreSnapshot(snapshot.snapshot_path)">Restore snapshot</button>
           </article>
@@ -4133,6 +4163,21 @@ const previewTimingStatus = computed(() => {
 });
 const releaseStatus = computed(() => active.value.compile?.semantic.status || "draft");
 const releaseStatusClass = computed(() => `release-${releaseStatus.value.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`);
+const versioningModeLabel = computed(() => {
+  if (store.gitStatus?.inside_repo) return "Git history and local snapshots";
+  if (!active.value.path) return "Unsaved draft using app-data snapshots";
+  return store.snapshotStorage === "project-local"
+    ? "Git-free recovery in the project .neditor folder"
+    : "Git-free recovery in private app data";
+});
+const gitFreeVersioningPlan = computed(() => [
+  active.value.path ? "Create named snapshots before major edits, AI rewrites, and review handoffs." : "Save the draft first when you want project-local recovery files.",
+  store.autoSnapshot ? "Automatic snapshots are on; keep the recovery interval aligned with the document's risk level." : "Turn on automatic recovery snapshots for long drafting sessions.",
+  "Use release status, approval metadata, and export manifests for lightweight release history.",
+  store.snapshotStorage === "project-local"
+    ? "Project-local snapshots travel with the folder for team handoff or backup."
+    : "Private app-data snapshots keep recovery files out of the document folder.",
+]);
 const watchStatus = computed(() => {
   if (store.watchDriver === "off" || !store.watchedPaths.length) return "";
   const label = store.watchDriver === "native" ? "Native watch" : "Plugin watch";
@@ -9740,6 +9785,11 @@ async function snapshotActive() {
   await store.snapshotActive();
 }
 
+async function createRecoverySnapshot() {
+  flushEditorTextToStore();
+  await store.snapshotActive("recovery");
+}
+
 async function restoreSnapshot(path: string) {
   flushEditorTextToStore();
   await store.restoreSnapshot(path);
@@ -12553,6 +12603,64 @@ select:hover {
 
 .snapshot-row p {
   margin: 0 0 4px;
+}
+
+.git-free-versioning {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 12px;
+  padding: 10px;
+  border: 1px solid #b8c5d4;
+  border-left: 3px solid #2f6f7e;
+  background: #ffffff;
+}
+
+.git-free-versioning header,
+.git-free-controls {
+  display: grid;
+  gap: 4px;
+}
+
+.git-free-versioning header span,
+.git-free-versioning p,
+.git-free-versioning li {
+  color: #526171;
+  font-size: 12px;
+}
+
+.git-free-versioning p,
+.git-free-versioning ol {
+  margin: 0;
+}
+
+.git-free-versioning ol {
+  padding-left: 18px;
+}
+
+.app-shell[data-theme="dark"] .git-free-versioning {
+  border-color: #34465a;
+  background: #1b2736;
+  color: #dce7f3;
+}
+
+.app-shell[data-theme="dark"] .git-free-versioning header span,
+.app-shell[data-theme="dark"] .git-free-versioning p,
+.app-shell[data-theme="dark"] .git-free-versioning li {
+  color: #aebdcc;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-shell[data-theme="system"] .git-free-versioning {
+    border-color: #34465a;
+    background: #1b2736;
+    color: #dce7f3;
+  }
+
+  .app-shell[data-theme="system"] .git-free-versioning header span,
+  .app-shell[data-theme="system"] .git-free-versioning p,
+  .app-shell[data-theme="system"] .git-free-versioning li {
+    color: #aebdcc;
+  }
 }
 
 .template-filters,

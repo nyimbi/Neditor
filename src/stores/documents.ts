@@ -1661,13 +1661,19 @@ export const useDocumentsStore = defineStore("documents", {
         return;
       }
       try {
-        this.gitStatus = await invoke<GitStatus>("get_git_status", { path: this.activeDocument?.path });
-        if (this.activeDocument?.path) {
+        const status = await invoke<GitStatus>("get_git_status", { path: this.activeDocument?.path });
+        this.gitStatus = status;
+        if (status.inside_repo && this.activeDocument?.path) {
           await this.refreshGitHistory();
           await this.refreshGitDiff();
+        } else {
+          this.gitHistory = [];
+          this.gitDiffText = "";
         }
       } catch {
         this.gitStatus = null;
+        this.gitHistory = [];
+        this.gitDiffText = "";
       }
     },
     async refreshGitHistory() {
