@@ -262,25 +262,64 @@ async function installTauriMock(page: Page, stateKey: string) {
     }
 
     function htmlFromMarkdown(text: string) {
-      return text
-        .split(/\r?\n/)
-        .map((line) => {
-          if (line.startsWith("# ")) return `<h1 id="${escapeHtml(line.slice(2).toLowerCase().replace(/\s+/g, "-"))}">${escapeHtml(line.slice(2))}</h1>`;
-          if (line.startsWith("## ")) return `<h2 id="${escapeHtml(line.slice(3).toLowerCase().replace(/\s+/g, "-"))}">${escapeHtml(line.slice(3))}</h2>`;
-          const figure = line.match(/^!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?/);
-          if (figure) {
-            const attrs = parseFigureAttributes(figure[3] || "");
-            const id = attrs.id ? ` id="${escapeHtml(attrs.id)}"` : "";
-            const caption = attrs.caption || figure[1] || "Figure";
-            return `<figure${id} class="figure"><img src="${escapeHtml(figure[2])}" alt="${escapeHtml(figure[1])}"/><figcaption>${escapeHtml(caption)}</figcaption></figure>`;
+      const lines = text.split(/\r?\n/);
+      const html: string[] = [];
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (line.startsWith("# ")) {
+          html.push(`<h1 id="${escapeHtml(line.slice(2).toLowerCase().replace(/\s+/g, "-"))}">${escapeHtml(line.slice(2))}</h1>`);
+          continue;
+        }
+        if (line.startsWith("## ")) {
+          html.push(`<h2 id="${escapeHtml(line.slice(3).toLowerCase().replace(/\s+/g, "-"))}">${escapeHtml(line.slice(3))}</h2>`);
+          continue;
+        }
+        const tableCaption = parseTableCaption(line);
+        if (tableCaption && lines[index + 1]?.trim().startsWith("|")) {
+          const tableLines: string[] = [];
+          let cursor = index + 1;
+          while (lines[cursor]?.trim().startsWith("|")) {
+            tableLines.push(lines[cursor]);
+            cursor += 1;
           }
-          const tocItem = line.match(/^\s*-\s+\[(.+?)\]\(#(.+?)\)$/);
-          if (tocItem) return `<li><a href="#${escapeHtml(tocItem[2])}">${escapeHtml(tocItem[1])}</a></li>`;
-          if (line.trim().startsWith("|")) return `<pre>${escapeHtml(line)}</pre>`;
-          if (!line.trim() || line.trim() === "---") return "";
-          return `<p>${escapeHtml(line)}</p>`;
-        })
-        .join("\n");
+          html.push(renderMockTable(tableCaption, tableLines));
+          index = cursor - 1;
+          continue;
+        }
+        if (line.trim() === "$$") {
+          const body: string[] = [];
+          let cursor = index + 1;
+          while (cursor < lines.length && !lines[cursor].trim().startsWith("$$")) {
+            body.push(lines[cursor]);
+            cursor += 1;
+          }
+          const attrs = parseFigureAttributes((lines[cursor] || "").replace(/^\s*\$\$\s*/, ""));
+          const id = attrs.id ? ` id="${escapeHtml(attrs.id)}"` : "";
+          const caption = attrs.caption || (attrs.id ? `Equation ${attrs.id.replace(/^eq:/, "")}` : "Equation");
+          html.push(`<figure${id} class="equation"><pre>${escapeHtml(body.join("\n"))}</pre><figcaption>${escapeHtml(caption)}</figcaption></figure>`);
+          index = cursor;
+          continue;
+        }
+        const figure = line.match(/^!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?/);
+        if (figure) {
+          const attrs = parseFigureAttributes(figure[3] || "");
+          const id = attrs.id ? ` id="${escapeHtml(attrs.id)}"` : "";
+          const caption = attrs.caption || figure[1] || "Figure";
+          html.push(`<figure${id} class="figure"><img src="${escapeHtml(figure[2])}" alt="${escapeHtml(figure[1])}"/><figcaption>${escapeHtml(caption)}</figcaption></figure>`);
+          continue;
+        }
+        const tocItem = line.match(/^\s*-\s+\[(.+?)\]\(#(.+?)\)$/);
+        if (tocItem) {
+          html.push(`<li><a href="#${escapeHtml(tocItem[2])}">${escapeHtml(tocItem[1])}</a></li>`);
+          continue;
+        }
+        if (line.trim().startsWith("|")) {
+          html.push(`<pre>${escapeHtml(line)}</pre>`);
+          continue;
+        }
+        html.push(!line.trim() || line.trim() === "---" ? "" : `<p>${escapeHtml(line)}</p>`);
+      }
+      return html.join("\n");
     }
 
     function headingsFromMarkdown(text: string) {
@@ -547,6 +586,118 @@ async function installTauriMock(page: Page, stateKey: string) {
       });
     }
 
+    function tableBlocksFromMarkdown(text: string, sourceFile: string) {
+      const lines = text.split(/\r?\n/);
+      const blocks: Array<{
+        kind: "table";
+        line: number;
+        end_line: number;
+        id: string | null;
+        caption: string | null;
+        headers: string[];
+        alignments: string[];
+        rows: string[][];
+        source: { source_file: string; source_line: number; end_source_line: number };
+      }> = [];
+      for (let index = 0; index < lines.length; index += 1) {
+        const caption = parseTableCaption(lines[index]);
+        if (!caption || !lines[index + 1]?.trim().startsWith("|")) continue;
+        const tableLines: string[] = [];
+        let cursor = index + 1;
+        while (lines[cursor]?.trim().startsWith("|")) {
+          tableLines.push(lines[cursor]);
+          cursor += 1;
+        }
+        const rows = tableLines.map(splitMarkdownTableRow);
+        blocks.push({
+          kind: "table",
+          line: index + 1,
+          end_line: cursor,
+          id: caption.id,
+          caption: caption.text,
+          headers: rows[0] || [],
+          alignments: rows[1] || [],
+          rows: rows.slice(2),
+          source: {
+            source_file: sourceFile,
+            source_line: index + 1,
+            end_source_line: cursor,
+          },
+        });
+        index = cursor - 1;
+      }
+      return blocks;
+    }
+
+    function equationBlocksFromMarkdown(text: string, sourceFile: string) {
+      const lines = text.split(/\r?\n/);
+      const blocks: Array<{
+        kind: "equation";
+        line: number;
+        end_line: number;
+        id: string | null;
+        caption: string | null;
+        text: string;
+        source: { source_file: string; source_line: number; end_source_line: number };
+      }> = [];
+      for (let index = 0; index < lines.length; index += 1) {
+        if (lines[index].trim() !== "$$") continue;
+        const body: string[] = [];
+        let cursor = index + 1;
+        while (cursor < lines.length && !lines[cursor].trim().startsWith("$$")) {
+          body.push(lines[cursor]);
+          cursor += 1;
+        }
+        const attrs = parseFigureAttributes((lines[cursor] || "").replace(/^\s*\$\$\s*/, ""));
+        blocks.push({
+          kind: "equation",
+          line: index + 1,
+          end_line: Math.min(lines.length, cursor + 1),
+          id: attrs.id || null,
+          caption: attrs.caption || null,
+          text: body.join("\n"),
+          source: {
+            source_file: sourceFile,
+            source_line: index + 1,
+            end_source_line: Math.min(lines.length, cursor + 1),
+          },
+        });
+        index = cursor;
+      }
+      return blocks;
+    }
+
+    function parseTableCaption(line: string) {
+      const match = line.match(/^Table:\s+(.+?)(?:\s+\{([^}]*)\})?\s*$/);
+      if (!match) return null;
+      const attrs = parseFigureAttributes(match[2] || "");
+      return {
+        text: match[1].trim(),
+        id: attrs.id || null,
+      };
+    }
+
+    function splitMarkdownTableRow(line: string) {
+      return line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim());
+    }
+
+    function renderMockTable(caption: { text: string; id: string | null }, tableLines: string[]) {
+      const rows = tableLines.map(splitMarkdownTableRow);
+      const headers = rows[0] || [];
+      const bodyRows = rows.slice(2);
+      const id = caption.id ? ` id="${escapeHtml(caption.id)}"` : "";
+      const headerHtml = headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
+      const bodyHtml = bodyRows
+        .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
+        .join("");
+      return `<table${id}><caption>${escapeHtml(caption.text)}</caption><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+    }
+
     function parseFigureAttributes(raw: string) {
       const attrs: Record<string, string> = {};
       const id = raw.match(/#([A-Za-z0-9_.:-]+)/)?.[1];
@@ -660,6 +811,8 @@ async function installTauriMock(page: Page, stateKey: string) {
       const aiAssistedSections = aiAssistedSectionsFromMarkdown(compiled);
       const transformArtifacts = transformArtifactsFromMarkdown(compiled, filePath);
       const figureBlocks = figureBlocksFromMarkdown(compiled, filePath);
+      const tableBlocks = tableBlocksFromMarkdown(compiled, filePath);
+      const equationBlocks = equationBlocksFromMarkdown(compiled, filePath);
       const sourceHash = hash(text);
       const frontMatterScalars = frontMatterScalarMap(text);
       const projectVariables = projectVariableScalars(filePath);
@@ -724,10 +877,17 @@ async function installTauriMock(page: Page, stateKey: string) {
           status,
           headings,
           outline: headings,
-          tables: (text.match(/^\|/gm) || []).length ? 1 : 0,
-          table_summaries: [],
+          tables: tableBlocks.length,
+          table_summaries: tableBlocks.map((table) => ({
+            line: table.line,
+            id: table.id,
+            caption: table.caption,
+            rows: table.rows.length,
+            columns: table.headers,
+            formulas: [],
+          })),
           figures: figureBlocks.length,
-          equations: 0,
+          equations: equationBlocks.length,
           citations: citationReferences,
           citation_references: citationReferences,
           duplicate_bibliography_keys: duplicateKeys,
@@ -752,7 +912,9 @@ async function installTauriMock(page: Page, stateKey: string) {
               end_line: heading.line,
               source: null,
             })),
+            ...tableBlocks,
             ...figureBlocks,
+            ...equationBlocks,
           ],
         },
         paged_document: { sections: [] },
@@ -1898,6 +2060,15 @@ test("syncs editor and preview scrolling and jumps preview headings to source", 
     "",
     "![Preview figure](assets/preview-navigation.png){#fig:preview-navigation caption=\"Preview figure source\"}",
     "",
+    "Table: Preview source map {#tbl:preview-navigation}",
+    "| Metric | Value |",
+    "| --- | ---: |",
+    "| Click target | 1 |",
+    "",
+    "$$",
+    "ROI = Gain / Cost",
+    "$$ {#eq:preview-navigation caption=\"Preview equation source\"}",
+    "",
     ...Array.from({ length: 24 }, (_, index) => [
       `## Follow-up ${index + 1}`,
       "",
@@ -1938,6 +2109,18 @@ test("syncs editor and preview scrolling and jumps preview headings to source", 
   await targetFigure.click();
 
   await expect(page.locator(".cm-line").filter({ hasText: "Preview figure" })).toBeVisible();
+
+  const targetTable = previewPane.locator("table#tbl\\:preview-navigation caption");
+  await targetTable.scrollIntoViewIfNeeded();
+  await targetTable.click();
+
+  await expect(page.locator(".cm-line").filter({ hasText: "Table: Preview source map" })).toBeVisible();
+
+  const targetEquation = previewPane.locator("figure#eq\\:preview-navigation figcaption");
+  await targetEquation.scrollIntoViewIfNeeded();
+  await targetEquation.click();
+
+  await expect(page.locator(".cm-line").filter({ hasText: "ROI = Gain / Cost" })).toBeVisible();
 });
 
 test("renders generated table of contents in preview and links back to source", async ({ page }) => {

@@ -104,8 +104,8 @@ Recent pushed checkpoints visible in current git history:
 - Preview click-to-source navigation now covers non-heading anchored artifacts.
   Clicking a rendered figure, table, or equation with a stable preview anchor
   uses the same source-target resolver as headings and cross-reference links,
-  and the focused browser workflow now proves direct figure-caption click-through
-  to the Markdown image line.
+  and the focused browser workflow now proves direct figure, table, and equation
+  click-through to the Markdown source lines.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,

@@ -1513,8 +1513,7 @@ Finish:
 - Debounced rendering behavior on large documents.
 - Editor/preview synchronized scrolling.
 - Preview heading and anchored artifact clicks jump to source for headings and
-  stable preview figures, with table/equation artifact anchors wired through
-  the same resolver.
+  stable preview figures, tables, and equations.
 - Separate preview theme behavior.
 - Inline warning rendering. The preview now injects escaped diagnostic callouts
   into the rendered flow and delegates source jumps back to the editor.
