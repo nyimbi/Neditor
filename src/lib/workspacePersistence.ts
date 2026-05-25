@@ -103,6 +103,26 @@ export interface GitIntegrationPreferences {
   warnOnDirtyExport: boolean;
 }
 
+export interface AgentRunHistoryItem {
+  runId: string;
+  title: string;
+  generatedAt: string;
+  updatedAt: string;
+  instruction: string;
+  documentType: string;
+  lanes: string[];
+  distributionTargets: ExportTarget[];
+  status: "generated" | "applied" | "provider-applied";
+  applicationMode: "replace-document" | "replace-selection" | "append-packet";
+  readinessScore: number;
+  outputFingerprint: string;
+  sourceFingerprint: string;
+  contextFingerprint: string;
+  instructionFingerprint: string;
+  appliedAt?: string;
+  providerProfile?: string;
+}
+
 export interface PersistedScrollPosition {
   editor?: number;
   preview?: number;
@@ -159,6 +179,7 @@ export interface PersistedWorkspace {
   transformTimeoutMs?: number;
   customTransformTemplates?: CustomTransformTemplate[];
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
+  agentRunHistory?: Partial<AgentRunHistoryItem>[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -364,6 +385,55 @@ export function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>):
   };
 }
 
+function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | null {
+  if (!isRecord(value)) return null;
+  const runId = normalizedString(value.runId, 80);
+  if (!runId) return null;
+  const status = enumValue(value.status, ["generated", "applied", "provider-applied"] as const) || "generated";
+  const applicationMode =
+    enumValue(value.applicationMode, ["replace-document", "replace-selection", "append-packet"] as const) || "append-packet";
+  const distributionTargets = Array.isArray(value.distributionTargets)
+    ? value.distributionTargets
+        .filter((target): target is ExportTarget =>
+          ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"].includes(String(target)),
+        )
+        .slice(0, 12)
+    : [];
+  return {
+    runId,
+    title: normalizedString(value.title, 120) || "Agent run",
+    generatedAt: normalizedString(value.generatedAt, 40),
+    updatedAt: normalizedString(value.updatedAt, 40),
+    instruction: normalizedString(value.instruction, 500),
+    documentType: normalizedString(value.documentType, 80),
+    lanes: stringArray(value.lanes, 12) || [],
+    distributionTargets,
+    status,
+    applicationMode,
+    readinessScore: Math.min(Math.max(numberValue(value.readinessScore) ?? 0, 0), 100),
+    outputFingerprint: normalizedString(value.outputFingerprint, 32),
+    sourceFingerprint: normalizedString(value.sourceFingerprint, 32),
+    contextFingerprint: normalizedString(value.contextFingerprint, 32),
+    instructionFingerprint: normalizedString(value.instructionFingerprint, 32),
+    appliedAt: normalizedString(value.appliedAt, 40) || undefined,
+    providerProfile: normalizedString(value.providerProfile, 120) || undefined,
+  };
+}
+
+export function normalizeAgentRunHistory(value: unknown): AgentRunHistoryItem[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const history: AgentRunHistoryItem[] = [];
+  for (const entry of value) {
+    const item = normalizeAgentRunHistoryItem(entry);
+    if (!item || seen.has(item.runId)) continue;
+    seen.add(item.runId);
+    history.push(item);
+    if (history.length >= 50) break;
+  }
+  return history;
+}
+
 function normalizeScrollPositions(value: unknown) {
   if (!isRecord(value)) return undefined;
   const positions: Record<string, PersistedScrollPosition> = {};
@@ -443,6 +513,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   }
   if (isRecord(raw.gitIntegration)) migrated.gitIntegration = normalizeGitIntegrationPreferences(raw.gitIntegration);
   if (isRecord(raw.aiCleanupDefaults)) migrated.aiCleanupDefaults = normalizeAiCleanupDefaults(raw.aiCleanupDefaults);
+  const agentRunHistory = normalizeAgentRunHistory(raw.agentRunHistory);
+  if (agentRunHistory.length) migrated.agentRunHistory = agentRunHistory;
   migrated.recentFiles = stringArray(raw.recentFiles, 20);
   migrated.recentFolders = stringArray(raw.recentFolders, 12);
   migrated.recentlyClosed = stringArray(raw.recentlyClosed, 20);

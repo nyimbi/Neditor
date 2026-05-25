@@ -87,6 +87,9 @@ grounding, governance state, and distribution state so reviewers can see what is
 safe to do next before applying generated text. The same packet includes an
 **Agent Audit Trail** with run ID, deterministic fingerprints for instruction,
 context, source, and output payloads, rollback guidance, and review events.
+Generated and applied runs are also saved in local workspace history so a user
+can reopen the Agent Workspace later and inspect recent run IDs, readiness,
+provider, apply mode, and fingerprints.
 **Apply agent output** uses the packet's safe apply mode: replace a new
 document, replace the selected text, or append a review packet to the current
 source.

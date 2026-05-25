@@ -201,6 +201,8 @@ web app.
   runbooks, AI provenance, blockers, an Agent Audit Trail with run ID,
   fingerprints, rollback plan, review events, and safe apply behavior for
   replacing a document, replacing selected text, or appending a review packet.
+  Recent generated/applied agent runs are kept in local workspace history with
+  run IDs, readiness, apply mode, provider, and fingerprints for later review.
   Provider handoff packages turn that run into
   redacted prompts, JSON request bodies, headers, cURL starters, and safety
   checklists for approved AI providers or local model gateways without storing

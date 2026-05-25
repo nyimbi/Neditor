@@ -15,6 +15,7 @@ import {
   clampSnapshotInterval,
   clampToolbarTextSize,
   migratePersistedWorkspace,
+  normalizeAgentRunHistory,
   normalizeAiCleanupDefaults,
   normalizeBibliographyDefaults,
   normalizeBrandProfileDefaults,
@@ -26,6 +27,7 @@ import {
   type ExportDefaults,
   type ExportProfile,
   type ExportTarget,
+  type AgentRunHistoryItem,
   type PersistedScrollPosition,
   type PersistedWorkspace,
   type PreviewTheme,
@@ -382,6 +384,7 @@ export const useDocumentsStore = defineStore("documents", {
     activeExportProfileId: "",
     gitIntegration: normalizeGitIntegrationPreferences({}),
     aiCleanupDefaults: normalizeAiCleanupDefaults({}),
+    agentRunHistory: [] as AgentRunHistoryItem[],
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
     lastError: "",
@@ -503,6 +506,7 @@ export const useDocumentsStore = defineStore("documents", {
             : "";
         if (persisted.gitIntegration) this.gitIntegration = normalizeGitIntegrationPreferences(persisted.gitIntegration);
         if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
+        this.agentRunHistory = normalizeAgentRunHistory(persisted.agentRunHistory);
         this.recentFiles = persisted.recentFiles || [];
         this.recentFolders = persisted.recentFolders || [];
         this.recentlyClosed = persisted.recentlyClosed || [];
@@ -566,6 +570,7 @@ export const useDocumentsStore = defineStore("documents", {
         activeExportProfileId: this.activeExportProfileId,
         gitIntegration: this.gitIntegration,
         aiCleanupDefaults: this.aiCleanupDefaults,
+        agentRunHistory: this.agentRunHistory,
         recentFiles: this.recentFiles.slice(0, 20),
         recentFolders: this.recentFolders.slice(0, 12),
         recentlyClosed: this.recentlyClosed.slice(0, 20),
@@ -597,6 +602,13 @@ export const useDocumentsStore = defineStore("documents", {
       };
       await preferencesStore.set("workspace", normalizePersistedWorkspaceForSave(workspace));
       await preferencesStore.save();
+    },
+    recordAgentRunHistory(item: AgentRunHistoryItem) {
+      this.agentRunHistory = normalizeAgentRunHistory([
+        item,
+        ...this.agentRunHistory.filter((entry) => entry.runId !== item.runId),
+      ]);
+      void this.persistWorkspace();
     },
     async restoreWorkspace(
       paths: string[],

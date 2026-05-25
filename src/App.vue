@@ -2074,6 +2074,38 @@
             </section>
             <textarea :value="agentRun.markdown" rows="12" readonly aria-label="Agent generated Markdown"></textarea>
           </section>
+          <section v-if="store.agentRunHistory.length" class="agent-history" aria-label="Agent run history">
+            <header>
+              <div>
+                <strong>Agent Run History</strong>
+                <span>Local audit records for generated and applied agent work.</span>
+              </div>
+              <small>{{ store.agentRunHistory.length }} saved</small>
+            </header>
+            <ol>
+              <li v-for="item in store.agentRunHistory.slice(0, 6)" :key="item.runId">
+                <div>
+                  <strong>{{ item.title }}</strong>
+                  <span>{{ item.status }} | {{ item.applicationMode }} | {{ item.readinessScore }}/100</span>
+                  <small>{{ item.runId }} | {{ item.updatedAt }}</small>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Output</dt>
+                    <dd>{{ item.outputFingerprint }}</dd>
+                  </div>
+                  <div>
+                    <dt>Source</dt>
+                    <dd>{{ item.sourceFingerprint }}</dd>
+                  </div>
+                  <div>
+                    <dt>Provider</dt>
+                    <dd>{{ item.providerProfile || "local planner" }}</dd>
+                  </div>
+                </dl>
+              </li>
+            </ol>
+          </section>
           <section class="agent-provider-panel" aria-label="AI provider handoff">
             <header>
               <div>
@@ -2362,7 +2394,7 @@ import {
   type CustomTransformTemplate,
   type TransformTemplate,
 } from "./lib/transformTemplates";
-import { SUPPORTED_CITATION_STYLES } from "./lib/workspacePersistence";
+import { SUPPORTED_CITATION_STYLES, type AgentRunHistoryItem } from "./lib/workspacePersistence";
 import {
   appendConflictMergePart,
   moveConflictMergePart,
@@ -3821,7 +3853,37 @@ function generateAgentWorkspaceRun() {
   });
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
+  recordAgentRunHistory(agentRun.value, "generated");
   store.statusMessage = `Generated agent packet for ${agentRun.value.plan.lanes.length} workflow lanes`;
+}
+function agentRunHistoryItem(
+  run: AgenticWorkflowRun,
+  status: AgentRunHistoryItem["status"],
+  providerProfile = "",
+): AgentRunHistoryItem {
+  const now = new Date().toISOString();
+  return {
+    runId: run.auditTrail.runId,
+    title: run.plan.title,
+    generatedAt: run.auditTrail.generatedAt,
+    updatedAt: now,
+    instruction: run.plan.instruction,
+    documentType: run.plan.documentType,
+    lanes: run.plan.lanes,
+    distributionTargets: run.plan.distributionTargets,
+    status,
+    applicationMode: run.applicationMode,
+    readinessScore: run.controlCenter.readinessScore,
+    outputFingerprint: run.auditTrail.outputFingerprint,
+    sourceFingerprint: run.auditTrail.sourceFingerprint,
+    contextFingerprint: run.auditTrail.contextFingerprint,
+    instructionFingerprint: run.auditTrail.instructionFingerprint,
+    appliedAt: status === "generated" ? undefined : now,
+    providerProfile: providerProfile || undefined,
+  };
+}
+function recordAgentRunHistory(run: AgenticWorkflowRun, status: AgentRunHistoryItem["status"], providerProfile = "") {
+  store.recordAgentRunHistory(agentRunHistoryItem(run, status, providerProfile));
 }
 function buildAgentProviderPackage() {
   if (!agentRun.value) generateAgentWorkspaceRun();
@@ -3852,6 +3914,7 @@ async function runAgentProviderRequest() {
 function applyAgentProviderResponse() {
   if (!agentProviderResult.value) return;
   applyAgentMarkdown(agentProviderResult.value.markdown, agentRun.value?.applicationMode || "append-packet");
+  if (agentRun.value) recordAgentRunHistory(agentRun.value, "provider-applied", agentProviderPackage.value?.profile.label || "");
   store.statusMessage = "Applied provider response for human review";
   closeAgentWorkspace();
 }
@@ -3868,6 +3931,7 @@ function applyAgentWorkspaceRun() {
   const run = agentRun.value;
   if (!run) return;
   applyAgentMarkdown(run.revision?.proposedText || run.markdown, run.applicationMode);
+  recordAgentRunHistory(run, "applied");
   store.statusMessage = "Applied agent output for human review";
   closeAgentWorkspace();
 }
@@ -8559,6 +8623,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-control-grid article,
 .app-shell[data-theme="dark"] .agent-audit-trail,
 .app-shell[data-theme="dark"] .agent-audit-grid article,
+.app-shell[data-theme="dark"] .agent-history,
+.app-shell[data-theme="dark"] .agent-history li,
 .app-shell[data-theme="dark"] .agent-run-columns article,
 .app-shell[data-theme="dark"] .agent-distribution-runbooks article,
 .app-shell[data-theme="dark"] .agent-provider-panel,
@@ -8659,6 +8725,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-control-grid article,
   .app-shell[data-theme="system"] .agent-audit-trail,
   .app-shell[data-theme="system"] .agent-audit-grid article,
+  .app-shell[data-theme="system"] .agent-history,
+  .app-shell[data-theme="system"] .agent-history li,
   .app-shell[data-theme="system"] .agent-run-columns article,
   .app-shell[data-theme="system"] .agent-distribution-runbooks article,
   .app-shell[data-theme="system"] .agent-provider-panel,
@@ -8744,6 +8812,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-control-grid article,
 .app-shell[data-high-contrast="true"] .agent-audit-trail,
 .app-shell[data-high-contrast="true"] .agent-audit-grid article,
+.app-shell[data-high-contrast="true"] .agent-history,
+.app-shell[data-high-contrast="true"] .agent-history li,
 .app-shell[data-high-contrast="true"] .agent-run-columns article,
 .app-shell[data-high-contrast="true"] .agent-distribution-runbooks article,
 .app-shell[data-high-contrast="true"] .agent-provider-panel,
@@ -10224,6 +10294,8 @@ select:hover {
 .agent-control-grid article,
 .agent-audit-trail,
 .agent-audit-grid article,
+.agent-history,
+.agent-history li,
 .agent-run-columns article,
 .agent-distribution-runbooks article,
 .agent-provider-panel,
@@ -10467,6 +10539,68 @@ select:hover {
   padding-left: 18px;
   color: #2d3746;
   font-size: 12px;
+}
+
+.agent-history {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #3d7160;
+  background: #f8fbfa;
+}
+
+.agent-history > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-history > header div,
+.agent-history li > div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-history > header span,
+.agent-history > header small,
+.agent-history li span,
+.agent-history li small {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-history ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-history li {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.agent-history dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.agent-history dt {
+  color: #526171;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.agent-history dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
 }
 
 .agent-run-columns {
@@ -11717,6 +11851,8 @@ select:hover {
   .agent-plan-grid,
   .agent-control-grid,
   .agent-audit-grid,
+  .agent-history li,
+  .agent-history dl,
   .agent-run-columns,
   .agent-distribution-runbooks,
   .agent-provider-grid,

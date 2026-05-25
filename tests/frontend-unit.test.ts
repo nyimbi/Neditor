@@ -34,7 +34,7 @@ import {
   transformTemplateFillFields,
   transformTemplateMarkdown,
 } from "../src/lib/transformTemplates.js";
-import { migratePersistedWorkspace, normalizeCitationStyle, WORKSPACE_SCHEMA_VERSION } from "../src/lib/workspacePersistence.js";
+import { migratePersistedWorkspace, normalizeAgentRunHistory, normalizeCitationStyle, WORKSPACE_SCHEMA_VERSION } from "../src/lib/workspacePersistence.js";
 import {
   appendConflictMergeLine,
   appendConflictMergePart,
@@ -681,6 +681,31 @@ test("workspace persistence migration versions and normalizes saved settings", (
     ],
     gitIntegration: { enabled: false },
     aiCleanupDefaults: { preserveHeadings: true, convertTables: false },
+    agentRunHistory: [
+      {
+        runId: "agent-1",
+        title: " Board Memo ",
+        generatedAt: "2026-05-25T10:00:00.000Z",
+        updatedAt: "2026-05-25T10:05:00.000Z",
+        instruction: "Create a board memo",
+        documentType: "board-memo",
+        lanes: ["create", "review", "create"],
+        distributionTargets: ["pdf", "bad-target"],
+        status: "applied",
+        applicationMode: "replace-document",
+        readinessScore: 200,
+        outputFingerprint: "abcdef0123456789",
+        sourceFingerprint: "1111111111111111",
+        contextFingerprint: "2222222222222222",
+        instructionFingerprint: "3333333333333333",
+        appliedAt: "2026-05-25T10:06:00.000Z",
+        providerProfile: " local ",
+      },
+      {
+        runId: "agent-1",
+        title: "Duplicate ignored",
+      },
+    ],
     recentFiles: ["/a.md", 42, "/a.md", "/b.md"],
     recentFolders: ["/workspace", ""],
     workspacePath: "/legacy/workspace",
@@ -788,6 +813,27 @@ test("workspace persistence migration versions and normalizes saved settings", (
     convertNumberedLists: true,
     convertTables: false,
   });
+  deepEqual(migrated.agentRunHistory?.[0], {
+    runId: "agent-1",
+    title: "Board Memo",
+    generatedAt: "2026-05-25T10:00:00.000Z",
+    updatedAt: "2026-05-25T10:05:00.000Z",
+    instruction: "Create a board memo",
+    documentType: "board-memo",
+    lanes: ["create", "review"],
+    distributionTargets: ["pdf"],
+    status: "applied",
+    applicationMode: "replace-document",
+    readinessScore: 100,
+    outputFingerprint: "abcdef0123456789",
+    sourceFingerprint: "1111111111111111",
+    contextFingerprint: "2222222222222222",
+    instructionFingerprint: "3333333333333333",
+    appliedAt: "2026-05-25T10:06:00.000Z",
+    providerProfile: "local",
+  });
+  equal(migrated.agentRunHistory?.length, 1);
+  equal(normalizeAgentRunHistory([{ runId: "" }]).length, 0);
   deepEqual(migrated.recentFiles, ["/a.md", "/b.md"]);
   deepEqual(migrated.recentFolders, ["/workspace"]);
   equal(migrated.workspaceRoot, "/legacy/workspace");
@@ -885,6 +931,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent audit trail"'));
   ok(app.includes("agentRun.auditTrail"));
   ok(app.includes("Rollback plan"));
+  ok(app.includes('aria-label="Agent run history"'));
+  ok(app.includes("store.agentRunHistory"));
+  ok(app.includes("recordAgentRunHistory"));
   ok(app.includes("Source grounding"));
   ok(app.includes("Distribution state"));
   ok(app.includes('aria-label="Agent distribution target runbooks"'));
