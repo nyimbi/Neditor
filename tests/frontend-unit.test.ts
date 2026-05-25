@@ -2193,6 +2193,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentRun.automationQueue"));
   ok(app.includes("Automation Scheduler"));
   ok(app.includes("runAgentAutomationTask"));
+  ok(app.includes("runSafeAgentAutomationQueue"));
+  ok(app.includes("agentAutomationRows"));
+  ok(app.includes("Agent Automation Scheduler Audit"));
+  ok(app.includes("Open surface"));
+  ok(app.includes("Insert audit"));
   ok(app.includes('aria-label="Agent reviewer agents"'));
   ok(app.includes("agentRun.reviewerAgents"));
   ok(app.includes("reviewer.requiredActions"));

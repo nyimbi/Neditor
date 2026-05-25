@@ -1502,6 +1502,11 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await agent.getByRole("button", { name: "Generate agent packet" }).click();
   await expect(agent.getByLabel("Agent generated output")).toContainText("Agent run prepared");
   await expect(agent.getByLabel("Agent generated output")).toContainText("QA gates");
+  const scheduler = agent.getByLabel("Agent automation scheduler");
+  await expect(scheduler).toContainText("Automation Scheduler");
+  await scheduler.getByRole("button", { name: "Run safe queue" }).click();
+  await expect(scheduler).toContainText("complete");
+  await expect(scheduler).toContainText("Evidence scan refreshed");
   await expect(agent.getByLabel("Agent distribution target runbooks")).toContainText("PDF controlled copy");
   await expect(agent.getByLabel("Agent distribution target runbooks")).toContainText("Google Docs collaboration package");
   await expect(agent.getByLabel("Agent generated Markdown")).toHaveValue(/NEditor Agent Workspace/);

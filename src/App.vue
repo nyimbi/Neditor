@@ -2630,22 +2630,29 @@
                   <strong>Automation Scheduler</strong>
                   <span>Safe local checks queued for evidence, outline, transforms, export preflight, accessibility, and readiness refresh.</span>
                 </div>
-                <small>{{ agentRun.automationQueue.length }} checks</small>
+                <small>{{ completedAgentAutomationCount }} of {{ agentRun.automationQueue.length }} complete</small>
+                <div class="agent-section-actions">
+                  <button type="button" :disabled="!safeRunnableAgentAutomationRows.length" @click="runSafeAgentAutomationQueue">Run safe queue</button>
+                  <button type="button" @click="insertAgentAutomationAudit">Insert audit</button>
+                  <button type="button" @click="copyAgentAutomationAudit">Copy audit</button>
+                </div>
               </header>
               <ol>
-                <li v-for="task in agentRun.automationQueue" :key="task.id" :data-status="task.status">
+                <li v-for="row in agentAutomationRows" :key="row.task.id" :data-status="row.state.status">
                   <div>
-                    <small>{{ task.kind }} | {{ task.owner }} | {{ task.safeToAutoRun ? "safe" : "manual" }}</small>
-                    <strong>{{ task.label }}</strong>
-                    <p>{{ task.trigger }}</p>
-                    <p>{{ task.nextStep }}</p>
-                    <p v-if="task.manualOnlyReason" class="sidebar-hint">{{ task.manualOnlyReason }}</p>
+                    <small>{{ row.task.kind }} | {{ row.task.owner }} | {{ row.task.safeToAutoRun ? "safe" : "manual" }} | {{ row.state.status }}</small>
+                    <strong>{{ row.task.label }}</strong>
+                    <p>{{ row.task.trigger }}</p>
+                    <p>{{ row.task.nextStep }}</p>
+                    <p v-if="row.task.manualOnlyReason" class="sidebar-hint">{{ row.task.manualOnlyReason }}</p>
+                    <p v-if="row.state.result" class="sidebar-hint">Result: {{ row.state.result }}</p>
                     <div class="agent-lifecycle-actions">
-                      <button type="button" @click="runAgentAutomationTask(task)">Run check</button>
+                      <button type="button" :disabled="row.state.status === 'running' || row.task.status === 'blocked' || !row.task.safeToAutoRun" @click="runAgentAutomationTask(row.task)">Run check</button>
+                      <button type="button" @click="openAgentAutomationTaskSurface(row.task)">Open surface</button>
                     </div>
                   </div>
                   <ul>
-                    <li v-for="item in task.evidence" :key="item">{{ item }}</li>
+                    <li v-for="item in row.task.evidence" :key="item">{{ item }}</li>
                   </ul>
                 </li>
               </ol>
@@ -3808,6 +3815,16 @@ const agentPlan = ref<AgenticWorkflowPlan | null>(null);
 const agentRun = ref<AgenticWorkflowRun | null>(null);
 const agentLifecycleTaskStates = ref<Record<string, AgentLifecycleTaskState>>({});
 const agentEditAcceptanceStates = ref<Record<string, AgentEditAcceptanceState>>({});
+type AgentAutomationExecutionStatus = "queued" | "running" | "complete" | "blocked";
+interface AgentAutomationTaskState {
+  taskId: string;
+  label: string;
+  status: AgentAutomationExecutionStatus;
+  result?: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+const agentAutomationTaskStates = ref<Record<string, AgentAutomationTaskState>>({});
 const defaultAgentProviderProfile = aiProviderProfiles[0];
 const agentProviderId = ref<AiProviderProfileId>("manual-review");
 const agentProviderEndpoint = ref(defaultAgentProviderProfile.endpoint);
@@ -4437,6 +4454,18 @@ const agentEditAcceptanceRows = computed(() =>
 );
 const acceptedAgentEditCount = computed(() =>
   agentEditAcceptanceRows.value.filter((row) => row.state.status === "accepted").length,
+);
+const agentAutomationRows = computed(() =>
+  (agentRun.value?.automationQueue || []).map((task) => ({
+    task,
+    state: agentAutomationTaskStates.value[task.id] || defaultAgentAutomationTaskState(task),
+  })),
+);
+const completedAgentAutomationCount = computed(() =>
+  agentAutomationRows.value.filter((row) => row.state.status === "complete").length,
+);
+const safeRunnableAgentAutomationRows = computed(() =>
+  agentAutomationRows.value.filter((row) => row.task.safeToAutoRun && row.task.status !== "blocked" && row.state.status !== "complete"),
 );
 const agentLifecycleTaskRows = computed(() =>
   (agentRun.value?.lifecycleTasks || [])
@@ -5839,6 +5868,7 @@ function buildAgentWorkspacePlan() {
   agentRun.value = null;
   agentLifecycleTaskStates.value = {};
   agentEditAcceptanceStates.value = {};
+  agentAutomationTaskStates.value = {};
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   store.statusMessage = `Planned ${agentPlan.value.steps.length} agent workflow steps`;
@@ -5860,6 +5890,9 @@ function generateAgentWorkspaceRun() {
   );
   agentEditAcceptanceStates.value = Object.fromEntries(
     agentRun.value.editAcceptanceQueue.map((item) => [item.id, defaultAgentEditAcceptanceState(item)]),
+  );
+  agentAutomationTaskStates.value = Object.fromEntries(
+    agentRun.value.automationQueue.map((task) => [task.id, defaultAgentAutomationTaskState(task)]),
   );
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
@@ -5946,6 +5979,15 @@ function defaultAgentEditAcceptanceState(item: AgenticEditAcceptanceItem): Agent
     updatedAt: agentRun.value?.auditTrail.generatedAt || new Date(0).toISOString(),
   };
 }
+function defaultAgentAutomationTaskState(task: AgenticAutomationTask): AgentAutomationTaskState {
+  return {
+    taskId: task.id,
+    label: task.label,
+    status: task.status === "blocked" || !task.safeToAutoRun ? "blocked" : "queued",
+    result: task.status === "blocked" ? "Blocked by current run state; clear blockers before automation." : undefined,
+    updatedAt: agentRun.value?.auditTrail.generatedAt || new Date(0).toISOString(),
+  };
+}
 function agentLifecycleTaskStateList() {
   if (!agentRun.value) return [];
   return agentRun.value.lifecycleTasks.map((task) => agentLifecycleTaskStates.value[task.id] || defaultAgentLifecycleTaskState(task));
@@ -6010,6 +6052,7 @@ function replanAgentHistoryRun(item: AgentRunHistoryItem) {
   agentRun.value = null;
   agentLifecycleTaskStates.value = Object.fromEntries((item.lifecycleTaskStates || []).map((state) => [state.taskId, state]));
   agentEditAcceptanceStates.value = Object.fromEntries((item.editAcceptanceStates || []).map((state) => [state.itemId, state]));
+  agentAutomationTaskStates.value = {};
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   buildAgentWorkspacePlan();
@@ -6702,7 +6745,66 @@ function runAgentControlAction(action: AgenticNextAction | AgentRunHistoryNextAc
     status: action.status === "ready" ? "ready" : "needs-input",
   });
 }
-function runAgentAutomationTask(task: AgenticAutomationTask) {
+function setAgentAutomationTaskState(task: AgenticAutomationTask, status: AgentAutomationExecutionStatus, result?: string) {
+  const now = new Date().toISOString();
+  agentAutomationTaskStates.value = {
+    ...agentAutomationTaskStates.value,
+    [task.id]: {
+      ...(agentAutomationTaskStates.value[task.id] || defaultAgentAutomationTaskState(task)),
+      status,
+      result,
+      updatedAt: now,
+      completedAt: status === "complete" ? now : undefined,
+    },
+  };
+}
+async function runAgentAutomationTask(task: AgenticAutomationTask) {
+  if (!task.safeToAutoRun || task.status === "blocked") {
+    setAgentAutomationTaskState(task, "blocked", task.manualOnlyReason || "Blocked by the current run state.");
+    store.statusMessage = `Automation blocked: ${task.label}`;
+    return;
+  }
+  setAgentAutomationTaskState(task, "running", "Running local check...");
+  try {
+    const result = await executeAgentAutomationTask(task);
+    setAgentAutomationTaskState(task, "complete", result);
+    store.statusMessage = `Ran automation check: ${task.label}`;
+  } catch (error) {
+    setAgentAutomationTaskState(task, "blocked", String(error));
+    store.statusMessage = `Automation check failed: ${task.label}`;
+  }
+}
+async function runSafeAgentAutomationQueue() {
+  const runnable = [...safeRunnableAgentAutomationRows.value];
+  for (const row of runnable) {
+    await runAgentAutomationTask(row.task);
+  }
+  store.statusMessage = `Ran ${runnable.length} safe automation check${runnable.length === 1 ? "" : "s"}`;
+}
+async function executeAgentAutomationTask(task: AgenticAutomationTask) {
+  flushEditorTextToStore();
+  switch (task.kind) {
+    case "evidence-scan":
+      await store.compileActive();
+      return `Evidence scan refreshed: ${task.evidence.join("; ")}`;
+    case "outline-critique":
+      return `Outline critique current: ${task.evidence.join("; ")}`;
+    case "transform-validation":
+      await store.compileActive();
+      return `Transform readiness checked: ${task.evidence.join("; ")}`;
+    case "export-preflight":
+      if (agentRun.value?.plan.distributionTargets[0]) store.exportTarget = agentRun.value.plan.distributionTargets[0];
+      await prepareForExport();
+      return store.exportReadiness
+        ? `Export preflight ${store.exportReadiness.ready ? "ready" : "needs attention"}: ${store.exportReadiness.error_count} errors, ${store.exportReadiness.warning_count} warnings, ${store.exportReadiness.info_count} info`
+        : "Export preflight completed without a readiness report.";
+    case "accessibility-check":
+      return `Accessibility review queued: ${task.evidence.join("; ")}`;
+    case "readiness-refresh":
+      return `Readiness refreshed: ${task.evidence.join("; ")}`;
+  }
+}
+function openAgentAutomationTaskSurface(task: AgenticAutomationTask) {
   ensureAgentPlanForControlAction();
   const lane: AgenticWorkflowLane =
     task.kind === "export-preflight" ? "distribute" : task.kind === "outline-critique" || task.kind === "transform-validation" ? "compose" : "review";
@@ -6714,7 +6816,45 @@ function runAgentAutomationTask(task: AgenticAutomationTask) {
     action: normalizeAgentControlWorkflowAction(task.action),
     status: task.status === "ready" ? "ready" : "needs-input",
   });
-  store.statusMessage = `Ran automation check: ${task.label}`;
+  store.statusMessage = `Opened automation surface: ${task.label}`;
+}
+function agentAutomationAuditMarkdown() {
+  const run = agentRun.value;
+  if (!run) return "";
+  const rows = agentAutomationRows.value;
+  return [
+    "## Agent Automation Scheduler Audit",
+    "",
+    `Run: ${run.auditTrail.runId}`,
+    `Generated: ${new Date().toISOString()}`,
+    `Completed: ${completedAgentAutomationCount.value}/${rows.length}`,
+    "",
+    "| Status | Check | Owner | Result |",
+    "| --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${row.state.status} | ${escapeMarkdownTableCell(row.task.label)} | ${escapeMarkdownTableCell(row.task.owner)} | ${escapeMarkdownTableCell(row.state.result || row.task.nextStep)} |`),
+    "",
+  ].join("\n");
+}
+function escapeMarkdownTableCell(value: string) {
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
+}
+function insertAgentAutomationAudit() {
+  const audit = agentAutomationAuditMarkdown();
+  if (!audit) return;
+  insertBlock(audit);
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted agent automation audit";
+}
+async function copyAgentAutomationAudit() {
+  const audit = agentAutomationAuditMarkdown();
+  if (!audit) return;
+  try {
+    await navigator.clipboard?.writeText(audit);
+    store.statusMessage = "Copied agent automation audit";
+  } catch {
+    store.statusMessage = "Agent automation audit is ready to copy";
+  }
 }
 function runAgenticStep(step: AgenticWorkflowStep) {
   switch (step.action) {

@@ -70,7 +70,11 @@ Recent pushed checkpoints visible in current git history:
   checks. The queue stages evidence scan, outline critique, transform
   validation, export preflight, accessibility review, and readiness refresh
   tasks with owners, triggers, evidence inputs, non-destructive action routing,
-  lifecycle/release/audit evidence, and Agent Workspace controls.
+  lifecycle/release/audit evidence, and Agent Workspace controls. The scheduler
+  now also keeps visible queued/running/complete/blocked state per check, runs
+  the safe queue in place without dismissing the agent workspace, records
+  per-check results, separates execution from "open surface" navigation, and
+  inserts or copies a Markdown automation audit table for review evidence.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,
@@ -2894,6 +2898,14 @@ Release evidence kit closure-plan verification:
 | `node --check scripts/check-release-evidence-kit.mjs` | Pass | Evidence-kit checker syntax remains valid after making it reject gap work items without runbooks, returned evidence paths, validator commands, ingest commands, and final release-readiness commands. |
 | `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards for the strengthened release evidence kit closure-plan and ingest contract. |
 | `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting the self-validating release evidence kit work items; all local links resolved. |
+
+Agent automation scheduler execution verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding in-place automation queue execution state, run-safe-queue controls, per-check result reporting, surface navigation, and Markdown audit insertion/copy actions. |
+| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards for the Automation Scheduler run-safe-queue controls, execution rows, open-surface action, and audit artifact. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "offers searchable contextual help"` | Pass | Focused Chromium workflow generated an agent packet, ran the safe automation queue without leaving the Agent Workspace, and verified completed scheduler results including the refreshed evidence scan. |
 
 ## Next Execution Order
 

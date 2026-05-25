@@ -215,7 +215,8 @@ Current direct evidence:
   Data-to-Narrative Bridge dependency links between structured values, claims,
   source signals, affected sections, and review actions, Approval Metadata Gate
   blockers for status, reviewer, owner, approvedAt, release target, source
-  confidence, comments, and AI provenance, automation scheduler, pre-review rehearsal,
+  confidence, comments, and AI provenance, automation scheduler execution state
+  with run-safe-queue controls and insertable/copyable audit evidence, pre-review rehearsal,
   playbooks, lifecycle tasks, provider handoff, runtime readiness, and guided
   demo.
 - `pnpm run check:a11y` now checks static Vue template accessibility guardrails

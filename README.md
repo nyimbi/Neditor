@@ -256,7 +256,11 @@ web app.
   owned tasks with dedicated evidence-fix tasks, persistent
   queued/in-progress/needs-review/complete status, lane/status/search filters,
   task notes, insertable/copyable Markdown task briefs, target-specific
-  distribution runbooks, AI provenance,
+  distribution runbooks, an **Automation Scheduler** that can run the safe
+  evidence scan, outline critique, transform validation, export preflight,
+  accessibility review, and readiness-refresh queue without leaving the agent
+  workspace, record per-check results, open the relevant remediation surface,
+  and insert or copy an automation audit table, AI provenance,
   blockers, an Agent Audit Trail with run ID,
   fingerprints, rollback plan, review events, and safe apply behavior for
   replacing a document, replacing selected text, or appending a review packet.
