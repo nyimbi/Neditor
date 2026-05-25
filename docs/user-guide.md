@@ -96,7 +96,7 @@ The AI Agent Workspace converts that instruction into a visible plan:
 - revision instructions for selected text or the whole document;
 - planned revision passes such as clarity, brevity, tone, evidence, legal
   caution, executive summary, accessibility, and humanization;
-- requested export targets such as PDF, Substack, LaTeX, or Google Docs;
+- requested export targets such as PDF, Substack, LaTeX, Google Docs, or EPUB;
 - runnable next steps that open Docs Live, AI Paste cleanup, Review, or Export
   readiness.
 
@@ -494,6 +494,7 @@ Supported targets:
 - LaTeX source for academic and technical handoff.
 - Google Docs package for local-first import through DOCX, HTML, Markdown, or
   text fallbacks.
+- EPUB ebook for portable long-form reader distribution.
 
 Export options cover manifests, styles, syntax highlighting, HTML language,
 HTML description, canonical URL, cover pages, page numbers, layout presets,
@@ -533,6 +534,9 @@ assets, and an embedded manifest for auditability. Their metadata names
 fallbacks, and includes the Google Docs import workflow. LaTeX exports write a
 direct `.tex` file and use the regular sidecar manifest when `includeManifest`
 is enabled.
+EPUB exports write a direct `.epub` package with the required `mimetype`,
+container file, OPF metadata, navigation document, XHTML body, stylesheet, text
+fallback, packaged media, and embedded NEditor manifest.
 
 ## Versioning And Snapshots
 

@@ -3059,6 +3059,32 @@ Business identity, document wizard, snippets, and local-agent handoff:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` with current evidence rows for this slice. |
 | `git diff --check` | Pass | No whitespace errors in the business wizard, native TOC, docs, tests, and validator diff. |
 
+Native RFP response wizard:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the native Templates-sidebar RFP response wizard, RFP analysis state, full response generation, Docs Live handoff, and local-agent handoff wiring. |
+| `pnpm run test:unit` | Pass | 49 frontend unit tests passed, including RFP source analysis for requirements, stated buyer intent, implied buyer intent, timelines, budget hints, mandatory attachments, compliance matrix rows, and generated review-ready Markdown. |
+| `cargo test --locked rfp_import --lib` in `src-tauri` | Pass | Native importer unit tests passed for DOCX XML text extraction and URL HTML-to-text cleanup. The new Tauri command accepts Markdown/text, DOCX packages, PDF via local `pdftotext`, and URL fetch via local `curl`, returning warnings when source capture needs manual verification. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "builds business documents from saved identity snippets and local-agent handoff"` | Pass | Focused Chromium workflow passed outside the sandbox on this host and wrote `.tmp/e2e-browser/business-document-wizard-report.json` with `businessDocumentWizard: true` and `rfpResponseWizard: true`. The workflow now proves pasted RFP analysis, stated/implied intent surfacing, requirement verification, full response creation, and compliance matrix rendering. |
+
+Equation editor and EPUB export:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked export_document_writes_epub_package --lib` in `src-tauri` | Pass | Direct native EPUB export writes `.epub` output with `mimetype`, `META-INF/container.xml`, `OEBPS/content.opf`, `OEBPS/nav.xhtml`, `OEBPS/document.xhtml`, stylesheet, embedded manifest, and no sidecar when package-embedded manifests are requested. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 29 export command tests passed, including EPUB extension validation, release metadata gating, optional manifest diagnostics, and desktop native command export through every target including EPUB. |
+| `pnpm run test:unit` | Pass | 49 frontend unit tests passed, including static UI guards for the Equation Editor, RFP response wizard, EPUB target persistence, agentic EPUB target detection, and release-readiness target lists. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit passed and now writes `.tmp/rendered-export-audit/rendered-export-audit.epub` with executable checks for EPUB container, OPF metadata, navigation, XHTML body, text fallback, packaged media, embedded NEditor manifest, visual review summary mapping, and package evidence. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "publishes and hands off extended export targets"` | Pass | Focused Chromium workflow passed outside the sandbox and wrote `.tmp/e2e-browser/extended-export-targets-report.json` with `exportWorkflows: true` and `epubExport: true`, proving the Export panel exposes EPUB, prepares readiness, writes the selected `.epub` output path, and reports manifest evidence. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "builds business documents from saved identity snippets and local-agent handoff"` | Pass | Focused Chromium workflow passed outside the sandbox and wrote `.tmp/e2e-browser/business-document-wizard-report.json` with `businessDocumentWizard: true`, `rfpResponseWizard: true`, and `equationEditor: true`, proving the equation editor templates and insertion flow in the same business-document workflow. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed outside the sandbox with 64 tests. `.tmp/e2e-browser/report.json` records `businessDocumentWizard`, `rfpResponseWizard`, `equationEditor`, `exportWorkflows`, and `epubExport` as true. |
+| `pnpm run build` | Pass | Production Vite build passed after EPUB UI, native command wiring, RFP wizard, and equation editor additions. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting EPUB in the README, user guide, progress log, and spec completion matrix; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` with current evidence rows for EPUB export and the native Equation Editor. |
+| `cargo check --locked` in `src-tauri` | Pass | Rust command/backend code compiles with the EPUB renderer, native RFP importer, and updated export command target set. |
+| `git diff --check` and `cargo fmt --check` | Pass | No whitespace errors and Rust formatting is clean. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

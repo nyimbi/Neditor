@@ -771,6 +771,95 @@
               </article>
             </div>
           </section>
+          <section class="business-template-hub rfp-response-wizard" aria-label="Native RFP response wizard">
+            <header>
+              <div>
+                <strong>RFP response wizard</strong>
+                <span>Import an RFP, surface stated and implied buyer intent, extract requirements, verify coverage, and create a compliance matrix.</span>
+              </div>
+              <small>{{ rfpAnalysisSummary }}</small>
+            </header>
+            <div class="rfp-source-grid">
+              <label>
+                Source type
+                <select v-model="rfpSourceKind" aria-label="RFP source type">
+                  <option value="markdown">Markdown or pasted text</option>
+                  <option value="pdf">PDF</option>
+                  <option value="docx">DOCX</option>
+                  <option value="url">URL</option>
+                </select>
+              </label>
+              <label>
+                RFP URL
+                <input v-model="rfpSourceUrl" type="url" placeholder="https://buyer.example/rfp" aria-label="RFP URL" />
+              </label>
+            </div>
+            <label>
+              RFP source text
+              <textarea
+                v-model="rfpSourceText"
+                rows="7"
+                aria-label="RFP source text"
+                placeholder="Paste RFP text, extracted PDF/DOCX content, or use Import RFP file / Fetch URL."
+              ></textarea>
+            </label>
+            <div class="template-actions">
+              <button type="button" title="Import a PDF, DOCX, Markdown, or text RFP source through the native file picker" :disabled="rfpImportBusy" @click="importRfpSourceFile">
+                <span class="button-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path v-for="path in toolbarIconPaths('open')" :key="path" :d="path"></path>
+                  </svg>
+                </span>
+                Import RFP file
+              </button>
+              <button type="button" title="Fetch and analyze a public RFP URL" :disabled="rfpImportBusy || !rfpSourceUrl.trim()" @click="importRfpSourceUrl">
+                <span class="button-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path v-for="path in toolbarIconPaths('link')" :key="path" :d="path"></path>
+                  </svg>
+                </span>
+                Fetch URL
+              </button>
+              <button type="button" title="Use the active Markdown document as the RFP source" @click="loadActiveDocumentAsRfpSource">Use active doc</button>
+              <button type="button" title="Analyze requirements, capabilities, timelines, budget hints, stated intent, and implied intent" @click="analyzeCurrentRfpSource">Analyze RFP</button>
+            </div>
+            <p v-if="rfpImportMessage" class="sidebar-hint">{{ rfpImportMessage }}</p>
+            <section v-if="rfpAnalysis" class="rfp-analysis-panel" aria-label="RFP analysis results">
+              <div class="rfp-analysis-metrics">
+                <span><strong>{{ rfpAnalysis.requirements.length }}</strong> requirements</span>
+                <span><strong>{{ rfpAnalysis.capabilities.length }}</strong> capabilities</span>
+                <span><strong>{{ rfpAnalysis.timelines.length }}</strong> timeline hints</span>
+                <span><strong>{{ rfpAnalysis.budgetHints.length }}</strong> budget hints</span>
+              </div>
+              <details open>
+                <summary>Stated buyer intent</summary>
+                <ul>
+                  <li v-for="item in rfpAnalysis.statedIntent" :key="`stated-${item}`">{{ item }}</li>
+                </ul>
+              </details>
+              <details open>
+                <summary>Implied buyer intent</summary>
+                <ul>
+                  <li v-for="item in rfpAnalysis.impliedIntent" :key="`implied-${item}`">{{ item }}</li>
+                </ul>
+              </details>
+              <details open>
+                <summary>Requirement verification</summary>
+                <ol>
+                  <li v-for="row in rfpAnalysis.complianceRows.slice(0, 12)" :key="row.id">
+                    <strong>{{ row.id }}</strong> {{ row.text }}
+                    <small>{{ row.category }} | {{ row.responseSection }} | {{ row.verification }}</small>
+                  </li>
+                </ol>
+              </details>
+              <div class="template-actions">
+                <button type="button" title="Insert only the generated compliance matrix into the active document" @click="insertRfpComplianceMatrix">Insert matrix</button>
+                <button type="button" title="Replace the active document with a full responsive RFP response draft" @click="createResponsiveRfpResponse">Create response</button>
+                <button type="button" title="Send the analyzed RFP to Docs Live for section-by-section drafting" @click="sendRfpResponseToDocsLive">Docs Live</button>
+                <button type="button" title="Prepare a Claude Code, Codex, or OpenCode handoff for the analyzed RFP" @click="openAgentWorkspaceForRfpAnalysis">Agent handoff</button>
+              </div>
+            </section>
+          </section>
           <section class="business-template-hub" aria-label="Reusable document parts">
             <header>
               <div>
@@ -1318,6 +1407,7 @@
               <option value="substack">Substack package</option>
               <option value="latex">LaTeX</option>
               <option value="google-docs">Google Docs package</option>
+              <option value="epub">EPUB ebook</option>
             </select>
           </label>
           <section v-if="store.exportTarget === 'html'" class="export-target-options" aria-label="HTML export options">
@@ -2223,6 +2313,64 @@
         <footer>
           <button type="button" @click="closeBusinessProfile">Cancel</button>
           <button type="submit">Save business identity</button>
+        </footer>
+      </form>
+    </section>
+
+    <section
+      v-if="equationEditorOpen"
+      ref="equationEditorDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Equation editor"
+      tabindex="-1"
+      @keydown="handleModalKeydown('equation-editor', $event)"
+    >
+      <form class="modal equation-editor-modal" @submit.prevent="insertEquationFromEditor">
+        <header>
+          <h2>Equation editor</h2>
+          <button type="button" aria-label="Close equation editor" @click="closeEquationEditor">x</button>
+        </header>
+        <section class="equation-template-picker" aria-label="Equation templates">
+          <button
+            v-for="template in equationEditorTemplates"
+            :key="template.label"
+            type="button"
+            :title="`Load ${template.label} equation template`"
+            @click="useEquationTemplate(template)"
+          >
+            {{ template.label }}
+          </button>
+        </section>
+        <section class="equation-editor-grid">
+          <label>
+            Mode
+            <select v-model="equationDraftMode" aria-label="Equation mode">
+              <option value="display">Display equation</option>
+              <option value="inline">Inline equation</option>
+            </select>
+          </label>
+          <label>
+            Label
+            <input v-model="equationDraftLabel" placeholder="eq:weighted-score" aria-label="Equation label" />
+          </label>
+          <label>
+            Caption
+            <input v-model="equationDraftCaption" placeholder="Weighted evaluation score" aria-label="Equation caption" />
+          </label>
+        </section>
+        <label>
+          LaTeX
+          <textarea v-model="equationDraftLatex" rows="6" aria-label="Equation LaTeX"></textarea>
+        </label>
+        <label class="equation-preview">
+          Markdown preview
+          <textarea :value="equationDraftMarkdown" rows="5" readonly aria-label="Equation Markdown preview"></textarea>
+        </label>
+        <footer>
+          <button type="button" @click="closeEquationEditor">Cancel</button>
+          <button type="submit">Insert equation</button>
         </footer>
       </form>
     </section>
@@ -3978,6 +4126,7 @@ import {
 import { createDebouncedTextCommit } from "./lib/debounce";
 import {
   agenticCliIntegrations,
+  analyzeRfpSource,
   aiDocumentWizardSteps,
   businessDocumentSnippets,
   businessDocumentTemplates,
@@ -3987,9 +4136,13 @@ import {
   businessTemplateMarkdown,
   businessWizardContext,
   normalizeBusinessProfile,
+  rfpComplianceMatrixMarkdown,
+  rfpResponseMarkdown,
   type BusinessDocumentSnippet,
   type BusinessDocumentTemplate,
   type BusinessProfile,
+  type RfpAnalysis,
+  type RfpSourceKind,
 } from "./lib/businessDocuments";
 import {
   buildDocsLiveDraft,
@@ -4074,6 +4227,15 @@ type DesktopWorkflowTestHooks = {
   activeDocumentText(): string;
   activeDocumentTitle(): string;
 };
+type ImportedRfpSource = {
+  source_type: RfpSourceKind;
+  title: string;
+  path?: string | null;
+  url?: string | null;
+  text: string;
+  extraction_method: string;
+  warnings: string[];
+};
 
 declare global {
   interface Window {
@@ -4107,6 +4269,7 @@ const previewPane = ref<HTMLElement | null>(null);
 const aiPasteDialog = ref<HTMLElement | null>(null);
 const docsLiveDialog = ref<HTMLElement | null>(null);
 const businessProfileDialog = ref<HTMLElement | null>(null);
+const equationEditorDialog = ref<HTMLElement | null>(null);
 const agentWorkspaceDialog = ref<HTMLElement | null>(null);
 const guidedDemoDialog = ref<HTMLElement | null>(null);
 const commandPaletteDialog = ref<HTMLElement | null>(null);
@@ -4271,6 +4434,19 @@ const businessProfileOpen = ref(false);
 const businessProfileDraft = ref<BusinessProfile>(normalizeBusinessProfile({}));
 const businessTemplateQuery = ref("");
 const businessSnippetQuery = ref("");
+const equationEditorOpen = ref(false);
+const equationDraftMode = ref<"display" | "inline">("display");
+const equationDraftLatex = ref("E = mc^2");
+const equationDraftLabel = ref("eq:energy");
+const equationDraftCaption = ref("Energy mass equivalence");
+const rfpSourceKind = ref<RfpSourceKind>("markdown");
+const rfpSourcePath = ref("");
+const rfpSourceUrl = ref("");
+const rfpSourceText = ref("");
+const rfpSourceTitle = ref("");
+const rfpAnalysis = ref<RfpAnalysis | null>(null);
+const rfpImportBusy = ref(false);
+const rfpImportMessage = ref("");
 const draggedTabId = ref("");
 const exportProfileName = ref("Client delivery");
 const helpQuery = ref("");
@@ -4640,6 +4816,14 @@ const dataSourceTypeOptions: SupportedDataSourceKind[] = ["csv", "tsv", "json", 
 const dataSourceNameDraft = ref("");
 const dataSourcePathDraft = ref("");
 const dataSourceTypeDraft = ref<SupportedDataSourceKind>("csv");
+const equationEditorTemplates = [
+  { label: "Weighted score", latex: "\\mathrm{Score}=\\sum_{i=1}^{n} w_i x_i", caption: "Weighted evaluation score", labelId: "eq:weighted-score" },
+  { label: "Total cost", latex: "\\mathrm{TCO}=C_{implementation}+C_{license}+C_{support}+C_{risk}", caption: "Total cost of ownership", labelId: "eq:total-cost" },
+  { label: "Service level", latex: "\\mathrm{SLA}=\\frac{\\mathrm{successful\\ requests}}{\\mathrm{total\\ requests}}\\times 100\\%", caption: "Service level calculation", labelId: "eq:sla" },
+  { label: "ROI", latex: "\\mathrm{ROI}=\\frac{\\mathrm{benefit}-\\mathrm{cost}}{\\mathrm{cost}}\\times 100\\%", caption: "Return on investment", labelId: "eq:roi" },
+  { label: "Risk score", latex: "\\mathrm{Risk}=\\mathrm{Impact}\\times\\mathrm{Likelihood}", caption: "Risk scoring model", labelId: "eq:risk-score" },
+  { label: "Capacity", latex: "\\mathrm{Capacity}=\\frac{\\mathrm{available\\ hours}}{\\mathrm{hours\\ per\\ deliverable}}", caption: "Delivery capacity estimate", labelId: "eq:capacity" },
+];
 const documentVariableNameDraft = ref("");
 const documentVariableValueDraft = ref("");
 const documentVariableFilterDraft = ref("none");
@@ -4675,6 +4859,7 @@ const nativeMenuExportTargets: Record<string, ExportTarget> = {
   "neditor-export-substack": "substack",
   "neditor-export-latex": "latex",
   "neditor-export-google-docs": "google-docs",
+  "neditor-export-epub": "epub",
 };
 let unlistenNativeMenuCommand: UnlistenFn | null = null;
 let docsLiveRecognition: SpeechRecognitionLike | null = null;
@@ -4743,6 +4928,7 @@ const agentPlaybookTargetOptions: Array<{ value: "all" | ExportTarget; label: st
   { value: "substack", label: "Substack" },
   { value: "latex", label: "LaTeX" },
   { value: "google-docs", label: "Google Docs" },
+  { value: "epub", label: "EPUB" },
 ];
 const filteredAgenticWorkflowPlaybooks = computed(() => {
   const query = agentPlaybookQuery.value.trim().toLowerCase();
@@ -5455,6 +5641,21 @@ const businessProfileCompletion = computed(() => {
   const completed = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
   return `${completed}/${businessProfileFields.length} fields`;
 });
+const rfpAnalysisSummary = computed(() => {
+  const analysis = rfpAnalysis.value;
+  if (!analysis) return "No RFP analyzed yet";
+  return `${analysis.requirements.length} requirements | ${analysis.statedIntent.length} stated intent | ${analysis.impliedIntent.length} implied intent | ${analysis.completenessScore}/100 ready`;
+});
+const equationDraftMarkdown = computed(() => {
+  const latex = equationDraftLatex.value.trim() || "E = mc^2";
+  if (equationDraftMode.value === "inline") return `$${latex}$`;
+  const attrValues = [
+    normalizedEquationLabel(equationDraftLabel.value) ? `#${normalizedEquationLabel(equationDraftLabel.value)}` : "",
+    equationDraftCaption.value.trim() ? `caption="${escapeEquationAttribute(equationDraftCaption.value)}"` : "",
+  ].filter(Boolean);
+  const attrs = attrValues.length ? ` {${attrValues.join(" ")}}` : "";
+  return `$$${attrs}\n${latex}\n$$\n`;
+});
 const customTemplateTags = computed({
   get: () => customTemplateDraft.value.tags.join(", "),
   set: (value: string) => {
@@ -5847,13 +6048,13 @@ const helpTopics = computed<HelpTopic[]>(() => [
     id: "export-publishing",
     title: "Export and publishing",
     category: "export",
-    summary: "Prepare and export HTML, PDF, DOCX, PPTX, Markdown bundles, blog packages, Substack, LaTeX, and Google Docs packages.",
+    summary: "Prepare and export HTML, PDF, DOCX, PPTX, Markdown bundles, blog packages, Substack, LaTeX, Google Docs packages, and EPUB ebooks.",
     when: "Use this when the document needs to leave NEditor as a deliverable or publishing package.",
     steps: [
       "Open Exports and choose the target format.",
       "Set delivery options such as HTML language, canonical URL, layout preset, comments, provenance, glossary, and agenda.",
       "Run Prepare for export to see readiness diagnostics before generating files.",
-      "Save export profiles for client, internal, blog, Substack, LaTeX, or Google Docs delivery settings.",
+      "Save export profiles for client, internal, blog, Substack, LaTeX, Google Docs, or EPUB delivery settings.",
     ],
     tips: [
       "Prepare for export is the safest first step when a document has references, figures, transforms, or layout directives.",
@@ -5864,7 +6065,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
       { label: "Prepare export", run: () => prepareForExport() },
       { label: "Export HTML", run: () => exportDocumentAs("html") },
     ],
-    keywords: ["html", "pdf", "docx", "pptx", "blog", "substack", "latex", "google docs"],
+    keywords: ["html", "pdf", "docx", "pptx", "blog", "substack", "latex", "google docs", "epub", "ebook"],
   },
   {
     id: "keyboard-shortcuts",
@@ -6079,7 +6280,7 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
     summary: "Validate and export to business and publishing targets.",
     detail: "Export readiness checks diagnostics, metadata, references, layout, and target-specific requirements before creating deliverables.",
     points: [
-      "Choose HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, or Google Docs package.",
+      "Choose HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, Google Docs package, or EPUB ebook.",
       "Run Prepare for export before generating files.",
       "Save export profiles for repeated client or publishing workflows.",
     ],
@@ -6162,7 +6363,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
       { id: "biz-part", label: "Part", title: "Insert a reusable business document part", icon: "templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
-      { id: "equation", label: "Equation", title: "Insert equation", icon: "equation", run: () => insertBlock(equationSnippet) },
+      { id: "equation", label: "Equation", title: "Open equation editor", icon: "equation", run: () => openEquationEditor() },
       { id: "toc", label: "TOC", title: "Insert table of contents", icon: "toc", run: () => insertBlock(tocSnippet) },
       { id: "ai-source", label: "AI Source", title: "Insert AI source block", icon: "ai", run: () => insertBlock(aiSnippet) },
     ],
@@ -6265,6 +6466,7 @@ function agentPlaybookTargets(playbook: AgenticWorkflowPlaybook): ExportTarget[]
     ["substack", /\bsubstack|newsletter\b/],
     ["latex", /\blatex|tex\b/],
     ["google-docs", /\bgoogle docs?\b/],
+    ["epub", /\bepub|ebook|e-book\b/],
     ["pptx", /\bpptx|slides?|deck\b/],
     ["markdown-bundle", /\bmarkdown bundle|source package\b/],
   ];
@@ -7549,6 +7751,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
       run: () => insertFigureSnippet(position),
     })),
   { name: "Insert calculation", group: "Snippet", run: () => insertBlock(calcSnippet) },
+  { name: "Open equation editor", group: "Snippet", run: () => openEquationEditor() },
   { name: "Insert equation", group: "Snippet", run: () => insertBlock(equationSnippet) },
   { name: "Insert table of contents", group: "Snippet", run: () => insertBlock(tocSnippet) },
   { name: "Insert index", group: "Snippet", run: () => insertBlock(indexSnippet) },
@@ -7685,7 +7888,7 @@ const commandAgentRouteSuggestions = computed<CommandAgentRouteSuggestion[]>(() 
       id: "export",
       label: "Export readiness",
       detail: "Open target-aware export readiness, manifests, publishing packages, and distribution evidence.",
-      rank: /\b(export|publish|distribut|blog|substack|google docs|latex|html|pdf|docx|pptx)\b/.test(instruction) ? 0 : 4,
+      rank: /\b(export|publish|distribut|blog|substack|google docs|latex|epub|ebook|html|pdf|docx|pptx)\b/.test(instruction) ? 0 : 4,
     },
     {
       id: "outline",
@@ -7886,6 +8089,7 @@ watch(aiPasteOpen, (open) => handleModalStateChange(open, aiPasteDialog));
 watch(agentWorkspaceOpen, (open) => handleModalStateChange(open, agentWorkspaceDialog));
 watch(docsLiveOpen, (open) => handleModalStateChange(open, docsLiveDialog));
 watch(businessProfileOpen, (open) => handleModalStateChange(open, businessProfileDialog));
+watch(equationEditorOpen, (open) => handleModalStateChange(open, equationEditorDialog));
 watch(guidedDemoOpen, (open) => handleModalStateChange(open, guidedDemoDialog));
 watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteDialog));
 watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
@@ -11118,7 +11322,7 @@ function restoreModalFocus() {
   }
 }
 
-function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
+function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "equation-editor" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.preventDefault();
     closeModal(kind);
@@ -11144,7 +11348,7 @@ function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" |
   }
 }
 
-function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "guided-demo" | "command-palette" | "conflict") {
+function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "equation-editor" | "guided-demo" | "command-palette" | "conflict") {
   if (kind === "ai-paste") {
     closeAiPaste();
   } else if (kind === "agent-workspace") {
@@ -11153,6 +11357,8 @@ function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "busine
     closeDocsLive();
   } else if (kind === "business-profile") {
     closeBusinessProfile();
+  } else if (kind === "equation-editor") {
+    closeEquationEditor();
   } else if (kind === "guided-demo") {
     closeGuidedDemo();
   } else if (kind === "command-palette") {
@@ -11371,6 +11577,220 @@ function openAgentWorkspaceForBusinessTemplate(template: BusinessDocumentTemplat
   generateAgentWorkspaceRun();
   buildAgentProviderPackage();
   store.statusMessage = `Prepared local-agent handoff for ${template.label}`;
+}
+
+function openEquationEditor(template = equationEditorTemplates[0]) {
+  equationDraftMode.value = "display";
+  equationDraftLatex.value = template.latex;
+  equationDraftCaption.value = template.caption;
+  equationDraftLabel.value = template.labelId;
+  equationEditorOpen.value = true;
+}
+
+function closeEquationEditor() {
+  equationEditorOpen.value = false;
+}
+
+function useEquationTemplate(template: (typeof equationEditorTemplates)[number]) {
+  equationDraftLatex.value = template.latex;
+  equationDraftCaption.value = template.caption;
+  equationDraftLabel.value = template.labelId;
+  store.statusMessage = `Loaded ${template.label} equation template`;
+}
+
+function insertEquationFromEditor() {
+  insertBlock(equationDraftMarkdown.value);
+  closeEquationEditor();
+  store.statusMessage = `Inserted ${equationDraftMode.value} equation`;
+}
+
+function normalizedEquationLabel(value: string) {
+  return value.trim().replace(/^#?/, "").replace(/^\{#|}$/g, "").replace(/\s+/g, "-") || "";
+}
+
+function escapeEquationAttribute(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').trim();
+}
+
+function analyzeCurrentRfpSource() {
+  const text = rfpSourceText.value.trim() || active.value.text;
+  rfpAnalysis.value = analyzeRfpSource(
+    {
+      kind: rfpSourceKind.value,
+      title: rfpSourceTitle.value || active.value.compile?.semantic.title || active.value.title || "RFP source",
+      url: rfpSourceUrl.value,
+      text,
+    },
+    store.businessProfile,
+  );
+  rfpSourceText.value = text;
+  store.statusMessage = `Analyzed RFP source with ${rfpAnalysis.value.requirements.length} requirements`;
+}
+
+async function importRfpSourceFile() {
+  const selected = await open({
+    multiple: false,
+    filters: [
+      { name: "RFP sources", extensions: ["pdf", "docx", "md", "markdown", "txt"] },
+      { name: "PDF", extensions: ["pdf"] },
+      { name: "Word", extensions: ["docx"] },
+      { name: "Markdown", extensions: ["md", "markdown", "txt"] },
+    ],
+  });
+  if (typeof selected !== "string") return;
+  rfpSourcePath.value = selected;
+  rfpSourceKind.value = rfpSourceKindFromPath(selected);
+  await importRfpSourceViaNative();
+}
+
+async function importRfpSourceUrl() {
+  rfpSourceKind.value = "url";
+  await importRfpSourceViaNative();
+}
+
+async function importRfpSourceViaNative() {
+  rfpImportBusy.value = true;
+  rfpImportMessage.value = "";
+  try {
+    const imported = await invoke<ImportedRfpSource>("import_rfp_source", {
+      request: {
+        source_type: rfpSourceKind.value,
+        path: rfpSourcePath.value || null,
+        url: rfpSourceUrl.value || null,
+        text: rfpSourceKind.value === "markdown" ? rfpSourceText.value : null,
+      },
+    });
+    rfpSourceKind.value = imported.source_type;
+    rfpSourceTitle.value = imported.title;
+    rfpSourcePath.value = imported.path || rfpSourcePath.value;
+    rfpSourceUrl.value = imported.url || rfpSourceUrl.value;
+    rfpSourceText.value = imported.text;
+    rfpAnalysis.value = analyzeRfpSource(
+      { kind: imported.source_type, title: imported.title, url: imported.url || "", text: imported.text },
+      store.businessProfile,
+    );
+    rfpImportMessage.value = [
+      `Imported via ${imported.extraction_method}.`,
+      ...imported.warnings,
+    ].join(" ");
+    store.statusMessage = `Imported and analyzed ${imported.source_type.toUpperCase()} RFP source`;
+  } catch (error) {
+    rfpImportMessage.value = error instanceof Error ? error.message : String(error);
+    store.statusMessage = "RFP source import failed";
+  } finally {
+    rfpImportBusy.value = false;
+  }
+}
+
+function loadActiveDocumentAsRfpSource() {
+  rfpSourceKind.value = "markdown";
+  rfpSourceTitle.value = active.value.compile?.semantic.title || active.value.title || "Current document";
+  rfpSourceText.value = active.value.text;
+  analyzeCurrentRfpSource();
+}
+
+function insertRfpComplianceMatrix() {
+  const analysis = ensureRfpAnalysis();
+  insertBlock(rfpComplianceMatrixMarkdown(analysis));
+  store.statusMessage = `Inserted compliance matrix with ${analysis.complianceRows.length} requirements`;
+}
+
+function createResponsiveRfpResponse() {
+  const analysis = ensureRfpAnalysis();
+  store.updateText(rfpResponseMarkdown(analysis, store.businessProfile));
+  store.sidebar = "review";
+  store.statusMessage = `Created responsive RFP response with ${analysis.complianceRows.length} compliance rows`;
+}
+
+function sendRfpResponseToDocsLive() {
+  const analysis = ensureRfpAnalysis();
+  docsLiveDocumentType.value = "rfp-response";
+  docsLiveTitle.value = `RFP response for ${store.businessProfile.defaultClientName || analysis.source.title || "Client"}`;
+  docsLiveOutlineText.value = [
+    "- Executive Response",
+    "- RFP Intake Summary",
+    "- Requirements Analysis",
+    "- Buyer Intent Analysis",
+    "  - Stated Intent",
+    "  - Implied Intent",
+    "- Compliance Matrix",
+    "- Capability Match",
+    "- Proposed Solution",
+    "- Implementation Plan and Timeline",
+    "- Pricing and Budget Response",
+    "- Mandatory Attachments",
+    "- Risk and Assumptions",
+    "- Submission QA Checklist",
+  ].join("\n");
+  docsLiveContext.value = [
+    businessWizardContext(businessDocumentTemplates.find((template) => template.id === "rfp") || businessDocumentTemplates[0], store.businessProfile),
+    "",
+    "RFP analysis:",
+    rfpResponseAnalysisBrief(analysis),
+  ].join("\n");
+  docsLivePlaceholderText.value = businessProfilePlaceholderText(store.businessProfile);
+  docsLiveDraftingDepth.value = "detailed";
+  docsLiveInsertMode.value = "replace";
+  docsLiveTargetSection.value = null;
+  openDocsLive();
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = "Sent analyzed RFP to Docs Live";
+}
+
+function openAgentWorkspaceForRfpAnalysis() {
+  const analysis = ensureRfpAnalysis();
+  selectAgentProviderProfileForInstruction("Claude Code");
+  openAgentWorkspace(
+    "Prepare a fully responsive RFP response from the analyzed source. Verify every stated and implied requirement, complete the compliance matrix, flag evidence gaps, and return review-ready Markdown.",
+  );
+  agentContextAnswers.value = rfpResponseAnalysisBrief(analysis);
+  buildAgentWorkspacePlan();
+  generateAgentWorkspaceRun();
+  buildAgentProviderPackage();
+  store.statusMessage = "Prepared local-agent handoff for analyzed RFP";
+}
+
+function ensureRfpAnalysis() {
+  if (!rfpAnalysis.value) analyzeCurrentRfpSource();
+  return rfpAnalysis.value || analyzeRfpSource({ kind: rfpSourceKind.value, title: "RFP source", url: rfpSourceUrl.value, text: rfpSourceText.value || active.value.text }, store.businessProfile);
+}
+
+function rfpSourceKindFromPath(path: string): RfpSourceKind {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".pdf")) return "pdf";
+  if (lower.endsWith(".docx")) return "docx";
+  return "markdown";
+}
+
+function rfpResponseAnalysisBrief(analysis: RfpAnalysis) {
+  return [
+    `Source: ${analysis.source.title}`,
+    `Source type: ${analysis.source.kind}`,
+    analysis.source.url ? `URL: ${analysis.source.url}` : "",
+    `Requirements: ${analysis.requirements.length}`,
+    `Completeness score: ${analysis.completenessScore}/100`,
+    "",
+    "Stated intent:",
+    ...analysis.statedIntent.map((item) => `- ${item}`),
+    "",
+    "Implied intent:",
+    ...analysis.impliedIntent.map((item) => `- ${item}`),
+    "",
+    "Requirements:",
+    ...analysis.requirements.map((item) => `- ${item.id} [${item.category}]: ${item.text} | ${item.responseStrategy}`),
+    "",
+    "Timeline hints:",
+    ...analysis.timelines.map((item) => `- ${item}`),
+    "",
+    "Budget hints:",
+    ...analysis.budgetHints.map((item) => `- ${item}`),
+    "",
+    "Mandatory attachments:",
+    ...analysis.mandatoryAttachments.map((item) => `- ${item}`),
+    "",
+    "Verification questions:",
+    ...analysis.questions.map((item) => `- ${item}`),
+  ].filter(Boolean).join("\n");
 }
 
 function startNewCustomTemplate() {
@@ -12573,6 +12993,7 @@ async function exportDocument() {
     substack: "zip",
     latex: "tex",
     "google-docs": "zip",
+    epub: "epub",
   };
   const extension = extensions[store.exportTarget];
   const smokeExportPath = await invoke<string | null>("desktop_workflow_smoke_export_path", { extension }).catch(() => null);
@@ -15840,6 +16261,57 @@ select:hover {
   padding-left: 18px;
 }
 
+.rfp-source-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 8px;
+}
+
+.rfp-analysis-panel {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #d8e0e8;
+}
+
+.rfp-analysis-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rfp-analysis-metrics span {
+  padding: 6px 8px;
+  border: 1px solid #d8e0e8;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.rfp-analysis-panel details {
+  padding: 6px 8px;
+  border: 1px solid #d8e0e8;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.rfp-analysis-panel ul,
+.rfp-analysis-panel ol {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.rfp-analysis-panel li {
+  margin-bottom: 5px;
+}
+
+.rfp-analysis-panel li small {
+  display: block;
+  color: #526171;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .snippet-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -15864,6 +16336,26 @@ select:hover {
 
 .business-profile-modal {
   max-width: 900px;
+}
+
+.equation-editor-modal {
+  max-width: 820px;
+}
+
+.equation-template-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.equation-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+
+.equation-preview textarea {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 .business-profile-grid {

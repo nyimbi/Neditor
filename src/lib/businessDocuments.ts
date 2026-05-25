@@ -69,6 +69,54 @@ export interface AgenticCliIntegration {
   handoff: string;
 }
 
+export type RfpSourceKind = "markdown" | "pdf" | "docx" | "url";
+
+export interface RfpSourceInput {
+  kind: RfpSourceKind;
+  title?: string;
+  url?: string;
+  text: string;
+}
+
+export interface RfpRequirement {
+  id: string;
+  category: string;
+  text: string;
+  sourceLine: number;
+  responseStrategy: string;
+  evidenceNeeded: string;
+  owner: string;
+}
+
+export interface RfpComplianceRow extends RfpRequirement {
+  complianceStatus: "Responsive draft prepared" | "Needs evidence review";
+  responseSection: string;
+  verification: string;
+}
+
+export interface RfpAnalysis {
+  source: {
+    kind: RfpSourceKind;
+    title: string;
+    url: string;
+    lineCount: number;
+    wordCount: number;
+  };
+  requirements: RfpRequirement[];
+  complianceRows: RfpComplianceRow[];
+  capabilities: string[];
+  statedIntent: string[];
+  impliedIntent: string[];
+  timelines: string[];
+  budgetHints: string[];
+  evaluationCriteria: string[];
+  mandatoryAttachments: string[];
+  risks: string[];
+  questions: string[];
+  warnings: string[];
+  completenessScore: number;
+}
+
 export const businessProfileFields: BusinessProfileField[] = [
   { key: "fullName", label: "Your name", placeholder: "Jane Doe" },
   { key: "email", label: "Email address", placeholder: "jane@example.com" },
@@ -484,6 +532,195 @@ export function businessWizardContext(template: BusinessDocumentTemplate, profil
   ].join("\n");
 }
 
+export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<BusinessProfile> = {}): RfpAnalysis {
+  const normalizedProfile = businessProfilePlaceholderMap(profile);
+  const title = normalizeWhitespace(input.title || input.url || "Imported RFP");
+  const url = normalizeWhitespace(input.url || "");
+  const normalizedText = normalizeRfpText(input.text);
+  const lines = normalizedText.split(/\r?\n/);
+  const significantLines = lines
+    .map((line, index) => ({ line: normalizeWhitespace(line), index: index + 1 }))
+    .filter((item) => item.line.length > 0);
+  const requirements = dedupeRequirements(
+    significantLines
+      .filter((item) => isRequirementLine(item.line))
+      .map((item, index) => buildRfpRequirement(item.line, item.index, index + 1, normalizedProfile)),
+  );
+  if (!requirements.length && normalizedText.trim()) {
+    requirements.push(...fallbackRequirements(significantLines, normalizedProfile));
+  }
+
+  const timelines = extractMatchingLines(significantLines, /\b(deadline|due|schedule|timeline|milestone|weeks?|months?|days?|implementation|start date|go-live|submission)\b/i, 8);
+  const budgetHints = extractMatchingLines(significantLines, /\b(budget|price|pricing|cost|fee|fees|commercial|payment|invoice|rate|rates|discount|value for money|\$|usd|eur|gbp|kes)\b/i, 8);
+  const evaluationCriteria = extractMatchingLines(significantLines, /\b(evaluation|scor|weight|criteria|points|award|selection|rated|technical merit|best value)\b/i, 8);
+  const mandatoryAttachments = extractMatchingLines(significantLines, /\b(attachment|appendix|form|certificate|insurance|tax|license|licence|registration|declaration|signature|signed|mandatory document)\b/i, 10);
+  const capabilities = inferRfpCapabilities(requirements, normalizedText, normalizedProfile);
+  const statedIntent = inferStatedRfpIntent(significantLines, requirements);
+  const impliedIntent = inferImpliedRfpIntent(requirements, timelines, budgetHints, evaluationCriteria, mandatoryAttachments, normalizedProfile);
+  const complianceRows = requirements.map((requirement) => ({
+    ...requirement,
+    complianceStatus: requirement.evidenceNeeded.includes("placeholder") ? "Needs evidence review" as const : "Responsive draft prepared" as const,
+    responseSection: responseSectionForCategory(requirement.category),
+    verification: `Mapped to ${responseSectionForCategory(requirement.category)} and Compliance Matrix; reviewer must confirm evidence before submission.`,
+  }));
+  const risks = inferRfpRisks(requirements, timelines, budgetHints, mandatoryAttachments);
+  const questions = inferRfpQuestions(requirements, timelines, budgetHints, evaluationCriteria, mandatoryAttachments, normalizedProfile);
+  const warnings = inferRfpWarnings(input, normalizedText, requirements);
+  const completenessScore = Math.max(0, Math.min(100, Math.round(
+    20 +
+      Math.min(requirements.length, 12) * 4 +
+      Math.min(capabilities.length, 6) * 3 +
+      Math.min(timelines.length, 4) * 3 +
+      Math.min(budgetHints.length, 4) * 3 +
+      Math.min(evaluationCriteria.length, 4) * 3 +
+      Math.min(mandatoryAttachments.length, 5) * 2 -
+      warnings.length * 5,
+  )));
+
+  return {
+    source: {
+      kind: input.kind,
+      title,
+      url,
+      lineCount: significantLines.length,
+      wordCount: normalizedText.split(/\s+/).filter(Boolean).length,
+    },
+    requirements,
+    complianceRows,
+    capabilities,
+    statedIntent,
+    impliedIntent,
+    timelines,
+    budgetHints,
+    evaluationCriteria,
+    mandatoryAttachments,
+    risks,
+    questions,
+    warnings,
+    completenessScore,
+  };
+}
+
+export function rfpComplianceMatrixMarkdown(analysis: RfpAnalysis) {
+  const rows = analysis.complianceRows.length ? analysis.complianceRows : [];
+  return [
+    "## Compliance Matrix",
+    "",
+    "| ID | Requirement | Category | Compliance status | Response section | Evidence / proof | Verification |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${escapeMarkdownTableCell(row.id)} | ${escapeMarkdownTableCell(row.text)} | ${escapeMarkdownTableCell(row.category)} | ${escapeMarkdownTableCell(row.complianceStatus)} | ${escapeMarkdownTableCell(row.responseSection)} | ${escapeMarkdownTableCell(row.evidenceNeeded)} | ${escapeMarkdownTableCell(row.verification)} |`),
+    rows.length ? "" : "| RFP-REQ-001 | Paste or import the RFP text to populate requirements. | Intake | Needs evidence review | Requirements Analysis | Source RFP text | Not verified. |",
+  ].join("\n");
+}
+
+export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<BusinessProfile> = {}) {
+  const placeholders = businessProfilePlaceholderMap(profile);
+  const title = `RFP response for ${placeholders.defaultClientName}`;
+  const requirementBullets = analysis.requirements.map((requirement) => `- **${requirement.id}:** ${requirement.text}`).join("\n") || "- No requirements were extracted. Import or paste the RFP text and re-run analysis.";
+  const statedIntentBullets = markdownBullets(analysis.statedIntent, "Add stated buyer intent from the RFP overview, purpose, objectives, scope, and award language.");
+  const impliedIntentBullets = markdownBullets(analysis.impliedIntent, "Infer unstated priorities from criteria, mandatory evidence, timeline pressure, budget language, and risk signals.");
+  const capabilityBullets = markdownBullets(analysis.capabilities, "Add capability evidence.");
+  const timelineBullets = markdownBullets(analysis.timelines, "Add the buyer deadline, milestones, and submission time zone.");
+  const budgetBullets = markdownBullets(analysis.budgetHints, "Add the pricing basis, budget ceiling, required forms, and assumptions.");
+  const criteriaBullets = markdownBullets(analysis.evaluationCriteria, "Add the evaluation criteria and scoring weights.");
+  const attachmentBullets = markdownBullets(analysis.mandatoryAttachments, "Add mandatory forms, certificates, declarations, and signatures.");
+  const riskBullets = markdownBullets(analysis.risks, "Review source RFP for risks, exceptions, and buyer constraints.");
+  const questionBullets = markdownBullets(analysis.questions, "No open questions detected.");
+  return fillBusinessTemplate(
+    [
+      "---",
+      `title: ${yamlScalar(title)}`,
+      "status: draft",
+      "documentType: RFP response",
+      `company: ${yamlScalar(placeholders.companyName)}`,
+      `preparedBy: ${yamlScalar(placeholders.fullName)}`,
+      `rfpSource: ${yamlScalar(analysis.source.title)}`,
+      analysis.source.url ? `rfpUrl: ${yamlScalar(analysis.source.url)}` : "",
+      "toc: true",
+      "---",
+      "",
+      `# ${title}`,
+      "",
+      businessDocumentSnippets[0].body,
+      "",
+      "[TOC]",
+      "",
+      "## Executive Response",
+      "",
+      `${placeholders.companyName} has prepared a fully responsive draft for ${placeholders.defaultClientName}. This response mirrors the RFP requirements, maps each requirement into a compliance matrix, and flags the evidence that must be confirmed before submission.`,
+      "",
+      "## RFP Intake Summary",
+      "",
+      `- Source type: ${analysis.source.kind.toUpperCase()}`,
+      `- Source title: ${analysis.source.title}`,
+      analysis.source.url ? `- Source URL: ${analysis.source.url}` : "",
+      `- Extracted requirements: ${analysis.requirements.length}`,
+      `- Completeness score: ${analysis.completenessScore}/100`,
+      `- Source size: ${analysis.source.wordCount} words across ${analysis.source.lineCount} non-empty lines`,
+      "",
+      "## Requirements Analysis",
+      "",
+      requirementBullets,
+      "",
+      "## Buyer Intent Analysis",
+      "",
+      "### Stated Intent",
+      "",
+      statedIntentBullets,
+      "",
+      "### Implied Intent",
+      "",
+      impliedIntentBullets,
+      "",
+      rfpComplianceMatrixMarkdown(analysis),
+      "",
+      "## Capability Match",
+      "",
+      capabilityBullets,
+      "",
+      "## Proposed Solution",
+      "",
+      "Our response is organized around the buyer's stated outcomes, mandatory requirements, evaluation criteria, and delivery constraints. Each requirement has a drafted response path, an evidence placeholder, and a reviewer verification note.",
+      "",
+      "## Implementation Plan and Timeline",
+      "",
+      timelineBullets,
+      "",
+      "## Pricing and Budget Response",
+      "",
+      budgetBullets,
+      "",
+      "## Evaluation Criteria Response",
+      "",
+      criteriaBullets,
+      "",
+      "## Mandatory Attachments",
+      "",
+      attachmentBullets,
+      "",
+      "## Risk and Assumptions",
+      "",
+      riskBullets,
+      "",
+      "## Open Questions for Buyer or Bid Team",
+      "",
+      questionBullets,
+      "",
+      "## Submission QA Checklist",
+      "",
+      "- [ ] Every RFP requirement appears in the compliance matrix.",
+      "- [ ] Every matrix row has a response section and evidence owner.",
+      "- [ ] Mandatory forms, certificates, declarations, and signatures are attached.",
+      "- [ ] Pricing matches the required format and stated assumptions.",
+      "- [ ] Timeline, delivery milestones, and submission deadline are confirmed.",
+      "- [ ] Legal, finance, and delivery reviewers have approved the final response.",
+      "",
+      "<!-- ai-assisted: status=needs-review | source=NEditor RFP Response Wizard | promptSummary=Analyze RFP, build compliance matrix, draft responsive response -->",
+    ].filter(Boolean).join("\n"),
+    profile,
+  );
+}
+
 function sectionPromptForHeading(heading: string) {
   return `<!-- Draft ${heading.toLowerCase()} with concrete evidence, unresolved placeholders, and review notes. -->`;
 }
@@ -491,4 +728,238 @@ function sectionPromptForHeading(heading: string) {
 function yamlScalar(value: string) {
   const clean = value.replace(/\s+/g, " ").trim() || "TBD";
   return JSON.stringify(clean);
+}
+
+function normalizeRfpText(text: string) {
+  return text
+    .replace(/\r/g, "\n")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function isRequirementLine(line: string) {
+  if (line.length < 18) return false;
+  if (/^(table of contents|contents|page \d+|copyright)\b/i.test(line)) return false;
+  return /(\b(shall|must|required|mandatory|provide|submit|include|describe|demonstrate|support|deliver|implement|maintain|comply|bidder|proposer|vendor|contractor|respondent)\b|^\s*(\d+(\.\d+){0,4}|[A-Z]\.|\([a-z0-9]+\)|[-*])\s+)/i.test(line);
+}
+
+function buildRfpRequirement(line: string, sourceLine: number, index: number, profile: Record<keyof BusinessProfile, string>): RfpRequirement {
+  const category = categorizeRequirement(line);
+  return {
+    id: `RFP-REQ-${String(index).padStart(3, "0")}`,
+    category,
+    text: stripRequirementPrefix(line),
+    sourceLine,
+    responseStrategy: responseStrategyForCategory(category, profile),
+    evidenceNeeded: evidenceForCategory(category),
+    owner: ownerForCategory(category),
+  };
+}
+
+function dedupeRequirements(requirements: RfpRequirement[]) {
+  const seen = new Set<string>();
+  const deduped: RfpRequirement[] = [];
+  for (const requirement of requirements) {
+    const key = requirement.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 140);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push({ ...requirement, id: `RFP-REQ-${String(deduped.length + 1).padStart(3, "0")}` });
+  }
+  return deduped.slice(0, 80);
+}
+
+function fallbackRequirements(lines: Array<{ line: string; index: number }>, profile: Record<keyof BusinessProfile, string>) {
+  return lines
+    .filter((item) => item.line.length > 40)
+    .slice(0, 8)
+    .map((item, index) => buildRfpRequirement(item.line, item.index, index + 1, profile));
+}
+
+function stripRequirementPrefix(line: string) {
+  return normalizeWhitespace(line.replace(/^(\s*(\d+(\.\d+){0,4}|[A-Z]\.|\([a-z0-9]+\)|[-*])\s*)/i, ""));
+}
+
+function categorizeRequirement(line: string) {
+  const value = line.toLowerCase();
+  if (/\b(price|pricing|cost|fee|commercial|budget|payment|invoice|rate)\b/.test(value)) return "Pricing";
+  if (/\b(deadline|timeline|schedule|milestone|implementation|delivery|go-live|days|weeks|months)\b/.test(value)) return "Timeline";
+  if (/\b(security|privacy|data|confidential|encryption|accessibility|compliance|regulatory|audit)\b/.test(value)) return "Compliance";
+  if (/\b(team|personnel|staff|experience|reference|case stud|qualification|certification)\b/.test(value)) return "Team and Experience";
+  if (/\b(attach|form|signed|signature|certificate|insurance|tax|registration|declaration)\b/.test(value)) return "Mandatory Attachment";
+  if (/\b(report|status|governance|meeting|communication|quality|risk|sla|support)\b/.test(value)) return "Delivery Governance";
+  if (/\b(solution|technical|system|platform|integration|api|architecture|training|documentation)\b/.test(value)) return "Technical Solution";
+  return "Requirement";
+}
+
+function responseSectionForCategory(category: string) {
+  const map: Record<string, string> = {
+    Pricing: "Pricing and Budget Response",
+    Timeline: "Implementation Plan and Timeline",
+    Compliance: "Compliance Matrix",
+    "Team and Experience": "Capability Match",
+    "Mandatory Attachment": "Mandatory Attachments",
+    "Delivery Governance": "Risk and Assumptions",
+    "Technical Solution": "Proposed Solution",
+    Requirement: "Requirements Analysis",
+  };
+  return map[category] || "Requirements Analysis";
+}
+
+function responseStrategyForCategory(category: string, profile: Record<keyof BusinessProfile, string>) {
+  const company = profile.companyName;
+  const map: Record<string, string> = {
+    Pricing: `State ${company}'s pricing basis, assumptions, exclusions, validity, and required commercial forms.`,
+    Timeline: "Mirror every buyer deadline, milestone, dependency, and approval date in the implementation plan.",
+    Compliance: "Map the requirement to a compliance response with proof, exception handling, and reviewer sign-off.",
+    "Team and Experience": "Attach named roles, relevant experience, certifications, references, and case evidence.",
+    "Mandatory Attachment": "Add the required attachment to the submission checklist and assign an owner.",
+    "Delivery Governance": "Describe governance cadence, quality controls, risk management, reporting, and escalation.",
+    "Technical Solution": "Explain the proposed technical approach, integrations, controls, training, and support model.",
+    Requirement: "Answer directly, cite supporting evidence, and keep unresolved assumptions visible.",
+  };
+  return map[category] || map.Requirement;
+}
+
+function evidenceForCategory(category: string) {
+  const map: Record<string, string> = {
+    Pricing: "Pricing schedule, assumptions, approvals, and commercial terms.",
+    Timeline: "Delivery plan, milestone schedule, dependency log, and named delivery owner.",
+    Compliance: "Policy, certificate, audit result, control description, or signed declaration.",
+    "Team and Experience": "CV, biography, certification, reference, case study, or project proof.",
+    "Mandatory Attachment": "Required form, certificate, signed statement, registration, or insurance proof.",
+    "Delivery Governance": "Governance plan, quality plan, risk register, reporting sample, or SLA.",
+    "Technical Solution": "Architecture note, method statement, integration plan, training plan, or support model.",
+    Requirement: "Source evidence placeholder, owner confirmation, and reviewer approval.",
+  };
+  return map[category] || map.Requirement;
+}
+
+function ownerForCategory(category: string) {
+  const map: Record<string, string> = {
+    Pricing: "Finance / Commercial",
+    Timeline: "Delivery Lead",
+    Compliance: "Legal / Compliance",
+    "Team and Experience": "Bid Manager",
+    "Mandatory Attachment": "Bid Coordinator",
+    "Delivery Governance": "Delivery Lead",
+    "Technical Solution": "Solution Lead",
+    Requirement: "Bid Owner",
+  };
+  return map[category] || "Bid Owner";
+}
+
+function extractMatchingLines(lines: Array<{ line: string; index: number }>, pattern: RegExp, limit: number) {
+  return lines
+    .filter((item) => pattern.test(item.line))
+    .map((item) => stripRequirementPrefix(item.line))
+    .filter((line, index, array) => array.findIndex((candidate) => candidate.toLowerCase() === line.toLowerCase()) === index)
+    .slice(0, limit);
+}
+
+function inferRfpCapabilities(requirements: RfpRequirement[], text: string, profile: Record<keyof BusinessProfile, string>) {
+  const capabilities = new Set<string>();
+  if (profile.companyName && !profile.companyName.startsWith("{{")) capabilities.add(`${profile.companyName} company profile and delivery credentials`);
+  if (profile.industry && !profile.industry.startsWith("{{")) capabilities.add(`${profile.industry} domain expertise`);
+  const lower = text.toLowerCase();
+  const probes: Array<[RegExp, string]> = [
+    [/\b(training|enablement|workshop|knowledge transfer)\b/, "Training, enablement, and knowledge-transfer plan"],
+    [/\b(integration|api|system|platform|technical)\b/, "Technical implementation and integration capability"],
+    [/\b(security|privacy|data protection|audit)\b/, "Security, privacy, and compliance controls"],
+    [/\b(reporting|governance|status|sla|support)\b/, "Governance, reporting, service management, and support model"],
+    [/\b(case stud|reference|experience|qualification)\b/, "Relevant experience, references, and proof points"],
+    [/\b(pricing|cost|commercial|budget)\b/, "Commercial model, pricing assumptions, and value narrative"],
+  ];
+  for (const [pattern, label] of probes) {
+    if (pattern.test(lower) || requirements.some((requirement) => pattern.test(requirement.text))) capabilities.add(label);
+  }
+  if (!capabilities.size) capabilities.add("Bid-specific capability narrative to be completed from the RFP source and business profile");
+  return [...capabilities].slice(0, 10);
+}
+
+function inferStatedRfpIntent(lines: Array<{ line: string; index: number }>, requirements: RfpRequirement[]) {
+  const explicitIntent = extractMatchingLines(
+    lines,
+    /\b(purpose|objective|goal|intent|seeking|scope of work|background|overview|the successful|the selected|vendor will|contractor will|proposer shall)\b/i,
+    8,
+  );
+  if (explicitIntent.length) return explicitIntent;
+  return requirements
+    .slice(0, 5)
+    .map((requirement) => `The buyer states a need for ${requirement.text.replace(/\.$/, "")}.`);
+}
+
+function inferImpliedRfpIntent(
+  requirements: RfpRequirement[],
+  timelines: string[],
+  budgetHints: string[],
+  criteria: string[],
+  attachments: string[],
+  profile: Record<keyof BusinessProfile, string>,
+) {
+  const intent = new Set<string>();
+  if (criteria.length) intent.add("The buyer likely wants an easily scored response; mirror evaluation criteria and make proof points visible.");
+  if (requirements.some((requirement) => requirement.category === "Compliance") || attachments.length) intent.add("The buyer is managing procurement risk; include evidence, declarations, and reviewer sign-off instead of broad claims.");
+  if (timelines.length) intent.add("The buyer is time-sensitive; show a credible mobilization plan, milestones, dependencies, and named delivery ownership.");
+  if (budgetHints.length) intent.add("The buyer is commercially constrained; make price basis, assumptions, exclusions, and value-for-money explicit.");
+  if (requirements.some((requirement) => requirement.category === "Team and Experience")) intent.add("The buyer needs confidence in delivery capacity; foreground relevant team credentials, references, and comparable work.");
+  if (requirements.some((requirement) => requirement.category === "Technical Solution")) intent.add("The buyer wants a practical implementation answer; connect the solution design to requirements, integrations, training, and support.");
+  if (profile.industry && !profile.industry.startsWith("{{")) intent.add(`The response should translate ${profile.industry} expertise into buyer-specific outcomes, not generic capability language.`);
+  if (!intent.size) intent.add("The buyer likely wants a low-risk, complete, easy-to-evaluate response; keep every requirement mapped and every assumption visible.");
+  return [...intent];
+}
+
+function inferRfpRisks(requirements: RfpRequirement[], timelines: string[], budgetHints: string[], attachments: string[]) {
+  const risks = new Set<string>();
+  if (requirements.length > 30) risks.add("Large requirement set; assign matrix owners and verify every row before submission.");
+  if (!timelines.length) risks.add("No explicit timeline detected; confirm submission deadline and delivery milestones.");
+  if (!budgetHints.length) risks.add("No budget or pricing hint detected; confirm pricing format, assumptions, taxes, and validity period.");
+  if (attachments.length) risks.add("Mandatory attachments detected; missing forms or signatures can make the bid nonresponsive.");
+  if (requirements.some((requirement) => requirement.category === "Compliance")) risks.add("Compliance requirements need legal or control-owner sign-off before final submission.");
+  if (!risks.size) risks.add("Keep all generated responses under human review until source evidence and approvals are verified.");
+  return [...risks];
+}
+
+function inferRfpQuestions(
+  requirements: RfpRequirement[],
+  timelines: string[],
+  budgetHints: string[],
+  criteria: string[],
+  attachments: string[],
+  profile: Record<keyof BusinessProfile, string>,
+) {
+  const questions = new Set<string>();
+  if (!profile.defaultClientName || profile.defaultClientName.startsWith("{{")) questions.add("Who is the buying organization or issuing authority?");
+  if (!timelines.length) questions.add("What is the submission deadline, time zone, validity period, and delivery schedule?");
+  if (!budgetHints.length) questions.add("What pricing format, budget ceiling, taxes, and commercial assumptions are required?");
+  if (!criteria.length) questions.add("What evaluation criteria and scoring weights should the response optimize for?");
+  if (!attachments.length) questions.add("Which mandatory forms, certificates, declarations, and signatures are required?");
+  if (!requirements.length) questions.add("Can the full RFP text be imported or pasted so every requirement is mapped?");
+  questions.add("Which claims require citations, customer references, or reviewer approval before submission?");
+  return [...questions];
+}
+
+function inferRfpWarnings(input: RfpSourceInput, text: string, requirements: RfpRequirement[]) {
+  const warnings: string[] = [];
+  if (!text.trim()) warnings.push("No RFP text was supplied; paste extracted PDF/DOCX text, Markdown, or fetched URL content before relying on the matrix.");
+  if ((input.kind === "pdf" || input.kind === "docx") && text.length < 400) warnings.push("PDF/DOCX input looks short; confirm text extraction captured the full RFP, including appendices.");
+  if (input.kind === "url" && !input.url) warnings.push("URL source type selected without a URL.");
+  if (requirements.length > 0 && requirements.length < 3) warnings.push("Only a few requirements were detected; verify headings, tables, and attachments manually.");
+  return warnings;
+}
+
+function markdownBullets(items: string[], fallback: string) {
+  return (items.length ? items : [fallback]).map((item) => `- ${item}`).join("\n");
+}
+
+function escapeMarkdownTableCell(value: string) {
+  return normalizeWhitespace(value).replace(/\|/g, "\\|");
 }

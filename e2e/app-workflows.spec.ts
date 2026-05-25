@@ -3267,6 +3267,109 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await expect.poll(() => editorText(page)).toContain("Margin: {{=margin_units}} units");
 });
 
+test("builds business documents from saved identity snippets and local-agent handoff", async ({ page }) => {
+  await page.getByRole("button", { name: "Templates" }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("templates");
+
+  let identity = page.getByRole("region", { name: "Business document creation" });
+  await expect(identity).toContainText("No company saved yet");
+  await identity.getByRole("button", { name: "Business info" }).click();
+
+  const profile = page.getByRole("dialog", { name: "Business identity setup" });
+  await expect(profile).toBeVisible();
+  await profile.getByLabel("Your name").fill("Jane Doe");
+  await profile.getByLabel("Email address").fill("jane@example.com");
+  await profile.getByLabel("Phone").fill("+1 555 0100");
+  await profile.getByLabel("Role or title").fill("Managing Partner");
+  await profile.getByLabel("Company name").fill("Acme Advisory");
+  await profile.getByLabel("Company address").fill("123 Market Street");
+  await profile.getByLabel("Website").fill("https://acme.example");
+  await profile.getByLabel("Industry").fill("strategy consulting");
+  await profile.getByLabel("Default client").fill("Globex");
+  await profile.getByLabel("Brand voice").fill("clear and practical");
+  await expect(profile.getByLabel("Business identity placeholder preview").locator("textarea")).toHaveValue(/companyName: Acme Advisory/);
+  await expect(profile.getByLabel("Local agent integrations")).toContainText("Claude Code");
+  await expect(profile.getByLabel("Local agent integrations")).toContainText("codex");
+  await expect(profile.getByLabel("Local agent integrations")).toContainText("opencode");
+  await profile.getByRole("button", { name: "Save business identity" }).click();
+  await expect(profile).toBeHidden();
+  await expect(identity).toContainText("Acme Advisory");
+  await expect(identity).toContainText("jane@example.com");
+
+  await page.reload();
+  await page.getByRole("button", { name: "Templates" }).click();
+  identity = page.getByRole("region", { name: "Business document creation" });
+  await expect(identity).toContainText("Acme Advisory");
+  await expect(identity).toContainText("https://acme.example");
+
+  const snippets = page.getByRole("region", { name: "Reusable document parts" });
+  await snippets.getByLabel("Find a part").fill("company overview");
+  const overview = snippets.getByRole("listitem").filter({ hasText: "Company overview" });
+  await overview.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => editorText(page)).toContain("Acme Advisory is a strategy consulting organization");
+  await expect.poll(() => editorText(page)).toContain("clear and practical communication");
+
+  const wizard = page.locator('section[aria-label="AI document creation wizard"]');
+  await wizard.getByLabel("Find a document type").fill("rfp");
+  const rfp = wizard.getByRole("listitem").filter({ hasText: "RFP response" });
+  await expect(rfp).toContainText("Compliance Matrix");
+  await expect(rfp).toContainText("Competitive bids");
+
+  await rfp.getByRole("button", { name: "AI wizard" }).click();
+  const docsLive = page.getByRole("dialog", { name: "Docs Live voice drafting" });
+  await expect(docsLive).toBeVisible();
+  await expect(docsLive.getByLabel("Document type")).toHaveValue("rfp-response");
+  await expect(docsLive.getByLabel("Document title")).toHaveValue(/RFP response for Globex/);
+  await expect(docsLive.getByLabel("Outline")).toHaveValue(/Compliance Matrix/);
+  await expect(docsLive.getByLabel("Placeholder values")).toHaveValue(/companyName: Acme Advisory/);
+  await expect(docsLive.getByLabel("Context and answers")).toHaveValue(/Agent handoff options/);
+  await expect(docsLive.getByLabel("AI document creation wizard stages")).toContainText("Quality assurance");
+  await docsLive.getByRole("button", { name: "Close Docs Live" }).click();
+  await expect(docsLive).toBeHidden();
+
+  await rfp.getByRole("button", { name: "Agent handoff" }).click();
+  const agent = page.getByRole("dialog", { name: "AI agent workspace" });
+  await expect(agent).toBeVisible();
+  await expect(agent.getByLabel("AI provider handoff")).toContainText("Claude Code CLI handoff");
+  await expect(agent.getByLabel("AI provider request Markdown")).toHaveValue(/Claude Code CLI handoff Request Package/);
+  await expect(agent.getByLabel("AI provider request Markdown")).toHaveValue(/Local Agent Handoff/);
+  await expect(agent.getByLabel("AI provider request Markdown")).toHaveValue(/```bash\nclaude\n```/);
+  await agent.getByRole("button", { name: "Close AI agent workspace" }).click();
+  await expect(agent).toBeHidden();
+
+  const rfpWizard = page.getByRole("region", { name: "Native RFP response wizard" });
+  await rfpWizard.getByLabel("RFP source text").fill([
+    "Purpose: Globex seeks a partner to modernize customer support while reducing delivery risk.",
+    "1. Vendor must provide a phased implementation plan within 90 days.",
+    "2. Proposer shall include pricing, payment terms, and all assumptions.",
+    "3. Vendor must demonstrate SOC 2 security controls and data protection practices.",
+    "4. Submit signed insurance certificate and three relevant customer references.",
+    "Evaluation criteria: technical merit 40 points, price 30 points, experience 30 points.",
+  ].join("\n"));
+  await rfpWizard.getByRole("button", { name: "Analyze RFP" }).click();
+  await expect(rfpWizard.getByRole("region", { name: "RFP analysis results" })).toContainText("5 requirements");
+  await expect(rfpWizard.getByText("Stated buyer intent", { exact: true })).toBeVisible();
+  await expect(rfpWizard.getByText("Implied buyer intent", { exact: true })).toBeVisible();
+  await expect(rfpWizard).toContainText("modernize customer support");
+  await expect(rfpWizard).toContainText("easily scored response");
+  await expect(rfpWizard).toContainText("RFP-REQ-001");
+  await rfpWizard.getByRole("button", { name: "Create response" }).click();
+  await expect.poll(() => editorText(page)).toContain("## Buyer Intent Analysis");
+  await expect(page.getByRole("heading", { name: "Compliance Matrix" })).toBeVisible();
+  await expect(page.getByText("RFP-REQ-003").first()).toBeVisible();
+  await expect(page.getByText("Every RFP requirement appears in the compliance matrix").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Equation" }).click();
+  const equationEditor = page.getByRole("dialog", { name: "Equation editor" });
+  await expect(equationEditor).toBeVisible();
+  await equationEditor.getByRole("button", { name: "Total cost" }).click();
+  await expect(equationEditor.getByLabel("Equation LaTeX")).toHaveValue(/C_\{implementation\}/);
+  await expect(equationEditor.getByLabel("Equation Markdown preview")).toHaveValue(/#eq:total-cost/);
+  await equationEditor.getByRole("button", { name: "Insert equation" }).click();
+  await expect(equationEditor).toBeHidden();
+  await expect.poll(() => editorText(page)).toContain("\\mathrm{TCO}");
+});
+
 test("runs command palette insertion and table editor workflows", async ({ page }) => {
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert table");
@@ -4503,6 +4606,7 @@ test("publishes and hands off extended export targets", async ({ page }) => {
     { value: "substack", label: "Substack package", path: "/exports/publishing.substack.zip" },
     { value: "latex", label: "LaTeX", path: "/exports/publishing.tex" },
     { value: "google-docs", label: "Google Docs package", path: "/exports/publishing.google-docs.zip" },
+    { value: "epub", label: "EPUB ebook", path: "/exports/publishing.epub" },
   ];
 
   for (const target of targets) {

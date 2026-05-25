@@ -10,7 +10,8 @@ documents usually force into office suites: structured metadata, includes,
 tables, calculations, citations, diagrams, review comments, release status,
 brand-aware exports, and reproducible export manifests. Your source stays local
 and inspectable. The app helps turn it into polished HTML, PDF, DOCX, PPTX,
-Markdown bundle, blog, Substack, LaTeX, or Google Docs package outputs.
+Markdown bundle, blog, Substack, LaTeX, Google Docs package, or EPUB ebook
+outputs.
 
 ![NEditor workbench showing Markdown source, live preview, outline, diagnostics, and status](docs/screenshots/workbench.svg)
 
@@ -89,6 +90,7 @@ uses it.
 | Prepare slides or an executive handoff | Export to PPTX or use presentation mode to review the section flow. |
 | Publish to a blog or Substack | Export the Blog or Substack package, then copy the prepared content into the publishing tool. |
 | Continue editing in Google Docs | Export the Google Docs package, then import the included DOCX into Google Docs. |
+| Share a long-form reader copy | Export the EPUB ebook, then open it in an EPUB reader before sending it. |
 | Keep formal evidence for approvals | Use export manifests, review status, approval metadata, snapshots, and release tags when your team needs an audit trail. |
 | Add calculations, charts, or diagrams | Insert a built-in transform template, replace the sample values, and preview the result. |
 
@@ -109,7 +111,7 @@ uses it.
 - Voice-guided first drafts where an outline, context, and placeholder values
   should become a structured reviewable document.
 - Repeatable exports where the same source can become HTML, PDF, DOCX, PPTX,
-  Markdown bundle, blog, Substack, LaTeX, or Google Docs handoff files.
+  Markdown bundle, blog, Substack, LaTeX, Google Docs, or EPUB handoff files.
 - Review-heavy work where comments, approval metadata, release status, AI
   provenance, and export evidence matter.
 - Local-first writing where files stay on your computer or in the folder system
@@ -433,6 +435,7 @@ Export panel target.
 | Substack package | Substack publishing handoff | Substack copy HTML, Markdown, text, publish workflow metadata, RSS seed, assets, and manifest |
 | LaTeX | Academic or technical handoff | `.tex` source with metadata, headings, tables, figures, equations, links, and labels |
 | Google Docs package | Google Docs import handoff | DOCX, HTML, Markdown, text, import workflow metadata, assets, and manifest |
+| EPUB ebook | Portable long-form reader handoff | `.epub` package with EPUB metadata, navigation, XHTML body, styles, text fallback, packaged media, and embedded NEditor manifest |
 
 Export defaults include manifests, styles, syntax highlighting, HTML language,
 HTML description, canonical URL, cover page, page numbers, layout preset,
@@ -655,10 +658,10 @@ and human reviewer sign-off for accessibility or native-viewer export review.
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
 DOCX, PPTX, Markdown bundle, blog package, Substack package, LaTeX, Google Docs
-package, hashes, a manual visual-review checklist, and `viewer-proof.json` with
+package, EPUB ebook, hashes, a manual visual-review checklist, and `viewer-proof.json` with
 executable HTML/PDF/DOCX/PPTX/package assertions, publishing handoff workflow
-metadata checks, LaTeX source checks, Google Docs import workflow checks, and
-nested Google Docs DOCX checks. It also writes
+metadata checks, LaTeX source checks, Google Docs import workflow checks, EPUB
+package checks, and nested Google Docs DOCX checks. It also writes
 `visual-review-summary.json`, which maps export targets and review cases to
 browser screenshots, PDF raster thumbnails, generated DOCX/PPTX Office preview
 dashboards, native tool proof, skipped host-limitation records, and human

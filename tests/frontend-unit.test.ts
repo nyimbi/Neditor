@@ -39,6 +39,7 @@ import {
 import { buildConflictDiff } from "../src/lib/conflict.js";
 import {
   agenticCliIntegrations,
+  analyzeRfpSource,
   businessDocumentSnippets,
   businessDocumentTemplates,
   businessProfilePlaceholderText,
@@ -46,6 +47,8 @@ import {
   businessTemplateMarkdown,
   businessWizardContext,
   normalizeBusinessProfile,
+  rfpComplianceMatrixMarkdown,
+  rfpResponseMarkdown,
 } from "../src/lib/businessDocuments.js";
 import {
   citationTodoAuditMarkdown,
@@ -550,6 +553,51 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(context.includes("OpenCode"));
 });
 
+test("RFP response wizard analyzes requirements intent and compliance coverage", () => {
+  const profile = normalizeBusinessProfile({
+    fullName: "Jane Doe",
+    companyName: "Acme Advisory",
+    industry: "strategy consulting",
+    defaultClientName: "Globex",
+  });
+  const analysis = analyzeRfpSource(
+    {
+      kind: "markdown",
+      title: "Globex Customer Support RFP",
+      text: [
+        "Purpose: Globex seeks a partner to improve customer support operations and reduce implementation risk.",
+        "1. Vendor must provide a phased implementation plan within 90 days.",
+        "2. Proposer shall include pricing, payment terms, and all assumptions.",
+        "3. Vendor must demonstrate SOC 2 security controls and data protection practices.",
+        "4. Submit signed insurance certificate and three relevant customer references.",
+        "Evaluation criteria: technical merit 40 points, price 30 points, experience 30 points.",
+      ].join("\n"),
+    },
+    profile,
+  );
+  equal(analysis.requirements.length, 5);
+  ok(analysis.statedIntent.some((item) => item.includes("improve customer support")));
+  ok(analysis.impliedIntent.some((item) => item.includes("easily scored response")));
+  ok(analysis.impliedIntent.some((item) => item.includes("procurement risk")));
+  ok(analysis.timelines.some((item) => item.includes("90 days")));
+  ok(analysis.budgetHints.some((item) => item.includes("pricing")));
+  ok(analysis.mandatoryAttachments.some((item) => item.includes("insurance certificate")));
+  ok(analysis.complianceRows.every((row) => row.verification.includes("Compliance Matrix")));
+
+  const matrix = rfpComplianceMatrixMarkdown(analysis);
+  ok(matrix.includes("| ID | Requirement | Category | Compliance status | Response section | Evidence / proof | Verification |"));
+  ok(matrix.includes("RFP-REQ-001"));
+  ok(matrix.includes("SOC 2 security controls"));
+
+  const response = rfpResponseMarkdown(analysis, profile);
+  ok(response.includes("## Buyer Intent Analysis"));
+  ok(response.includes("### Stated Intent"));
+  ok(response.includes("### Implied Intent"));
+  ok(response.includes("## Compliance Matrix"));
+  ok(response.includes("- [ ] Every RFP requirement appears in the compliance matrix."));
+  ok(response.includes("source=NEditor RFP Response Wizard"));
+});
+
 test("Docs Live section drafts can replace matching Markdown sections", () => {
   const source = [
     "# Capital Allocation Memo",
@@ -828,6 +876,14 @@ test("agentic workflow playbooks cover common business and publishing starts", (
   ok(publishingPlan.distributionTargets.includes("blog"));
   ok(publishingPlan.distributionTargets.includes("substack"));
   ok(publishingPlan.distributionTargets.includes("html"));
+
+  const ebookPlan = buildAgenticWorkflowPlan({
+    instruction: "Prepare this guide for EPUB ebook export and downloadable reader review.",
+    documentTitle: "Field Guide",
+    documentText: "# Field Guide\n\nDraft.",
+  });
+  ok(ebookPlan.distributionTargets.includes("epub"));
+  ok(ebookPlan.steps.some((step) => step.lane === "distribute"));
 });
 
 test("agentic workflow run generates auditable creation and distribution packets", () => {
@@ -1231,7 +1287,7 @@ test("agentic lifecycle task cap preserves distribution and release readiness ta
   const longOutline = Array.from({ length: 18 }, (_, index) => `## Section ${index + 1}\n\nSection ${index + 1} draft notes.`).join("\n\n");
   const run = buildAgenticWorkflowRun({
     instruction:
-      "Revise this report section by section, review evidence, and distribute as HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs. audience: executives owner: PMO deadline: June 1 evidence: source pack reviewer: Legal",
+      "Revise this report section by section, review evidence, and distribute as HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, Google Docs, and EPUB. audience: executives owner: PMO deadline: June 1 evidence: source pack reviewer: Legal",
     documentTitle: "Multi Target Release Report",
     documentText: [
       "---",
@@ -2094,6 +2150,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Help Center"));
   ok(app.includes('aria-label="Business document creation"'));
   ok(app.includes('aria-label="AI document creation wizard"'));
+  ok(app.includes('aria-label="Native RFP response wizard"'));
+  ok(app.includes('aria-label="RFP analysis results"'));
+  ok(app.includes("analyzeRfpSource"));
+  ok(app.includes("import_rfp_source"));
+  ok(app.includes('aria-label="Equation editor"'));
+  ok(app.includes('aria-label="Equation templates"'));
+  ok(app.includes("equationEditorTemplates"));
+  ok(app.includes("Open equation editor"));
   ok(app.includes('aria-label="Reusable document parts"'));
   ok(app.includes('aria-label="Business identity setup"'));
   ok(app.includes("businessProfileFields"));
@@ -3171,7 +3235,7 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("accessibility-assistive-technology-human-signoff"));
   ok(script.includes("rendered-export-native-viewer-human-signoff"));
   ok(script.includes("renderedExportAuditAccepted"));
-  ok(script.includes('"markdown-bundle", "blog", "substack", "latex", "google-docs"'));
+  ok(script.includes('"markdown-bundle", "blog", "substack", "latex", "google-docs", "epub"'));
   ok(script.includes('"rich-blocks", "option-heavy"'));
   ok(script.includes("invalidExternalEvidence"));
   ok(script.includes("engine.externalEvidence?.status !== \"accepted\""));
@@ -3191,6 +3255,14 @@ test("browser e2e runner emits structured workflow evidence for release readines
   ok(script.includes("summarizePlaywrightOutput"));
   ok(script.includes("workflowEvidence"));
   ok(script.includes("docsLiveDraft"));
+  ok(script.includes("businessDocumentWizard"));
+  ok(script.includes("builds business documents from saved identity snippets and local-agent handoff"));
+  ok(script.includes("rfpResponseWizard"));
+  ok(script.includes("Native RFP response wizard"));
+  ok(script.includes("equationEditor"));
+  ok(script.includes("Equation editor"));
+  ok(script.includes("epubExport"));
+  ok(script.includes("publishes and hands off extended export targets"));
   ok(script.includes("editorKeybindingModes"));
   ok(script.includes("runs configurable Emacs and Vim-style editor keybinding modes"));
   ok(script.includes("generates a Docs Live draft from outline, context, and placeholders"));

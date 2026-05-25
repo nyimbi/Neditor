@@ -620,6 +620,7 @@ const exportSignals: Array<[ExportTarget, RegExp]> = [
   ["substack", /\bsubstack|newsletter\b/i],
   ["latex", /\blatex|academic|paper\b/i],
   ["google-docs", /\bgoogle docs?|gdoc|collaborative review\b/i],
+  ["epub", /\bepub|ebook|e-book|ereader|e-reader\b/i],
 ];
 
 const laneSignals: Array<[AgenticWorkflowLane, RegExp]> = [
@@ -628,7 +629,7 @@ const laneSignals: Array<[AgenticWorkflowLane, RegExp]> = [
   ["edit", /\b(edit|change|insert|delete|replace|add|remove)\b/i],
   ["revise", /\b(revise|rewrite|shorten|expand|simplify|humanize|tone|polish|make it)\b/i],
   ["review", /\b(review|qa|quality|proof|fact.?check|citations?|approval|risk|governance)\b/i],
-  ["distribute", /\b(export|publish|send|distribute|deliver|package|substack|blog|google docs?|pdf|docx|pptx|latex|html)\b/i],
+  ["distribute", /\b(export|publish|send|distribute|deliver|package|substack|blog|google docs?|epub|ebook|e-book|pdf|docx|pptx|latex|html)\b/i],
 ];
 
 const revisionModeSignals: Array<[AgenticRevisionMode, RegExp]> = [
@@ -1277,7 +1278,7 @@ function memoryEntryFromSignal(line: string, source: AgenticDocumentMemoryEntry[
   if (/\b(?:accepted|approved|decision|decided|chosen)\b/i.test(line)) return memoryEntry("accepted-decision", line.slice(0, 90), line, source);
   if (/\b(?:rejected|avoid|do not|don't|never use)\b/i.test(line)) return memoryEntry("rejected-direction", line.slice(0, 90), line, source);
   if (/\b(?:reviewer prefers|review preference|approver wants|legal wants|cfo wants)\b/i.test(line)) return memoryEntry("review-preference", line.slice(0, 90), line, source);
-  if (/\b(?:distribution|publish|export|substack|blog|google docs|pdf|docx)\b/i.test(line)) {
+  if (/\b(?:distribution|publish|export|substack|blog|google docs|epub|ebook|pdf|docx)\b/i.test(line)) {
     return memoryEntry("distribution-preference", line.slice(0, 90), line, source);
   }
   return null;
@@ -2013,7 +2014,7 @@ function buildOutlineVariants(input: {
   const riskAnchor = content.find((heading) => /\b(risks?|assumptions?|constraints?|mitigation|legal|compliance)\b/i.test(heading)) || "Risks And Assumptions";
   const actionAnchor = content.find((heading) => /\b(recommendation|decision|approval|ask|next steps?|handoff|distribution)\b/i.test(heading)) || "Recommendation And Next Steps";
   const contextAnchor = content.find((heading) => /\b(context|background|current state|problem|need)\b/i.test(heading)) || "Context And Reader Need";
-  const hasPublishingTarget = input.distributionTargets.some((target) => target === "blog" || target === "substack" || target === "html");
+  const hasPublishingTarget = input.distributionTargets.some((target) => target === "blog" || target === "substack" || target === "html" || target === "epub");
   const hasTechnicalTarget = input.distributionTargets.some((target) => target === "latex" || target === "google-docs") || /\b(technical|architecture|research|paper|spec)\b/i.test(input.documentType);
   const sourceDetail = input.sourcePack.claims.length ? `${input.sourcePack.claims.length} managed claim(s)` : input.contextCompleteness.present.includes("evidence") ? "provided evidence" : "evidence still to confirm";
   const memoryDetail = input.documentMemory.entries.length ? "document memory" : "current context";
@@ -2064,7 +2065,7 @@ function buildOutlineVariants(input: {
       outline: hasTechnicalTarget
         ? outlineVariantText(root, ["Abstract", "Method Or Architecture", evidenceAnchor, "Implementation Details", riskAnchor, "References And Submission Notes"])
         : outlineVariantText(root, ["Hook", contextAnchor, evidenceAnchor, "What This Means", actionAnchor, "Publishing Metadata"]),
-      bestFor: hasTechnicalTarget ? ["technical papers", "architecture docs", "LaTeX exports"] : ["blog posts", "Substack", "public web pages"],
+      bestFor: hasTechnicalTarget ? ["technical papers", "architecture docs", "LaTeX exports"] : ["blog posts", "Substack", "EPUB ebooks", "public web pages"],
       tradeoffs: hasTechnicalTarget
         ? ["Improves technical review and export handoff.", "Requires more source discipline before drafting."]
         : ["Improves reader momentum.", "Needs careful humanization to avoid generic thought-leadership tone."],
@@ -3319,13 +3320,13 @@ function buildTransformRecommendations(input: {
     });
   }
 
-  if (distributionTargetPlans.some((targetPlan) => targetPlan.target === "blog" || targetPlan.target === "substack" || targetPlan.target === "html")) {
+  if (distributionTargetPlans.some((targetPlan) => targetPlan.target === "blog" || targetPlan.target === "substack" || targetPlan.target === "html" || targetPlan.target === "epub")) {
     add({
       kind: "publishing",
       label: "Publishing metadata table",
-      purpose: "Prepare channel-specific metadata and reuse it across blog, Substack, and HTML distribution checks.",
+      purpose: "Prepare channel-specific metadata and reuse it across blog, Substack, EPUB, and HTML distribution checks.",
       insertionTarget: "Distribution or publishing handoff",
-      sourceSignal: "Blog, Substack, newsletter, or HTML distribution target detected.",
+      sourceSignal: "Blog, Substack, newsletter, EPUB, or HTML distribution target detected.",
       narrativeReviewTrigger: "Changing title, excerpt, subject line, CTA, or tags should reopen the first paragraph and distribution preview.",
       evidenceRequired: ["Channel title", "Excerpt or preview text", "CTA", "Link and metadata preview"],
       riskLevel: "medium",
@@ -3334,6 +3335,7 @@ function buildTransformRecommendations(input: {
         "| --- | --- | --- | --- | --- |",
         "| Blog | Working title | Search/social excerpt | tag-1, tag-2 | Primary action |",
         "| Substack | Subject line | Inbox preview | tag-1, tag-2 | Reader action |",
+        "| EPUB | Ebook title | Store/library description | category-1, category-2 | Download or review action |",
       ].join("\n"),
       owner: "Distribution Agent",
     });
@@ -3945,7 +3947,10 @@ function buildReviewerAgents(input: {
         "Add citation TODOs beside factual claims that do not have a named source.",
         documentEvidence.brokenLinkHints.length ? "Repair placeholder or suspicious links before publishing." : "",
         documentEvidence.referenceHints.length ? "Repair missing labels, malformed label syntax, or unmatched cross references before export handoff." : "",
-        plan.distributionTargets.includes("html") || plan.distributionTargets.includes("blog") || plan.distributionTargets.includes("substack")
+        plan.distributionTargets.includes("html") ||
+        plan.distributionTargets.includes("blog") ||
+        plan.distributionTargets.includes("substack") ||
+        plan.distributionTargets.includes("epub")
           ? "Check external links, canonical URL expectations, and visible source notes for web publishing."
           : "",
         plan.distributionTargets.includes("latex") ? "Confirm bibliography entries and citation keys compile in the exported TeX source." : "",
@@ -5205,6 +5210,13 @@ function distributionProfile(target: ExportTarget) {
       preflightChecks: ["Confirm DOCX, HTML, Markdown, text, assets, import metadata, and unresolved blockers are ready."],
       handoffSteps: ["Export the Google Docs package, import document.docx into Google Docs, read back required text markers, and keep the Drive URL in the review record."],
       evidenceRequired: ["Google Drive import/readback evidence with imported document URL and exported DOCX hash."],
+    },
+    epub: {
+      label: "EPUB ebook package",
+      purpose: "Portable ebook distribution for readers, libraries, long-form review, and downloadable knowledge products.",
+      preflightChecks: ["Confirm title, author, language, heading outline, equations, image alt text, link behavior, and metadata are reader-ready."],
+      handoffSteps: ["Export EPUB, inspect the package manifest, open it in an EPUB reader, and keep the source hash with the release record."],
+      evidenceRequired: ["EPUB package proof with content.opf, nav.xhtml, document.xhtml, manifest.json, and reader/viewer review notes."],
     },
   };
   return profiles[target];

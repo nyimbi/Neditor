@@ -103,6 +103,7 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
         ("substack", "zip"),
         ("latex", "tex"),
         ("google-docs", "zip"),
+        ("epub", "epub"),
     ] {
         let output_path = exports.join(format!("native-smoke.{extension}"));
         let response = export_document(ExportRequest {
@@ -263,6 +264,51 @@ fn export_document_writes_latex_and_google_docs_outputs() {
 
     fs::remove_file(latex_output).expect("clean latex export");
     fs::remove_file(google_docs_output).expect("clean google docs package");
+}
+
+#[test]
+fn export_document_writes_epub_package() {
+    let source = "---\ntitle: Ebook Brief\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing\nreleaseTarget: EPUB readers\n---\n# Ebook Brief\n\nA portable **ebook** with a [source link](https://example.com).\n\n## Scoring\n\n$$ {#eq:score caption=\"Weighted score\"}\nScore = \\sum w_i x_i\n$$\n".to_string();
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let output = std::env::temp_dir().join(format!("neditor-epub-{unique}.epub"));
+    let response = export_document(ExportRequest {
+        text: source,
+        file_path: None,
+        target: "epub".to_string(),
+        output_path: path_to_string(&output),
+        options: json!({ "warnOnDirtyGit": false, "includeManifest": false }),
+    })
+    .expect("epub export should pass");
+    let bytes = fs::read(&output).expect("epub output");
+    assert_eq!(response.manifest.export_target, "epub");
+    assert!(response.manifest_path.is_none());
+    assert!(zip_has_entry(&bytes, "mimetype"));
+    assert_eq!(zip_entry_text(&bytes, "mimetype"), "application/epub+zip");
+    assert!(zip_has_entry(&bytes, "META-INF/container.xml"));
+    assert!(zip_has_entry(&bytes, "OEBPS/content.opf"));
+    assert!(zip_has_entry(&bytes, "OEBPS/nav.xhtml"));
+    assert!(zip_has_entry(&bytes, "OEBPS/document.xhtml"));
+    assert!(zip_has_entry(&bytes, "OEBPS/styles/neditor.css"));
+    assert!(zip_has_entry(&bytes, "OEBPS/metadata/manifest.json"));
+    assert!(
+        zip_entry_text(&bytes, "META-INF/container.xml").contains("application/oebps-package+xml")
+    );
+    assert!(
+        zip_entry_text(&bytes, "OEBPS/content.opf").contains("<dc:title>Ebook Brief</dc:title>")
+    );
+    assert!(zip_entry_text(&bytes, "OEBPS/nav.xhtml").contains("Ebook Brief"));
+    assert!(zip_entry_text(&bytes, "OEBPS/document.xhtml").contains("Score"));
+    assert!(zip_entry_text(&bytes, "OEBPS/metadata/manifest.json")
+        .contains("\"export_target\": \"epub\""));
+    assert!(response.progress_steps.iter().any(|step| {
+        step.id == "manifest"
+            && step.label == "Embed package manifest"
+            && step.detail.contains("sidecar manifest output is disabled")
+    }));
+    fs::remove_file(output).expect("clean epub package");
 }
 
 #[test]
@@ -1203,7 +1249,7 @@ fn prepare_for_export_reports_target_specific_release_metadata_blockers() {
     let draft_presentation =
         "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: in-review\n---\n# Board Deck\n"
             .to_string();
-    for target in ["pptx", "blog", "substack", "google-docs"] {
+    for target in ["pptx", "blog", "substack", "google-docs", "epub"] {
         let report = prepare_for_export(PrepareExportRequest {
             text: draft_presentation.clone(),
             file_path: None,

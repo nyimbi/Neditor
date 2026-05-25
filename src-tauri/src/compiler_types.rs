@@ -200,7 +200,7 @@ pub(crate) fn export_progress_steps(
     ];
     let bundle_embeds_manifest = matches!(
         target,
-        "markdown-bundle" | "markdown" | "blog" | "substack" | "google-docs"
+        "markdown-bundle" | "markdown" | "blog" | "substack" | "google-docs" | "epub"
     );
     if include_manifest || bundle_embeds_manifest {
         let (label, detail) = if bundle_embeds_manifest && !include_manifest {

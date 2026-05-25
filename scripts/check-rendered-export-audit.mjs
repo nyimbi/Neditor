@@ -27,6 +27,7 @@ const requiredFiles = [
   ["rendered-export-audit.substack.zip", 1000],
   ["rendered-export-audit.tex", 1000],
   ["rendered-export-audit.google-docs.zip", 1000],
+  ["rendered-export-audit.epub", 1000],
   ["rendered-export-audit-report.json", 500],
   ["README.md", 100],
 ];
@@ -83,7 +84,7 @@ for (const [file, minBytes] of requiredFiles) {
 if (issues.length === 0) {
   auditReport = JSON.parse(readFileSync(join(auditDir, "rendered-export-audit-report.json"), "utf8"));
   const targets = new Set(auditReport.targets?.map((target) => target.target));
-  for (const target of ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"]) {
+  for (const target of ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs", "epub"]) {
     if (!targets.has(target)) {
       issues.push(`audit report is missing target ${target}`);
     }
@@ -461,6 +462,43 @@ function collectViewerProof(issues, assertions) {
     "Control summary",
     "Architecture diagram",
     "AI Provenance",
+  ]);
+
+  const epub = join(auditDir, "rendered-export-audit.epub");
+  assertEntries(assertions, issues, "epub-package", listZipEntries(epub), [
+    "mimetype",
+    "META-INF/container.xml",
+    "OEBPS/content.opf",
+    "OEBPS/nav.xhtml",
+    "OEBPS/document.xhtml",
+    "OEBPS/styles/neditor.css",
+    "OEBPS/metadata/manifest.json",
+    "OEBPS/metadata/document.txt",
+  ]);
+  assertContains(assertions, issues, "epub-container", readZipEntryText(epub, "META-INF/container.xml"), [
+    "application/oebps-package+xml",
+    "OEBPS/content.opf",
+  ]);
+  assertContains(assertions, issues, "epub-package-manifest", readZipEntryText(epub, "OEBPS/content.opf"), [
+    "<dc:title>Rendered Export Audit</dc:title>",
+    "neditor:sourceHash",
+    "image/svg+xml",
+  ]);
+  assertContains(assertions, issues, "epub-document", readZipEntryText(epub, "OEBPS/document.xhtml"), [
+    "Rendered Export Audit",
+    "Control summary",
+    "Architecture diagram",
+    "assets/",
+    "human-reviewed",
+  ]);
+  assertContains(assertions, issues, "epub-text-fallback", readZipEntryText(epub, "OEBPS/metadata/document.txt"), [
+    "AI Provenance",
+    "Legal Disclaimer",
+    "Control summary",
+  ]);
+  assertContains(assertions, issues, "epub-neditor-manifest", readZipEntryText(epub, "OEBPS/metadata/manifest.json"), [
+    "\"export_target\": \"epub\"",
+    "\"document_title\": \"Rendered Export Audit\"",
   ]);
 }
 
@@ -1778,6 +1816,7 @@ function verifyManualReviewDashboard(issues, assertions) {
     "Rendered Export Manual Review",
     "rendered-export-audit.pdf",
     "rendered-export-audit.google-docs.zip",
+    "rendered-export-audit.epub",
     "review-cases/rich-blocks/rich-blocks.html",
     "review-cases/option-heavy/option-heavy.html",
     "Executable Viewer And Package Proof",
@@ -1889,7 +1928,7 @@ function verifyVisualReviewSummary(issues, report, assertions) {
   }
   const summary = JSON.parse(readFileSync(path, "utf8"));
   const targetSet = new Set((summary.primaryTargets || []).map((target) => target.target));
-  for (const target of ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"]) {
+  for (const target of ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs", "epub"]) {
     if (!targetSet.has(target)) issues.push(`visual-review-summary.json is missing primary target ${target}`);
   }
   if (!["pending-human-review", "human-reviewed"].includes(summary.humanSignoff?.status)) {
@@ -1957,6 +1996,7 @@ function targetEvidence(target, assertions) {
     substack: ["substack-package", "substack-metadata", "substack-copy"],
     latex: ["latex-source"],
     "google-docs": ["google-docs-package", "google-docs-metadata", "google-docs-docx-document"],
+    epub: ["epub-package", "epub-container", "epub-package-manifest", "epub-document", "epub-text-fallback"],
   };
   const [reviewSlug, reviewTarget] = String(target).includes(":") ? String(target).split(":") : ["", target];
   const prefixes = reviewSlug

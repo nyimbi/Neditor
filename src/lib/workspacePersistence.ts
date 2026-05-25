@@ -41,7 +41,8 @@ export type ExportTarget =
   | "blog"
   | "substack"
   | "latex"
-  | "google-docs";
+  | "google-docs"
+  | "epub";
 export type WorkbenchMode = "split" | "source" | "preview" | "focus" | "outline" | "export" | "review" | "presentation";
 export type SidebarPanel =
   | "files"
@@ -537,7 +538,7 @@ function normalizeExportProfile(profile: unknown, index: number): ExportProfile 
   const id = stringValue(profile.id)?.trim() || `export-profile-${index + 1}`;
   const name = stringValue(profile.name)?.trim() || `Export profile ${index + 1}`;
   const exportTarget =
-    enumValue(profile.exportTarget, ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"] as const) ||
+    enumValue(profile.exportTarget, ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs", "epub"] as const) ||
     "html";
   return {
     id,
@@ -913,7 +914,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
   const distributionTargets = Array.isArray(value.distributionTargets)
     ? value.distributionTargets
         .filter((target): target is ExportTarget =>
-          ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"].includes(String(target)),
+          ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs", "epub"].includes(String(target)),
         )
         .slice(0, 12)
     : [];
@@ -1089,6 +1090,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
     "substack",
     "latex",
     "google-docs",
+    "epub",
   ] as const);
   if (exportTarget) migrated.exportTarget = exportTarget;
   if (isRecord(raw.exportDefaults)) migrated.exportDefaults = normalizeExportDefaults(raw.exportDefaults);

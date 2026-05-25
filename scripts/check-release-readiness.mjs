@@ -625,7 +625,7 @@ function releaseEvidenceKitAccepted(report) {
 
 function renderedExportAuditAccepted(report) {
   const targetNames = new Set((Array.isArray(report.targets) ? report.targets : []).map((target) => target?.target));
-  const requiredTargets = ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs"];
+  const requiredTargets = ["html", "pdf", "docx", "pptx", "markdown-bundle", "blog", "substack", "latex", "google-docs", "epub"];
   const missingTargets = requiredTargets.filter((target) => !targetNames.has(target));
   const reviewCases = Array.isArray(report.reviewCases) ? report.reviewCases : [];
   const reviewCaseBySlug = new Map(reviewCases.map((reviewCase) => [reviewCase?.slug, reviewCase]));

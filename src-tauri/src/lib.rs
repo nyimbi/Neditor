@@ -34,6 +34,7 @@ mod paged_document;
 mod provenance;
 mod references;
 mod review;
+mod rfp_import;
 mod rich_blocks;
 mod snapshot;
 mod snapshot_metadata;
@@ -62,7 +63,7 @@ pub(crate) use diagnostics::{diag, DocumentDiagnostic};
 use document_ast::DocumentBlock;
 #[cfg(test)]
 use export::{
-    render_blog_publish_package_bytes, render_docx_bytes, render_full_html,
+    render_blog_publish_package_bytes, render_docx_bytes, render_epub_bytes, render_full_html,
     render_google_docs_package_bytes, render_latex_bytes, render_markdown_bundle_bytes,
     render_pdf_bytes, render_pptx_bytes,
 };
@@ -88,6 +89,7 @@ use git::{
 use git_support::run_git;
 #[cfg(test)]
 use git_types::{GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRequest};
+use rfp_import::import_rfp_source;
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
 use tauri::{
     menu::{Menu, MenuItemBuilder, SubmenuBuilder},
@@ -145,6 +147,7 @@ pub fn run() {
             compile_document_with_options,
             export_document,
             prepare_for_export,
+            import_rfp_source,
             create_snapshot,
             list_snapshots,
             restore_snapshot,
@@ -210,6 +213,7 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             "neditor-export-google-docs",
             "Google Docs Package Export",
         )?)
+        .item(&menu_item(app, "neditor-export-epub", "EPUB Export")?)
         .build()?;
 
     let file_menu = SubmenuBuilder::new(app, "File")

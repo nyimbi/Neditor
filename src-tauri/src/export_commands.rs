@@ -7,7 +7,7 @@ use crate::{
     },
     diagnostics::{diag, DocumentDiagnostic},
     export::{
-        render_blog_publish_package_bytes, render_docx_bytes, render_full_html,
+        render_blog_publish_package_bytes, render_docx_bytes, render_epub_bytes, render_full_html,
         render_google_docs_package_bytes, render_latex_bytes, render_markdown_bundle_bytes,
         render_pdf_bytes, render_pptx_bytes,
     },
@@ -164,9 +164,14 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
             render_google_docs_package_bytes(&compile_response, &manifest)?,
         )
         .map_err(|err| err.to_string())?,
+        "epub" => fs::write(
+            &output_path,
+            render_epub_bytes(&compile_response, &manifest)?,
+        )
+        .map_err(|err| err.to_string())?,
         other => {
             return Err(format!(
-                "Unsupported export target '{other}'. Use html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, or google-docs."
+                "Unsupported export target '{other}'. Use html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, google-docs, or epub."
             ));
         }
     }
@@ -319,13 +324,14 @@ fn validate_export_settings(
             | "substack"
             | "latex"
             | "google-docs"
+            | "epub"
     ) {
         diagnostics.push(diag(
             "error",
             format!("Unsupported export target: {target}"),
             None,
             None,
-            Some("Use html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, or google-docs."),
+            Some("Use html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, google-docs, or epub."),
         ));
     }
     validate_optional_string(options, "watermark", "Export watermark", diagnostics);
@@ -524,7 +530,7 @@ fn validate_target_specific_export_options(
 
     if matches!(
         target,
-        "markdown-bundle" | "markdown" | "blog" | "substack" | "google-docs"
+        "markdown-bundle" | "markdown" | "blog" | "substack" | "google-docs" | "epub"
     ) {
         if sidecar_manifest_disabled {
             push_option_info(
@@ -664,6 +670,7 @@ fn expected_export_extension(target: &str) -> Option<&'static str> {
         "pptx" => Some("pptx"),
         "latex" => Some("tex"),
         "markdown-bundle" | "markdown" | "blog" | "substack" | "google-docs" => Some("zip"),
+        "epub" => Some("epub"),
         _ => None,
     }
 }
@@ -725,7 +732,10 @@ fn validate_target_specific_export_readiness(
 }
 
 fn release_metadata_required_for_target(target: &str) -> bool {
-    matches!(target, "pptx" | "blog" | "substack" | "google-docs")
+    matches!(
+        target,
+        "pptx" | "blog" | "substack" | "google-docs" | "epub"
+    )
 }
 
 fn validate_transform_export_settings(options: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {

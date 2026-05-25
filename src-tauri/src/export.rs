@@ -47,3 +47,6 @@ pub(crate) use blog::render_blog_publish_package_bytes;
 
 mod google_docs;
 pub(crate) use google_docs::render_google_docs_package_bytes;
+
+mod epub;
+pub(crate) use epub::render_epub_bytes;

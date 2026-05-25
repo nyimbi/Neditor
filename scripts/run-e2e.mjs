@@ -89,6 +89,17 @@ function workflowEvidence(command, stdout) {
     docsLiveDraft:
       /Docs Live/i.test(commandText) ||
       output.includes("generates a Docs Live draft from outline, context, and placeholders"),
+    businessDocumentWizard:
+      /business documents|document wizard/i.test(commandText) ||
+      output.includes("builds business documents from saved identity snippets and local-agent handoff"),
+    rfpResponseWizard:
+      /rfp response|rfp wizard/i.test(commandText) ||
+      output.includes("Native RFP response wizard") ||
+      output.includes("builds business documents from saved identity snippets and local-agent handoff"),
+    equationEditor:
+      /equation editor/i.test(commandText) ||
+      output.includes("Equation editor") ||
+      output.includes("builds business documents from saved identity snippets and local-agent handoff"),
     outlineModeCrud:
       /outline/i.test(commandText) ||
       output.includes("edits document structure from outline mode"),
@@ -104,5 +115,8 @@ function workflowEvidence(command, stdout) {
     exportWorkflows:
       /export/i.test(commandText) ||
       output.includes("runs export readiness, success, and failure workflows"),
+    epubExport:
+      /epub|ebook/i.test(commandText) ||
+      output.includes("publishes and hands off extended export targets"),
   };
 }
