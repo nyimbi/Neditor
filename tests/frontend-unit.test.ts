@@ -1981,8 +1981,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("blocked-path"));
   ok(app.includes('aria-label="Document variable manager"'));
   ok(app.includes("frontMatterVariableRows"));
+  ok(app.includes("mergedMetadataVariableRows"));
   ok(app.includes("documentVariableManagerSummary"));
   ok(app.includes("parseFrontMatterVariables"));
+  ok(app.includes("parseMergedMetadataVariables"));
+  ok(app.includes("project/merged metadata"));
   ok(app.includes("insertDocumentVariable"));
   ok(app.includes("addDocumentVariable"));
   ok(app.includes("Document variable insert filter"));

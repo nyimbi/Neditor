@@ -402,6 +402,10 @@ Research and business documents can keep reference metadata near the source.
 - Use the Captions and Lists manager to insert lists of figures and tables,
   inspect tables, figures, and equations that need labels or captions, jump to
   their source, and insert cross-reference text for labeled items.
+- Use the Document Variables manager to inspect scalar front matter values and
+  merged project variables from `.neditor/variables.yaml`, insert filtered
+  placeholders such as `{{projectLead | upper}}`, and add new front matter
+  variables without editing YAML by hand.
 
 The references panel surfaces resolved bibliography entries, missing citation
 keys, duplicate bibliography keys, and citation TODO blockers. The Citation

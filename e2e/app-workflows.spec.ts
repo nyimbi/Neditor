@@ -232,6 +232,35 @@ async function installTauriMock(page: Page, stateKey: string) {
       return match?.[1].replace(/^["']|["']$/g, "").trim() || "";
     }
 
+    function frontMatterScalarMap(text: string) {
+      const frontMatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+      if (!frontMatter) return {};
+      return yamlScalarMap(frontMatter[1]);
+    }
+
+    function projectVariableScalars(filePath: string) {
+      const folder = dirname(filePath);
+      const candidate =
+        files.get(`${folder}/.neditor/variables.yaml`)?.text ||
+        files.get(`${folder}/.neditor/variables.yml`)?.text ||
+        "";
+      if (!candidate.trim()) return {};
+      const inner = candidate.match(/^variables:\s*\r?\n([\s\S]*)$/m);
+      return yamlScalarMap(inner?.[1] || candidate);
+    }
+
+    function yamlScalarMap(text: string) {
+      const values: Record<string, string> = {};
+      for (const raw of text.split(/\r?\n/)) {
+        const match = raw.match(/^\s{0,2}([A-Za-z][\w-]*):\s*(.+?)\s*$/);
+        if (!match) continue;
+        const value = match[2].replace(/^["']|["']$/g, "").trim();
+        if (!value || value === "[]" || value === "{}" || /^[>|]$/.test(value) || value.startsWith("[") || value.startsWith("{")) continue;
+        values[match[1]] = value;
+      }
+      return values;
+    }
+
     function htmlFromMarkdown(text: string) {
       return text
         .split(/\r?\n/)
@@ -575,7 +604,11 @@ async function installTauriMock(page: Page, stateKey: string) {
       const aiAssistedSections = aiAssistedSectionsFromMarkdown(compiled);
       const transformArtifacts = transformArtifactsFromMarkdown(compiled, filePath);
       const sourceHash = hash(text);
+      const frontMatterScalars = frontMatterScalarMap(text);
+      const projectVariables = projectVariableScalars(filePath);
       const metadata = {
+        ...projectVariables,
+        ...frontMatterScalars,
         title,
         status,
         version,
@@ -2427,6 +2460,11 @@ test("runs command palette citation glossary and index navigation", async ({ pag
 test("manages front matter data sources from the references panel", async ({ page }) => {
   await setMockFileText(
     page,
+    "/workspace/.neditor/variables.yaml",
+    ["variables:", "  projectLead: Strategy PMO", "  projectCapex: 450000"].join("\n"),
+  );
+  await setMockFileText(
+    page,
     "/workspace/data-source-ui.md",
     [
       "---",
@@ -2470,12 +2508,17 @@ test("manages front matter data sources from the references panel", async ({ pag
   await expect.poll(() => editorText(page)).toContain("type: tsv");
 
   const variables = page.getByRole("region", { name: "Document variable manager" });
-  await expect(variables).toContainText("scalar variables");
+  await expect(variables).toContainText("front matter variables");
+  await expect(variables).toContainText("project/merged variables");
   await expect(variables.locator(".snapshot-row").filter({ hasText: "client" })).toContainText("Example Corp");
   await expect(variables.locator(".snapshot-row").filter({ hasText: "owner" })).toContainText("empty");
+  await expect(variables.locator(".snapshot-row").filter({ hasText: "projectLead" })).toContainText("Strategy PMO");
   await variables.getByLabel("Document variable insert filter").selectOption("currency");
   await variables.locator(".snapshot-row").filter({ hasText: "budget" }).getByRole("button", { name: "Insert variable" }).click();
   await expect.poll(() => editorText(page)).toContain("{{budget | currency}}");
+  await variables.getByLabel("Document variable insert filter").selectOption("upper");
+  await variables.locator(".snapshot-row").filter({ hasText: "projectLead" }).getByRole("button", { name: "Insert variable" }).click();
+  await expect.poll(() => editorText(page)).toContain("{{projectLead | upper}}");
   await variables.getByPlaceholder("client, owner, budget").fill("reviewer");
   await variables.getByPlaceholder("Example Corp, Strategy Office, 125000").fill("QA Lead");
   await variables.getByRole("button", { name: "Add variable" }).click();

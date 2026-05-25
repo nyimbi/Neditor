@@ -882,7 +882,16 @@
                 <button type="button" @click="goToSourceTarget({ line: variable.line })">Go to variable</button>
               </div>
             </article>
-            <p v-if="!frontMatterVariableRows.length" class="sidebar-hint">No scalar front matter variables are available for placeholder insertion.</p>
+            <article v-for="variable in mergedMetadataVariableRows" :key="variable.key" class="snapshot-row" :data-status="variable.status">
+              <p>{{ variable.key }}</p>
+              <small>{{ variable.status }} | project/merged metadata | {{ variable.value || "empty" }}</small>
+              <div class="reference-actions">
+                <button type="button" @click="insertDocumentVariable(variable.key)">Insert variable</button>
+              </div>
+            </article>
+            <p v-if="!frontMatterVariableRows.length && !mergedMetadataVariableRows.length" class="sidebar-hint">
+              No scalar front matter or merged project variables are available for placeholder insertion.
+            </p>
           </section>
           <h3>Captions and Lists</h3>
           <section class="reference-manager" aria-label="Captions and generated lists manager">
@@ -4464,10 +4473,11 @@ const dataSourceManagerSummary = computed(() => {
   return `${rows.length} local data sources | ${ready} ready | ${blocked} need attention`;
 });
 const frontMatterVariableRows = computed(() => parseFrontMatterVariables(active.value.text));
+const mergedMetadataVariableRows = computed(() => parseMergedMetadataVariables(active.value.compile?.metadata || {}, frontMatterVariableRows.value));
 const documentVariableManagerSummary = computed(() => {
-  const rows = frontMatterVariableRows.value;
+  const rows = [...frontMatterVariableRows.value, ...mergedMetadataVariableRows.value];
   const empty = rows.filter((row) => row.status === "empty").length;
-  return `${rows.length} scalar variables | ${empty} empty | filters: default, trim, upper, lower, title, number, round, percent, currency`;
+  return `${frontMatterVariableRows.value.length} front matter variables | ${mergedMetadataVariableRows.value.length} project/merged variables | ${empty} empty | filters: default, trim, upper, lower, title, number, round, percent, currency`;
 });
 const captionedReferenceItems = computed<CaptionedReferenceItem[]>(() =>
   (active.value.compile?.document_ast.blocks || []).flatMap((block: DocumentBlock) => {
@@ -9957,6 +9967,41 @@ function parseFrontMatterVariables(text: string): FrontMatterVariableRow[] {
   return rows.sort((left, right) => left.key.localeCompare(right.key));
 }
 
+function parseMergedMetadataVariables(metadata: Record<string, unknown>, frontMatterRows: FrontMatterVariableRow[]): FrontMatterVariableRow[] {
+  const frontMatterKeys = new Set(frontMatterRows.map((row) => row.key));
+  const rows: FrontMatterVariableRow[] = [];
+  collectMergedMetadataVariables(metadata, "", frontMatterKeys, rows);
+  return rows.sort((left, right) => left.key.localeCompare(right.key));
+}
+
+function collectMergedMetadataVariables(
+  value: unknown,
+  path: string,
+  frontMatterKeys: Set<string>,
+  rows: FrontMatterVariableRow[],
+) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const childPath = path ? `${path}.${key}` : key;
+    if (frontMatterKeys.has(childPath) || metadataVariableExcludedKeys.has(childPath) || metadataVariableExcludedKeys.has(key)) continue;
+    if (isScalarMetadataValue(child)) {
+      const rendered = cleanMetadataVariableValue(child);
+      rows.push({ key: childPath, value: rendered, status: rendered ? "ready" : "empty", line: 0 });
+      continue;
+    }
+    collectMergedMetadataVariables(child, childPath, frontMatterKeys, rows);
+  }
+}
+
+function isScalarMetadataValue(value: unknown) {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null;
+}
+
+function cleanMetadataVariableValue(value: unknown) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
 const frontMatterVariableExcludedKeys = new Set([
   "brand",
   "layout",
@@ -9968,6 +10013,16 @@ const frontMatterVariableExcludedKeys = new Set([
   "ymlFiles",
   "bibliography",
   "indexExclude",
+]);
+
+const metadataVariableExcludedKeys = new Set([
+  "source_hash",
+  "sourceHash",
+  "compiled_at",
+  "exported_at",
+  "output_path",
+  "output_hash",
+  "app_version",
 ]);
 
 function applyDataSourcePair(row: Partial<FrontMatterDataSourceRow>, pairText: string) {

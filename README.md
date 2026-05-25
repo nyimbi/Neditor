@@ -279,7 +279,10 @@ web app.
   history records the wrapped review draft that was actually inserted.
   The References panel also includes a Citation TODO workflow for adding,
   resolving, deferring, jumping to, and exporting citation blockers as a
-  reviewer-ready Markdown audit.
+  reviewer-ready Markdown audit. It also exposes front matter and merged
+  project variables from `.neditor/variables.yaml` as insertable placeholders
+  with filters, so repeated client, owner, budget, and source values do not
+  require hand-written `{{variable}}` syntax.
   The Help Center and guided demo include AI Governance steps that show
   non-technical users how to route lifecycle tasks, insert or copy task briefs,
   review provider packages, and apply provider output only as governed
@@ -321,7 +324,8 @@ web app.
   child front-matter stripping, include graph tracking, source/include hashing,
   and diagnostics for missing or circular includes.
 - Document variables, default variables, project variables, inline formulas,
-  calculation blocks, table formulas, and dependency diagnostics.
+  calculation blocks, table formulas, UI insertion for merged metadata
+  variables, and dependency diagnostics.
 - Automatic table of contents, glossary, index, bibliography, source maps,
   export manifests, semantic AST, paged-document model, diagnostics, and
   transform artifacts.
