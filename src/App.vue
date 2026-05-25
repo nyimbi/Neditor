@@ -2923,8 +2923,25 @@
           <div>
             <strong>Generate with AI agent</strong>
             <span>Plan the workflow, create a governed packet, and keep it ready for review or distribution.</span>
+            <dl v-if="commandAgentPlanPreview" class="command-agent-preview" aria-label="AI command plan preview">
+              <div>
+                <dt>Lanes</dt>
+                <dd>{{ commandAgentPlanPreview.lanes.join(", ") }}</dd>
+              </div>
+              <div>
+                <dt>Targets</dt>
+                <dd>{{ commandAgentPlanPreview.distributionTargets.length ? commandAgentPlanPreview.distributionTargets.join(", ") : "Review packet" }}</dd>
+              </div>
+              <div>
+                <dt>Missing</dt>
+                <dd>{{ commandAgentPlanPreview.missingInputs.length ? commandAgentPlanPreview.missingInputs.slice(0, 4).join(", ") : "Ready to draft" }}</dd>
+              </div>
+            </dl>
           </div>
-          <button type="button" @click="runCommandPaletteAgentInstruction">Generate Packet</button>
+          <div class="command-agent-actions">
+            <button type="button" @click="openCommandPaletteAgentPlan">Plan first</button>
+            <button type="button" @click="runCommandPaletteAgentInstruction">Generate Packet</button>
+          </div>
         </section>
         <button
           v-for="command in filteredCommands"
@@ -5808,6 +5825,16 @@ const commandAgentInstructionAvailable = computed(() => {
   const query = commandQuery.value.trim();
   if (query.length < 8) return false;
   return /\b(ai|agent|create|draft|write|revise|edit|review|summari[sz]e|publish|export|prepare|make|turn|improve|humanize|outline|compose)\b/i.test(query);
+});
+const commandAgentPlanPreview = computed(() => {
+  const instruction = commandQuery.value.trim();
+  if (!commandAgentInstructionAvailable.value) return null;
+  return buildAgenticWorkflowPlan({
+    instruction,
+    documentTitle: active.value.compile?.semantic.title || active.value.title,
+    documentText: active.value.text,
+    selectedText: currentEditorSelectionText(),
+  });
 });
 
 async function bindNativeMenuCommands() {
@@ -9614,6 +9641,15 @@ async function runCommand(run: () => unknown) {
   closeCommandPalette();
   await nextTick();
   run();
+}
+
+async function openCommandPaletteAgentPlan() {
+  const instruction = commandQuery.value.trim();
+  if (!instruction) return;
+  closeCommandPalette();
+  await nextTick();
+  openAgentWorkspace(instruction);
+  store.statusMessage = "Planned agent workflow from command palette instruction";
 }
 
 async function runCommandPaletteAgentInstruction() {
@@ -14132,13 +14168,38 @@ select:hover {
   background: #f5faff;
 }
 
-.command-agent-route div {
+.command-agent-route > div,
+.command-agent-actions {
   display: grid;
-  gap: 2px;
+  gap: 6px;
 }
 
 .command-agent-route span {
   color: #526171;
+  font-size: 12px;
+}
+
+.command-agent-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 4px 0 0;
+}
+
+.command-agent-preview div {
+  min-width: 0;
+}
+
+.command-agent-preview dt {
+  color: #526171;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.command-agent-preview dd {
+  margin: 0;
+  overflow-wrap: anywhere;
   font-size: 12px;
 }
 
@@ -14332,6 +14393,11 @@ select:hover {
   .command-group,
   .compact-field {
     max-width: 100%;
+  }
+
+  .command-agent-route,
+  .command-agent-preview {
+    grid-template-columns: 1fr;
   }
 
   .workspace,

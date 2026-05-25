@@ -192,7 +192,9 @@ web app.
   Markdown document skeleton before writing the body text.
 - AI Agent Workspace turns a plain-language instruction into an agentic plan
   across creation, composition, editing, revision, review, and distribution. It
-  includes searchable and filterable workflow playbooks for board approvals,
+  includes command-palette AI previews that show detected lanes, output targets,
+  and missing inputs before generating a packet, searchable and filterable
+  workflow playbooks for board approvals,
   client proposals, SOPs, strategy memos, policies, release notes, grant
   applications, technical/LaTeX papers, blog/Substack publishing, and executive
   revision passes, then identifies lanes, missing inputs, placeholder values,

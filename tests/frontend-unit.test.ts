@@ -1659,7 +1659,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("commandAgentInstructionAvailable"));
   ok(app.includes("runCommandPaletteAgentInstruction"));
   ok(app.includes('aria-label="AI command route"'));
+  ok(app.includes('aria-label="AI command plan preview"'));
+  ok(app.includes("commandAgentPlanPreview"));
+  ok(app.includes("openCommandPaletteAgentPlan"));
+  ok(app.includes("Planned agent workflow from command palette instruction"));
   ok(app.includes("Generate with AI agent"));
+  ok(app.includes("Plan first"));
   ok(app.includes("Generate Packet"));
   ok(app.includes("Generated agent packet from command palette instruction"));
   ok(app.includes("Context answers and constraints"));
