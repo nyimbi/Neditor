@@ -1202,6 +1202,14 @@
             <input :value="String(active.compile?.metadata.documentSet || '')" @change="setFrontMatterField('documentSet', inputValue($event))" />
           </label>
           <label>
+            Owner
+            <input :value="String(active.compile?.metadata.owner || '')" @change="setFrontMatterField('owner', inputValue($event))" />
+          </label>
+          <label>
+            Release target
+            <input :value="String(active.compile?.metadata.releaseTarget || '')" @change="setFrontMatterField('releaseTarget', inputValue($event))" />
+          </label>
+          <label>
             Approved by
             <input :value="String(active.compile?.metadata.approvedBy || '')" @change="setFrontMatterField('approvedBy', inputValue($event))" />
           </label>

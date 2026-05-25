@@ -673,38 +673,59 @@ fn validate_target_specific_export_readiness(
     metadata: &Value,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
-    if target != "pptx" {
+    if !release_metadata_required_for_target(target) {
         return;
     }
 
     let status = metadata_string(metadata, "status").unwrap_or_else(|| "draft".to_string());
-    let approved_by_missing = metadata_string(metadata, "approvedBy")
+    let approval_reviewer_missing = metadata_string(metadata, "approvedBy")
+        .or_else(|| metadata_string(metadata, "reviewer"))
         .map(|value| value.trim().is_empty())
         .unwrap_or(true);
     let approved_at_missing = metadata_string(metadata, "approvedAt")
         .map(|value| value.trim().is_empty())
         .unwrap_or(true);
+    let owner_missing = metadata_string(metadata, "owner")
+        .map(|value| value.trim().is_empty())
+        .unwrap_or(true);
+    let release_target_missing = metadata_string(metadata, "releaseTarget")
+        .map(|value| value.trim().is_empty())
+        .unwrap_or(true);
     if !matches!(status.as_str(), "approved" | "published")
-        || approved_by_missing
+        || approval_reviewer_missing
         || approved_at_missing
+        || owner_missing
+        || release_target_missing
     {
         let mut diagnostic = diag(
             "error",
-            "PPTX export requires approved metadata before writing.",
+            &format!("{} export requires release approval metadata before writing.", target.to_ascii_uppercase()),
             None,
             None,
-            Some("Set status to approved or published and add approvedBy plus approvedAt before exporting a presentation."),
+            Some("Set status to approved or published and add approvedBy or reviewer, approvedAt, owner, and releaseTarget before distribution."),
         );
-        diagnostic.related.push("target:pptx".to_string());
+        diagnostic.related.push(format!("target:{target}"));
         diagnostic.related.push(format!("status:{status}"));
-        if approved_by_missing {
-            diagnostic.related.push("missing:approvedBy".to_string());
+        if approval_reviewer_missing {
+            diagnostic
+                .related
+                .push("missing:approvedBy-or-reviewer".to_string());
         }
         if approved_at_missing {
             diagnostic.related.push("missing:approvedAt".to_string());
         }
+        if owner_missing {
+            diagnostic.related.push("missing:owner".to_string());
+        }
+        if release_target_missing {
+            diagnostic.related.push("missing:releaseTarget".to_string());
+        }
         diagnostics.push(diagnostic);
     }
+}
+
+fn release_metadata_required_for_target(target: &str) -> bool {
+    matches!(target, "pptx" | "blog" | "substack" | "google-docs")
 }
 
 fn validate_transform_export_settings(options: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {

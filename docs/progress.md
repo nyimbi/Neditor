@@ -1750,12 +1750,12 @@ Additional external conflict composition verification:
 | `pnpm exec playwright test e2e/app-workflows.spec.ts --grep "merges external conflict" --project chromium` | Blocked locally | Playwright could not launch because the local Chromium headless-shell executable is missing from the Playwright cache; the focused workflow was discovered but did not execute assertions. |
 | `git diff --check` | Pass | No whitespace errors in the slice. |
 
-Additional target-specific PPTX readiness verification:
+Additional target-specific external release readiness verification:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `cargo test --locked prepare_for_export_reports_target_specific_pptx_blockers --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust readiness proof blocks PPTX export for in-review documents missing `approvedBy` and `approvedAt`, records `target:pptx` related context, copies readiness into the manifest, and keeps the same source ready for PDF. |
-| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | 16 export command tests passed after adding the PPTX target-specific blocker. |
+| `cargo test --locked prepare_for_export_reports_target_specific_release_metadata_blockers --lib -- --nocapture` in `src-tauri` | Pass | Focused Rust readiness proof blocks PPTX, blog, Substack, and Google Docs export for in-review documents missing approver/reviewer, `approvedAt`, `owner`, and `releaseTarget`, records target-specific related context, copies readiness into the manifest, and keeps the same source ready for PDF. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | Export command tests passed after expanding target-specific release metadata blockers across PPTX, blog, Substack, and Google Docs. |
 | `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the export readiness update. |
 | `pnpm run build` | Pass | `vue-tsc --noEmit` and Vite production build passed after aligning the browser export workflow mock with the PPTX approved-metadata blocker. |
 | `pnpm run test:unit` | Pass | 12 frontend unit tests still pass after the export workflow update. |

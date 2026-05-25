@@ -875,6 +875,8 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.controlCenter.governance.some((item) => item.label === "Humanization" && item.status === "needs-review"));
   ok(run.controlCenter.governance.some((item) => item.label === "Human review" && item.detail.includes("unresolved current-document review comment")));
   ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata" && item.detail.includes("approvedAt")));
+  ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata" && item.detail.includes("owner")));
+  ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata" && item.detail.includes("releaseTarget")));
   ok(run.controlCenter.distribution.some((item) => item.detail.includes("placeholder or suspicious link")));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-placeholders" && task.evidence.some((item) => item.includes("{{client_name}}"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-outline-critique" && task.action === "open-outline"));
@@ -886,6 +888,8 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-ai-review" && task.owner === "Governance Agent"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-links" && task.action === "prepare-export"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata" && task.evidence.some((item) => item.includes("approvedAt"))));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata" && task.nextStep.includes("owner")));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata" && task.evidence.some((item) => item.includes("releaseTarget"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.findings.some((item) => item.includes("{{client_name}}"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("outline critique"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("humanization findings"))));
@@ -1599,6 +1603,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Task note"));
   ok(app.includes("Needs review"));
   ok(app.includes("Execution note"));
+  ok(app.includes("active.compile?.metadata.owner"));
+  ok(app.includes("active.compile?.metadata.releaseTarget"));
+  ok(app.includes("Release target"));
+  ok(app.includes("releaseTarget"));
   ok(app.includes("runAgentLifecycleTask"));
   ok(app.includes("insertAgentLifecycleTaskBrief"));
   ok(app.includes("copyAgentLifecycleTaskBrief"));

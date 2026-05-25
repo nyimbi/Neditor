@@ -1398,7 +1398,7 @@ function distributionQualityGate(targets: ExportTarget[]): AgenticQualityGate {
     appliesTo: "distribution",
     label: "Distribution Readiness",
     detail: `Requested targets (${targets.join(", ")}) have approval metadata, export readiness, and artifact evidence requirements staged.`,
-    evidenceRequired: ["Approval metadata present", "Target artifacts or runbooks verified"],
+    evidenceRequired: ["Status, approver or reviewer, approvedAt, owner, and releaseTarget metadata present", "Target artifacts or runbooks verified"],
   };
 }
 
@@ -1410,7 +1410,7 @@ function buildDistributionTargetPlans(plan: AgenticWorkflowPlan): AgenticDistrib
       label: profile.label,
       purpose: profile.purpose,
       preflightChecks: [
-        "Confirm approval status, reviewer, approvedAt, and export metadata are present.",
+        "Confirm approved or published status, approver or reviewer, approvedAt, owner, releaseTarget, and export metadata are present.",
         "Run export readiness and resolve unresolved comments, AI review warnings, broken links, and missing assets.",
         ...profile.preflightChecks,
       ],
@@ -1608,7 +1608,7 @@ function buildLifecycleTasks(input: {
     evidence: [
       "All AI-assisted sections must be source-checked and marked human-reviewed.",
       "All requested distribution artifacts must retain export manifests or equivalent proof.",
-      "Release status, reviewer, and approval metadata must match the intended handoff.",
+      "Release status, approver or reviewer, approvedAt, owner, and releaseTarget metadata must match the intended handoff.",
     ],
     nextStep: "Resolve outstanding review and distribution evidence before publishing or archiving.",
   });
@@ -1730,7 +1730,7 @@ function buildDocumentEvidenceLifecycleTasks(documentEvidence: AgenticDocumentEv
       status: "needs-input",
       action: "prepare-export",
       evidence: documentEvidence.approvalMetadataMissing.map((item) => `Missing ${item}`),
-      nextStep: "Add approval status, reviewer, and approvedAt metadata before export or publishing handoff.",
+      nextStep: "Add approved or published status, approver or reviewer, approvedAt, owner, and releaseTarget metadata before export or publishing handoff.",
     });
   }
   return tasks;
@@ -2091,7 +2091,7 @@ function buildReviewerAgents(input: {
         blockers.length && !hardBlockers.length ? "Resolve all missing-input blockers before marking the packet approved." : "",
         revision?.meaningDriftFindings.length ? "Approve, restore, or explicitly document every meaning-drift finding before release handoff." : "",
         documentEvidence.reviewCommentResolutions.length ? "Work through the review comment resolution queue with resolution notes before release handoff." : "",
-        plan.lanes.includes("distribute") ? "Confirm approval status, reviewer, and release owner before any external handoff." : "",
+        plan.lanes.includes("distribute") ? "Confirm approved or published status, approver or reviewer, approvedAt, owner, and releaseTarget before any external handoff." : "",
       ],
     }),
     reviewerAgent({
@@ -2846,9 +2846,7 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
   const unreviewedAiAssisted = [...documentText.matchAll(/<!--\s*ai-assisted:[\s\S]*?-->/g)].filter((marker) => !/\bstatus\s*=\s*human-reviewed\b/i.test(marker[0])).length;
   const reviewCommentResolutions = extractReviewCommentResolutions(documentText);
   const unresolvedComments = reviewCommentResolutions.length;
-  const approvalMetadataMissing = plan.distributionTargets.length
-    ? ["status", "reviewer", "approvedAt"].filter((key) => !new RegExp(`^${key}:\\s*\\S`, "im").test(documentText))
-    : [];
+  const approvalMetadataMissing = plan.distributionTargets.length ? releaseMetadataMissing(documentText) : [];
   const brokenLinkHints = Array.from(
     new Set([...documentText.matchAll(/\]\((?:TODO|TBD|#|https?:\/\/example\.com)[^)]*\)/gi)].map((match) => match[0])),
   ).slice(0, 12);
@@ -2866,6 +2864,18 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
     approvalMetadataMissing,
     brokenLinkHints,
   };
+}
+
+function releaseMetadataMissing(documentText: string) {
+  const hasValue = (key: string) => new RegExp(`^${key}:\\s*\\S`, "im").test(documentText);
+  const statusApproved = /^status:\s*(approved|published)\b/im.test(documentText);
+  return [
+    statusApproved ? "" : "status: approved or published",
+    hasValue("approvedBy") || hasValue("reviewer") ? "" : "approvedBy or reviewer",
+    hasValue("approvedAt") ? "" : "approvedAt",
+    hasValue("owner") ? "" : "owner",
+    hasValue("releaseTarget") ? "" : "releaseTarget",
+  ].filter(Boolean);
 }
 
 function extractReviewCommentResolutions(documentText: string): AgenticReviewCommentResolution[] {

@@ -29,7 +29,7 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
     fs::create_dir_all(&exports).expect("create smoke exports");
     let root_doc = root.join("board-pack.md");
     let summary = chapters.join("summary.md");
-    let source = "---\ntitle: Native Workflow Smoke\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21T08:00:00Z\ntoc: true\n---\n# Native Workflow Smoke\n\n!include chapters/summary.md\n\n[TOC]\n\n```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\nmargin = profit / revenue\n```\n\nExpected margin: {{=margin | percent}}\n\nTable: Budget controls {#tbl:budget}\n| Metric | Value |\n| --- | ---: |\n| Revenue | {{=revenue | currency}} |\n| Cost | {{=cost | currency}} |\n| Profit | {{=profit | currency}} |\n\n```chart\ntype: bar\ntitle: Quarterly Revenue\ndata:\n  - quarter: Q1\n    revenue: 120\n  - quarter: Q2\n    revenue: 148\nx: quarter\ny: revenue\n```\n\n![Architecture](data:image/svg+xml;base64,PHN2Zy8+){#fig:architecture caption=\"Architecture diagram\"}\n\nSee {@tbl:budget} and {@fig:architecture}.\n".to_string();
+    let source = "---\ntitle: Native Workflow Smoke\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21T08:00:00Z\nowner: Release QA\nreleaseTarget: native export smoke\ntoc: true\n---\n# Native Workflow Smoke\n\n!include chapters/summary.md\n\n[TOC]\n\n```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\nmargin = profit / revenue\n```\n\nExpected margin: {{=margin | percent}}\n\nTable: Budget controls {#tbl:budget}\n| Metric | Value |\n| --- | ---: |\n| Revenue | {{=revenue | currency}} |\n| Cost | {{=cost | currency}} |\n| Profit | {{=profit | currency}} |\n\n```chart\ntype: bar\ntitle: Quarterly Revenue\ndata:\n  - quarter: Q1\n    revenue: 120\n  - quarter: Q2\n    revenue: 148\nx: quarter\ny: revenue\n```\n\n![Architecture](data:image/svg+xml;base64,PHN2Zy8+){#fig:architecture caption=\"Architecture diagram\"}\n\nSee {@tbl:budget} and {@fig:architecture}.\n".to_string();
     fs::write(
         &summary,
         "## Executive Summary\n\nThe native workflow smoke uses real file operations and export commands.\n",
@@ -140,7 +140,7 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
 
 #[test]
 fn export_document_writes_blog_and_substack_publish_packages() {
-    let source = "---\ntitle: Board Notes\nsubtitle: Weekly operating summary\nslug: board-notes-weekly\nauthor: NEditor QA\ndate: 2026-05-21\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\ntags:\n  - strategy\n  - operations\ncanonicalUrl: https://example.com/board-notes\n---\n# Board Notes\n\nA copy-ready post with **business** context.\n".to_string();
+    let source = "---\ntitle: Board Notes\nsubtitle: Weekly operating summary\nslug: board-notes-weekly\nauthor: NEditor QA\ndate: 2026-05-21\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: executive newsletter\ntags:\n  - strategy\n  - operations\ncanonicalUrl: https://example.com/board-notes\n---\n# Board Notes\n\nA copy-ready post with **business** context.\n".to_string();
 
     for target in ["blog", "substack"] {
         let unique = SystemTime::now()
@@ -197,7 +197,7 @@ fn export_document_writes_blog_and_substack_publish_packages() {
 
 #[test]
 fn export_document_writes_latex_and_google_docs_outputs() {
-    let source = "---\ntitle: Research Brief\nsubtitle: Import-ready evidence pack\nauthor: NEditor QA\ndate: 2026-05-21\nversion: 2.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Research Brief\n\nA **business** brief with a [source link](https://example.com/evidence).\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Review | Operations |\n\nSee [Table controls](#tbl:controls).\n\n$$\nROI = \\frac{Gain}{Cost}\n$$ {#eq:roi caption=\"Return on investment\"}\n".to_string();
+    let source = "---\ntitle: Research Brief\nsubtitle: Import-ready evidence pack\nauthor: NEditor QA\ndate: 2026-05-21\nversion: 2.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Research Ops\nreleaseTarget: Google Docs review room\n---\n# Research Brief\n\nA **business** brief with a [source link](https://example.com/evidence).\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Review | Operations |\n\nSee [Table controls](#tbl:controls).\n\n$$\nROI = \\frac{Gain}{Cost}\n$$ {#eq:roi caption=\"Return on investment\"}\n".to_string();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time should be after epoch")
@@ -694,7 +694,7 @@ fn export_document_blocks_target_extension_mismatches_before_writing() {
     let output = root.join("board-deck.pdf");
 
     let error = export_document(ExportRequest {
-        text: "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Board Deck\n".to_string(),
+        text: "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Release QA\nreleaseTarget: board deck\n---\n# Board Deck\n".to_string(),
         file_path: None,
         target: "pptx".to_string(),
         output_path: path_to_string(&output),
@@ -721,7 +721,7 @@ fn export_document_writes_optional_sidecar_manifest() {
     fs::create_dir_all(&root).expect("create export manifest dir");
     let output = root.join("ready.html");
     let source =
-            "---\ntitle: Manifest Ready\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-19\nversion: 1.0.0\n---\n# Ready\n";
+            "---\ntitle: Manifest Ready\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-19\nowner: Release QA\nreleaseTarget: manifest smoke\nversion: 1.0.0\n---\n# Ready\n";
 
     let response = export_document(ExportRequest {
         text: source.to_string(),
@@ -1199,49 +1199,67 @@ fn prepare_for_export_validates_brand_and_default_style_options() {
 }
 
 #[test]
-fn prepare_for_export_reports_target_specific_pptx_blockers() {
+fn prepare_for_export_reports_target_specific_release_metadata_blockers() {
     let draft_presentation =
         "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: in-review\n---\n# Board Deck\n"
             .to_string();
-    let report = prepare_for_export(PrepareExportRequest {
-        text: draft_presentation.clone(),
-        file_path: None,
-        target: "pptx".to_string(),
-        options: json!({ "warnOnDirtyGit": false }),
-    });
+    for target in ["pptx", "blog", "substack", "google-docs"] {
+        let report = prepare_for_export(PrepareExportRequest {
+            text: draft_presentation.clone(),
+            file_path: None,
+            target: target.to_string(),
+            options: json!({ "warnOnDirtyGit": false }),
+        });
 
-    assert!(!report.ready);
-    assert_eq!(report.error_count, 1, "{:#?}", report.diagnostics);
-    assert_eq!(report.warning_count, 0, "{:#?}", report.diagnostics);
-    let diagnostic = report
-        .diagnostics
-        .iter()
-        .find(|diagnostic| {
-            diagnostic
-                .message
-                .contains("PPTX export requires approved metadata")
-        })
-        .expect("pptx readiness diagnostic");
-    assert_eq!(diagnostic.severity, "error");
-    assert!(diagnostic
-        .suggestion
-        .as_deref()
-        .is_some_and(|suggestion| suggestion.contains("approvedBy plus approvedAt")));
-    assert!(diagnostic.related.iter().any(|item| item == "target:pptx"));
-    assert!(diagnostic
-        .related
-        .iter()
-        .any(|item| item == "status:in-review"));
-    assert!(diagnostic
-        .related
-        .iter()
-        .any(|item| item == "missing:approvedBy"));
-    assert!(diagnostic
-        .related
-        .iter()
-        .any(|item| item == "missing:approvedAt"));
-    assert_eq!(report.manifest.readiness.error_count, 1);
-    assert!(!report.manifest.readiness.ready);
+        assert!(!report.ready, "{target} should require release metadata");
+        assert_eq!(report.error_count, 1, "{target}: {:#?}", report.diagnostics);
+        assert_eq!(
+            report.warning_count, 0,
+            "{target}: {:#?}",
+            report.diagnostics
+        );
+        let diagnostic = report
+            .diagnostics
+            .iter()
+            .find(|diagnostic| {
+                diagnostic
+                    .message
+                    .contains("requires release approval metadata")
+            })
+            .unwrap_or_else(|| panic!("{target} readiness diagnostic"));
+        assert_eq!(diagnostic.severity, "error");
+        assert!(diagnostic.suggestion.as_deref().is_some_and(|suggestion| {
+            suggestion.contains("approvedBy or reviewer")
+                && suggestion.contains("owner")
+                && suggestion.contains("releaseTarget")
+        }));
+        assert!(diagnostic
+            .related
+            .iter()
+            .any(|item| item == &format!("target:{target}")));
+        assert!(diagnostic
+            .related
+            .iter()
+            .any(|item| item == "status:in-review"));
+        assert!(diagnostic
+            .related
+            .iter()
+            .any(|item| item == "missing:approvedBy-or-reviewer"));
+        assert!(diagnostic
+            .related
+            .iter()
+            .any(|item| item == "missing:approvedAt"));
+        assert!(diagnostic
+            .related
+            .iter()
+            .any(|item| item == "missing:owner"));
+        assert!(diagnostic
+            .related
+            .iter()
+            .any(|item| item == "missing:releaseTarget"));
+        assert_eq!(report.manifest.readiness.error_count, 1);
+        assert!(!report.manifest.readiness.ready);
+    }
 
     let pdf_report = prepare_for_export(PrepareExportRequest {
         text: draft_presentation,

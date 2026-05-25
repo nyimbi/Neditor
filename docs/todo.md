@@ -1219,10 +1219,11 @@ Current evidence:
   Markdown bundles include `include-graph.json` in addition to `manifest.json`
   and `include-map.json`; focused Rust coverage proves both include directives
   and front matter data-source edges appear in export evidence.
-- PPTX readiness now has target-specific validation: unapproved presentation
-  exports are blocked unless status is approved/published and `approvedBy` plus
-  `approvedAt` are present, and the diagnostic is copied into manifest
-  readiness.
+- External release readiness now has target-specific validation: PPTX, blog,
+  Substack, and Google Docs exports are blocked unless status is
+  approved/published and approver/reviewer, `approvedAt`, `owner`, and
+  `releaseTarget` metadata are present, and the diagnostic is copied into
+  manifest readiness.
 - Target-specific option audits now report non-blocking info diagnostics when
   valid options are ignored by the selected target, including non-PPTX agenda
   options and Markdown bundle render-only options.
