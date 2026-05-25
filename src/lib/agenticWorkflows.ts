@@ -264,6 +264,7 @@ export interface AgenticWorkflowRun {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   releaseEvidenceBundle: AgenticReleaseEvidenceBundle;
@@ -392,6 +393,23 @@ export interface AgenticSectionWorkItem {
   draftingInstruction: string;
   completionCriteria: string[];
   reviewerAgentIds: AgenticReviewerAgentId[];
+}
+
+export type AgenticSectionDraftAcceptanceStatus = "drafted" | "needs-review" | "accepted";
+
+export interface AgenticSectionDraftHistoryItem {
+  id: string;
+  sectionId: string;
+  sectionHeading: string;
+  generatedAt: string;
+  versionLabel: string;
+  promptSummary: string;
+  rationale: string;
+  reviewerNotes: string[];
+  sectionFingerprint: string;
+  sourceFingerprint: string;
+  restorePointMarkdown: string;
+  acceptanceStatus: AgenticSectionDraftAcceptanceStatus;
 }
 
 export interface AgenticSectionContract {
@@ -654,6 +672,13 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     outlineCritique,
   });
   const sectionWorkQueue = buildSectionWorkQueue(plan, reviewerAgents);
+  const sectionDraftHistory = buildSectionDraftHistory({
+    plan,
+    sectionWorkQueue,
+    draftSections: draft?.sections || [],
+    draftMarkdown: draft?.markdown || "",
+    generatedAt,
+  });
   const preReviewRehearsal = buildPreReviewRehearsal({
     plan,
     reviewerAgents,
@@ -669,6 +694,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     editAcceptanceQueue,
     reviewerAgents,
     sectionWorkQueue,
+    sectionDraftHistory,
     preReviewRehearsal,
     distributionTargetPlans,
     blockers,
@@ -684,6 +710,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    sectionDraftHistory,
     preReviewRehearsal,
     documentEvidence,
     outlineCritique,
@@ -701,6 +728,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    sectionDraftHistory,
     preReviewRehearsal,
     distributionTargetPlans,
     documentEvidence,
@@ -718,6 +746,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    sectionDraftHistory,
     outlineCritique,
     preReviewRehearsal,
     reviewChecklist,
@@ -741,6 +770,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    sectionDraftHistory,
     outlineCritique,
     preReviewRehearsal,
     reviewChecklist,
@@ -847,6 +877,7 @@ export function buildAgenticReleaseEvidenceAuditPackage(run: AgenticWorkflowRun)
     ...auditTrailMarkdown(run.auditTrail),
     ...controlCenterMarkdown(run.controlCenter),
     ...reviewerAgentsMarkdown(run.reviewerAgents),
+    ...sectionDraftHistoryMarkdown(run.sectionDraftHistory),
     ...lifecycleTasksMarkdown(run.lifecycleTasks),
     ...(run.distributionTargetPlans.length ? distributionTargetRunbookMarkdown(run.distributionTargetPlans) : ["## Distribution Runbooks", "", "No distribution target runbooks were staged for this run.", ""]),
   ].join("\n");
@@ -2076,13 +2107,14 @@ function buildLifecycleTasks(input: {
   editAcceptanceQueue: AgenticEditAcceptanceItem[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticLifecycleTask[] {
-  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
+  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, sectionDraftHistory, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const tasks: AgenticLifecycleTask[] = [];
   const hasBlockers = blockers.length > 0;
   const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
@@ -2251,6 +2283,19 @@ function buildLifecycleTasks(input: {
         ...section.completionCriteria,
       ],
       nextStep: "Draft the section against its contract, then route it through assigned reviewer agents.",
+    });
+  }
+
+  if (sectionDraftHistory.length) {
+    tasks.push({
+      id: "task-section-draft-history",
+      lane: "compose",
+      title: "Preserve composable section draft versions",
+      owner: "Docs Live Section Agent",
+      status: sectionDraftHistory.some((item) => item.acceptanceStatus !== "accepted") ? "needs-input" : "ready",
+      action: "generate-docs-live-draft",
+      evidence: sectionDraftHistory.slice(0, 10).map((item) => `${item.versionLabel}: ${item.sectionHeading} (${item.sectionFingerprint})`),
+      nextStep: "Review saved section versions, accept or revise useful drafts, and keep restore points for rollback before applying final prose.",
     });
   }
 
@@ -2475,6 +2520,105 @@ function buildSectionWorkQueue(plan: AgenticWorkflowPlan, reviewerAgents: Agenti
       reviewerAgentIds,
     };
   });
+}
+
+type AgenticDocsLiveSectionSnapshot = {
+  title: string;
+  qaFocus: string;
+  draftingBrief: string;
+  qaSummary: string;
+  humanizationNotes: string[];
+  reviewQuestions: string[];
+  reviewHandoff: string;
+};
+
+function buildSectionDraftHistory(input: {
+  plan: AgenticWorkflowPlan;
+  sectionWorkQueue: AgenticSectionWorkItem[];
+  draftSections: AgenticDocsLiveSectionSnapshot[];
+  draftMarkdown: string;
+  generatedAt: string;
+}): AgenticSectionDraftHistoryItem[] {
+  const { plan, sectionWorkQueue, draftSections, draftMarkdown, generatedAt } = input;
+  if (!sectionWorkQueue.length || !(plan.lanes.includes("create") || plan.lanes.includes("compose"))) return [];
+  const draftByTitle = new Map(draftSections.map((section) => [normalizeSectionDraftTitle(section.title), section]));
+  return sectionWorkQueue.slice(0, 18).map((section, index) => {
+    const matchedDraft = draftByTitle.get(normalizeSectionDraftTitle(section.heading)) || draftSections[index];
+    const promptSummary = [
+      `Draft "${section.heading}" at ${section.draftingDepth} depth for ${section.contract.targetReader}.`,
+      section.contract.desiredDecision,
+      section.contract.evidenceExpectations[0] || "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const rationale = matchedDraft?.draftingBrief || section.contract.purpose;
+    const reviewerNotes = Array.from(
+      new Set([
+        ...(matchedDraft?.reviewQuestions || []),
+        matchedDraft?.qaSummary || "",
+        matchedDraft?.reviewHandoff || "",
+        ...section.reviewerAgentIds.map((id) => `${titleCase(id)} reviewer must confirm this section before final release.`),
+      ].filter(Boolean)),
+    ).slice(0, 6);
+    const restorePointMarkdown = buildSectionDraftRestorePoint(section, matchedDraft, plan, generatedAt);
+    const sectionFingerprint = stableFingerprint([section.id, section.heading, promptSummary, restorePointMarkdown].join("\n"));
+    return {
+      id: `section-draft-${section.id}-${sectionFingerprint.slice(0, 10)}`,
+      sectionId: section.id,
+      sectionHeading: section.heading,
+      generatedAt,
+      versionLabel: `v${String(index + 1).padStart(2, "0")} ${section.draftingDepth}`,
+      promptSummary,
+      rationale,
+      reviewerNotes,
+      sectionFingerprint,
+      sourceFingerprint: stableFingerprint([plan.instruction, plan.context, plan.placeholderText, draftMarkdown].join("\n")),
+      restorePointMarkdown,
+      acceptanceStatus: "needs-review",
+    };
+  });
+}
+
+function normalizeSectionDraftTitle(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function buildSectionDraftRestorePoint(
+  section: AgenticSectionWorkItem,
+  matchedDraft: AgenticDocsLiveSectionSnapshot | undefined,
+  plan: AgenticWorkflowPlan,
+  generatedAt: string,
+) {
+  const lines = [
+    `## ${section.heading}`,
+    "",
+    "<!-- ai-assisted: needs-review | source: NEditor Agent Workspace | workflow: composable-section-draft-history -->",
+    "",
+    "```ai-section-draft",
+    `sectionId: ${section.id}`,
+    `generatedAt: ${generatedAt}`,
+    `documentType: ${plan.documentType}`,
+    `draftingDepth: ${section.draftingDepth}`,
+    `reviewers: ${section.reviewerAgentIds.join(", ") || "editor"}`,
+    "status: needs-review",
+    "```",
+    "",
+    matchedDraft?.draftingBrief || section.draftingInstruction,
+    "",
+    "### Evidence And Review Notes",
+    "",
+    ...section.contract.evidenceExpectations.map((item) => `- [ ] ${item}`),
+    matchedDraft?.qaSummary ? `- [ ] ${matchedDraft.qaSummary}` : "",
+    ...(matchedDraft?.humanizationNotes || []).map((item) => `- [ ] ${item}`),
+    ...(matchedDraft?.reviewQuestions || []).map((item) => `- [ ] ${item}`),
+    "",
+    "### Acceptance Criteria",
+    "",
+    ...section.completionCriteria.map((item) => `- [ ] ${item}`),
+    matchedDraft?.reviewHandoff ? `- [ ] ${matchedDraft.reviewHandoff}` : "",
+    "",
+  ];
+  return lines.filter((line) => line !== undefined).join("\n").replace(/\n{3,}/g, "\n\n");
 }
 
 function buildSectionContract(
@@ -3182,6 +3326,7 @@ function buildAuditTrail(input: {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
@@ -3201,6 +3346,7 @@ function buildAuditTrail(input: {
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    sectionDraftHistory,
     preReviewRehearsal,
     documentEvidence,
     outlineCritique,
@@ -3242,6 +3388,18 @@ function buildAuditTrail(input: {
       ...task.evidence,
     ]),
     ...reviewerAgents.flatMap((agent) => [agent.id, agent.label, agent.mandate, agent.status, ...agent.findings, ...agent.requiredActions]),
+    ...sectionDraftHistory.flatMap((item) => [
+      item.id,
+      item.sectionId,
+      item.sectionHeading,
+      item.versionLabel,
+      item.promptSummary,
+      item.rationale,
+      item.sectionFingerprint,
+      item.sourceFingerprint,
+      item.acceptanceStatus,
+      ...item.reviewerNotes,
+    ]),
     ...preReviewRehearsal.flatMap((item) => [
       item.id,
       item.kind,
@@ -3325,6 +3483,7 @@ function buildAuditTrail(input: {
       blockers.length ? `Human review required before release because ${blockers.length} blocker item(s) remain.` : "No blocker items detected at packet generation time.",
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
       `Lifecycle task board prepared for ${lifecycleTasks.length} task(s) across ${Array.from(new Set(lifecycleTasks.map((task) => task.lane))).map(titleCase).join(", ")}.`,
+      `Section draft history preserved ${sectionDraftHistory.length} composable draft restore point(s).`,
       `Pre-review rehearsal prepared ${preReviewRehearsal.length} likely reviewer question, objection, redline, or missing-evidence prompt(s).`,
       `Outline variant comparison prepared ${plan.outlineVariants.length} alternative structure(s) for user selection before drafting.`,
       `Section work queue prepared for ${sectionWorkQueue.length} outline item(s).`,
@@ -3365,12 +3524,13 @@ function buildReleaseEvidenceBundle(input: {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   documentEvidence: AgenticDocumentEvidence;
   blockers: string[];
 }): AgenticReleaseEvidenceBundle {
-  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
+  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, sectionDraftHistory, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
   const taskBlockers = lifecycleTasks.filter((task) => task.status === "blocked" || task.status === "needs-input");
   const reviewerBlockers = reviewerAgents.filter((agent) => agent.status !== "ready");
   const items: AgenticReleaseEvidenceItem[] = [
@@ -3424,6 +3584,15 @@ function buildReleaseEvidenceBundle(input: {
       sectionWorkQueue.length
         ? `${sectionWorkQueue.length} section contract card(s) define purpose, reader, desired outcome, evidence expectations, owner, risk, and done criteria.`
         : "No section contract cards were generated because no outline is available.",
+      true,
+    ),
+    releaseEvidenceItem(
+      "Composable section draft history",
+      "Docs Live Section Agent",
+      sectionDraftHistory.length ? "needs-review" : "missing",
+      sectionDraftHistory.length
+        ? `${sectionDraftHistory.length} section draft restore point(s) preserve prompt summaries, rationale, reviewer notes, fingerprints, and reusable Markdown.`
+        : "No section draft restore points were generated.",
       true,
     ),
     releaseEvidenceItem(
@@ -4284,6 +4453,7 @@ function buildRunMarkdown(input: {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  sectionDraftHistory: AgenticSectionDraftHistoryItem[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   reviewChecklist: string[];
@@ -4304,6 +4474,7 @@ function buildRunMarkdown(input: {
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    sectionDraftHistory,
     outlineCritique,
     preReviewRehearsal,
     reviewChecklist,
@@ -4417,6 +4588,7 @@ function buildRunMarkdown(input: {
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
   lines.push(...preReviewRehearsalMarkdown(preReviewRehearsal));
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
+  lines.push(...sectionDraftHistoryMarkdown(sectionDraftHistory));
   lines.push(...auditTrailMarkdown(auditTrail));
   lines.push(...releaseEvidenceBundleMarkdown(releaseEvidenceBundle));
   if (draftMarkdown.trim()) {
@@ -4741,6 +4913,41 @@ function sectionWorkQueueMarkdown(sectionWorkQueue: AgenticSectionWorkItem[]) {
       "",
       "Completion criteria:",
       ...section.completionCriteria.map((item) => `- [ ] ${item}`),
+      "",
+    );
+  }
+  return lines;
+}
+
+function sectionDraftHistoryMarkdown(items: AgenticSectionDraftHistoryItem[]) {
+  if (!items.length) {
+    return ["## Section Draft History", "", "No composable section draft restore points were generated.", ""];
+  }
+  const lines = [
+    "## Section Draft History",
+    "",
+    "| Version | Section | Status | Section fingerprint | Prompt summary |",
+    "| --- | --- | --- | --- | --- |",
+    ...items.map(
+      (item) =>
+        `| ${escapeTableCell(item.versionLabel)} | ${escapeTableCell(item.sectionHeading)} | ${item.acceptanceStatus} | ${item.sectionFingerprint} | ${escapeTableCell(item.promptSummary)} |`,
+    ),
+    "",
+  ];
+  for (const item of items) {
+    lines.push(
+      `### ${item.versionLabel}: ${item.sectionHeading}`,
+      "",
+      `Source fingerprint: ${item.sourceFingerprint}`,
+      "",
+      `Rationale: ${item.rationale}`,
+      "",
+      "Reviewer notes:",
+      ...item.reviewerNotes.map((note) => `- [ ] ${note}`),
+      "",
+      "Restore point:",
+      "",
+      fencedBlock("markdown", item.restorePointMarkdown),
       "",
     );
   }

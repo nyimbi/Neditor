@@ -59,6 +59,7 @@ const productSurfaceChecks = [
   ["Document intent sheet", app],
   ["Document memory", app],
   ["Section contract", app],
+  ["Section Draft History", app],
   ["Outline variants", app],
   ["Agent workflow playbooks", app],
   ["AI control center", app],

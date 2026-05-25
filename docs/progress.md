@@ -61,6 +61,11 @@ Recent pushed checkpoints visible in current git history:
   evidence requests; marks release blockers; feeds lifecycle tasks, release
   evidence, audit fingerprints, generated packets, and the Agent Workspace UI;
   and persists a prompt count into local run history.
+- Agent runs now preserve composable section draft history. Each generated
+  section version carries a prompt summary, rationale, reviewer notes, section
+  and source fingerprints, acceptance status, and reusable restore-point
+  Markdown; the Agent Workspace exposes insert/copy/Docs Live reuse actions and
+  local run history persists bounded draft-version evidence.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,

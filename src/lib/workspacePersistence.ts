@@ -210,6 +210,21 @@ export interface AgentRunHistorySourcePack {
   releaseEvidence: string[];
 }
 
+export interface AgentRunHistorySectionDraftItem {
+  id: string;
+  sectionId: string;
+  sectionHeading: string;
+  generatedAt: string;
+  versionLabel: string;
+  promptSummary: string;
+  rationale: string;
+  reviewerNotes: string[];
+  sectionFingerprint: string;
+  sourceFingerprint: string;
+  restorePointMarkdown: string;
+  acceptanceStatus: "drafted" | "needs-review" | "accepted";
+}
+
 export type AgentRunHistoryDocumentIntentStatus = "provided" | "needs-review" | "missing";
 
 export interface AgentRunHistoryDocumentIntentField {
@@ -252,6 +267,8 @@ export interface AgentRunHistoryItem {
   packetMarkdown?: string;
   packetPreview?: string;
   sectionCount?: number;
+  sectionDraftVersionCount?: number;
+  sectionDraftHistory?: AgentRunHistorySectionDraftItem[];
   reviewerCount?: number;
   preReviewPromptCount?: number;
   taskCount?: number;
@@ -778,6 +795,36 @@ function normalizeAgentRunHistorySourcePack(value: unknown): AgentRunHistorySour
   };
 }
 
+function normalizeAgentRunHistorySectionDrafts(value: unknown): AgentRunHistorySectionDraftItem[] {
+  if (!Array.isArray(value)) return [];
+  const items: AgentRunHistorySectionDraftItem[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const id = normalizedString(item.id, 140);
+    const sectionId = normalizedString(item.sectionId, 140);
+    const restorePointMarkdown = normalizedString(item.restorePointMarkdown, 8_000);
+    if (!id || !sectionId || !restorePointMarkdown || seen.has(id)) continue;
+    seen.add(id);
+    items.push({
+      id,
+      sectionId,
+      sectionHeading: normalizedString(item.sectionHeading, 180) || "Section",
+      generatedAt: normalizedString(item.generatedAt, 40) || new Date(0).toISOString(),
+      versionLabel: normalizedString(item.versionLabel, 80) || "section draft",
+      promptSummary: normalizedString(item.promptSummary, 1_000) || "Draft this section from the saved agent context.",
+      rationale: normalizedString(item.rationale, 1_000) || "Review this saved draft before reusing it.",
+      reviewerNotes: normalizedStringArray(item.reviewerNotes, 12, 600),
+      sectionFingerprint: normalizedString(item.sectionFingerprint, 32) || id.slice(0, 32),
+      sourceFingerprint: normalizedString(item.sourceFingerprint, 32) || "",
+      restorePointMarkdown,
+      acceptanceStatus: enumValue(item.acceptanceStatus, ["drafted", "needs-review", "accepted"] as const) || "needs-review",
+    });
+    if (items.length >= 60) break;
+  }
+  return items;
+}
+
 function normalizeAgentRunHistoryDocumentIntent(value: unknown): AgentRunHistoryDocumentIntent | undefined {
   if (!isRecord(value)) return undefined;
   const fields: AgentRunHistoryDocumentIntentField[] = [];
@@ -830,6 +877,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
   const documentEvidence = normalizeAgentRunHistoryDocumentEvidence(value.documentEvidence);
   const outlineCritique = normalizeAgentRunHistoryOutlineCritique(value.outlineCritique);
   const sourcePack = normalizeAgentRunHistorySourcePack(value.sourcePack);
+  const sectionDraftHistory = normalizeAgentRunHistorySectionDrafts(value.sectionDraftHistory);
   const documentIntent = normalizeAgentRunHistoryDocumentIntent(value.documentIntent);
   return {
     runId,
@@ -853,6 +901,8 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     packetMarkdown: normalizedString(value.packetMarkdown, 24_000) || undefined,
     packetPreview: normalizedString(value.packetPreview, 1_200) || undefined,
     sectionCount: Math.max(numberValue(value.sectionCount) ?? 0, 0),
+    sectionDraftVersionCount: Math.max(numberValue(value.sectionDraftVersionCount) ?? sectionDraftHistory.length, 0),
+    ...(sectionDraftHistory.length ? { sectionDraftHistory } : {}),
     reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
     preReviewPromptCount: Math.max(numberValue(value.preReviewPromptCount) ?? 0, 0),
     taskCount: Math.max(numberValue(value.taskCount) ?? 0, 0),

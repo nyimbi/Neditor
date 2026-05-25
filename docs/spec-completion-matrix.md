@@ -210,8 +210,8 @@ Current direct evidence:
   matrix linkage, and implemented/tested AI surfaces for Docs Live, Agent
   Workspace, document intent sheets with persisted run-history audit snapshots,
   reusable document memory packs, outline variants, section contract cards,
-  pre-review rehearsal, playbooks, lifecycle tasks, provider handoff, runtime
-  readiness, and guided demo.
+  composable section draft history, pre-review rehearsal, playbooks, lifecycle
+  tasks, provider handoff, runtime readiness, and guided demo.
 - `pnpm run check:a11y` now checks static Vue template accessibility guardrails
   for accessible control names, dialog labeling, dialog focusability/keyboard
   handling, required skip-link targets, and status/progress live regions.

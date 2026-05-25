@@ -803,6 +803,8 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Agent Lifecycle Task Board"));
   ok(run.markdown.includes("Final human approval and release readiness"));
   ok(run.markdown.includes("## Section Work Queue"));
+  ok(run.markdown.includes("## Section Draft History"));
+  ok(run.markdown.includes("```ai-section-draft"));
   ok(run.markdown.includes("Section contract:"));
   ok(run.markdown.includes("Contract risk:"));
   ok(run.markdown.includes("Completion criteria:"));
@@ -813,6 +815,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Document intent sheet" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Outline variant comparison" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Section contract cards" && item.requiredBeforeRelease));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Composable section draft history" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Pre-review rehearsal" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Substack newsletter package evidence" && item.requiredBeforeRelease));
@@ -827,6 +830,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(releaseAuditPackage.includes("## NEditor Release Evidence Audit Package"));
   ok(releaseAuditPackage.includes("## Release Evidence Bundle"));
   ok(releaseAuditPackage.includes("## Agent Audit Trail"));
+  ok(releaseAuditPackage.includes("## Section Draft History"));
   ok(releaseAuditPackage.includes("## Agent Lifecycle Task Board"));
   ok(releaseAuditPackage.includes("### Target Runbooks"));
   ok(run.markdown.includes("Substack newsletter package"));
@@ -850,6 +854,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.lifecycleTasks.length >= run.sectionWorkQueue.length + run.reviewerAgents.length);
   ok(run.lifecycleTasks.some((task) => task.title.includes("Resolve intent") && task.owner === "Planner Agent"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-pre-review-rehearsal" && task.evidence.some((item) => item.includes("Missing Evidence"))));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-section-draft-history" && task.evidence.some((item) => item.includes("v01"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-outline-variants" && task.evidence.some((item) => item.includes("Executive-first"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-intake-context" && task.evidence.some((item) => item.includes("Document intent"))));
   ok(run.lifecycleTasks.some((task) => task.owner === "Docs Live Section Agent" && task.action === "generate-docs-live-draft" && task.sectionId));
@@ -860,6 +865,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("Google Docs collaboration package"))));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Reviewer agents prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Lifecycle task board prepared")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Section draft history preserved")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Pre-review rehearsal prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline variant comparison prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline critique prepared")));
@@ -877,6 +883,11 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.sectionWorkQueue.every((section) => section.contract.evidenceExpectations.length >= 1));
   ok(run.sectionWorkQueue.every((section) => section.contract.doneCriteria.length >= 4));
   ok(run.sectionWorkQueue.some((section) => section.contract.riskLevel === "high"));
+  equal(run.sectionDraftHistory.length, run.sectionWorkQueue.length);
+  ok(run.sectionDraftHistory.every((item) => item.promptSummary.length > 30));
+  ok(run.sectionDraftHistory.every((item) => item.restorePointMarkdown.includes("workflow: composable-section-draft-history")));
+  ok(run.sectionDraftHistory.every((item) => item.reviewerNotes.length >= 1));
+  ok(run.sectionDraftHistory.every((item) => item.sectionFingerprint.length === 16));
   equal(run.plan.outlineVariants.length, 5);
   ok(run.plan.outlineVariants.some((variant) => variant.strategy === "executive-first" && variant.outline.includes("Decision Snapshot")));
   ok(run.plan.outlineVariants.some((variant) => variant.strategy === "evidence-led" && variant.tradeoffs.length >= 2));
@@ -1321,6 +1332,23 @@ test("workspace persistence migration versions and normalizes saved settings", (
         packetMarkdown: "# Agent Packet\n\nGenerated body",
         packetPreview: "Generated body preview",
         sectionCount: 8,
+        sectionDraftVersionCount: 2,
+        sectionDraftHistory: [
+          {
+            id: "draft-1",
+            sectionId: "section-01",
+            sectionHeading: " Executive Summary ",
+            generatedAt: "2026-05-25T10:02:00.000Z",
+            versionLabel: " v01 executive ",
+            promptSummary: " Draft for the board ",
+            rationale: " Keep the decision visible ",
+            reviewerNotes: [" Confirm source ", "Confirm source"],
+            sectionFingerprint: "aaaaaaaaaaaaaaaa",
+            sourceFingerprint: "bbbbbbbbbbbbbbbb",
+            restorePointMarkdown: "## Executive Summary\n\nReview this section.",
+            acceptanceStatus: "needs-review",
+          },
+        ],
         reviewerCount: 6,
         preReviewPromptCount: 7,
         taskCount: 14,
@@ -1598,6 +1626,23 @@ test("workspace persistence migration versions and normalizes saved settings", (
     packetMarkdown: "# Agent Packet\n\nGenerated body",
     packetPreview: "Generated body preview",
     sectionCount: 8,
+    sectionDraftVersionCount: 2,
+    sectionDraftHistory: [
+      {
+        id: "draft-1",
+        sectionId: "section-01",
+        sectionHeading: "Executive Summary",
+        generatedAt: "2026-05-25T10:02:00.000Z",
+        versionLabel: "v01 executive",
+        promptSummary: "Draft for the board",
+        rationale: "Keep the decision visible",
+        reviewerNotes: ["Confirm source"],
+        sectionFingerprint: "aaaaaaaaaaaaaaaa",
+        sourceFingerprint: "bbbbbbbbbbbbbbbb",
+        restorePointMarkdown: "## Executive Summary\n\nReview this section.",
+        acceptanceStatus: "needs-review",
+      },
+    ],
     reviewerCount: 6,
     preReviewPromptCount: 7,
     taskCount: 14,
@@ -2056,6 +2101,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Pre-review Rehearsal"));
   ok(app.includes('aria-label="Agent section work queue"'));
   ok(app.includes("agentRun.sectionWorkQueue"));
+  ok(app.includes('aria-label="Agent section draft history"'));
+  ok(app.includes("agentRun.sectionDraftHistory"));
+  ok(app.includes("Section Draft History"));
+  ok(app.includes("insertAgentSectionDraftRestorePoint"));
+  ok(app.includes("draftAgentSectionHistoryWithDocsLive"));
+  ok(app.includes("copyAgentSectionDraftRestorePoint"));
+  ok(app.includes("agentRunHistorySectionDraftSummary"));
   ok(app.includes("agentSectionDraftingDepthOptions"));
   ok(app.includes("agentPlan.outlineVariants"));
   ok(app.includes("hydrateDocsLiveFromOutlineVariant"));

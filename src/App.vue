@@ -2933,6 +2933,34 @@
                 </li>
               </ol>
             </section>
+            <section class="agent-section-draft-history" aria-label="Agent section draft history">
+              <header>
+                <div>
+                  <strong>Section Draft History</strong>
+                  <span>Composable section versions with prompt summaries, rationale, reviewer notes, fingerprints, and restore points.</span>
+                </div>
+                <small>{{ agentRun.sectionDraftHistory.length }} versions</small>
+              </header>
+              <ol>
+                <li v-for="item in agentRun.sectionDraftHistory" :key="item.id" :data-status="item.acceptanceStatus">
+                  <div>
+                    <small>{{ item.versionLabel }} | {{ item.acceptanceStatus }} | {{ item.sectionFingerprint }}</small>
+                    <strong>{{ item.sectionHeading }}</strong>
+                    <p>{{ item.promptSummary }}</p>
+                    <p>{{ item.rationale }}</p>
+                    <ul>
+                      <li v-for="note in item.reviewerNotes" :key="note">{{ note }}</li>
+                    </ul>
+                    <div class="agent-section-actions">
+                      <button type="button" @click="insertAgentSectionDraftRestorePoint(item)">Insert restore point</button>
+                      <button type="button" @click="draftAgentSectionHistoryWithDocsLive(item)">Draft in Docs Live</button>
+                      <button type="button" @click="copyAgentSectionDraftRestorePoint(item)">Copy restore point</button>
+                    </div>
+                  </div>
+                  <pre>{{ item.restorePointMarkdown }}</pre>
+                </li>
+              </ol>
+            </section>
             <section class="agent-audit-trail" aria-label="Agent audit trail">
               <header>
                 <div>
@@ -3106,6 +3134,7 @@
                   <p v-if="item.documentIntent">Intent: {{ agentRunHistoryIntentSummary(item) }}</p>
                   <p v-if="item.documentEvidence">Evidence: {{ agentRunHistoryEvidenceSummary(item) }}</p>
                   <p v-if="item.outlineCritique?.length">Outline: {{ agentRunHistoryOutlineSummary(item) }}</p>
+                  <p v-if="item.sectionDraftHistory?.length">Section drafts: {{ agentRunHistorySectionDraftSummary(item) }}</p>
                   <p v-if="item.sourcePack">Source pack: {{ agentRunHistorySourcePackSummary(item) }}</p>
                   <p v-if="item.lifecycleTaskStates?.length">Task states: {{ agentRunHistoryTaskStateSummary(item) }}</p>
                   <div class="agent-history-actions">
@@ -3130,7 +3159,7 @@
                   </div>
                   <div>
                     <dt>Sections</dt>
-                    <dd>{{ item.sectionCount || 0 }}</dd>
+                    <dd>{{ item.sectionCount || 0 }} / {{ item.sectionDraftVersionCount || item.sectionDraftHistory?.length || 0 }} draft versions</dd>
                   </div>
                   <div>
                     <dt>Reviewers</dt>
@@ -3491,6 +3520,7 @@ import {
   type AgenticDocumentClaim,
   type AgenticReviewCommentResolution,
   type AgenticSectionWorkItem,
+  type AgenticSectionDraftHistoryItem,
   type AgenticWorkflowStep,
   type AgenticNextAction,
   type AgenticOutlineVariant,
@@ -5747,6 +5777,11 @@ function agentRunHistoryItem(
     packetMarkdown: packetMarkdown.slice(0, 24_000),
     packetPreview: packetMarkdownOverride ? agentPacketPreview(packetMarkdownOverride) : run.summary.slice(0, 260),
     sectionCount: run.sectionWorkQueue.length,
+    sectionDraftVersionCount: run.sectionDraftHistory.length,
+    sectionDraftHistory: run.sectionDraftHistory.map((item) => ({
+      ...item,
+      restorePointMarkdown: item.restorePointMarkdown.slice(0, 8_000),
+    })),
     reviewerCount: run.reviewerAgents.length,
     preReviewPromptCount: run.preReviewRehearsal.length,
     taskCount: run.lifecycleTasks.length,
@@ -5977,6 +6012,7 @@ function agentHistoryAuditMarkdown() {
     ...runs.slice(0, 24).flatMap((item) => [
       `- **${agentAuditInline(item.title)}** (${agentAuditInline(item.runId)}): ${agentAuditInline(item.controlCenter?.summary || item.packetPreview || "No summary captured.")}`,
       item.outlineCritique?.length ? `  - Outline: ${agentAuditInline(agentRunHistoryOutlineSummary(item))}` : "",
+      item.sectionDraftHistory?.length ? `  - Section drafts: ${agentAuditInline(agentRunHistorySectionDraftSummary(item))}` : "",
       item.documentIntent ? `  - Intent: ${agentAuditInline(agentRunHistoryIntentSummary(item))}` : "",
       item.sourcePack ? `  - Source pack: ${agentAuditInline(agentRunHistorySourcePackSummary(item))}` : "",
     ].filter(Boolean)),
@@ -6044,6 +6080,19 @@ function agentRunHistoryOutlineSummary(item: AgentRunHistoryItem) {
     .filter((severity) => counts.has(severity))
     .map((severity) => `${counts.get(severity)} ${severity}`)
     .join(", ");
+}
+function agentRunHistorySectionDraftSummary(item: AgentRunHistoryItem) {
+  const drafts = item.sectionDraftHistory || [];
+  if (!drafts.length) return `${item.sectionDraftVersionCount || 0} draft versions`;
+  const statuses = new Map<string, number>();
+  for (const draft of drafts) {
+    statuses.set(draft.acceptanceStatus, (statuses.get(draft.acceptanceStatus) || 0) + 1);
+  }
+  const statusText = ["drafted", "needs-review", "accepted"]
+    .filter((status) => statuses.has(status))
+    .map((status) => `${statuses.get(status)} ${status}`)
+    .join(", ");
+  return `${drafts.length} restore point${drafts.length === 1 ? "" : "s"}${statusText ? `; ${statusText}` : ""}`;
 }
 function agentRunHistorySourcePackSummary(item: AgentRunHistoryItem) {
   const sourcePack = item.sourcePack;
@@ -6327,6 +6376,53 @@ function draftAgentSectionWithDocsLive(section: AgenticSectionWorkItem) {
   closeAgentWorkspace();
   docsLiveOpen.value = true;
   store.statusMessage = `Sent ${section.heading} to Docs Live`;
+}
+function insertAgentSectionDraftRestorePoint(item: AgenticSectionDraftHistoryItem) {
+  insertBlock(item.restorePointMarkdown);
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = `Inserted section draft restore point for ${item.sectionHeading}`;
+}
+function draftAgentSectionHistoryWithDocsLive(item: AgenticSectionDraftHistoryItem) {
+  const section = agentRun.value?.sectionWorkQueue.find((candidate) => candidate.id === item.sectionId);
+  if (section) {
+    draftAgentSectionWithDocsLive(section);
+    return;
+  }
+  const run = agentRun.value;
+  if (!run) return;
+  docsLiveDocumentType.value = run.plan.documentType;
+  docsLiveTitle.value = `${run.plan.title} - ${item.sectionHeading}`;
+  docsLiveOutlineText.value = `- ${item.sectionHeading}`;
+  docsLiveContext.value = [
+    run.plan.context,
+    "",
+    `Saved section version: ${item.versionLabel}`,
+    `Prompt summary: ${item.promptSummary}`,
+    `Rationale: ${item.rationale}`,
+    "",
+    "Reviewer notes:",
+    ...item.reviewerNotes.map((note) => `- ${note}`),
+    "",
+    "Restore point:",
+    item.restorePointMarkdown,
+  ].join("\n");
+  docsLivePlaceholderText.value = run.plan.placeholderText;
+  docsLiveQuestionnaireAnswerText.value = `Revise or extend saved section draft ${item.versionLabel} for ${item.sectionHeading}. Preserve unresolved evidence and reviewer notes.`;
+  docsLiveInsertMode.value = "section";
+  docsLiveTargetSection.value = null;
+  refreshDocsLiveQuestionnaire();
+  closeAgentWorkspace();
+  docsLiveOpen.value = true;
+  store.statusMessage = `Sent saved ${item.sectionHeading} draft version to Docs Live`;
+}
+async function copyAgentSectionDraftRestorePoint(item: AgenticSectionDraftHistoryItem) {
+  try {
+    await navigator.clipboard?.writeText(item.restorePointMarkdown);
+    store.statusMessage = `Copied section draft restore point for ${item.sectionHeading}`;
+  } catch {
+    store.statusMessage = `Section draft restore point for ${item.sectionHeading} is ready to copy`;
+  }
 }
 function runAgentLifecycleTask(task: AgenticLifecycleTask) {
   setAgentLifecycleTaskStatus(task, "in-progress");
@@ -12059,6 +12155,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-pre-review-rehearsal li,
 .app-shell[data-theme="dark"] .agent-section-workqueue,
 .app-shell[data-theme="dark"] .agent-section-workqueue li,
+.app-shell[data-theme="dark"] .agent-section-draft-history,
+.app-shell[data-theme="dark"] .agent-section-draft-history li,
 .app-shell[data-theme="dark"] .agent-audit-trail,
 .app-shell[data-theme="dark"] .agent-audit-grid article,
 .app-shell[data-theme="dark"] .agent-release-evidence,
@@ -12122,6 +12220,11 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-section-workqueue small,
 .app-shell[data-theme="dark"] .agent-section-workqueue span,
 .app-shell[data-theme="dark"] .agent-section-workqueue ul,
+.app-shell[data-theme="dark"] .agent-section-draft-history > header span,
+.app-shell[data-theme="dark"] .agent-section-draft-history > header small,
+.app-shell[data-theme="dark"] .agent-section-draft-history small,
+.app-shell[data-theme="dark"] .agent-section-draft-history p,
+.app-shell[data-theme="dark"] .agent-section-draft-history ul,
 .app-shell[data-theme="dark"] .agent-release-evidence > header span,
 .app-shell[data-theme="dark"] .agent-release-evidence > header small,
 .app-shell[data-theme="dark"] .agent-release-evidence-grid small,
@@ -12204,8 +12307,12 @@ select:hover {
   .app-shell[data-theme="system"] .agent-review-comment-queue li,
   .app-shell[data-theme="system"] .agent-reviewer-agents,
   .app-shell[data-theme="system"] .agent-reviewer-grid article,
+  .app-shell[data-theme="system"] .agent-pre-review-rehearsal,
+  .app-shell[data-theme="system"] .agent-pre-review-rehearsal li,
   .app-shell[data-theme="system"] .agent-section-workqueue,
   .app-shell[data-theme="system"] .agent-section-workqueue li,
+  .app-shell[data-theme="system"] .agent-section-draft-history,
+  .app-shell[data-theme="system"] .agent-section-draft-history li,
   .app-shell[data-theme="system"] .agent-audit-trail,
   .app-shell[data-theme="system"] .agent-audit-grid article,
   .app-shell[data-theme="system"] .agent-release-evidence,
@@ -12261,11 +12368,19 @@ select:hover {
   .app-shell[data-theme="system"] .agent-reviewer-agents > header small,
   .app-shell[data-theme="system"] .agent-reviewer-grid article header span,
   .app-shell[data-theme="system"] .agent-reviewer-grid ul,
+  .app-shell[data-theme="system"] .agent-pre-review-rehearsal > header span,
+  .app-shell[data-theme="system"] .agent-pre-review-rehearsal > header small,
+  .app-shell[data-theme="system"] .agent-pre-review-rehearsal small,
   .app-shell[data-theme="system"] .agent-section-workqueue > header span,
   .app-shell[data-theme="system"] .agent-section-workqueue > header small,
   .app-shell[data-theme="system"] .agent-section-workqueue small,
   .app-shell[data-theme="system"] .agent-section-workqueue span,
   .app-shell[data-theme="system"] .agent-section-workqueue ul,
+  .app-shell[data-theme="system"] .agent-section-draft-history > header span,
+  .app-shell[data-theme="system"] .agent-section-draft-history > header small,
+  .app-shell[data-theme="system"] .agent-section-draft-history small,
+  .app-shell[data-theme="system"] .agent-section-draft-history p,
+  .app-shell[data-theme="system"] .agent-section-draft-history ul,
   .app-shell[data-theme="system"] .agent-release-evidence > header span,
   .app-shell[data-theme="system"] .agent-release-evidence > header small,
   .app-shell[data-theme="system"] .agent-release-evidence-grid small,
@@ -12333,8 +12448,12 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-review-comment-queue li,
 .app-shell[data-high-contrast="true"] .agent-reviewer-agents,
 .app-shell[data-high-contrast="true"] .agent-reviewer-grid article,
+.app-shell[data-high-contrast="true"] .agent-pre-review-rehearsal,
+.app-shell[data-high-contrast="true"] .agent-pre-review-rehearsal li,
 .app-shell[data-high-contrast="true"] .agent-section-workqueue,
 .app-shell[data-high-contrast="true"] .agent-section-workqueue li,
+.app-shell[data-high-contrast="true"] .agent-section-draft-history,
+.app-shell[data-high-contrast="true"] .agent-section-draft-history li,
 .app-shell[data-high-contrast="true"] .agent-audit-trail,
 .app-shell[data-high-contrast="true"] .agent-audit-grid article,
 .app-shell[data-high-contrast="true"] .agent-release-evidence,
@@ -14119,8 +14238,12 @@ select:hover {
 .agent-review-comment-queue li,
 .agent-reviewer-agents,
 .agent-reviewer-grid article,
+.agent-pre-review-rehearsal,
+.agent-pre-review-rehearsal li,
 .agent-section-workqueue,
 .agent-section-workqueue li,
+.agent-section-draft-history,
+.agent-section-draft-history li,
 .agent-audit-trail,
 .agent-audit-grid article,
 .agent-release-evidence,
@@ -14505,6 +14628,7 @@ select:hover {
 }
 
 .agent-section-workqueue > header,
+.agent-section-draft-history > header,
 .agent-review-comment-queue > header,
 .agent-edit-acceptance-queue > header,
 .agent-lifecycle-board > header {
@@ -14515,6 +14639,8 @@ select:hover {
 
 .agent-section-workqueue > header div,
 .agent-section-workqueue li > div,
+.agent-section-draft-history > header div,
+.agent-section-draft-history li > div,
 .agent-review-comment-queue > header div,
 .agent-review-comment-queue li > div,
 .agent-edit-acceptance-queue > header div,
@@ -14529,6 +14655,9 @@ select:hover {
 .agent-section-workqueue > header small,
 .agent-section-workqueue small,
 .agent-section-workqueue span,
+.agent-section-draft-history > header span,
+.agent-section-draft-history > header small,
+.agent-section-draft-history small,
 .agent-review-comment-queue > header span,
 .agent-review-comment-queue > header small,
 .agent-review-comment-queue small,
@@ -14570,6 +14699,7 @@ select:hover {
 }
 
 .agent-section-workqueue ol,
+.agent-section-draft-history ol,
 .agent-review-comment-queue ol,
 .agent-edit-acceptance-queue ol,
 .agent-lifecycle-board ol {
@@ -14585,6 +14715,32 @@ select:hover {
   grid-template-columns: minmax(220px, 0.6fr) minmax(0, 1fr);
   gap: 10px;
   border-left: 3px solid #7fa2cd;
+}
+
+.agent-section-draft-history {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #555fa8;
+  background: #f6f8ff;
+}
+
+.agent-section-draft-history li {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.68fr) minmax(0, 1fr);
+  gap: 10px;
+  border-left: 3px solid #707bd0;
+}
+
+.agent-section-draft-history li[data-status="accepted"] {
+  border-left-color: #2f7d4c;
+}
+
+.agent-section-draft-history pre {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .agent-lifecycle-board li {
@@ -14630,6 +14786,8 @@ select:hover {
 .agent-section-workqueue p,
 .agent-section-workqueue ul,
 .agent-section-workqueue dl,
+.agent-section-draft-history p,
+.agent-section-draft-history ul,
 .agent-review-comment-queue p,
 .agent-review-comment-queue ul,
 .agent-edit-acceptance-queue p,
