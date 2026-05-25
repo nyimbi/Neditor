@@ -3016,6 +3016,7 @@
                   <small>{{ item.runId }} | {{ item.updatedAt }}</small>
                   <p v-if="item.packetPreview">{{ item.packetPreview }}</p>
                   <p v-if="item.controlCenter">Control: {{ item.controlCenter.status }} | {{ item.controlCenter.summary }}</p>
+                  <p v-if="item.documentIntent">Intent: {{ agentRunHistoryIntentSummary(item) }}</p>
                   <p v-if="item.documentEvidence">Evidence: {{ agentRunHistoryEvidenceSummary(item) }}</p>
                   <p v-if="item.outlineCritique?.length">Outline: {{ agentRunHistoryOutlineSummary(item) }}</p>
                   <p v-if="item.sourcePack">Source pack: {{ agentRunHistorySourcePackSummary(item) }}</p>
@@ -5660,6 +5661,7 @@ function agentRunHistoryItem(
     controlCenter: run.controlCenter,
     documentEvidence: run.documentEvidence,
     outlineCritique: run.outlineCritique,
+    documentIntent: run.plan.documentIntent,
     sourcePack,
     appliedAt: status === "generated" ? undefined : now,
     providerProfile: providerProfile || undefined,
@@ -5880,6 +5882,7 @@ function agentHistoryAuditMarkdown() {
     ...runs.slice(0, 24).flatMap((item) => [
       `- **${agentAuditInline(item.title)}** (${agentAuditInline(item.runId)}): ${agentAuditInline(item.controlCenter?.summary || item.packetPreview || "No summary captured.")}`,
       item.outlineCritique?.length ? `  - Outline: ${agentAuditInline(agentRunHistoryOutlineSummary(item))}` : "",
+      item.documentIntent ? `  - Intent: ${agentAuditInline(agentRunHistoryIntentSummary(item))}` : "",
       item.sourcePack ? `  - Source pack: ${agentAuditInline(agentRunHistorySourcePackSummary(item))}` : "",
     ].filter(Boolean)),
   ];
@@ -5930,6 +5933,12 @@ function agentRunHistoryEvidenceSummary(item: AgentRunHistoryItem) {
     evidence.referenceHints.length ? `${evidence.referenceHints.length} reference checks` : "",
   ].filter(Boolean);
   return parts.join(", ") || "no blockers";
+}
+function agentRunHistoryIntentSummary(item: AgentRunHistoryItem) {
+  const intent = item.documentIntent;
+  if (!intent) return "none captured";
+  const missing = intent.missingFields.length ? `; missing ${intent.missingFields.join(", ")}` : "";
+  return `${intent.completenessScore}/100 ${intent.status}${missing}`;
 }
 function agentRunHistoryOutlineSummary(item: AgentRunHistoryItem) {
   const counts = new Map<string, number>();

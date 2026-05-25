@@ -38,7 +38,8 @@ Recent pushed checkpoints visible in current git history:
   status, distribution targets, and constraints from the instruction, context
   answers, source pack, and current document; surfaces missing fields in the
   plan UI; feeds the AI Control Center and release evidence bundle; and is
-  included in generated agent packets and audit fingerprints.
+  included in generated agent packets, audit fingerprints, persisted run
+  history, and filtered run-history audits.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,

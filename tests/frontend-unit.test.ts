@@ -1332,6 +1332,31 @@ test("workspace persistence migration versions and normalizes saved settings", (
           distributionBlockers: ["Substack preflight pending"],
           releaseEvidence: ["Release evidence blocker"],
         },
+        documentIntent: {
+          summary: " Intent needs owner and outcome. ",
+          completenessScore: 88.4,
+          status: "ready",
+          fields: [
+            {
+              key: " audience ",
+              label: " Audience ",
+              value: " Board ",
+              status: "provided",
+              source: " context ",
+              guidance: " Confirm audience. ",
+            },
+            {
+              key: " evidence ",
+              label: " Evidence ",
+              value: " audited forecast ",
+              status: "bad-status",
+              source: "",
+              guidance: "",
+            },
+          ],
+          missingFields: [" outcome ", " outcome "],
+          reviewPrompts: [" Confirm outcome. ", " Confirm outcome. "],
+        },
         appliedAt: "2026-05-25T10:06:00.000Z",
         providerProfile: " local ",
       },
@@ -1578,6 +1603,31 @@ test("workspace persistence migration versions and normalizes saved settings", (
       distributionBlockers: ["Substack preflight pending"],
       releaseEvidence: ["Release evidence blocker"],
     },
+    documentIntent: {
+      summary: "Intent needs owner and outcome.",
+      completenessScore: 88.4,
+      status: "ready",
+      fields: [
+        {
+          key: "audience",
+          label: "Audience",
+          value: "Board",
+          status: "provided",
+          source: "context",
+          guidance: "Confirm audience.",
+        },
+        {
+          key: "evidence",
+          label: "Evidence",
+          value: "audited forecast",
+          status: "needs-review",
+          source: "unknown",
+          guidance: "Review this intent field before relying on generated content.",
+        },
+      ],
+      missingFields: ["outcome"],
+      reviewPrompts: ["Confirm outcome."],
+    },
     appliedAt: "2026-05-25T10:06:00.000Z",
     providerProfile: "local",
   });
@@ -1756,11 +1806,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentHistoryLaneFilter"));
   ok(app.includes("agentHistoryTargetFilter"));
   ok(app.includes("agentHistoryAuditMarkdown"));
+  ok(app.includes("agentRunHistoryIntentSummary"));
   ok(app.includes("insertAgentHistoryAudit"));
   ok(app.includes("copyAgentHistoryAudit"));
   ok(app.includes("removeAgentHistoryRun"));
   ok(app.includes("clearAgentHistory"));
   ok(app.includes("## Agent Run History Audit"));
+  ok(app.includes("Intent: {{ agentRunHistoryIntentSummary(item) }}"));
   ok(app.includes("```ai-audit"));
   ok(app.includes("Inserted agent history audit"));
   ok(app.includes("Copied agent history audit"));

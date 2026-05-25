@@ -208,8 +208,9 @@ Current direct evidence:
 - `docs/ai-first-platform-roadmap.md` captures the 50-change AI-first roadmap;
   `pnpm run check:ai-roadmap` verifies the exact 50-item structure, README and
   matrix linkage, and implemented/tested AI surfaces for Docs Live, Agent
-  Workspace, document intent sheets, playbooks, lifecycle tasks, provider
-  handoff, runtime readiness, and guided demo.
+  Workspace, document intent sheets with persisted run-history audit snapshots,
+  playbooks, lifecycle tasks, provider handoff, runtime readiness, and guided
+  demo.
 - `pnpm run check:a11y` now checks static Vue template accessibility guardrails
   for accessible control names, dialog labeling, dialog focusability/keyboard
   handling, required skip-link targets, and status/progress live regions.

@@ -210,6 +210,26 @@ export interface AgentRunHistorySourcePack {
   releaseEvidence: string[];
 }
 
+export type AgentRunHistoryDocumentIntentStatus = "provided" | "needs-review" | "missing";
+
+export interface AgentRunHistoryDocumentIntentField {
+  key: string;
+  label: string;
+  value: string;
+  status: AgentRunHistoryDocumentIntentStatus;
+  source: string;
+  guidance: string;
+}
+
+export interface AgentRunHistoryDocumentIntent {
+  summary: string;
+  completenessScore: number;
+  status: "ready" | "needs-input";
+  fields: AgentRunHistoryDocumentIntentField[];
+  missingFields: string[];
+  reviewPrompts: string[];
+}
+
 export interface AgentRunHistoryItem {
   runId: string;
   title: string;
@@ -239,6 +259,7 @@ export interface AgentRunHistoryItem {
   documentEvidence?: AgentRunHistoryDocumentEvidence;
   outlineCritique?: AgentRunHistoryOutlineCritiqueItem[];
   sourcePack?: AgentRunHistorySourcePack;
+  documentIntent?: AgentRunHistoryDocumentIntent;
   appliedAt?: string;
   providerProfile?: string;
 }
@@ -755,6 +776,38 @@ function normalizeAgentRunHistorySourcePack(value: unknown): AgentRunHistorySour
   };
 }
 
+function normalizeAgentRunHistoryDocumentIntent(value: unknown): AgentRunHistoryDocumentIntent | undefined {
+  if (!isRecord(value)) return undefined;
+  const fields: AgentRunHistoryDocumentIntentField[] = [];
+  if (Array.isArray(value.fields)) {
+    for (const item of value.fields) {
+      if (!isRecord(item)) continue;
+      const key = normalizedString(item.key, 80);
+      const label = normalizedString(item.label, 120);
+      if (!key || !label) continue;
+      fields.push({
+        key,
+        label,
+        value: normalizedString(item.value, 300) || "TBD",
+        status: enumValue(item.status, ["provided", "needs-review", "missing"] as const) || "needs-review",
+        source: normalizedString(item.source, 80) || "unknown",
+        guidance: normalizedString(item.guidance, 500) || "Review this intent field before relying on generated content.",
+      });
+      if (fields.length >= 40) break;
+    }
+  }
+  const summary = normalizedString(value.summary, 500);
+  if (!summary && !fields.length) return undefined;
+  return {
+    summary: summary || "Document intent sheet snapshot",
+    completenessScore: Math.min(Math.max(numberValue(value.completenessScore) ?? 0, 0), 100),
+    status: enumValue(value.status, ["ready", "needs-input"] as const) || "needs-input",
+    fields,
+    missingFields: normalizedStringArray(value.missingFields, 30, 160),
+    reviewPrompts: normalizedStringArray(value.reviewPrompts, 40, 500),
+  };
+}
+
 function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | null {
   if (!isRecord(value)) return null;
   const runId = normalizedString(value.runId, 80);
@@ -775,6 +828,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
   const documentEvidence = normalizeAgentRunHistoryDocumentEvidence(value.documentEvidence);
   const outlineCritique = normalizeAgentRunHistoryOutlineCritique(value.outlineCritique);
   const sourcePack = normalizeAgentRunHistorySourcePack(value.sourcePack);
+  const documentIntent = normalizeAgentRunHistoryDocumentIntent(value.documentIntent);
   return {
     runId,
     title: normalizedString(value.title, 120) || "Agent run",
@@ -804,6 +858,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     ...(documentEvidence ? { documentEvidence } : {}),
     ...(outlineCritique.length ? { outlineCritique } : {}),
     ...(sourcePack ? { sourcePack } : {}),
+    ...(documentIntent ? { documentIntent } : {}),
     appliedAt: normalizedString(value.appliedAt, 40) || undefined,
     providerProfile: normalizedString(value.providerProfile, 120) || undefined,
   };
