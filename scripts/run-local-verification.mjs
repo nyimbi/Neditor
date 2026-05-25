@@ -16,6 +16,7 @@ const quickCommands = [
   command("Dependency/license admission", "pnpm", ["run", "check:deps"]),
   command("AI provider evidence contract", "pnpm", ["run", "check:ai-provider"]),
   command("AI runtime evidence contract", "pnpm", ["run", "check:ai-runtime"]),
+  command("Security review evidence contract", "pnpm", ["run", "check:security-review"]),
   command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"]),
   command("Markdown links", "pnpm", ["run", "check:docs"]),
   command("Rust formatting", "cargo", ["fmt", "--check"], "src-tauri"),

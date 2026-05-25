@@ -2054,6 +2054,7 @@ test("local verification scripts expose local baseline checks", () => {
   const aiProviderEvidence = readFileSync("scripts/check-ai-provider-evidence.mjs", "utf8");
   const aiProviderCollector = readFileSync("scripts/collect-ai-provider-evidence.mjs", "utf8");
   const aiRuntimeEvidence = readFileSync("scripts/check-ai-runtime-evidence.mjs", "utf8");
+  const securityReview = readFileSync("scripts/check-security-review-evidence.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
   const googleDocsCollector = readFileSync("scripts/collect-google-docs-import-evidence.mjs", "utf8");
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
@@ -2086,6 +2087,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:evidence-kit"], "node scripts/check-release-evidence-kit.mjs");
   equal(scripts["check:release-signing"], "node scripts/check-release-signing.mjs");
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
+  equal(scripts["check:security-review"], "node scripts/check-security-review-evidence.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
   equal(scripts["collect:ai-provider"], "node scripts/collect-ai-provider-evidence.mjs");
   equal(scripts["collect:google-docs-import"], "node scripts/collect-google-docs-import-evidence.mjs");
@@ -2110,6 +2112,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Google Docs import evidence contract", "pnpm", ["run", "check:google-docs-import"])'));
   ok(verification.includes('command("AI provider evidence contract", "pnpm", ["run", "check:ai-provider"])'));
   ok(verification.includes('command("AI runtime evidence contract", "pnpm", ["run", "check:ai-runtime"])'));
+  ok(verification.includes('command("Security review evidence contract", "pnpm", ["run", "check:security-review"])'));
   ok(verification.includes('command("AI provider live endpoint evidence contract", "pnpm", ["run", "check:ai-provider"])'));
   ok(verification.includes('command("Release device performance profile contract", "pnpm", ["run", "check:performance-profile"])'));
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
@@ -2167,6 +2170,18 @@ test("local verification scripts expose local baseline checks", () => {
   ok(aiRuntimeEvidence.includes("forbiddenEvidenceKeys"));
   ok(aiRuntimeEvidence.includes("clipboardText"));
   ok(aiRuntimeEvidence.includes("audioSample"));
+  ok(securityReview.includes("neditor.security-review-evidence.v1"));
+  ok(securityReview.includes("NEDITOR_SECURITY_REVIEW_EVIDENCE_DIR"));
+  ok(securityReview.includes("NEDITOR_SECURITY_REVIEW_EVIDENCE"));
+  ok(securityReview.includes("pending-independent-security-review"));
+  ok(securityReview.includes("sourceCommit must match current git commit"));
+  ok(securityReview.includes("sourceTreeClean must be true"));
+  ok(securityReview.includes("tauri-command-boundary"));
+  ok(securityReview.includes("external-transform-boundary"));
+  ok(securityReview.includes("ai-provider-boundary"));
+  ok(securityReview.includes("findings.critical must be 0"));
+  ok(securityReview.includes("signoff.approvedForRelease must be true"));
+  ok(securityReview.includes("signoff.networkTelemetryAdded must be false"));
   ok(performanceProfile.includes("neditor.performance-profile-evidence.v1"));
   ok(performanceProfile.includes("NEDITOR_PERFORMANCE_PROFILE_EVIDENCE_DIR"));
   ok(performanceProfile.includes("NEDITOR_PERFORMANCE_PROFILE_EVIDENCE"));
@@ -2244,6 +2259,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("linux-package-artifact-proof"));
   ok(evidenceKitCollector.includes("ai-provider-live-endpoint-proof"));
   ok(evidenceKitCollector.includes("ai-runtime-real-device-proof"));
+  ok(evidenceKitCollector.includes("independent-security-review-signoff"));
   ok(evidenceKitCollector.includes("release-device-native-performance-profile"));
   ok(evidenceKitCollector.includes("google-docs-live-import-readback"));
   ok(evidenceKitCollector.includes("rendered-export-native-viewer-human-signoff"));
@@ -2256,6 +2272,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("Optional CI path: gh workflow run neditor-release-evidence.yml"));
   ok(evidenceKitCollector.includes("provider-evidence.template.json"));
   ok(evidenceKitCollector.includes("runtime-evidence.template.json"));
+  ok(evidenceKitCollector.includes("security-review.template.json"));
   ok(evidenceKitCollector.includes("native-profile.template.json"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
@@ -2266,9 +2283,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit-report.v1"));
   ok(evidenceKitChecker.includes("runbooks/ai-provider-endpoint.md"));
   ok(evidenceKitChecker.includes("runbooks/ai-runtime-device.md"));
+  ok(evidenceKitChecker.includes("runbooks/independent-security-review.md"));
   ok(evidenceKitChecker.includes("runbooks/release-device-performance-profile.md"));
   ok(evidenceKitChecker.includes("runbooks/optional-external-engines.md"));
-  ok(evidenceKitChecker.includes("expectedTemplateCount = 14"));
+  ok(evidenceKitChecker.includes("expectedTemplateCount = 15"));
   ok(evidenceKitChecker.includes("report.json"));
   ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
   ok(evidenceKitChecker.includes("current source tree must be clean"));
@@ -2281,6 +2299,9 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceIngest.includes("platform/win32-package-artifacts.json"));
   ok(evidenceIngest.includes("ai-provider/provider-evidence.json"));
   ok(evidenceIngest.includes("ai-runtime/runtime-evidence.json"));
+  ok(evidenceIngest.includes("security-review-signoff"));
+  ok(evidenceIngest.includes("security/security-review.json"));
+  ok(evidenceIngest.includes("check:security-review"));
   ok(evidenceIngest.includes("performance-native-profile"));
   ok(evidenceIngest.includes("performance/native-profile.json"));
   ok(evidenceIngest.includes("check:performance-profile"));
@@ -2422,8 +2443,11 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("releaseEvidenceKitAccepted"));
   ok(script.includes("neditor.release-evidence-kit-report.v1"));
   ok(script.includes("current-source-tree-not-clean"));
-  ok(script.includes("summary?.copiedTemplates || 0) < 14"));
-  ok(script.includes("summary?.runbooks || 0) < 10"));
+  ok(script.includes("summary?.copiedTemplates || 0) < 15"));
+  ok(script.includes("summary?.runbooks || 0) < 11"));
+  ok(script.includes("security-review-evidence"));
+  ok(script.includes("independent-security-review-signoff"));
+  ok(script.includes("securityReviewEvidenceAccepted"));
   ok(script.includes("performance-profile-evidence"));
   ok(script.includes("release-device-native-performance-profile"));
   ok(script.includes("performanceProfileEvidenceAccepted"));

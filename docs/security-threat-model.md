@@ -169,3 +169,6 @@ Mitigations:
 - `save_file_rejects_stale_expected_hash`
 - `AI provider packages redact secrets and preserve agent governance context`
 - `AI provider execution extracts Markdown without persisting secrets`
+- `pnpm run check:security-review` emits the independent review evidence
+  template and validates returned reviewer scope, findings, report hashes, and
+  release sign-off before security review can satisfy release readiness.

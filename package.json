@@ -26,6 +26,7 @@
     "check:evidence-kit": "node scripts/check-release-evidence-kit.mjs",
     "check:release-signing": "node scripts/check-release-signing.mjs",
     "check:release-readiness": "node scripts/check-release-readiness.mjs",
+    "check:security-review": "node scripts/check-security-review-evidence.mjs",
     "check:structure": "node scripts/check-project-structure.mjs",
     "collect:ai-provider": "node scripts/collect-ai-provider-evidence.mjs",
     "collect:google-docs-import": "node scripts/collect-google-docs-import-evidence.mjs",

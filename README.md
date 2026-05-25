@@ -527,13 +527,15 @@ uploaded evidence artifacts and import returned completed sign-offs locally with
 
 `pnpm run collect:evidence-kit` packages the current release-readiness gaps into
 a reviewer-friendly bundle with runbooks, templates, and return paths for
-platform evidence, signing, live AI provider/runtime proof, Google Docs import,
-release-device performance profiling, human review sign-offs, and optional
-external engines such as Pikchr. The ingest tool recognizes returned
-performance profile proof under paths such as `performance/native-profile.json`
-and optional-engine proof under paths such as
+platform evidence, signing, live AI provider/runtime proof, independent security
+review, Google Docs import, release-device performance profiling, human review
+sign-offs, and optional external engines such as Pikchr. The ingest tool
+recognizes returned security review proof under paths such as
+`security/security-review.json`, performance profile proof under paths such as
+`performance/native-profile.json`, and optional-engine proof under paths such as
 `external-engines/external/pikchr.json`, then validates them through
-`pnpm run check:performance-profile` and `pnpm run check:engines`.
+`pnpm run check:security-review`, `pnpm run check:performance-profile`, and
+`pnpm run check:engines`.
 
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`
@@ -582,14 +584,22 @@ success without stored clipboard content. Missing real-device evidence remains a
 release gap; malformed evidence, stale commits, recorded audio samples, or
 clipboard text fail validation.
 
+`pnpm run check:security-review` writes `.tmp/security-review/report.json` and
+creates `.tmp/security-review/templates/security-review.template.json` for
+independent security review sign-off. The validator accepts only current-source,
+clean-tree evidence from an independent reviewer, requires the documented trust
+boundaries and reviewed artifacts to be covered, rejects unresolved critical or
+high findings, requires report hashes, and confirms no secrets, telemetry, or
+unreviewed external/provider execution paths were introduced.
+
 `pnpm run check:release-readiness` aggregates the current local proof set into
 `.tmp/release-readiness/report.json`. It fails if required current-host reports
 are missing or failed, and otherwise records remaining external evidence gaps
 such as Windows/Linux package artifacts, Windows/Linux WebDriver execution,
 release signing/notarization, live approved-provider endpoint proof, real Docs
-Live runtime device proof, Google Docs live import/readback, optional missing
-engines, and human reviewer sign-off for accessibility or native-viewer export
-review.
+Live runtime device proof, independent security review sign-off, Google Docs
+live import/readback, optional missing engines, and human reviewer sign-off for
+accessibility or native-viewer export review.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
