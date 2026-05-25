@@ -102,7 +102,7 @@ Recent pushed checkpoints visible in current git history:
   tab is inactive and not the current watcher root. When the user switches back,
   the active-tab watcher setup immediately compares the saved root-file hash
   against disk, reloads clean documents, clears the dirty marker, and reports
-  `Reloaded external changes`; the full browser suite now passes 60 Chromium
+  `Reloaded external changes`; the full browser suite now passes 61 Chromium
   workflows including the inactive-tab watcher case.
 - Preview click-to-source navigation now covers non-heading anchored artifacts.
   Clicking a rendered figure, table, or equation with a stable preview anchor

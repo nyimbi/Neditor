@@ -137,7 +137,7 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 60 Chromium browser workbench workflows
+- `pnpm run test:e2e`: passed all 61 Chromium browser workbench workflows
   locally on 2026-05-25 through the workspace-local Playwright Chromium cache
   at `.tmp/ms-playwright`, including collapsible toolbars, HTML, blog/Substack,
   LaTeX, Google Docs export-target handoffs, app-level shortcuts for search,
