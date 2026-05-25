@@ -241,11 +241,11 @@ web app.
   blockers, an Agent Audit Trail with run ID,
   fingerprints, rollback plan, review events, and safe apply behavior for
   replacing a document, replacing selected text, or appending a review packet.
-  Recent generated/applied agent runs are kept in local workspace history with
-  run IDs, readiness, apply mode, provider, fingerprints, section/reviewer
-  counts, a bounded packet snapshot that can be appended or copied later, and
-  a replan action that restarts from the saved instruction against the current
-  document context.
+  Recent generated/applied agent runs are kept in searchable local workspace
+  history with status, lane, and target filters, run IDs, readiness, apply
+  mode, provider, fingerprints, section/reviewer counts, a bounded packet
+  snapshot that can be appended or copied later, and a replan action that
+  restarts from the saved instruction against the current document context.
   Provider handoff packages turn that run into
   redacted prompts, source evidence packs with extracted claims, citation TODOs,
   humanization findings, outline critique, governance blockers, distribution

@@ -92,7 +92,11 @@ handoff, provider request package, and saved run history instead of living only
 in a separate chat note. Use **Source Pack Builder** to add source notes, claims,
 URLs, file paths, references, and reviewer comments before planning or provider
 handoff; those managed items become part of the context pack, generated packet,
-reviewer tasks, provider source evidence pack, and saved run history. The plan also scores context completeness across
+reviewer tasks, provider source evidence pack, and saved run history. The run
+history can be searched and filtered by status, workflow lane, or output target
+so generated packets, applied revisions, provider-applied drafts, evidence
+blockers, and distribution handoffs remain recoverable after the workspace
+accumulates multiple agent runs. The plan also scores context completeness across
 audience, evidence, constraints, examples, tone, and approval context, with
 recommendations for missing grounding before users generate a first draft.
 

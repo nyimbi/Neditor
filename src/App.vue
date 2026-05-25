@@ -2687,10 +2687,43 @@
                 <strong>Agent Run History</strong>
                 <span>Local audit records for generated and applied agent work.</span>
               </div>
-              <small>{{ store.agentRunHistory.length }} saved</small>
+              <small>{{ filteredAgentRunHistory.length }} of {{ store.agentRunHistory.length }} saved</small>
             </header>
+            <section class="agent-history-filters" aria-label="Filter agent run history">
+              <label>
+                Search
+                <input v-model="agentHistoryQuery" type="search" placeholder="Instruction, evidence, provider, blocker" />
+              </label>
+              <label>
+                Status
+                <select v-model="agentHistoryStatusFilter">
+                  <option value="all">All statuses</option>
+                  <option value="generated">Generated</option>
+                  <option value="applied">Applied</option>
+                  <option value="provider-applied">Provider applied</option>
+                </select>
+              </label>
+              <label>
+                Lane
+                <select v-model="agentHistoryLaneFilter">
+                  <option v-for="lane in agentTaskLaneOptions" :key="lane" :value="lane">
+                    {{ lane === "all" ? "All lanes" : lane }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                Target
+                <select v-model="agentHistoryTargetFilter">
+                  <option value="all">All targets</option>
+                  <option v-for="option in agentPlaybookTargetOptions.filter((item) => item.value !== 'all')" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+            </section>
+            <p v-if="!filteredAgentRunHistory.length" class="sidebar-hint">No agent runs match the current history filters.</p>
             <ol>
-              <li v-for="item in store.agentRunHistory.slice(0, 6)" :key="item.runId">
+              <li v-for="item in filteredAgentRunHistory.slice(0, 12)" :key="item.runId">
                 <div>
                   <strong>{{ item.title }}</strong>
                   <span>{{ item.status }} | {{ item.applicationMode }} | {{ item.readinessScore }}/100</span>
@@ -3222,6 +3255,10 @@ const agentTaskSectionFilter = ref("all");
 const agentTaskTargetFilter = ref("all");
 const agentTaskEvidenceFilter = ref<"all" | "has-evidence" | "missing-evidence" | "release-blocker">("all");
 const agentTaskQuery = ref("");
+const agentHistoryQuery = ref("");
+const agentHistoryStatusFilter = ref<"all" | AgentRunHistoryItem["status"]>("all");
+const agentHistoryLaneFilter = ref<"all" | AgenticWorkflowLane>("all");
+const agentHistoryTargetFilter = ref<"all" | ExportTarget>("all");
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const guidedDemoStepIndex = ref(0);
@@ -3786,6 +3823,39 @@ const agentLifecycleTaskRows = computed(() =>
     }),
 );
 const agentLifecycleTaskTotal = computed(() => agentRun.value?.lifecycleTasks.length || 0);
+const filteredAgentRunHistory = computed(() => {
+  const query = agentHistoryQuery.value.trim().toLowerCase();
+  return store.agentRunHistory.filter((item) => {
+    const statusMatches = agentHistoryStatusFilter.value === "all" || item.status === agentHistoryStatusFilter.value;
+    const laneMatches = agentHistoryLaneFilter.value === "all" || item.lanes.includes(agentHistoryLaneFilter.value);
+    const targetMatches = agentHistoryTargetFilter.value === "all" || item.distributionTargets.includes(agentHistoryTargetFilter.value);
+    const searchable = [
+      item.title,
+      item.instruction,
+      item.contextAnswers || "",
+      item.sourcePackText || "",
+      item.packetPreview || "",
+      item.status,
+      item.applicationMode,
+      item.providerProfile || "",
+      item.documentType,
+      item.controlCenter?.summary || "",
+      ...(item.lanes || []),
+      ...(item.distributionTargets || []),
+      ...(item.documentEvidence?.unresolvedPlaceholders || []),
+      ...(item.documentEvidence?.citationTodos || []),
+      ...(item.outlineCritique || []).map((critique) => `${critique.area} ${critique.heading} ${critique.detail} ${critique.recommendation}`),
+      ...(item.sourcePack?.claimReview || []),
+      ...(item.sourcePack?.cleanupBlockers || []),
+      ...(item.sourcePack?.governanceBlockers || []),
+      ...(item.sourcePack?.distributionBlockers || []),
+      ...(item.sourcePack?.releaseEvidence || []),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return statusMatches && laneMatches && targetMatches && (!query || searchable.includes(query));
+  });
+});
 const previewDocumentLabel = computed(() => {
   const title = active.value.compile?.semantic.title || active.value.title || "Untitled document";
   const status = active.value.compile?.semantic.status || "draft";
@@ -12933,6 +13003,12 @@ select:hover {
   font-size: 12px;
 }
 
+.agent-history-filters {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.5fr) repeat(3, minmax(120px, 1fr));
+  gap: 8px;
+}
+
 .agent-history ol {
   display: grid;
   gap: 8px;
@@ -14326,6 +14402,10 @@ select:hover {
   }
 
   .agent-playbook-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-history-filters {
     grid-template-columns: 1fr;
   }
 

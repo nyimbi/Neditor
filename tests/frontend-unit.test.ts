@@ -1597,6 +1597,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentPlaybookTargets"));
   ok(app.includes("agentPlaybookFocusLabel"));
   ok(app.includes("applyAgentWorkflowPlaybook"));
+  ok(app.includes('aria-label="Filter agent run history"'));
+  ok(app.includes("filteredAgentRunHistory"));
+  ok(app.includes("agentHistoryQuery"));
+  ok(app.includes("agentHistoryStatusFilter"));
+  ok(app.includes("agentHistoryLaneFilter"));
+  ok(app.includes("agentHistoryTargetFilter"));
+  ok(app.includes("No agent runs match the current history filters."));
   ok(app.includes("Workflow Playbooks"));
   ok(app.includes("Agent Workspace playbooks"));
   ok(app.includes("agent-playbooks"));
