@@ -1787,9 +1787,7 @@
           <label>
             Drafting depth
             <select v-model="docsLiveDraftingDepth">
-              <option value="concise">Concise</option>
-              <option value="standard">Standard</option>
-              <option value="detailed">Detailed</option>
+              <option v-for="depth in docsLiveDraftingDepthOptions" :key="depth.value" :value="depth.value">{{ depth.label }}</option>
             </select>
           </label>
           <label class="docs-live-wide">
@@ -2436,8 +2434,14 @@
               <ol>
                 <li v-for="section in agentRun.sectionWorkQueue" :key="section.id">
                   <div>
-                    <small>Level {{ section.level }} | {{ section.lane }}</small>
+                    <small>Level {{ section.level }} | {{ section.lane }} | {{ section.draftingDepth }} depth</small>
                     <strong>{{ section.heading }}</strong>
+                    <label class="agent-section-depth">
+                      Depth
+                      <select v-model="section.draftingDepth">
+                        <option v-for="depth in agentSectionDraftingDepthOptions" :key="depth.value" :value="depth.value">{{ depth.label }}</option>
+                      </select>
+                    </label>
                     <p>{{ section.draftingInstruction }}</p>
                     <span>Reviewers: {{ section.reviewerAgentIds.join(", ") }}</span>
                     <div class="agent-section-actions">
@@ -3091,6 +3095,15 @@ const docsLiveQuestionnaireAnswerText = ref("");
 const docsLiveGeneratedMarkdown = ref("");
 const docsLiveDraft = ref<DocsLiveDraft | null>(null);
 const docsLiveDraftingDepth = ref<DocsLiveDraftDepth>("standard");
+const docsLiveDraftingDepthOptions: Array<{ value: DocsLiveDraftDepth; label: string }> = [
+  { value: "summary", label: "Summary" },
+  { value: "standard", label: "Standard" },
+  { value: "detailed", label: "Detailed" },
+  { value: "technical", label: "Technical" },
+  { value: "legal", label: "Legal" },
+  { value: "executive", label: "Executive" },
+];
+const agentSectionDraftingDepthOptions = docsLiveDraftingDepthOptions;
 const docsLiveInsertMode = ref<"replace" | "append" | "selection" | "section">("replace");
 const docsLiveTargetSection = ref<AgenticSectionWorkItem | null>(null);
 const docsLiveListening = ref(false);
@@ -5080,7 +5093,7 @@ function draftAgentSectionWithDocsLive(section: AgenticSectionWorkItem) {
   ].join("\n");
   docsLivePlaceholderText.value = run.plan.placeholderText;
   docsLiveQuestionnaireAnswerText.value = `Draft only this section first: ${section.heading}. Keep unresolved facts visible and preserve reviewer handoff notes.`;
-  docsLiveDraftingDepth.value = "detailed";
+  docsLiveDraftingDepth.value = section.draftingDepth;
   docsLiveInsertMode.value = "section";
   docsLiveTargetSection.value = section;
   refreshDocsLiveQuestionnaire();
@@ -12226,6 +12239,16 @@ select:hover {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 4px;
+}
+
+.agent-section-depth {
+  max-width: 180px;
+  margin-top: 6px;
+}
+
+.agent-section-depth select {
+  min-height: 30px;
+  font-size: 12px;
 }
 
 .agent-section-actions button {

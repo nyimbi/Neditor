@@ -41,7 +41,7 @@ export interface DocsLiveQuestionnaireRequest {
   placeholders?: string;
 }
 
-export type DocsLiveDraftDepth = "concise" | "standard" | "detailed";
+export type DocsLiveDraftDepth = "summary" | "standard" | "detailed" | "technical" | "legal" | "executive";
 
 export interface DocsLivePlaceholderEntry {
   key: string;
@@ -832,10 +832,23 @@ function sectionBodyParagraphs(
   const third =
     contextSentences[(index + 1) % Math.max(1, contextSentences.length)] ||
     "Keep the prose specific enough for review while leaving unresolved claims visibly marked.";
-  const fourth = `Before this section is approved, remove unsupported certainty, add citations or calculations for factual claims, and keep only language a responsible human reviewer would stand behind.`;
-  if (draftingDepth === "concise") return [first, second];
-  if (draftingDepth === "detailed") return [first, second, third, fourth];
+  const fourth = depthReviewSentence(draftingDepth);
+  if (draftingDepth === "summary" || draftingDepth === "executive") return [first, second];
+  if (draftingDepth === "detailed" || draftingDepth === "technical" || draftingDepth === "legal") return [first, second, third, fourth];
   return [first, second, fourth];
+}
+
+function depthReviewSentence(draftingDepth: DocsLiveDraftDepth) {
+  if (draftingDepth === "technical") {
+    return "Before this section is approved, verify technical terms, assumptions, dependencies, examples, interfaces, and source references.";
+  }
+  if (draftingDepth === "legal") {
+    return "Before this section is approved, verify obligations, caveats, defined parties, authority, dates, and reviewer assumptions.";
+  }
+  if (draftingDepth === "executive") {
+    return "Before this section is approved, verify the decision headline, tradeoff, owner, and timing are explicit enough for executive review.";
+  }
+  return "Before this section is approved, remove unsupported certainty, add citations or calculations for factual claims, and keep only language a responsible human reviewer would stand behind.";
 }
 
 function factSentence(placeholders: Record<string, string>) {
@@ -891,7 +904,8 @@ function humanizeDraftText(markdown: string) {
 }
 
 function normalizeDraftingDepth(value?: string): DocsLiveDraftDepth {
-  if (value === "concise" || value === "standard" || value === "detailed") return value;
+  if (value === "concise") return "summary";
+  if (value === "summary" || value === "standard" || value === "detailed" || value === "technical" || value === "legal" || value === "executive") return value;
   return "standard";
 }
 

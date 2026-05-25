@@ -1521,12 +1521,13 @@ Finish:
   palette, and native Writing Tools menu now open Docs Live; it accepts Web
   Speech dictation where available, freeform context, generated questionnaire
   prompts, placeholder values, and an outline, then drafts section-by-section
-  Markdown with AI provenance, needs-review markers, QA checks, humanization
-  tasks, and reviewer notes. The focused browser harness now drives the Web
-  Speech path with a deterministic mock, and the bounded native launch smoke
-  records `docsLive.open: true` from the Writing Tools menu. Remaining work is
-  real browser/native microphone permission proof and accepted provider evidence
-  from a credentialed host.
+  Markdown with selectable summary, standard, detailed, technical, legal, or
+  executive depth, AI provenance, needs-review markers, QA checks,
+  humanization tasks, and reviewer notes. The focused browser harness now
+  drives the Web Speech path with a deterministic mock, and the bounded native
+  launch smoke records `docsLive.open: true` from the Writing Tools menu.
+  Remaining work is real browser/native microphone permission proof and
+  accepted provider evidence from a credentialed host.
 - Agentic distribution runbooks. AI Agent Workspace now turns requested export
   or publishing targets into target-specific preflight, handoff, and evidence
   cards for HTML, PDF, DOCX, PPTX, Markdown bundles, blog, Substack, LaTeX, and

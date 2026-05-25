@@ -406,6 +406,18 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.markdown.includes("Commercial team should verify"));
   ok(draft.markdown.includes("The reader should approve renewal"));
   ok(draft.markdown.includes("Commercial team"));
+
+  const technicalDraft = buildDocsLiveDraft({
+    documentType: "technical-architecture",
+    title: "Integration Plan",
+    outline: "- API Contract",
+    context: "audience: engineering review board. evidence: architecture notes. owner: Platform.",
+    placeholders: "audience: engineering review board\nowner: Platform\nevidence: architecture notes",
+    draftingDepth: "technical",
+    generatedAt: "2026-05-23T09:00:00.000Z",
+  });
+  ok(technicalDraft.markdown.includes("technical depth"));
+  ok(technicalDraft.markdown.includes("verify technical terms"));
 });
 
 test("Docs Live covers business technical legal marketing and customer document blueprints", () => {
@@ -738,8 +750,12 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.sectionWorkQueue.every((section) => section.completionCriteria.length >= 4));
   ok(run.sectionWorkQueue.some((section) => section.reviewerAgentIds.includes("export")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Section work queue prepared")));
+  ok(run.sectionWorkQueue.every((section) => section.draftingDepth));
+  ok(run.sectionWorkQueue.some((section) => section.draftingDepth === "detailed"));
+  ok(run.markdown.includes("Drafting depth:"));
   const sectionBrief = buildAgenticSectionWorkBrief(run.sectionWorkQueue[0], run.reviewerAgents);
   ok(sectionBrief.includes("```ai-section-task"));
+  ok(sectionBrief.includes("draftingDepth:"));
   ok(sectionBrief.includes("### Drafting Instruction"));
   ok(sectionBrief.includes("### Completion Criteria"));
   ok(sectionBrief.includes("### Assigned Reviewers"));
@@ -938,6 +954,7 @@ test("AI provider packages redact secrets and preserve agent governance context"
   ok(providerPackage.userPrompt.includes("Reviewer agents:"));
   ok(providerPackage.userPrompt.includes("Lifecycle task board:"));
   ok(providerPackage.userPrompt.includes("Release evidence bundle:"));
+  ok(providerPackage.userPrompt.includes("depth; reviewers:"));
   ok(providerPackage.userPrompt.includes("Final human approval and release readiness"));
   ok(providerPackage.userPrompt.includes("Section work queue:"));
   ok(providerPackage.userPrompt.includes("Required response"));
@@ -1621,6 +1638,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("reviewer.requiredActions"));
   ok(app.includes('aria-label="Agent section work queue"'));
   ok(app.includes("agentRun.sectionWorkQueue"));
+  ok(app.includes("agentSectionDraftingDepthOptions"));
+  ok(app.includes("section.draftingDepth"));
   ok(app.includes("section.completionCriteria"));
   ok(app.includes("insertAgentSectionBrief"));
   ok(app.includes("draftAgentSectionWithDocsLive"));

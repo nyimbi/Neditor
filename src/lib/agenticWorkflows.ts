@@ -1,4 +1,4 @@
-import { buildDocsLiveDraft, docsLiveDocumentTypes, normalizeDocsLiveDocumentType, type DocsLiveDocumentType } from "./docsLive.js";
+import { buildDocsLiveDraft, docsLiveDocumentTypes, normalizeDocsLiveDocumentType, type DocsLiveDocumentType, type DocsLiveDraftDepth } from "./docsLive.js";
 import { extractCitationTodoItems } from "./citationTodoWorkflow.js";
 import { outlinePlanFromMarkdown } from "./documentOutline.js";
 import type { ExportTarget } from "./workspacePersistence.js";
@@ -307,6 +307,7 @@ export interface AgenticSectionWorkItem {
   heading: string;
   level: number;
   lane: AgenticWorkflowLane;
+  draftingDepth: DocsLiveDraftDepth;
   draftingInstruction: string;
   completionCriteria: string[];
   reviewerAgentIds: AgenticReviewerAgentId[];
@@ -589,6 +590,7 @@ export function buildAgenticSectionWorkBrief(section: AgenticSectionWorkItem, re
     `order: ${section.order}`,
     `level: ${section.level}`,
     `lane: ${section.lane}`,
+    `draftingDepth: ${section.draftingDepth}`,
     `reviewers: ${section.reviewerAgentIds.join(", ")}`,
     "status: needs-draft",
     "```",
@@ -1744,14 +1746,16 @@ function buildSectionWorkQueue(plan: AgenticWorkflowPlan, reviewerAgents: Agenti
   const activeReviewerIds = new Set(reviewerAgents.map((agent) => agent.id));
   return sections.slice(0, 18).map((section, index) => {
     const reviewerAgentIds = sectionReviewerIds(section.heading, plan).filter((id) => activeReviewerIds.has(id));
+    const draftingDepth = sectionDraftingDepth(section.heading, section.level, plan);
     return {
       id: `section-${String(index + 1).padStart(2, "0")}-${stableFingerprint(section.heading).slice(0, 8)}`,
       order: index + 1,
       heading: section.heading,
       level: section.level,
       lane: plan.lanes.includes("compose") || plan.lanes.includes("create") ? "compose" : plan.primaryLane,
+      draftingDepth,
       draftingInstruction: [
-        `Draft or revise "${section.heading}" for ${audience}.`,
+        `Draft or revise "${section.heading}" for ${audience} at ${draftingDepth} depth.`,
         `Use ${evidence} for material claims and name ${owner} where accountability or follow-through is required.`,
         plan.distributionTargets.length ? `Preserve structure and metadata needed for ${plan.distributionTargets.join(", ")} distribution.` : "",
       ]
@@ -1766,6 +1770,17 @@ function buildSectionWorkQueue(plan: AgenticWorkflowPlan, reviewerAgents: Agenti
       reviewerAgentIds,
     };
   });
+}
+
+function sectionDraftingDepth(heading: string, level: number, plan: AgenticWorkflowPlan): DocsLiveDraftDepth {
+  const headingText = heading.toLowerCase();
+  const documentType = plan.documentType.toLowerCase();
+  if (/\b(executive summary|summary|overview|abstract|decision needed|recommendation)\b/.test(headingText)) return "executive";
+  if (/\b(legal|contract|terms|compliance|policy|obligation|risk|privacy|security)\b/.test(headingText) || /\b(policy|contract)\b/.test(documentType)) return "legal";
+  if (/\b(technical|architecture|implementation|api|schema|equation|method|methodology|integration|data model)\b/.test(headingText) || /\b(technical|architecture|adr|research)\b/.test(documentType)) return "technical";
+  if (/\b(context|background|current state|financial|investment|pricing|model|analysis|evidence|metrics|forecast|business case|roi)\b/.test(headingText)) return "detailed";
+  if (level >= 3) return "detailed";
+  return "standard";
 }
 
 function parseOutlineSections(outline: string) {
@@ -3487,6 +3502,8 @@ function sectionWorkQueueMarkdown(sectionWorkQueue: AgenticSectionWorkItem[]) {
       `Level: ${section.level}`,
       "",
       `Lane: ${section.lane}`,
+      "",
+      `Drafting depth: ${section.draftingDepth}`,
       "",
       `Reviewers: ${section.reviewerAgentIds.join(", ")}`,
       "",

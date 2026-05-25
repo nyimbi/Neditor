@@ -247,7 +247,7 @@ function buildUserPrompt(run: AgenticWorkflowRun, sourcePack: AiProviderSourcePa
     `Release evidence bundle:\n${run.releaseEvidenceBundle.items.map(formatReleaseEvidenceItem).join("\n")}`,
     "",
     `Section work queue:\n${run.sectionWorkQueue
-      .map((section) => `- ${section.order}. ${section.heading} (${section.lane}; reviewers: ${section.reviewerAgentIds.join(", ")}): ${section.draftingInstruction}`)
+      .map((section) => `- ${section.order}. ${section.heading} (${section.lane}; ${section.draftingDepth} depth; reviewers: ${section.reviewerAgentIds.join(", ")}): ${section.draftingInstruction}`)
       .join("\n")}`,
     "",
     run.revision
