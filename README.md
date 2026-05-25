@@ -208,7 +208,9 @@ web app.
   work-brief insertion, and focused Docs Live handoff that can replace the
   matching Markdown section instead of appending duplicate section copy, an
   **AI Control Center** for readiness score, source grounding, governance
-  state, next actions, an agentic lifecycle task board that turns creation,
+  state, current-document placeholders, citation TODOs, unresolved comments,
+  unreviewed AI markers, approval metadata gaps, placeholder links, next
+  actions, an agentic lifecycle task board that turns creation,
   composition, editing, revision, review, and distribution into runnable
   owned tasks with persistent queued/in-progress/needs-review/complete status,
   task notes, insertable/copyable Markdown task briefs, target-specific

@@ -77,6 +77,15 @@ export interface AgenticWorkflowRevision {
   changeSummary: string[];
 }
 
+export interface AgenticDocumentEvidence {
+  unresolvedPlaceholders: string[];
+  citationTodos: string[];
+  unreviewedAiMarkers: number;
+  unresolvedComments: number;
+  approvalMetadataMissing: string[];
+  brokenLinkHints: string[];
+}
+
 export interface AgenticWorkflowRun {
   plan: AgenticWorkflowPlan;
   summary: string;
@@ -315,8 +324,9 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const distributionChecklist = buildDistributionChecklist(plan, distributionTargetPlans);
   const blockers = buildRunBlockers(plan, hasDocument, hasSelection);
   const applicationMode = inferApplicationMode(plan, hasDocument, hasSelection);
-  const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans });
-  const reviewerAgents = buildReviewerAgents({ plan, draftMarkdown: draft?.markdown || "", revision, controlCenter, distributionTargetPlans, blockers });
+  const documentEvidence = analyzeAgenticDocumentEvidence(request.documentText || "", plan);
+  const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence });
+  const reviewerAgents = buildReviewerAgents({ plan, draftMarkdown: draft?.markdown || "", revision, controlCenter, distributionTargetPlans, blockers, documentEvidence });
   const sectionWorkQueue = buildSectionWorkQueue(plan, reviewerAgents);
   const lifecycleTasks = buildLifecycleTasks({ plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers });
   const auditTrail = buildAuditTrail({
@@ -866,8 +876,9 @@ function buildReviewerAgents(input: {
   controlCenter: AgenticControlCenter;
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
+  documentEvidence: AgenticDocumentEvidence;
 }): AgenticReviewerAgent[] {
-  const { plan, draftMarkdown, revision, controlCenter, distributionTargetPlans, blockers } = input;
+  const { plan, draftMarkdown, revision, controlCenter, distributionTargetPlans, blockers, documentEvidence } = input;
   const evidenceValue = extractKeyValue(plan.placeholderText, "evidence");
   const hasSpecificEvidence = Boolean(evidenceValue && !/^TBD\b/i.test(evidenceValue));
   const hasDraft = Boolean(draftMarkdown.trim());
@@ -883,12 +894,16 @@ function buildReviewerAgents(input: {
       findings: [
         plan.suggestedOutline.trim() ? "Outline is available as an editorial structure for section-by-section review." : "No outline was available to validate narrative structure.",
         hasDraft ? "Generated draft exists and needs audience-fit and stale phrase cleanup." : revision ? "Revision proposal exists and needs before/after editorial comparison." : "No generated body copy is present yet.",
+        documentEvidence.unresolvedPlaceholders.length
+          ? `Current document has unresolved placeholders: ${documentEvidence.unresolvedPlaceholders.slice(0, 4).join(", ")}.`
+          : "No obvious placeholder tokens were found in the current document.",
         `Tone target: ${extractKeyValue(plan.placeholderText, "tone") || "professional and direct"}.`,
       ],
       requiredActions: [
         missingInputs.includes("audience") ? "Confirm the intended audience before approving voice, detail level, and calls to action." : "",
         revision ? "Compare the proposed revision to the source text for meaning drift and over-compression." : "",
         hasDraft ? "Run a humanization pass for generic AI phrasing, repetition, and claims that sound confident without support." : "",
+        documentEvidence.unresolvedPlaceholders.length ? "Resolve or intentionally preserve current-document placeholders before final approval." : "",
       ],
     }),
     reviewerAgent({
@@ -900,10 +915,14 @@ function buildReviewerAgents(input: {
         controlCenter.sourceGrounding.some((item) => item.label === "Current document" && item.status === "available")
           ? "Current document context is available for source comparison."
           : "Current document source text is not available for full grounding.",
+        documentEvidence.citationTodos.length
+          ? `Current document has citation TODOs: ${documentEvidence.citationTodos.slice(0, 4).join(", ")}.`
+          : "No citation TODO markers were found in the current document.",
       ],
       requiredActions: [
         hasSpecificEvidence ? "Verify every material claim against the supplied evidence before final export." : "Supply source evidence, data references, or citation expectations before final approval.",
         "Mark unsupported claims with citation TODOs instead of letting them ship as confident assertions.",
+        documentEvidence.citationTodos.length ? "Resolve current-document citation TODOs or keep them as explicit blockers in the review record." : "",
       ],
     }),
     reviewerAgent({
@@ -912,11 +931,15 @@ function buildReviewerAgents(input: {
       mandate: "Surface decision risk, operational assumptions, missing approvals, and blocker severity.",
       findings: [
         blockers.length ? `${blockers.length} blocker or missing-input item(s) remain.` : "No blocker items were generated for this packet.",
+        documentEvidence.unresolvedComments
+          ? `${documentEvidence.unresolvedComments} unresolved review comment(s) remain in the current document.`
+          : "No unresolved review comments were detected in the current document.",
         plan.lanes.includes("distribute") ? "Distribution is in scope, so approval and release risk must be checked explicitly." : "Distribution is not currently in scope.",
       ],
       requiredActions: [
         ...hardBlockers,
         blockers.length && !hardBlockers.length ? "Resolve all missing-input blockers before marking the packet approved." : "",
+        documentEvidence.unresolvedComments ? "Resolve current-document review comments before release handoff." : "",
         plan.lanes.includes("distribute") ? "Confirm approval status, reviewer, and release owner before any external handoff." : "",
       ],
     }),
@@ -926,10 +949,14 @@ function buildReviewerAgents(input: {
       mandate: "Ensure citation expectations, bibliography notes, links, and source markers survive drafting and export.",
       findings: [
         plan.instruction.match(/\bcitations?|references?|sources?\b/i) ? "The instruction explicitly asks for source or citation review." : "Citation handling is inferred from evidence and review requirements.",
+        documentEvidence.brokenLinkHints.length
+          ? `Current document has link placeholders or suspicious links: ${documentEvidence.brokenLinkHints.slice(0, 4).join(", ")}.`
+          : "No obvious placeholder links were found in the current document.",
         plan.distributionTargets.includes("latex") ? "LaTeX export requires bibliography, labels, equations, and cross-reference checks." : "No LaTeX-specific citation target is active.",
       ],
       requiredActions: [
         "Add citation TODOs beside factual claims that do not have a named source.",
+        documentEvidence.brokenLinkHints.length ? "Repair placeholder or suspicious links before publishing." : "",
         plan.distributionTargets.includes("html") || plan.distributionTargets.includes("blog") || plan.distributionTargets.includes("substack")
           ? "Check external links, canonical URL expectations, and visible source notes for web publishing."
           : "",
@@ -942,10 +969,14 @@ function buildReviewerAgents(input: {
       mandate: "Keep AI provenance, audit fingerprints, rollback instructions, and human review status visible.",
       findings: [
         "AI source metadata, control-center status, and audit fingerprints are included in the run packet.",
+        documentEvidence.unreviewedAiMarkers
+          ? `${documentEvidence.unreviewedAiMarkers} current-document AI provenance marker(s) still need human review.`
+          : "No unreviewed current-document AI provenance markers were detected.",
         `Apply mode is ${inferApplicationMode(plan, Boolean(controlCenter.sourceGrounding.find((item) => item.label === "Current document" && item.status === "available")), Boolean(controlCenter.sourceGrounding.find((item) => item.label === "Selected text" && item.status === "available")))}.`,
       ],
       requiredActions: [
         "Do not remove AI provenance until a human reviewer has accepted the generated section or packet.",
+        documentEvidence.unreviewedAiMarkers ? "Mark current-document AI source and AI-assisted markers human-reviewed only after inspection." : "",
         "Retain run ID, source fingerprint, and output fingerprint in review notes when applying agent output.",
       ],
     }),
@@ -955,12 +986,18 @@ function buildReviewerAgents(input: {
       mandate: "Validate channel-specific packaging, manifests, previews, and distribution evidence before release.",
       findings: [
         distributionTargetPlans.length ? `Target runbooks staged for ${distributionLabels}.` : "No export or publishing target is selected yet.",
+        documentEvidence.approvalMetadataMissing.length
+          ? `Current document is missing distribution approval metadata: ${documentEvidence.approvalMetadataMissing.join(", ")}.`
+          : "Required approval metadata is present or no distribution target is active.",
         distributionTargetPlans.length
           ? "Each target has preflight checks, handoff steps, and evidence requirements."
           : "Export reviewer cannot complete target checks until a target is chosen.",
       ],
       requiredActions: [
         distributionTargetPlans.length ? "Run export readiness for every target and keep manifest evidence with the review record." : "Choose at least one target before claiming distribution readiness.",
+        documentEvidence.approvalMetadataMissing.length
+          ? `Add missing approval metadata before distribution: ${documentEvidence.approvalMetadataMissing.join(", ")}.`
+          : "",
         ...distributionTargetPlans.map((target) => `${target.label}: ${target.evidenceRequired[0]}`),
       ],
     }),
@@ -992,13 +1029,14 @@ function buildControlCenter(input: {
   hasSelection: boolean;
   revision: AgenticWorkflowRevision | null;
   distributionTargetPlans: AgenticDistributionTargetPlan[];
+  documentEvidence: AgenticDocumentEvidence;
 }): AgenticControlCenter {
-  const { plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans } = input;
+  const { plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence } = input;
   const hardBlockers = blockers.filter((blocker) => !blocker.startsWith("Missing input:"));
   const status: AgenticControlStatus = hardBlockers.length ? "blocked" : blockers.length ? "needs-input" : "ready";
-  const sourceGrounding = buildSourceGrounding(plan, hasDocument, hasSelection);
-  const governance = buildGovernanceItems(plan, revision, blockers);
-  const distribution = buildDistributionItems(plan, distributionTargetPlans);
+  const sourceGrounding = buildSourceGrounding(plan, hasDocument, hasSelection, documentEvidence);
+  const governance = buildGovernanceItems(plan, revision, blockers, documentEvidence);
+  const distribution = buildDistributionItems(plan, distributionTargetPlans, documentEvidence);
   const readinessScore = scoreControlCenter(status, sourceGrounding, governance, distribution, blockers);
   const nextActions = buildNextActions(plan, status, blockers, distributionTargetPlans);
   const summary =
@@ -1124,7 +1162,12 @@ function rollbackPlan(applicationMode: AgenticWorkflowRun["applicationMode"]) {
   ];
 }
 
-function buildSourceGrounding(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSelection: boolean): AgenticControlItem[] {
+function buildSourceGrounding(
+  plan: AgenticWorkflowPlan,
+  hasDocument: boolean,
+  hasSelection: boolean,
+  documentEvidence: AgenticDocumentEvidence,
+): AgenticControlItem[] {
   const evidenceValue = extractKeyValue(plan.placeholderText, "evidence");
   return [
     {
@@ -1150,25 +1193,45 @@ function buildSourceGrounding(plan: AgenticWorkflowPlan, hasDocument: boolean, h
     {
       label: "Evidence",
       detail:
-        evidenceValue && !/^TBD\b/i.test(evidenceValue)
+        documentEvidence.citationTodos.length
+          ? `${documentEvidence.citationTodos.length} citation TODO marker(s) remain in the current document.`
+          : evidenceValue && !/^TBD\b/i.test(evidenceValue)
           ? `Evidence expectation captured: ${evidenceValue}.`
           : "Evidence is not yet specific enough for final claims.",
-      status: evidenceValue && !/^TBD\b/i.test(evidenceValue) ? "available" : "needs-review",
+      status: documentEvidence.citationTodos.length ? "needs-review" : evidenceValue && !/^TBD\b/i.test(evidenceValue) ? "available" : "needs-review",
+    },
+    {
+      label: "Document placeholders",
+      detail: documentEvidence.unresolvedPlaceholders.length
+        ? `Unresolved placeholders detected: ${documentEvidence.unresolvedPlaceholders.slice(0, 5).join(", ")}.`
+        : "No obvious current-document placeholders were detected.",
+      status: documentEvidence.unresolvedPlaceholders.length ? "needs-review" : "available",
     },
   ];
 }
 
-function buildGovernanceItems(plan: AgenticWorkflowPlan, revision: AgenticWorkflowRevision | null, blockers: string[]): AgenticControlItem[] {
+function buildGovernanceItems(
+  plan: AgenticWorkflowPlan,
+  revision: AgenticWorkflowRevision | null,
+  blockers: string[],
+  documentEvidence: AgenticDocumentEvidence,
+): AgenticControlItem[] {
   return [
     {
       label: "AI provenance",
-      detail: "Agent output includes ai-source and ai-assisted review metadata.",
-      status: "available",
+      detail: documentEvidence.unreviewedAiMarkers
+        ? `${documentEvidence.unreviewedAiMarkers} current-document AI marker(s) still need human review; generated packet also includes provenance metadata.`
+        : "Agent output includes ai-source and ai-assisted review metadata.",
+      status: documentEvidence.unreviewedAiMarkers ? "needs-review" : "available",
     },
     {
       label: "Human review",
-      detail: blockers.length ? "Human review remains blocked by missing inputs or workflow constraints." : "Reviewer can inspect QA gates before marking sections human-reviewed.",
-      status: blockers.length ? "needs-review" : "available",
+      detail: documentEvidence.unresolvedComments
+        ? `${documentEvidence.unresolvedComments} unresolved current-document review comment(s) remain.`
+        : blockers.length
+          ? "Human review remains blocked by missing inputs or workflow constraints."
+          : "Reviewer can inspect QA gates before marking sections human-reviewed.",
+      status: blockers.length || documentEvidence.unresolvedComments ? "needs-review" : "available",
     },
     {
       label: "Revision audit",
@@ -1177,13 +1240,21 @@ function buildGovernanceItems(plan: AgenticWorkflowPlan, revision: AgenticWorkfl
     },
     {
       label: "Approval metadata",
-      detail: plan.distributionTargets.length ? "Approval status, reviewer, and approvedAt must be confirmed before distribution." : "Distribution approval metadata is not required until a target is selected.",
-      status: plan.distributionTargets.length ? "needs-review" : "available",
+      detail: documentEvidence.approvalMetadataMissing.length
+        ? `Missing approval metadata: ${documentEvidence.approvalMetadataMissing.join(", ")}.`
+        : plan.distributionTargets.length
+          ? "Approval metadata is present enough for distribution readiness review."
+          : "Distribution approval metadata is not required until a target is selected.",
+      status: documentEvidence.approvalMetadataMissing.length ? "needs-review" : "available",
     },
   ];
 }
 
-function buildDistributionItems(plan: AgenticWorkflowPlan, targetPlans: AgenticDistributionTargetPlan[]): AgenticControlItem[] {
+function buildDistributionItems(
+  plan: AgenticWorkflowPlan,
+  targetPlans: AgenticDistributionTargetPlan[],
+  documentEvidence: AgenticDocumentEvidence,
+): AgenticControlItem[] {
   if (!plan.distributionTargets.length) {
     return [
       {
@@ -1195,7 +1266,9 @@ function buildDistributionItems(plan: AgenticWorkflowPlan, targetPlans: AgenticD
   }
   return targetPlans.map((targetPlan) => ({
     label: targetPlan.label,
-    detail: `${targetPlan.preflightChecks.length} preflight checks, ${targetPlan.handoffSteps.length} handoff step, and ${targetPlan.evidenceRequired.length} evidence requirements are staged.`,
+    detail: documentEvidence.brokenLinkHints.length
+      ? `${targetPlan.preflightChecks.length} preflight checks staged; repair ${documentEvidence.brokenLinkHints.length} placeholder or suspicious link(s) before handoff.`
+      : `${targetPlan.preflightChecks.length} preflight checks, ${targetPlan.handoffSteps.length} handoff step, and ${targetPlan.evidenceRequired.length} evidence requirements are staged.`,
     status: "needs-review" as const,
   }));
 }
@@ -1339,6 +1412,40 @@ function buildRunBlockers(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSe
     blockers.push("Distribution requested but no export or publishing target was identified.");
   }
   return Array.from(new Set(blockers));
+}
+
+function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkflowPlan): AgenticDocumentEvidence {
+  const unresolvedPlaceholders = Array.from(
+    new Set(
+      [
+        ...documentText.matchAll(/\b(?:TBD|TODO|FIXME|PLACEHOLDER|INSERT\s+[A-Z ]+|\[[A-Z][A-Z0-9 _-]{2,}\])\b/g),
+        ...documentText.matchAll(/\{\{\s*[^}]+\s*\}\}/g),
+      ]
+        .map((match) => match[0].replace(/\s+/g, " ").trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 12);
+  const citationTodos = Array.from(
+    new Set([...documentText.matchAll(/(?:citation TODO|source needed|needs citation|TODO:\s*add citation|cite needed)/gi)].map((match) => match[0])),
+  ).slice(0, 12);
+  const unreviewedAiSources = [...documentText.matchAll(/```ai-source[\s\S]*?```/g)].filter((block) => !/\bstatus:\s*human-reviewed\b/i.test(block[0])).length;
+  const unreviewedAiAssisted = [...documentText.matchAll(/<!--\s*ai-assisted:[\s\S]*?-->/g)].filter((marker) => !/\bstatus\s*=\s*human-reviewed\b/i.test(marker[0])).length;
+  const unresolvedComments = [...documentText.matchAll(/<!--\s*comment:\s*unresolved\b/gi)].length;
+  const approvalMetadataMissing = plan.distributionTargets.length
+    ? ["status", "reviewer", "approvedAt"].filter((key) => !new RegExp(`^${key}:\\s*\\S`, "im").test(documentText))
+    : [];
+  const brokenLinkHints = Array.from(
+    new Set([...documentText.matchAll(/\]\((?:TODO|TBD|#|https?:\/\/example\.com)[^)]*\)/gi)].map((match) => match[0])),
+  ).slice(0, 12);
+
+  return {
+    unresolvedPlaceholders,
+    citationTodos,
+    unreviewedAiMarkers: unreviewedAiSources + unreviewedAiAssisted,
+    unresolvedComments,
+    approvalMetadataMissing,
+    brokenLinkHints,
+  };
 }
 
 function inferApplicationMode(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSelection: boolean): AgenticWorkflowRun["applicationMode"] {

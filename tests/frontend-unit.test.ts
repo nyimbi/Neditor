@@ -669,6 +669,50 @@ test("agentic workflow run proposes selection-aware revisions with review metada
   ok(run.markdown.includes("### Proposed Text"));
 });
 
+test("agentic workflow reviewers inspect current document evidence", () => {
+  const run = buildAgenticWorkflowRun({
+    instruction:
+      "Review this board memo for evidence, governance, links, and PDF distribution. audience: board owner: Finance deadline: June 1 evidence: audited forecast status: ready",
+    documentTitle: "Board Memo",
+    documentText: [
+      "---",
+      "title: Board Memo",
+      "status: draft",
+      "---",
+      "",
+      "# Board Memo",
+      "",
+      "ARR grows by 18%. citation TODO",
+      "",
+      "{{client_name}} must approve [OWNER].",
+      "",
+      "[placeholder link](https://example.com/review)",
+      "",
+      "```ai-source",
+      "provider: OpenAI",
+      "model: ChatGPT",
+      "status: needs-review",
+      "```",
+      "",
+      "<!-- ai-assisted: status=needs-review | source=NEditor Docs Live | promptSummary=Draft -->",
+      "<!-- comment: unresolved | author: Reviewer | at: 2026-05-24 | Confirm finance source. -->",
+    ].join("\n"),
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Document placeholders" && item.status === "needs-review"));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.detail.includes("citation TODO")));
+  ok(run.controlCenter.governance.some((item) => item.label === "AI provenance" && item.status === "needs-review"));
+  ok(run.controlCenter.governance.some((item) => item.label === "Human review" && item.detail.includes("unresolved current-document review comment")));
+  ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata" && item.detail.includes("approvedAt")));
+  ok(run.controlCenter.distribution.some((item) => item.detail.includes("placeholder or suspicious link")));
+  ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.findings.some((item) => item.includes("{{client_name}}"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.findings.some((item) => item.includes("citation TODO"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("review comments"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "governance" && agent.requiredActions.some((item) => item.includes("human-reviewed"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("approvedAt"))));
+});
+
 test("AI provider packages redact secrets and preserve agent governance context", () => {
   const run = buildAgenticWorkflowRun({
     instruction:
