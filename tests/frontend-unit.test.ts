@@ -1991,6 +1991,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Collapse all toolbars"));
   ok(app.includes("Expand all toolbars"));
   ok(app.includes("toggleToolbarRow"));
+  ok(app.includes("interface CommandPaletteCommand"));
+  ok(app.includes("commandSearchText(command).includes(query)"));
+  ok(app.includes("Place another cursor on the line above for parallel edits."));
+  ok(app.includes('keywords: ["multi cursor", "multiple cursors", "cursor above", "parallel edit"]'));
+  ok(app.includes("Select another matching word or phrase for simultaneous editing."));
+  ok(app.includes('<small v-if="command.description">{{ command.description }}</small>'));
   ok(app.includes("Help Center"));
   ok(app.includes('aria-label="Help center"'));
   ok(app.includes("filteredHelpTopics"));

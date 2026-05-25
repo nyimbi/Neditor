@@ -2716,8 +2716,11 @@ test("edits with explicit multi-cursor commands", async ({ page }) => {
   await editorContent.click();
   await moveEditorCursorToEnd(page);
   await page.getByRole("button", { name: "Commands" }).click();
-  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Add cursor above");
-  await page.getByRole("button", { name: /Add cursor above Edit/ }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("multi cursor");
+  await expect(page.getByRole("button", { name: /Add cursor above.*line above.*Edit/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Add cursor below.*line below.*Edit/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Select next occurrence.*simultaneous editing.*Edit/ })).toBeVisible();
+  await page.getByRole("button", { name: /Add cursor above.*Edit/ }).click();
   await page.keyboard.type("!");
 
   await expect.poll(() => editorText(page)).toContain("Row A!");

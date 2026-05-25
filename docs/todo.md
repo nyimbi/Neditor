@@ -1516,6 +1516,10 @@ Covered:
 - Explicit multi-cursor command palette actions for add-cursor-above,
   add-cursor-below, and select-next-occurrence, with a browser harness workflow
   that edits matching lines through multiple cursors.
+- Command-palette descriptions and "multi cursor"/"multiple cursors" search
+  aliases for add-cursor-above, add-cursor-below, and select-next-occurrence,
+  with the browser harness now discovering the commands through the user-intent
+  query before editing two lines.
 - Launched Tauri webview evidence for word statistics, spellcheck attributes,
   line numbers, word wrap, folding gutter rendering, search/replace mutation,
   Markdown list continuation, bracket-pair insertion, and multi-cursor editing.

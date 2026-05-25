@@ -3527,7 +3527,10 @@
           type="button"
           @click="runCommand(command.run)"
         >
-          <strong>{{ command.name }}</strong>
+          <span class="command-row-main">
+            <strong>{{ command.name }}</strong>
+            <small v-if="command.description">{{ command.description }}</small>
+          </span>
           <span>{{ command.group }}</span>
         </button>
         <section v-if="commandAgentInstructionAvailable" class="command-agent-route" aria-label="AI command route">
@@ -4273,6 +4276,14 @@ interface CommandAgentRouteSuggestion {
   id: CommandAgentRouteId;
   label: string;
   detail: string;
+}
+
+interface CommandPaletteCommand {
+  name: string;
+  group: string;
+  description?: string;
+  keywords?: string[];
+  run: () => unknown;
 }
 
 interface OutlineModeHeading {
@@ -7125,7 +7136,7 @@ function startAiDocumentCreation() {
   refreshDocsLiveQuestionnaire();
   store.statusMessage = "AI-first document creation ready in Docs Live";
 }
-const commands = computed(() => [
+const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
   { name: "Open folder", group: "Workspace", run: () => void openFolder() },
@@ -7167,9 +7178,27 @@ const commands = computed(() => [
   { name: "Find previous", group: "Edit", run: () => runEditorCommand(findPrevious) },
   { name: "Replace next", group: "Edit", run: () => runEditorCommand(replaceNext) },
   { name: "Replace all", group: "Edit", run: () => runEditorCommand(replaceAll) },
-  { name: "Select next occurrence", group: "Edit", run: () => runEditorCommand(selectNextOccurrence) },
-  { name: "Add cursor above", group: "Edit", run: () => runEditorCommand(addCursorAbove) },
-  { name: "Add cursor below", group: "Edit", run: () => runEditorCommand(addCursorBelow) },
+  {
+    name: "Select next occurrence",
+    group: "Edit",
+    description: "Select another matching word or phrase for simultaneous editing.",
+    keywords: ["multi cursor", "multiple cursors", "select match", "same text", "occurrence"],
+    run: () => runEditorCommand(selectNextOccurrence),
+  },
+  {
+    name: "Add cursor above",
+    group: "Edit",
+    description: "Place another cursor on the line above for parallel edits.",
+    keywords: ["multi cursor", "multiple cursors", "cursor above", "parallel edit"],
+    run: () => runEditorCommand(addCursorAbove),
+  },
+  {
+    name: "Add cursor below",
+    group: "Edit",
+    description: "Place another cursor on the line below for parallel edits.",
+    keywords: ["multi cursor", "multiple cursors", "cursor below", "parallel edit"],
+    run: () => runEditorCommand(addCursorBelow),
+  },
   { name: "Show document outline", group: "Navigate", run: () => showOutline() },
   { name: "Open outline mode", group: "Navigate", run: () => (store.mode = "outline") },
   { name: "Plan document from outline", group: "Navigate", run: () => planDocumentOutline() },
@@ -7284,10 +7313,13 @@ const commands = computed(() => [
     },
   }))),
 ]);
+function commandSearchText(command: CommandPaletteCommand): string {
+  return [command.name, command.group, command.description || "", ...(command.keywords || [])].join(" ").toLowerCase();
+}
 const filteredCommands = computed(() => {
   const query = commandQuery.value.trim().toLowerCase();
   if (!query) return commands.value;
-  return commands.value.filter((command) => `${command.name} ${command.group}`.toLowerCase().includes(query));
+  return commands.value.filter((command) => commandSearchText(command).includes(query));
 });
 const commandAgentInstructionAvailable = computed(() => {
   const query = commandQuery.value.trim();
@@ -17516,7 +17548,19 @@ select:hover {
   text-align: left;
 }
 
-.command-row span {
+.command-row-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.command-row-main small {
+  color: #526171;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.command-row > span:last-child {
   color: #526171;
   font-size: 12px;
 }
