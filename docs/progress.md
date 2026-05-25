@@ -31,6 +31,10 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Smart Markdown list continuation now covers more business-writing edge cases:
+  tab-indented lists, zero-padded ordered lists, uppercase checked task lists,
+  and nested blockquoted numbered lists, with width-preserving ordered-list
+  continuation in `src/lib/markdownEditing.ts`.
 - Windows external-transform setup is now guarded by
   `pnpm run check:external-transform-docs`: the Windows docs cover Graphviz,
   D2, Java/PlantUML, Rust/Pikchr CLI, explicit `.exe` paths, shim guidance, and

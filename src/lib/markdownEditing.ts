@@ -22,7 +22,8 @@ export function markdownListContinuation(beforeCursor: string): MarkdownListCont
 
   const [, indent, number, suffix, rawContent] = numbered || [];
   const content = (rawContent || "").trim();
-  const markerText = `${indent}${Number(number || "0") + 1}${suffix || "."} `;
+  const nextNumber = String(Number(number || "0") + 1).padStart((number || "").length, "0");
+  const markerText = `${indent}${nextNumber}${suffix || "."} `;
   if (!content) {
     return { kind: "exit", fromColumn: quotePrefix.length, replacement: indent };
   }

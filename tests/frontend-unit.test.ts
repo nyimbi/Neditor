@@ -306,9 +306,13 @@ test("latest document task guard rejects stale and cancelled compile results", (
 test("markdown list continuation handles tasks numbers and blockquotes", () => {
   deepEqual(markdownListContinuation("- First item"), { kind: "continue", insert: "\n- " });
   deepEqual(markdownListContinuation("  3) Third item"), { kind: "continue", insert: "\n  4) " });
+  deepEqual(markdownListContinuation("\t- Tab-indented item"), { kind: "continue", insert: "\n\t- " });
+  deepEqual(markdownListContinuation("009. Padded sequence"), { kind: "continue", insert: "\n010. " });
   deepEqual(markdownListContinuation("- [x] Completed task"), { kind: "continue", insert: "\n- [ ] " });
+  deepEqual(markdownListContinuation("* [X] Completed alt task"), { kind: "continue", insert: "\n* [ ] " });
   deepEqual(markdownListContinuation("> - Quoted item"), { kind: "continue", insert: "\n> - " });
   deepEqual(markdownListContinuation("> 2. Quoted numbered item"), { kind: "continue", insert: "\n> 3. " });
+  deepEqual(markdownListContinuation("> > 09) Deep quoted numbered item"), { kind: "continue", insert: "\n> > 10) " });
   deepEqual(markdownListContinuation("  - "), { kind: "exit", fromColumn: 0, replacement: "  " });
   deepEqual(markdownListContinuation("> - [ ] "), { kind: "exit", fromColumn: 2, replacement: "" });
   equal(markdownListContinuation("plain paragraph"), null);
