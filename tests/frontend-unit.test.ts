@@ -796,6 +796,8 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Claim Inventory"));
   ok(run.markdown.includes("## Humanization Findings"));
   ok(run.markdown.includes("## Review Agents"));
+  ok(run.markdown.includes("## Pre-Review Rehearsal"));
+  ok(run.markdown.includes("missing-evidence"));
   ok(run.markdown.includes("### Editorial Reviewer"));
   ok(run.markdown.includes("### Export Reviewer"));
   ok(run.markdown.includes("## Agent Lifecycle Task Board"));
@@ -811,6 +813,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Document intent sheet" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Outline variant comparison" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Section contract cards" && item.requiredBeforeRelease));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Pre-review rehearsal" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Substack newsletter package evidence" && item.requiredBeforeRelease));
   ok(
@@ -846,6 +849,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.controlCenter.distribution.some((item) => item.label === "Substack newsletter package"));
   ok(run.lifecycleTasks.length >= run.sectionWorkQueue.length + run.reviewerAgents.length);
   ok(run.lifecycleTasks.some((task) => task.title.includes("Resolve intent") && task.owner === "Planner Agent"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-pre-review-rehearsal" && task.evidence.some((item) => item.includes("Missing Evidence"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-outline-variants" && task.evidence.some((item) => item.includes("Executive-first"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-intake-context" && task.evidence.some((item) => item.includes("Document intent"))));
   ok(run.lifecycleTasks.some((task) => task.owner === "Docs Live Section Agent" && task.action === "generate-docs-live-draft" && task.sectionId));
@@ -856,6 +860,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("Google Docs collaboration package"))));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Reviewer agents prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Lifecycle task board prepared")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Pre-review rehearsal prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline variant comparison prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline critique prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Humanization scan")));
@@ -877,6 +882,10 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.plan.outlineVariants.some((variant) => variant.strategy === "evidence-led" && variant.tradeoffs.length >= 2));
   ok(run.plan.outlineVariants.every((variant) => variant.bestFor.length >= 3));
   ok(run.plan.outlineVariants.every((variant) => variant.risks.length >= 2));
+  ok(run.preReviewRehearsal.length >= 6);
+  ok(run.preReviewRehearsal.some((item) => item.kind === "question" && item.reviewer === "editor"));
+  ok(run.preReviewRehearsal.some((item) => item.kind === "missing-evidence" && item.releaseBlocker));
+  ok(run.preReviewRehearsal.every((item) => item.suggestedResponse.length > 20));
   ok(run.markdown.includes("Drafting depth:"));
   const sectionBrief = buildAgenticSectionWorkBrief(run.sectionWorkQueue[0], run.reviewerAgents);
   ok(sectionBrief.includes("```ai-section-task"));
@@ -1313,6 +1322,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         packetPreview: "Generated body preview",
         sectionCount: 8,
         reviewerCount: 6,
+        preReviewPromptCount: 7,
         taskCount: 14,
         lifecycleTaskStates: [
           {
@@ -1589,6 +1599,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     packetPreview: "Generated body preview",
     sectionCount: 8,
     reviewerCount: 6,
+    preReviewPromptCount: 7,
     taskCount: 14,
     lifecycleTaskStates: [
       {
@@ -2040,6 +2051,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent reviewer agents"'));
   ok(app.includes("agentRun.reviewerAgents"));
   ok(app.includes("reviewer.requiredActions"));
+  ok(app.includes('aria-label="Agent pre-review rehearsal"'));
+  ok(app.includes("agentRun.preReviewRehearsal"));
+  ok(app.includes("Pre-review Rehearsal"));
   ok(app.includes('aria-label="Agent section work queue"'));
   ok(app.includes("agentRun.sectionWorkQueue"));
   ok(app.includes("agentSectionDraftingDepthOptions"));

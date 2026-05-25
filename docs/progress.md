@@ -56,6 +56,11 @@ Recent pushed checkpoints visible in current git history:
   risks, full outline text, release evidence, lifecycle tasks, AI Control Center
   grounding, generated packet content, and UI actions to load a variant into
   Docs Live or the outline planner.
+- Agent runs now include a pre-review rehearsal before formal review. The run
+  simulates likely reviewer questions, objections, redlines, and missing
+  evidence requests; marks release blockers; feeds lifecycle tasks, release
+  evidence, audit fingerprints, generated packets, and the Agent Workspace UI;
+  and persists a prompt count into local run history.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,

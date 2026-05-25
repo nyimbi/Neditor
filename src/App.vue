@@ -2857,6 +2857,25 @@
                 </article>
               </section>
             </section>
+            <section class="agent-pre-review-rehearsal" aria-label="Agent pre-review rehearsal">
+              <header>
+                <div>
+                  <strong>Pre-review Rehearsal</strong>
+                  <span>Likely reviewer questions, objections, redlines, and missing-evidence requests to resolve before formal review.</span>
+                </div>
+                <small>{{ agentRun.preReviewRehearsal.length }} prompts</small>
+              </header>
+              <ol>
+                <li v-for="item in agentRun.preReviewRehearsal" :key="item.id" :data-kind="item.kind" :data-blocker="item.releaseBlocker">
+                  <div>
+                    <small>{{ item.kind }} | {{ item.reviewer }} reviewer <span v-if="item.releaseBlocker">| release blocker</span></small>
+                    <strong>{{ item.prompt }}</strong>
+                    <p>{{ item.whyItMatters }}</p>
+                  </div>
+                  <p>{{ item.suggestedResponse }}</p>
+                </li>
+              </ol>
+            </section>
             <section class="agent-section-workqueue" aria-label="Agent section work queue">
               <header>
                 <div>
@@ -5729,6 +5748,7 @@ function agentRunHistoryItem(
     packetPreview: packetMarkdownOverride ? agentPacketPreview(packetMarkdownOverride) : run.summary.slice(0, 260),
     sectionCount: run.sectionWorkQueue.length,
     reviewerCount: run.reviewerAgents.length,
+    preReviewPromptCount: run.preReviewRehearsal.length,
     taskCount: run.lifecycleTasks.length,
     lifecycleTaskStates: agentLifecycleTaskStateList(),
     editAcceptanceStates: agentEditAcceptanceStateList(),
@@ -12035,6 +12055,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-review-comment-queue li,
 .app-shell[data-theme="dark"] .agent-reviewer-agents,
 .app-shell[data-theme="dark"] .agent-reviewer-grid article,
+.app-shell[data-theme="dark"] .agent-pre-review-rehearsal,
+.app-shell[data-theme="dark"] .agent-pre-review-rehearsal li,
 .app-shell[data-theme="dark"] .agent-section-workqueue,
 .app-shell[data-theme="dark"] .agent-section-workqueue li,
 .app-shell[data-theme="dark"] .agent-audit-trail,
@@ -12092,6 +12114,9 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-reviewer-agents > header small,
 .app-shell[data-theme="dark"] .agent-reviewer-grid article header span,
 .app-shell[data-theme="dark"] .agent-reviewer-grid ul,
+.app-shell[data-theme="dark"] .agent-pre-review-rehearsal > header span,
+.app-shell[data-theme="dark"] .agent-pre-review-rehearsal > header small,
+.app-shell[data-theme="dark"] .agent-pre-review-rehearsal small,
 .app-shell[data-theme="dark"] .agent-section-workqueue > header span,
 .app-shell[data-theme="dark"] .agent-section-workqueue > header small,
 .app-shell[data-theme="dark"] .agent-section-workqueue small,
@@ -14401,6 +14426,54 @@ select:hover {
   padding-left: 18px;
   color: #2d3746;
   font-size: 12px;
+}
+
+.agent-pre-review-rehearsal {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #7b6b9d;
+  background: #f8f6fc;
+}
+
+.agent-pre-review-rehearsal > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-pre-review-rehearsal > header div,
+.agent-pre-review-rehearsal li > div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-pre-review-rehearsal > header span,
+.agent-pre-review-rehearsal > header small,
+.agent-pre-review-rehearsal small {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-pre-review-rehearsal ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-pre-review-rehearsal li {
+  display: grid;
+  gap: 8px;
+  border-left: 3px solid #8f82bd;
+}
+
+.agent-pre-review-rehearsal li[data-blocker="true"] {
+  border-left-color: #b34040;
+}
+
+.agent-pre-review-rehearsal p {
+  margin: 0;
 }
 
 .agent-section-workqueue {

@@ -265,6 +265,7 @@ export interface AgenticWorkflowRun {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   outlineCritique: AgenticOutlineCritiqueItem[];
+  preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   releaseEvidenceBundle: AgenticReleaseEvidenceBundle;
   reviewChecklist: string[];
   distributionChecklist: string[];
@@ -304,6 +305,19 @@ export interface AgenticOutlineVariant {
   bestFor: string[];
   tradeoffs: string[];
   risks: string[];
+}
+
+export type AgenticPreReviewRehearsalKind = "question" | "objection" | "redline" | "missing-evidence";
+
+export interface AgenticPreReviewRehearsalItem {
+  id: string;
+  kind: AgenticPreReviewRehearsalKind;
+  reviewer: AgenticReviewerAgentId;
+  prompt: string;
+  whyItMatters: string;
+  suggestedResponse: string;
+  relatedSectionId?: string;
+  releaseBlocker: boolean;
 }
 
 export interface AgenticDistributionTargetPlan {
@@ -640,12 +654,22 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     outlineCritique,
   });
   const sectionWorkQueue = buildSectionWorkQueue(plan, reviewerAgents);
+  const preReviewRehearsal = buildPreReviewRehearsal({
+    plan,
+    reviewerAgents,
+    sectionWorkQueue,
+    documentEvidence,
+    revision,
+    distributionTargetPlans,
+    blockers,
+  });
   const lifecycleTasks = buildLifecycleTasks({
     plan,
     revision,
     editAcceptanceQueue,
     reviewerAgents,
     sectionWorkQueue,
+    preReviewRehearsal,
     distributionTargetPlans,
     blockers,
     documentEvidence,
@@ -660,6 +684,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    preReviewRehearsal,
     documentEvidence,
     outlineCritique,
     reviewChecklist,
@@ -676,6 +701,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    preReviewRehearsal,
     distributionTargetPlans,
     documentEvidence,
     blockers,
@@ -693,6 +719,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     outlineCritique,
+    preReviewRehearsal,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -715,6 +742,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     outlineCritique,
+    preReviewRehearsal,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -1861,6 +1889,7 @@ function buildReviewChecklist(
     "Confirm the document has a clear audience, decision, owner, deadline, and review status.",
     "Replace unresolved placeholders with verified names, dates, numbers, and source references.",
     "Check each factual claim against the evidence or add a citation TODO before export.",
+    "Run the pre-review rehearsal and answer likely reviewer questions, objections, redlines, and missing-evidence requests.",
     "Mark every AI source block and AI-assisted section human-reviewed only after a person verifies it.",
     revision ? "Compare the revision proposal against the original text before applying final edits." : "",
     revision?.revisionPasses.length ? `Complete revision passes before acceptance: ${revision.revisionPasses.map((pass) => pass.label).join(", ")}.` : "",
@@ -2047,12 +2076,13 @@ function buildLifecycleTasks(input: {
   editAcceptanceQueue: AgenticEditAcceptanceItem[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticLifecycleTask[] {
-  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
+  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const tasks: AgenticLifecycleTask[] = [];
   const hasBlockers = blockers.length > 0;
   const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
@@ -2112,6 +2142,19 @@ function buildLifecycleTasks(input: {
       action: "open-outline",
       evidence: outlineCritique.slice(0, 8).map((item) => `${titleCase(item.area)}: ${item.detail}`),
       nextStep: "Address missing, duplicate, weak, or poorly sequenced outline items before section drafting starts.",
+    });
+  }
+
+  if (preReviewRehearsal.length) {
+    tasks.push({
+      id: "task-pre-review-rehearsal",
+      lane: "review",
+      title: "Rehearse likely reviewer objections",
+      owner: "Review Lead",
+      status: preReviewRehearsal.some((item) => item.releaseBlocker) ? "needs-input" : "ready",
+      action: "open-review",
+      evidence: preReviewRehearsal.slice(0, 10).map((item) => `${titleCase(item.kind)} from ${titleCase(item.reviewer)} reviewer: ${item.prompt}`),
+      nextStep: "Answer likely reviewer questions, objections, redlines, and missing-evidence requests before formal review.",
     });
   }
 
@@ -2961,6 +3004,139 @@ function reviewerAgent(input: Omit<AgenticReviewerAgent, "status">): AgenticRevi
   };
 }
 
+function buildPreReviewRehearsal(input: {
+  plan: AgenticWorkflowPlan;
+  reviewerAgents: AgenticReviewerAgent[];
+  sectionWorkQueue: AgenticSectionWorkItem[];
+  documentEvidence: AgenticDocumentEvidence;
+  revision: AgenticWorkflowRevision | null;
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
+  blockers: string[];
+}): AgenticPreReviewRehearsalItem[] {
+  const { plan, reviewerAgents, sectionWorkQueue, documentEvidence, revision, distributionTargetPlans, blockers } = input;
+  const items: AgenticPreReviewRehearsalItem[] = [];
+  const reviewerActive = (id: AgenticReviewerAgentId) => reviewerAgents.some((agent) => agent.id === id);
+  const add = (
+    kind: AgenticPreReviewRehearsalKind,
+    reviewer: AgenticReviewerAgentId,
+    prompt: string,
+    whyItMatters: string,
+    suggestedResponse: string,
+    releaseBlocker: boolean,
+    relatedSectionId?: string,
+  ) => {
+    if (!reviewerActive(reviewer)) return;
+    items.push({
+      id: `pre-review-${kind}-${reviewer}-${stableFingerprint([kind, reviewer, prompt, relatedSectionId || ""].join("\n")).slice(0, 10)}`,
+      kind,
+      reviewer,
+      prompt,
+      whyItMatters,
+      suggestedResponse,
+      relatedSectionId,
+      releaseBlocker,
+    });
+  };
+
+  const decisionSection = sectionWorkQueue.find((section) => /\b(decision|approval|ask|recommendation|next steps?)\b/i.test(section.heading));
+  const evidenceSection = sectionWorkQueue.find((section) => /\b(evidence|findings|analysis|financial|data|metrics?|source|proof)\b/i.test(section.heading));
+  const riskSection = sectionWorkQueue.find((section) => /\b(risks?|assumptions?|constraints?|mitigation|legal|compliance)\b/i.test(section.heading));
+  const audience = extractKeyValue(plan.placeholderText, "audience") || extractIntentField(plan.documentIntent, "audience") || "the intended reader";
+  const evidence = extractKeyValue(plan.placeholderText, "evidence") || extractIntentField(plan.documentIntent, "evidence") || "named source evidence";
+
+  add(
+    "question",
+    "editor",
+    `Will ${audience} understand the requested decision after the first page or opening section?`,
+    "Reviewers often reject otherwise useful drafts when the ask is buried behind process or background.",
+    "Move the ask, owner, and decision language into the opening structure or add an executive summary bullet.",
+    false,
+    decisionSection?.id,
+  );
+  add(
+    "objection",
+    "risk",
+    "What assumption would make this recommendation unsafe, late, or too expensive?",
+    "Risk reviewers need to see the failure mode before approving action or distribution.",
+    riskSection ? "Strengthen the risk section with mitigation, owner, and decision impact." : "Add a risk or assumptions section before formal review.",
+    true,
+    riskSection?.id,
+  );
+  add(
+    "missing-evidence",
+    "evidence",
+    `Which material claim still depends on ${evidence} and lacks a named source, date, or confidence level?`,
+    "Claims without source labels become release blockers in client, board, research, and publishing workflows.",
+    evidenceSection ? "Attach source labels in the evidence section and add citation TODOs beside unsupported claims." : "Create an evidence section or source ledger before drafting final claims.",
+    !plan.sourcePack.claims.length && documentEvidence.claimInventory.length > 0,
+    evidenceSection?.id,
+  );
+  add(
+    "redline",
+    "governance",
+    "Which sentence would legal, compliance, or an approver redline because it sounds like an unsupported promise?",
+    "Overconfident or obligation-shaped language should be caught before external handoff.",
+    "Rewrite commitments with caveats, conditions, owner, and approval status, then keep the redline note in the review record.",
+    documentEvidence.claimInventory.some((claim) => claim.kind === "commitment") || blockers.length > 0,
+    riskSection?.id,
+  );
+
+  if (revision) {
+    add(
+      "question",
+      "editor",
+      "What did the revision compress or remove that a reviewer may consider material?",
+      "Revision passes can accidentally remove caveats, obligations, dates, numbers, or context.",
+      "Compare original and proposed text, then record accepted meaning changes or restore the caveat.",
+      Boolean(revision.meaningDriftFindings.length),
+    );
+  }
+
+  if (documentEvidence.reviewCommentResolutions.length) {
+    add(
+      "objection",
+      "risk",
+      `Which unresolved comment is most likely to block approval: ${documentEvidence.reviewCommentResolutions[0]?.excerpt || "unresolved review comment"}?`,
+      "Open comments are reviewer objections already present in the document.",
+      "Resolve the comment, record a resolution note, or explicitly carry it forward as a release blocker.",
+      true,
+    );
+  }
+
+  if (documentEvidence.humanizationFindings.length) {
+    add(
+      "redline",
+      "editor",
+      `Which phrase should be rewritten because it sounds generic or AI-authored: "${documentEvidence.humanizationFindings[0]?.text || "generic phrasing"}"?`,
+      "Human reviewers often flag generic AI phrasing even when facts are correct.",
+      "Rewrite the phrase in the user's voice, tie it to a concrete source or implication, and rerun review.",
+      false,
+    );
+  }
+
+  if (distributionTargetPlans.length) {
+    add(
+      "missing-evidence",
+      "export",
+      `What proof will show the ${distributionTargetPlans.map((target) => target.label).join(", ")} artifact was actually inspected?`,
+      "Distribution is not complete until target-specific preview, import, or package evidence exists.",
+      `Attach manifest, preview, readback, or reviewer evidence for ${distributionTargetPlans.map((target) => target.label).join(", ")} before release.`,
+      true,
+    );
+  }
+
+  add(
+    "question",
+    "citation",
+    "Which citation, reference, link, table, equation, or label could fail when exported?",
+    "Cross-target exports can expose weak source labels that are invisible in the drafting pane.",
+    "Run citation/link/reference checks, repair labels, and keep export readiness evidence with the run.",
+    Boolean(documentEvidence.citationTodos.length || documentEvidence.referenceHints.length || documentEvidence.brokenLinkHints.length),
+  );
+
+  return items.slice(0, 12);
+}
+
 function buildControlCenter(input: {
   plan: AgenticWorkflowPlan;
   blockers: string[];
@@ -3006,6 +3182,7 @@ function buildAuditTrail(input: {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
   reviewChecklist: string[];
@@ -3024,6 +3201,7 @@ function buildAuditTrail(input: {
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    preReviewRehearsal,
     documentEvidence,
     outlineCritique,
     reviewChecklist,
@@ -3064,6 +3242,16 @@ function buildAuditTrail(input: {
       ...task.evidence,
     ]),
     ...reviewerAgents.flatMap((agent) => [agent.id, agent.label, agent.mandate, agent.status, ...agent.findings, ...agent.requiredActions]),
+    ...preReviewRehearsal.flatMap((item) => [
+      item.id,
+      item.kind,
+      item.reviewer,
+      item.prompt,
+      item.whyItMatters,
+      item.suggestedResponse,
+      item.relatedSectionId || "",
+      String(item.releaseBlocker),
+    ]),
     ...(revision?.revisionPasses.flatMap((pass) => [pass.mode, pass.label, pass.rationale, ...pass.checklist]) || []),
     ...editAcceptanceQueue.flatMap((item) => [
       item.id,
@@ -3137,6 +3325,7 @@ function buildAuditTrail(input: {
       blockers.length ? `Human review required before release because ${blockers.length} blocker item(s) remain.` : "No blocker items detected at packet generation time.",
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
       `Lifecycle task board prepared for ${lifecycleTasks.length} task(s) across ${Array.from(new Set(lifecycleTasks.map((task) => task.lane))).map(titleCase).join(", ")}.`,
+      `Pre-review rehearsal prepared ${preReviewRehearsal.length} likely reviewer question, objection, redline, or missing-evidence prompt(s).`,
       `Outline variant comparison prepared ${plan.outlineVariants.length} alternative structure(s) for user selection before drafting.`,
       `Section work queue prepared for ${sectionWorkQueue.length} outline item(s).`,
       `Section contract cards prepared for ${sectionWorkQueue.length} outline item(s) with purpose, reader, evidence, owner, risk, and done criteria.`,
@@ -3176,11 +3365,12 @@ function buildReleaseEvidenceBundle(input: {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   documentEvidence: AgenticDocumentEvidence;
   blockers: string[];
 }): AgenticReleaseEvidenceBundle {
-  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, distributionTargetPlans, documentEvidence, blockers } = input;
+  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
   const taskBlockers = lifecycleTasks.filter((task) => task.status === "blocked" || task.status === "needs-input");
   const reviewerBlockers = reviewerAgents.filter((agent) => agent.status !== "ready");
   const items: AgenticReleaseEvidenceItem[] = [
@@ -3259,6 +3449,13 @@ function buildReleaseEvidenceBundle(input: {
       reviewerBlockers.length
         ? `${reviewerBlockers.length} reviewer agent(s) still require action: ${reviewerBlockers.map((agent) => agent.label).join(", ")}.`
         : "All reviewer agents are ready.",
+      true,
+    ),
+    releaseEvidenceItem(
+      "Pre-review rehearsal",
+      "Review Lead",
+      preReviewRehearsal.some((item) => item.releaseBlocker) ? "needs-review" : "available",
+      `${preReviewRehearsal.length} likely reviewer prompt(s) staged; ${preReviewRehearsal.filter((item) => item.releaseBlocker).length} should be resolved before formal review or release.`,
       true,
     ),
     releaseEvidenceItem(
@@ -4088,6 +4285,7 @@ function buildRunMarkdown(input: {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   outlineCritique: AgenticOutlineCritiqueItem[];
+  preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -4107,6 +4305,7 @@ function buildRunMarkdown(input: {
     reviewerAgents,
     sectionWorkQueue,
     outlineCritique,
+    preReviewRehearsal,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -4216,6 +4415,7 @@ function buildRunMarkdown(input: {
   lines.push(...editAcceptanceQueueMarkdown(editAcceptanceQueue));
   lines.push(...lifecycleTasksMarkdown(lifecycleTasks));
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
+  lines.push(...preReviewRehearsalMarkdown(preReviewRehearsal));
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
   lines.push(...auditTrailMarkdown(auditTrail));
   lines.push(...releaseEvidenceBundleMarkdown(releaseEvidenceBundle));
@@ -4490,6 +4690,23 @@ function reviewerAgentsMarkdown(reviewerAgents: AgenticReviewerAgent[]) {
     );
   }
   return lines;
+}
+
+function preReviewRehearsalMarkdown(items: AgenticPreReviewRehearsalItem[]) {
+  if (!items.length) {
+    return ["## Pre-Review Rehearsal", "", "No pre-review rehearsal prompts were generated.", ""];
+  }
+  return [
+    "## Pre-Review Rehearsal",
+    "",
+    "| Type | Reviewer | Blocker | Prompt | Why it matters | Suggested response |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...items.map(
+      (item) =>
+        `| ${item.kind} | ${item.reviewer} | ${item.releaseBlocker ? "yes" : "no"} | ${escapeTableCell(item.prompt)} | ${escapeTableCell(item.whyItMatters)} | ${escapeTableCell(item.suggestedResponse)} |`,
+    ),
+    "",
+  ];
 }
 
 function sectionWorkQueueMarkdown(sectionWorkQueue: AgenticSectionWorkItem[]) {

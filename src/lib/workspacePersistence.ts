@@ -253,6 +253,7 @@ export interface AgentRunHistoryItem {
   packetPreview?: string;
   sectionCount?: number;
   reviewerCount?: number;
+  preReviewPromptCount?: number;
   taskCount?: number;
   lifecycleTaskStates?: AgentLifecycleTaskState[];
   editAcceptanceStates?: AgentEditAcceptanceState[];
@@ -853,6 +854,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     packetPreview: normalizedString(value.packetPreview, 1_200) || undefined,
     sectionCount: Math.max(numberValue(value.sectionCount) ?? 0, 0),
     reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
+    preReviewPromptCount: Math.max(numberValue(value.preReviewPromptCount) ?? 0, 0),
     taskCount: Math.max(numberValue(value.taskCount) ?? 0, 0),
     ...(lifecycleTaskStates.length ? { lifecycleTaskStates } : {}),
     ...(editAcceptanceStates.length ? { editAcceptanceStates } : {}),
