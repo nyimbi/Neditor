@@ -212,7 +212,9 @@ web app.
   complete agent packet with a Docs Live draft, selection-aware revision
   proposal, meaning-drift checks for changed numbers, dates, commitments, and
   caveats, an edit acceptance queue for accepting, rejecting, revising, and
-  applying only approved edits item by item, QA gates, named reviewer agents for editorial, evidence, risk,
+  applying only approved edits item by item, document-type quality gates for
+  board memos, proposals, policies, SOPs, research/technical documents,
+  publishing drafts, and other supported business documents, named reviewer agents for editorial, evidence, risk,
   citation, governance, and export readiness, deterministic outline critique
   for coverage, sequencing, duplication, depth, and specificity, deterministic
   humanization findings for generic, repetitive, vague, or overconfident

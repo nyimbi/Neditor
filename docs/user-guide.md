@@ -103,7 +103,9 @@ the planned revision pass checklist, meaning-drift findings for changed or
 removed numbers, dates, commitments, and caveats, and an edit acceptance queue
 where each selected-text, document, or section edit can be accepted, rejected,
 sent for another revision pass, and applied only after approval. The packet also
-includes QA gates, distribution gates, and blockers for missing inputs, and
+includes document-type quality gates for board memos, proposals, policies, SOPs,
+research/technical papers, publishing drafts, and other supported documents, plus
+distribution gates and blockers for missing inputs, and
 shows an **AI Control Center** with readiness score, next actions, source
 grounding, governance state, and distribution state so reviewers can see what is
 safe to do next before applying generated text. The control center and reviewer

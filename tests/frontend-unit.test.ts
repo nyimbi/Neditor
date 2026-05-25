@@ -557,6 +557,9 @@ test("agentic workflow planner coordinates creation revision review and distribu
   ok(plan.revisionModes.includes("executive-summary"));
   ok(plan.revisionModes.includes("evidence"));
   ok(plan.revisionModes.includes("legal-caution"));
+  ok(plan.qualityGates.some((gate) => gate.label === "Board Decision"));
+  ok(plan.qualityGates.some((gate) => gate.label === "Financial Case"));
+  ok(plan.qualityGates.some((gate) => gate.label === "Distribution Readiness"));
   ok(plan.missingInputs.includes("evidence"));
   ok(plan.steps.some((step) => step.action === "open-docs-live"));
   ok(plan.steps.some((step) => step.action === "open-ai-paste"));
@@ -682,6 +685,9 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Generated Draft"));
   ok(run.markdown.includes("provider: NEditor Docs Live"));
   ok(run.markdown.includes("## Quality Assurance"));
+  ok(run.markdown.includes("### Document-Type Quality Gates"));
+  ok(run.markdown.includes("Client Need"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-quality-gates"));
   ok(run.markdown.includes("## Distribution"));
   ok(run.markdown.includes("### Target Runbooks"));
   ok(run.markdown.includes("## AI Control Center"));
@@ -1490,6 +1496,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentPlan.revisionModes"));
   ok(app.includes("Revision passes"));
   ok(app.includes("agent-revision-modes"));
+  ok(app.includes("agentPlan.qualityGates"));
+  ok(app.includes("Quality gates"));
+  ok(app.includes("agent-quality-gates"));
   ok(app.includes("Agent edit acceptance queue"));
   ok(app.includes("agentEditAcceptanceRows"));
   ok(app.includes("acceptedAgentEditCount"));

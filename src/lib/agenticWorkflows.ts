@@ -59,6 +59,7 @@ export interface AgenticWorkflowPlan {
   contextCompleteness: AgenticContextCompleteness;
   revisionInstruction: string;
   revisionModes: AgenticRevisionMode[];
+  qualityGates: AgenticQualityGate[];
   distributionTargets: ExportTarget[];
   missingInputs: string[];
   steps: AgenticWorkflowStep[];
@@ -90,6 +91,14 @@ export interface AgenticSourcePack {
   claims: AgenticSourcePackItem[];
   notes: AgenticSourcePackItem[];
   markdown: string;
+}
+
+export interface AgenticQualityGate {
+  id: string;
+  label: string;
+  appliesTo: DocsLiveDocumentType | "blog" | "newsletter" | "distribution";
+  detail: string;
+  evidenceRequired: string[];
 }
 
 export interface AgenticWorkflowPlaybook {
@@ -395,6 +404,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
   const missingInputs = buildMissingInputs(corpus, lanes, distributionTargets);
   const revisionInstruction = buildRevisionInstruction(instruction, lanes, request.selectedText);
   const revisionModes = detectRevisionModes(corpus, lanes, documentType);
+  const qualityGates = buildQualityGates(documentType, distributionTargets);
   const steps = buildPlanSteps(lanes, missingInputs, distributionTargets, Boolean(request.documentText?.trim()), Boolean(request.selectedText?.trim()));
 
   return {
@@ -412,6 +422,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     contextCompleteness,
     revisionInstruction,
     revisionModes,
+    qualityGates,
     distributionTargets,
     missingInputs,
     steps,
@@ -1207,9 +1218,146 @@ function buildReviewChecklist(
     revision ? "Compare the revision proposal against the original text before applying final edits." : "",
     revision?.revisionPasses.length ? `Complete revision passes before acceptance: ${revision.revisionPasses.map((pass) => pass.label).join(", ")}.` : "",
     editAcceptanceQueue.length ? "Accept, reject, or request revision for each edit acceptance queue item before applying changes." : "",
+    ...plan.qualityGates.map((gate) => `${gate.label}: ${gate.detail}`),
     revision?.meaningDriftFindings.length ? "Resolve all meaning-drift findings before accepting the revision." : "",
     plan.distributionTargets.length ? "Run export readiness for every requested distribution target." : "",
   ].filter(Boolean);
+}
+
+function buildQualityGates(documentType: DocsLiveDocumentType, distributionTargets: ExportTarget[]): AgenticQualityGate[] {
+  const profile = qualityGateProfiles()[documentType] || qualityGateProfiles()["business-brief"];
+  const gates: AgenticQualityGate[] = profile.map((gate, index) => ({
+    ...gate,
+    id: `quality-${documentType}-${index + 1}-${stableFingerprint(`${gate.label}\n${gate.detail}`).slice(0, 8)}`,
+    appliesTo: documentType,
+  }));
+  if (distributionTargets.includes("blog")) gates.push(publishingQualityGate("blog"));
+  if (distributionTargets.includes("substack")) gates.push(publishingQualityGate("newsletter"));
+  if (distributionTargets.length) gates.push(distributionQualityGate(distributionTargets));
+  return gates.slice(0, 10);
+}
+
+function qualityGateProfiles(): Record<DocsLiveDocumentType, Array<Omit<AgenticQualityGate, "id" | "appliesTo">>> {
+  return {
+    "business-brief": [
+      qualityGate("Reader Decision", "The brief states the requested decision, recommendation, owner, and deadline in the first screen.", [
+        "Decision or action named",
+        "Owner and due date present",
+      ]),
+      qualityGate("Evidence Spine", "Every material claim, metric, or risk has a source note or citation TODO.", ["Claims checked", "Evidence or TODO present"]),
+      qualityGate("Executive Scan", "Headings, bullets, and summary language support a five-minute executive read.", ["Scannable headings", "No generic filler"]),
+    ],
+    "board-memo": [
+      qualityGate("Board Decision", "The memo identifies the board decision, requested approval, and consequence of delay.", [
+        "Decision requested",
+        "Approval language reviewed",
+      ]),
+      qualityGate("Financial Case", "Investment, cost, risk, return, and assumptions are visible and source-backed.", ["Financial evidence attached", "Assumptions named"]),
+      qualityGate("Director Challenge", "Strategic alternatives, dissent, and key risks are explicit enough for director scrutiny.", ["Alternatives considered", "Risks and mitigations reviewed"]),
+    ],
+    proposal: [
+      qualityGate("Client Need", "The proposal ties the offer to the client's stated problem, value, and success criteria.", ["Client problem named", "Success criteria listed"]),
+      qualityGate("Scope Discipline", "In-scope, out-of-scope, timeline, dependencies, and acceptance criteria are explicit.", ["Scope boundaries present", "Acceptance criteria present"]),
+      qualityGate("Commercial Review", "Pricing, assumptions, obligations, and approval terms are checked before client handoff.", ["Investment reviewed", "Terms and assumptions reviewed"]),
+    ],
+    "strategy-plan": [
+      qualityGate("Strategic Choice", "The plan names the strategic bet, alternatives rejected, and tradeoffs.", ["Choice stated", "Rejected alternatives captured"]),
+      qualityGate("Execution Measures", "Roadmap, owners, milestones, and measurable outcomes are tied to evidence.", ["Owners and milestones present", "Metrics source-backed"]),
+      qualityGate("Market Reality", "Market forces, constraints, risks, and assumptions are visible.", ["Market evidence present", "Assumptions reviewed"]),
+    ],
+    "project-plan": [
+      qualityGate("Delivery Ownership", "Outcomes, workstreams, owners, dependencies, and milestones are assigned.", ["Owners named", "Milestones listed"]),
+      qualityGate("Risk Controls", "Risks, mitigations, escalation path, and governance cadence are explicit.", ["Risks reviewed", "Escalation path present"]),
+      qualityGate("Scope Integrity", "Scope, exclusions, and acceptance criteria are clear enough for delivery tracking.", ["Scope boundaries present", "Acceptance criteria present"]),
+    ],
+    "research-brief": [
+      qualityGate("Research Question", "The brief states the question, method, source boundaries, and confidence level.", ["Question stated", "Method and source boundaries present"]),
+      qualityGate("Finding Traceability", "Findings distinguish evidence, interpretation, gaps, and open questions.", ["Findings source-backed", "Evidence gaps listed"]),
+      qualityGate("Reference Readiness", "Citations, bibliography expectations, and unsupported claims are marked before handoff.", ["References present", "Citation TODOs resolved or explicit"]),
+    ],
+    policy: [
+      qualityGate("Policy Authority", "Purpose, scope, required behavior, approver, and exception owner are explicit.", ["Scope and requirements present", "Approver named"]),
+      qualityGate("Compliance Safety", "Must/shall language, obligations, exceptions, and review cadence are checked for unintended commitments.", [
+        "Obligations reviewed",
+        "Exceptions path present",
+      ]),
+      qualityGate("Operational Fit", "Roles, responsibilities, controls, and rollout implications are clear to non-technical users.", ["Roles named", "Controls listed"]),
+    ],
+    "meeting-brief": [
+      qualityGate("Meeting Outcome", "Purpose, decisions needed, attendees, and follow-ups are visible.", ["Outcome stated", "Decisions listed"]),
+      qualityGate("Preparation Readiness", "Pre-reads, context, agenda, and open questions are ready before the meeting.", ["Pre-reads listed", "Open questions present"]),
+      qualityGate("Action Capture", "Owners, deadlines, and follow-up expectations are explicit.", ["Owners named", "Dates present"]),
+    ],
+    "business-case": [
+      qualityGate("Investment Decision", "Problem, options, recommendation, ROI, and implementation path are decision-ready.", ["Options compared", "ROI assumptions present"]),
+      qualityGate("Assumption Integrity", "Financial and operational assumptions are sourced and caveated.", ["Assumptions source-backed", "Caveats present"]),
+      qualityGate("Implementation Risk", "Dependencies, risks, owners, and next steps are explicit.", ["Dependencies listed", "Owners named"]),
+    ],
+    "operating-procedure": [
+      qualityGate("Procedure Completeness", "Prerequisites, inputs, ordered steps, outputs, controls, and exceptions are complete.", ["Prerequisites present", "Controls and exceptions listed"]),
+      qualityGate("Operator Usability", "Steps are unambiguous, testable, and written for the role performing the work.", ["Role named", "Steps are action-oriented"]),
+      qualityGate("Change Control", "Revision history, owner, review cycle, and escalation path are visible.", ["Owner present", "Review cadence present"]),
+    ],
+    "technical-architecture": [
+      qualityGate("Architecture Traceability", "Context, constraints, decisions, alternatives, and tradeoffs are explicit.", ["Constraints listed", "Alternatives reviewed"]),
+      qualityGate("Trust Boundaries", "Data flows, security boundaries, dependencies, and failure modes are reviewed.", ["Data flow present", "Security review notes present"]),
+      qualityGate("Implementation Handoff", "Risks, open questions, operational concerns, and review owners are clear.", ["Open questions listed", "Owners named"]),
+    ],
+    adr: [
+      qualityGate("Decision Record", "Context, decision, options considered, consequences, and status are complete.", ["Decision stated", "Consequences listed"]),
+      qualityGate("Reviewability", "Assumptions, constraints, and rejected alternatives are easy to audit later.", ["Rejected options present", "Constraints listed"]),
+      qualityGate("Implementation Link", "Follow-up tasks, owners, and related architecture references are captured.", ["Owners named", "Related references present"]),
+    ],
+    "release-notes": [
+      qualityGate("Audience Segmentation", "User-facing changes, technical changes, fixes, and breaking changes are separated.", ["Change groups present", "Audience clear"]),
+      qualityGate("Upgrade Safety", "Migration steps, compatibility notes, risks, and rollback guidance are visible.", ["Migration notes present", "Rollback guidance present"]),
+      qualityGate("Evidence and Links", "Issue links, version, date, and verification notes are attached.", ["Version and date present", "Verification notes present"]),
+    ],
+    "contract-brief": [
+      qualityGate("Commercial Terms", "Parties, scope, obligations, dates, payment terms, and approvals are visible.", ["Parties named", "Obligations reviewed"]),
+      qualityGate("Risk and Exceptions", "Liability, renewal, termination, exceptions, and open legal questions are flagged.", ["Legal questions listed", "Risk terms reviewed"]),
+      qualityGate("Approval Path", "Reviewer, approver, status, and handoff deadline are explicit.", ["Reviewer named", "Approval status present"]),
+    ],
+    "marketing-brief": [
+      qualityGate("Audience Offer Fit", "Audience, offer, positioning, proof points, and call to action are aligned.", ["Audience named", "CTA present"]),
+      qualityGate("Claim Safety", "Customer claims, statistics, testimonials, and competitive statements are sourced.", ["Proof points sourced", "Unsupported claims marked"]),
+      qualityGate("Channel Readiness", "Tone, assets, metadata, and distribution channel requirements are listed.", ["Assets listed", "Channel requirements present"]),
+    ],
+    "customer-case-study": [
+      qualityGate("Customer Consent", "Customer name, permissions, quote approvals, and anonymization needs are explicit.", ["Consent status present", "Quotes approved or marked"]),
+      qualityGate("Outcome Evidence", "Problem, solution, metrics, and customer outcomes are traceable to sources.", ["Metrics sourced", "Customer proof present"]),
+      qualityGate("Story Integrity", "Narrative avoids exaggeration and separates customer quote from company interpretation.", ["Quotes separated", "Claims reviewed"]),
+    ],
+  };
+}
+
+function qualityGate(label: string, detail: string, evidenceRequired: string[]): Omit<AgenticQualityGate, "id" | "appliesTo"> {
+  return { label, detail, evidenceRequired };
+}
+
+function publishingQualityGate(appliesTo: "blog" | "newsletter"): AgenticQualityGate {
+  const isNewsletter = appliesTo === "newsletter";
+  return {
+    id: `quality-${appliesTo}`,
+    appliesTo,
+    label: isNewsletter ? "Newsletter Handoff" : "Blog Handoff",
+    detail: isNewsletter
+      ? "Subject line, preview text, excerpt, CTA, links, and Substack-safe copy are ready for publishing."
+      : "Slug, excerpt, tags, canonical URL, CTA, links, and CMS-safe copy are ready for publishing.",
+    evidenceRequired: isNewsletter
+      ? ["Subject line and preview text present", "Links and CTA checked"]
+      : ["Slug/excerpt/tags present", "Canonical URL and links checked"],
+  };
+}
+
+function distributionQualityGate(targets: ExportTarget[]): AgenticQualityGate {
+  return {
+    id: "quality-distribution-readiness",
+    appliesTo: "distribution",
+    label: "Distribution Readiness",
+    detail: `Requested targets (${targets.join(", ")}) have approval metadata, export readiness, and artifact evidence requirements staged.`,
+    evidenceRequired: ["Approval metadata present", "Target artifacts or runbooks verified"],
+  };
 }
 
 function buildDistributionTargetPlans(plan: AgenticWorkflowPlan): AgenticDistributionTargetPlan[] {
@@ -1348,6 +1496,19 @@ function buildLifecycleTasks(input: {
       action: "open-review",
       evidence: plan.sourcePack.items.slice(0, 8).map((item) => `${titleCase(item.kind)} ${item.label}: ${item.detail}`),
       nextStep: "Confirm each source-pack note, URL, file, reference, reviewer comment, and claim is safe and relevant before provider handoff.",
+    });
+  }
+
+  if (plan.qualityGates.length) {
+    tasks.push({
+      id: "task-quality-gates",
+      lane: "review",
+      title: "Complete document-type quality gates",
+      owner: "Quality Agent",
+      status: "needs-input",
+      action: "open-review",
+      evidence: plan.qualityGates.slice(0, 10).map((gate) => `${gate.label}: ${gate.evidenceRequired.join("; ")}`),
+      nextStep: "Work through every document-type quality gate before review sign-off or distribution.",
     });
   }
 
@@ -1801,6 +1962,7 @@ function buildReviewerAgents(input: {
         editAcceptanceQueue.length
           ? `Edit acceptance queue prepared ${editAcceptanceQueue.length} item(s) for item-by-item approval.`
           : "",
+        `Document-type quality gates: ${plan.qualityGates.map((gate) => gate.label).join(", ")}.`,
         documentEvidence.humanizationFindings.length
           ? `Humanization scan found ${documentEvidence.humanizationFindings.length} generic, repetitive, vague, or overconfident phrasing item(s).`
           : "No obvious generic AI phrasing patterns were detected in the current document.",
@@ -1812,6 +1974,7 @@ function buildReviewerAgents(input: {
         revision ? "Compare the proposed revision to the source text for meaning drift and over-compression." : "",
         revision?.revisionPasses.length ? `Complete the ${revision.revisionPasses.map((pass) => pass.label).join(", ")} revision pass checklist before sign-off.` : "",
         editAcceptanceQueue.length ? "Resolve every edit acceptance queue item as accepted, rejected, or needing another revision before applying changes." : "",
+        "Complete the document-type quality gates before marking editorial review finished.",
         revision?.meaningDriftFindings.length ? "Resolve meaning-drift findings before accepting the proposed revision." : "",
         documentEvidence.humanizationFindings.length ? "Rewrite current-document humanization findings before final reader review." : "",
         hasDraft ? "Run a humanization pass for generic AI phrasing, repetition, and claims that sound confident without support." : "",
@@ -2099,6 +2262,7 @@ function buildAuditTrail(input: {
       plan.sourcePack.items.length
         ? `User source pack included ${plan.sourcePack.items.length} structured item(s) for provider and reviewer grounding.`
         : "No user-managed source pack items were supplied.",
+      `Document-type quality gates staged: ${plan.qualityGates.map((gate) => gate.label).join(", ")}.`,
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
         : "No distribution target selected at packet generation time.",
@@ -2734,6 +2898,10 @@ function buildRunMarkdown(input: {
         ]
       : ["No user-managed source pack items were supplied."]),
     "",
+    "### Document-Type Quality Gates",
+    "",
+    ...qualityGatesMarkdown(plan.qualityGates),
+    "",
     "### Placeholders",
     "",
     fencedBlock("yaml", plan.placeholderText),
@@ -2834,6 +3002,14 @@ function editAcceptanceQueueMarkdown(editAcceptanceQueue: AgenticEditAcceptanceI
     );
   }
   return lines;
+}
+
+function qualityGatesMarkdown(qualityGates: AgenticQualityGate[]) {
+  if (!qualityGates.length) return ["- No document-type quality gates were selected."];
+  return qualityGates.flatMap((gate) => [
+    `- [ ] ${gate.label} (${gate.appliesTo}): ${gate.detail}`,
+    ...gate.evidenceRequired.map((item) => `  - Evidence: ${item}`),
+  ]);
 }
 
 function revisionPassesMarkdown(revisionPasses: AgenticRevisionPass[]) {

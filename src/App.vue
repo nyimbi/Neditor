@@ -2133,6 +2133,13 @@
                 <li v-for="item in agentPlan.sourcePack.items.slice(0, 6)" :key="item.id">{{ item.kind }}: {{ item.label }}</li>
               </ul>
             </article>
+            <article class="agent-quality-gates">
+              <h3>Quality gates</h3>
+              <p>{{ agentPlan.qualityGates.length }} document-type gates</p>
+              <ul>
+                <li v-for="gate in agentPlan.qualityGates" :key="gate.id">{{ gate.label }}</li>
+              </ul>
+            </article>
             <article>
               <h3>Suggested outline</h3>
               <pre>{{ agentPlan.suggestedOutline }}</pre>
