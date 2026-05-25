@@ -2083,7 +2083,7 @@
                 Add value
               </button>
             </div>
-            <div class="docs-live-placeholder-grid" role="table" aria-label="Managed placeholder values">
+            <div class="docs-live-placeholder-grid" role="table" aria-label="Managed variable table">
               <div class="docs-live-placeholder-head" role="row">
                 <span role="columnheader">Key</span>
                 <span role="columnheader">Value</span>
