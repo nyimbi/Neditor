@@ -656,8 +656,12 @@ test("agentic source pack builder structures notes urls files claims and reviewe
 });
 
 test("agentic workflow playbooks cover common business and publishing starts", () => {
-  ok(agenticWorkflowPlaybooks.length >= 6);
+  ok(agenticWorkflowPlaybooks.length >= 10);
   ok(agenticWorkflowPlaybooks.some((playbook) => playbook.id === "board-memo-to-approval"));
+  ok(agenticWorkflowPlaybooks.some((playbook) => playbook.id === "strategy-memo-from-research"));
+  ok(agenticWorkflowPlaybooks.some((playbook) => playbook.id === "policy-to-approval"));
+  ok(agenticWorkflowPlaybooks.some((playbook) => playbook.id === "release-notes-to-publish"));
+  ok(agenticWorkflowPlaybooks.some((playbook) => playbook.id === "grant-application-review"));
   ok(agenticWorkflowPlaybooks.some((playbook) => playbook.instruction.includes("Substack")));
   ok(agenticWorkflowPlaybooks.every((playbook) => playbook.bestFor.length >= 3));
   ok(agenticWorkflowPlaybooks.every((playbook) => playbook.expectedOutputs.length >= 4));

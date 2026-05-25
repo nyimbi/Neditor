@@ -370,6 +370,42 @@ export const agenticWorkflowPlaybooks: AgenticWorkflowPlaybook[] = [
     bestFor: ["CFO review", "CEO updates", "leadership briefings"],
     expectedOutputs: ["Selection-aware revision", "risk review", "humanization pass", "PDF/DOCX readiness"],
   },
+  {
+    id: "strategy-memo-from-research",
+    label: "Strategy Memo From Research",
+    summary: "Turn research notes into a strategy memo with options, tradeoffs, risks, decisions, and executive-ready recommendations.",
+    instruction:
+      "Create a strategy memo from the current research notes, organize the situation, options, tradeoffs, recommendation, risks, owner, and decision timeline, check evidence and assumptions, then prepare PDF and Google Docs distribution.",
+    bestFor: ["Strategy memos", "market-entry analysis", "portfolio decisions"],
+    expectedOutputs: ["Strategy memo draft", "options and tradeoffs", "evidence review", "PDF/Google Docs package"],
+  },
+  {
+    id: "policy-to-approval",
+    label: "Policy To Approval",
+    summary: "Draft a policy with scope, obligations, exceptions, controls, reviewer sign-off, and approval metadata.",
+    instruction:
+      "Create a policy document from the current context, define scope, roles, requirements, exceptions, controls, enforcement, review cadence, and approval metadata, then prepare DOCX, PDF, and Google Docs distribution.",
+    bestFor: ["Internal policies", "compliance rollouts", "governance updates"],
+    expectedOutputs: ["Policy draft", "control checklist", "approval metadata tasks", "DOCX/PDF/Google Docs package"],
+  },
+  {
+    id: "release-notes-to-publish",
+    label: "Release Notes To Publish",
+    summary: "Convert shipped changes into release notes with audience framing, known issues, upgrade notes, and publishing packages.",
+    instruction:
+      "Create release notes from the current change list, group features, fixes, known issues, upgrade notes, owners, and customer impact, humanize the voice, verify links, then prepare blog, Substack, HTML, and Google Docs distribution.",
+    bestFor: ["Product releases", "customer announcements", "upgrade notes"],
+    expectedOutputs: ["Release notes draft", "known-issues review", "link and claim check", "blog/Substack/HTML package"],
+  },
+  {
+    id: "grant-application-review",
+    label: "Grant Application Review",
+    summary: "Build a grant application narrative with eligibility, budget, outcomes, attachments, evidence, and reviewer gates.",
+    instruction:
+      "Create a grant application from the current notes, structure eligibility, need, outcomes, budget, timeline, attachments, risks, reviewer questions, and evidence gaps, then prepare DOCX, PDF, and Google Docs distribution.",
+    bestFor: ["Grant applications", "funding proposals", "nonprofit reports"],
+    expectedOutputs: ["Grant narrative draft", "budget and attachment checklist", "evidence gaps", "DOCX/PDF/Google Docs package"],
+  },
 ];
 
 const exportSignals: Array<[ExportTarget, RegExp]> = [
