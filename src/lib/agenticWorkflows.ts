@@ -328,7 +328,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence });
   const reviewerAgents = buildReviewerAgents({ plan, draftMarkdown: draft?.markdown || "", revision, controlCenter, distributionTargetPlans, blockers, documentEvidence });
   const sectionWorkQueue = buildSectionWorkQueue(plan, reviewerAgents);
-  const lifecycleTasks = buildLifecycleTasks({ plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers });
+  const lifecycleTasks = buildLifecycleTasks({ plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence });
   const auditTrail = buildAuditTrail({
     plan,
     request,
@@ -705,11 +705,13 @@ function buildLifecycleTasks(input: {
   sectionWorkQueue: AgenticSectionWorkItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
+  documentEvidence: AgenticDocumentEvidence;
 }): AgenticLifecycleTask[] {
-  const { plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers } = input;
+  const { plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence } = input;
   const tasks: AgenticLifecycleTask[] = [];
   const hasBlockers = blockers.length > 0;
   const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
+  const evidenceTasks = buildDocumentEvidenceLifecycleTasks(documentEvidence, plan);
 
   tasks.push({
     id: "task-intake-context",
@@ -746,7 +748,10 @@ function buildLifecycleTasks(input: {
     });
   }
 
-  for (const section of sectionWorkQueue.slice(0, 14)) {
+  tasks.push(...evidenceTasks);
+
+  const sectionTaskLimit = Math.max(6, 14 - evidenceTasks.length);
+  for (const section of sectionWorkQueue.slice(0, sectionTaskLimit)) {
     tasks.push({
       id: `task-${section.id}`,
       lane: section.lane,
@@ -803,6 +808,83 @@ function buildLifecycleTasks(input: {
   });
 
   return tasks.slice(0, 36);
+}
+
+function buildDocumentEvidenceLifecycleTasks(documentEvidence: AgenticDocumentEvidence, plan: AgenticWorkflowPlan): AgenticLifecycleTask[] {
+  const tasks: AgenticLifecycleTask[] = [];
+  if (documentEvidence.unresolvedPlaceholders.length) {
+    tasks.push({
+      id: "task-evidence-placeholders",
+      lane: "edit",
+      title: "Resolve current-document placeholders",
+      owner: "Editorial Agent",
+      status: "needs-input",
+      action: "open-ai-paste",
+      evidence: documentEvidence.unresolvedPlaceholders.slice(0, 8),
+      nextStep: "Replace placeholders with verified values or mark intentionally deferred placeholders in the review notes.",
+    });
+  }
+  if (documentEvidence.citationTodos.length) {
+    tasks.push({
+      id: "task-evidence-citations",
+      lane: "review",
+      title: "Resolve citation TODOs",
+      owner: "Evidence Agent",
+      status: "needs-input",
+      action: "open-review",
+      evidence: documentEvidence.citationTodos.slice(0, 8),
+      nextStep: "Attach source references to each citation TODO or keep the unresolved citations as explicit release blockers.",
+    });
+  }
+  if (documentEvidence.unresolvedComments) {
+    tasks.push({
+      id: "task-evidence-comments",
+      lane: "review",
+      title: "Close unresolved review comments",
+      owner: "Risk Reviewer",
+      status: "needs-input",
+      action: "open-review",
+      evidence: [`${documentEvidence.unresolvedComments} unresolved review comment(s) detected.`],
+      nextStep: "Resolve, answer, or deliberately carry forward each review comment before release handoff.",
+    });
+  }
+  if (documentEvidence.unreviewedAiMarkers) {
+    tasks.push({
+      id: "task-evidence-ai-review",
+      lane: "review",
+      title: "Mark AI-assisted material human-reviewed",
+      owner: "Governance Agent",
+      status: "needs-input",
+      action: "open-review",
+      evidence: [`${documentEvidence.unreviewedAiMarkers} AI provenance marker(s) still need human review.`],
+      nextStep: "Inspect the AI-assisted material, preserve provenance, and mark only accepted blocks human-reviewed.",
+    });
+  }
+  if (documentEvidence.brokenLinkHints.length) {
+    tasks.push({
+      id: "task-evidence-links",
+      lane: plan.distributionTargets.length ? "distribute" : "review",
+      title: "Repair placeholder or suspicious links",
+      owner: "Citation Reviewer",
+      status: "needs-input",
+      action: plan.distributionTargets.length ? "prepare-export" : "open-review",
+      evidence: documentEvidence.brokenLinkHints.slice(0, 8),
+      nextStep: "Replace placeholder links with final URLs, anchors, or remove them before publishing.",
+    });
+  }
+  if (documentEvidence.approvalMetadataMissing.length) {
+    tasks.push({
+      id: "task-evidence-approval-metadata",
+      lane: "distribute",
+      title: "Complete approval metadata",
+      owner: "Distribution Agent",
+      status: "needs-input",
+      action: "prepare-export",
+      evidence: documentEvidence.approvalMetadataMissing.map((item) => `Missing ${item}`),
+      nextStep: "Add approval status, reviewer, and approvedAt metadata before export or publishing handoff.",
+    });
+  }
+  return tasks;
 }
 
 function buildSectionWorkQueue(plan: AgenticWorkflowPlan, reviewerAgents: AgenticReviewerAgent[]): AgenticSectionWorkItem[] {
@@ -1038,7 +1120,7 @@ function buildControlCenter(input: {
   const governance = buildGovernanceItems(plan, revision, blockers, documentEvidence);
   const distribution = buildDistributionItems(plan, distributionTargetPlans, documentEvidence);
   const readinessScore = scoreControlCenter(status, sourceGrounding, governance, distribution, blockers);
-  const nextActions = buildNextActions(plan, status, blockers, distributionTargetPlans);
+  const nextActions = buildNextActions(plan, status, blockers, distributionTargetPlans, documentEvidence);
   const summary =
     status === "blocked"
       ? "Agent run is blocked until source context or target instructions are supplied."
@@ -1278,6 +1360,7 @@ function buildNextActions(
   status: AgenticControlStatus,
   blockers: string[],
   targetPlans: AgenticDistributionTargetPlan[],
+  documentEvidence: AgenticDocumentEvidence,
 ): AgenticNextAction[] {
   const actions: AgenticNextAction[] = [];
   if (blockers.length) {
@@ -1286,6 +1369,44 @@ function buildNextActions(
       detail: blockers.slice(0, 4).join("; "),
       lane: "create",
       action: "open-docs-live",
+      status: "needs-input",
+    });
+  }
+  if (documentEvidence.unresolvedPlaceholders.length) {
+    actions.push({
+      label: "Resolve document placeholders",
+      detail: `${documentEvidence.unresolvedPlaceholders.length} placeholder marker(s) need verified values or explicit deferral.`,
+      lane: "edit",
+      action: "open-ai-paste",
+      status: "needs-input",
+    });
+  }
+  if (documentEvidence.citationTodos.length || documentEvidence.unresolvedComments || documentEvidence.unreviewedAiMarkers) {
+    actions.push({
+      label: "Review evidence and governance blockers",
+      detail: [
+        documentEvidence.citationTodos.length ? `${documentEvidence.citationTodos.length} citation TODO(s)` : "",
+        documentEvidence.unresolvedComments ? `${documentEvidence.unresolvedComments} unresolved comment(s)` : "",
+        documentEvidence.unreviewedAiMarkers ? `${documentEvidence.unreviewedAiMarkers} AI review marker(s)` : "",
+      ]
+        .filter(Boolean)
+        .join(", "),
+      lane: "review",
+      action: "open-review",
+      status: "needs-input",
+    });
+  }
+  if (documentEvidence.approvalMetadataMissing.length || documentEvidence.brokenLinkHints.length) {
+    actions.push({
+      label: "Repair distribution blockers",
+      detail: [
+        documentEvidence.approvalMetadataMissing.length ? `missing ${documentEvidence.approvalMetadataMissing.join(", ")}` : "",
+        documentEvidence.brokenLinkHints.length ? `${documentEvidence.brokenLinkHints.length} placeholder or suspicious link(s)` : "",
+      ]
+        .filter(Boolean)
+        .join("; "),
+      lane: plan.distributionTargets.length ? "distribute" : "review",
+      action: plan.distributionTargets.length ? "prepare-export" : "open-review",
       status: "needs-input",
     });
   }
