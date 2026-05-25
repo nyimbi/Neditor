@@ -264,7 +264,9 @@ web app.
   The Help Center and guided demo include AI Governance steps that show
   non-technical users how to route lifecycle tasks, insert or copy task briefs,
   review provider packages, and apply provider output only as governed
-  needs-review material.
+  needs-review material. The guided demo also tracks step completion and can
+  insert or copy a Markdown onboarding checklist for trainers, reviewers, or
+  rollout notes.
 - AI Create makes Docs Live the default first step for intent-led drafting,
   so users can begin with the outcome, audience, context, and placeholders
   instead of a blank page.

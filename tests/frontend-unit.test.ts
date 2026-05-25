@@ -1557,6 +1557,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("handleButtonHelpEnter"));
   ok(app.includes("NEditor Guided Demo"));
   ok(app.includes("guidedDemoSteps"));
+  ok(app.includes("guidedDemoCompletionSummary"));
+  ok(app.includes("guidedDemoCompletedCount"));
+  ok(app.includes("guidedDemoCompletedStepIds"));
+  ok(app.includes("Mark done"));
+  ok(app.includes("Insert checklist"));
+  ok(app.includes("Copy checklist"));
+  ok(app.includes("guidedDemoChecklistMarkdown"));
+  ok(app.includes("## NEditor Guided Demo Checklist"));
   ok(app.includes("AI Agent Workspace"));
   ok(app.includes('aria-label="Docs Live placeholder manager"'));
   ok(app.includes('aria-label="AI Create intent brief"'));

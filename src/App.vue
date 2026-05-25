@@ -2815,15 +2815,28 @@
           <div>
             <h2>NEditor Guided Demo</h2>
             <p>{{ currentDemoStep?.summary }}</p>
+            <small>{{ guidedDemoCompletionSummary }}</small>
           </div>
           <button type="button" aria-label="Close guided demo" @click="closeGuidedDemo">x</button>
         </header>
+        <section class="guided-demo-progress" aria-label="Guided demo progress">
+          <div>
+            <strong>{{ guidedDemoCompletedCount }} of {{ guidedDemoSteps.length }} completed</strong>
+            <span>{{ guidedDemoCompletionPercent }}%</span>
+          </div>
+          <progress :value="guidedDemoCompletedCount" :max="guidedDemoSteps.length">{{ guidedDemoCompletionPercent }}%</progress>
+        </section>
         <section class="guided-demo-layout">
           <ol class="guided-demo-steps" aria-label="Guided demo steps">
-            <li v-for="(step, index) in guidedDemoSteps" :key="step.id" :class="{ active: index === guidedDemoStepIndex }">
+            <li
+              v-for="(step, index) in guidedDemoSteps"
+              :key="step.id"
+              :class="{ active: index === guidedDemoStepIndex, complete: guidedDemoStepIsComplete(step.id) }"
+            >
               <button type="button" @click="selectGuidedDemoStep(index)">
                 <span>{{ index + 1 }}</span>
                 <strong>{{ step.title }}</strong>
+                <small>{{ guidedDemoStepIsComplete(step.id) ? "Done" : "Open" }}</small>
               </button>
             </li>
           </ol>
@@ -2837,7 +2850,13 @@
             <div class="guided-demo-actions">
               <button type="button" :disabled="guidedDemoStepIndex === 0" @click="previousGuidedDemoStep">Previous</button>
               <button type="button" @click="runGuidedDemoStep(currentDemoStep)">Try this step</button>
+              <button type="button" @click="markGuidedDemoStepComplete(currentDemoStep.id)">Mark done</button>
               <button type="button" :disabled="guidedDemoStepIndex === guidedDemoSteps.length - 1" @click="nextGuidedDemoStep">Next</button>
+            </div>
+            <div class="guided-demo-evidence-actions">
+              <button type="button" @click="insertGuidedDemoChecklist">Insert checklist</button>
+              <button type="button" @click="copyGuidedDemoChecklist">Copy checklist</button>
+              <button type="button" @click="resetGuidedDemoProgress">Reset progress</button>
             </div>
           </article>
         </section>
@@ -3206,6 +3225,7 @@ const agentTaskQuery = ref("");
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const guidedDemoStepIndex = ref(0);
+const guidedDemoCompletedStepIds = ref<string[]>([]);
 const docsLiveDocumentType = ref<DocsLiveDocumentType>("business-brief");
 const docsLiveTitle = ref("");
 const docsLiveOutlineText = ref("");
@@ -4658,6 +4678,13 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
   },
 ]);
 const currentDemoStep = computed(() => guidedDemoSteps.value[guidedDemoStepIndex.value] || guidedDemoSteps.value[0] || null);
+const guidedDemoCompletedCount = computed(() => guidedDemoSteps.value.filter((step) => guidedDemoCompletedStepIds.value.includes(step.id)).length);
+const guidedDemoCompletionPercent = computed(() =>
+  guidedDemoSteps.value.length ? Math.round((guidedDemoCompletedCount.value / guidedDemoSteps.value.length) * 100) : 0,
+);
+const guidedDemoCompletionSummary = computed(() =>
+  `${guidedDemoCompletedCount.value}/${guidedDemoSteps.value.length} demo capabilities completed: AI creation, playbooks, lifecycle tasks, provider governance, outline, composition, templates, review, and export.`,
+);
 const commandBarGroups = computed<CommandBarGroup[]>(() => [
   {
     id: "document",
@@ -5479,10 +5506,65 @@ function previousGuidedDemoStep() {
 function nextGuidedDemoStep() {
   selectGuidedDemoStep(guidedDemoStepIndex.value + 1);
 }
+function guidedDemoStepIsComplete(stepId: string) {
+  return guidedDemoCompletedStepIds.value.includes(stepId);
+}
+function markGuidedDemoStepComplete(stepId: string) {
+  if (!guidedDemoCompletedStepIds.value.includes(stepId)) {
+    guidedDemoCompletedStepIds.value = [...guidedDemoCompletedStepIds.value, stepId];
+  }
+  store.statusMessage = `Marked guided demo step complete: ${stepId}`;
+}
+function resetGuidedDemoProgress() {
+  guidedDemoCompletedStepIds.value = [];
+  store.statusMessage = "Reset guided demo progress";
+}
+function guidedDemoTableCell(value: string) {
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
+}
 async function runGuidedDemoStep(step: GuidedDemoStep) {
+  markGuidedDemoStepComplete(step.id);
   closeGuidedDemo();
   await nextTick();
   void step.run();
+}
+function guidedDemoChecklistMarkdown() {
+  const generatedAt = new Date().toISOString();
+  return [
+    "## NEditor Guided Demo Checklist",
+    "",
+    `Generated: ${generatedAt}`,
+    `Progress: ${guidedDemoCompletedCount.value}/${guidedDemoSteps.value.length} (${guidedDemoCompletionPercent.value}%)`,
+    "",
+    "| Done | Capability | Surface | Evidence to inspect |",
+    "| --- | --- | --- | --- |",
+    ...guidedDemoSteps.value.map((step) => {
+      const done = guidedDemoStepIsComplete(step.id) ? "x" : " ";
+      return `| [${done}] | ${guidedDemoTableCell(step.title)} | ${guidedDemoTableCell(step.mode)} | ${guidedDemoTableCell(step.points.join("; "))} |`;
+    }),
+    "",
+    "### Trainer Notes",
+    "",
+    "- Complete every step before onboarding a team to AI-first document creation.",
+    "- Confirm provider outputs remain needs-review until a human accepts them.",
+    "- Confirm export readiness is run before distributing external deliverables.",
+    "",
+  ].join("\n");
+}
+function insertGuidedDemoChecklist() {
+  insertBlock(guidedDemoChecklistMarkdown());
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted guided demo checklist";
+}
+async function copyGuidedDemoChecklist() {
+  const checklist = guidedDemoChecklistMarkdown();
+  try {
+    await navigator.clipboard?.writeText(checklist);
+    store.statusMessage = "Copied guided demo checklist";
+  } catch {
+    store.statusMessage = "Guided demo checklist is ready to copy";
+  }
 }
 function startAiDocumentCreation() {
   if (store.mode === "outline") store.mode = "split";
@@ -10211,6 +10293,7 @@ select:hover {
 .app-shell[data-theme="dark"] .help-topic-button,
 .app-shell[data-theme="dark"] .help-topic-header small,
 .app-shell[data-theme="dark"] .help-keywords span,
+.app-shell[data-theme="dark"] .guided-demo-progress,
 .app-shell[data-theme="dark"] .guided-demo-card,
 .app-shell[data-theme="dark"] .guided-demo-steps span,
 .app-shell[data-theme="dark"] .agent-playbooks,
@@ -10261,6 +10344,9 @@ select:hover {
 .app-shell[data-theme="dark"] .help-when,
 .app-shell[data-theme="dark"] .help-tips,
 .app-shell[data-theme="dark"] .guided-demo-modal header p,
+.app-shell[data-theme="dark"] .guided-demo-modal header small,
+.app-shell[data-theme="dark"] .guided-demo-progress div,
+.app-shell[data-theme="dark"] .guided-demo-steps small,
 .app-shell[data-theme="dark"] .guided-demo-card small,
 .app-shell[data-theme="dark"] .agent-workspace-modal header p,
 .app-shell[data-theme="dark"] .agent-playbooks > header span,
@@ -10350,6 +10436,7 @@ select:hover {
   .app-shell[data-theme="system"] .help-topic-button,
   .app-shell[data-theme="system"] .help-topic-header small,
   .app-shell[data-theme="system"] .help-keywords span,
+  .app-shell[data-theme="system"] .guided-demo-progress,
   .app-shell[data-theme="system"] .guided-demo-card,
   .app-shell[data-theme="system"] .guided-demo-steps span,
   .app-shell[data-theme="system"] .agent-playbooks,
@@ -10400,6 +10487,9 @@ select:hover {
   .app-shell[data-theme="system"] .help-when,
   .app-shell[data-theme="system"] .help-tips,
   .app-shell[data-theme="system"] .guided-demo-modal header p,
+  .app-shell[data-theme="system"] .guided-demo-modal header small,
+  .app-shell[data-theme="system"] .guided-demo-progress div,
+  .app-shell[data-theme="system"] .guided-demo-steps small,
   .app-shell[data-theme="system"] .guided-demo-card small,
   .app-shell[data-theme="system"] .agent-workspace-modal header p,
   .app-shell[data-theme="system"] .agent-playbooks > header span,
@@ -10474,6 +10564,7 @@ select:hover {
 .app-shell[data-high-contrast="true"] .help-topic-button,
 .app-shell[data-high-contrast="true"] .help-topic-header small,
 .app-shell[data-high-contrast="true"] .help-keywords span,
+.app-shell[data-high-contrast="true"] .guided-demo-progress,
 .app-shell[data-high-contrast="true"] .guided-demo-card,
 .app-shell[data-high-contrast="true"] .guided-demo-steps span,
 .app-shell[data-high-contrast="true"] .agent-playbooks,
@@ -11847,6 +11938,32 @@ select:hover {
   color: #526171;
 }
 
+.guided-demo-modal header small {
+  color: #526171;
+  font-size: 12px;
+}
+
+.guided-demo-progress {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+}
+
+.guided-demo-progress div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #31516f;
+  font-size: 12px;
+}
+
+.guided-demo-progress progress {
+  width: 100%;
+  height: 10px;
+}
+
 .guided-demo-layout {
   display: grid;
   grid-template-columns: minmax(180px, 0.45fr) minmax(0, 1fr);
@@ -11863,7 +11980,7 @@ select:hover {
 
 .guided-demo-steps button {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -11886,6 +12003,18 @@ select:hover {
 .guided-demo-steps .active button {
   border-color: #7fa2cd;
   background: #eef6ff;
+}
+
+.guided-demo-steps .complete button {
+  border-color: #88b99a;
+  background: #f0faf3;
+}
+
+.guided-demo-steps small {
+  color: #526171;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .guided-demo-card {
@@ -11919,6 +12048,14 @@ select:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.guided-demo-evidence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #d8e0e8;
 }
 
 .agent-workspace-modal {
