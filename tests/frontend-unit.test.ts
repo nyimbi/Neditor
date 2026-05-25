@@ -927,10 +927,13 @@ test("AI provider packages redact secrets and preserve agent governance context"
   ok(providerPackage.sourcePack.claimReview.some((item) => item.includes("Revenue grows by 18%")));
   ok(providerPackage.sourcePack.cleanupBlockers.some((item) => item.includes("comprehensive analysis")));
   ok(providerPackage.sourcePack.governanceBlockers.some((item) => item.includes("unresolved review comment")));
+  ok(providerPackage.sourcePack.releaseEvidence.some((item) => item.includes("Release blocker")));
   ok(formatAiProviderSourcePack(providerPackage.sourcePack).includes("Claims and citation review:"));
   ok(formatAiProviderSourcePack(providerPackage.sourcePack).includes("Distribution blockers:"));
+  ok(formatAiProviderSourcePack(providerPackage.sourcePack).includes("Release evidence bundle:"));
   ok(providerPackage.userPrompt.includes("Reviewer agents:"));
   ok(providerPackage.userPrompt.includes("Lifecycle task board:"));
+  ok(providerPackage.userPrompt.includes("Release evidence bundle:"));
   ok(providerPackage.userPrompt.includes("Final human approval and release readiness"));
   ok(providerPackage.userPrompt.includes("Section work queue:"));
   ok(providerPackage.userPrompt.includes("Required response"));
@@ -1187,6 +1190,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
           cleanupBlockers: ["Placeholder [client]"],
           governanceBlockers: ["Missing approvedBy"],
           distributionBlockers: ["Substack preflight pending"],
+          releaseEvidence: ["Release evidence blocker"],
         },
         appliedAt: "2026-05-25T10:06:00.000Z",
         providerProfile: " local ",
@@ -1405,6 +1409,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       cleanupBlockers: ["Placeholder [client]"],
       governanceBlockers: ["Missing approvedBy"],
       distributionBlockers: ["Substack preflight pending"],
+      releaseEvidence: ["Release evidence blocker"],
     },
     appliedAt: "2026-05-25T10:06:00.000Z",
     providerProfile: "local",

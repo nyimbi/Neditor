@@ -39,6 +39,7 @@ export interface AiProviderSourcePack {
   cleanupBlockers: string[];
   governanceBlockers: string[];
   distributionBlockers: string[];
+  releaseEvidence: string[];
 }
 
 export interface AiProviderExecutionResult {
@@ -243,6 +244,8 @@ function buildUserPrompt(run: AgenticWorkflowRun, sourcePack: AiProviderSourcePa
     "",
     `Lifecycle task board:\n${run.lifecycleTasks.map(formatLifecycleTask).join("\n")}`,
     "",
+    `Release evidence bundle:\n${run.releaseEvidenceBundle.items.map(formatReleaseEvidenceItem).join("\n")}`,
+    "",
     `Section work queue:\n${run.sectionWorkQueue
       .map((section) => `- ${section.order}. ${section.heading} (${section.lane}; reviewers: ${section.reviewerAgentIds.join(", ")}): ${section.draftingInstruction}`)
       .join("\n")}`,
@@ -269,6 +272,10 @@ function formatLifecycleTask(task: AgenticWorkflowRun["lifecycleTasks"][number])
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function formatReleaseEvidenceItem(item: AgenticWorkflowRun["releaseEvidenceBundle"]["items"][number]) {
+  return `- ${item.label} (${item.status}; owner: ${item.owner}; required: ${item.requiredBeforeRelease ? "yes" : "no"}): ${item.detail}`;
 }
 
 function buildAiProviderSourcePack(run: AgenticWorkflowRun): AiProviderSourcePack {
@@ -305,6 +312,11 @@ function buildAiProviderSourcePack(run: AgenticWorkflowRun): AiProviderSourcePac
     ...evidence.brokenLinkHints.slice(0, 8).map((item) => `Suspicious link: ${item}`),
     ...run.distributionTargetPlans.map((target) => `${target.label}: ${target.preflightChecks[0]}`),
   ];
+  const releaseEvidence = [
+    `Bundle ${run.releaseEvidenceBundle.id}: ${run.releaseEvidenceBundle.summary}`,
+    ...run.releaseEvidenceBundle.items.map(formatReleaseEvidenceItem),
+    ...run.releaseEvidenceBundle.blockers.slice(0, 8).map((blocker) => `Release blocker: ${blocker}`),
+  ];
 
   return {
     contextSources,
@@ -313,6 +325,7 @@ function buildAiProviderSourcePack(run: AgenticWorkflowRun): AiProviderSourcePac
     cleanupBlockers,
     governanceBlockers,
     distributionBlockers,
+    releaseEvidence,
   };
 }
 
@@ -335,6 +348,9 @@ export function formatAiProviderSourcePack(sourcePack: AiProviderSourcePack) {
     "",
     "Distribution blockers:",
     ...(sourcePack.distributionBlockers.length ? sourcePack.distributionBlockers.map((item) => `- ${item}`) : ["- No distribution blockers detected."]),
+    "",
+    "Release evidence bundle:",
+    ...(sourcePack.releaseEvidence.length ? sourcePack.releaseEvidence.map((item) => `- ${item}`) : ["- No release evidence items detected."]),
   ].join("\n");
 }
 
@@ -460,7 +476,8 @@ function buildChecklist(profile: AiProviderProfile, keyEnv: string, sourcePack: 
     sourcePack.claimReview.length +
     sourcePack.cleanupBlockers.length +
     sourcePack.governanceBlockers.length +
-    sourcePack.distributionBlockers.length;
+    sourcePack.distributionBlockers.length +
+    sourcePack.releaseEvidence.length;
   return [
     "Confirm your organization approves this provider and model for the document classification.",
     profile.endpoint ? "Review the endpoint before sending any content." : "Paste the prompt only into an approved provider workspace.",

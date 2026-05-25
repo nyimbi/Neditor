@@ -206,6 +206,7 @@ export interface AgentRunHistorySourcePack {
   cleanupBlockers: string[];
   governanceBlockers: string[];
   distributionBlockers: string[];
+  releaseEvidence: string[];
 }
 
 export interface AgentRunHistoryItem {
@@ -729,6 +730,7 @@ function normalizeAgentRunHistorySourcePack(value: unknown): AgentRunHistorySour
     cleanupBlockers: stringArray(value.cleanupBlockers, 120) || [],
     governanceBlockers: stringArray(value.governanceBlockers, 80) || [],
     distributionBlockers: stringArray(value.distributionBlockers, 80) || [],
+    releaseEvidence: stringArray(value.releaseEvidence, 80) || [],
   };
 }
 

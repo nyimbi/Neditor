@@ -4862,7 +4862,8 @@ function agentRunHistorySourcePackSummary(item: AgentRunHistoryItem) {
     sourcePack.claimReview.length +
     sourcePack.cleanupBlockers.length +
     sourcePack.governanceBlockers.length +
-    sourcePack.distributionBlockers.length;
+    sourcePack.distributionBlockers.length +
+    sourcePack.releaseEvidence.length;
   return `${count} provider handoff item${count === 1 ? "" : "s"}`;
 }
 function buildAgentProviderPackage() {
