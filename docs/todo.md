@@ -1377,6 +1377,9 @@ Finish:
 - Missing optional engine paths now emit non-blocking setup diagnostics before
   embedded fallback so users can see why high-fidelity external rendering was
   not attempted.
+- Transform diagnostics now carry fenced-block column bounds plus `transform:`
+  and `source range:` related context in both compiler diagnostics and
+  per-artifact diagnostics.
 - Prepare-for-export readiness now rejects configured missing, directory, and
   non-executable external engine paths before export, while still ignoring
   disabled engine paths.

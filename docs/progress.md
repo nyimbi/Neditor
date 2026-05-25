@@ -127,6 +127,11 @@ Recent pushed checkpoints visible in current git history:
   execution. The browser workflow covers these states alongside probe success
   and missing-executable diagnostics so optional engine setup is clearer for
   non-technical users.
+- Transform diagnostics now attach tighter source metadata to the fenced block.
+  Global compiler diagnostics and per-artifact diagnostics both carry the
+  transform name, source-range breadcrumb, start/end lines, and column bounds,
+  so preview/sidebar jumps and export manifests have a more precise repair
+  target.
 - The status bar now reports live preview update telemetry, including elapsed
   compile time and compiled character count. The large-document browser
   workflow verifies that a 120-section edit reaches the preview within the

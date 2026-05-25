@@ -380,6 +380,16 @@ title: Bad Transform
     assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
     assert_eq!(diagnostic.line, Some(6));
     assert_eq!(diagnostic.end_line, Some(8));
+    assert_eq!(diagnostic.column, Some(1));
+    assert_eq!(diagnostic.end_column, Some(4));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "transform: json"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "source range: 6-8"));
 
     let artifact_diagnostic = response
         .transform_artifacts
@@ -393,6 +403,16 @@ title: Bad Transform
     );
     assert_eq!(artifact_diagnostic.line, Some(6));
     assert_eq!(artifact_diagnostic.end_line, Some(8));
+    assert_eq!(artifact_diagnostic.column, Some(1));
+    assert_eq!(artifact_diagnostic.end_column, Some(4));
+    assert!(artifact_diagnostic
+        .related
+        .iter()
+        .any(|related| related == "transform: json"));
+    assert!(artifact_diagnostic
+        .related
+        .iter()
+        .any(|related| related == "source range: 6-8"));
 }
 
 #[test]

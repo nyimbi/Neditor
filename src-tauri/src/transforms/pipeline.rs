@@ -78,9 +78,11 @@ fn attach_transform_source(
     let source_file = artifact.source_file.clone();
     let source_line = artifact.source_line;
     let end_source_line = artifact.end_source_line;
+    let transform_name = artifact.name.clone();
     for diagnostic in &mut artifact.diagnostics {
         attach_transform_diagnostic_source(
             diagnostic,
+            &transform_name,
             source_file.as_deref(),
             source_line,
             end_source_line,
@@ -89,6 +91,7 @@ fn attach_transform_source(
     for diagnostic in diagnostics {
         attach_transform_diagnostic_source(
             diagnostic,
+            &transform_name,
             source_file.as_deref(),
             source_line,
             end_source_line,
@@ -98,6 +101,7 @@ fn attach_transform_source(
 
 fn attach_transform_diagnostic_source(
     diagnostic: &mut DocumentDiagnostic,
+    transform_name: &str,
     source_file: Option<&str>,
     source_line: Option<usize>,
     end_source_line: Option<usize>,
@@ -110,6 +114,26 @@ fn attach_transform_diagnostic_source(
     }
     if diagnostic.end_line.is_none() {
         diagnostic.end_line = end_source_line;
+    }
+    if diagnostic.column.is_none() {
+        diagnostic.column = Some(1);
+    }
+    if diagnostic.end_column.is_none() {
+        diagnostic.end_column = Some(4);
+    }
+    push_related_once(diagnostic, format!("transform: {transform_name}"));
+    if let Some(source_line) = source_line {
+        let end_source_line = end_source_line.unwrap_or(source_line);
+        push_related_once(
+            diagnostic,
+            format!("source range: {source_line}-{end_source_line}"),
+        );
+    }
+}
+
+fn push_related_once(diagnostic: &mut DocumentDiagnostic, value: String) {
+    if !diagnostic.related.iter().any(|related| related == &value) {
+        diagnostic.related.push(value);
     }
 }
 
