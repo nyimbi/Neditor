@@ -1816,6 +1816,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("copyDocsLiveHistoryDraft"));
   ok(app.includes("insertDocsLiveHistoryReviewPacket"));
   ok(app.includes("copyDocsLiveHistoryReviewPacket"));
+  ok(app.includes("latestDocsLiveDraftHistory"));
+  ok(app.includes("openDocsLiveHistory"));
+  ok(app.includes("appendLatestDocsLiveDraft"));
+  ok(app.includes("copyLatestDocsLiveDraft"));
+  ok(app.includes("insertLatestDocsLiveReviewPacket"));
+  ok(app.includes("copyLatestDocsLiveReviewPacket"));
+  ok(app.includes("Open Docs Live draft history"));
+  ok(app.includes("Append latest Docs Live draft"));
+  ok(app.includes("Copy latest Docs Live review packet"));
   ok(app.includes("Appended Docs Live draft for review"));
   ok(app.includes("Copied Docs Live draft"));
   ok(app.includes("Inserted Docs Live review packet"));

@@ -51,7 +51,10 @@ The command palette searches app actions, headings, citations, glossary terms,
 index terms, open documents, and workspace files. It also accepts typed
 AI-first instructions such as "revise this for the board and prepare PDF" and
 previews the detected workflow lanes, output targets, and missing inputs before
-you choose **Plan first** or **Generate Packet**.
+you choose **Plan first** or **Generate Packet**. It also exposes recent Docs
+Live draft recovery actions, including opening the history, appending the
+latest draft, copying the latest draft, and inserting or copying the latest
+review packet.
 
 The top command bar is grouped around document, management, writing, navigation,
 insertion, review, and view workflows. Use Navigate for search, previous/next

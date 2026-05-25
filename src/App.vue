@@ -3816,6 +3816,7 @@ const agentProviderSourcePackMarkdown = computed(() =>
   agentProviderPackage.value ? formatAiProviderSourcePack(agentProviderPackage.value.sourcePack) : "",
 );
 const latestAgentRunHistory = computed(() => store.agentRunHistory[0] || null);
+const latestDocsLiveDraftHistory = computed(() => store.docsLiveDraftHistory[0] || null);
 const activeAgentControlCenter = computed(() => agentRun.value?.controlCenter || latestAgentRunHistory.value?.controlCenter || null);
 const agentTaskLaneOptions: Array<"all" | AgenticWorkflowLane> = ["all", "create", "compose", "edit", "revise", "review", "distribute"];
 const agentTaskStatusOptions: Array<"all" | AgentLifecycleExecutionStatus> = ["all", "queued", "in-progress", "needs-review", "complete", "blocked"];
@@ -5813,6 +5814,11 @@ const commands = computed(() => [
   { name: "AI: Compose from outline", group: "AI", run: () => openDocsLiveFromOutline() },
   { name: "AI: Review and clean pasted text", group: "AI", run: () => openAiPaste() },
   { name: "Open Docs Live", group: "AI", run: () => openDocsLive() },
+  { name: "Open Docs Live draft history", group: "AI", run: () => openDocsLiveHistory() },
+  { name: "Append latest Docs Live draft", group: "AI", run: () => appendLatestDocsLiveDraft() },
+  { name: "Copy latest Docs Live draft", group: "AI", run: () => void copyLatestDocsLiveDraft() },
+  { name: "Insert latest Docs Live review packet", group: "AI", run: () => insertLatestDocsLiveReviewPacket() },
+  { name: "Copy latest Docs Live review packet", group: "AI", run: () => void copyLatestDocsLiveReviewPacket() },
   { name: "Paste from AI chat", group: "AI", run: () => openAiPaste() },
   { name: "Open Help Center", group: "Help", run: () => openHelp() },
   { name: "Start guided demo", group: "Help", run: () => openGuidedDemo() },
@@ -9805,6 +9811,49 @@ async function copyDocsLiveHistoryReviewPacket(item: DocsLiveDraftHistoryItem) {
   } catch {
     store.statusMessage = `Saved Docs Live review packet ${item.title} is ready to copy`;
   }
+}
+
+function openDocsLiveHistory() {
+  openDocsLive();
+  store.statusMessage = store.docsLiveDraftHistory.length
+    ? "Opened Docs Live draft history"
+    : "No Docs Live draft history yet";
+}
+
+function appendLatestDocsLiveDraft() {
+  const item = latestDocsLiveDraftHistory.value;
+  if (!item) {
+    store.statusMessage = "No saved Docs Live draft yet";
+    return;
+  }
+  appendDocsLiveHistoryDraft(item);
+}
+
+async function copyLatestDocsLiveDraft() {
+  const item = latestDocsLiveDraftHistory.value;
+  if (!item) {
+    store.statusMessage = "No saved Docs Live draft yet";
+    return;
+  }
+  await copyDocsLiveHistoryDraft(item);
+}
+
+function insertLatestDocsLiveReviewPacket() {
+  const item = latestDocsLiveDraftHistory.value;
+  if (!item) {
+    store.statusMessage = "No saved Docs Live review packet yet";
+    return;
+  }
+  insertDocsLiveHistoryReviewPacket(item);
+}
+
+async function copyLatestDocsLiveReviewPacket() {
+  const item = latestDocsLiveDraftHistory.value;
+  if (!item) {
+    store.statusMessage = "No saved Docs Live review packet yet";
+    return;
+  }
+  await copyDocsLiveHistoryReviewPacket(item);
 }
 
 function insertDocsLiveReviewPacket() {

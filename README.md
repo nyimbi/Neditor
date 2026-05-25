@@ -186,7 +186,8 @@ web app.
   word count, character count, and reading-time status.
 - Command palette for app actions, natural-language AI agent instructions, and
   document-aware navigation across headings, citations, glossary terms, index
-  terms, open documents, and workspace files.
+  terms, open documents, workspace files, and recent Docs Live draft recovery
+  actions.
 - First-class outline planning in the Outline panel: draft a document structure
   with indented bullets, numbers, or Markdown headings, then create or append a
   Markdown document skeleton before writing the body text.
