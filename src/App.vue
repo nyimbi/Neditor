@@ -1790,6 +1790,25 @@
               <option v-for="depth in docsLiveDraftingDepthOptions" :key="depth.value" :value="depth.value">{{ depth.label }}</option>
             </select>
           </label>
+          <section class="docs-live-intent-brief docs-live-wide" aria-label="AI Create intent brief">
+            <header>
+              <div>
+                <strong>Intent Brief</strong>
+                <span>Business context required before a responsible first draft.</span>
+              </div>
+              <small>{{ docsLiveIntentCompletion }}</small>
+            </header>
+            <div class="docs-live-intent-grid">
+              <label v-for="field in docsLiveIntentFields" :key="field.key">
+                {{ field.label }}
+                <input
+                  :value="docsLivePlaceholderValue(field.key)"
+                  :placeholder="field.placeholder"
+                  @change="updateDocsLiveIntentField(field.key, inputValue($event))"
+                />
+              </label>
+            </div>
+          </section>
           <label class="docs-live-wide">
             Outline
             <textarea v-model="docsLiveOutlineText" rows="7" placeholder="- Executive Summary&#10;- Recommendation&#10;- Next Steps"></textarea>
@@ -3121,6 +3140,13 @@ const docsLiveContext = ref("");
 const docsLivePlaceholderText = ref("");
 const docsLivePlaceholderKey = ref("");
 const docsLivePlaceholderValue = ref("");
+const docsLiveIntentFields = [
+  { key: "audience", label: "Audience", placeholder: "executive team, board, customers" },
+  { key: "outcome", label: "Outcome", placeholder: "approve renewal, align launch plan" },
+  { key: "owner", label: "Owner", placeholder: "Finance, Product, Legal" },
+  { key: "deadline", label: "Deadline", placeholder: "June 1, end of Q2" },
+  { key: "distribution target", label: "Distribution target", placeholder: "PDF, Google Docs, Substack" },
+];
 const docsLiveQuestionnaireText = ref(buildDocsLiveQuestionnaire("business-brief"));
 const docsLiveQuestionnaireAnswerText = ref("");
 const docsLiveGeneratedMarkdown = ref("");
@@ -3520,10 +3546,14 @@ const buttonHelpStyle = computed<CSSProperties>(() => ({
 }));
 const docsLiveSpeechAvailable = computed(() => Boolean(speechRecognitionConstructor()));
 const docsLivePlaceholderRows = computed(() => docsLivePlaceholderEntries(docsLivePlaceholderText.value));
-const docsLiveRequiredPlaceholderKeys = ["audience", "owner", "deadline", "evidence", "tone", "reviewer"];
+const docsLiveRequiredPlaceholderKeys = ["audience", "outcome", "owner", "deadline", "distribution target", "evidence", "tone", "reviewer"];
 const docsLiveMissingPlaceholderKeys = computed(() => {
   const present = new Set(docsLivePlaceholderRows.value.map((entry) => entry.key));
   return docsLiveRequiredPlaceholderKeys.filter((key) => !present.has(key));
+});
+const docsLiveIntentCompletion = computed(() => {
+  const present = docsLiveIntentFields.filter((field) => Boolean(docsLivePlaceholderValue(field.key))).length;
+  return `${present}/${docsLiveIntentFields.length} intent fields`;
 });
 const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
@@ -9035,6 +9065,18 @@ function addDocsLivePlaceholder() {
   store.statusMessage = "Added Docs Live placeholder value";
 }
 
+function docsLivePlaceholderValue(key: string) {
+  return docsLivePlaceholderRows.value.find((entry) => entry.key === key)?.value || "";
+}
+
+function updateDocsLiveIntentField(key: string, value: string) {
+  docsLivePlaceholderText.value = value.trim()
+    ? upsertDocsLivePlaceholder(docsLivePlaceholderText.value, key, value)
+    : removeDocsLivePlaceholder(docsLivePlaceholderText.value, key);
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = `Updated ${key} intent value`;
+}
+
 function updateDocsLivePlaceholder(key: string, value: string) {
   docsLivePlaceholderText.value = upsertDocsLivePlaceholder(docsLivePlaceholderText.value, key, value);
   refreshDocsLiveQuestionnaire();
@@ -9973,6 +10015,7 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-provider-panel,
 .app-shell[data-theme="dark"] .agent-provider-output,
 .app-shell[data-theme="dark"] .docs-live-runtime,
+.app-shell[data-theme="dark"] .docs-live-intent-brief,
 .app-shell[data-theme="dark"] .docs-live-placeholder-manager,
 .app-shell[data-theme="dark"] .docs-live-workflow,
 .app-shell[data-theme="dark"] .status-message,
@@ -10111,6 +10154,7 @@ select:hover {
   .app-shell[data-theme="system"] .agent-provider-panel,
   .app-shell[data-theme="system"] .agent-provider-output,
   .app-shell[data-theme="system"] .docs-live-runtime,
+  .app-shell[data-theme="system"] .docs-live-intent-brief,
   .app-shell[data-theme="system"] .docs-live-placeholder-manager,
   .app-shell[data-theme="system"] .docs-live-workflow,
   .app-shell[data-theme="system"] .status-message,
@@ -13413,6 +13457,7 @@ select:hover {
   padding-left: 18px;
 }
 
+.docs-live-intent-brief,
 .docs-live-placeholder-manager {
   display: grid;
   gap: 8px;
@@ -13420,6 +13465,25 @@ select:hover {
   border: 1px solid #d7dee7;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.docs-live-intent-brief header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.docs-live-intent-brief header span,
+.docs-live-intent-brief header small {
+  color: #526171;
+  font-size: 12px;
+}
+
+.docs-live-intent-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  gap: 8px;
 }
 
 .docs-live-placeholder-manager header,
@@ -13861,6 +13925,10 @@ select:hover {
   }
 
   .docs-live-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .docs-live-intent-grid {
     grid-template-columns: 1fr;
   }
 

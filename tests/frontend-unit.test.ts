@@ -350,6 +350,8 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(questionnaire.includes("Who is the client or sponsor?"));
   ok(questionnaire.includes('What should "Acme Renewal Proposal" help the reader decide'));
   ok(questionnaire.includes('For "Executive Summary", what facts'));
+  ok(questionnaire.includes("Outcome"));
+  ok(questionnaire.includes("Distribution Target"));
 
   const draft = buildDocsLiveDraft({
     documentType: "proposal",
@@ -1538,6 +1540,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("guidedDemoSteps"));
   ok(app.includes("AI Agent Workspace"));
   ok(app.includes('aria-label="Docs Live placeholder manager"'));
+  ok(app.includes('aria-label="AI Create intent brief"'));
+  ok(app.includes("docsLiveIntentFields"));
+  ok(app.includes("docsLiveIntentCompletion"));
+  ok(app.includes("updateDocsLiveIntentField"));
+  ok(app.includes("docsLivePlaceholderValue"));
+  ok(app.includes("distribution target"));
   ok(app.includes("docsLivePlaceholderRows"));
   ok(app.includes("docsLiveMissingPlaceholderKeys"));
   ok(app.includes("addDocsLivePlaceholder"));

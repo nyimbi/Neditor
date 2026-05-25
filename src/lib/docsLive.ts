@@ -309,6 +309,8 @@ const placeholderSignals = [
   "audience",
   "decision",
   "goal",
+  "outcome",
+  "distribution target",
   "deadline",
   "date",
   "budget",
@@ -340,7 +342,7 @@ export function buildDocsLiveQuestionnaire(documentType: string, request: DocsLi
   for (const section of outlineItems.slice(0, 8)) {
     questions.push(`For "${section.title}", what facts, examples, calculations, decisions, or caveats must be included?`);
   }
-  const missing = ["audience", "owner", "deadline", "evidence", "tone", "reviewer"].filter((key) => !placeholders[key]);
+  const missing = ["audience", "outcome", "owner", "deadline", "distribution target", "evidence", "tone", "reviewer"].filter((key) => !placeholders[key]);
   if (missing.length) {
     questions.push(`Which ${missing.map(titleCase).join(", ")} values should Docs Live use as placeholders or review prompts?`);
   }
