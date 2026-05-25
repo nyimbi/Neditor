@@ -3225,7 +3225,6 @@ const agentTaskQuery = ref("");
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const guidedDemoStepIndex = ref(0);
-const guidedDemoCompletedStepIds = ref<string[]>([]);
 const docsLiveDocumentType = ref<DocsLiveDocumentType>("business-brief");
 const docsLiveTitle = ref("");
 const docsLiveOutlineText = ref("");
@@ -4678,7 +4677,7 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
   },
 ]);
 const currentDemoStep = computed(() => guidedDemoSteps.value[guidedDemoStepIndex.value] || guidedDemoSteps.value[0] || null);
-const guidedDemoCompletedCount = computed(() => guidedDemoSteps.value.filter((step) => guidedDemoCompletedStepIds.value.includes(step.id)).length);
+const guidedDemoCompletedCount = computed(() => guidedDemoSteps.value.filter((step) => store.guidedDemoCompletedStepIds.includes(step.id)).length);
 const guidedDemoCompletionPercent = computed(() =>
   guidedDemoSteps.value.length ? Math.round((guidedDemoCompletedCount.value / guidedDemoSteps.value.length) * 100) : 0,
 );
@@ -5507,16 +5506,14 @@ function nextGuidedDemoStep() {
   selectGuidedDemoStep(guidedDemoStepIndex.value + 1);
 }
 function guidedDemoStepIsComplete(stepId: string) {
-  return guidedDemoCompletedStepIds.value.includes(stepId);
+  return store.guidedDemoCompletedStepIds.includes(stepId);
 }
 function markGuidedDemoStepComplete(stepId: string) {
-  if (!guidedDemoCompletedStepIds.value.includes(stepId)) {
-    guidedDemoCompletedStepIds.value = [...guidedDemoCompletedStepIds.value, stepId];
-  }
+  store.recordGuidedDemoStepComplete(stepId);
   store.statusMessage = `Marked guided demo step complete: ${stepId}`;
 }
 function resetGuidedDemoProgress() {
-  guidedDemoCompletedStepIds.value = [];
+  store.resetGuidedDemoProgress();
   store.statusMessage = "Reset guided demo progress";
 }
 function guidedDemoTableCell(value: string) {

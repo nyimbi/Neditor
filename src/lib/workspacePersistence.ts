@@ -299,6 +299,7 @@ export interface PersistedWorkspace {
   customTransformTemplates?: CustomTransformTemplate[];
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
   agentRunHistory?: Partial<AgentRunHistoryItem>[];
+  guidedDemoCompletedStepIds?: string[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -883,6 +884,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (isRecord(raw.aiCleanupDefaults)) migrated.aiCleanupDefaults = normalizeAiCleanupDefaults(raw.aiCleanupDefaults);
   const agentRunHistory = normalizeAgentRunHistory(raw.agentRunHistory);
   if (agentRunHistory.length) migrated.agentRunHistory = agentRunHistory;
+  migrated.guidedDemoCompletedStepIds = stringArray(raw.guidedDemoCompletedStepIds, 40);
   migrated.recentFiles = stringArray(raw.recentFiles, 20);
   migrated.recentFolders = stringArray(raw.recentFolders, 12);
   migrated.recentlyClosed = stringArray(raw.recentlyClosed, 20);

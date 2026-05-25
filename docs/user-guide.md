@@ -189,8 +189,9 @@ new users to this flow. The guided demo now includes dedicated steps for the
 Lifecycle Task Board and provider handoff governance, so business users can
 practice routing tasks, inserting briefs, copying handoffs, building provider
 packages, and applying provider output as review material before using those
-controls on a live document. Trainers can mark steps complete, reset progress,
-or insert/copy the generated Markdown checklist as onboarding evidence.
+controls on a live document. Trainers can mark steps complete, reset locally
+persisted progress, or insert/copy the generated Markdown checklist as
+onboarding evidence.
 
 Use **AI Create** when the next action is clearly to create a first draft. It
 opens Docs Live with an intent-first workflow: document type, outline, spoken or

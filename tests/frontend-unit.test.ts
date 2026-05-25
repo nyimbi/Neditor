@@ -1257,6 +1257,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         title: "Duplicate ignored",
       },
     ],
+    guidedDemoCompletedStepIds: ["ai-create", "", "export", "ai-create", 42],
     recentFiles: ["/a.md", 42, "/a.md", "/b.md"],
     recentFolders: ["/workspace", ""],
     workspacePath: "/legacy/workspace",
@@ -1473,6 +1474,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   });
   equal(migrated.agentRunHistory?.length, 1);
   equal(normalizeAgentRunHistory([{ runId: "" }]).length, 0);
+  deepEqual(migrated.guidedDemoCompletedStepIds, ["ai-create", "export"]);
   deepEqual(migrated.recentFiles, ["/a.md", "/b.md"]);
   deepEqual(migrated.recentFolders, ["/workspace"]);
   equal(migrated.workspaceRoot, "/legacy/workspace");
@@ -1560,6 +1562,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("guidedDemoCompletionSummary"));
   ok(app.includes("guidedDemoCompletedCount"));
   ok(app.includes("guidedDemoCompletedStepIds"));
+  ok(app.includes("recordGuidedDemoStepComplete"));
+  ok(app.includes("resetGuidedDemoProgress"));
   ok(app.includes("Mark done"));
   ok(app.includes("Insert checklist"));
   ok(app.includes("Copy checklist"));

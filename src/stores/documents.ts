@@ -385,6 +385,7 @@ export const useDocumentsStore = defineStore("documents", {
     gitIntegration: normalizeGitIntegrationPreferences({}),
     aiCleanupDefaults: normalizeAiCleanupDefaults({}),
     agentRunHistory: [] as AgentRunHistoryItem[],
+    guidedDemoCompletedStepIds: [] as string[],
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
     lastError: "",
@@ -507,6 +508,7 @@ export const useDocumentsStore = defineStore("documents", {
         if (persisted.gitIntegration) this.gitIntegration = normalizeGitIntegrationPreferences(persisted.gitIntegration);
         if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
         this.agentRunHistory = normalizeAgentRunHistory(persisted.agentRunHistory);
+        this.guidedDemoCompletedStepIds = persisted.guidedDemoCompletedStepIds || [];
         this.recentFiles = persisted.recentFiles || [];
         this.recentFolders = persisted.recentFolders || [];
         this.recentlyClosed = persisted.recentlyClosed || [];
@@ -571,6 +573,7 @@ export const useDocumentsStore = defineStore("documents", {
         gitIntegration: this.gitIntegration,
         aiCleanupDefaults: this.aiCleanupDefaults,
         agentRunHistory: this.agentRunHistory,
+        guidedDemoCompletedStepIds: this.guidedDemoCompletedStepIds,
         recentFiles: this.recentFiles.slice(0, 20),
         recentFolders: this.recentFolders.slice(0, 12),
         recentlyClosed: this.recentlyClosed.slice(0, 20),
@@ -608,6 +611,16 @@ export const useDocumentsStore = defineStore("documents", {
         item,
         ...this.agentRunHistory.filter((entry) => entry.runId !== item.runId),
       ]);
+      void this.persistWorkspace();
+    },
+    recordGuidedDemoStepComplete(stepId: string) {
+      const normalizedStepId = stepId.trim();
+      if (!normalizedStepId || this.guidedDemoCompletedStepIds.includes(normalizedStepId)) return;
+      this.guidedDemoCompletedStepIds = [...this.guidedDemoCompletedStepIds, normalizedStepId].slice(0, 40);
+      void this.persistWorkspace();
+    },
+    resetGuidedDemoProgress() {
+      this.guidedDemoCompletedStepIds = [];
       void this.persistWorkspace();
     },
     async restoreWorkspace(
