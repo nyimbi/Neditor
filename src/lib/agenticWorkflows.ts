@@ -210,10 +210,26 @@ export interface AgenticWorkflowRun {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   outlineCritique: AgenticOutlineCritiqueItem[];
+  releaseEvidenceBundle: AgenticReleaseEvidenceBundle;
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
+}
+
+export interface AgenticReleaseEvidenceBundle {
+  id: string;
+  summary: string;
+  items: AgenticReleaseEvidenceItem[];
+  blockers: string[];
+}
+
+export interface AgenticReleaseEvidenceItem {
+  label: string;
+  owner: string;
+  status: AgenticEvidenceStatus;
+  detail: string;
+  requiredBeforeRelease: boolean;
 }
 
 export interface AgenticOutlineCritiqueItem {
@@ -511,6 +527,16 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     applicationMode,
     generatedAt,
   });
+  const releaseEvidenceBundle = buildReleaseEvidenceBundle({
+    plan,
+    auditTrail,
+    controlCenter,
+    lifecycleTasks,
+    reviewerAgents,
+    distributionTargetPlans,
+    documentEvidence,
+    blockers,
+  });
   const markdown = buildRunMarkdown({
     plan,
     draftMarkdown: draft?.markdown || "",
@@ -519,6 +545,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     controlCenter,
     documentEvidence,
     auditTrail,
+    releaseEvidenceBundle,
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
@@ -540,6 +567,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     controlCenter,
     auditTrail,
     documentEvidence,
+    releaseEvidenceBundle,
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
@@ -2319,6 +2347,113 @@ function buildAuditTrail(input: {
   };
 }
 
+function buildReleaseEvidenceBundle(input: {
+  plan: AgenticWorkflowPlan;
+  auditTrail: AgenticAuditTrail;
+  controlCenter: AgenticControlCenter;
+  lifecycleTasks: AgenticLifecycleTask[];
+  reviewerAgents: AgenticReviewerAgent[];
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
+  documentEvidence: AgenticDocumentEvidence;
+  blockers: string[];
+}): AgenticReleaseEvidenceBundle {
+  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, distributionTargetPlans, documentEvidence, blockers } = input;
+  const taskBlockers = lifecycleTasks.filter((task) => task.status === "blocked" || task.status === "needs-input");
+  const reviewerBlockers = reviewerAgents.filter((agent) => agent.status !== "ready");
+  const items: AgenticReleaseEvidenceItem[] = [
+    releaseEvidenceItem(
+      "Agent audit trail",
+      "Governance Agent",
+      "available",
+      `Run ${auditTrail.runId} includes instruction, context, source, and output fingerprints.`,
+      true,
+    ),
+    releaseEvidenceItem(
+      "Source grounding",
+      "Evidence Agent",
+      controlCenter.sourceGrounding.some((item) => item.status === "missing")
+        ? "missing"
+        : controlCenter.sourceGrounding.some((item) => item.status === "needs-review")
+          ? "needs-review"
+          : "available",
+      "Context completeness, current document evidence, selected text, source pack, citation TODOs, and claim inventory are captured in the control center.",
+      true,
+    ),
+    releaseEvidenceItem(
+      "Human review closure",
+      "Governance Agent",
+      documentEvidence.unreviewedAiMarkers || documentEvidence.unresolvedComments || taskBlockers.length ? "needs-review" : "available",
+      `${documentEvidence.unreviewedAiMarkers} AI marker(s), ${documentEvidence.unresolvedComments} review comment(s), and ${taskBlockers.length} unresolved lifecycle task(s) require closure evidence.`,
+      true,
+    ),
+    releaseEvidenceItem(
+      "Reviewer sign-off",
+      "Review Lead",
+      reviewerBlockers.length ? "needs-review" : "available",
+      reviewerBlockers.length
+        ? `${reviewerBlockers.length} reviewer agent(s) still require action: ${reviewerBlockers.map((agent) => agent.label).join(", ")}.`
+        : "All reviewer agents are ready.",
+      true,
+    ),
+    releaseEvidenceItem(
+      "Document-type quality gates",
+      "Quality Agent",
+      plan.qualityGates.length ? "needs-review" : "available",
+      plan.qualityGates.length
+        ? `${plan.qualityGates.length} quality gate(s) are staged for ${plan.documentType}; completion evidence must be attached before release.`
+        : "No document-type quality gates were required.",
+      true,
+    ),
+    releaseEvidenceItem(
+      "Distribution artifacts",
+      "Distribution Agent",
+      distributionTargetPlans.length ? "needs-review" : "available",
+      distributionTargetPlans.length
+        ? `${distributionTargetPlans.map((target) => target.label).join(", ")} need generated artifacts, manifests, and handoff evidence.`
+        : "No distribution target is active.",
+      Boolean(distributionTargetPlans.length),
+    ),
+    releaseEvidenceItem(
+      "Approval metadata",
+      "Governance Agent",
+      documentEvidence.approvalMetadataMissing.length ? "missing" : "available",
+      documentEvidence.approvalMetadataMissing.length
+        ? `Missing approval metadata: ${documentEvidence.approvalMetadataMissing.join(", ")}.`
+        : "Required approval metadata is present or not required for this run.",
+      Boolean(distributionTargetPlans.length),
+    ),
+    releaseEvidenceItem(
+      "Provider handoff proof",
+      "Provider Operator",
+      plan.sourcePack.items.length || plan.lanes.some((lane) => lane === "create" || lane === "revise") ? "needs-review" : "available",
+      "If an external provider is used, retain the redacted request package, response hash, imported response wrapper, and source-pack evidence.",
+      false,
+    ),
+  ];
+  const bundleBlockers = [
+    ...blockers,
+    ...items.filter((item) => item.requiredBeforeRelease && item.status !== "available").map((item) => `${item.label}: ${item.detail}`),
+  ];
+  return {
+    id: `release-evidence-${auditTrail.runId}`,
+    summary: bundleBlockers.length
+      ? `${bundleBlockers.length} release evidence blocker(s) remain before distribution or archival.`
+      : "Release evidence bundle is ready for human approval and archival.",
+    items,
+    blockers: bundleBlockers.slice(0, 16),
+  };
+}
+
+function releaseEvidenceItem(
+  label: string,
+  owner: string,
+  status: AgenticEvidenceStatus,
+  detail: string,
+  requiredBeforeRelease: boolean,
+): AgenticReleaseEvidenceItem {
+  return { label, owner, status, detail, requiredBeforeRelease };
+}
+
 function rollbackPlan(applicationMode: AgenticWorkflowRun["applicationMode"]) {
   if (applicationMode === "replace-selection") {
     return [
@@ -2979,6 +3114,7 @@ function buildRunMarkdown(input: {
   controlCenter: AgenticControlCenter;
   documentEvidence: AgenticDocumentEvidence;
   auditTrail: AgenticAuditTrail;
+  releaseEvidenceBundle: AgenticReleaseEvidenceBundle;
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
@@ -2997,6 +3133,7 @@ function buildRunMarkdown(input: {
     controlCenter,
     documentEvidence,
     auditTrail,
+    releaseEvidenceBundle,
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
@@ -3086,6 +3223,7 @@ function buildRunMarkdown(input: {
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
   lines.push(...auditTrailMarkdown(auditTrail));
+  lines.push(...releaseEvidenceBundleMarkdown(releaseEvidenceBundle));
   if (draftMarkdown.trim()) {
     lines.push("## Generated Draft", "", draftMarkdown.trim(), "");
   }
@@ -3379,6 +3517,25 @@ function auditTrailMarkdown(auditTrail: AgenticAuditTrail) {
     "",
     ...auditTrail.reviewEvents.map((item) => `- ${item}`),
     "",
+  ];
+}
+
+function releaseEvidenceBundleMarkdown(bundle: AgenticReleaseEvidenceBundle) {
+  return [
+    "## Release Evidence Bundle",
+    "",
+    `Bundle ID: ${bundle.id}`,
+    "",
+    bundle.summary,
+    "",
+    "| Evidence | Owner | Status | Required | Detail |",
+    "| --- | --- | --- | --- | --- |",
+    ...bundle.items.map(
+      (item) =>
+        `| ${escapeTableCell(item.label)} | ${escapeTableCell(item.owner)} | ${item.status} | ${item.requiredBeforeRelease ? "yes" : "no"} | ${escapeTableCell(item.detail)} |`,
+    ),
+    "",
+    ...(bundle.blockers.length ? ["### Release Evidence Blockers", "", ...bundle.blockers.map((blocker) => `- [ ] ${blocker}`), ""] : []),
   ];
 }
 

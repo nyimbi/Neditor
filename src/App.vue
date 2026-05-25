@@ -2487,6 +2487,26 @@
                 </article>
               </section>
             </section>
+            <section class="agent-release-evidence" aria-label="Agent release evidence bundle">
+              <header>
+                <div>
+                  <strong>Release Evidence Bundle</strong>
+                  <span>{{ agentRun.releaseEvidenceBundle.summary }}</span>
+                </div>
+                <small>{{ agentRun.releaseEvidenceBundle.blockers.length }} blockers</small>
+              </header>
+              <section class="agent-release-evidence-grid">
+                <article
+                  v-for="item in agentRun.releaseEvidenceBundle.items"
+                  :key="item.label"
+                  :data-status="item.status"
+                >
+                  <small>{{ item.owner }} | {{ item.requiredBeforeRelease ? "required" : "optional" }}</small>
+                  <strong>{{ item.label }}</strong>
+                  <p>{{ item.detail }}</p>
+                </article>
+              </section>
+            </section>
             <section v-if="agentRun.blockers.length" class="agent-missing-inputs" aria-label="Agent run blockers">
               <strong>Resolve before final release</strong>
               <ul>
@@ -9861,6 +9881,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-section-workqueue li,
 .app-shell[data-theme="dark"] .agent-audit-trail,
 .app-shell[data-theme="dark"] .agent-audit-grid article,
+.app-shell[data-theme="dark"] .agent-release-evidence,
+.app-shell[data-theme="dark"] .agent-release-evidence-grid article,
 .app-shell[data-theme="dark"] .agent-history,
 .app-shell[data-theme="dark"] .agent-history li,
 .app-shell[data-theme="dark"] .agent-run-columns article,
@@ -9912,6 +9934,9 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-section-workqueue small,
 .app-shell[data-theme="dark"] .agent-section-workqueue span,
 .app-shell[data-theme="dark"] .agent-section-workqueue ul,
+.app-shell[data-theme="dark"] .agent-release-evidence > header span,
+.app-shell[data-theme="dark"] .agent-release-evidence > header small,
+.app-shell[data-theme="dark"] .agent-release-evidence-grid small,
 .app-shell[data-theme="dark"] .agent-history p,
 .app-shell[data-theme="dark"] .agent-run-columns ul,
 .app-shell[data-theme="dark"] .agent-distribution-runbooks ul,
@@ -9994,6 +10019,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-section-workqueue li,
   .app-shell[data-theme="system"] .agent-audit-trail,
   .app-shell[data-theme="system"] .agent-audit-grid article,
+  .app-shell[data-theme="system"] .agent-release-evidence,
+  .app-shell[data-theme="system"] .agent-release-evidence-grid article,
   .app-shell[data-theme="system"] .agent-history,
   .app-shell[data-theme="system"] .agent-history li,
   .app-shell[data-theme="system"] .agent-run-columns article,
@@ -10045,6 +10072,9 @@ select:hover {
   .app-shell[data-theme="system"] .agent-section-workqueue small,
   .app-shell[data-theme="system"] .agent-section-workqueue span,
   .app-shell[data-theme="system"] .agent-section-workqueue ul,
+  .app-shell[data-theme="system"] .agent-release-evidence > header span,
+  .app-shell[data-theme="system"] .agent-release-evidence > header small,
+  .app-shell[data-theme="system"] .agent-release-evidence-grid small,
   .app-shell[data-theme="system"] .agent-history p,
   .app-shell[data-theme="system"] .agent-run-columns ul,
   .app-shell[data-theme="system"] .agent-distribution-runbooks ul,
@@ -10112,6 +10142,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-section-workqueue li,
 .app-shell[data-high-contrast="true"] .agent-audit-trail,
 .app-shell[data-high-contrast="true"] .agent-audit-grid article,
+.app-shell[data-high-contrast="true"] .agent-release-evidence,
+.app-shell[data-high-contrast="true"] .agent-release-evidence-grid article,
 .app-shell[data-high-contrast="true"] .agent-history,
 .app-shell[data-high-contrast="true"] .agent-history li,
 .app-shell[data-high-contrast="true"] .agent-run-columns article,
@@ -11731,6 +11763,8 @@ select:hover {
 .agent-section-workqueue li,
 .agent-audit-trail,
 .agent-audit-grid article,
+.agent-release-evidence,
+.agent-release-evidence-grid article,
 .agent-history,
 .agent-history li,
 .agent-run-columns article,
@@ -12293,6 +12327,56 @@ select:hover {
 
 .agent-audit-grid ul {
   padding-left: 18px;
+  color: #2d3746;
+  font-size: 12px;
+}
+
+.agent-release-evidence {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #4d6f8f;
+  background: #f7fbff;
+}
+
+.agent-release-evidence > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-release-evidence > header div,
+.agent-release-evidence-grid article {
+  display: grid;
+  gap: 3px;
+}
+
+.agent-release-evidence > header span,
+.agent-release-evidence > header small,
+.agent-release-evidence-grid small {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-release-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.agent-release-evidence-grid article[data-status="missing"] {
+  border-left: 3px solid #b34040;
+}
+
+.agent-release-evidence-grid article[data-status="needs-review"] {
+  border-left: 3px solid #c68a1a;
+}
+
+.agent-release-evidence-grid article[data-status="available"] {
+  border-left: 3px solid #2f7d4c;
+}
+
+.agent-release-evidence-grid p {
+  margin: 0;
   color: #2d3746;
   font-size: 12px;
 }
@@ -13701,6 +13785,7 @@ select:hover {
   .agent-edit-acceptance-compare,
   .agent-review-comment-queue li,
   .agent-section-workqueue li,
+  .agent-release-evidence-grid,
   .agent-history li,
   .agent-history dl,
   .agent-run-columns,

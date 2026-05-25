@@ -705,6 +705,9 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("Completion criteria:"));
   ok(run.markdown.includes("## Agent Audit Trail"));
   ok(run.markdown.includes("### Rollback Plan"));
+  ok(run.markdown.includes("## Release Evidence Bundle"));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent audit trail" && item.status === "available"));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
   ok(run.markdown.includes("Substack newsletter package"));
   ok(run.markdown.includes("Google Docs collaboration package"));
   ok(run.auditTrail.runId.startsWith("agent-20260524T10000"));
@@ -1534,6 +1537,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Review Comment Resolution Queue"));
   ok(app.includes("agentRun.documentEvidence.reviewCommentResolutions"));
   ok(app.includes("setAgentReviewCommentStatus"));
+  ok(app.includes("Release Evidence Bundle"));
+  ok(app.includes("agentRun.releaseEvidenceBundle"));
+  ok(app.includes("agent-release-evidence"));
   ok(app.includes("Revise"));
   ok(app.includes("agent-context-score"));
   ok(app.includes("agentRun"));
