@@ -1018,6 +1018,16 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Agent Workspace playbooks"));
   ok(app.includes("agent-playbooks"));
   ok(app.includes("Run a workflow playbook"));
+  ok(app.includes("agent-lifecycle-governance"));
+  ok(app.includes("Agent lifecycle governance"));
+  ok(app.includes("Open lifecycle board"));
+  ok(app.includes("Turn AI plans into owned tasks"));
+  ok(app.includes("Provider responses are applied as needs-review material"));
+  ok(app.includes("lifecycle-tasks"));
+  ok(app.includes("Turn plans into owned tasks"));
+  ok(app.includes("provider-governance"));
+  ok(app.includes("Govern provider handoffs"));
+  ok(app.includes("Apply response wraps returned Markdown in AI provenance"));
   ok(app.includes("buildAgenticWorkflowPlan"));
   ok(app.includes("buildAgenticWorkflowRun"));
   ok(app.includes("agentPlan"));

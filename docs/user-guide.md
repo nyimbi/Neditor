@@ -132,6 +132,13 @@ so a provider response cannot enter the document as approved final copy. The
 saved run history stores that wrapped review draft, so later append/copy actions
 reproduce the same governed material that was applied.
 
+Open **Help > Guided Demo** or the **AI Governance** help topic when onboarding
+new users to this flow. The guided demo now includes dedicated steps for the
+Lifecycle Task Board and provider handoff governance, so business users can
+practice routing tasks, inserting briefs, copying handoffs, building provider
+packages, and applying provider output as review material before using those
+controls on a live document.
+
 Use **AI Create** when the next action is clearly to create a first draft. It
 opens Docs Live with an intent-first workflow: document type, outline, spoken or
 typed context, placeholder values, AI-created questionnaire, section-by-section

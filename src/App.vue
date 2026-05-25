@@ -1190,6 +1190,7 @@
             <div class="help-quick-actions" aria-label="Popular help actions">
               <button type="button" @click="openHelp('getting-started')">Start</button>
               <button type="button" @click="openHelp('docs-live')">Docs Live</button>
+              <button type="button" @click="openHelp('agent-lifecycle-governance')">AI Governance</button>
               <button type="button" @click="openGuidedDemo()">Guided demo</button>
               <button type="button" @click="openHelp('export-publishing')">Export</button>
               <button type="button" @click="openHelp('keyboard-shortcuts')">Shortcuts</button>
@@ -3398,11 +3399,12 @@ const helpTopics = computed<HelpTopic[]>(() => [
       "Open AI Create, Docs Live, or Agent Workspace and choose a workflow playbook when the work matches a common business pattern.",
       "Give the agent the audience, outcome, constraints, source facts, tone, and placeholder values.",
       "Let the AI-created questionnaire expose missing context before drafting.",
-      "Generate the draft section by section, then use the QA register and humanization checklist before applying it.",
+      "Generate the draft section by section, then use the Lifecycle Task Board, QA register, and humanization checklist before applying it.",
     ],
     tips: [
       "AI-first does not mean unreviewed: keep provenance, comments, and human review status visible.",
       "Outline-first inputs produce better drafts because sections have a clear job before prose is generated.",
+      "Use the lifecycle board when composition, editing, revision, review, and distribution need different owners or evidence.",
     ],
     actions: [
       { label: "AI Create", run: () => startAiDocumentCreation() },
@@ -3423,10 +3425,12 @@ const helpTopics = computed<HelpTopic[]>(() => [
       "Edit the generated instruction so it names the audience, owner, deadline, evidence, reviewer, and target delivery channels.",
       "Plan the workflow to inspect lanes, missing inputs, placeholders, outline, and next actions.",
       "Generate the agent packet, then review the AI Control Center, reviewer agents, section work queue, audit trail, and distribution runbooks before applying or sending to a provider.",
+      "Use the Lifecycle Task Board to run, insert, or copy owned task briefs for creation, composition, editing, revision, review, and distribution.",
     ],
     tips: [
       "Playbooks are starting points, not hidden automation: the full instruction remains editable before generation.",
       "Provider handoff packages include reviewer agents and section work queues so an approved model can continue the same governed workflow.",
+      "Provider responses are applied as needs-review material, then tracked in run history with the exact wrapped review packet.",
     ],
     actions: [
       { label: "Open Agent Workspace", run: () => openAgentWorkspace() },
@@ -3436,14 +3440,52 @@ const helpTopics = computed<HelpTopic[]>(() => [
     keywords: ["agent", "playbook", "workflow", "board memo", "proposal", "SOP", "substack", "provider"],
   },
   {
+    id: "agent-lifecycle-governance",
+    title: "Agent lifecycle governance",
+    category: "review",
+    summary: "Turn AI plans into owned tasks, governed provider handoffs, review evidence, and reusable run history.",
+    when: "Use this when AI work needs to move from idea to draft to review to distribution without becoming an untracked chat transcript.",
+    steps: [
+      "Open Agent Workspace, load a playbook, and generate the agent packet.",
+      "Read the AI Control Center to decide which next action is safe: gather context, draft, revise, review, or prepare export.",
+      "Use the Lifecycle Task Board to run the right workspace surface or insert/copy a durable task brief for another owner.",
+      "Build a provider request only after reviewing the redacted prompt, lifecycle context, reviewer assignments, section queue, and safety checklist.",
+      "Apply provider responses only through Apply response so NEditor wraps them in needs-review provenance and saves the wrapped packet to history.",
+    ],
+    tips: [
+      "Run task is for immediate routing; Insert brief is for document-visible work orders; Copy brief is for external reviewers or delivery owners.",
+      "Run history makes the agent workflow reusable: replan from the same instruction, append the saved packet, or copy the exact governed material later.",
+      "Keep human review status separate from provider output so distribution readiness can prove what was inspected.",
+    ],
+    actions: [
+      {
+        label: "Open lifecycle board",
+        run: () => {
+          openAgentWorkspace(agenticWorkflowPlaybooks[0]?.instruction || "");
+          generateAgentWorkspaceRun();
+        },
+      },
+      {
+        label: "Build provider package",
+        run: () => {
+          openAgentWorkspace(agenticWorkflowPlaybooks.find((playbook) => playbook.id === "publish-to-blog-and-substack")?.instruction || "");
+          generateAgentWorkspaceRun();
+          buildAgentProviderPackage();
+        },
+      },
+      { label: "Review provenance", run: () => (store.sidebar = "review") },
+    ],
+    keywords: ["lifecycle", "governance", "provider", "audit", "task board", "provenance", "history"],
+  },
+  {
     id: "guided-demo",
     title: "Guided product demo",
     category: "basics",
-    summary: "Walk through NEditor capabilities from AI creation to outline planning, review, templates, and export.",
+    summary: "Walk through NEditor capabilities from AI creation to lifecycle governance, outline planning, review, templates, and export.",
     when: "Use this when onboarding a new user or evaluating what NEditor can do.",
     steps: [
       "Start the guided demo from Help or the command palette.",
-      "Move step by step through AI creation, outline planning, systematic composition, templates, review, and export.",
+      "Move step by step through AI creation, lifecycle task ownership, provider governance, outline planning, systematic composition, templates, review, and export.",
       "Use Try this step to route the workbench to the relevant real feature.",
       "Return to Help at any time for deeper workflow guidance.",
     ],
@@ -3776,6 +3818,39 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Build a provider package when an approved model should continue the workflow.",
     ],
     run: () => openAgentWorkspace(agenticWorkflowPlaybooks[0]?.instruction || ""),
+  },
+  {
+    id: "lifecycle-tasks",
+    title: "Turn plans into owned tasks",
+    mode: "Lifecycle Task Board",
+    summary: "Route creation, composition, editing, revision, review, and distribution through visible task briefs.",
+    detail: "The Lifecycle Task Board converts an AI workflow into owned actions with evidence, next steps, and controls to run the task, insert a brief, or copy it for another stakeholder.",
+    points: [
+      "Review task lane, status, owner, next step, and evidence before anyone starts work.",
+      "Use Run task to jump to Docs Live, Outline, Review, AI Paste, or Export readiness.",
+      "Use Insert brief or Copy brief when a task should become a documented handoff.",
+    ],
+    run: () => {
+      openAgentWorkspace(agenticWorkflowPlaybooks[0]?.instruction || "");
+      generateAgentWorkspaceRun();
+    },
+  },
+  {
+    id: "provider-governance",
+    title: "Govern provider handoffs",
+    mode: "Provider review",
+    summary: "Send only reviewed packages to approved AI providers and apply responses as needs-review material.",
+    detail: "Provider handoff builds a redacted request package with lifecycle context, reviewer assignments, section work queues, and safety checks; Apply response wraps returned Markdown in AI provenance before it reaches the document.",
+    points: [
+      "Choose the approved provider profile, model, endpoint, and session-only key.",
+      "Inspect the request package before any direct provider execution.",
+      "Apply provider output only after previewing the response and preserving needs-review provenance.",
+    ],
+    run: () => {
+      openAgentWorkspace(agenticWorkflowPlaybooks.find((playbook) => playbook.id === "publish-to-blog-and-substack")?.instruction || "");
+      generateAgentWorkspaceRun();
+      buildAgentProviderPackage();
+    },
   },
   {
     id: "outline",

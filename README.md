@@ -226,6 +226,10 @@ web app.
   provider responses are wrapped in local `ai-source` and `ai-assisted`
   needs-review provenance before they enter the document, and provider-applied
   history records the wrapped review draft that was actually inserted.
+  The Help Center and guided demo include AI Governance steps that show
+  non-technical users how to route lifecycle tasks, insert or copy task briefs,
+  review provider packages, and apply provider output only as governed
+  needs-review material.
 - AI Create makes Docs Live the default first step for intent-led drafting,
   so users can begin with the outcome, audience, context, and placeholders
   instead of a blank page.
