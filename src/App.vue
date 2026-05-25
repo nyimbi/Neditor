@@ -3433,9 +3433,19 @@
           autofocus
           data-initial-focus
           aria-label="Search commands, headings, citations, glossary, index terms, or enter an AI instruction"
-          placeholder="Search commands or tell NEditor what to do"
+          placeholder="Search commands, headings, citations, glossary, index terms"
           @keydown.enter.prevent="runCommandPaletteAgentInstruction"
         />
+        <button
+          v-for="command in filteredCommands"
+          :key="command.name"
+          class="command-row"
+          type="button"
+          @click="runCommand(command.run)"
+        >
+          <strong>{{ command.name }}</strong>
+          <span>{{ command.group }}</span>
+        </button>
         <section v-if="commandAgentInstructionAvailable" class="command-agent-route" aria-label="AI command route">
           <div>
             <strong>Generate with AI agent</strong>
@@ -3471,16 +3481,6 @@
             <button type="button" @click="runCommandPaletteAgentInstruction">Generate Packet</button>
           </div>
         </section>
-        <button
-          v-for="command in filteredCommands"
-          :key="command.name"
-          class="command-row"
-          type="button"
-          @click="runCommand(command.run)"
-        >
-          <strong>{{ command.name }}</strong>
-          <span>{{ command.group }}</span>
-        </button>
       </div>
     </section>
 

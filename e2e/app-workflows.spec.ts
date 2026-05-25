@@ -1679,7 +1679,7 @@ test("manages modal focus and Escape return paths", async ({ page }) => {
   await commandsButton.click();
   const commandDialog = page.getByRole("dialog", { name: "Command palette" });
   await expect(commandDialog).toBeVisible();
-  await expect(page.getByLabel("Search commands, headings, citations, glossary, and index terms")).toBeFocused();
+  await expect(page.getByLabel("Search commands, headings, citations, glossary, index terms, or enter an AI instruction")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(commandDialog).toBeHidden();
   await expect(commandsButton).toBeFocused();
@@ -1705,7 +1705,7 @@ test("supports keyboard-only operation for deep workbench controls", async ({ pa
   await commandsButton.press("Space");
   const commandDialog = page.getByRole("dialog", { name: "Command palette" });
   await expect(commandDialog).toBeVisible();
-  await expect(page.getByLabel("Search commands, headings, citations, glossary, and index terms")).toBeFocused();
+  await expect(page.getByLabel("Search commands, headings, citations, glossary, index terms, or enter an AI instruction")).toBeFocused();
   await page.keyboard.type("Show document outline");
   await page.keyboard.press("Tab");
   await expect(commandDialog.getByRole("button", { name: /Show document outline Navigate/ })).toBeFocused();
