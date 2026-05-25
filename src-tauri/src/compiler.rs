@@ -138,7 +138,12 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     }
     normalize_source_map_after_front_matter(&mut source_map, body_start_line);
     let mut calculation_context = HashMap::new();
-    let formula_graph = collect_calculations(&body, &mut calculation_context, &mut diagnostics);
+    let formula_graph = collect_calculations(
+        &body,
+        &mut calculation_context,
+        &source_map,
+        &mut diagnostics,
+    );
     let formula_edges = formula_dependency_edges(&formula_graph);
     let interpolated = interpolate_variables(
         &body,

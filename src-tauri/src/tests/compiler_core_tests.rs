@@ -328,9 +328,28 @@ fn calc_blocks_resolve_forward_refs_and_report_cycles() {
                 .as_deref()
                 .is_some_and(|error| error.contains("#CYCLE? cycle_a -> cycle_b -> cycle_a"))
     }));
-    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
-        .message
-        .contains("#CYCLE? cycle_a -> cycle_b -> cycle_a")));
+    let cycle_diagnostic = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic
+                .message
+                .contains("#CYCLE? cycle_a -> cycle_b -> cycle_a")
+        })
+        .expect("cycle diagnostic");
+    assert_eq!(cycle_diagnostic.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(cycle_diagnostic.line, Some(11));
+    assert_eq!(cycle_diagnostic.column, Some(1));
+    assert_eq!(cycle_diagnostic.end_line, Some(11));
+    assert_eq!(cycle_diagnostic.end_column, Some(22));
+    assert!(cycle_diagnostic
+        .related
+        .iter()
+        .any(|related| related == "formula_name:cycle_a"));
+    assert!(cycle_diagnostic
+        .related
+        .iter()
+        .any(|related| related == "dependency:cycle_b"));
 }
 
 #[test]

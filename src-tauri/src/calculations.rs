@@ -1,5 +1,9 @@
-use crate::diagnostics::DocumentDiagnostic;
-use crate::{compiler_support::collect_fence_bodies, diagnostics::diag};
+use crate::{
+    compiler_support::collect_fence_bodies_with_lines,
+    diagnostics::{diag, with_range, DocumentDiagnostic},
+    source_mapping::diagnostic_location_for_generated_line,
+    SourceMapEntry,
+};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -46,18 +50,22 @@ pub(crate) enum FormulaAstNode {
 pub(crate) fn collect_calculations(
     text: &str,
     context: &mut HashMap<String, f64>,
+    source_map: &[SourceMapEntry],
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> Vec<FormulaValue> {
     let mut definitions = Vec::new();
     let mut definition_index = HashMap::new();
-    for block in collect_fence_bodies(text, "calc") {
-        for line in block.lines() {
+    for (fence_start_line, block) in collect_fence_bodies_with_lines(text, "calc") {
+        for (body_line_index, line) in block.lines().enumerate() {
             let trimmed = line.trim();
             if trimmed.is_empty() || trimmed.starts_with('#') {
                 continue;
             }
             if let Some((name, expression)) = trimmed.split_once('=') {
+                let source_line = fence_start_line + body_line_index + 1;
+                let column = line.find(name.trim()).map(|index| index + 1).unwrap_or(1);
                 let name = name.trim().to_string();
+                let end_column = line.trim_end().len().saturating_add(1).max(column);
                 let expression = expression.trim().to_string();
                 let dependencies = expression_dependencies(&expression);
                 definition_index.insert(name.clone(), definitions.len());
@@ -65,6 +73,9 @@ pub(crate) fn collect_calculations(
                     name,
                     expression,
                     dependencies,
+                    source_line,
+                    column,
+                    end_column,
                 });
             }
         }
@@ -92,13 +103,29 @@ pub(crate) fn collect_calculations(
                 ast: parse_formula_ast(&definition.expression).ok(),
             }),
             Err(error) => {
-                diagnostics.push(diag(
-                    "error",
-                    format!("Formula error for {}: {error}", definition.name),
-                    None,
-                    None,
-                    Some("Use numeric expressions, supported functions, or acyclic named values."),
-                ));
+                let (source_file, line) =
+                    diagnostic_location_for_generated_line(source_map, definition.source_line);
+                let mut diagnostic = with_range(
+                    diag(
+                        "error",
+                        format!("Formula error for {}: {error}", definition.name),
+                        source_file,
+                        line,
+                        Some(
+                            "Use numeric expressions, supported functions, defined names, or acyclic named values.",
+                        ),
+                    ),
+                    definition.column,
+                    line,
+                    definition.end_column,
+                );
+                diagnostic
+                    .related
+                    .push(format!("formula_name:{}", definition.name));
+                for dependency in &definition.dependencies {
+                    diagnostic.related.push(format!("dependency:{dependency}"));
+                }
+                diagnostics.push(diagnostic);
                 formulas.push(FormulaValue {
                     name: definition.name.clone(),
                     expression: definition.expression.clone(),
@@ -132,6 +159,9 @@ struct FormulaDefinition {
     name: String,
     expression: String,
     dependencies: Vec<String>,
+    source_line: usize,
+    column: usize,
+    end_column: usize,
 }
 
 fn evaluate_formula_definition(

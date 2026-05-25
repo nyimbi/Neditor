@@ -3085,6 +3085,12 @@ Equation editor and EPUB export:
 | `cargo check --locked` in `src-tauri` | Pass | Rust command/backend code compiles with the EPUB renderer, native RFP importer, and updated export command target set. |
 | `git diff --check` and `cargo fmt --check` | Pass | No whitespace errors and Rust formatting is clean. |
 
+Calc block diagnostic precision:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked calc_blocks_resolve_forward_refs_and_report_cycles --lib` in `src-tauri` | Pass | Focused compiler proof now checks cyclic calc block diagnostics include the Markdown source file, exact formula source line, start/end columns, formula-name related context, and dependency related context. |
+
 Local agent CLI workspace preparation:
 
 | Command | Result | Evidence |
