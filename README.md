@@ -200,7 +200,9 @@ web app.
   gives users a dedicated **Context answers and constraints** field plus
   **Replan with answers** action so missing-input answers become part of the
   context pack, placeholders, packet, Docs Live handoff, provider package, and
-  saved run history. It can also generate a
+  saved run history. Plans include a context completeness score across
+  audience, evidence, constraints, examples, tone, and approval context so
+  users know whether a responsible first draft has enough grounding. It can also generate a
   complete agent packet with a Docs Live draft, selection-aware revision
   proposal, meaning-drift checks for changed numbers, dates, commitments, and
   caveats, QA gates, named reviewer agents for editorial, evidence, risk,

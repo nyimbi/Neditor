@@ -53,10 +53,19 @@ export interface AgenticWorkflowPlan {
   suggestedOutline: string;
   context: string;
   placeholderText: string;
+  contextCompleteness: AgenticContextCompleteness;
   revisionInstruction: string;
   distributionTargets: ExportTarget[];
   missingInputs: string[];
   steps: AgenticWorkflowStep[];
+}
+
+export interface AgenticContextCompleteness {
+  score: number;
+  status: "strong" | "usable" | "thin";
+  present: string[];
+  missing: string[];
+  recommendations: string[];
 }
 
 export interface AgenticWorkflowPlaybook {
@@ -314,6 +323,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
   const distributionTargets = detectDistributionTargets(corpus);
   const context = buildContext(request, lanes, distributionTargets);
   const placeholderText = buildPlaceholderText(corpus, title, lanes, distributionTargets);
+  const contextCompleteness = scoreContextCompleteness(corpus, context, placeholderText, distributionTargets);
   const suggestedOutline = buildSuggestedOutline(request, primaryLane, documentType);
   const missingInputs = buildMissingInputs(corpus, lanes, distributionTargets);
   const revisionInstruction = buildRevisionInstruction(instruction, lanes, request.selectedText);
@@ -329,6 +339,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     suggestedOutline,
     context,
     placeholderText,
+    contextCompleteness,
     revisionInstruction,
     distributionTargets,
     missingInputs,
@@ -695,6 +706,35 @@ function buildPlaceholderText(corpus: string, title: string, lanes: AgenticWorkf
     .join("\n");
 }
 
+function scoreContextCompleteness(corpus: string, context: string, placeholderText: string, targets: ExportTarget[]): AgenticContextCompleteness {
+  const combined = [corpus, context, placeholderText].join("\n");
+  const checks = [
+    contextCompletenessCheck("audience", combined, /\baudience\s*(?:is|=|:)|\bfor\s+(?:the\s+)?(?:board|executive|customer|client|reader|team|committee)\b/i),
+    contextCompletenessCheck("evidence", combined, /\bevidence\s*(?:is|=|:)|\b(source|data|metric|forecast|research|citation|reference)\b/i),
+    contextCompletenessCheck("constraints", combined, /\b(constraint|risk|must|must not|requirement|policy|legal|budget|deadline)\b/i),
+    contextCompletenessCheck("examples", combined, /\b(example|sample|reference doc|prior version|style guide|template)\b/i),
+    contextCompletenessCheck("tone", combined, /\btone\s*(?:is|=|:)|\b(concise|formal|plain language|executive|technical|legal|friendly)\b/i),
+    contextCompletenessCheck("approval", combined, /\b(approval|approved|reviewer|approver|sign[- ]?off|release status)\b/i),
+  ];
+  const present = checks.filter((check) => check.present).map((check) => check.label);
+  const missing = checks.filter((check) => !check.present).map((check) => check.label);
+  const score = Math.round((present.length / checks.length) * 100);
+  const status: AgenticContextCompleteness["status"] = score >= 80 ? "strong" : score >= 50 ? "usable" : "thin";
+  const recommendations = [
+    missing.includes("audience") ? "Name the audience or decision-maker before drafting." : "",
+    missing.includes("evidence") ? "Add source facts, data, citations, or evidence expectations." : "",
+    missing.includes("constraints") ? "Capture risks, constraints, deadlines, budget, legal, or policy limits." : "",
+    missing.includes("examples") ? "Attach an example, style reference, prior version, or template when tone/shape matters." : "",
+    missing.includes("tone") ? "State the tone and detail level expected by the reader." : "",
+    missing.includes("approval") || targets.length ? "Identify reviewer, approver, release status, or sign-off expectations." : "",
+  ].filter(Boolean);
+  return { score, status, present, missing, recommendations };
+}
+
+function contextCompletenessCheck(label: string, value: string, pattern: RegExp) {
+  return { label, present: pattern.test(value) && !new RegExp(`\\bTBD\\s+${label}\\b`, "i").test(value) };
+}
+
 function buildSuggestedOutline(request: AgenticWorkflowRequest, primaryLane: AgenticWorkflowLane, documentType: DocsLiveDocumentType) {
   const existingOutline = request.documentText ? outlinePlanFromMarkdown(request.documentText) : "";
   if (existingOutline && primaryLane !== "create") return existingOutline;
@@ -844,10 +884,17 @@ function buildLifecycleTasks(input: {
     lane: "create",
     title: "Resolve intent, context, and placeholder inputs",
     owner: "Planner Agent",
-    status: hasBlockers ? "needs-input" : "ready",
+    status: hasBlockers || plan.contextCompleteness.status === "thin" ? "needs-input" : "ready",
     action: "open-docs-live",
-    evidence: blockers.length ? blockers.slice(0, 6) : ["Instruction, context pack, placeholders, and outline are available."],
-    nextStep: hasBlockers ? "Capture missing inputs or keep them visible as review blockers." : "Proceed to outline or section drafting.",
+    evidence: [
+      `Context completeness: ${plan.contextCompleteness.score}/100 (${plan.contextCompleteness.status})`,
+      ...(blockers.length ? blockers.slice(0, 6) : ["Instruction, context pack, placeholders, and outline are available."]),
+      ...plan.contextCompleteness.recommendations.slice(0, 4),
+    ],
+    nextStep:
+      hasBlockers || plan.contextCompleteness.status === "thin"
+        ? "Capture missing inputs and improve audience, evidence, constraints, examples, tone, or approval context."
+        : "Proceed to outline or section drafting.",
   });
 
   tasks.push({
@@ -1664,6 +1711,11 @@ function buildSourceGrounding(
       status: !plan.suggestedOutline.trim() ? "missing" : outlineCritique.length ? "needs-review" : "available",
     },
     {
+      label: "Context completeness",
+      detail: `${plan.contextCompleteness.score}/100 (${plan.contextCompleteness.status}); missing ${plan.contextCompleteness.missing.join(", ") || "none"}.`,
+      status: plan.contextCompleteness.status === "thin" ? "needs-review" : "available",
+    },
+    {
       label: "Evidence",
       detail:
         documentEvidence.citationTodos.length
@@ -2198,9 +2250,19 @@ function buildRunMarkdown(input: {
     "",
     `Workflow lanes: ${plan.lanes.map(titleCase).join(" -> ")}`,
     "",
+    `Context completeness: ${plan.contextCompleteness.score}/100 (${plan.contextCompleteness.status})`,
+    "",
     "### Context Pack",
     "",
     fencedBlock("text", plan.context),
+    "",
+    "### Context Completeness",
+    "",
+    `Present: ${plan.contextCompleteness.present.join(", ") || "none"}`,
+    "",
+    `Missing: ${plan.contextCompleteness.missing.join(", ") || "none"}`,
+    "",
+    ...plan.contextCompleteness.recommendations.map((item) => `- [ ] ${item}`),
     "",
     "### Placeholders",
     "",

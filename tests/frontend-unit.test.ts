@@ -547,6 +547,9 @@ test("agentic workflow planner coordinates creation revision review and distribu
   ok(plan.context.includes("Agent lanes requested"));
   ok(plan.placeholderText.includes("audience: executive team"));
   ok(plan.placeholderText.includes("distribution: pdf, google-docs"));
+  equal(plan.contextCompleteness.status, "usable");
+  ok(plan.contextCompleteness.present.includes("audience"));
+  ok(plan.contextCompleteness.missing.includes("examples"));
   ok(plan.suggestedOutline.includes("Board memo"));
   ok(plan.revisionInstruction.includes("revise it for the CFO"));
   ok(plan.missingInputs.includes("evidence"));
@@ -570,6 +573,8 @@ test("agentic workflow planner uses context answers to close missing inputs", ()
   ok(plan.placeholderText.includes("audience: board"));
   ok(plan.placeholderText.includes("owner: Finance"));
   ok(plan.placeholderText.includes("evidence: audited forecast"));
+  equal(plan.contextCompleteness.status, "strong");
+  ok(plan.contextCompleteness.score >= 80);
   ok(plan.distributionTargets.includes("pdf"));
   ok(!plan.missingInputs.includes("evidence"));
   ok(!plan.missingInputs.includes("approval status for distribution"));
@@ -583,7 +588,9 @@ test("agentic workflow planner uses context answers to close missing inputs", ()
   });
 
   ok(run.markdown.includes("Agent context answers:"));
+  ok(run.markdown.includes("### Context Completeness"));
   ok(run.auditTrail.contextFingerprint.length === 16);
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Context completeness" && item.status === "available"));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.status === "available"));
 });
 
@@ -1366,6 +1373,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("buildAgenticWorkflowPlan"));
   ok(app.includes("buildAgenticWorkflowRun"));
   ok(app.includes("agentPlan"));
+  ok(app.includes("agentPlan.contextCompleteness"));
+  ok(app.includes("agent-context-score"));
   ok(app.includes("agentRun"));
   ok(app.includes("agentContextAnswers"));
   ok(app.includes("commandAgentInstructionAvailable"));

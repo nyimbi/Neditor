@@ -2058,6 +2058,15 @@
             <small>{{ agentPlan.steps.length }} steps</small>
           </header>
           <section class="agent-plan-grid">
+            <article class="agent-context-score" :data-status="agentPlan.contextCompleteness.status">
+              <h3>Context completeness</h3>
+              <strong>{{ agentPlan.contextCompleteness.score }}/100 {{ agentPlan.contextCompleteness.status }}</strong>
+              <p>Present: {{ agentPlan.contextCompleteness.present.join(", ") || "none" }}</p>
+              <p>Missing: {{ agentPlan.contextCompleteness.missing.join(", ") || "none" }}</p>
+              <ul>
+                <li v-for="item in agentPlan.contextCompleteness.recommendations" :key="item">{{ item }}</li>
+              </ul>
+            </article>
             <article>
               <h3>Context pack</h3>
               <pre>{{ agentPlan.context }}</pre>
@@ -11317,6 +11326,18 @@ select:hover {
   overflow: auto;
   margin: 6px 0 0;
   white-space: pre-wrap;
+}
+
+.agent-context-score[data-status="thin"] {
+  border-left: 3px solid #ba5c4b;
+}
+
+.agent-context-score[data-status="usable"] {
+  border-left: 3px solid #c38a22;
+}
+
+.agent-context-score[data-status="strong"] {
+  border-left: 3px solid #4f7f55;
 }
 
 .agent-missing-inputs {

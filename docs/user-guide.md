@@ -86,7 +86,9 @@ When the plan lists missing inputs, answer them in **Context answers and
 constraints** and choose **Replan with answers**. Those answers become part of
 the context pack, placeholder resolution, generated agent packet, Docs Live
 handoff, provider request package, and saved run history instead of living only
-in a separate chat note.
+in a separate chat note. The plan also scores context completeness across
+audience, evidence, constraints, examples, tone, and approval context, with
+recommendations for missing grounding before users generate a first draft.
 
 Choose **Generate agent packet** when the instruction should become a reviewable
 artifact immediately. NEditor creates an auditable packet with AI provenance,
