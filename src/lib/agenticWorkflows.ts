@@ -59,6 +59,7 @@ export interface AgenticWorkflowRun {
   markdown: string;
   applicationMode: "replace-document" | "replace-selection" | "append-packet";
   revision: AgenticWorkflowRevision | null;
+  controlCenter: AgenticControlCenter;
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -72,6 +73,33 @@ export interface AgenticDistributionTargetPlan {
   preflightChecks: string[];
   handoffSteps: string[];
   evidenceRequired: string[];
+}
+
+export type AgenticControlStatus = "ready" | "needs-input" | "blocked";
+export type AgenticEvidenceStatus = "available" | "missing" | "needs-review";
+
+export interface AgenticControlItem {
+  label: string;
+  detail: string;
+  status: AgenticEvidenceStatus;
+}
+
+export interface AgenticNextAction {
+  label: string;
+  detail: string;
+  lane: AgenticWorkflowLane;
+  action: AgenticWorkflowAction;
+  status: AgenticControlStatus;
+}
+
+export interface AgenticControlCenter {
+  status: AgenticControlStatus;
+  readinessScore: number;
+  summary: string;
+  nextActions: AgenticNextAction[];
+  sourceGrounding: AgenticControlItem[];
+  governance: AgenticControlItem[];
+  distribution: AgenticControlItem[];
 }
 
 const exportSignals: Array<[ExportTarget, RegExp]> = [
@@ -161,10 +189,12 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const distributionChecklist = buildDistributionChecklist(plan, distributionTargetPlans);
   const blockers = buildRunBlockers(plan, hasDocument, hasSelection);
   const applicationMode = inferApplicationMode(plan, hasDocument, hasSelection);
+  const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans });
   const markdown = buildRunMarkdown({
     plan,
     draftMarkdown: draft?.markdown || "",
     revision,
+    controlCenter,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -178,6 +208,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     markdown,
     applicationMode,
     revision,
+    controlCenter,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -441,6 +472,168 @@ function buildDistributionChecklist(plan: AgenticWorkflowPlan, targetPlans: Agen
   ]);
 }
 
+function buildControlCenter(input: {
+  plan: AgenticWorkflowPlan;
+  blockers: string[];
+  hasDocument: boolean;
+  hasSelection: boolean;
+  revision: AgenticWorkflowRevision | null;
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
+}): AgenticControlCenter {
+  const { plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans } = input;
+  const hardBlockers = blockers.filter((blocker) => !blocker.startsWith("Missing input:"));
+  const status: AgenticControlStatus = hardBlockers.length ? "blocked" : blockers.length ? "needs-input" : "ready";
+  const sourceGrounding = buildSourceGrounding(plan, hasDocument, hasSelection);
+  const governance = buildGovernanceItems(plan, revision, blockers);
+  const distribution = buildDistributionItems(plan, distributionTargetPlans);
+  const readinessScore = scoreControlCenter(status, sourceGrounding, governance, distribution, blockers);
+  const nextActions = buildNextActions(plan, status, blockers, distributionTargetPlans);
+  const summary =
+    status === "blocked"
+      ? "Agent run is blocked until source context or target instructions are supplied."
+      : status === "needs-input"
+        ? "Agent run is usable as a draft packet, but missing inputs must be resolved before approval or distribution."
+        : "Agent run is ready for governed drafting, review, and target-specific distribution prep.";
+
+  return {
+    status,
+    readinessScore,
+    summary,
+    nextActions,
+    sourceGrounding,
+    governance,
+    distribution,
+  };
+}
+
+function buildSourceGrounding(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSelection: boolean): AgenticControlItem[] {
+  const evidenceValue = extractKeyValue(plan.placeholderText, "evidence");
+  return [
+    {
+      label: "User instruction",
+      detail: plan.instruction ? "Plain-language intent captured as the agent objective." : "No explicit instruction was supplied.",
+      status: plan.instruction ? "available" : "missing",
+    },
+    {
+      label: "Current document",
+      detail: hasDocument ? "Current Markdown body is included in the context pack." : "No current document body is available to ground the run.",
+      status: hasDocument ? "available" : "needs-review",
+    },
+    {
+      label: "Selected text",
+      detail: hasSelection ? "Selection is available for precise edit/revision work." : "No selected text was supplied for selection-aware edits.",
+      status: hasSelection ? "available" : plan.lanes.some((lane) => lane === "edit" || lane === "revise") ? "missing" : "needs-review",
+    },
+    {
+      label: "Outline",
+      detail: plan.suggestedOutline.trim() ? "Outline is available as the composition work queue." : "No outline is available for section-by-section drafting.",
+      status: plan.suggestedOutline.trim() ? "available" : "missing",
+    },
+    {
+      label: "Evidence",
+      detail:
+        evidenceValue && !/^TBD\b/i.test(evidenceValue)
+          ? `Evidence expectation captured: ${evidenceValue}.`
+          : "Evidence is not yet specific enough for final claims.",
+      status: evidenceValue && !/^TBD\b/i.test(evidenceValue) ? "available" : "needs-review",
+    },
+  ];
+}
+
+function buildGovernanceItems(plan: AgenticWorkflowPlan, revision: AgenticWorkflowRevision | null, blockers: string[]): AgenticControlItem[] {
+  return [
+    {
+      label: "AI provenance",
+      detail: "Agent output includes ai-source and ai-assisted review metadata.",
+      status: "available",
+    },
+    {
+      label: "Human review",
+      detail: blockers.length ? "Human review remains blocked by missing inputs or workflow constraints." : "Reviewer can inspect QA gates before marking sections human-reviewed.",
+      status: blockers.length ? "needs-review" : "available",
+    },
+    {
+      label: "Revision audit",
+      detail: revision ? "Original text, proposed text, and change summary are captured for comparison." : "No selection-aware revision is part of this run.",
+      status: revision ? "available" : "needs-review",
+    },
+    {
+      label: "Approval metadata",
+      detail: plan.distributionTargets.length ? "Approval status, reviewer, and approvedAt must be confirmed before distribution." : "Distribution approval metadata is not required until a target is selected.",
+      status: plan.distributionTargets.length ? "needs-review" : "available",
+    },
+  ];
+}
+
+function buildDistributionItems(plan: AgenticWorkflowPlan, targetPlans: AgenticDistributionTargetPlan[]): AgenticControlItem[] {
+  if (!plan.distributionTargets.length) {
+    return [
+      {
+        label: "Distribution targets",
+        detail: "No export or publishing target is selected yet.",
+        status: "needs-review",
+      },
+    ];
+  }
+  return targetPlans.map((targetPlan) => ({
+    label: targetPlan.label,
+    detail: `${targetPlan.preflightChecks.length} preflight checks, ${targetPlan.handoffSteps.length} handoff step, and ${targetPlan.evidenceRequired.length} evidence requirements are staged.`,
+    status: "needs-review" as const,
+  }));
+}
+
+function buildNextActions(
+  plan: AgenticWorkflowPlan,
+  status: AgenticControlStatus,
+  blockers: string[],
+  targetPlans: AgenticDistributionTargetPlan[],
+): AgenticNextAction[] {
+  const actions: AgenticNextAction[] = [];
+  if (blockers.length) {
+    actions.push({
+      label: "Resolve missing inputs",
+      detail: blockers.slice(0, 4).join("; "),
+      lane: "create",
+      action: "open-docs-live",
+      status: "needs-input",
+    });
+  }
+  for (const step of plan.steps) {
+    actions.push({
+      label: step.title,
+      detail: step.detail,
+      lane: step.lane,
+      action: step.action,
+      status: step.status === "needs-input" ? "needs-input" : status === "blocked" ? "blocked" : "ready",
+    });
+  }
+  if (targetPlans.length) {
+    actions.push({
+      label: "Verify target artifacts",
+      detail: `Retain evidence for ${targetPlans.map((target) => target.label).join(", ")} before publication.`,
+      lane: "distribute",
+      action: "prepare-export",
+      status: "needs-input",
+    });
+  }
+  return actions.slice(0, 8);
+}
+
+function scoreControlCenter(
+  status: AgenticControlStatus,
+  sourceGrounding: AgenticControlItem[],
+  governance: AgenticControlItem[],
+  distribution: AgenticControlItem[],
+  blockers: string[],
+) {
+  const allItems = [...sourceGrounding, ...governance, ...distribution];
+  const missingPenalty = allItems.filter((item) => item.status === "missing").length * 16;
+  const reviewPenalty = allItems.filter((item) => item.status === "needs-review").length * 7;
+  const blockerPenalty = blockers.length * 8;
+  const statusPenalty = status === "blocked" ? 20 : status === "needs-input" ? 8 : 0;
+  return Math.max(0, Math.min(100, 100 - missingPenalty - reviewPenalty - blockerPenalty - statusPenalty));
+}
+
 function distributionProfile(target: ExportTarget) {
   const profiles: Record<
     ExportTarget,
@@ -541,13 +734,14 @@ function buildRunMarkdown(input: {
   plan: AgenticWorkflowPlan;
   draftMarkdown: string;
   revision: AgenticWorkflowRevision | null;
+  controlCenter: AgenticControlCenter;
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   generatedAt: string;
 }) {
-  const { plan, draftMarkdown, revision, reviewChecklist, distributionChecklist, distributionTargetPlans, blockers, generatedAt } = input;
+  const { plan, draftMarkdown, revision, controlCenter, reviewChecklist, distributionChecklist, distributionTargetPlans, blockers, generatedAt } = input;
   const lines = [
     "---",
     `title: ${yamlScalar(`${plan.title} Agent Run`)}`,
@@ -590,6 +784,7 @@ function buildRunMarkdown(input: {
   if (blockers.length) {
     lines.push("### Blockers", "", ...blockers.map((blocker) => `- [ ] ${blocker}`), "");
   }
+  lines.push(...controlCenterMarkdown(controlCenter));
   if (draftMarkdown.trim()) {
     lines.push("## Generated Draft", "", draftMarkdown.trim(), "");
   }
@@ -627,6 +822,35 @@ function buildRunMarkdown(input: {
     "",
   );
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+function controlCenterMarkdown(controlCenter: AgenticControlCenter) {
+  return [
+    "## AI Control Center",
+    "",
+    `Status: ${controlCenter.status}`,
+    "",
+    `Readiness score: ${controlCenter.readinessScore}/100`,
+    "",
+    controlCenter.summary,
+    "",
+    "### Next Actions",
+    "",
+    ...controlCenter.nextActions.map((action) => `- [ ] ${action.label} (${action.lane}, ${action.status}): ${action.detail}`),
+    "",
+    "### Source Grounding",
+    "",
+    ...controlCenter.sourceGrounding.map((item) => `- ${item.label} [${item.status}]: ${item.detail}`),
+    "",
+    "### Governance",
+    "",
+    ...controlCenter.governance.map((item) => `- ${item.label} [${item.status}]: ${item.detail}`),
+    "",
+    "### Distribution State",
+    "",
+    ...controlCenter.distribution.map((item) => `- ${item.label} [${item.status}]: ${item.detail}`),
+    "",
+  ];
 }
 
 function fencedBlock(language: string, value: string) {

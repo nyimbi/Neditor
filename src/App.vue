@@ -1931,6 +1931,57 @@
               </div>
               <small>{{ agentRun.blockers.length }} blockers</small>
             </header>
+            <section class="agent-control-center" :data-status="agentRun.controlCenter.status" aria-label="AI control center">
+              <header>
+                <div>
+                  <strong>AI Control Center</strong>
+                  <span>{{ agentRun.controlCenter.summary }}</span>
+                </div>
+                <small>{{ agentRun.controlCenter.readinessScore }}/100 readiness</small>
+              </header>
+              <section class="agent-control-grid">
+                <article>
+                  <h3>Next actions</h3>
+                  <ul>
+                    <li v-for="action in agentRun.controlCenter.nextActions" :key="`${action.lane}-${action.label}`">
+                      <strong>{{ action.label }}</strong>
+                      <span>{{ action.lane }} | {{ action.status }}</span>
+                      <p>{{ action.detail }}</p>
+                    </li>
+                  </ul>
+                </article>
+                <article>
+                  <h3>Source grounding</h3>
+                  <ul>
+                    <li v-for="item in agentRun.controlCenter.sourceGrounding" :key="item.label" :data-status="item.status">
+                      <strong>{{ item.label }}</strong>
+                      <span>{{ item.status }}</span>
+                      <p>{{ item.detail }}</p>
+                    </li>
+                  </ul>
+                </article>
+                <article>
+                  <h3>Governance</h3>
+                  <ul>
+                    <li v-for="item in agentRun.controlCenter.governance" :key="item.label" :data-status="item.status">
+                      <strong>{{ item.label }}</strong>
+                      <span>{{ item.status }}</span>
+                      <p>{{ item.detail }}</p>
+                    </li>
+                  </ul>
+                </article>
+                <article>
+                  <h3>Distribution state</h3>
+                  <ul>
+                    <li v-for="item in agentRun.controlCenter.distribution" :key="item.label" :data-status="item.status">
+                      <strong>{{ item.label }}</strong>
+                      <span>{{ item.status }}</span>
+                      <p>{{ item.detail }}</p>
+                    </li>
+                  </ul>
+                </article>
+              </section>
+            </section>
             <section v-if="agentRun.blockers.length" class="agent-missing-inputs" aria-label="Agent run blockers">
               <strong>Resolve before final release</strong>
               <ul>
@@ -8460,6 +8511,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-step-list li,
 .app-shell[data-theme="dark"] .agent-missing-inputs li,
 .app-shell[data-theme="dark"] .agent-run-output,
+.app-shell[data-theme="dark"] .agent-control-center,
+.app-shell[data-theme="dark"] .agent-control-grid article,
 .app-shell[data-theme="dark"] .agent-run-columns article,
 .app-shell[data-theme="dark"] .agent-distribution-runbooks article,
 .app-shell[data-theme="dark"] .agent-provider-panel,
@@ -8556,6 +8609,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-step-list li,
   .app-shell[data-theme="system"] .agent-missing-inputs li,
   .app-shell[data-theme="system"] .agent-run-output,
+  .app-shell[data-theme="system"] .agent-control-center,
+  .app-shell[data-theme="system"] .agent-control-grid article,
   .app-shell[data-theme="system"] .agent-run-columns article,
   .app-shell[data-theme="system"] .agent-distribution-runbooks article,
   .app-shell[data-theme="system"] .agent-provider-panel,
@@ -8637,6 +8692,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-step-list li,
 .app-shell[data-high-contrast="true"] .agent-missing-inputs li,
 .app-shell[data-high-contrast="true"] .agent-run-output,
+.app-shell[data-high-contrast="true"] .agent-control-center,
+.app-shell[data-high-contrast="true"] .agent-control-grid article,
 .app-shell[data-high-contrast="true"] .agent-run-columns article,
 .app-shell[data-high-contrast="true"] .agent-distribution-runbooks article,
 .app-shell[data-high-contrast="true"] .agent-provider-panel,
@@ -10113,6 +10170,8 @@ select:hover {
 .agent-missing-inputs,
 .agent-step-list li,
 .agent-run-output,
+.agent-control-center,
+.agent-control-grid article,
 .agent-run-columns article,
 .agent-distribution-runbooks article,
 .agent-provider-panel,
@@ -10198,6 +10257,90 @@ select:hover {
 .agent-run-output > header span,
 .agent-run-output > header small {
   color: #526171;
+  font-size: 12px;
+}
+
+.agent-control-center {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #275da8;
+  background: #f7fbff;
+}
+
+.agent-control-center[data-status="needs-input"] {
+  border-left-color: #c68a1a;
+}
+
+.agent-control-center[data-status="blocked"] {
+  border-left-color: #b34040;
+}
+
+.agent-control-center > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-control-center > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-control-center > header span,
+.agent-control-center > header small {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-control-grid article {
+  display: grid;
+  gap: 6px;
+}
+
+.agent-control-grid h3,
+.agent-control-grid ul,
+.agent-control-grid p {
+  margin: 0;
+}
+
+.agent-control-grid ul {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-control-grid li {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+}
+
+.agent-control-grid li[data-status="missing"] {
+  border-color: #e4aaaa;
+}
+
+.agent-control-grid li[data-status="needs-review"] {
+  border-color: #e2c582;
+}
+
+.agent-control-grid li span {
+  color: #526171;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.agent-control-grid li p {
+  color: #2d3746;
   font-size: 12px;
 }
 
@@ -11447,6 +11590,7 @@ select:hover {
   }
 
   .agent-plan-grid,
+  .agent-control-grid,
   .agent-run-columns,
   .agent-distribution-runbooks,
   .agent-provider-grid,

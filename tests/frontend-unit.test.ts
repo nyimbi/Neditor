@@ -446,8 +446,16 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Quality Assurance"));
   ok(run.markdown.includes("## Distribution"));
   ok(run.markdown.includes("### Target Runbooks"));
+  ok(run.markdown.includes("## AI Control Center"));
+  ok(run.markdown.includes("### Source Grounding"));
   ok(run.markdown.includes("Substack newsletter package"));
   ok(run.markdown.includes("Google Docs collaboration package"));
+  ok(run.controlCenter.readinessScore > 0);
+  ok(run.controlCenter.status === "needs-input" || run.controlCenter.status === "ready");
+  ok(run.controlCenter.nextActions.some((action) => action.label === "Verify target artifacts"));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.status === "available"));
+  ok(run.controlCenter.governance.some((item) => item.label === "AI provenance" && item.status === "available"));
+  ok(run.controlCenter.distribution.some((item) => item.label === "Substack newsletter package"));
   ok(run.distributionChecklist.some((item) => item.startsWith("Substack newsletter package:")));
   ok(run.reviewChecklist.some((item) => item.includes("human-reviewed")));
 });
@@ -470,6 +478,9 @@ test("agentic workflow run proposes selection-aware revisions with review metada
   ok(!run.revision?.proposedText.includes("It is important to note"));
   ok(!run.revision?.proposedText.includes("leveraging"));
   ok(run.reviewChecklist.some((item) => item.includes("Compare the revision proposal")));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Selected text" && item.status === "available"));
+  ok(run.controlCenter.governance.some((item) => item.label === "Revision audit" && item.status === "available"));
+  ok(run.controlCenter.nextActions.some((action) => action.lane === "revise"));
   ok(run.markdown.includes("## Revision Proposal"));
   ok(run.markdown.includes("### Original Text"));
   ok(run.markdown.includes("### Proposed Text"));
@@ -819,6 +830,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Generate agent packet"));
   ok(app.includes("Apply agent output"));
   ok(app.includes('aria-label="Agent generated output"'));
+  ok(app.includes('aria-label="AI control center"'));
+  ok(app.includes("agentRun.controlCenter"));
+  ok(app.includes("Source grounding"));
+  ok(app.includes("Distribution state"));
   ok(app.includes('aria-label="Agent distribution target runbooks"'));
   ok(app.includes("distributionTargetPlans"));
   ok(app.includes("Build provider request"));

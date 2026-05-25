@@ -81,9 +81,12 @@ Choose **Generate agent packet** when the instruction should become a reviewable
 artifact immediately. NEditor creates an auditable packet with AI provenance,
 the generated draft when creation or composition is requested, a
 selection-aware revision proposal when editing or revision is requested, QA
-gates, distribution gates, and blockers for missing inputs. **Apply agent
-output** uses the packet's safe apply mode: replace a new document, replace the
-selected text, or append a review packet to the current source.
+gates, distribution gates, and blockers for missing inputs. The packet also
+shows an **AI Control Center** with readiness score, next actions, source
+grounding, governance state, and distribution state so reviewers can see what is
+safe to do next before applying generated text. **Apply agent output** uses the
+packet's safe apply mode: replace a new document, replace the selected text, or
+append a review packet to the current source.
 
 Use **Build provider request** when your team wants a credentialed model to
 continue the work outside the local deterministic planner. Choose the approved
