@@ -1362,6 +1362,8 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
   ok(script.includes("bytes must match current audit artifact"));
   ok(script.includes("collectOfficePreviewProof"));
   ok(script.includes('page.locator("body").screenshot'));
+  ok(script.includes("pdftocairo"));
+  ok(script.includes("renderPdfCairoPage"));
   ok(script.includes("automated-visual-review.json"));
   ok(script.includes('"automated-reviewed"'));
   ok(script.includes("office-preview-docx"));

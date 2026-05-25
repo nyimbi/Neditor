@@ -627,23 +627,51 @@ function renderPdfRasterPages(issues, assertions, scope, path, outputPrefix, las
   }
 
   for (let page = 1; page <= lastPage; page += 1) {
-    const thumbnail = `${outputPrefix}-${page}.png`;
-    const dimensions = existsSync(thumbnail) ? pngDimensions(thumbnail) : null;
-    const bytes = existsSync(thumbnail) ? statSync(thumbnail).size : 0;
-    const passed = Boolean(dimensions && dimensions.width >= 500 && dimensions.height >= 500 && bytes > 10_000);
+    let thumbnail = `${outputPrefix}-${page}.png`;
+    let tool = "pdftoppm";
+    let evidence = rasterThumbnailEvidence(thumbnail);
+    if (!evidence.passed) {
+      const fallbackThumbnail = renderPdfCairoPage(path, `${outputPrefix}-cairo`, page);
+      const fallbackEvidence = fallbackThumbnail ? rasterThumbnailEvidence(fallbackThumbnail) : null;
+      if (fallbackEvidence?.passed) {
+        thumbnail = fallbackThumbnail;
+        tool = "pdftocairo";
+        evidence = fallbackEvidence;
+      }
+    }
     assertions.push({
       scope: `pdftoppm-${scope}-page-${page}`,
       assertion: `renders PDF page ${page} to a non-empty PNG thumbnail`,
-      passed,
+      passed: evidence.passed,
+      tool,
       thumbnail: relativeToAudit(thumbnail),
-      bytes,
-      width: dimensions?.width || 0,
-      height: dimensions?.height || 0,
+      bytes: evidence.bytes,
+      width: evidence.dimensions?.width || 0,
+      height: evidence.dimensions?.height || 0,
     });
-    if (!passed) {
+    if (!evidence.passed) {
       issues.push(`pdftoppm did not render a meaningful thumbnail for ${relativeToAudit(path)} page ${page}`);
     }
   }
+}
+
+function renderPdfCairoPage(path, outputPrefix, page) {
+  const result = spawnSync("pdftocairo", ["-png", "-r", "96", "-f", String(page), "-l", String(page), path, outputPrefix], {
+    encoding: "utf8",
+    timeout: 20_000,
+  });
+  if (result.status !== 0) return null;
+  return `${outputPrefix}-${page}.png`;
+}
+
+function rasterThumbnailEvidence(path) {
+  const dimensions = existsSync(path) ? pngDimensions(path) : null;
+  const bytes = existsSync(path) ? statSync(path).size : 0;
+  return {
+    passed: Boolean(dimensions && dimensions.width >= 500 && dimensions.height >= 500 && bytes > 10_000),
+    dimensions,
+    bytes,
+  };
 }
 
 function pngDimensions(path) {

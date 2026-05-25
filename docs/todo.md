@@ -1113,6 +1113,8 @@ Current evidence:
   Poppler tools are installed, it also verifies PDF metadata and extracted text
   through `pdfinfo` and `pdftotext`, and renders PNG PDF review thumbnails through `pdftoppm` under
   `.tmp/rendered-export-audit/raster-proof/` with links in `manual-review.html`.
+  The raster proof now falls back to Poppler `pdftocairo` when `pdftoppm`
+  creates structurally valid but visually empty thumbnails on a verifier host.
   When Chromium can launch, it captures visual screenshots for the primary HTML
   export, `manual-review.html`, and the rich-block/option-heavy HTML review
   cases under `.tmp/rendered-export-audit/browser-visual-proof/`, with DOM and
