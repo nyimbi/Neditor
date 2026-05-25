@@ -1689,6 +1689,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("No agent runs match the current history filters."));
   ok(app.includes("Workflow Playbooks"));
   ok(app.includes("Agent Workspace playbooks"));
+  ok(app.includes("AI-first platform roadmap"));
+  ok(app.includes("Understand the 50 product changes"));
+  ok(app.includes("release evidence bundles"));
   ok(app.includes("agent-playbooks"));
   ok(app.includes("Run a workflow playbook"));
   ok(app.includes("strategy memos, policies, release notes, grant applications"));

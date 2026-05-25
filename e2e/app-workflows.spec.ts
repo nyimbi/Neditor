@@ -1380,6 +1380,12 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await page.getByRole("button", { name: /Export and publishing/ }).click();
   await expect(page.getByLabel("Selected help topic").getByText(/Markdown bundles, blog packages, Substack/)).toBeVisible();
 
+  await page.getByLabel("Search help").fill("roadmap");
+  await expect(page.getByRole("button", { name: /AI-first platform roadmap/ })).toBeVisible();
+  await page.getByRole("button", { name: /AI-first platform roadmap/ }).click();
+  await expect(page.getByLabel("Selected help topic")).toContainText("50 product changes");
+  await expect(page.getByLabel("Selected help topic")).toContainText("release evidence bundles");
+
   await page.getByRole("button", { name: "Export panel" }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
   await expect(page.locator(".sidebar").getByRole("heading", { name: "Export" })).toBeVisible();

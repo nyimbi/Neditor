@@ -60,6 +60,7 @@ const productSurfaceChecks = [
   ["AI control center", app],
   ["Agent lifecycle task board", app],
   ["Agent source pack builder", app],
+  ["AI-first platform roadmap", app],
   ["Provider profile", app],
   ["Run provider request", app],
   ["AI runtime readiness", app],

@@ -38,6 +38,10 @@ Recent pushed checkpoints visible in current git history:
   and app/test evidence for Docs Live, Agent Workspace, workflow playbooks,
   source packs, lifecycle tasks, provider handoff, AI runtime readiness, and the
   guided demo.
+- The Help Center now exposes an in-app "AI-first platform roadmap" topic so
+  users can discover how intent capture, outline-first planning, agentic
+  editing, grounding, review, provider handoff, distribution, and release
+  evidence fit together without leaving NEditor.
 - The Outline panel is now an editable planning surface, not only a generated
   heading navigator. Users can draft an outline with indented bullets, numbered
   lines, or Markdown heading marks, then create a document skeleton with front

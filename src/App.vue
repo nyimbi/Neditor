@@ -4529,6 +4529,32 @@ const helpTopics = computed<HelpTopic[]>(() => [
     keywords: ["AI first", "agentic", "create", "compose", "questionnaire", "QA", "humanize"],
   },
   {
+    id: "ai-first-roadmap",
+    title: "AI-first platform roadmap",
+    category: "writing",
+    summary: "Understand the 50 product changes that make composition, editing, revision, review, distribution, provider handoff, and audit work agentic.",
+    when: "Use this when evaluating whether a workflow should start in Docs Live, Agent Workspace, review governance, provider handoff, or export readiness.",
+    steps: [
+      "Start with intent capture: document type, audience, outcome, owner, deadline, distribution target, and placeholders.",
+      "Plan the structure before prose by using Outline, outline critique, section work queues, drafting depth, and reviewer mandates.",
+      "Route editing and revision through scoped tasks that preserve original text, proposed text, meaning-drift checks, rollback notes, and an acceptance queue.",
+      "Ground the document with evidence scans, source packs, claim inventory, citation TODOs, reviewer agents, humanization checks, and readiness scoring.",
+      "Prepare distribution through target-aware runbooks, provider packages, provenance wrapping, local run history, release evidence bundles, and verification contracts.",
+    ],
+    tips: [
+      "The roadmap is intentionally operational: every item should correspond to an app surface, test, evidence contract, or documented release risk.",
+      "When in doubt, use Agent Workspace because it exposes lanes for create, compose, edit, revise, review, and distribute in one governed packet.",
+      "Provider execution is only one part of the workflow; local analysis, provenance, human review, and export evidence remain first-class.",
+    ],
+    actions: [
+      { label: "Agent workspace", run: () => openAgentWorkspace() },
+      { label: "Docs Live", run: () => openDocsLive() },
+      { label: "AI governance", run: () => (store.sidebar = "review") },
+      { label: "Export panel", run: () => (store.sidebar = "exports") },
+    ],
+    keywords: ["roadmap", "50", "platform", "agentic", "provider", "distribution", "audit", "release evidence"],
+  },
+  {
     id: "agent-workspace",
     title: "Agent Workspace playbooks",
     category: "writing",
