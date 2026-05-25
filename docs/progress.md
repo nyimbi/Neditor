@@ -2794,6 +2794,12 @@ Live Google Docs import attempt:
 | Google Drive `_import_document` with `.tmp/rendered-export-audit/rendered-export-audit.docx` | Blocked by connector authorization | The current connector call returned `token_expired` before upload/conversion; an earlier attempt reached the Drive upload-conversion endpoint and returned `403 Forbidden`. The exported DOCX/package remains locally verified, and live import proof needs a refreshed Google Drive OAuth scope or another authorized Drive session. |
 | Google Drive `_import_document` with `.tmp/rendered-export-audit/rendered-export-audit.docx` on 2026-05-23 | Blocked by connector authorization | The connector still returns `token_expired`, so no live upload/conversion/readback evidence can be generated from this session until Drive authorization is refreshed. |
 
+AI lifecycle task preservation verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 45 frontend unit tests passed, including a long-outline, evidence-heavy, nine-target agentic release run proving the bounded lifecycle task board preserves every target-specific distribution task plus final release readiness while keeping section drafting and evidence tasks present. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

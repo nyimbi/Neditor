@@ -963,6 +963,48 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("approvedAt"))));
 });
 
+test("agentic lifecycle task cap preserves distribution and release readiness tasks", () => {
+  const longOutline = Array.from({ length: 18 }, (_, index) => `## Section ${index + 1}\n\nSection ${index + 1} draft notes.`).join("\n\n");
+  const run = buildAgenticWorkflowRun({
+    instruction:
+      "Revise this report section by section, review evidence, and distribute as HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs. audience: executives owner: PMO deadline: June 1 evidence: source pack reviewer: Legal",
+    documentTitle: "Multi Target Release Report",
+    documentText: [
+      "---",
+      "title: Multi Target Release Report",
+      "status: draft",
+      "---",
+      "",
+      "# Multi Target Release Report",
+      "",
+      longOutline,
+      "",
+      "ARR grows by 18%. citation TODO",
+      "Furthermore, this comprehensive analysis clearly unlocks the potential for growth.",
+      "{{client_name}} must approve [OWNER].",
+      "[placeholder link](https://example.com/review)",
+      "See {@missing-release-evidence}.",
+      "```ai-source",
+      "provider: OpenAI",
+      "model: ChatGPT",
+      "status: needs-review",
+      "```",
+      "<!-- comment: unresolved | author: Legal | at: 2026-05-24 | Confirm approval basis. -->",
+    ].join("\n"),
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  const taskIds = new Set(run.lifecycleTasks.map((task) => task.id));
+  equal(run.lifecycleTasks.length <= 36, true);
+  ok(taskIds.has("task-final-release-readiness"));
+  for (const target of run.plan.distributionTargets) {
+    ok(taskIds.has(`task-distribution-${target}`), `missing distribution task for ${target}`);
+  }
+  ok(run.lifecycleTasks.some((task) => task.owner === "Docs Live Section Agent"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-citations"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata"));
+});
+
 test("AI provider packages redact secrets and preserve agent governance context", () => {
   const run = buildAgenticWorkflowRun({
     instruction:

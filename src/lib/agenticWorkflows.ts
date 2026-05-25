@@ -1673,7 +1673,18 @@ function buildLifecycleTasks(input: {
     nextStep: "Resolve outstanding review and distribution evidence before publishing or archiving.",
   });
 
-  return tasks.slice(0, 36);
+  return limitLifecycleTasks(tasks, ["task-final-release-readiness", ...distributionTargetPlans.map((targetPlan) => `task-distribution-${targetPlan.target}`)]);
+}
+
+const maxLifecycleTaskCount = 36;
+
+function limitLifecycleTasks(tasks: AgenticLifecycleTask[], protectedTaskIds: string[]) {
+  if (tasks.length <= maxLifecycleTaskCount) return tasks;
+  const protectedIds = new Set(protectedTaskIds);
+  const protectedCount = tasks.filter((task) => protectedIds.has(task.id)).length;
+  const optionalSlots = Math.max(0, maxLifecycleTaskCount - protectedCount);
+  const selectedOptionalIds = new Set(tasks.filter((task) => !protectedIds.has(task.id)).slice(0, optionalSlots).map((task) => task.id));
+  return tasks.filter((task) => protectedIds.has(task.id) || selectedOptionalIds.has(task.id));
 }
 
 function buildDocumentEvidenceLifecycleTasks(documentEvidence: AgenticDocumentEvidence, plan: AgenticWorkflowPlan): AgenticLifecycleTask[] {
