@@ -1888,6 +1888,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Help: Docs Live"));
   ok(app.includes("Help: Export and publishing"));
   ok(app.includes("Help: AI-first composition"));
+  ok(app.includes('aria-label="Table of contents manager"'));
+  ok(app.includes("tocDepthOptions"));
+  ok(app.includes("tocDepthDraft"));
+  ok(app.includes("tocNumberedDraft"));
+  ok(app.includes("tocManagerSummary"));
+  ok(app.includes("enableFrontMatterToc"));
+  ok(app.includes("applyTocSettings"));
+  ok(app.includes("frontMatterScalarValue"));
+  ok(app.includes("Applied TOC settings"));
   ok(app.includes('aria-label="Index manager"'));
   ok(app.includes("indexTermDraft"));
   ok(app.includes("indexExcludeDraft"));

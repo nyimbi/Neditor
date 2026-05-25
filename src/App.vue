@@ -793,6 +793,27 @@
             <span>[@{{ citation.key }}<template v-if="citation.locator">, {{ citation.locator }}</template>]</span>
             <small>{{ bibliographyByKey.get(citation.key) || "Missing bibliography entry" }}</small>
           </button>
+          <h3>Table of Contents</h3>
+          <section class="reference-manager" aria-label="Table of contents manager">
+            <div class="reference-actions">
+              <button type="button" @click="insertBlock(tocSnippet)">Insert TOC marker</button>
+              <button type="button" @click="enableFrontMatterToc">Enable front matter TOC</button>
+            </div>
+            <div class="reference-inline-form">
+              <label>
+                TOC depth
+                <select v-model.number="tocDepthDraft">
+                  <option v-for="depth in tocDepthOptions" :key="depth" :value="depth">H1-H{{ depth }}</option>
+                </select>
+              </label>
+              <button type="button" @click="applyTocSettings">Apply TOC settings</button>
+            </div>
+            <label class="reference-checkbox">
+              <input v-model="tocNumberedDraft" type="checkbox" />
+              Number TOC entries
+            </label>
+            <p class="sidebar-hint">{{ tocManagerSummary }}</p>
+          </section>
           <template v-if="resolvedCitationEntries.length">
             <h3>Resolved references</h3>
             <article v-for="entry in resolvedCitationEntries" :key="entry.key" class="snapshot-row">
@@ -3726,6 +3747,9 @@ const figureCropPositionPoints: Record<FigureCropPosition, { x: number; y: numbe
 const calcSnippet = "```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\n```\n";
 const equationSnippet = "$$\nE = mc^2\n$$ {#eq:energy}\n";
 const tocSnippet = "[TOC]\n";
+const tocDepthOptions = [1, 2, 3, 4, 5, 6];
+const tocDepthDraft = ref(3);
+const tocNumberedDraft = ref(false);
 const indexSnippet = "[INDEX]\n";
 const indexTermDraft = ref("");
 const indexExcludeDraft = ref("");
@@ -4069,6 +4093,12 @@ const glossaryEntries = computed(() =>
     .map(([term, definition]) => ({ term, definition }))
     .sort((left, right) => left.term.localeCompare(right.term)),
 );
+const tocManagerSummary = computed(() => {
+  const tocEnabled = frontMatterScalarValue(active.value.text, "toc") || frontMatterScalarValue(active.value.text, "tableOfContents");
+  const depth = frontMatterScalarValue(active.value.text, "tocDepth") || "default";
+  const numbered = frontMatterScalarValue(active.value.text, "tocNumbered") || frontMatterScalarValue(active.value.text, "numberedHeadings") || "false";
+  return `Front matter TOC: ${tocEnabled || "not set"} | depth: ${depth} | numbered: ${numbered}`;
+});
 const indexTerms = computed(() => [...(active.value.compile?.index_terms || [])].sort((left, right) => left.localeCompare(right)));
 const indexExclusionTerms = computed(() => frontMatterListValues(active.value.text, "indexExclude"));
 const reviewSummary = computed(() => {
@@ -9065,6 +9095,20 @@ function setFrontMatterField(key: string, value: string) {
   store.updateText(upsertFrontMatterField(active.value.text, key, value.trim()));
 }
 
+function enableFrontMatterToc() {
+  setFrontMatterField("toc", "true");
+  store.statusMessage = "Enabled front matter table of contents";
+}
+
+function applyTocSettings() {
+  const depth = Math.min(Math.max(Math.floor(Number(tocDepthDraft.value) || 3), 1), 6);
+  let nextText = upsertFrontMatterField(active.value.text, "toc", "true");
+  nextText = upsertFrontMatterField(nextText, "tocDepth", String(depth));
+  nextText = upsertFrontMatterField(nextText, "tocNumbered", tocNumberedDraft.value ? "true" : "false");
+  store.updateText(nextText);
+  store.statusMessage = `Applied TOC settings: H1-H${depth}, ${tocNumberedDraft.value ? "numbered" : "plain"} entries`;
+}
+
 function setDocumentStatus(status: string) {
   if (!releaseStatuses.includes(status)) return;
   setFrontMatterField("status", status);
@@ -9091,6 +9135,16 @@ function upsertFrontMatterField(text: string, key: string, value: string) {
     lines.splice(endIndex, 0, line);
   }
   return lines.join("\n");
+}
+
+function frontMatterScalarValue(text: string, key: string) {
+  if (!text.startsWith("---\n")) return "";
+  const lines = text.split("\n");
+  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
+  if (endIndex <= 0) return "";
+  const line = lines.find((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
+  if (!line) return "";
+  return line.split(":").slice(1).join(":").trim().replace(/^["']|["']$/g, "");
 }
 
 function upsertFrontMatterListField(text: string, key: string, values: string[]) {
@@ -12011,6 +12065,12 @@ select:hover {
   background: #f8fafc;
   color: #2d3746;
   font-size: 12px;
+}
+
+.reference-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .workspace-root {
