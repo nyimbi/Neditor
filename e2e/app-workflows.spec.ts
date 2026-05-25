@@ -2389,13 +2389,17 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
 
   await expect(engine).toContainText("Runs only with explicit trust");
   await expect(engine).toContainText("Version probe: d2 --version");
+  await expect(engine).toContainText("No external executable path is configured");
+  await expect(engine).toContainText("compiler diagnostics will explain fallback rendering");
 
   await setEnginePath(enginePath, "/usr/local/bin/d2");
   await expect(trusted).not.toBeChecked();
   await expect(engine).toContainText("Probe required after engine path change.");
+  await expect(engine).toContainText("Executable path is configured but not trusted yet");
 
   await confirmTransformTrustPrompt(page, "d2", true);
   await expect(trusted).toBeChecked();
+  await expect(engine).toContainText("External executable path is trusted");
 
   await engine.getByLabel("Input").selectOption("file");
   await page.getByLabel("Timeout").fill("7750");
@@ -2419,6 +2423,8 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await confirmTransformTrustPrompt(page, "d2", false);
   await expect(trusted).not.toBeChecked();
   await expect(engine).toContainText("Probe required after engine path change.");
+  await engine.getByLabel("Disable external engine").check();
+  await expect(engine).toContainText("External execution is disabled");
 });
 
 test("manages transform templates and inserts reusable workflows", async ({ page }) => {

@@ -1918,6 +1918,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("AgenticNextAction"));
   ok(app.includes("AgentRunHistoryNextAction"));
   ok(app.includes("Run action"));
+  ok(app.includes("externalEngineSetupStatus"));
+  ok(app.includes("No external executable path is configured"));
+  ok(app.includes("External executable path is trusted"));
+  ok(app.includes("External execution is disabled"));
   ok(app.includes("Help: Docs Live"));
   ok(app.includes("Help: Export and publishing"));
   ok(app.includes("Help: AI-first composition"));

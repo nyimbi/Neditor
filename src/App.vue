@@ -1613,6 +1613,9 @@
             <small v-if="engine.diagnosticProfile.versionProbe">Version probe: {{ engine.diagnosticProfile.versionProbe }}</small>
             <small v-if="engine.diagnosticProfile.failureHint">Failure hint: {{ engine.diagnosticProfile.failureHint }}</small>
             <small>{{ engine.securitySummary }}</small>
+            <p :class="['engine-setup-status', externalEngineSetupStatus(engine).status]" role="note">
+              <strong>Setup status:</strong> {{ externalEngineSetupStatus(engine).message }}
+            </p>
             <label>
               Engine path
               <span class="path-picker">
@@ -3318,7 +3321,7 @@ import {
   type TableSortDirection,
 } from "./lib/tables";
 import { useDocumentsStore } from "./stores/documents";
-import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument } from "./types";
+import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
 
 const store = useDocumentsStore();
 type ExportTarget = typeof store.exportTarget;
@@ -4138,6 +4141,31 @@ const externalTransformTrustPrompts = computed<TransformTrustPrompt[]>(() => {
       securitySummary: engine.securitySummary,
     }));
 });
+function externalEngineSetupStatus(engine: TransformEngineMetadata) {
+  if (store.disabledTransformEngines[engine.name]) {
+    return {
+      status: "disabled",
+      message: "External execution is disabled; NEditor will use native or embedded fallbacks when available.",
+    };
+  }
+  const path = store.transformEnginePaths[engine.name]?.trim() || "";
+  if (!path) {
+    return {
+      status: "fallback",
+      message: "No external executable path is configured; compiler diagnostics will explain fallback rendering before using the native renderer.",
+    };
+  }
+  if (!store.trustedTransformEngines[engine.name]) {
+    return {
+      status: "needs-trust",
+      message: "Executable path is configured but not trusted yet; review the trust prompt and run a probe before external rendering.",
+    };
+  }
+  return {
+    status: "ready",
+    message: "External executable path is trusted; run Probe after upgrades or path changes to refresh diagnostic proof.",
+  };
+}
 const manifestPreview = computed(() => JSON.stringify(store.exportReadiness?.manifest || active.value.compile?.export_manifest || {}, null, 2));
 const readinessLayoutSummary = computed(() => {
   const sections = store.exportReadiness?.paged_document.sections || [];
@@ -14107,6 +14135,29 @@ select:hover {
 .engine-row h4 {
   margin: 0;
   font-size: 13px;
+}
+
+.engine-setup-status {
+  margin: 0;
+  padding: 6px 8px;
+  border-left: 3px solid #64748b;
+  background: #f8fafc;
+}
+
+.engine-setup-status.fallback,
+.engine-setup-status.needs-trust {
+  border-left-color: #b45309;
+  background: #fffbeb;
+}
+
+.engine-setup-status.ready {
+  border-left-color: #2f855a;
+  background: #f0fdf4;
+}
+
+.engine-setup-status.disabled {
+  border-left-color: #6b7280;
+  background: #f3f4f6;
 }
 
 .engine-probe {

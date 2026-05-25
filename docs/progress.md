@@ -42,6 +42,11 @@ Recent pushed checkpoints visible in current git history:
   users can discover how intent capture, outline-first planning, agentic
   editing, grounding, review, provider handoff, distribution, and release
   evidence fit together without leaving NEditor.
+- Transform engine settings now show a setup status for native fallback
+  diagnostics, untrusted configured paths, trusted paths, and disabled external
+  execution. The browser workflow covers these states alongside probe success
+  and missing-executable diagnostics so optional engine setup is clearer for
+  non-technical users.
 - The Outline panel is now an editable planning surface, not only a generated
   heading navigator. Users can draft an outline with indented bullets, numbered
   lines, or Markdown heading marks, then create a document skeleton with front
