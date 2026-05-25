@@ -1605,6 +1605,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentLifecycleTaskTotal"));
   ok(app.includes("agentTaskLaneFilter"));
   ok(app.includes("agentTaskStatusFilter"));
+  ok(app.includes("agentTaskOwnerFilter"));
+  ok(app.includes("agentTaskSectionFilter"));
+  ok(app.includes("agentTaskTargetFilter"));
+  ok(app.includes("agentTaskEvidenceFilter"));
+  ok(app.includes("agentTaskOwnerOptions"));
+  ok(app.includes("agentTaskSectionOptions"));
+  ok(app.includes("agentTaskTargetOptions"));
+  ok(app.includes("release-blocker"));
   ok(app.includes("agentTaskQuery"));
   ok(app.includes("agentLifecycleTaskStates"));
   ok(app.includes("agentRunHistoryTaskStateSummary"));

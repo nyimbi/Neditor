@@ -2356,8 +2356,35 @@
                   </select>
                 </label>
                 <label>
+                  Owner
+                  <select v-model="agentTaskOwnerFilter">
+                    <option v-for="owner in agentTaskOwnerOptions" :key="owner" :value="owner">{{ owner === "all" ? "All owners" : owner }}</option>
+                  </select>
+                </label>
+                <label>
+                  Section
+                  <select v-model="agentTaskSectionFilter">
+                    <option v-for="section in agentTaskSectionOptions" :key="section.value" :value="section.value">{{ section.label }}</option>
+                  </select>
+                </label>
+                <label>
+                  Target
+                  <select v-model="agentTaskTargetFilter">
+                    <option v-for="target in agentTaskTargetOptions" :key="target" :value="target">{{ target === "all" ? "All targets" : target }}</option>
+                  </select>
+                </label>
+                <label>
+                  Evidence
+                  <select v-model="agentTaskEvidenceFilter">
+                    <option value="all">All evidence states</option>
+                    <option value="has-evidence">Has evidence</option>
+                    <option value="missing-evidence">Missing evidence</option>
+                    <option value="release-blocker">Release blockers</option>
+                  </select>
+                </label>
+                <label>
                   Search tasks
-                  <input v-model="agentTaskQuery" placeholder="owner, section, evidence, target" />
+                  <input v-model="agentTaskQuery" placeholder="search title, note, evidence, or next step" />
                 </label>
               </section>
               <p v-if="!agentLifecycleTaskRows.length" class="sidebar-hint">No lifecycle tasks match the current filters.</p>
@@ -3077,6 +3104,10 @@ const agentProviderBusy = ref(false);
 const agentProviderResult = ref<AiProviderExecutionResult | null>(null);
 const agentTaskLaneFilter = ref<"all" | AgenticWorkflowLane>("all");
 const agentTaskStatusFilter = ref<"all" | AgentLifecycleExecutionStatus>("all");
+const agentTaskOwnerFilter = ref("all");
+const agentTaskSectionFilter = ref("all");
+const agentTaskTargetFilter = ref("all");
+const agentTaskEvidenceFilter = ref<"all" | "has-evidence" | "missing-evidence" | "release-blocker">("all");
 const agentTaskQuery = ref("");
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
@@ -3506,6 +3537,27 @@ const latestAgentRunHistory = computed(() => store.agentRunHistory[0] || null);
 const activeAgentControlCenter = computed(() => agentRun.value?.controlCenter || latestAgentRunHistory.value?.controlCenter || null);
 const agentTaskLaneOptions: Array<"all" | AgenticWorkflowLane> = ["all", "create", "compose", "edit", "revise", "review", "distribute"];
 const agentTaskStatusOptions: Array<"all" | AgentLifecycleExecutionStatus> = ["all", "queued", "in-progress", "needs-review", "complete", "blocked"];
+const agentTaskOwnerOptions = computed(() => [
+  "all",
+  ...Array.from(new Set((agentRun.value?.lifecycleTasks || []).map((task) => task.owner).filter(Boolean))).sort(),
+]);
+const agentTaskSectionOptions = computed(() => {
+  const sections = new Map((agentRun.value?.sectionWorkQueue || []).map((section) => [section.id, section.heading]));
+  const taskSections = (agentRun.value?.lifecycleTasks || [])
+    .map((task) => task.sectionId)
+    .filter((sectionId): sectionId is string => Boolean(sectionId));
+  return [
+    { value: "all", label: "All sections" },
+    ...Array.from(new Set(taskSections)).map((sectionId) => ({
+      value: sectionId,
+      label: sections.get(sectionId) || sectionId,
+    })),
+  ];
+});
+const agentTaskTargetOptions = computed(() => [
+  "all",
+  ...Array.from(new Set((agentRun.value?.lifecycleTasks || []).map((task) => task.target).filter((target): target is ExportTarget => Boolean(target)))).sort(),
+]);
 const agentEditAcceptanceRows = computed(() =>
   (agentRun.value?.editAcceptanceQueue || []).map((item) => ({
     item,
@@ -3525,6 +3577,15 @@ const agentLifecycleTaskRows = computed(() =>
       const query = agentTaskQuery.value.trim().toLowerCase();
       const laneMatches = agentTaskLaneFilter.value === "all" || row.task.lane === agentTaskLaneFilter.value;
       const statusMatches = agentTaskStatusFilter.value === "all" || row.state.status === agentTaskStatusFilter.value;
+      const ownerMatches = agentTaskOwnerFilter.value === "all" || row.task.owner === agentTaskOwnerFilter.value;
+      const sectionMatches = agentTaskSectionFilter.value === "all" || row.task.sectionId === agentTaskSectionFilter.value;
+      const targetMatches = agentTaskTargetFilter.value === "all" || row.task.target === agentTaskTargetFilter.value;
+      const evidenceText = row.task.evidence.join(" ").toLowerCase();
+      const evidenceMatches =
+        agentTaskEvidenceFilter.value === "all" ||
+        (agentTaskEvidenceFilter.value === "has-evidence" && row.task.evidence.length > 0) ||
+        (agentTaskEvidenceFilter.value === "missing-evidence" && row.task.evidence.length === 0) ||
+        (agentTaskEvidenceFilter.value === "release-blocker" && /\b(blocked|blocker|missing|unresolved|required|approval|release)\b/i.test(`${row.task.title} ${row.task.nextStep} ${evidenceText}`));
       const searchable = [
         row.task.title,
         row.task.owner,
@@ -3538,7 +3599,7 @@ const agentLifecycleTaskRows = computed(() =>
       ]
         .join(" ")
         .toLowerCase();
-      return laneMatches && statusMatches && (!query || searchable.includes(query));
+      return laneMatches && statusMatches && ownerMatches && sectionMatches && targetMatches && evidenceMatches && (!query || searchable.includes(query));
     }),
 );
 const agentLifecycleTaskTotal = computed(() => agentRun.value?.lifecycleTasks.length || 0);
