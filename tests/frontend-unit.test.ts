@@ -2390,6 +2390,8 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("releaseEvidenceKitAccepted"));
   ok(script.includes("neditor.release-evidence-kit-report.v1"));
   ok(script.includes("current-source-tree-not-clean"));
+  ok(script.includes("summary?.copiedTemplates || 0) < 13"));
+  ok(script.includes("summary?.runbooks || 0) < 9"));
   ok(script.includes("missingReleaseSigningEvidence"));
   ok(script.includes("ai-provider-evidence"));
   ok(script.includes("ai-provider-live-endpoint-proof"));
