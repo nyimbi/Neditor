@@ -514,25 +514,65 @@ fn compiler_reports_malformed_front_matter_data_sources() {
         file_path: Some(path_to_string(&root.join("report.md"))),
     });
 
-    assert!(response.diagnostics.iter().any(|diagnostic| {
-        diagnostic.severity == "warning"
-            && diagnostic.message == "Data source entry is missing a path."
-    }));
-    assert!(response.diagnostics.iter().any(|diagnostic| {
-        diagnostic.severity == "warning"
-            && diagnostic
-                .message
-                .contains("Unsupported data source type 'xlsx'")
-            && diagnostic
-                .suggestion
-                .as_deref()
-                .is_some_and(|suggestion| suggestion.contains("csv, tsv, json, or yaml"))
-    }));
-    assert!(response.diagnostics.iter().any(|diagnostic| {
-        diagnostic.severity == "error"
-            && diagnostic.message.contains("Unable to read data source")
-            && diagnostic.message.contains("data/missing.json")
-    }));
+    let missing_path = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.severity == "warning"
+                && diagnostic.message == "Data source entry is missing a path."
+        })
+        .expect("missing-path data source diagnostic");
+    assert!(missing_path
+        .related
+        .iter()
+        .any(|related| related == "data_source_name: Missing path"));
+    assert!(missing_path
+        .related
+        .iter()
+        .any(|related| related == "data_source_type: json"));
+    let unsupported = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.severity == "warning"
+                && diagnostic
+                    .message
+                    .contains("Unsupported data source type 'xlsx'")
+        })
+        .expect("unsupported data source diagnostic");
+    assert!(unsupported
+        .related
+        .iter()
+        .any(|related| related == "data_source_path: data/report.xlsx"));
+    assert!(unsupported
+        .related
+        .iter()
+        .any(|related| related == "data_source_type: xlsx"));
+    assert!(unsupported
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("csv, tsv, json, or yaml")));
+    let unreadable = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.severity == "error"
+                && diagnostic.message.contains("Unable to read data source")
+                && diagnostic.message.contains("data/missing.json")
+        })
+        .expect("unreadable data source diagnostic");
+    assert!(unreadable
+        .related
+        .iter()
+        .any(|related| related == "data_source_path: data/missing.json"));
+    assert!(unreadable
+        .related
+        .iter()
+        .any(|related| related == "data_source_type: json"));
+    assert!(unreadable
+        .related
+        .iter()
+        .any(|related| related.starts_with("resolved_path: ")));
     assert!(response.transform_artifacts.is_empty());
 
     fs::remove_dir_all(root).expect("clean bad data source test dir");
@@ -573,6 +613,26 @@ fn compiler_blocks_data_sources_outside_document_folder() {
     assert!(path_errors
         .iter()
         .any(|diagnostic| diagnostic.message.contains("/tmp/neditor-secret.csv")));
+    assert!(path_errors.iter().any(|diagnostic| {
+        diagnostic
+            .related
+            .iter()
+            .any(|related| related == "data_source_name: Parent escape")
+            && diagnostic
+                .related
+                .iter()
+                .any(|related| related == "data_source_path: ../secrets.csv")
+    }));
+    assert!(path_errors.iter().any(|diagnostic| {
+        diagnostic
+            .related
+            .iter()
+            .any(|related| related == "data_source_name: Absolute escape")
+            && diagnostic
+                .related
+                .iter()
+                .any(|related| related == "data_source_path: /tmp/neditor-secret.csv")
+    }));
     assert!(response.html.contains("Data Source: Safe data"));
     assert!(response.html.contains("<td>Public</td>"));
     assert!(!response.html.contains("Token"));

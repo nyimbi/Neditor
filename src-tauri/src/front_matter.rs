@@ -189,17 +189,19 @@ pub(crate) fn render_front_matter_data_sources(
     let mut rendered = Vec::new();
     for spec in specs {
         if spec.path.trim().is_empty() {
-            diagnostics.push(diag(
+            diagnostics.push(data_source_context_diagnostic(
+                &spec,
+                None,
+                Some(root_file.to_string()),
                 "warning",
                 "Data source entry is missing a path.",
-                Some(root_file.to_string()),
                 None,
                 Some("Add a path/file value or remove the empty data source entry."),
             ));
             continue;
         }
         if !data_source_path_is_document_relative(&spec.path) {
-            diagnostics.push(data_source_path_diagnostic(root_file, &spec.path));
+            diagnostics.push(data_source_path_diagnostic(root_file, &spec, None));
             continue;
         }
         let kind = spec
@@ -209,10 +211,12 @@ pub(crate) fn render_front_matter_data_sources(
             .unwrap_or("csv")
             .to_ascii_lowercase();
         if !matches!(kind.as_str(), "csv" | "tsv" | "json" | "yaml") {
-            diagnostics.push(diag(
+            diagnostics.push(data_source_context_diagnostic(
+                &spec,
+                None,
+                Some(root_file.to_string()),
                 "warning",
                 format!("Unsupported data source type '{kind}' for {}", spec.path),
-                Some(root_file.to_string()),
                 None,
                 Some("Use csv, tsv, json, or yaml for local data sources."),
             ));
@@ -220,16 +224,18 @@ pub(crate) fn render_front_matter_data_sources(
         }
         let path = base.join(&spec.path);
         if data_source_resolves_outside_base(&base, &path) {
-            diagnostics.push(data_source_path_diagnostic(root_file, &spec.path));
+            diagnostics.push(data_source_path_diagnostic(root_file, &spec, Some(&path)));
             continue;
         }
         let contents = match fs::read_to_string(&path) {
             Ok(contents) => contents,
             Err(err) => {
-                diagnostics.push(diag(
+                diagnostics.push(data_source_context_diagnostic(
+                    &spec,
+                    Some(&path),
+                    Some(path_to_string(&path)),
                     "error",
                     format!("Unable to read data source {}: {err}", path.display()),
-                    Some(path_to_string(&path)),
                     None,
                     Some("Create the data file or update front matter dataSources/csvFiles."),
                 ));
@@ -347,14 +353,52 @@ fn data_source_resolves_outside_base(base: &Path, path: &Path) -> bool {
     !path.starts_with(base)
 }
 
-fn data_source_path_diagnostic(root_file: &str, path: &str) -> DocumentDiagnostic {
-    diag(
-        "error",
-        format!("Data source path must stay relative to the document folder: {path}"),
+fn data_source_path_diagnostic(
+    root_file: &str,
+    spec: &DataSourceSpec,
+    resolved_path: Option<&Path>,
+) -> DocumentDiagnostic {
+    data_source_context_diagnostic(
+        spec,
+        resolved_path,
         Some(root_file.to_string()),
+        "error",
+        format!(
+            "Data source path must stay relative to the document folder: {}",
+            spec.path
+        ),
         None,
         Some("Use a relative child path such as data/accounts.csv."),
     )
+}
+
+fn data_source_context_diagnostic(
+    spec: &DataSourceSpec,
+    resolved_path: Option<&Path>,
+    source_file: Option<String>,
+    severity: impl Into<String>,
+    message: impl Into<String>,
+    line: Option<usize>,
+    suggestion: Option<&str>,
+) -> DocumentDiagnostic {
+    let mut diagnostic = diag(severity, message, source_file, line, suggestion);
+    if let Some(name) = spec.name.as_deref().filter(|name| !name.trim().is_empty()) {
+        diagnostic.related.push(format!("data_source_name: {name}"));
+    }
+    if !spec.path.trim().is_empty() {
+        diagnostic
+            .related
+            .push(format!("data_source_path: {}", spec.path));
+    }
+    if let Some(kind) = spec.kind.as_deref().filter(|kind| !kind.trim().is_empty()) {
+        diagnostic.related.push(format!("data_source_type: {kind}"));
+    }
+    if let Some(path) = resolved_path {
+        diagnostic
+            .related
+            .push(format!("resolved_path: {}", path.display()));
+    }
+    diagnostic
 }
 
 pub(crate) fn strip_front_matter(text: &str) -> String {

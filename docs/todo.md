@@ -1396,6 +1396,10 @@ Finish:
   and `source range:` related context in both compiler diagnostics and
   per-artifact diagnostics. Row-level CSV/TSV formula diagnostics now point at
   the absolute Markdown source row that needs repair.
+- Malformed front matter data-source diagnostics now attach structured related
+  context for the declared data-source name, path, type, and resolved path where
+  available, so sidebar/export-manifest repair workflows can identify the exact
+  source entry without reading the full YAML block.
 - Prepare-for-export readiness now rejects configured missing, directory, and
   non-executable external engine paths before export, while still ignoring
   disabled engine paths.

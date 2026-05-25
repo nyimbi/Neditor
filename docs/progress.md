@@ -166,6 +166,10 @@ Recent pushed checkpoints visible in current git history:
   target. Row-level CSV/TSV formula diagnostics are now translated from
   transform-body row numbers to absolute Markdown source lines, with the
   diagnostic ending on the exact bad data row instead of the whole fence.
+- Front matter data-source diagnostics now carry structured related context for
+  the declared source name, path, type, and resolved path where available,
+  improving sidebar/export-manifest repair handoffs for missing paths,
+  unsupported types, unreadable files, and unsafe path escapes.
 - The status bar now reports live preview update telemetry, including elapsed
   compile time and compiled character count. The large-document browser
   workflow verifies that a 120-section edit reaches the preview within the
