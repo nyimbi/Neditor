@@ -63,6 +63,7 @@ const productSurfaceChecks = [
   ["Outline variants", app],
   ["Agent workflow playbooks", app],
   ["AI control center", app],
+  ["Automation Scheduler", app],
   ["Pre-review Rehearsal", app],
   ["Agent lifecycle task board", app],
   ["Agent source pack builder", app],

@@ -66,6 +66,11 @@ Recent pushed checkpoints visible in current git history:
   and source fingerprints, acceptance status, and reusable restore-point
   Markdown; the Agent Workspace exposes insert/copy/Docs Live reuse actions and
   local run history persists bounded draft-version evidence.
+- Agent runs now include a first-class automation scheduler for safe local
+  checks. The queue stages evidence scan, outline critique, transform
+  validation, export preflight, accessibility review, and readiness refresh
+  tasks with owners, triggers, evidence inputs, non-destructive action routing,
+  lifecycle/release/audit evidence, and Agent Workspace controls.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,

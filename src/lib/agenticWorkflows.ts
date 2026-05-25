@@ -265,6 +265,7 @@ export interface AgenticWorkflowRun {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  automationQueue: AgenticAutomationTask[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   releaseEvidenceBundle: AgenticReleaseEvidenceBundle;
@@ -328,6 +329,28 @@ export interface AgenticDistributionTargetPlan {
   preflightChecks: string[];
   handoffSteps: string[];
   evidenceRequired: string[];
+}
+
+export type AgenticAutomationTaskKind =
+  | "evidence-scan"
+  | "outline-critique"
+  | "transform-validation"
+  | "export-preflight"
+  | "accessibility-check"
+  | "readiness-refresh";
+
+export interface AgenticAutomationTask {
+  id: string;
+  kind: AgenticAutomationTaskKind;
+  label: string;
+  owner: string;
+  status: AgenticControlStatus;
+  safeToAutoRun: boolean;
+  trigger: string;
+  action: AgenticWorkflowAction;
+  evidence: string[];
+  nextStep: string;
+  manualOnlyReason?: string;
 }
 
 export type AgenticControlStatus = "ready" | "needs-input" | "blocked";
@@ -688,6 +711,14 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     distributionTargetPlans,
     blockers,
   });
+  const automationQueue = buildAutomationQueue({
+    plan,
+    documentEvidence,
+    outlineCritique,
+    distributionTargetPlans,
+    controlCenter,
+    blockers,
+  });
   const lifecycleTasks = buildLifecycleTasks({
     plan,
     revision,
@@ -695,6 +726,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    automationQueue,
     preReviewRehearsal,
     distributionTargetPlans,
     blockers,
@@ -711,6 +743,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    automationQueue,
     preReviewRehearsal,
     documentEvidence,
     outlineCritique,
@@ -729,6 +762,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    automationQueue,
     preReviewRehearsal,
     distributionTargetPlans,
     documentEvidence,
@@ -747,6 +781,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    automationQueue,
     outlineCritique,
     preReviewRehearsal,
     reviewChecklist,
@@ -771,6 +806,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    automationQueue,
     outlineCritique,
     preReviewRehearsal,
     reviewChecklist,
@@ -878,6 +914,7 @@ export function buildAgenticReleaseEvidenceAuditPackage(run: AgenticWorkflowRun)
     ...controlCenterMarkdown(run.controlCenter),
     ...reviewerAgentsMarkdown(run.reviewerAgents),
     ...sectionDraftHistoryMarkdown(run.sectionDraftHistory),
+    ...automationQueueMarkdown(run.automationQueue),
     ...lifecycleTasksMarkdown(run.lifecycleTasks),
     ...(run.distributionTargetPlans.length ? distributionTargetRunbookMarkdown(run.distributionTargetPlans) : ["## Distribution Runbooks", "", "No distribution target runbooks were staged for this run.", ""]),
   ].join("\n");
@@ -2108,13 +2145,14 @@ function buildLifecycleTasks(input: {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticLifecycleTask[] {
-  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, sectionDraftHistory, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
+  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, sectionDraftHistory, automationQueue, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const tasks: AgenticLifecycleTask[] = [];
   const hasBlockers = blockers.length > 0;
   const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
@@ -2299,6 +2337,19 @@ function buildLifecycleTasks(input: {
     });
   }
 
+  if (automationQueue.length) {
+    tasks.push({
+      id: "task-agent-automation-scheduler",
+      lane: "review",
+      title: "Run safe agent automation queue",
+      owner: "Automation Scheduler",
+      status: automationQueue.some((item) => item.status === "blocked") ? "blocked" : "needs-input",
+      action: "open-review",
+      evidence: automationQueue.map((item) => `${item.label}: ${item.safeToAutoRun ? "safe" : "manual"}; ${item.trigger}`),
+      nextStep: "Run safe queued checks, attach evidence, and keep destructive or external actions manual.",
+    });
+  }
+
   for (const reviewer of reviewerAgents) {
     tasks.push({
       id: `task-reviewer-${reviewer.id}`,
@@ -2341,7 +2392,13 @@ function buildLifecycleTasks(input: {
     nextStep: "Resolve outstanding review and distribution evidence before publishing or archiving.",
   });
 
-  return limitLifecycleTasks(tasks, ["task-final-release-readiness", ...distributionTargetPlans.map((targetPlan) => `task-distribution-${targetPlan.target}`)]);
+  return limitLifecycleTasks(tasks, [
+    "task-agent-automation-scheduler",
+    "task-section-draft-history",
+    "task-pre-review-rehearsal",
+    "task-final-release-readiness",
+    ...distributionTargetPlans.map((targetPlan) => `task-distribution-${targetPlan.target}`),
+  ]);
 }
 
 const maxLifecycleTaskCount = 36;
@@ -3281,6 +3338,121 @@ function buildPreReviewRehearsal(input: {
   return items.slice(0, 12);
 }
 
+function buildAutomationQueue(input: {
+  plan: AgenticWorkflowPlan;
+  documentEvidence: AgenticDocumentEvidence;
+  outlineCritique: AgenticOutlineCritiqueItem[];
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
+  controlCenter: AgenticControlCenter;
+  blockers: string[];
+}): AgenticAutomationTask[] {
+  const { plan, documentEvidence, outlineCritique, distributionTargetPlans, controlCenter, blockers } = input;
+  const evidenceBlockerCount =
+    documentEvidence.unresolvedPlaceholders.length +
+    documentEvidence.citationTodos.length +
+    documentEvidence.claimInventory.length +
+    documentEvidence.humanizationFindings.length +
+    documentEvidence.reviewCommentResolutions.length +
+    documentEvidence.brokenLinkHints.length +
+    documentEvidence.referenceHints.length +
+    documentEvidence.approvalMetadataMissing.length;
+  const transformHints = [
+    plan.sourcePack.items.some((item) => /\b(table|chart|calc|diagram|timeline|roadmap|schema|openapi|json|csv|qr)\b/i.test(`${item.label} ${item.detail}`))
+      ? "Source pack contains structured-data or transform cues."
+      : "",
+    /\b(calc|chart|diagram|timeline|roadmap|table|schema|openapi|latex|equation)\b/i.test(plan.instruction)
+      ? "Instruction mentions transform, table, diagram, schema, equation, or data work."
+      : "",
+  ].filter(Boolean);
+  const tasks: AgenticAutomationTask[] = [
+    automationTask({
+      kind: "evidence-scan",
+      label: "Refresh current-document evidence scan",
+      owner: "Evidence Agent",
+      status: evidenceBlockerCount ? "needs-input" : "ready",
+      trigger: "Run after each draft, provider response, paste cleanup, or accepted revision.",
+      action: "open-review",
+      evidence: [
+        `${documentEvidence.unresolvedPlaceholders.length} placeholders`,
+        `${documentEvidence.citationTodos.length} citation TODOs`,
+        `${documentEvidence.claimInventory.length} claims`,
+        `${documentEvidence.reviewCommentResolutions.length} review comments`,
+      ],
+      nextStep: "Open Review, refresh evidence findings, and keep unresolved source gaps as release blockers.",
+    }),
+    automationTask({
+      kind: "outline-critique",
+      label: "Refresh outline critique",
+      owner: "Composition Agent",
+      status: outlineCritique.some((item) => item.severity === "blocker") ? "blocked" : outlineCritique.length ? "needs-input" : "ready",
+      trigger: "Run whenever the outline, section order, document type, or audience changes.",
+      action: "open-outline",
+      evidence: outlineCritique.length ? outlineCritique.slice(0, 6).map((item) => `${titleCase(item.area)} ${item.severity}: ${item.detail}`) : ["No outline critique blockers detected."],
+      nextStep: "Open Outline mode, resolve structure issues, then regenerate section contracts and drafting tasks.",
+    }),
+    automationTask({
+      kind: "transform-validation",
+      label: "Validate recommended transforms and templates",
+      owner: "Transform Agent",
+      status: transformHints.length ? "needs-input" : "ready",
+      trigger: "Run before inserting calc, table, chart, diagram, timeline, roadmap, schema, QR, or equation blocks.",
+      action: "open-review",
+      evidence: transformHints.length ? transformHints : ["No transform-specific source cues detected in the current run."],
+      nextStep: "Validate selected templates, source data, and transform engine readiness before generated narrative depends on structured outputs.",
+    }),
+    automationTask({
+      kind: "export-preflight",
+      label: "Run target-aware export preflight",
+      owner: "Distribution Agent",
+      status: distributionTargetPlans.length ? "needs-input" : "ready",
+      trigger: "Run when distribution targets, release metadata, assets, links, or export options change.",
+      action: "prepare-export",
+      evidence: distributionTargetPlans.length
+        ? distributionTargetPlans.map((target) => `${target.label}: ${target.preflightChecks[0]}`)
+        : ["No export or publishing target requested yet."],
+      nextStep: "Open export readiness, confirm metadata and target-specific blockers, then attach manifest or package evidence.",
+    }),
+    automationTask({
+      kind: "accessibility-check",
+      label: "Queue accessibility and readability check",
+      owner: "Accessibility Agent",
+      status: plan.distributionTargets.length || plan.lanes.includes("distribute") ? "needs-input" : "ready",
+      trigger: "Run before external review, publishing, PDF/DOCX/PPTX export, or executive handoff.",
+      action: "open-review",
+      evidence: [
+        "Check headings, link text, table readability, alt text, color-independent meaning, and review notes before publishing.",
+        plan.distributionTargets.length ? `Targets: ${plan.distributionTargets.join(", ")}` : "No external target requested yet.",
+      ],
+      nextStep: "Review accessibility risks and keep manual assistive-technology sign-off as release evidence when required.",
+    }),
+    automationTask({
+      kind: "readiness-refresh",
+      label: "Refresh AI control-center readiness",
+      owner: "Governance Agent",
+      status: controlCenter.status === "blocked" || blockers.length ? "blocked" : controlCenter.status === "needs-input" ? "needs-input" : "ready",
+      trigger: "Run after any task status, evidence, approval metadata, provider output, or export state changes.",
+      action: "open-review",
+      evidence: [
+        `Readiness score ${controlCenter.readinessScore}/100`,
+        `Control status ${controlCenter.status}`,
+        blockers.length ? `${blockers.length} blocker(s): ${blockers.slice(0, 3).join("; ")}` : "No run-level blockers detected.",
+      ],
+      nextStep: "Refresh readiness and confirm whether the next safe action is drafting, review, provider handoff, export preflight, or human approval.",
+    }),
+  ];
+  return tasks;
+}
+
+function automationTask(input: Omit<AgenticAutomationTask, "id" | "safeToAutoRun" | "manualOnlyReason"> & { safeToAutoRun?: boolean; manualOnlyReason?: string }): AgenticAutomationTask {
+  const safeToAutoRun = input.safeToAutoRun ?? true;
+  return {
+    id: `automation-${input.kind}-${stableFingerprint([input.kind, input.label, input.trigger].join("\n")).slice(0, 10)}`,
+    safeToAutoRun,
+    manualOnlyReason: safeToAutoRun ? undefined : input.manualOnlyReason || "This task may change files, publish content, or call an external service.",
+    ...input,
+  };
+}
+
 function buildControlCenter(input: {
   plan: AgenticWorkflowPlan;
   blockers: string[];
@@ -3327,6 +3499,7 @@ function buildAuditTrail(input: {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
@@ -3347,6 +3520,7 @@ function buildAuditTrail(input: {
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    automationQueue,
     preReviewRehearsal,
     documentEvidence,
     outlineCritique,
@@ -3399,6 +3573,18 @@ function buildAuditTrail(input: {
       item.sourceFingerprint,
       item.acceptanceStatus,
       ...item.reviewerNotes,
+    ]),
+    ...automationQueue.flatMap((item) => [
+      item.id,
+      item.kind,
+      item.label,
+      item.owner,
+      item.status,
+      String(item.safeToAutoRun),
+      item.trigger,
+      item.nextStep,
+      item.manualOnlyReason || "",
+      ...item.evidence,
     ]),
     ...preReviewRehearsal.flatMap((item) => [
       item.id,
@@ -3484,6 +3670,7 @@ function buildAuditTrail(input: {
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
       `Lifecycle task board prepared for ${lifecycleTasks.length} task(s) across ${Array.from(new Set(lifecycleTasks.map((task) => task.lane))).map(titleCase).join(", ")}.`,
       `Section draft history preserved ${sectionDraftHistory.length} composable draft restore point(s).`,
+      `Automation scheduler queued ${automationQueue.length} safe local check(s) with destructive actions kept manual.`,
       `Pre-review rehearsal prepared ${preReviewRehearsal.length} likely reviewer question, objection, redline, or missing-evidence prompt(s).`,
       `Outline variant comparison prepared ${plan.outlineVariants.length} alternative structure(s) for user selection before drafting.`,
       `Section work queue prepared for ${sectionWorkQueue.length} outline item(s).`,
@@ -3525,12 +3712,13 @@ function buildReleaseEvidenceBundle(input: {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   documentEvidence: AgenticDocumentEvidence;
   blockers: string[];
 }): AgenticReleaseEvidenceBundle {
-  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, sectionDraftHistory, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
+  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, sectionDraftHistory, automationQueue, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
   const taskBlockers = lifecycleTasks.filter((task) => task.status === "blocked" || task.status === "needs-input");
   const reviewerBlockers = reviewerAgents.filter((agent) => agent.status !== "ready");
   const items: AgenticReleaseEvidenceItem[] = [
@@ -3593,6 +3781,13 @@ function buildReleaseEvidenceBundle(input: {
       sectionDraftHistory.length
         ? `${sectionDraftHistory.length} section draft restore point(s) preserve prompt summaries, rationale, reviewer notes, fingerprints, and reusable Markdown.`
         : "No section draft restore points were generated.",
+      true,
+    ),
+    releaseEvidenceItem(
+      "Agent automation scheduler",
+      "Automation Scheduler",
+      automationQueue.some((item) => item.status === "blocked") ? "needs-review" : "available",
+      `${automationQueue.length} safe local automation check(s) are queued for evidence scan, outline critique, transform validation, export preflight, accessibility, and readiness refresh.`,
       true,
     ),
     releaseEvidenceItem(
@@ -4454,6 +4649,7 @@ function buildRunMarkdown(input: {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  automationQueue: AgenticAutomationTask[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   reviewChecklist: string[];
@@ -4475,6 +4671,7 @@ function buildRunMarkdown(input: {
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    automationQueue,
     outlineCritique,
     preReviewRehearsal,
     reviewChecklist,
@@ -4589,6 +4786,7 @@ function buildRunMarkdown(input: {
   lines.push(...preReviewRehearsalMarkdown(preReviewRehearsal));
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
   lines.push(...sectionDraftHistoryMarkdown(sectionDraftHistory));
+  lines.push(...automationQueueMarkdown(automationQueue));
   lines.push(...auditTrailMarkdown(auditTrail));
   lines.push(...releaseEvidenceBundleMarkdown(releaseEvidenceBundle));
   if (draftMarkdown.trim()) {
@@ -4952,6 +5150,32 @@ function sectionDraftHistoryMarkdown(items: AgenticSectionDraftHistoryItem[]) {
     );
   }
   return lines;
+}
+
+function automationQueueMarkdown(items: AgenticAutomationTask[]) {
+  if (!items.length) {
+    return ["## Agent Automation Scheduler", "", "No safe automation tasks were queued for this run.", ""];
+  }
+  return [
+    "## Agent Automation Scheduler",
+    "",
+    "| Check | Owner | Status | Safe | Trigger | Next step |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...items.map(
+      (item) =>
+        `| ${escapeTableCell(item.label)} | ${escapeTableCell(item.owner)} | ${item.status} | ${item.safeToAutoRun ? "yes" : "manual"} | ${escapeTableCell(item.trigger)} | ${escapeTableCell(item.nextStep)} |`,
+    ),
+    "",
+    "### Evidence Inputs",
+    "",
+    ...items.flatMap((item) => [
+      `#### ${item.label}`,
+      "",
+      ...item.evidence.map((evidence) => `- [ ] ${evidence}`),
+      item.manualOnlyReason ? `- Manual-only: ${item.manualOnlyReason}` : "",
+      "",
+    ].filter(Boolean)),
+  ];
 }
 
 function auditTrailMarkdown(auditTrail: AgenticAuditTrail) {

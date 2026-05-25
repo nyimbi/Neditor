@@ -2623,6 +2623,32 @@
                 </article>
               </section>
             </section>
+            <section class="agent-automation-scheduler" aria-label="Agent automation scheduler">
+              <header>
+                <div>
+                  <strong>Automation Scheduler</strong>
+                  <span>Safe local checks queued for evidence, outline, transforms, export preflight, accessibility, and readiness refresh.</span>
+                </div>
+                <small>{{ agentRun.automationQueue.length }} checks</small>
+              </header>
+              <ol>
+                <li v-for="task in agentRun.automationQueue" :key="task.id" :data-status="task.status">
+                  <div>
+                    <small>{{ task.kind }} | {{ task.owner }} | {{ task.safeToAutoRun ? "safe" : "manual" }}</small>
+                    <strong>{{ task.label }}</strong>
+                    <p>{{ task.trigger }}</p>
+                    <p>{{ task.nextStep }}</p>
+                    <p v-if="task.manualOnlyReason" class="sidebar-hint">{{ task.manualOnlyReason }}</p>
+                    <div class="agent-lifecycle-actions">
+                      <button type="button" @click="runAgentAutomationTask(task)">Run check</button>
+                    </div>
+                  </div>
+                  <ul>
+                    <li v-for="item in task.evidence" :key="item">{{ item }}</li>
+                  </ul>
+                </li>
+              </ol>
+            </section>
             <section v-if="agentRun.documentEvidence.claimInventory.length" class="agent-claim-inventory" aria-label="Agent claim inventory">
               <header>
                 <div>
@@ -3135,6 +3161,7 @@
                   <p v-if="item.documentEvidence">Evidence: {{ agentRunHistoryEvidenceSummary(item) }}</p>
                   <p v-if="item.outlineCritique?.length">Outline: {{ agentRunHistoryOutlineSummary(item) }}</p>
                   <p v-if="item.sectionDraftHistory?.length">Section drafts: {{ agentRunHistorySectionDraftSummary(item) }}</p>
+                  <p v-if="item.automationTaskCount">Automation: {{ item.automationTaskCount }} scheduled checks</p>
                   <p v-if="item.sourcePack">Source pack: {{ agentRunHistorySourcePackSummary(item) }}</p>
                   <p v-if="item.lifecycleTaskStates?.length">Task states: {{ agentRunHistoryTaskStateSummary(item) }}</p>
                   <div class="agent-history-actions">
@@ -3521,6 +3548,7 @@ import {
   type AgenticReviewCommentResolution,
   type AgenticSectionWorkItem,
   type AgenticSectionDraftHistoryItem,
+  type AgenticAutomationTask,
   type AgenticWorkflowStep,
   type AgenticNextAction,
   type AgenticOutlineVariant,
@@ -5782,6 +5810,7 @@ function agentRunHistoryItem(
       ...item,
       restorePointMarkdown: item.restorePointMarkdown.slice(0, 8_000),
     })),
+    automationTaskCount: run.automationQueue.length,
     reviewerCount: run.reviewerAgents.length,
     preReviewPromptCount: run.preReviewRehearsal.length,
     taskCount: run.lifecycleTasks.length,
@@ -6517,6 +6546,20 @@ function runAgentControlAction(action: AgenticNextAction | AgentRunHistoryNextAc
     action: workflowAction,
     status: action.status === "ready" ? "ready" : "needs-input",
   });
+}
+function runAgentAutomationTask(task: AgenticAutomationTask) {
+  ensureAgentPlanForControlAction();
+  const lane: AgenticWorkflowLane =
+    task.kind === "export-preflight" ? "distribute" : task.kind === "outline-critique" || task.kind === "transform-validation" ? "compose" : "review";
+  runAgenticStep({
+    id: `automation-${stableFingerprint(`${task.kind}:${task.action}:${task.label}`).slice(0, 10)}`,
+    lane,
+    title: task.label,
+    detail: `${task.trigger} ${task.nextStep}`,
+    action: normalizeAgentControlWorkflowAction(task.action),
+    status: task.status === "ready" ? "ready" : "needs-input",
+  });
+  store.statusMessage = `Ran automation check: ${task.label}`;
 }
 function runAgenticStep(step: AgenticWorkflowStep) {
   switch (step.action) {
@@ -12147,6 +12190,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-run-output,
 .app-shell[data-theme="dark"] .agent-control-center,
 .app-shell[data-theme="dark"] .agent-control-grid article,
+.app-shell[data-theme="dark"] .agent-automation-scheduler,
+.app-shell[data-theme="dark"] .agent-automation-scheduler li,
 .app-shell[data-theme="dark"] .agent-review-comment-queue,
 .app-shell[data-theme="dark"] .agent-review-comment-queue li,
 .app-shell[data-theme="dark"] .agent-reviewer-agents,
@@ -12204,6 +12249,10 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-step-list small,
 .app-shell[data-theme="dark"] .agent-run-output > header span,
 .app-shell[data-theme="dark"] .agent-run-output > header small,
+.app-shell[data-theme="dark"] .agent-automation-scheduler > header span,
+.app-shell[data-theme="dark"] .agent-automation-scheduler > header small,
+.app-shell[data-theme="dark"] .agent-automation-scheduler small,
+.app-shell[data-theme="dark"] .agent-automation-scheduler ul,
 .app-shell[data-theme="dark"] .agent-review-comment-queue > header span,
 .app-shell[data-theme="dark"] .agent-review-comment-queue > header small,
 .app-shell[data-theme="dark"] .agent-review-comment-queue small,
@@ -12303,6 +12352,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-run-output,
   .app-shell[data-theme="system"] .agent-control-center,
   .app-shell[data-theme="system"] .agent-control-grid article,
+  .app-shell[data-theme="system"] .agent-automation-scheduler,
+  .app-shell[data-theme="system"] .agent-automation-scheduler li,
   .app-shell[data-theme="system"] .agent-review-comment-queue,
   .app-shell[data-theme="system"] .agent-review-comment-queue li,
   .app-shell[data-theme="system"] .agent-reviewer-agents,
@@ -12360,6 +12411,10 @@ select:hover {
   .app-shell[data-theme="system"] .agent-step-list small,
   .app-shell[data-theme="system"] .agent-run-output > header span,
   .app-shell[data-theme="system"] .agent-run-output > header small,
+  .app-shell[data-theme="system"] .agent-automation-scheduler > header span,
+  .app-shell[data-theme="system"] .agent-automation-scheduler > header small,
+  .app-shell[data-theme="system"] .agent-automation-scheduler small,
+  .app-shell[data-theme="system"] .agent-automation-scheduler ul,
   .app-shell[data-theme="system"] .agent-review-comment-queue > header span,
   .app-shell[data-theme="system"] .agent-review-comment-queue > header small,
   .app-shell[data-theme="system"] .agent-review-comment-queue small,
@@ -12444,6 +12499,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-run-output,
 .app-shell[data-high-contrast="true"] .agent-control-center,
 .app-shell[data-high-contrast="true"] .agent-control-grid article,
+.app-shell[data-high-contrast="true"] .agent-automation-scheduler,
+.app-shell[data-high-contrast="true"] .agent-automation-scheduler li,
 .app-shell[data-high-contrast="true"] .agent-review-comment-queue,
 .app-shell[data-high-contrast="true"] .agent-review-comment-queue li,
 .app-shell[data-high-contrast="true"] .agent-reviewer-agents,
@@ -14234,6 +14291,8 @@ select:hover {
 .agent-run-output,
 .agent-control-center,
 .agent-control-grid article,
+.agent-automation-scheduler,
+.agent-automation-scheduler li,
 .agent-review-comment-queue,
 .agent-review-comment-queue li,
 .agent-reviewer-agents,
@@ -14479,6 +14538,60 @@ select:hover {
 .agent-control-grid li p {
   color: #2d3746;
   font-size: 12px;
+}
+
+.agent-automation-scheduler {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #4e778d;
+  background: #f5fbfd;
+}
+
+.agent-automation-scheduler > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-automation-scheduler > header div,
+.agent-automation-scheduler li > div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-automation-scheduler > header span,
+.agent-automation-scheduler > header small,
+.agent-automation-scheduler small {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-automation-scheduler ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-automation-scheduler li {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.7fr) minmax(0, 1fr);
+  gap: 10px;
+  border-left: 3px solid #6294ad;
+}
+
+.agent-automation-scheduler li[data-status="blocked"] {
+  border-left-color: #b34040;
+}
+
+.agent-automation-scheduler li[data-status="needs-input"] {
+  border-left-color: #c68a1a;
+}
+
+.agent-automation-scheduler p,
+.agent-automation-scheduler ul {
+  margin: 0;
 }
 
 .agent-reviewer-agents {

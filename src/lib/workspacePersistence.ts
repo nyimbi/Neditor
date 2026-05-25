@@ -269,6 +269,7 @@ export interface AgentRunHistoryItem {
   sectionCount?: number;
   sectionDraftVersionCount?: number;
   sectionDraftHistory?: AgentRunHistorySectionDraftItem[];
+  automationTaskCount?: number;
   reviewerCount?: number;
   preReviewPromptCount?: number;
   taskCount?: number;
@@ -903,6 +904,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     sectionCount: Math.max(numberValue(value.sectionCount) ?? 0, 0),
     sectionDraftVersionCount: Math.max(numberValue(value.sectionDraftVersionCount) ?? sectionDraftHistory.length, 0),
     ...(sectionDraftHistory.length ? { sectionDraftHistory } : {}),
+    automationTaskCount: Math.max(numberValue(value.automationTaskCount) ?? 0, 0),
     reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
     preReviewPromptCount: Math.max(numberValue(value.preReviewPromptCount) ?? 0, 0),
     taskCount: Math.max(numberValue(value.taskCount) ?? 0, 0),
