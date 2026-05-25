@@ -1734,6 +1734,16 @@
       </span>
       <span class="word-stats" :aria-label="`Document statistics: ${wordStats}`">{{ wordStats }}</span>
       <span
+        v-if="previewTimingStatus"
+        class="preview-timing"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        :aria-label="`Preview timing: ${previewTimingStatus}`"
+      >
+        {{ previewTimingStatus }}
+      </span>
+      <span
         v-if="watchStatus"
         class="watch-status"
         role="status"
@@ -4116,6 +4126,10 @@ const wordStats = computed(() => {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   const minutes = words ? Math.max(1, Math.ceil(words / 220)) : 0;
   return `${words} words | ${text.length} characters | ${minutes} min read`;
+});
+const previewTimingStatus = computed(() => {
+  if (store.lastPreviewCompileDurationMs === null) return "";
+  return `Preview updated in ${store.lastPreviewCompileDurationMs} ms for ${store.lastPreviewCompiledCharacters} characters`;
 });
 const releaseStatus = computed(() => active.value.compile?.semantic.status || "draft");
 const releaseStatusClass = computed(() => `release-${releaseStatus.value.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`);
@@ -11210,6 +11224,7 @@ select:hover {
 .app-shell[data-theme="dark"] .docs-live-workflow,
 .app-shell[data-theme="dark"] .status-message,
 .app-shell[data-theme="dark"] .word-stats,
+.app-shell[data-theme="dark"] .preview-timing,
 .app-shell[data-theme="dark"] .watch-status,
 .app-shell[data-theme="dark"] .export-progress {
   border-color: #34465a;
@@ -11353,6 +11368,7 @@ select:hover {
   .app-shell[data-theme="system"] .docs-live-workflow,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
+  .app-shell[data-theme="system"] .preview-timing,
   .app-shell[data-theme="system"] .watch-status,
   .app-shell[data-theme="system"] .export-progress {
     border-color: #34465a;
@@ -11479,6 +11495,7 @@ select:hover {
 .app-shell[data-high-contrast="true"] .docs-live-workflow,
 .app-shell[data-high-contrast="true"] .status-message,
 .app-shell[data-high-contrast="true"] .word-stats,
+.app-shell[data-high-contrast="true"] .preview-timing,
 .app-shell[data-high-contrast="true"] .watch-status,
 .app-shell[data-high-contrast="true"] .export-progress,
 .app-shell[data-high-contrast="true"] button,
@@ -14665,6 +14682,7 @@ select:hover {
 
 .status-message,
 .word-stats,
+.preview-timing,
 .watch-status,
 .export-progress,
 .error {
@@ -14687,6 +14705,7 @@ select:hover {
 }
 
 .word-stats,
+.preview-timing,
 .watch-status,
 .export-progress {
   background: #eef3f8;

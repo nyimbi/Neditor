@@ -1823,6 +1823,8 @@ test("keeps large document editing and preview updates responsive", async ({ pag
   await expect(previewPane).toContainText("Large document edit landed.");
   const elapsedMs = await page.evaluate((start) => performance.now() - start, startedAt);
   expect(elapsedMs, "large document edit should reach preview promptly in the browser harness").toBeLessThan(3000);
+  await expect(page.getByRole("status", { name: /Preview timing: Preview updated in \d+ ms for \d+ characters/ })).toBeVisible();
+  await expect(page.locator(".status-bar")).toContainText("Preview updated in");
 
   await editorScroller.evaluate((element) => {
     element.scrollTop = element.scrollHeight * 0.7;

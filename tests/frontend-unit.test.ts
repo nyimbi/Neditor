@@ -1629,6 +1629,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('button.getAttribute("data-help")'));
   ok(app.includes('button.getAttribute("aria-label")'));
   ok(app.includes('button.innerText.replace'));
+  ok(app.includes("previewTimingStatus"));
+  ok(app.includes("Preview updated in"));
+  ok(store.includes("lastPreviewCompileDurationMs"));
+  ok(store.includes("lastPreviewCompiledCharacters"));
   ok(app.includes("NEditor Guided Demo"));
   ok(app.includes("guidedDemoSteps"));
   ok(app.includes("guidedDemoCompletionSummary"));

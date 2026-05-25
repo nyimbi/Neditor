@@ -413,6 +413,9 @@ export const useDocumentsStore = defineStore("documents", {
     compileTaskGate: { sequence: 0 },
     compileBusy: false,
     compileProgress: "",
+    lastPreviewCompileDurationMs: null as number | null,
+    lastPreviewCompiledCharacters: 0,
+    lastPreviewCompiledAt: "",
     exportBusy: false,
     exportProgress: "",
     lastExportOutputPath: "",
@@ -935,6 +938,7 @@ export const useDocumentsStore = defineStore("documents", {
       const doc = this.activeDocument;
       if (!doc) return;
       const snapshot = beginLatestDocumentTask(this.compileTaskGate, doc);
+      const startedAt = performance.now();
       this.compileBusy = true;
       this.compileProgress = "Compiling preview";
       try {
@@ -946,6 +950,9 @@ export const useDocumentsStore = defineStore("documents", {
         }
         doc.compile = compile;
         doc.title = String(doc.compile.semantic.title || titleFromPath(doc.path));
+        this.lastPreviewCompileDurationMs = Math.max(0, Math.round(performance.now() - startedAt));
+        this.lastPreviewCompiledCharacters = snapshot.text.length;
+        this.lastPreviewCompiledAt = new Date().toISOString();
         this.statusMessage = `${doc.compile.diagnostics.length} diagnostics`;
         this.lastError = "";
         await this.syncFileWatcher();

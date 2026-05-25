@@ -47,6 +47,10 @@ Recent pushed checkpoints visible in current git history:
   execution. The browser workflow covers these states alongside probe success
   and missing-executable diagnostics so optional engine setup is clearer for
   non-technical users.
+- The status bar now reports live preview update telemetry, including elapsed
+  compile time and compiled character count. The large-document browser
+  workflow verifies that a 120-section edit reaches the preview within the
+  timing budget and exposes that timing signal to users.
 - The Outline panel is now an editable planning surface, not only a generated
   heading navigator. Users can draft an outline with indented bullets, numbered
   lines, or Markdown heading marks, then create a document skeleton with front
