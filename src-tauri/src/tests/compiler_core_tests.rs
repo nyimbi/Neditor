@@ -285,9 +285,7 @@ fn compiler_handles_document_variable_filter_edge_cases() {
     assert!(response
         .compiled_markdown
         .contains("Currency string: $1234.60"));
-    assert!(response
-        .compiled_markdown
-        .contains("Rounded string: 1235"));
+    assert!(response.compiled_markdown.contains("Rounded string: 1235"));
     assert!(response
         .compiled_markdown
         .contains("Percent string: 27.50%"));

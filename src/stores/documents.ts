@@ -1044,6 +1044,7 @@ export const useDocumentsStore = defineStore("documents", {
       this.watchDriver = driver;
       this.watchedPaths = watchPaths;
       this.watchedPathRoles = pathRoles;
+      await this.refreshExternalState(doc, undefined, context);
     },
     detachFileWatchListeners() {
       unwatchFileChanges?.();

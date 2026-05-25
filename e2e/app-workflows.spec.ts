@@ -3442,6 +3442,30 @@ test("reloads clean documents after watcher-originated external edits", async ({
   await expect(page.locator(".document-tabs .tab.active")).not.toContainText("*");
 });
 
+test("detects external changes when switching back to an inactive clean tab", async ({ page }) => {
+  await setMockFileText(page, "/workspace/watch-a.md", "# Watch A\n\nOriginal A body.");
+  await setMockFileText(page, "/workspace/watch-b.md", "# Watch B\n\nOriginal B body.");
+
+  await queueDialogSelection(page, "/workspace/watch-a.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueDialogSelection(page, "/workspace/watch-b.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText(/Watch B|watch-b\.md/);
+  await expect.poll(() => editorText(page)).toContain("Original B body.");
+  await expect(page.locator(".status-bar")).toContainText("Native watch: 1 path");
+
+  await setMockFileText(page, "/workspace/watch-a.md", "# Watch A\n\nExternal A update while inactive.");
+  await emitMockFileWatch(page, "/workspace/watch-a.md");
+  await expect.poll(() => editorText(page)).toContain("Original B body.");
+  await expect.poll(() => editorText(page)).not.toContain("External A update while inactive.");
+
+  await page.locator(".document-tabs .tab").filter({ hasText: /Watch A|watch-a\.md/ }).getByRole("button", { name: /Watch A|watch-a\.md/ }).click();
+  await expect(page.locator(".document-tabs .tab.active")).toContainText(/Watch A|watch-a\.md/);
+  await expect.poll(() => editorText(page)).toContain("External A update while inactive.");
+  await expect(page.locator(".status-bar")).toContainText("Reloaded external changes");
+  await expect(page.locator(".document-tabs .tab.active")).not.toContainText("*");
+});
+
 test("opens a root-file conflict when watcher events arrive during local edits", async ({ page }) => {
   await queueDialogSelection(page, "/workspace/market.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();

@@ -95,6 +95,12 @@ Recent pushed checkpoints visible in current git history:
   persists the per-check queued/running/complete/blocked breakdown into local
   run history so replanned runs, history summaries, and inserted/copied audit
   packages keep durable automation evidence.
+- Clean multi-tab external refresh now catches changes that happen while a file
+  tab is inactive and not the current watcher root. When the user switches back,
+  the active-tab watcher setup immediately compares the saved root-file hash
+  against disk, reloads clean documents, clears the dirty marker, and reports
+  `Reloaded external changes`; the full browser suite now passes 60 Chromium
+  workflows including the inactive-tab watcher case.
 - The AI-first platform roadmap is now an executable release contract. The
   roadmap still names 50 concrete changes, and `pnpm run check:ai-roadmap`
   verifies the item count, ten five-item sections, README/spec-matrix linkage,

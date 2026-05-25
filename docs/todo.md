@@ -137,14 +137,15 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 59 Chromium browser workbench workflows
+- `pnpm run test:e2e`: passed all 60 Chromium browser workbench workflows
   locally on 2026-05-25 through the workspace-local Playwright Chromium cache
   at `.tmp/ms-playwright`, including collapsible toolbars, HTML, blog/Substack,
   LaTeX, Google Docs export-target handoffs, app-level shortcuts for search,
   Review readiness, Export readiness, AI Agent Workspace, Docs Live, shortcut
   help, and deep keyboard-only operation through tabs, command palette,
   diagnostics, table editor, conflict merge, and preview focus paths, plus
-  dedicated outline-mode CRUD.
+  dedicated outline-mode CRUD and inactive clean-tab external file refresh when
+  switching back to a previously unwatched tab.
 - `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture`:
   passed and proves no-bibliography citation readiness emits a broad source
   warning plus precise per-key missing citation diagnostics that are copied
@@ -912,8 +913,10 @@ Current browser coverage in `e2e/app-workflows.spec.ts`:
 
 Required next coverage:
 
-- Remaining file/workspace flows: multi-tab watcher switching and native
-  desktop dialog behavior.
+- Remaining file/workspace flows: native desktop dialog behavior and broader
+  supported-OS watcher proof. Multi-tab clean-document watcher switching is now
+  browser-proven, including external changes that occur while another tab is
+  active and are detected when the clean tab becomes active again.
 - Deeper workspace folder browsing and native document-set proof. Tab ordering
   now has accessible move-left/move-right controls, drag-to-tab reordering, and
   browser restore proof; remaining work is native pointer proof across supported

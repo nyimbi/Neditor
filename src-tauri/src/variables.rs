@@ -193,23 +193,25 @@ fn apply_variable_filters(
             "upper" | "uppercase" => value.to_ascii_uppercase(),
             "lower" | "lowercase" => value.to_ascii_lowercase(),
             "title" | "titlecase" => title_case(&value),
-            "round" | "number" | "percent" | "currency" => match parse_variable_number(&value, variable_filter_name(filter)) {
-                Some(number) => format_value(number, variable_filter_name(filter)),
-                None => {
-                    push_variable_filter_diagnostic(
-                        path,
-                        filter,
-                        "numeric",
-                        source_map,
-                        token_line,
-                        token_column,
-                        token_end_line,
-                        token_end_column,
-                        diagnostics,
-                    );
-                    value
+            "round" | "number" | "percent" | "currency" => {
+                match parse_variable_number(&value, variable_filter_name(filter)) {
+                    Some(number) => format_value(number, variable_filter_name(filter)),
+                    None => {
+                        push_variable_filter_diagnostic(
+                            path,
+                            filter,
+                            "numeric",
+                            source_map,
+                            token_line,
+                            token_column,
+                            token_end_line,
+                            token_end_column,
+                            diagnostics,
+                        );
+                        value
+                    }
                 }
-            },
+            }
             _ => {
                 push_variable_filter_diagnostic(
                     path,

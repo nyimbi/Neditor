@@ -2019,6 +2019,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Insert document set manifest"));
   ok(app.includes("Document Set Manifest"));
   ok(store.includes("moveDocument(id: string, targetId: string"));
+  ok(store.includes("await this.refreshExternalState(doc, undefined, context);"));
   ok(app.includes("moveTabWithinGroup"));
   ok(app.includes("dropTabOnDocument"));
   ok(app.includes("tab-drag-handle"));
