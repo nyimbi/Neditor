@@ -1960,6 +1960,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("addFrontMatterDataSource"));
   ok(app.includes("Data source type"));
   ok(app.includes("blocked-path"));
+  ok(app.includes('aria-label="Document variable manager"'));
+  ok(app.includes("frontMatterVariableRows"));
+  ok(app.includes("documentVariableManagerSummary"));
+  ok(app.includes("parseFrontMatterVariables"));
+  ok(app.includes("insertDocumentVariable"));
+  ok(app.includes("addDocumentVariable"));
+  ok(app.includes("Document variable insert filter"));
+  ok(app.includes("currency"));
   ok(app.includes('aria-label="Captions and generated lists manager"'));
   ok(app.includes("captionedReferenceItems"));
   ok(app.includes("captionManagerSummary"));

@@ -2374,6 +2374,9 @@ test("manages front matter data sources from the references panel", async ({ pag
       "---",
       "title: Data Source UI",
       "status: draft",
+      "client: Example Corp",
+      "budget: 125000",
+      "owner:",
       "dataSources:",
       "  - name: Revenue",
       "    path: data/revenue.csv",
@@ -2407,6 +2410,18 @@ test("manages front matter data sources from the references panel", async ({ pag
   await expect.poll(() => editorText(page)).toContain('name: "Targets"');
   await expect.poll(() => editorText(page)).toContain('path: "data/targets.tsv"');
   await expect.poll(() => editorText(page)).toContain("type: tsv");
+
+  const variables = page.getByRole("region", { name: "Document variable manager" });
+  await expect(variables).toContainText("scalar variables");
+  await expect(variables.locator(".snapshot-row").filter({ hasText: "client" })).toContainText("Example Corp");
+  await expect(variables.locator(".snapshot-row").filter({ hasText: "owner" })).toContainText("empty");
+  await variables.getByLabel("Document variable insert filter").selectOption("currency");
+  await variables.locator(".snapshot-row").filter({ hasText: "budget" }).getByRole("button", { name: "Insert variable" }).click();
+  await expect.poll(() => editorText(page)).toContain("{{budget | currency}}");
+  await variables.getByPlaceholder("client, owner, budget").fill("reviewer");
+  await variables.getByPlaceholder("Example Corp, Strategy Office, 125000").fill("QA Lead");
+  await variables.getByRole("button", { name: "Add variable" }).click();
+  await expect.poll(() => editorText(page)).toContain('reviewer: "QA Lead"');
 });
 
 test("runs command palette open document and workspace file navigation", async ({ page }) => {

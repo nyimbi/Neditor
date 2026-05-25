@@ -854,6 +854,36 @@
             </article>
             <p v-if="!frontMatterDataSourceRows.length" class="sidebar-hint">No local CSV, TSV, JSON, or YAML data sources declared in front matter.</p>
           </section>
+          <h3>Document variables</h3>
+          <section class="reference-manager" aria-label="Document variable manager">
+            <p class="sidebar-hint">{{ documentVariableManagerSummary }}</p>
+            <div class="reference-inline-form">
+              <label>
+                Variable name
+                <input v-model="documentVariableNameDraft" placeholder="client, owner, budget" />
+              </label>
+              <label>
+                Value
+                <input v-model="documentVariableValueDraft" placeholder="Example Corp, Strategy Office, 125000" />
+              </label>
+              <button type="button" :disabled="!documentVariableNameDraft.trim()" @click="addDocumentVariable">Add variable</button>
+            </div>
+            <label>
+              Insert filter
+              <select v-model="documentVariableFilterDraft" aria-label="Document variable insert filter">
+                <option v-for="filter in documentVariableFilterOptions" :key="filter.value" :value="filter.value">{{ filter.label }}</option>
+              </select>
+            </label>
+            <article v-for="variable in frontMatterVariableRows" :key="variable.key" class="snapshot-row" :data-status="variable.status">
+              <p>{{ variable.key }}</p>
+              <small>{{ variable.status }} | {{ variable.value || "empty" }}{{ variable.line ? ` | line ${variable.line}` : "" }}</small>
+              <div class="reference-actions">
+                <button type="button" @click="insertDocumentVariable(variable.key)">Insert variable</button>
+                <button type="button" @click="goToSourceTarget({ line: variable.line })">Go to variable</button>
+              </div>
+            </article>
+            <p v-if="!frontMatterVariableRows.length" class="sidebar-hint">No scalar front matter variables are available for placeholder insertion.</p>
+          </section>
           <h3>Captions and Lists</h3>
           <section class="reference-manager" aria-label="Captions and generated lists manager">
             <div class="reference-actions">
@@ -3725,6 +3755,13 @@ interface FrontMatterDataSourceRow {
   line: number;
 }
 
+interface FrontMatterVariableRow {
+  key: string;
+  value: string;
+  status: "ready" | "empty";
+  line: number;
+}
+
 type HelpCategory = "basics" | "writing" | "structure" | "content" | "review" | "export" | "settings";
 
 interface HelpTopicAction {
@@ -3940,6 +3977,20 @@ const dataSourceTypeOptions: SupportedDataSourceKind[] = ["csv", "tsv", "json", 
 const dataSourceNameDraft = ref("");
 const dataSourcePathDraft = ref("");
 const dataSourceTypeDraft = ref<SupportedDataSourceKind>("csv");
+const documentVariableNameDraft = ref("");
+const documentVariableValueDraft = ref("");
+const documentVariableFilterDraft = ref("none");
+const documentVariableFilterOptions = [
+  { value: "none", label: "No filter" },
+  { value: "trim", label: "Trim" },
+  { value: "upper", label: "Uppercase" },
+  { value: "lower", label: "Lowercase" },
+  { value: "title", label: "Title case" },
+  { value: "number", label: "Number" },
+  { value: "round", label: "Round" },
+  { value: "percent", label: "Percent" },
+  { value: "currency", label: "Currency" },
+];
 const bibliographySnippet = "[BIBLIOGRAPHY]\n";
 const bibliographyTemplateSnippet = "```bibtex\n@misc{source2026,\n  title = {Source title},\n  author = {Author},\n  year = {2026}\n}\n```\n";
 const listOfFiguresSnippet = "[LIST_OF_FIGURES]\n";
@@ -4370,6 +4421,12 @@ const dataSourceManagerSummary = computed(() => {
   const ready = rows.filter((row) => row.status === "ready").length;
   const blocked = rows.length - ready;
   return `${rows.length} local data sources | ${ready} ready | ${blocked} need attention`;
+});
+const frontMatterVariableRows = computed(() => parseFrontMatterVariables(active.value.text));
+const documentVariableManagerSummary = computed(() => {
+  const rows = frontMatterVariableRows.value;
+  const empty = rows.filter((row) => row.status === "empty").length;
+  return `${rows.length} scalar variables | ${empty} empty | filters: default, trim, upper, lower, title, number, round, percent, currency`;
 });
 const captionedReferenceItems = computed<CaptionedReferenceItem[]>(() =>
   (active.value.compile?.document_ast.blocks || []).flatMap((block: DocumentBlock) => {
@@ -9555,6 +9612,22 @@ function addFrontMatterDataSource() {
   store.statusMessage = `Added ${dataSourceTypeDraft.value.toUpperCase()} data source`;
 }
 
+function addDocumentVariable() {
+  const key = documentVariableNameDraft.value.trim();
+  if (!key) return;
+  setFrontMatterField(key, yamlInlineString(documentVariableValueDraft.value.trim()));
+  documentVariableNameDraft.value = "";
+  documentVariableValueDraft.value = "";
+  store.statusMessage = `Added document variable ${key}`;
+}
+
+function insertDocumentVariable(key: string) {
+  const filter = documentVariableFilterDraft.value;
+  const expression = filter === "none" ? key : `${key} | ${filter}`;
+  insertBlock(`{{${expression}}}`);
+  store.statusMessage = `Inserted document variable ${key}`;
+}
+
 function setDocumentStatus(status: string) {
   if (!releaseStatuses.includes(status)) return;
   setFrontMatterField("status", status);
@@ -9724,6 +9797,45 @@ function parseFrontMatterDataSources(text: string): FrontMatterDataSourceRow[] {
   flushCurrent();
   return rows;
 }
+
+function parseFrontMatterVariables(text: string): FrontMatterVariableRow[] {
+  if (!text.startsWith("---\n")) return [];
+  const lines = text.split("\n");
+  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
+  if (endIndex <= 0) return [];
+  const rows: FrontMatterVariableRow[] = [];
+  for (let index = 1; index < endIndex; index += 1) {
+    const raw = lines[index];
+    const match = raw.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+    if (!match || frontMatterVariableExcludedKeys.has(match[1])) continue;
+    const value = cleanYamlScalar(match[2]);
+    if (!value || value === "[]" || value === "{}") {
+      rows.push({ key: match[1], value: "", status: "empty", line: index + 1 });
+      continue;
+    }
+    if (/^[>|]$/.test(value) || value.startsWith("[") || value.startsWith("{")) continue;
+    rows.push({
+      key: match[1],
+      value,
+      status: "ready",
+      line: index + 1,
+    });
+  }
+  return rows.sort((left, right) => left.key.localeCompare(right.key));
+}
+
+const frontMatterVariableExcludedKeys = new Set([
+  "brand",
+  "layout",
+  "dataSources",
+  "csvFiles",
+  "tsvFiles",
+  "jsonFiles",
+  "yamlFiles",
+  "ymlFiles",
+  "bibliography",
+  "indexExclude",
+]);
 
 function applyDataSourcePair(row: Partial<FrontMatterDataSourceRow>, pairText: string) {
   const pair = pairText.match(/^([\w-]+):\s*(.*)$/);
