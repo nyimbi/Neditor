@@ -588,6 +588,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("### Target Runbooks"));
   ok(run.markdown.includes("## AI Control Center"));
   ok(run.markdown.includes("### Source Grounding"));
+  ok(run.markdown.includes("## Outline Critique"));
   ok(run.markdown.includes("## Claim Inventory"));
   ok(run.markdown.includes("## Review Agents"));
   ok(run.markdown.includes("### Editorial Reviewer"));
@@ -622,6 +623,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("Google Docs collaboration package"))));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Reviewer agents prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Lifecycle task board prepared")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline critique prepared")));
   ok(run.sectionWorkQueue.length >= 5);
   ok(run.sectionWorkQueue.every((section) => section.completionCriteria.length >= 4));
   ok(run.sectionWorkQueue.some((section) => section.reviewerAgentIds.includes("export")));
@@ -702,6 +704,7 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   });
 
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Document placeholders" && item.status === "needs-review"));
+  ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Outline" && item.detail.includes("critique")));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.detail.includes("citation TODO")));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Claim inventory" && item.status === "needs-review"));
   ok(run.controlCenter.nextActions.some((action) => action.label === "Resolve document placeholders" && action.action === "open-ai-paste"));
@@ -713,6 +716,7 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata" && item.detail.includes("approvedAt")));
   ok(run.controlCenter.distribution.some((item) => item.detail.includes("placeholder or suspicious link")));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-placeholders" && task.evidence.some((item) => item.includes("{{client_name}}"))));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-outline-critique" && task.action === "open-outline"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-citations" && task.owner === "Evidence Agent"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-claim-inventory" && task.evidence.some((item) => item.includes("ARR grows by 18%"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-comments" && task.nextStep.includes("Resolve")));
@@ -720,6 +724,7 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-links" && task.action === "prepare-export"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-evidence-approval-metadata" && task.evidence.some((item) => item.includes("approvedAt"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.findings.some((item) => item.includes("{{client_name}}"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("outline critique"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.findings.some((item) => item.includes("citation TODO"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.requiredActions.some((item) => item.includes("claim inventory"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("review comments"))));

@@ -105,10 +105,19 @@ export interface AgenticWorkflowRun {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  outlineCritique: AgenticOutlineCritiqueItem[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
+}
+
+export interface AgenticOutlineCritiqueItem {
+  severity: "info" | "warning" | "blocker";
+  area: "coverage" | "sequence" | "duplication" | "depth" | "specificity";
+  heading: string;
+  detail: string;
+  recommendation: string;
 }
 
 export interface AgenticDistributionTargetPlan {
@@ -333,10 +342,11 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const blockers = buildRunBlockers(plan, hasDocument, hasSelection);
   const applicationMode = inferApplicationMode(plan, hasDocument, hasSelection);
   const documentEvidence = analyzeAgenticDocumentEvidence(request.documentText || "", plan);
-  const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence });
-  const reviewerAgents = buildReviewerAgents({ plan, draftMarkdown: draft?.markdown || "", revision, controlCenter, distributionTargetPlans, blockers, documentEvidence });
+  const outlineCritique = buildOutlineCritique(plan);
+  const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence, outlineCritique });
+  const reviewerAgents = buildReviewerAgents({ plan, draftMarkdown: draft?.markdown || "", revision, controlCenter, distributionTargetPlans, blockers, documentEvidence, outlineCritique });
   const sectionWorkQueue = buildSectionWorkQueue(plan, reviewerAgents);
-  const lifecycleTasks = buildLifecycleTasks({ plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence });
+  const lifecycleTasks = buildLifecycleTasks({ plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence, outlineCritique });
   const auditTrail = buildAuditTrail({
     plan,
     request,
@@ -345,6 +355,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    outlineCritique,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -362,6 +373,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    outlineCritique,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -380,6 +392,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    outlineCritique,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -715,8 +728,9 @@ function buildLifecycleTasks(input: {
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   documentEvidence: AgenticDocumentEvidence;
+  outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticLifecycleTask[] {
-  const { plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence } = input;
+  const { plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const tasks: AgenticLifecycleTask[] = [];
   const hasBlockers = blockers.length > 0;
   const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
@@ -743,6 +757,19 @@ function buildLifecycleTasks(input: {
     evidence: plan.suggestedOutline.trim() ? parseOutlineSections(plan.suggestedOutline).slice(0, 6).map((section) => section.heading) : ["No outline supplied."],
     nextStep: "Review the outline in outline mode before drafting body text.",
   });
+
+  if (outlineCritique.length) {
+    tasks.push({
+      id: "task-outline-critique",
+      lane: "compose",
+      title: "Resolve outline critique before drafting",
+      owner: "Composition Agent",
+      status: outlineCritique.some((item) => item.severity === "blocker") ? "blocked" : "needs-input",
+      action: "open-outline",
+      evidence: outlineCritique.slice(0, 8).map((item) => `${titleCase(item.area)}: ${item.detail}`),
+      nextStep: "Address missing, duplicate, weak, or poorly sequenced outline items before section drafting starts.",
+    });
+  }
 
   if (revision) {
     tasks.push({
@@ -962,6 +989,188 @@ function parseOutlineSections(outline: string) {
   return parsed.length ? parsed : [{ heading: "Document", level: 1 }];
 }
 
+function buildOutlineCritique(plan: AgenticWorkflowPlan): AgenticOutlineCritiqueItem[] {
+  if (!plan.suggestedOutline.trim()) {
+    return [
+      {
+        severity: "blocker",
+        area: "coverage",
+        heading: "(missing outline)",
+        detail: "No outline is available for section-by-section drafting.",
+        recommendation: "Create at least three outline sections before generating body copy.",
+      },
+    ];
+  }
+  const sections = parseOutlineSections(plan.suggestedOutline);
+  const critique: AgenticOutlineCritiqueItem[] = [];
+  const bodySections = sections.length > 1 ? sections.slice(1) : sections;
+  if (bodySections.length < 3) {
+    critique.push({
+      severity: "blocker",
+      area: "coverage",
+      heading: sections[0]?.heading || "(outline)",
+      detail: `Only ${bodySections.length} draftable outline section(s) were found.`,
+      recommendation: "Add enough sections to cover context, evidence, recommendation, risk, and handoff before drafting.",
+    });
+  }
+
+  const counts = new Map<string, number>();
+  for (const section of sections) {
+    const key = normalizeOutlineHeading(section.heading);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  for (const [heading, count] of counts) {
+    if (count > 1) {
+      critique.push({
+        severity: "warning",
+        area: "duplication",
+        heading,
+        detail: `${count} outline entries normalize to the same heading.`,
+        recommendation: "Rename, merge, or remove duplicated outline headings before assigning section work.",
+      });
+    }
+  }
+
+  for (const section of bodySections) {
+    if (section.level > 4) {
+      critique.push({
+        severity: "warning",
+        area: "depth",
+        heading: section.heading,
+        detail: `Heading is nested at level ${section.level}, deeper than the first-class outline mode supports.`,
+        recommendation: "Promote deeply nested material or convert it into bullets inside a parent section.",
+      });
+    }
+    if (/^(introduction|overview|background|miscellaneous|other|notes|conclusion)$/i.test(section.heading.trim())) {
+      critique.push({
+        severity: "info",
+        area: "specificity",
+        heading: section.heading,
+        detail: "Heading is generic and may not tell the drafting agent what decision, evidence, or action belongs there.",
+        recommendation: "Rename the section around the reader outcome, evidence type, or decision it supports.",
+      });
+    }
+  }
+
+  for (const expected of expectedOutlineSignals(plan)) {
+    if (!sections.some((section) => expected.pattern.test(section.heading))) {
+      critique.push({
+        severity: expected.required ? "warning" : "info",
+        area: "coverage",
+        heading: expected.label,
+        detail: `The ${expected.label} section expected for ${titleCase(plan.documentType)} is not present.`,
+        recommendation: expected.recommendation,
+      });
+    }
+  }
+
+  const firstActionIndex = sections.findIndex((section) => /\b(next steps?|requested approval|approval|handoff|publish|distribution)\b/i.test(section.heading));
+  const firstContextIndex = sections.findIndex((section) => /\b(context|background|current state|problem|need|evidence|findings)\b/i.test(section.heading));
+  if (firstActionIndex >= 0 && (firstContextIndex < 0 || firstActionIndex < firstContextIndex)) {
+    critique.push({
+      severity: "warning",
+      area: "sequence",
+      heading: sections[firstActionIndex]?.heading || "Action section",
+      detail: "Action or approval section appears before context or evidence.",
+      recommendation: "Move context, evidence, or findings before approval and next-step sections.",
+    });
+  }
+
+  return critique.slice(0, 12);
+}
+
+function normalizeOutlineHeading(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function expectedOutlineSignals(plan: AgenticWorkflowPlan) {
+  const common = [
+    {
+      label: "Evidence or findings",
+      pattern: /\b(evidence|findings|financial|data|metrics?|source|proof)\b/i,
+      required: plan.lanes.includes("review"),
+      recommendation: "Add an evidence, findings, data, or financial case section so claims have a source-review home.",
+    },
+    {
+      label: "Risk or assumptions",
+      pattern: /\b(risks?|assumptions?|constraints?|mitigation)\b/i,
+      required: plan.lanes.includes("review") || plan.distributionTargets.length > 0,
+      recommendation: "Add a risk, assumption, or constraint section before review or distribution.",
+    },
+  ];
+  const byType: Partial<Record<DocsLiveDocumentType, typeof common>> = {
+    "board-memo": [
+      {
+        label: "Decision needed",
+        pattern: /\b(decision|ask|approval requested|requested approval)\b/i,
+        required: true,
+        recommendation: "Add a decision or requested approval section for directors.",
+      },
+      {
+        label: "Financial case",
+        pattern: /\b(financial|investment|budget|forecast|case)\b/i,
+        required: true,
+        recommendation: "Add a financial case section with the evidence directors need.",
+      },
+      {
+        label: "Risks",
+        pattern: /\b(risks?|mitigation|challenge)\b/i,
+        required: true,
+        recommendation: "Add a risk section before the approval request.",
+      },
+    ],
+    proposal: [
+      {
+        label: "Client need",
+        pattern: /\b(client need|need|problem|challenge)\b/i,
+        required: true,
+        recommendation: "Add a client need or problem section before the proposed approach.",
+      },
+      {
+        label: "Scope",
+        pattern: /\b(scope|deliverables?|out of scope)\b/i,
+        required: true,
+        recommendation: "Add a scope section so acceptance and delivery boundaries are explicit.",
+      },
+      {
+        label: "Investment",
+        pattern: /\b(investment|pricing|fees?|commercial|budget)\b/i,
+        required: true,
+        recommendation: "Add an investment or commercial section before acceptance.",
+      },
+    ],
+    "research-brief": [
+      {
+        label: "Method",
+        pattern: /\b(method|methodology|sources?|approach)\b/i,
+        required: true,
+        recommendation: "Add a method or source approach section before findings.",
+      },
+      {
+        label: "References",
+        pattern: /\b(references?|bibliography|citations?|sources?)\b/i,
+        required: true,
+        recommendation: "Add a references or source section for research handoff.",
+      },
+    ],
+    "operating-procedure": [
+      {
+        label: "Steps",
+        pattern: /\b(steps?|procedure|workflow|process)\b/i,
+        required: true,
+        recommendation: "Add a procedure or steps section that operators can follow.",
+      },
+      {
+        label: "Controls",
+        pattern: /\b(controls?|checks?|exceptions?|escalation)\b/i,
+        required: true,
+        recommendation: "Add controls, checks, or exceptions before release.",
+      },
+    ],
+  };
+  return [...(byType[plan.documentType] || []), ...common];
+}
+
 function sectionReviewerIds(heading: string, plan: AgenticWorkflowPlan): AgenticReviewerAgentId[] {
   const ids: AgenticReviewerAgentId[] = ["editor", "evidence", "governance"];
   if (/\b(risk|assumption|constraint|approval|decision|legal|compliance)\b/i.test(heading)) ids.push("risk");
@@ -980,8 +1189,9 @@ function buildReviewerAgents(input: {
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   documentEvidence: AgenticDocumentEvidence;
+  outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticReviewerAgent[] {
-  const { plan, draftMarkdown, revision, controlCenter, distributionTargetPlans, blockers, documentEvidence } = input;
+  const { plan, draftMarkdown, revision, controlCenter, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const evidenceValue = extractKeyValue(plan.placeholderText, "evidence");
   const hasSpecificEvidence = Boolean(evidenceValue && !/^TBD\b/i.test(evidenceValue));
   const hasDraft = Boolean(draftMarkdown.trim());
@@ -1000,10 +1210,14 @@ function buildReviewerAgents(input: {
         documentEvidence.unresolvedPlaceholders.length
           ? `Current document has unresolved placeholders: ${documentEvidence.unresolvedPlaceholders.slice(0, 4).join(", ")}.`
           : "No obvious placeholder tokens were found in the current document.",
+        outlineCritique.length
+          ? `Outline critique found ${outlineCritique.length} structure, coverage, sequencing, duplication, or specificity item(s).`
+          : "No outline critique items were detected.",
         `Tone target: ${extractKeyValue(plan.placeholderText, "tone") || "professional and direct"}.`,
       ],
       requiredActions: [
         missingInputs.includes("audience") ? "Confirm the intended audience before approving voice, detail level, and calls to action." : "",
+        outlineCritique.length ? "Resolve outline critique items before treating section drafting as locked." : "",
         revision ? "Compare the proposed revision to the source text for meaning drift and over-compression." : "",
         hasDraft ? "Run a humanization pass for generic AI phrasing, repetition, and claims that sound confident without support." : "",
         documentEvidence.unresolvedPlaceholders.length ? "Resolve or intentionally preserve current-document placeholders before final approval." : "",
@@ -1137,11 +1351,12 @@ function buildControlCenter(input: {
   revision: AgenticWorkflowRevision | null;
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   documentEvidence: AgenticDocumentEvidence;
+  outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticControlCenter {
-  const { plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence } = input;
+  const { plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence, outlineCritique } = input;
   const hardBlockers = blockers.filter((blocker) => !blocker.startsWith("Missing input:"));
   const status: AgenticControlStatus = hardBlockers.length ? "blocked" : blockers.length ? "needs-input" : "ready";
-  const sourceGrounding = buildSourceGrounding(plan, hasDocument, hasSelection, documentEvidence);
+  const sourceGrounding = buildSourceGrounding(plan, hasDocument, hasSelection, documentEvidence, outlineCritique);
   const governance = buildGovernanceItems(plan, revision, blockers, documentEvidence);
   const distribution = buildDistributionItems(plan, distributionTargetPlans, documentEvidence);
   const readinessScore = scoreControlCenter(status, sourceGrounding, governance, distribution, blockers);
@@ -1172,6 +1387,7 @@ function buildAuditTrail(input: {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  outlineCritique: AgenticOutlineCritiqueItem[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -1187,6 +1403,7 @@ function buildAuditTrail(input: {
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    outlineCritique,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -1218,6 +1435,7 @@ function buildAuditTrail(input: {
       ...section.completionCriteria,
       ...section.reviewerAgentIds,
     ]),
+    ...outlineCritique.flatMap((item) => [item.severity, item.area, item.heading, item.detail, item.recommendation]),
     ...reviewChecklist,
     ...distributionChecklist,
     ...distributionTargetPlans.flatMap((target) => [target.target, target.label, ...target.preflightChecks, ...target.handoffSteps, ...target.evidenceRequired]),
@@ -1240,6 +1458,9 @@ function buildAuditTrail(input: {
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
       `Lifecycle task board prepared for ${lifecycleTasks.length} task(s) across ${Array.from(new Set(lifecycleTasks.map((task) => task.lane))).map(titleCase).join(", ")}.`,
       `Section work queue prepared for ${sectionWorkQueue.length} outline item(s).`,
+      outlineCritique.length
+        ? `Outline critique prepared ${outlineCritique.length} structure and coverage item(s).`
+        : "Outline critique found no structure or coverage issues.",
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
         : "No distribution target selected at packet generation time.",
@@ -1274,6 +1495,7 @@ function buildSourceGrounding(
   hasDocument: boolean,
   hasSelection: boolean,
   documentEvidence: AgenticDocumentEvidence,
+  outlineCritique: AgenticOutlineCritiqueItem[],
 ): AgenticControlItem[] {
   const evidenceValue = extractKeyValue(plan.placeholderText, "evidence");
   return [
@@ -1294,8 +1516,12 @@ function buildSourceGrounding(
     },
     {
       label: "Outline",
-      detail: plan.suggestedOutline.trim() ? "Outline is available as the composition work queue." : "No outline is available for section-by-section drafting.",
-      status: plan.suggestedOutline.trim() ? "available" : "missing",
+      detail: outlineCritique.length
+        ? `Outline is available, with ${outlineCritique.length} critique item(s) to resolve before drafting.`
+        : plan.suggestedOutline.trim()
+          ? "Outline is available as the composition work queue."
+          : "No outline is available for section-by-section drafting.",
+      status: !plan.suggestedOutline.trim() ? "missing" : outlineCritique.length ? "needs-review" : "available",
     },
     {
       label: "Evidence",
@@ -1689,6 +1915,7 @@ function buildRunMarkdown(input: {
   lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
+  outlineCritique: AgenticOutlineCritiqueItem[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -1705,6 +1932,7 @@ function buildRunMarkdown(input: {
     lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
+    outlineCritique,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -1754,6 +1982,7 @@ function buildRunMarkdown(input: {
     lines.push("### Blockers", "", ...blockers.map((blocker) => `- [ ] ${blocker}`), "");
   }
   lines.push(...controlCenterMarkdown(controlCenter));
+  lines.push(...outlineCritiqueMarkdown(outlineCritique));
   lines.push(...claimInventoryMarkdown(documentEvidence.claimInventory));
   lines.push(...lifecycleTasksMarkdown(lifecycleTasks));
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
@@ -1848,6 +2077,23 @@ function controlCenterMarkdown(controlCenter: AgenticControlCenter) {
     "### Distribution State",
     "",
     ...controlCenter.distribution.map((item) => `- ${item.label} [${item.status}]: ${item.detail}`),
+    "",
+  ];
+}
+
+function outlineCritiqueMarkdown(outlineCritique: AgenticOutlineCritiqueItem[]) {
+  if (!outlineCritique.length) {
+    return ["## Outline Critique", "", "No outline critique items were detected.", ""];
+  }
+  return [
+    "## Outline Critique",
+    "",
+    "| Severity | Area | Heading | Finding | Recommendation |",
+    "| --- | --- | --- | --- | --- |",
+    ...outlineCritique.map(
+      (item) =>
+        `| ${item.severity} | ${item.area} | ${escapeTableCell(item.heading)} | ${escapeTableCell(item.detail)} | ${escapeTableCell(item.recommendation)} |`,
+    ),
     "",
   ];
 }

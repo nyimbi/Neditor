@@ -102,9 +102,11 @@ concrete next actions and lifecycle tasks, so evidence cleanup can be assigned,
 run, noted, and completed from the same agent board. The same packet includes named
 reviewer agents for editorial quality, evidence grounding, risk, citations,
 governance, and export readiness so each review lane has findings and required
-actions instead of one undifferentiated checklist. It also includes a
-section-by-section work queue with drafting instructions, completion criteria,
-and assigned reviewer agents so a team can build the document systematically
+actions instead of one undifferentiated checklist. It also includes deterministic
+outline critique for coverage, sequencing, duplicated headings, excessive depth,
+and generic section names before drafting starts, plus a section-by-section work
+queue with drafting instructions, completion criteria, and assigned reviewer
+agents so a team can build the document systematically
 from outline to reviewed sections. Each queued section can insert a visible work
 brief into the Markdown source or open Docs Live preloaded with that section's
 instruction, criteria, placeholders, and reviewer agents for focused drafting.
