@@ -547,11 +547,14 @@ uploaded evidence artifacts and import returned completed sign-offs locally with
 `pnpm run ingest:evidence -- --source /path/to/unpacked-artifacts`.
 
 `pnpm run collect:evidence-kit` packages the current release-readiness gaps into
-a reviewer-friendly bundle with runbooks, templates, and return paths for
-platform evidence, signing, live AI provider/runtime proof, independent security
-review, Google Docs import, release-device performance profiling, human review
-sign-offs, optional external engines such as Pikchr, and spec-completion closure
-work. The ingest tool
+a reviewer-friendly bundle with runbooks, templates, return paths, validator
+commands, ingest commands, and final release-readiness commands for platform
+evidence, signing, live AI provider/runtime proof, independent security review,
+Google Docs import, release-device performance profiling, human review sign-offs,
+optional external engines such as Pikchr, and spec-completion closure work. The
+kit contract now fails if a readiness gap cannot be closed from a generated work
+item with at least one runbook, returned evidence path, validator command, and
+`pnpm run check:release-readiness` handoff. The ingest tool
 recognizes returned security review proof under paths such as
 `security/security-review.json`, performance profile proof under paths such as
 `performance/native-profile.json`, and optional-engine proof under paths such as

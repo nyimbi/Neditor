@@ -2886,6 +2886,15 @@ AI control-center approval gate wiring verification:
 | `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including blocked agent runs whose AI Control Center summary, readiness state, next actions, governance rows, distribution rows, and automation preflight now reflect the approval gate instead of scattered approval hints. |
 | `git diff --check` | Pass | The control-center gate-wiring diff has no whitespace errors. |
 
+Release evidence kit closure-plan verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/collect-release-evidence-kit.mjs` | Pass | Evidence-kit collector syntax remains valid after adding per-gap validator commands, ingest commands, final readiness commands, and `readyToSend` closure metadata. |
+| `node --check scripts/check-release-evidence-kit.mjs` | Pass | Evidence-kit checker syntax remains valid after making it reject gap work items without runbooks, returned evidence paths, validator commands, ingest commands, and final release-readiness commands. |
+| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards for the strengthened release evidence kit closure-plan and ingest contract. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting the self-validating release evidence kit work items; all local links resolved. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

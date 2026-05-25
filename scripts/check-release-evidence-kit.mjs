@@ -81,6 +81,24 @@ function validateManifest(manifest, readiness) {
     requireValue(runbookPaths.has(runbook), `manifest is missing runbook ${runbook}`);
     requireFile(join(kitDir, runbook), `runbook ${runbook}`, 100);
   }
+  for (const runbook of runbooks) {
+    requireValue(Array.isArray(runbook.validatorCommands) && runbook.validatorCommands.length > 0, `runbook ${runbook.path} must list validator commands`);
+    requireValue(String(runbook.ingestCommand || "").includes("pnpm run ingest:evidence"), `runbook ${runbook.path} must list ingest command`);
+    requireValue(String(runbook.finalReadinessCommand || "").includes("pnpm run check:release-readiness"), `runbook ${runbook.path} must list final readiness command`);
+  }
+
+  const gapWorkItems = Array.isArray(manifest.gapWorkItems) ? manifest.gapWorkItems : [];
+  requireValue(gapWorkItems.length === readinessGaps.length, "gapWorkItems must mirror the release readiness report");
+  const readinessGapIds = new Set(readinessGaps.map((gap) => gap.id));
+  for (const item of gapWorkItems) {
+    requireValue(readinessGapIds.has(item.id), `gapWorkItems contains unknown readiness gap ${item.id}`);
+    requireValue(item.readyToSend === true, `gap work item ${item.id} must be ready to send`);
+    requireValue(Array.isArray(item.runbooks) && item.runbooks.length > 0, `gap work item ${item.id} must list at least one runbook`);
+    requireValue(Array.isArray(item.returns) && item.returns.length > 0, `gap work item ${item.id} must list returned evidence paths`);
+    requireValue(Array.isArray(item.validatorCommands) && item.validatorCommands.length > 0, `gap work item ${item.id} must list validator commands`);
+    requireValue(String(item.ingestCommand || "").includes("pnpm run ingest:evidence"), `gap work item ${item.id} must list ingest command`);
+    requireValue(String(item.finalReadinessCommand || "").includes("pnpm run check:release-readiness"), `gap work item ${item.id} must list final readiness command`);
+  }
 }
 
 function writeReport(manifest, readiness) {

@@ -2757,6 +2757,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("spec-completion-open-items"));
   ok(evidenceKitCollector.includes("runbooks/spec-completion-closure.md"));
   ok(evidenceKitCollector.includes("gapWorkItems"));
+  ok(evidenceKitCollector.includes("readyToSend"));
+  ok(evidenceKitCollector.includes("validatorCommandsForRunbook"));
+  ok(evidenceKitCollector.includes("validatorCommands"));
+  ok(evidenceKitCollector.includes("finalReadinessCommand"));
+  ok(evidenceKitCollector.includes("pnpm run check:release-readiness"));
   ok(evidenceKitCollector.includes("pnpm run ingest:evidence"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit.v1"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit-report.v1"));
@@ -2774,6 +2779,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("staleTemplates must be empty"));
   ok(evidenceKitChecker.includes("missingTemplates must be empty"));
   ok(evidenceKitChecker.includes("manifest gaps must mirror the release readiness report"));
+  ok(evidenceKitChecker.includes("gapWorkItems must mirror the release readiness report"));
+  ok(evidenceKitChecker.includes("must list validator commands"));
+  ok(evidenceKitChecker.includes("must list returned evidence paths"));
+  ok(evidenceKitChecker.includes("must list final readiness command"));
   ok(evidenceIngest.includes("neditor.release-evidence-ingest.v1"));
   ok(evidenceIngest.includes("NEDITOR_RELEASE_EVIDENCE_RETURN_DIR"));
   ok(evidenceIngest.includes("platform/win32-package-artifacts.json"));

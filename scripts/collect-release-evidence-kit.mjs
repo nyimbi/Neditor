@@ -254,6 +254,9 @@ const manifest = {
     path: runbook.file,
     gaps: runbook.gaps,
     returns: runbook.returns,
+    validatorCommands: validatorCommandsForRunbook(runbook),
+    ingestCommand: ingestCommand(),
+    finalReadinessCommand: finalReadinessCommand(),
   })),
   gapWorkItems: gapWorkItems(),
 };
@@ -330,6 +333,7 @@ function inspectTemplateFreshness(path) {
 
 function writeRunbooks() {
   for (const runbook of runbooks) {
+    const validatorCommands = validatorCommandsForRunbook(runbook);
     const body = [
       `# ${runbook.title}`,
       "",
@@ -345,6 +349,15 @@ function writeRunbooks() {
       "## Return Evidence",
       "",
       ...runbook.returns.map((item) => `- \`${item}\``),
+      "",
+      "## Validate Before Returning",
+      "",
+      ...validatorCommands.map((command) => `- \`${command}\``),
+      "",
+      "## Ingest On The Release Host",
+      "",
+      `- \`${ingestCommand()}\``,
+      `- \`${finalReadinessCommand()}\``,
       "",
     ].join("\n");
     const destination = join(outputDir, runbook.file);
@@ -364,6 +377,9 @@ function readme(manifest) {
           `- [ ] \`${item.id}\`: ${item.detail || "See release readiness report."}`,
           ...item.runbooks.map((runbook) => `  - Runbook: [${runbook.title}](${runbook.path})`),
           ...item.returns.map((returned) => `  - Return: \`${returned}\``),
+          ...item.validatorCommands.map((command) => `  - Validate: \`${command}\``),
+          `  - Ingest: \`${item.ingestCommand}\``,
+          `  - Final readiness: \`${item.finalReadinessCommand}\``,
         ].join("\n"))
         .join("\n")
     : "- No external work items are required by the current release readiness report.";
@@ -415,21 +431,40 @@ function readme(manifest) {
 function gapWorkItems() {
   return gaps.map((gap) => {
     const id = gap.id || gap.check || gap.name || "unknown-gap";
-    const matchingRunbooks = runbooks
-      .filter((runbook) => runbook.gaps.includes(id))
-      .map((runbook) => ({
-        title: runbook.title,
-        path: runbook.file,
-      }));
+    const matchingRunbooks = runbooks.filter((runbook) => runbook.gaps.includes(id));
+    const returns = Array.from(new Set(matchingRunbooks.flatMap((runbook) => runbook.returns)));
+    const validatorCommands = Array.from(new Set(matchingRunbooks.flatMap((runbook) => validatorCommandsForRunbook(runbook))));
     return {
       id,
       status: gap.status || "pending",
       detail: gap.detail || gap.reason || gap.message || "",
       evidence: gap.evidence || null,
-      runbooks: matchingRunbooks,
-      returns: Array.from(new Set(runbooks.filter((runbook) => runbook.gaps.includes(id)).flatMap((runbook) => runbook.returns))),
+      runbooks: matchingRunbooks.map((runbook) => ({
+        title: runbook.title,
+        path: runbook.file,
+      })),
+      returns,
+      validatorCommands,
+      ingestCommand: ingestCommand(),
+      finalReadinessCommand: finalReadinessCommand(),
+      readyToSend: matchingRunbooks.length > 0 && returns.length > 0 && validatorCommands.length > 0,
     };
   });
+}
+
+function validatorCommandsForRunbook(runbook) {
+  const commands = runbook.commands.filter(
+    (command) => /\bpnpm run (check:[a-z0-9:-]+|test:rendered-exports)\b/i.test(command) || /^NEDITOR_[A-Z0-9_]+=/.test(command),
+  );
+  return Array.from(new Set(commands));
+}
+
+function ingestCommand() {
+  return "pnpm run ingest:evidence -- --source /path/to/return-dir";
+}
+
+function finalReadinessCommand() {
+  return "pnpm run check:release-readiness";
 }
 
 function readJson(path) {
