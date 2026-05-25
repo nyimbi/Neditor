@@ -224,7 +224,8 @@ web app.
   request with a session-only API key, preview the provider's Markdown response,
   and apply it as review material without persisting the secret; imported
   provider responses are wrapped in local `ai-source` and `ai-assisted`
-  needs-review provenance before they enter the document.
+  needs-review provenance before they enter the document, and provider-applied
+  history records the wrapped review draft that was actually inserted.
 - AI Create makes Docs Live the default first step for intent-led drafting,
   so users can begin with the outcome, audience, context, and placeholders
   instead of a blank page.

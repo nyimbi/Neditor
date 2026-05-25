@@ -1069,6 +1069,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Run provider request"));
   ok(app.includes("buildAiProviderResponseReviewMarkdown"));
   ok(app.includes("Apply wraps this output in needs-review provenance"));
+  ok(app.includes("packetMarkdownOverride"));
+  ok(app.includes("stableFingerprint(packetMarkdownOverride)"));
+  ok(app.includes("agentPacketPreview"));
+  ok(app.includes('recordAgentRunHistory(agentRun.value, "provider-applied"'));
   ok(app.includes("Session API key"));
   ok(app.includes("executeAiProviderRequestPackage"));
   ok(app.includes('aria-label="AI provider response"'));

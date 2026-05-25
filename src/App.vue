@@ -2502,6 +2502,7 @@ import {
   buildAgenticSectionWorkBrief,
   buildAgenticWorkflowPlan,
   buildAgenticWorkflowRun,
+  stableFingerprint,
   type AgenticWorkflowPlaybook,
   type AgenticWorkflowPlan,
   type AgenticWorkflowRun,
@@ -4039,8 +4040,10 @@ function agentRunHistoryItem(
   run: AgenticWorkflowRun,
   status: AgentRunHistoryItem["status"],
   providerProfile = "",
+  packetMarkdownOverride = "",
 ): AgentRunHistoryItem {
   const now = new Date().toISOString();
+  const packetMarkdown = packetMarkdownOverride || run.markdown;
   return {
     runId: run.auditTrail.runId,
     title: run.plan.title,
@@ -4053,12 +4056,12 @@ function agentRunHistoryItem(
     status,
     applicationMode: run.applicationMode,
     readinessScore: run.controlCenter.readinessScore,
-    outputFingerprint: run.auditTrail.outputFingerprint,
+    outputFingerprint: packetMarkdownOverride ? stableFingerprint(packetMarkdownOverride) : run.auditTrail.outputFingerprint,
     sourceFingerprint: run.auditTrail.sourceFingerprint,
     contextFingerprint: run.auditTrail.contextFingerprint,
     instructionFingerprint: run.auditTrail.instructionFingerprint,
-    packetMarkdown: run.markdown.slice(0, 24_000),
-    packetPreview: run.summary.slice(0, 260),
+    packetMarkdown: packetMarkdown.slice(0, 24_000),
+    packetPreview: packetMarkdownOverride ? agentPacketPreview(packetMarkdownOverride) : run.summary.slice(0, 260),
     sectionCount: run.sectionWorkQueue.length,
     reviewerCount: run.reviewerAgents.length,
     taskCount: run.lifecycleTasks.length,
@@ -4066,8 +4069,16 @@ function agentRunHistoryItem(
     providerProfile: providerProfile || undefined,
   };
 }
-function recordAgentRunHistory(run: AgenticWorkflowRun, status: AgentRunHistoryItem["status"], providerProfile = "") {
-  store.recordAgentRunHistory(agentRunHistoryItem(run, status, providerProfile));
+function agentPacketPreview(markdown: string) {
+  return markdown
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/[#>*_`[\]-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 260);
+}
+function recordAgentRunHistory(run: AgenticWorkflowRun, status: AgentRunHistoryItem["status"], providerProfile = "", packetMarkdownOverride = "") {
+  store.recordAgentRunHistory(agentRunHistoryItem(run, status, providerProfile, packetMarkdownOverride));
 }
 function replanAgentHistoryRun(item: AgentRunHistoryItem) {
   agentInstruction.value = item.instruction;
@@ -4125,7 +4136,7 @@ function applyAgentProviderResponse() {
     runId: agentRun.value?.auditTrail.runId,
   });
   applyAgentMarkdown(reviewMarkdown, agentRun.value?.applicationMode || "append-packet");
-  if (agentRun.value) recordAgentRunHistory(agentRun.value, "provider-applied", agentProviderPackage.value?.profile.label || "");
+  if (agentRun.value) recordAgentRunHistory(agentRun.value, "provider-applied", agentProviderPackage.value?.profile.label || "", reviewMarkdown);
   store.statusMessage = "Applied provider response for human review";
   closeAgentWorkspace();
 }

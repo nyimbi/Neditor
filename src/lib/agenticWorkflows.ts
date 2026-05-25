@@ -1638,7 +1638,7 @@ function compactTimestamp(value: string) {
   return value.replace(/[^0-9A-Za-z]+/g, "").slice(0, 15) || "undated";
 }
 
-function stableFingerprint(value: string) {
+export function stableFingerprint(value: string) {
   let first = 0x811c9dc5;
   let second = 0x9e3779b9;
   for (let index = 0; index < value.length; index += 1) {

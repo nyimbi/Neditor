@@ -128,7 +128,9 @@ choose **Run provider request**. The key is held only in the open dialog, is not
 written to the document, and is cleared when the session ends. Review the
 provider response before using **Apply response**. NEditor wraps imported
 provider output in local `ai-source` and `ai-assisted` needs-review provenance,
-so a provider response cannot enter the document as approved final copy.
+so a provider response cannot enter the document as approved final copy. The
+saved run history stores that wrapped review draft, so later append/copy actions
+reproduce the same governed material that was applied.
 
 Use **AI Create** when the next action is clearly to create a first draft. It
 opens Docs Live with an intent-first workflow: document type, outline, spoken or
