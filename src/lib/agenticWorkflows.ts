@@ -752,7 +752,18 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const documentEvidence = analyzeAgenticDocumentEvidence(request.documentText || "", plan);
   const reviewChecklist = buildReviewChecklist(plan, revision, editAcceptanceQueue, documentEvidence);
   const outlineCritique = buildOutlineCritique(plan);
-  const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence, outlineCritique });
+  const approvalGate = buildApprovalGate(plan, documentEvidence, request.documentText || "");
+  const controlCenter = buildControlCenter({
+    plan,
+    blockers,
+    hasDocument,
+    hasSelection,
+    revision,
+    distributionTargetPlans,
+    documentEvidence,
+    outlineCritique,
+    approvalGate,
+  });
   const reviewerAgents = buildReviewerAgents({
     plan,
     draftMarkdown: draft?.markdown || "",
@@ -784,7 +795,6 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     documentEvidence,
     transformRecommendations,
   });
-  const approvalGate = buildApprovalGate(plan, documentEvidence, request.documentText || "");
   const preReviewRehearsal = buildPreReviewRehearsal({
     plan,
     reviewerAgents,
@@ -802,6 +812,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     controlCenter,
     blockers,
     transformRecommendations,
+    approvalGate,
   });
   const lifecycleTasks = buildLifecycleTasks({
     plan,
@@ -4111,8 +4122,9 @@ function buildAutomationQueue(input: {
   controlCenter: AgenticControlCenter;
   blockers: string[];
   transformRecommendations: AgenticTransformRecommendation[];
+  approvalGate: AgenticApprovalGate;
 }): AgenticAutomationTask[] {
-  const { plan, documentEvidence, outlineCritique, distributionTargetPlans, controlCenter, blockers, transformRecommendations } = input;
+  const { plan, documentEvidence, outlineCritique, distributionTargetPlans, controlCenter, blockers, transformRecommendations, approvalGate } = input;
   const evidenceBlockerCount =
     documentEvidence.unresolvedPlaceholders.length +
     documentEvidence.citationTodos.length +
@@ -4121,7 +4133,8 @@ function buildAutomationQueue(input: {
     documentEvidence.reviewCommentResolutions.length +
     documentEvidence.brokenLinkHints.length +
     documentEvidence.referenceHints.length +
-    documentEvidence.approvalMetadataMissing.length;
+    documentEvidence.approvalMetadataMissing.length +
+    approvalGate.blockers.length;
   const transformHints = [
     plan.sourcePack.items.some((item) => /\b(table|chart|calc|diagram|timeline|roadmap|schema|openapi|json|csv|qr)\b/i.test(`${item.label} ${item.detail}`))
       ? "Source pack contains structured-data or transform cues."
@@ -4173,13 +4186,20 @@ function buildAutomationQueue(input: {
       kind: "export-preflight",
       label: "Run target-aware export preflight",
       owner: "Distribution Agent",
-      status: distributionTargetPlans.length ? "needs-input" : "ready",
+      status: approvalGate.status === "blocked" ? "blocked" : distributionTargetPlans.length ? "needs-input" : "ready",
       trigger: "Run when distribution targets, release metadata, assets, links, or export options change.",
       action: "prepare-export",
       evidence: distributionTargetPlans.length
-        ? distributionTargetPlans.map((target) => `${target.label}: ${target.preflightChecks[0]}`)
+        ? [
+            `Approval gate: ${approvalGate.status}`,
+            ...approvalGate.blockers.slice(0, 5),
+            ...distributionTargetPlans.map((target) => `${target.label}: ${target.preflightChecks[0]}`),
+          ]
         : ["No export or publishing target requested yet."],
-      nextStep: "Open export readiness, confirm metadata and target-specific blockers, then attach manifest or package evidence.",
+      nextStep:
+        approvalGate.status === "blocked"
+          ? "Clear the approval metadata gate before generating export or publishing evidence."
+          : "Open export readiness, confirm metadata and target-specific blockers, then attach manifest or package evidence.",
     }),
     automationTask({
       kind: "accessibility-check",
@@ -4204,6 +4224,7 @@ function buildAutomationQueue(input: {
       evidence: [
         `Readiness score ${controlCenter.readinessScore}/100`,
         `Control status ${controlCenter.status}`,
+        `Approval gate ${approvalGate.status}`,
         blockers.length ? `${blockers.length} blocker(s): ${blockers.slice(0, 3).join("; ")}` : "No run-level blockers detected.",
       ],
       nextStep: "Refresh readiness and confirm whether the next safe action is drafting, review, provider handoff, export preflight, or human approval.",
@@ -4231,18 +4252,22 @@ function buildControlCenter(input: {
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
+  approvalGate: AgenticApprovalGate;
 }): AgenticControlCenter {
-  const { plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence, outlineCritique } = input;
+  const { plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans, documentEvidence, outlineCritique, approvalGate } = input;
   const hardBlockers = blockers.filter((blocker) => !blocker.startsWith("Missing input:"));
-  const status: AgenticControlStatus = hardBlockers.length ? "blocked" : blockers.length ? "needs-input" : "ready";
+  const status: AgenticControlStatus =
+    hardBlockers.length || approvalGate.status === "blocked" ? "blocked" : blockers.length || approvalGate.status === "needs-review" ? "needs-input" : "ready";
   const sourceGrounding = buildSourceGrounding(plan, hasDocument, hasSelection, documentEvidence, outlineCritique);
-  const governance = buildGovernanceItems(plan, revision, blockers, documentEvidence);
-  const distribution = buildDistributionItems(plan, distributionTargetPlans, documentEvidence);
+  const governance = buildGovernanceItems(plan, revision, blockers, documentEvidence, approvalGate);
+  const distribution = buildDistributionItems(plan, distributionTargetPlans, documentEvidence, approvalGate);
   const readinessScore = scoreControlCenter(status, sourceGrounding, governance, distribution, blockers);
-  const nextActions = buildNextActions(plan, status, blockers, distributionTargetPlans, documentEvidence);
+  const nextActions = buildNextActions(plan, status, blockers, distributionTargetPlans, documentEvidence, approvalGate);
   const summary =
     status === "blocked"
-      ? "Agent run is blocked until source context or target instructions are supplied."
+      ? approvalGate.status === "blocked"
+        ? "Agent run is blocked until the approval metadata gate is cleared for distribution."
+        : "Agent run is blocked until source context or target instructions are supplied."
       : status === "needs-input"
         ? "Agent run is usable as a draft packet, but missing inputs must be resolved before approval or distribution."
         : "Agent run is ready for governed drafting, review, and target-specific distribution prep.";
@@ -4855,6 +4880,7 @@ function buildGovernanceItems(
   revision: AgenticWorkflowRevision | null,
   blockers: string[],
   documentEvidence: AgenticDocumentEvidence,
+  approvalGate: AgenticApprovalGate,
 ): AgenticControlItem[] {
   return [
     {
@@ -4891,12 +4917,17 @@ function buildGovernanceItems(
     },
     {
       label: "Approval metadata",
-      detail: documentEvidence.approvalMetadataMissing.length
-        ? `Missing approval metadata: ${documentEvidence.approvalMetadataMissing.join(", ")}.`
+      detail: approvalGate.blockers.length
+        ? `${approvalGate.summary} Missing or unresolved gate evidence: ${approvalGate.blockers.slice(0, 4).join("; ")}.`
         : plan.distributionTargets.length
-          ? "Approval metadata is present enough for distribution readiness review."
+          ? approvalGate.summary
           : "Distribution approval metadata is not required until a target is selected.",
-      status: documentEvidence.approvalMetadataMissing.length ? "needs-review" : "available",
+      status: approvalGate.status === "blocked" ? "missing" : approvalGate.status === "needs-review" ? "needs-review" : "available",
+    },
+    {
+      label: "Approval metadata gate",
+      detail: `${approvalGate.summary} Required before distribution: ${approvalGate.requiredBeforeDistribution ? "yes" : "no"}.`,
+      status: approvalGate.status === "blocked" ? "missing" : approvalGate.status === "needs-review" ? "needs-review" : "available",
     },
   ];
 }
@@ -4905,6 +4936,7 @@ function buildDistributionItems(
   plan: AgenticWorkflowPlan,
   targetPlans: AgenticDistributionTargetPlan[],
   documentEvidence: AgenticDocumentEvidence,
+  approvalGate: AgenticApprovalGate,
 ): AgenticControlItem[] {
   if (!plan.distributionTargets.length) {
     return [
@@ -4917,6 +4949,7 @@ function buildDistributionItems(
   }
   return targetPlans.map((targetPlan) => {
     const blockers = [
+      approvalGate.status === "blocked" ? `${approvalGate.blockers.length} approval gate blocker(s)` : "",
       documentEvidence.brokenLinkHints.length ? `${documentEvidence.brokenLinkHints.length} placeholder or suspicious link(s)` : "",
       documentEvidence.referenceHints.length ? `${documentEvidence.referenceHints.length} reference issue(s)` : "",
     ].filter(Boolean);
@@ -4925,7 +4958,7 @@ function buildDistributionItems(
       detail: blockers.length
         ? `${targetPlan.preflightChecks.length} preflight checks staged; repair ${blockers.join(" and ")} before handoff.`
         : `${targetPlan.preflightChecks.length} preflight checks, ${targetPlan.handoffSteps.length} handoff step, and ${targetPlan.evidenceRequired.length} evidence requirements are staged.`,
-      status: "needs-review" as const,
+      status: approvalGate.status === "blocked" ? "missing" as const : "needs-review" as const,
     };
   });
 }
@@ -4936,8 +4969,20 @@ function buildNextActions(
   blockers: string[],
   targetPlans: AgenticDistributionTargetPlan[],
   documentEvidence: AgenticDocumentEvidence,
+  approvalGate: AgenticApprovalGate,
 ): AgenticNextAction[] {
   const actions: AgenticNextAction[] = [];
+  if (approvalGate.requiredBeforeDistribution && approvalGate.status !== "ready") {
+    actions.push({
+      label: "Clear approval metadata gate",
+      detail: approvalGate.blockers.length
+        ? approvalGate.blockers.slice(0, 4).join("; ")
+        : "Review approval metadata before distribution.",
+      lane: "distribute",
+      action: "prepare-export",
+      status: approvalGate.status === "blocked" ? "blocked" : "needs-input",
+    });
+  }
   if (blockers.length) {
     actions.push({
       label: "Resolve missing inputs",

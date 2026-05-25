@@ -2878,6 +2878,14 @@ Approval metadata gate verification:
 | `pnpm run check:a11y` | Pass | Static accessibility guardrails passed with the new Agent Workspace approval gate section and controls. |
 | `git diff --check` | Pass | The approval gate diff has no whitespace errors. |
 
+AI control-center approval gate wiring verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after moving Approval Metadata Gate ahead of control-center construction and threading it into governance, distribution, next-action, and automation-preflight decisions. |
+| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including blocked agent runs whose AI Control Center summary, readiness state, next actions, governance rows, distribution rows, and automation preflight now reflect the approval gate instead of scattered approval hints. |
+| `git diff --check` | Pass | The control-center gate-wiring diff has no whitespace errors. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
