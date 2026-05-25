@@ -123,6 +123,7 @@ export interface AgentRunHistoryItem {
   packetPreview?: string;
   sectionCount?: number;
   reviewerCount?: number;
+  taskCount?: number;
   appliedAt?: string;
   providerProfile?: string;
 }
@@ -423,6 +424,7 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
     packetPreview: normalizedString(value.packetPreview, 1_200) || undefined,
     sectionCount: Math.max(numberValue(value.sectionCount) ?? 0, 0),
     reviewerCount: Math.max(numberValue(value.reviewerCount) ?? 0, 0),
+    taskCount: Math.max(numberValue(value.taskCount) ?? 0, 0),
     appliedAt: normalizedString(value.appliedAt, 40) || undefined,
     providerProfile: normalizedString(value.providerProfile, 120) || undefined,
   };

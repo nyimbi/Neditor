@@ -511,6 +511,8 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Review Agents"));
   ok(run.markdown.includes("### Editorial Reviewer"));
   ok(run.markdown.includes("### Export Reviewer"));
+  ok(run.markdown.includes("## Agent Lifecycle Task Board"));
+  ok(run.markdown.includes("Final human approval and release readiness"));
   ok(run.markdown.includes("## Section Work Queue"));
   ok(run.markdown.includes("Completion criteria:"));
   ok(run.markdown.includes("## Agent Audit Trail"));
@@ -529,11 +531,16 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.status === "available"));
   ok(run.controlCenter.governance.some((item) => item.label === "AI provenance" && item.status === "available"));
   ok(run.controlCenter.distribution.some((item) => item.label === "Substack newsletter package"));
+  ok(run.lifecycleTasks.length >= run.sectionWorkQueue.length + run.reviewerAgents.length);
+  ok(run.lifecycleTasks.some((task) => task.title.includes("Resolve intent") && task.owner === "Planner Agent"));
+  ok(run.lifecycleTasks.some((task) => task.owner === "Docs Live Section Agent" && task.action === "generate-docs-live-draft" && task.sectionId));
+  ok(run.lifecycleTasks.some((task) => task.owner === "Distribution Agent" && task.lane === "distribute" && task.target === "substack"));
   equal(run.reviewerAgents.length, 6);
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.findings.some((item) => item.includes("Outline"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.requiredActions.some((item) => item.includes("Verify every material claim"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("Google Docs collaboration package"))));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Reviewer agents prepared")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Lifecycle task board prepared")));
   ok(run.sectionWorkQueue.length >= 5);
   ok(run.sectionWorkQueue.every((section) => section.completionCriteria.length >= 4));
   ok(run.sectionWorkQueue.some((section) => section.reviewerAgentIds.includes("export")));
@@ -746,6 +753,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         packetPreview: "Generated body preview",
         sectionCount: 8,
         reviewerCount: 6,
+        taskCount: 14,
         appliedAt: "2026-05-25T10:06:00.000Z",
         providerProfile: " local ",
       },
@@ -881,6 +889,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     packetPreview: "Generated body preview",
     sectionCount: 8,
     reviewerCount: 6,
+    taskCount: 14,
     appliedAt: "2026-05-25T10:06:00.000Z",
     providerProfile: "local",
   });
@@ -987,6 +996,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent generated output"'));
   ok(app.includes('aria-label="AI control center"'));
   ok(app.includes("agentRun.controlCenter"));
+  ok(app.includes('aria-label="Agent lifecycle task board"'));
+  ok(app.includes("agentRun.lifecycleTasks"));
+  ok(app.includes("runAgentLifecycleTask"));
+  ok(app.includes("task.sectionId"));
+  ok(app.includes("task.target"));
+  ok(app.includes("Lifecycle Task Board"));
   ok(app.includes('aria-label="Agent reviewer agents"'));
   ok(app.includes("agentRun.reviewerAgents"));
   ok(app.includes("reviewer.requiredActions"));
@@ -1008,6 +1023,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("copyAgentHistoryPacket"));
   ok(app.includes("item.packetPreview"));
   ok(app.includes("item.sectionCount"));
+  ok(app.includes("item.taskCount"));
   ok(app.includes("Source grounding"));
   ok(app.includes("Distribution state"));
   ok(app.includes('aria-label="Agent distribution target runbooks"'));

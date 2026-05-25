@@ -2011,6 +2011,28 @@
                 </article>
               </section>
             </section>
+            <section class="agent-lifecycle-board" aria-label="Agent lifecycle task board">
+              <header>
+                <div>
+                  <strong>Lifecycle Task Board</strong>
+                  <span>Operational tasks for creating, composing, editing, revising, reviewing, and distributing the document.</span>
+                </div>
+                <small>{{ agentRun.lifecycleTasks.length }} tasks</small>
+              </header>
+              <ol>
+                <li v-for="task in agentRun.lifecycleTasks" :key="task.id" :data-lane="task.lane" :data-status="task.status">
+                  <div>
+                    <small>{{ task.lane }} | {{ task.status }} | {{ task.owner }}</small>
+                    <strong>{{ task.title }}</strong>
+                    <p>{{ task.nextStep }}</p>
+                    <button type="button" @click="runAgentLifecycleTask(task)">Run task</button>
+                  </div>
+                  <ul>
+                    <li v-for="item in task.evidence" :key="item">{{ item }}</li>
+                  </ul>
+                </li>
+              </ol>
+            </section>
             <section class="agent-reviewer-agents" aria-label="Agent reviewer agents">
               <header>
                 <div>
@@ -2202,6 +2224,10 @@
                   <div>
                     <dt>Reviewers</dt>
                     <dd>{{ item.reviewerCount || 0 }}</dd>
+                  </div>
+                  <div>
+                    <dt>Tasks</dt>
+                    <dd>{{ item.taskCount || 0 }}</dd>
                   </div>
                 </dl>
               </li>
@@ -2473,6 +2499,7 @@ import {
   type AgenticWorkflowPlaybook,
   type AgenticWorkflowPlan,
   type AgenticWorkflowRun,
+  type AgenticLifecycleTask,
   type AgenticSectionWorkItem,
   type AgenticWorkflowStep,
 } from "./lib/agenticWorkflows";
@@ -4028,6 +4055,7 @@ function agentRunHistoryItem(
     packetPreview: run.summary.slice(0, 260),
     sectionCount: run.sectionWorkQueue.length,
     reviewerCount: run.reviewerAgents.length,
+    taskCount: run.lifecycleTasks.length,
     appliedAt: status === "generated" ? undefined : now,
     providerProfile: providerProfile || undefined,
   };
@@ -4176,6 +4204,24 @@ function draftAgentSectionWithDocsLive(section: AgenticSectionWorkItem) {
   closeAgentWorkspace();
   docsLiveOpen.value = true;
   store.statusMessage = `Sent ${section.heading} to Docs Live`;
+}
+function runAgentLifecycleTask(task: AgenticLifecycleTask) {
+  const section = task.sectionId ? agentRun.value?.sectionWorkQueue.find((item) => item.id === task.sectionId) : null;
+  if (section) {
+    draftAgentSectionWithDocsLive(section);
+    return;
+  }
+  if (task.target) {
+    store.exportTarget = task.target;
+  }
+  runAgenticStep({
+    id: task.id,
+    lane: task.lane,
+    title: task.title,
+    detail: task.nextStep,
+    action: task.action,
+    status: task.status === "ready" ? "ready" : "needs-input",
+  });
 }
 function runAgentPlanReview() {
   closeAgentWorkspace();
@@ -10884,14 +10930,24 @@ select:hover {
   background: #f8fcfb;
 }
 
-.agent-section-workqueue > header {
+.agent-lifecycle-board {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #7d5a28;
+  background: #fffaf2;
+}
+
+.agent-section-workqueue > header,
+.agent-lifecycle-board > header {
   display: flex;
   justify-content: space-between;
   gap: 12px;
 }
 
 .agent-section-workqueue > header div,
-.agent-section-workqueue li > div {
+.agent-section-workqueue li > div,
+.agent-lifecycle-board > header div,
+.agent-lifecycle-board li > div {
   display: grid;
   gap: 2px;
 }
@@ -10899,12 +10955,16 @@ select:hover {
 .agent-section-workqueue > header span,
 .agent-section-workqueue > header small,
 .agent-section-workqueue small,
-.agent-section-workqueue span {
+.agent-section-workqueue span,
+.agent-lifecycle-board > header span,
+.agent-lifecycle-board > header small,
+.agent-lifecycle-board small {
   color: #526171;
   font-size: 12px;
 }
 
-.agent-section-workqueue ol {
+.agent-section-workqueue ol,
+.agent-lifecycle-board ol {
   display: grid;
   gap: 8px;
   margin: 0;
@@ -10919,8 +10979,17 @@ select:hover {
   border-left: 3px solid #7fa2cd;
 }
 
+.agent-lifecycle-board li {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.62fr) minmax(0, 1fr);
+  gap: 10px;
+  border-left: 3px solid #c09a55;
+}
+
 .agent-section-workqueue p,
-.agent-section-workqueue ul {
+.agent-section-workqueue ul,
+.agent-lifecycle-board p,
+.agent-lifecycle-board ul {
   margin: 0;
 }
 
@@ -10937,12 +11006,21 @@ select:hover {
   font-size: 11px;
 }
 
-.agent-section-workqueue small {
+.agent-lifecycle-board button {
+  width: fit-content;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.agent-section-workqueue small,
+.agent-lifecycle-board small {
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.agent-section-workqueue ul {
+.agent-section-workqueue ul,
+.agent-lifecycle-board ul {
   display: grid;
   gap: 4px;
   padding-left: 18px;

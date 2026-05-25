@@ -28,6 +28,19 @@ export interface AgenticWorkflowStep {
   status: "ready" | "needs-input";
 }
 
+export interface AgenticLifecycleTask {
+  id: string;
+  lane: AgenticWorkflowLane;
+  title: string;
+  owner: string;
+  status: AgenticControlStatus;
+  action: AgenticWorkflowAction;
+  sectionId?: string;
+  target?: ExportTarget;
+  evidence: string[];
+  nextStep: string;
+}
+
 export interface AgenticWorkflowPlan {
   instruction: string;
   title: string;
@@ -70,6 +83,7 @@ export interface AgenticWorkflowRun {
   revision: AgenticWorkflowRevision | null;
   controlCenter: AgenticControlCenter;
   auditTrail: AgenticAuditTrail;
+  lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   reviewChecklist: string[];
@@ -300,11 +314,13 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans });
   const reviewerAgents = buildReviewerAgents({ plan, draftMarkdown: draft?.markdown || "", revision, controlCenter, distributionTargetPlans, blockers });
   const sectionWorkQueue = buildSectionWorkQueue(plan, reviewerAgents);
+  const lifecycleTasks = buildLifecycleTasks({ plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers });
   const auditTrail = buildAuditTrail({
     plan,
     request,
     revision,
     draftMarkdown: draft?.markdown || "",
+    lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
     reviewChecklist,
@@ -320,6 +336,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     revision,
     controlCenter,
     auditTrail,
+    lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
     reviewChecklist,
@@ -337,6 +354,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     revision,
     controlCenter,
     auditTrail,
+    lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
     reviewChecklist,
@@ -631,6 +649,113 @@ function buildDistributionChecklist(plan: AgenticWorkflowPlan, targetPlans: Agen
   ]);
 }
 
+function buildLifecycleTasks(input: {
+  plan: AgenticWorkflowPlan;
+  revision: AgenticWorkflowRevision | null;
+  reviewerAgents: AgenticReviewerAgent[];
+  sectionWorkQueue: AgenticSectionWorkItem[];
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
+  blockers: string[];
+}): AgenticLifecycleTask[] {
+  const { plan, revision, reviewerAgents, sectionWorkQueue, distributionTargetPlans, blockers } = input;
+  const tasks: AgenticLifecycleTask[] = [];
+  const hasBlockers = blockers.length > 0;
+  const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
+
+  tasks.push({
+    id: "task-intake-context",
+    lane: "create",
+    title: "Resolve intent, context, and placeholder inputs",
+    owner: "Planner Agent",
+    status: hasBlockers ? "needs-input" : "ready",
+    action: "open-docs-live",
+    evidence: blockers.length ? blockers.slice(0, 6) : ["Instruction, context pack, placeholders, and outline are available."],
+    nextStep: hasBlockers ? "Capture missing inputs or keep them visible as review blockers." : "Proceed to outline or section drafting.",
+  });
+
+  tasks.push({
+    id: "task-outline-structure",
+    lane: "compose",
+    title: "Lock the working outline and section order",
+    owner: "Composition Agent",
+    status: plan.suggestedOutline.trim() ? "ready" : "blocked",
+    action: "open-outline",
+    evidence: plan.suggestedOutline.trim() ? parseOutlineSections(plan.suggestedOutline).slice(0, 6).map((section) => section.heading) : ["No outline supplied."],
+    nextStep: "Review the outline in outline mode before drafting body text.",
+  });
+
+  if (revision) {
+    tasks.push({
+      id: "task-revision-proposal",
+      lane: plan.lanes.includes("revise") ? "revise" : "edit",
+      title: "Compare and apply the revision proposal",
+      owner: "Revision Agent",
+      status: baseStatus,
+      action: "open-ai-paste",
+      evidence: revision.changeSummary,
+      nextStep: "Compare original and proposed text before accepting the replacement.",
+    });
+  }
+
+  for (const section of sectionWorkQueue.slice(0, 14)) {
+    tasks.push({
+      id: `task-${section.id}`,
+      lane: section.lane,
+      title: `Draft section ${section.order}: ${section.heading}`,
+      owner: "Docs Live Section Agent",
+      status: baseStatus,
+      action: "generate-docs-live-draft",
+      sectionId: section.id,
+      evidence: section.completionCriteria,
+      nextStep: "Draft the section, then route it through assigned reviewer agents.",
+    });
+  }
+
+  for (const reviewer of reviewerAgents) {
+    tasks.push({
+      id: `task-reviewer-${reviewer.id}`,
+      lane: "review",
+      title: `${reviewer.label} sign-off`,
+      owner: reviewer.label,
+      status: reviewer.status === "blocked" ? "blocked" : reviewer.status === "needs-review" ? "needs-input" : "ready",
+      action: "open-review",
+      evidence: [...reviewer.findings.slice(0, 3), ...reviewer.requiredActions.slice(0, 3)],
+      nextStep: reviewer.requiredActions[0] || "Record reviewer approval and move to distribution readiness.",
+    });
+  }
+
+  for (const targetPlan of distributionTargetPlans) {
+    tasks.push({
+      id: `task-distribution-${targetPlan.target}`,
+      lane: "distribute",
+      title: `Prepare ${targetPlan.label}`,
+      owner: "Distribution Agent",
+      status: "needs-input",
+      action: "prepare-export",
+      target: targetPlan.target,
+      evidence: [targetPlan.preflightChecks[0], targetPlan.handoffSteps[0], targetPlan.evidenceRequired[0]],
+      nextStep: "Run export readiness, generate the target artifact, and attach evidence to the review record.",
+    });
+  }
+
+  tasks.push({
+    id: "task-final-release-readiness",
+    lane: "review",
+    title: "Final human approval and release readiness",
+    owner: "Governance Agent",
+    status: hasBlockers || distributionTargetPlans.length ? "needs-input" : "ready",
+    action: plan.distributionTargets.length ? "prepare-export" : "open-review",
+    evidence: [
+      "All AI-assisted sections must be source-checked and marked human-reviewed.",
+      "All requested distribution artifacts must retain export manifests or equivalent proof.",
+      "Release status, reviewer, and approval metadata must match the intended handoff.",
+    ],
+    nextStep: "Resolve outstanding review and distribution evidence before publishing or archiving.",
+  });
+
+  return tasks.slice(0, 36);
+}
+
 function buildSectionWorkQueue(plan: AgenticWorkflowPlan, reviewerAgents: AgenticReviewerAgent[]): AgenticSectionWorkItem[] {
   const sections = parseOutlineSections(plan.suggestedOutline);
   const audience = extractKeyValue(plan.placeholderText, "audience") || "the intended audience";
@@ -860,6 +985,7 @@ function buildAuditTrail(input: {
   request: AgenticWorkflowRunRequest;
   revision: AgenticWorkflowRevision | null;
   draftMarkdown: string;
+  lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   reviewChecklist: string[];
@@ -874,6 +1000,7 @@ function buildAuditTrail(input: {
     request,
     revision,
     draftMarkdown,
+    lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
     reviewChecklist,
@@ -888,6 +1015,17 @@ function buildAuditTrail(input: {
   const outputPayload = [
     draftMarkdown,
     revision?.proposedText || "",
+    ...lifecycleTasks.flatMap((task) => [
+      task.id,
+      task.lane,
+      task.title,
+      task.owner,
+      task.status,
+      task.sectionId || "",
+      task.target || "",
+      task.nextStep,
+      ...task.evidence,
+    ]),
     ...reviewerAgents.flatMap((agent) => [agent.id, agent.label, agent.mandate, agent.status, ...agent.findings, ...agent.requiredActions]),
     ...sectionWorkQueue.flatMap((section) => [
       section.id,
@@ -916,6 +1054,7 @@ function buildAuditTrail(input: {
       "AI provenance metadata attached to generated packet.",
       blockers.length ? `Human review required before release because ${blockers.length} blocker item(s) remain.` : "No blocker items detected at packet generation time.",
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
+      `Lifecycle task board prepared for ${lifecycleTasks.length} task(s) across ${Array.from(new Set(lifecycleTasks.map((task) => task.lane))).map(titleCase).join(", ")}.`,
       `Section work queue prepared for ${sectionWorkQueue.length} outline item(s).`,
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
@@ -1176,6 +1315,7 @@ function buildRunMarkdown(input: {
   revision: AgenticWorkflowRevision | null;
   controlCenter: AgenticControlCenter;
   auditTrail: AgenticAuditTrail;
+  lifecycleTasks: AgenticLifecycleTask[];
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   reviewChecklist: string[];
@@ -1190,6 +1330,7 @@ function buildRunMarkdown(input: {
     revision,
     controlCenter,
     auditTrail,
+    lifecycleTasks,
     reviewerAgents,
     sectionWorkQueue,
     reviewChecklist,
@@ -1241,6 +1382,7 @@ function buildRunMarkdown(input: {
     lines.push("### Blockers", "", ...blockers.map((blocker) => `- [ ] ${blocker}`), "");
   }
   lines.push(...controlCenterMarkdown(controlCenter));
+  lines.push(...lifecycleTasksMarkdown(lifecycleTasks));
   lines.push(...reviewerAgentsMarkdown(reviewerAgents));
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
   lines.push(...auditTrailMarkdown(auditTrail));
@@ -1281,6 +1423,31 @@ function buildRunMarkdown(input: {
     "",
   );
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+function lifecycleTasksMarkdown(lifecycleTasks: AgenticLifecycleTask[]) {
+  const lines = ["## Agent Lifecycle Task Board", ""];
+  for (const task of lifecycleTasks) {
+    lines.push(
+      `### ${task.title}`,
+      "",
+      `Lane: ${task.lane}`,
+      "",
+      `Owner: ${task.owner}`,
+      "",
+      `Status: ${task.status}`,
+      "",
+      task.sectionId ? `Section ID: ${task.sectionId}` : "",
+      task.target ? `Target: ${task.target}` : "",
+      task.sectionId || task.target ? "" : "",
+      `Next step: ${task.nextStep}`,
+      "",
+      "Evidence:",
+      ...task.evidence.map((item) => `- ${item}`),
+      "",
+    );
+  }
+  return lines;
 }
 
 function controlCenterMarkdown(controlCenter: AgenticControlCenter) {

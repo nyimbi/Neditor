@@ -204,7 +204,9 @@ web app.
   with drafting instructions, completion criteria, assigned reviewers, per-section
   work-brief insertion, and focused Docs Live handoff, an **AI Control Center**
   for readiness score, source grounding, governance
-  state, next actions, target-specific distribution runbooks, AI provenance,
+  state, next actions, an agentic lifecycle task board that turns creation,
+  composition, editing, revision, review, and distribution into runnable
+  owned tasks, target-specific distribution runbooks, AI provenance,
   blockers, an Agent Audit Trail with run ID,
   fingerprints, rollback plan, review events, and safe apply behavior for
   replacing a document, replacing selected text, or appending a review packet.

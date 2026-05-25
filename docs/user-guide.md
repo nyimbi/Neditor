@@ -95,12 +95,17 @@ and assigned reviewer agents so a team can build the document systematically
 from outline to reviewed sections. Each queued section can insert a visible work
 brief into the Markdown source or open Docs Live preloaded with that section's
 instruction, criteria, placeholders, and reviewer agents for focused drafting.
+The same packet includes a **Lifecycle Task Board** that turns the whole
+document workflow into owned tasks across creation, composition, editing,
+revision, review, and distribution. Use **Run task** when a task should route
+you to Docs Live, Outline, AI Paste, Review, or Export readiness from the
+agent's plan.
 The packet also includes an
 **Agent Audit Trail** with run ID, deterministic fingerprints for instruction,
 context, source, and output payloads, rollback guidance, and review events.
 Generated and applied runs are also saved in local workspace history so a user
 can reopen the Agent Workspace later and inspect recent run IDs, readiness,
-provider, apply mode, fingerprints, section/reviewer counts, and a bounded
+provider, apply mode, fingerprints, section/reviewer/task counts, and a bounded
 packet snapshot that can be appended back into the document or copied for
 review. Use **Replan** on a saved run when you want to restart from the same
 instruction with the current document context.
