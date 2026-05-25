@@ -535,7 +535,8 @@ uploaded evidence artifacts and import returned completed sign-offs locally with
 a reviewer-friendly bundle with runbooks, templates, and return paths for
 platform evidence, signing, live AI provider/runtime proof, independent security
 review, Google Docs import, release-device performance profiling, human review
-sign-offs, and optional external engines such as Pikchr. The ingest tool
+sign-offs, optional external engines such as Pikchr, and spec-completion closure
+work. The ingest tool
 recognizes returned security review proof under paths such as
 `security/security-review.json`, performance profile proof under paths such as
 `performance/native-profile.json`, and optional-engine proof under paths such as

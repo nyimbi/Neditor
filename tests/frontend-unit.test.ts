@@ -2299,6 +2299,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
   ok(evidenceKitCollector.includes("pikchr.template.json"));
+  ok(evidenceKitCollector.includes("spec-completion-open-items"));
+  ok(evidenceKitCollector.includes("runbooks/spec-completion-closure.md"));
   ok(evidenceKitCollector.includes("gapWorkItems"));
   ok(evidenceKitCollector.includes("pnpm run ingest:evidence"));
   ok(evidenceKitChecker.includes("neditor.release-evidence-kit.v1"));
@@ -2308,6 +2310,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("runbooks/independent-security-review.md"));
   ok(evidenceKitChecker.includes("runbooks/release-device-performance-profile.md"));
   ok(evidenceKitChecker.includes("runbooks/optional-external-engines.md"));
+  ok(evidenceKitChecker.includes("runbooks/spec-completion-closure.md"));
   ok(evidenceKitChecker.includes("expectedTemplateCount = 15"));
   ok(evidenceKitChecker.includes("report.json"));
   ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
@@ -2466,7 +2469,7 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("neditor.release-evidence-kit-report.v1"));
   ok(script.includes("current-source-tree-not-clean"));
   ok(script.includes("summary?.copiedTemplates || 0) < 15"));
-  ok(script.includes("summary?.runbooks || 0) < 11"));
+  ok(script.includes("summary?.runbooks || 0) < 12"));
   ok(script.includes("security-review-evidence"));
   ok(script.includes("independent-security-review-signoff"));
   ok(script.includes("securityReviewEvidenceAccepted"));

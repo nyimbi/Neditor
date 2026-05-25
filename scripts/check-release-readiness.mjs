@@ -610,7 +610,7 @@ function releaseEvidenceKitAccepted(report) {
   if (Number(report.summary?.missingTemplates || 0) !== 0) issues.push("missing-templates");
   if (Number(report.summary?.staleTemplates || 0) !== 0) issues.push("stale-templates");
   if (Number(report.summary?.copiedTemplates || 0) < 15) issues.push("incomplete-template-set");
-  if (Number(report.summary?.runbooks || 0) < 11) issues.push("incomplete-runbook-set");
+  if (Number(report.summary?.runbooks || 0) < 12) issues.push("incomplete-runbook-set");
   if (Number(report.summary?.issues || 0) !== 0) issues.push("reported-issues");
 
   return {

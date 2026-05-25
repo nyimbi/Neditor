@@ -208,6 +208,24 @@ const runbooks = [
     ],
     returns: [".tmp/external-engines/external/pikchr.json"],
   },
+  {
+    file: "runbooks/spec-completion-closure.md",
+    title: "Spec Completion Matrix Closure",
+    gaps: ["spec-completion-open-items"],
+    commands: [
+      "git fetch --all --tags",
+      `git checkout ${sourceCommit || "<source-commit>"}`,
+      "git status --porcelain",
+      "pnpm install --frozen-lockfile",
+      "pnpm run check:spec-completion",
+      "Open .tmp/spec-completion/report.json and work each openRows item until direct current evidence proves it.",
+      "Update docs/spec-completion-matrix.md only after the implementation, tests, artifacts, or platform proof exist.",
+      "pnpm run verify:local -- --list",
+      "pnpm run check:spec-completion",
+      "pnpm run check:release-readiness",
+    ],
+    returns: ["updated docs/spec-completion-matrix.md", ".tmp/spec-completion/report.json"],
+  },
 ];
 
 rmSync(outputDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
