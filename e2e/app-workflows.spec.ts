@@ -3027,6 +3027,23 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await qrTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain("https://example.com/releases/neditor-report");
 
+  await templateFilters.getByLabel("Category").selectOption("Data");
+  await templateFilters.getByLabel("Transform").selectOption("openapi");
+  await templateFilters.getByLabel("Search").fill("endpoint");
+  const openApiTemplate = sidebar.getByRole("listitem").filter({ hasText: "OpenAPI endpoint" });
+  await expect(openApiTemplate).toContainText("Data | openapi | builtin");
+  await openApiTemplate.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => editorText(page)).toContain("openapi: 3.1.0");
+  await expect.poll(() => editorText(page)).toContain("/reports:");
+
+  await templateFilters.getByLabel("Transform").selectOption("json-schema");
+  await templateFilters.getByLabel("Search").fill("schema");
+  const schemaTemplate = sidebar.getByRole("listitem").filter({ hasText: "JSON Schema object" });
+  await expect(schemaTemplate).toContainText("Data | json-schema | builtin");
+  await schemaTemplate.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => editorText(page)).toContain('"title": "Customer"');
+  await expect.poll(() => editorText(page)).toContain('"starter", "growth", "enterprise"');
+
   await page.getByLabel("View mode").selectOption("preview");
   const transformPreview = page.getByRole("region", { name: "Transform artifact preview" });
   await expect(transformPreview).toContainText("chart");
@@ -3034,6 +3051,8 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await expect(transformPreview).toContainText("roadmap");
   await expect(transformPreview).toContainText("adr");
   await expect(transformPreview).toContainText("qr");
+  await expect(transformPreview).toContainText("openapi");
+  await expect(transformPreview).toContainText("json-schema");
   await page.getByLabel("View mode").selectOption("split");
 
   const customEditor = page.getByRole("region", { name: "Custom transform template editor" });

@@ -31,10 +31,10 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
-- The Templates browser workflow now proves safe business transform insertion
-  beyond calculations and charts: timeline, roadmap, ADR, and QR built-in
-  templates are inserted from the Templates sidebar and verified in the
-  transform artifact preview.
+- The Templates browser workflow now proves safe business and structured API
+  transform insertion beyond calculations and charts: timeline, roadmap, ADR,
+  QR, OpenAPI endpoint, and JSON Schema object built-in templates are inserted
+  from the Templates sidebar and verified in the transform artifact preview.
 - Help now includes an External transform troubleshooting topic for Graphviz,
   D2, Pikchr, PlantUML, and executable transform failures, including
   platform-specific path/permission guidance, timeout/empty-output/trust/cache
