@@ -193,7 +193,7 @@ fn apply_variable_filters(
             "upper" | "uppercase" => value.to_ascii_uppercase(),
             "lower" | "lowercase" => value.to_ascii_lowercase(),
             "title" | "titlecase" => title_case(&value),
-            "round" | "number" | "percent" | "currency" => match parse_variable_number(&value) {
+            "round" | "number" | "percent" | "currency" => match parse_variable_number(&value, variable_filter_name(filter)) {
                 Some(number) => format_value(number, variable_filter_name(filter)),
                 None => {
                     push_variable_filter_diagnostic(
@@ -237,14 +237,20 @@ fn variable_filter_name(filter: &str) -> &str {
         .unwrap_or(filter.trim())
 }
 
-fn parse_variable_number(value: &str) -> Option<f64> {
-    value
-        .trim()
+fn parse_variable_number(value: &str, filter: &str) -> Option<f64> {
+    let trimmed = value.trim();
+    let has_percent_suffix = trimmed.ends_with('%');
+    let parsed = trimmed
         .trim_start_matches('$')
         .trim_end_matches('%')
         .replace(',', "")
         .parse::<f64>()
-        .ok()
+        .ok()?;
+    if has_percent_suffix && filter == "percent" {
+        Some(parsed / 100.0)
+    } else {
+        Some(parsed)
+    }
 }
 
 fn title_case(value: &str) -> String {

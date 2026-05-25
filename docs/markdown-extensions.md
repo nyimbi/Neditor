@@ -108,6 +108,9 @@ Fallback owner: {{owner | default:"strategy office" | title}}
 Document variable filters include `default`, `trim`, `upper`, `lower`, `title`,
 `number`, `round`, `percent`, and `currency`. Unsupported filters and numeric
 filters applied to non-numeric values produce source-ranged diagnostics.
+Text values such as `$1,234.50` can be formatted as numbers, currency, or
+rounded values, and values already written as `27.5%` keep their human
+percentage scale when the `percent` filter is applied.
 
 Inline formulas use `{{= expression }}` and can include numeric format filters:
 

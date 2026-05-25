@@ -267,6 +267,43 @@ fn compiler_formats_document_variables_and_reports_bad_filters() {
 }
 
 #[test]
+fn compiler_handles_document_variable_filter_edge_cases() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Variable Filter Edges\nstatus: approved\napprovedBy: QA\nclient: Acme HOLDINGS\nbudgetText: '$1,234.60'\nmarginText: '27.5%'\n---\n# Variable Filter Edges\nUpper alias: {{client | uppercase}}\nLower alias: {{client | lowercase}}\nTitle alias: {{client | titlecase}}\nCurrency string: {{budgetText | currency}}\nRounded string: {{budgetText | round}}\nPercent string: {{marginText | percent}}\nDefault equals: {{owner | default=Strategy Office | upper}}\nDefault space: {{reviewer | default Strategy Lead | title}}\n".to_string(),
+        file_path: None,
+    });
+
+    assert!(response
+        .compiled_markdown
+        .contains("Upper alias: ACME HOLDINGS"));
+    assert!(response
+        .compiled_markdown
+        .contains("Lower alias: acme holdings"));
+    assert!(response
+        .compiled_markdown
+        .contains("Title alias: Acme Holdings"));
+    assert!(response
+        .compiled_markdown
+        .contains("Currency string: $1234.60"));
+    assert!(response
+        .compiled_markdown
+        .contains("Rounded string: 1235"));
+    assert!(response
+        .compiled_markdown
+        .contains("Percent string: 27.50%"));
+    assert!(response
+        .compiled_markdown
+        .contains("Default equals: STRATEGY OFFICE"));
+    assert!(response
+        .compiled_markdown
+        .contains("Default space: Strategy Lead"));
+    assert!(response
+        .diagnostics
+        .iter()
+        .all(|diagnostic| !diagnostic.message.contains("document variable filter")));
+}
+
+#[test]
 fn calc_blocks_resolve_forward_refs_and_report_cycles() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Calc Graph\nstatus: approved\napprovedBy: QA\n---\n# Calc Graph\n```calc\nprofit = revenue - cost\ncost = 40\nrevenue = 100\ncycle_a = cycle_b + 1\ncycle_b = cycle_a + 1\n```\n\nProfit: {{=profit | round}}\n".to_string(),
