@@ -500,6 +500,52 @@ async function installTauriMock(page: Page, stateKey: string) {
       });
     }
 
+    function reviewFields(text: string) {
+      const fields: Record<string, string> = {};
+      const notes: string[] = [];
+      for (const part of text.split("|").map((part) => part.trim()).filter(Boolean)) {
+        const pair = part.match(/^([A-Za-z][\w-]*)\s*[:=]\s*(.*?)\s*$/);
+        if (pair) fields[pair[1]] = pair[2];
+        else if (part === "resolved" || part === "unresolved") fields.state = part;
+        else notes.push(part);
+      }
+      fields.text = notes.join(" | ");
+      return fields;
+    }
+
+    function commentsFromMarkdown(text: string) {
+      return text.split(/\r?\n/).flatMap((line, index) => {
+        const match = line.match(/^\s*<!--\s*comment:\s*([\s\S]*?)-->\s*$/);
+        if (!match) return [];
+        const fields = reviewFields(match[1]);
+        return [
+          {
+            line: index + 1,
+            author: fields.author || "local",
+            created_at: fields.at || fields.createdAt || "",
+            state: fields.state || (/\bresolved\b/.test(match[1]) ? "resolved" : "unresolved"),
+            text: fields.text || "Review comment",
+          },
+        ];
+      });
+    }
+
+    function changeNotesFromMarkdown(text: string) {
+      return text.split(/\r?\n/).flatMap((line, index) => {
+        const match = line.match(/^\s*<!--\s*change:\s*([\s\S]*?)-->\s*$/);
+        if (!match) return [];
+        const fields = reviewFields(match[1]);
+        return [
+          {
+            line: index + 1,
+            author: fields.author || "local",
+            created_at: fields.at || fields.createdAt || "",
+            text: fields.text || "Change note",
+          },
+        ];
+      });
+    }
+
     function transformArtifactsFromMarkdown(text: string, sourceFile: string) {
       const artifacts: Array<{
         id: string;
@@ -809,6 +855,8 @@ async function installTauriMock(page: Page, stateKey: string) {
       const indexTerms = indexTermsFromMarkdown(compiled);
       const aiSources = aiSourcesFromMarkdown(compiled);
       const aiAssistedSections = aiAssistedSectionsFromMarkdown(compiled);
+      const comments = commentsFromMarkdown(compiled);
+      const changeNotes = changeNotesFromMarkdown(compiled);
       const transformArtifacts = transformArtifactsFromMarkdown(compiled, filePath);
       const figureBlocks = figureBlocksFromMarkdown(compiled, filePath);
       const tableBlocks = tableBlocksFromMarkdown(compiled, filePath);
@@ -893,8 +941,8 @@ async function installTauriMock(page: Page, stateKey: string) {
           duplicate_bibliography_keys: duplicateKeys,
           glossary,
           layout_directives: [],
-          comments: [],
-          change_notes: [],
+          comments,
+          change_notes: changeNotes,
           ai_sources: aiSources,
           ai_assisted_sections: aiAssistedSections,
           labels: [],
@@ -3977,6 +4025,46 @@ test("toggles AI review state and clears provenance readiness warnings", async (
   await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
   await expect(page.getByText("0 errors, 0 warnings, 0 info")).toBeVisible();
   await expect(page.locator(".sidebar").getByText('"includeProvenance": true')).toBeVisible();
+});
+
+test("manages review comments and change notes from the review panel", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/review-workflow.md",
+    [
+      "---",
+      "title: Review Workflow",
+      "status: draft",
+      "---",
+      "",
+      "# Review Workflow",
+      "",
+      "Ready for reviewer notes.",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/review-workflow.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  await page.getByLabel("Sidebar panel").selectOption("review");
+  await expect(page.locator(".snapshot-row").filter({ hasText: "draft | 0 unresolved | 0 resolved" })).toBeVisible();
+
+  await page.getByLabel("New comment").fill("Confirm finance source.");
+  await page.getByRole("button", { name: "Add comment" }).click();
+  await expect.poll(() => editorText(page)).toContain("Confirm finance source.");
+  await expect(page.locator(".snapshot-row").filter({ hasText: "Confirm finance source." })).toContainText("unresolved");
+  await expect(page.locator(".snapshot-row").filter({ hasText: "draft | 1 unresolved | 0 resolved" })).toBeVisible();
+
+  await page.getByLabel("Change note").fill("Updated finance assumption for review.");
+  await page.getByRole("button", { name: "Add change note" }).click();
+  await expect.poll(() => editorText(page)).toContain("Updated finance assumption for review.");
+  await expect(page.locator(".snapshot-row").filter({ hasText: "1 change notes" })).toBeVisible();
+  await expect(page.locator(".snapshot-row").filter({ hasText: "Updated finance assumption for review." })).toContainText("local");
+
+  const commentRow = page.locator(".snapshot-row").filter({ hasText: "Confirm finance source." });
+  await commentRow.getByRole("button", { name: "Resolve" }).click();
+  await expect.poll(() => editorText(page)).toContain("<!-- comment: resolved | author: local");
+  await expect(commentRow).toContainText("resolved");
+  await expect(page.locator(".snapshot-row").filter({ hasText: "draft | 0 unresolved | 1 resolved" })).toBeVisible();
 });
 
 test("applies AI paste quote appendix and section merge modes", async ({ page }) => {

@@ -1309,7 +1309,10 @@ Readiness should validate and report:
 - Target/output extension consistency. Focused Rust coverage now proves direct
   exports refuse mismatched target extensions before writing artifacts.
 - Unresolved comments and malformed comment/change-note audit metadata. Broad
-  readiness audit test coverage exists.
+  readiness audit test coverage exists, and the browser workflow now proves
+  Review sidebar comment/change-note insertion, semantic summary updates,
+  source marker insertion, and comment resolution. Remaining work is native
+  target fidelity and richer rendered/manual review audit QA.
 - AI provenance that is not human reviewed or lacks required audit metadata.
   Broad readiness audit test coverage exists.
 - Dirty Git state and export manifest state. Direct export and preflight export

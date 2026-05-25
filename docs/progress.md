@@ -31,6 +31,9 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- The Review sidebar now has browser workflow proof for adding unresolved
+  review comments, adding change notes, updating the semantic review summary,
+  inserting audit markers into Markdown, and resolving comments from the UI.
 - Open document tabs now have accessible move-left and move-right controls in
   addition to pointer drag behavior. Reordering is persisted through workspace
   restore, and dragging one tab onto another aligns document-set/pinned grouping
