@@ -102,7 +102,8 @@ Generated and applied runs are also saved in local workspace history so a user
 can reopen the Agent Workspace later and inspect recent run IDs, readiness,
 provider, apply mode, fingerprints, section/reviewer counts, and a bounded
 packet snapshot that can be appended back into the document or copied for
-review.
+review. Use **Replan** on a saved run when you want to restart from the same
+instruction with the current document context.
 **Apply agent output** uses the packet's safe apply mode: replace a new
 document, replace the selected text, or append a review packet to the current
 source.

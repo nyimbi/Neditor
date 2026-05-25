@@ -1002,6 +1002,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent run history"'));
   ok(app.includes("store.agentRunHistory"));
   ok(app.includes("recordAgentRunHistory"));
+  ok(app.includes("replanAgentHistoryRun"));
+  ok(app.includes("Replan"));
   ok(app.includes("appendAgentHistoryPacket"));
   ok(app.includes("copyAgentHistoryPacket"));
   ok(app.includes("item.packetPreview"));

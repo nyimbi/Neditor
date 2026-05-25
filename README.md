@@ -210,7 +210,9 @@ web app.
   replacing a document, replacing selected text, or appending a review packet.
   Recent generated/applied agent runs are kept in local workspace history with
   run IDs, readiness, apply mode, provider, fingerprints, section/reviewer
-  counts, and a bounded packet snapshot that can be appended or copied later.
+  counts, a bounded packet snapshot that can be appended or copied later, and
+  a replan action that restarts from the saved instruction against the current
+  document context.
   Provider handoff packages turn that run into
   redacted prompts, JSON request bodies, headers, cURL starters, and safety
   checklists for approved AI providers or local model gateways without storing

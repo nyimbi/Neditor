@@ -2177,6 +2177,7 @@
                   <small>{{ item.runId }} | {{ item.updatedAt }}</small>
                   <p v-if="item.packetPreview">{{ item.packetPreview }}</p>
                   <div class="agent-history-actions">
+                    <button type="button" @click="replanAgentHistoryRun(item)">Replan</button>
                     <button type="button" :disabled="!item.packetMarkdown" @click="appendAgentHistoryPacket(item)">Append packet</button>
                     <button type="button" :disabled="!item.packetMarkdown" @click="copyAgentHistoryPacket(item)">Copy packet</button>
                   </div>
@@ -4033,6 +4034,14 @@ function agentRunHistoryItem(
 }
 function recordAgentRunHistory(run: AgenticWorkflowRun, status: AgentRunHistoryItem["status"], providerProfile = "") {
   store.recordAgentRunHistory(agentRunHistoryItem(run, status, providerProfile));
+}
+function replanAgentHistoryRun(item: AgentRunHistoryItem) {
+  agentInstruction.value = item.instruction;
+  agentRun.value = null;
+  agentProviderPackage.value = null;
+  agentProviderResult.value = null;
+  buildAgentWorkspacePlan();
+  store.statusMessage = `Replanned saved agent run ${item.runId}`;
 }
 function appendAgentHistoryPacket(item: AgentRunHistoryItem) {
   if (!item.packetMarkdown) return;
