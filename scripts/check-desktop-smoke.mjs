@@ -474,6 +474,11 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow edited with Vim normal insert and append",
     "native workflow persisted Vim keybinding mode",
     "native workflow navigated outline heading to source",
+    "native workflow rendered diagnostic range in editor",
+    "native workflow jumped preview diagnostic to source range",
+    "native workflow jumped sidebar diagnostic to source range",
+    "native workflow jumped preview table artifact to source",
+    "native workflow jumped preview equation artifact to source",
     "native workflow opened command palette",
     "native workflow found dose template",
     "native workflow inserted calc template into source",
@@ -719,6 +724,47 @@ function validateNativeWorkflowReport(launchReport) {
     !String(outlineNavigationEvidence.sidebarText || "").includes("Native Outline Target")
   ) {
     issues.push(`native workflow report did not include outline navigation evidence: ${JSON.stringify(outlineNavigationEvidence)}`);
+  }
+  const diagnosticNavigationEvidence = payload.diagnosticNavigationEvidence || {};
+  if (
+    diagnosticNavigationEvidence.editorLint?.diagnosticFound !== true ||
+    diagnosticNavigationEvidence.editorLint?.severity !== "warning" ||
+    Number(diagnosticNavigationEvidence.editorLint?.line || 0) < 1 ||
+    Number(diagnosticNavigationEvidence.editorLint?.column || 0) < 1 ||
+    Number(diagnosticNavigationEvidence.editorLint?.endColumn || 0) <= Number(diagnosticNavigationEvidence.editorLint?.column || 0) ||
+    Number(diagnosticNavigationEvidence.editorLint?.lintRangeCount || 0) < 1 ||
+    Number(diagnosticNavigationEvidence.editorLint?.lintMarkerCount || 0) < 1 ||
+    !String(diagnosticNavigationEvidence.editorLint?.selection?.text || "").includes("native-missing.png") ||
+    diagnosticNavigationEvidence.previewJump?.diagnosticVisible !== true ||
+    diagnosticNavigationEvidence.previewJump?.jumpButtonVisible !== true ||
+    !String(diagnosticNavigationEvidence.previewJump?.diagnosticText || "").includes("Broken image path") ||
+    !String(diagnosticNavigationEvidence.previewJump?.selection?.text || "").includes("native-missing.png") ||
+    !String(diagnosticNavigationEvidence.previewJump?.selection?.selectedText || "").includes("native-missing.png") ||
+    diagnosticNavigationEvidence.sidebarJump?.sidebar !== "diagnostics" ||
+    diagnosticNavigationEvidence.sidebarJump?.diagnosticVisible !== true ||
+    diagnosticNavigationEvidence.sidebarJump?.jumpButtonVisible !== true ||
+    !String(diagnosticNavigationEvidence.sidebarJump?.diagnosticText || "").includes("Broken image path") ||
+    !String(diagnosticNavigationEvidence.sidebarJump?.selection?.text || "").includes("native-missing.png") ||
+    !String(diagnosticNavigationEvidence.sidebarJump?.selection?.selectedText || "").includes("native-missing.png")
+  ) {
+    issues.push(`native workflow report did not include diagnostic navigation evidence: ${JSON.stringify(diagnosticNavigationEvidence)}`);
+  }
+  const previewSourceMapEvidence = payload.previewSourceMapEvidence || {};
+  if (
+    previewSourceMapEvidence.table?.previewPaneVisible !== true ||
+    previewSourceMapEvidence.table?.captionFound !== true ||
+    !String(previewSourceMapEvidence.table?.captionText || "").includes("Native source map") ||
+    !String(
+      `${previewSourceMapEvidence.table?.selection?.lineText || ""}\n${previewSourceMapEvidence.table?.selection?.selectedText || ""}\n${previewSourceMapEvidence.table?.selection?.nearbyText || ""}`,
+    ).match(/Table: Native source map|\| Metric \| Value \|/) ||
+    previewSourceMapEvidence.equation?.previewPaneVisible !== true ||
+    previewSourceMapEvidence.equation?.captionFound !== true ||
+    !String(previewSourceMapEvidence.equation?.captionText || "").includes("Native equation source") ||
+    !String(
+      `${previewSourceMapEvidence.equation?.selection?.lineText || ""}\n${previewSourceMapEvidence.equation?.selection?.selectedText || ""}\n${previewSourceMapEvidence.equation?.selection?.nearbyText || ""}`,
+    ).includes("ARR = Revenue")
+  ) {
+    issues.push(`native workflow report did not include preview source-map evidence: ${JSON.stringify(previewSourceMapEvidence)}`);
   }
   const snapshotEvidence = payload.snapshotEvidence || {};
   if (

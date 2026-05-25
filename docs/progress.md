@@ -3021,6 +3021,18 @@ Document-set manager verification:
 | `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards for the Document Sets manager, current front matter grouping helpers, and manifest command surface. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "groups documents by document set"` | Pass | Focused Chromium workflow opened folder/document-set groups, dragged a loose document into a set, saved generated `documentSet` front matter, renamed the open set, verified immediate regrouping, inserted a Document Set Manifest with set members and review handoff, removed the active document from the set, and closed the remaining group without disturbing another folder group. |
 
+Native diagnostic and preview source-map proof:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding preview source-anchor annotation and native diagnostic/source-map smoke collection. |
+| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards for the new native diagnostic and preview source-map smoke evidence. |
+| `pnpm run build` | Pass | Production Vite build passed after preview tables gained generated IDs/captions for source-map navigation. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Release-profile Tauri binary rebuilt with the updated webview bundle. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | App-authored launched-webview smoke passed with 102 assertions. The report records `diagnosticNavigationEvidence` for a real broken-image compiler diagnostic rendered as one CodeMirror lint range and one lint gutter marker, preview diagnostic `Go to source`, and Diagnostics sidebar `Go to source`; it also records `previewSourceMapEvidence` for rendered table/equation caption clicks that land on the Markdown table source and nearby equation source block. |
+| `pnpm run test:tauri-webdriver` | Pass | macOS WebDriver remains an official skip, and the script refreshed the native launch fallback proof against the current smoke artifacts. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after the native fallback refresh. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

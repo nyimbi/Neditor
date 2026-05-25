@@ -3314,10 +3314,18 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow edited with Vim normal insert and append"));
   ok(app.includes("collectNativeOutlineNavigationEvidence"));
   ok(app.includes("native workflow navigated outline heading to source"));
+  ok(app.includes("collectNativeDiagnosticNavigationEvidence"));
+  ok(app.includes("native workflow rendered diagnostic range in editor"));
+  ok(app.includes("native workflow jumped preview diagnostic to source range"));
+  ok(app.includes("collectNativePreviewSourceMapEvidence"));
+  ok(app.includes("native workflow jumped preview table artifact to source"));
+  ok(app.includes("native workflow jumped preview equation artifact to source"));
   ok(smoke.includes("native workflow report did not include editor ergonomics evidence"));
   ok(smoke.includes("native workflow report did not include split source pane evidence"));
   ok(smoke.includes("native workflow report did not include editor keybinding evidence"));
   ok(smoke.includes("native workflow report did not include outline navigation evidence"));
+  ok(smoke.includes("native workflow report did not include diagnostic navigation evidence"));
+  ok(smoke.includes("native workflow report did not include preview source-map evidence"));
   ok(smoke.includes("native workflow report did not include rendered outline-mode structure"));
   ok(smoke.includes("native workflow report did not include rendered export-mode content"));
   ok(smoke.includes("native workflow report did not include rendered review-mode governance content"));

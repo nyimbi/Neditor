@@ -2148,7 +2148,10 @@ Completion criteria:
    target-specific option matrices, progress/cancellation behavior if needed,
    broader keyboard shortcuts, deeper workspace grouping, remaining preview
    modes, and remaining AI provenance/table export modes.
-2. Add desktop WebDriver/Tauri smoke tests.
+2. Add desktop WebDriver/Tauri smoke tests. Current app-authored native smoke
+   coverage includes file/conflict flows, snapshots, modes, editor ergonomics,
+   split panes, keybindings, outline navigation, diagnostic range/source jumps,
+   and preview table/equation source-map jumps.
 3. Use workflow failures to close real implementation gaps.
 4. Audit export artifacts and add conformance fixtures.
 5. Harden cross-platform external transform evidence.

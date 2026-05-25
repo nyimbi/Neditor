@@ -4680,7 +4680,9 @@ const previewDiagnostics = computed<PreviewDiagnosticItem[]>(() => {
     }))
     .sort((left, right) => left.generatedLine - right.generatedLine || (left.line || 0) - (right.line || 0));
 });
-const previewHtmlWithDiagnostics = computed(() => inlinePreviewDiagnostics(active.value.compile?.html || "", previewDiagnostics.value));
+const previewHtmlWithDiagnostics = computed(() =>
+  annotatePreviewSourceAnchors(inlinePreviewDiagnostics(active.value.compile?.html || "", previewDiagnostics.value)),
+);
 const compilerOutputInventory = computed<CompilerOutputInventoryItem[]>(() => {
   const compile = active.value.compile;
   const metadataKeys = Object.keys(compile?.metadata || {});
@@ -7916,6 +7918,12 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     const outlineNavigationEvidence = await collectNativeOutlineNavigationEvidence(record);
     smokePhase = "outline-navigation";
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence });
+    const diagnosticNavigationEvidence = await collectNativeDiagnosticNavigationEvidence(record);
+    smokePhase = "diagnostic-navigation";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence });
+    const previewSourceMapEvidence = await collectNativePreviewSourceMapEvidence(record);
+    smokePhase = "preview-source-map";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence });
 
     commandPaletteOpen.value = true;
     await nextTick();
@@ -8009,7 +8017,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       JSON.stringify(nativeMenuExportResult),
     );
     smokePhase = "html-export";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, exportResult, nativeMenuExportResult });
     const editorSnippet = smokeSnippetAround(active.value.text, "weight_kg = 72");
     const previewSnippet = text("#live-preview").slice(0, 2000);
     const exportReadinessEvidence = store.exportReadiness
@@ -8022,12 +8030,12 @@ async function runDesktopWorkflowSmokeIfEnabled() {
         }
       : null;
     smokePhase = "export-profile-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, exportResult, nativeMenuExportResult });
     const exportProfileEvidence = await collectNativeExportProfileEvidence(record);
     smokePhase = "export-profile";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     smokePhase = "theme-accessibility-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
     smokePhase = "theme-accessibility";
     await writeNativeWorkflowProgress(smokePhase, assertions, {
@@ -8038,6 +8046,8 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       splitSourcePaneEvidence,
       editorKeybindingEvidence,
       outlineNavigationEvidence,
+      diagnosticNavigationEvidence,
+      previewSourceMapEvidence,
       exportResult,
       nativeMenuExportResult,
       exportProfileEvidence,
@@ -8070,6 +8080,8 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       splitSourcePaneEvidence,
       editorKeybindingEvidence,
       outlineNavigationEvidence,
+      diagnosticNavigationEvidence,
+      previewSourceMapEvidence,
       editorSnippet,
       previewSnippet,
       themeAccessibility,
@@ -9670,6 +9682,259 @@ async function collectNativeOutlineNavigationEvidence(record: (name: string, pas
   }
 }
 
+async function collectNativeDiagnosticNavigationEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const original = {
+    text: active.value.text,
+    mode: store.mode,
+    sidebar: store.sidebar,
+  };
+  const evidence: Record<string, unknown> = {};
+  const selectionSnapshot = () => {
+    if (!editorView) return { line: 0, text: "", selectedText: "", from: 0, to: 0 };
+    const selection = editorView.state.selection.main;
+    const line = editorView.state.doc.lineAt(selection.from);
+    return {
+      line: line.number,
+      text: line.text,
+      selectedText: editorView.state.sliceDoc(selection.from, selection.to),
+      from: selection.from,
+      to: selection.to,
+    };
+  };
+
+  try {
+    await setNativeWorkflowText(
+      [
+        "---",
+        "title: Native Diagnostic Navigation",
+        "status: draft",
+        "---",
+        "",
+        "# Native Diagnostic Navigation",
+        "",
+        "The native smoke should expose source-ranged diagnostics in both the editor and preview.",
+        "",
+        '![Missing native asset](assets/native-missing.png){#fig:native-diagnostic caption="Native diagnostic figure"}',
+        "",
+        "Follow-up text keeps the diagnostic line selectable.",
+      ].join("\n"),
+    );
+    await store.compileActive();
+    store.mode = "split";
+    store.sidebar = "diagnostics";
+    await nextTick();
+    await nextTick();
+
+    const diagnostic = (active.value.compile?.diagnostics || []).find((item) => item.message.includes("Broken image path"));
+    if (editorView) {
+      forceLinting(editorView);
+      if (diagnostic?.line) {
+        await goToSourceTarget(diagnostic);
+      }
+    }
+    await waitForNativeWorkflowCondition(
+      () => Boolean(document.querySelector(".cm-lintRange-warning, .cm-lintRange-error, .cm-lint-marker-warning, .cm-lint-marker-error")),
+      1200,
+    );
+    const lintRangeCount = document.querySelectorAll(".cm-lintRange-warning, .cm-lintRange-error").length;
+    const lintMarkerCount = document.querySelectorAll(".cm-lint-marker-warning, .cm-lint-marker-error").length;
+    evidence.editorLint = {
+      diagnosticFound: Boolean(diagnostic),
+      severity: diagnostic?.severity || "",
+      line: diagnostic?.line || 0,
+      column: diagnostic?.column || 0,
+      endColumn: diagnostic?.end_column || 0,
+      sourceFileMatchesActive: Boolean(diagnostic?.source_file && diagnostic.source_file === active.value.path),
+      lintRangeCount,
+      lintMarkerCount,
+      selection: selectionSnapshot(),
+    };
+    record(
+      "native workflow rendered diagnostic range in editor",
+      Boolean(
+        diagnostic?.line &&
+          diagnostic.column &&
+          diagnostic.end_column &&
+          lintRangeCount > 0 &&
+          lintMarkerCount > 0 &&
+          (evidence.editorLint as { selection: { text: string } }).selection.text.includes("native-missing.png"),
+      ),
+      JSON.stringify(evidence.editorLint),
+    );
+
+    const previewDiagnostic = Array.from(document.querySelectorAll<HTMLElement>(".preview-diagnostic")).find((item) =>
+      item.textContent?.includes("Broken image path"),
+    );
+    const previewJump = previewDiagnostic?.querySelector<HTMLButtonElement>("button.preview-diagnostic-jump") || null;
+    previewJump?.click();
+    await waitForNativeWorkflowCondition(() => selectionSnapshot().text.includes("native-missing.png"), 1200);
+    evidence.previewJump = {
+      diagnosticVisible: Boolean(previewDiagnostic),
+      jumpButtonVisible: Boolean(previewJump),
+      diagnosticText: previewDiagnostic?.textContent?.replace(/\s+/g, " ").trim().slice(0, 360) || "",
+      selection: selectionSnapshot(),
+    };
+    record(
+      "native workflow jumped preview diagnostic to source range",
+      Boolean(
+        previewDiagnostic &&
+          previewJump &&
+          (evidence.previewJump as { selection: { text: string; selectedText: string } }).selection.text.includes("native-missing.png") &&
+          (evidence.previewJump as { selection: { text: string; selectedText: string } }).selection.selectedText.includes("native-missing.png"),
+      ),
+      JSON.stringify(evidence.previewJump),
+    );
+
+    const sidebarDiagnostic = Array.from(document.querySelectorAll<HTMLElement>("#document-sidebar .diagnostic")).find((item) =>
+      item.textContent?.includes("Broken image path"),
+    );
+    const sidebarJump = sidebarDiagnostic?.querySelector<HTMLButtonElement>("button") || null;
+    sidebarJump?.click();
+    await waitForNativeWorkflowCondition(() => selectionSnapshot().text.includes("native-missing.png"), 1200);
+    evidence.sidebarJump = {
+      sidebar: store.sidebar,
+      diagnosticVisible: Boolean(sidebarDiagnostic),
+      jumpButtonVisible: Boolean(sidebarJump),
+      diagnosticText: sidebarDiagnostic?.textContent?.replace(/\s+/g, " ").trim().slice(0, 360) || "",
+      selection: selectionSnapshot(),
+    };
+    record(
+      "native workflow jumped sidebar diagnostic to source range",
+      Boolean(
+        store.sidebar === "diagnostics" &&
+          sidebarDiagnostic &&
+          sidebarJump &&
+          (evidence.sidebarJump as { selection: { text: string; selectedText: string } }).selection.text.includes("native-missing.png") &&
+          (evidence.sidebarJump as { selection: { text: string; selectedText: string } }).selection.selectedText.includes("native-missing.png"),
+      ),
+      JSON.stringify(evidence.sidebarJump),
+    );
+
+    return evidence;
+  } finally {
+    store.mode = original.mode;
+    store.sidebar = original.sidebar;
+    await setNativeWorkflowText(original.text);
+    await store.compileActive();
+    await nextTick();
+  }
+}
+
+async function collectNativePreviewSourceMapEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const original = {
+    text: active.value.text,
+    mode: store.mode,
+    sidebar: store.sidebar,
+  };
+  const evidence: Record<string, unknown> = {};
+  const sourceSelection = () => {
+    if (!editorView) return { line: 0, lineText: "", selectedText: "", nearbyText: "" };
+    const selection = editorView.state.selection.main;
+    const line = editorView.state.doc.lineAt(selection.from);
+    const nearbyEndLine = editorView.state.doc.line(Math.min(editorView.state.doc.lines, line.number + 3));
+    return {
+      line: line.number,
+      lineText: line.text,
+      selectedText: editorView.state.sliceDoc(selection.from, selection.to),
+      nearbyText: editorView.state.sliceDoc(line.from, nearbyEndLine.to),
+    };
+  };
+
+  try {
+    await setNativeWorkflowText(
+      [
+        "---",
+        "title: Native Preview Source Map",
+        "status: draft",
+        "---",
+        "",
+        "# Native Preview Source Map",
+        "",
+        "The launched native webview should map rendered artifacts back to their Markdown source.",
+        "",
+        "Table: Native source map {#tbl:native-source-map}",
+        "| Metric | Value |",
+        "| --- | ---: |",
+        "| Runway | 18 |",
+        "",
+        "$$",
+        "ARR = Revenue / Retention",
+        "$$ {#eq:native-source-map caption=\"Native equation source\"}",
+        "",
+        "Closing context for source-map navigation.",
+      ].join("\n"),
+    );
+    await store.compileActive();
+    store.mode = "split";
+    store.sidebar = "outline";
+    await nextTick();
+    await nextTick();
+
+    const previewPaneElement = document.querySelector(".preview-pane") as HTMLElement | null;
+    const tableCaption = document.querySelector<HTMLElement>("table#tbl\\:native-source-map caption");
+    tableCaption?.click();
+    await waitForNativeWorkflowCondition(
+      () =>
+        sourceSelection().lineText.includes("Table: Native source map") ||
+        sourceSelection().selectedText.includes("Table: Native source map") ||
+        sourceSelection().nearbyText.includes("| Metric | Value |"),
+      1200,
+    );
+    evidence.table = {
+      previewPaneVisible: Boolean(previewPaneElement),
+      captionFound: Boolean(tableCaption),
+      captionText: tableCaption?.textContent?.replace(/\s+/g, " ").trim() || "",
+      selection: sourceSelection(),
+    };
+    record(
+      "native workflow jumped preview table artifact to source",
+      Boolean(
+        previewPaneElement &&
+          tableCaption &&
+          ((evidence.table as { selection: { lineText: string; selectedText: string } }).selection.lineText.includes("Table: Native source map") ||
+            (evidence.table as { selection: { lineText: string; selectedText: string; nearbyText: string } }).selection.selectedText.includes("Table: Native source map") ||
+            (evidence.table as { selection: { lineText: string; selectedText: string; nearbyText: string } }).selection.nearbyText.includes("| Metric | Value |")),
+      ),
+      JSON.stringify(evidence.table),
+    );
+
+    const equationCaption = document.querySelector<HTMLElement>("figure#eq\\:native-source-map figcaption");
+    equationCaption?.click();
+    await waitForNativeWorkflowCondition(
+      () =>
+        sourceSelection().lineText.includes("ARR = Revenue") ||
+        sourceSelection().selectedText.includes("ARR = Revenue") ||
+        sourceSelection().nearbyText.includes("ARR = Revenue"),
+      1200,
+    );
+    evidence.equation = {
+      previewPaneVisible: Boolean(previewPaneElement),
+      captionFound: Boolean(equationCaption),
+      captionText: equationCaption?.textContent?.replace(/\s+/g, " ").trim() || "",
+      selection: sourceSelection(),
+    };
+    record(
+      "native workflow jumped preview equation artifact to source",
+      Boolean(
+        previewPaneElement &&
+          equationCaption &&
+          ((evidence.equation as { selection: { lineText: string; selectedText: string; nearbyText: string } }).selection.lineText.includes("ARR = Revenue") ||
+            (evidence.equation as { selection: { lineText: string; selectedText: string; nearbyText: string } }).selection.selectedText.includes("ARR = Revenue") ||
+            (evidence.equation as { selection: { lineText: string; selectedText: string; nearbyText: string } }).selection.nearbyText.includes("ARR = Revenue")),
+      ),
+      JSON.stringify(evidence.equation),
+    );
+
+    return evidence;
+  } finally {
+    store.mode = original.mode;
+    store.sidebar = original.sidebar;
+    await setNativeWorkflowText(original.text);
+    await store.compileActive();
+    await nextTick();
+  }
+}
+
 function smokeSnippetAround(text: string, needle: string) {
   const index = text.indexOf(needle);
   if (index < 0) return text.slice(0, 800);
@@ -10144,6 +10409,30 @@ function renderPreviewDiagnostic(diagnostic: PreviewDiagnosticItem) {
     )}" data-end-column="${escapePreviewAttribute(String(diagnostic.end_column || ""))}">Go to source</button>`,
     "</aside>",
   ].join("");
+}
+
+function annotatePreviewSourceAnchors(html: string) {
+  const compile = active.value.compile;
+  if (!compile || !html.trim() || typeof document === "undefined") return html;
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const tableBlocks = compile.document_ast.blocks.filter(
+    (block): block is Extract<DocumentBlock, { kind: "table" }> => block.kind === "table" && Boolean(block.id),
+  );
+  const renderedTables = Array.from(template.content.querySelectorAll("table"));
+  tableBlocks.forEach((block, index) => {
+    const table = renderedTables[index];
+    if (!table || !block.id) return;
+    table.id = table.id || block.id;
+    table.dataset.sourceLine = String(block.source?.source_line || block.line || "");
+    table.dataset.endSourceLine = String(block.source?.end_source_line || block.end_line || block.line || "");
+    if (!table.querySelector("caption") && block.caption) {
+      const caption = document.createElement("caption");
+      caption.textContent = `Table ${index + 1}: ${block.caption}`;
+      table.prepend(caption);
+    }
+  });
+  return template.innerHTML;
 }
 
 function escapePreviewHtml(value: string) {
