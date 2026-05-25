@@ -1612,7 +1612,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Help center"'));
   ok(app.includes("filteredHelpTopics"));
   ok(app.includes("button-help-tooltip"));
+  ok(app.includes('role="tooltip"'));
   ok(app.includes("handleButtonHelpEnter"));
+  ok(app.includes('window.addEventListener("mouseover", handleButtonHelpEnter)'));
+  ok(app.includes('window.addEventListener("focusin", handleButtonHelpEnter)'));
+  ok(app.includes('button.getAttribute("data-help")'));
+  ok(app.includes('button.getAttribute("aria-label")'));
+  ok(app.includes('button.innerText.replace'));
   ok(app.includes("NEditor Guided Demo"));
   ok(app.includes("guidedDemoSteps"));
   ok(app.includes("guidedDemoCompletionSummary"));
@@ -2044,6 +2050,7 @@ test("local verification scripts expose local baseline checks", () => {
   const verification = readFileSync("scripts/run-local-verification.mjs", "utf8");
   const e2eEnvironment = readFileSync("scripts/check-e2e-environment.mjs", "utf8");
   const browserEnv = readFileSync("scripts/playwright-browser-env.mjs", "utf8");
+  const accessibilityGuard = readFileSync("scripts/check-accessibility.mjs", "utf8");
   const aiProviderEvidence = readFileSync("scripts/check-ai-provider-evidence.mjs", "utf8");
   const aiProviderCollector = readFileSync("scripts/collect-ai-provider-evidence.mjs", "utf8");
   const aiRuntimeEvidence = readFileSync("scripts/check-ai-runtime-evidence.mjs", "utf8");
@@ -2120,6 +2127,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(e2eEnvironment.includes("isTransientBrowserLaunchFailure"));
   ok(browserEnv.includes('join(root, ".tmp", "ms-playwright")'));
   ok(browserEnv.includes("PLAYWRIGHT_BROWSERS_PATH: baseEnv.PLAYWRIGHT_BROWSERS_PATH ?? projectBrowserCache"));
+  ok(accessibilityGuard.includes("button-hover-help"));
+  ok(accessibilityGuard.includes("handleButtonHelpEnter"));
+  ok(accessibilityGuard.includes("data-help fallback"));
+  ok(accessibilityGuard.includes("disabled help fallback"));
+  ok(accessibilityGuard.includes("role\\s*=\\s*[\"']tooltip"));
   ok(aiProviderEvidence.includes("neditor.ai-provider-evidence.v1"));
   ok(aiProviderEvidence.includes("NEDITOR_AI_PROVIDER_EVIDENCE_DIR"));
   ok(aiProviderEvidence.includes("pending-live-provider-evidence"));

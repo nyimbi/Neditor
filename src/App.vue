@@ -2270,7 +2270,14 @@
                   <strong>{{ playbook.label }}</strong>
                   <span>{{ playbook.summary }}</span>
                 </div>
-                <button type="button" @click="applyAgentWorkflowPlaybook(playbook)">Use</button>
+                <button
+                  type="button"
+                  :aria-label="`Use ${playbook.label} playbook`"
+                  :data-help="`Fill the Agent Workspace instruction and context from the ${playbook.label} playbook.`"
+                  @click="applyAgentWorkflowPlaybook(playbook)"
+                >
+                  Use
+                </button>
               </header>
               <p class="agent-playbook-meta">
                 {{ agentPlaybookFocusLabel(playbook) }} | {{ agentPlaybookTargets(playbook).map((target) => target.toUpperCase()).join(", ") || "No fixed export target" }}

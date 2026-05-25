@@ -24,6 +24,11 @@ const checks = [
     run: checkButtons,
   },
   {
+    id: "button-hover-help",
+    description: "Buttons receive delegated hover and focus help from labels, titles, or data-help text.",
+    run: checkButtonHoverHelp,
+  },
+  {
     id: "form-control-labels",
     description: "Inputs, selects, and textareas are labelled directly or by wrapping labels.",
     run: checkFormControls,
@@ -105,6 +110,28 @@ function checkButtons() {
       issues.push(
         `${sourcePath}:${lineFor(match.index)} button needs descriptive text or aria-label`,
       );
+    }
+  }
+}
+
+function checkButtonHoverHelp() {
+  const requirements = [
+    ["tooltip role", /class\s*=\s*["']button-help-tooltip["'][\s\S]*?role\s*=\s*["']tooltip["']/],
+    ["mouseover listener", /window\.addEventListener\(["']mouseover["'],\s*handleButtonHelpEnter\)/],
+    ["focusin listener", /window\.addEventListener\(["']focusin["'],\s*handleButtonHelpEnter\)/],
+    ["mouseout listener", /window\.addEventListener\(["']mouseout["'],\s*handleButtonHelpLeave\)/],
+    ["focusout listener", /window\.addEventListener\(["']focusout["'],\s*handleButtonHelpLeave\)/],
+    ["listener cleanup", /window\.removeEventListener\(["']mouseover["'],\s*handleButtonHelpEnter\)[\s\S]*window\.removeEventListener\(["']focusout["'],\s*handleButtonHelpLeave\)/],
+    ["button event delegation", /target\?\.closest\(["']button["']\)/],
+    ["data-help fallback", /button\.getAttribute\(["']data-help["']\)/],
+    ["title fallback", /button\.getAttribute\(["']title["']\)/],
+    ["aria-label fallback", /button\.getAttribute\(["']aria-label["']\)/],
+    ["visible text fallback", /button\.innerText\.replace/],
+    ["disabled help fallback", /data-disabled-help/],
+  ];
+  for (const [label, pattern] of requirements) {
+    if (!pattern.test(source)) {
+      issues.push(`${sourcePath}:1 button hover help must include ${label}`);
     }
   }
 }

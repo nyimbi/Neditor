@@ -60,7 +60,9 @@ The top command bar is grouped around document, management, writing, navigation,
 insertion, review, and view workflows. Use Navigate for search, previous/next
 matches, the left document outline, and fold/unfold section commands. In
 Settings or the command bar's Buttons selector, choose icons and text, icons
-only, or text only to match the density you want.
+only, or text only to match the density you want. Buttons show contextual help
+on hover and keyboard focus, including disabled-state guidance when an action
+needs a document, selection, outline, or export-ready state first.
 
 ## AI-First Workflows
 
