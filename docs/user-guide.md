@@ -84,9 +84,12 @@ selection-aware revision proposal when editing or revision is requested, QA
 gates, distribution gates, and blockers for missing inputs. The packet also
 shows an **AI Control Center** with readiness score, next actions, source
 grounding, governance state, and distribution state so reviewers can see what is
-safe to do next before applying generated text. **Apply agent output** uses the
-packet's safe apply mode: replace a new document, replace the selected text, or
-append a review packet to the current source.
+safe to do next before applying generated text. The same packet includes an
+**Agent Audit Trail** with run ID, deterministic fingerprints for instruction,
+context, source, and output payloads, rollback guidance, and review events.
+**Apply agent output** uses the packet's safe apply mode: replace a new
+document, replace the selected text, or append a review packet to the current
+source.
 
 Use **Build provider request** when your team wants a credentialed model to
 continue the work outside the local deterministic planner. Choose the approved

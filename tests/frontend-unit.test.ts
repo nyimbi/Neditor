@@ -487,8 +487,16 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("### Target Runbooks"));
   ok(run.markdown.includes("## AI Control Center"));
   ok(run.markdown.includes("### Source Grounding"));
+  ok(run.markdown.includes("## Agent Audit Trail"));
+  ok(run.markdown.includes("### Rollback Plan"));
   ok(run.markdown.includes("Substack newsletter package"));
   ok(run.markdown.includes("Google Docs collaboration package"));
+  ok(run.auditTrail.runId.startsWith("agent-20260524T10000"));
+  equal(run.auditTrail.applicationMode, "replace-document");
+  equal(run.auditTrail.instructionFingerprint.length, 16);
+  equal(run.auditTrail.outputFingerprint.length, 16);
+  ok(run.auditTrail.rollbackPlan.some((item) => item.includes("snapshot")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Distribution evidence requirements")));
   ok(run.controlCenter.readinessScore > 0);
   ok(run.controlCenter.status === "needs-input" || run.controlCenter.status === "ready");
   ok(run.controlCenter.nextActions.some((action) => action.label === "Verify target artifacts"));
@@ -520,6 +528,9 @@ test("agentic workflow run proposes selection-aware revisions with review metada
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Selected text" && item.status === "available"));
   ok(run.controlCenter.governance.some((item) => item.label === "Revision audit" && item.status === "available"));
   ok(run.controlCenter.nextActions.some((action) => action.lane === "revise"));
+  equal(run.auditTrail.applicationMode, "replace-selection");
+  ok(run.auditTrail.rollbackPlan.some((item) => item.includes("editor undo")));
+  ok(run.markdown.includes("Apply mode: replace-selection"));
   ok(run.markdown.includes("## Revision Proposal"));
   ok(run.markdown.includes("### Original Text"));
   ok(run.markdown.includes("### Proposed Text"));
@@ -871,6 +882,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent generated output"'));
   ok(app.includes('aria-label="AI control center"'));
   ok(app.includes("agentRun.controlCenter"));
+  ok(app.includes('aria-label="Agent audit trail"'));
+  ok(app.includes("agentRun.auditTrail"));
+  ok(app.includes("Rollback plan"));
   ok(app.includes("Source grounding"));
   ok(app.includes("Distribution state"));
   ok(app.includes('aria-label="Agent distribution target runbooks"'));

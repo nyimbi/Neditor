@@ -60,6 +60,7 @@ export interface AgenticWorkflowRun {
   applicationMode: "replace-document" | "replace-selection" | "append-packet";
   revision: AgenticWorkflowRevision | null;
   controlCenter: AgenticControlCenter;
+  auditTrail: AgenticAuditTrail;
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -101,6 +102,21 @@ export interface AgenticControlCenter {
   governance: AgenticControlItem[];
   distribution: AgenticControlItem[];
 }
+
+export interface AgenticAuditTrail {
+  runId: string;
+  generatedAt: string;
+  plannerVersion: string;
+  instructionFingerprint: string;
+  contextFingerprint: string;
+  sourceFingerprint: string;
+  outputFingerprint: string;
+  applicationMode: AgenticWorkflowRun["applicationMode"];
+  rollbackPlan: string[];
+  reviewEvents: string[];
+}
+
+const agentPlannerVersion = "agentic-workflow-v3-control-audit";
 
 const exportSignals: Array<[ExportTarget, RegExp]> = [
   ["html", /\bhtml|website|web page|landing page\b/i],
@@ -166,6 +182,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
 }
 
 export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): AgenticWorkflowRun {
+  const generatedAt = request.generatedAt || new Date().toISOString();
   const plan = buildAgenticWorkflowPlan(request);
   const hasSelection = Boolean(request.selectedText?.trim());
   const hasDocument = Boolean(request.documentText?.trim());
@@ -181,7 +198,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
           : "",
         placeholders: plan.placeholderText,
         draftingDepth: plan.primaryLane === "compose" ? "detailed" : "standard",
-        generatedAt: request.generatedAt,
+        generatedAt,
       })
     : null;
   const reviewChecklist = buildReviewChecklist(plan, revision);
@@ -190,16 +207,29 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const blockers = buildRunBlockers(plan, hasDocument, hasSelection);
   const applicationMode = inferApplicationMode(plan, hasDocument, hasSelection);
   const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans });
+  const auditTrail = buildAuditTrail({
+    plan,
+    request,
+    revision,
+    draftMarkdown: draft?.markdown || "",
+    reviewChecklist,
+    distributionChecklist,
+    distributionTargetPlans,
+    blockers,
+    applicationMode,
+    generatedAt,
+  });
   const markdown = buildRunMarkdown({
     plan,
     draftMarkdown: draft?.markdown || "",
     revision,
     controlCenter,
+    auditTrail,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
     blockers,
-    generatedAt: request.generatedAt || new Date().toISOString(),
+    generatedAt,
   });
 
   return {
@@ -209,6 +239,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     applicationMode,
     revision,
     controlCenter,
+    auditTrail,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -506,6 +537,72 @@ function buildControlCenter(input: {
   };
 }
 
+function buildAuditTrail(input: {
+  plan: AgenticWorkflowPlan;
+  request: AgenticWorkflowRunRequest;
+  revision: AgenticWorkflowRevision | null;
+  draftMarkdown: string;
+  reviewChecklist: string[];
+  distributionChecklist: string[];
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
+  blockers: string[];
+  applicationMode: AgenticWorkflowRun["applicationMode"];
+  generatedAt: string;
+}): AgenticAuditTrail {
+  const { plan, request, revision, draftMarkdown, reviewChecklist, distributionChecklist, distributionTargetPlans, blockers, applicationMode, generatedAt } = input;
+  const contextPayload = [plan.context, plan.placeholderText, plan.suggestedOutline, plan.revisionInstruction].join("\n---\n");
+  const sourcePayload = [request.documentTitle || "", request.documentText || "", request.selectedText || ""].join("\n---\n");
+  const outputPayload = [
+    draftMarkdown,
+    revision?.proposedText || "",
+    ...reviewChecklist,
+    ...distributionChecklist,
+    ...distributionTargetPlans.flatMap((target) => [target.target, target.label, ...target.preflightChecks, ...target.handoffSteps, ...target.evidenceRequired]),
+    ...blockers,
+  ].join("\n");
+  return {
+    runId: `agent-${compactTimestamp(generatedAt)}-${stableFingerprint([plan.title, plan.instruction, contextPayload].join("\n")).slice(0, 10)}`,
+    generatedAt,
+    plannerVersion: agentPlannerVersion,
+    instructionFingerprint: stableFingerprint(plan.instruction || "(empty instruction)"),
+    contextFingerprint: stableFingerprint(contextPayload),
+    sourceFingerprint: stableFingerprint(sourcePayload),
+    outputFingerprint: stableFingerprint(outputPayload),
+    applicationMode,
+    rollbackPlan: rollbackPlan(applicationMode),
+    reviewEvents: [
+      "Agent plan generated from current instruction, document context, and selection state.",
+      "AI provenance metadata attached to generated packet.",
+      blockers.length ? `Human review required before release because ${blockers.length} blocker item(s) remain.` : "No blocker items detected at packet generation time.",
+      distributionTargetPlans.length
+        ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
+        : "No distribution target selected at packet generation time.",
+    ],
+  };
+}
+
+function rollbackPlan(applicationMode: AgenticWorkflowRun["applicationMode"]) {
+  if (applicationMode === "replace-selection") {
+    return [
+      "Review the selected range before applying the agent output.",
+      "Use editor undo immediately after apply if the replacement is not acceptable.",
+      "Keep the generated agent packet as review material until the reviewer accepts the change.",
+    ];
+  }
+  if (applicationMode === "replace-document") {
+    return [
+      "Create or keep a snapshot before replacing the current document.",
+      "Use local snapshot or Git history to restore the prior document if the draft is rejected.",
+      "Keep AI provenance and review metadata visible until human review is complete.",
+    ];
+  }
+  return [
+    "Append the packet instead of overwriting existing source.",
+    "Remove the appended agent packet if review rejects the proposal.",
+    "Retain the run ID and fingerprints in review notes when accepting any generated section.",
+  ];
+}
+
 function buildSourceGrounding(plan: AgenticWorkflowPlan, hasDocument: boolean, hasSelection: boolean): AgenticControlItem[] {
   const evidenceValue = extractKeyValue(plan.placeholderText, "evidence");
   return [
@@ -735,13 +832,14 @@ function buildRunMarkdown(input: {
   draftMarkdown: string;
   revision: AgenticWorkflowRevision | null;
   controlCenter: AgenticControlCenter;
+  auditTrail: AgenticAuditTrail;
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   generatedAt: string;
 }) {
-  const { plan, draftMarkdown, revision, controlCenter, reviewChecklist, distributionChecklist, distributionTargetPlans, blockers, generatedAt } = input;
+  const { plan, draftMarkdown, revision, controlCenter, auditTrail, reviewChecklist, distributionChecklist, distributionTargetPlans, blockers, generatedAt } = input;
   const lines = [
     "---",
     `title: ${yamlScalar(`${plan.title} Agent Run`)}`,
@@ -785,6 +883,7 @@ function buildRunMarkdown(input: {
     lines.push("### Blockers", "", ...blockers.map((blocker) => `- [ ] ${blocker}`), "");
   }
   lines.push(...controlCenterMarkdown(controlCenter));
+  lines.push(...auditTrailMarkdown(auditTrail));
   if (draftMarkdown.trim()) {
     lines.push("## Generated Draft", "", draftMarkdown.trim(), "");
   }
@@ -853,6 +952,36 @@ function controlCenterMarkdown(controlCenter: AgenticControlCenter) {
   ];
 }
 
+function auditTrailMarkdown(auditTrail: AgenticAuditTrail) {
+  return [
+    "## Agent Audit Trail",
+    "",
+    `Run ID: ${auditTrail.runId}`,
+    "",
+    `Generated: ${auditTrail.generatedAt}`,
+    "",
+    `Planner: ${auditTrail.plannerVersion}`,
+    "",
+    `Apply mode: ${auditTrail.applicationMode}`,
+    "",
+    "| Fingerprint | Value |",
+    "| --- | --- |",
+    `| Instruction | ${auditTrail.instructionFingerprint} |`,
+    `| Context | ${auditTrail.contextFingerprint} |`,
+    `| Source | ${auditTrail.sourceFingerprint} |`,
+    `| Output payload | ${auditTrail.outputFingerprint} |`,
+    "",
+    "### Rollback Plan",
+    "",
+    ...auditTrail.rollbackPlan.map((item) => `- ${item}`),
+    "",
+    "### Review Events",
+    "",
+    ...auditTrail.reviewEvents.map((item) => `- ${item}`),
+    "",
+  ];
+}
+
 function fencedBlock(language: string, value: string) {
   return ["```" + language, value.trim() || "(empty)", "```"].join("\n");
 }
@@ -899,6 +1028,23 @@ function inferTone(corpus: string) {
   if (/\bplain|simple|non-technical\b/i.test(corpus)) return "plain-language";
   if (/\blegal|compliance|risk\b/i.test(corpus)) return "careful and evidence-led";
   return "professional and direct";
+}
+
+function compactTimestamp(value: string) {
+  return value.replace(/[^0-9A-Za-z]+/g, "").slice(0, 15) || "undated";
+}
+
+function stableFingerprint(value: string) {
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first ^= code;
+    first = Math.imul(first, 0x01000193) >>> 0;
+    second ^= code + index;
+    second = Math.imul(second, 0x85ebca6b) >>> 0;
+  }
+  return `${first.toString(16).padStart(8, "0")}${second.toString(16).padStart(8, "0")}`;
 }
 
 function titleCase(value: string) {

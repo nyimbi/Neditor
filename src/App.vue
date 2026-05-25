@@ -1982,6 +1982,50 @@
                 </article>
               </section>
             </section>
+            <section class="agent-audit-trail" aria-label="Agent audit trail">
+              <header>
+                <div>
+                  <strong>Agent Audit Trail</strong>
+                  <span>{{ agentRun.auditTrail.runId }}</span>
+                </div>
+                <small>{{ agentRun.auditTrail.plannerVersion }}</small>
+              </header>
+              <section class="agent-audit-grid">
+                <article>
+                  <h3>Fingerprints</h3>
+                  <dl>
+                    <div>
+                      <dt>Instruction</dt>
+                      <dd>{{ agentRun.auditTrail.instructionFingerprint }}</dd>
+                    </div>
+                    <div>
+                      <dt>Context</dt>
+                      <dd>{{ agentRun.auditTrail.contextFingerprint }}</dd>
+                    </div>
+                    <div>
+                      <dt>Source</dt>
+                      <dd>{{ agentRun.auditTrail.sourceFingerprint }}</dd>
+                    </div>
+                    <div>
+                      <dt>Output</dt>
+                      <dd>{{ agentRun.auditTrail.outputFingerprint }}</dd>
+                    </div>
+                  </dl>
+                </article>
+                <article>
+                  <h3>Rollback plan</h3>
+                  <ul>
+                    <li v-for="item in agentRun.auditTrail.rollbackPlan" :key="item">{{ item }}</li>
+                  </ul>
+                </article>
+                <article>
+                  <h3>Review events</h3>
+                  <ul>
+                    <li v-for="item in agentRun.auditTrail.reviewEvents" :key="item">{{ item }}</li>
+                  </ul>
+                </article>
+              </section>
+            </section>
             <section v-if="agentRun.blockers.length" class="agent-missing-inputs" aria-label="Agent run blockers">
               <strong>Resolve before final release</strong>
               <ul>
@@ -8513,6 +8557,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-run-output,
 .app-shell[data-theme="dark"] .agent-control-center,
 .app-shell[data-theme="dark"] .agent-control-grid article,
+.app-shell[data-theme="dark"] .agent-audit-trail,
+.app-shell[data-theme="dark"] .agent-audit-grid article,
 .app-shell[data-theme="dark"] .agent-run-columns article,
 .app-shell[data-theme="dark"] .agent-distribution-runbooks article,
 .app-shell[data-theme="dark"] .agent-provider-panel,
@@ -8611,6 +8657,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-run-output,
   .app-shell[data-theme="system"] .agent-control-center,
   .app-shell[data-theme="system"] .agent-control-grid article,
+  .app-shell[data-theme="system"] .agent-audit-trail,
+  .app-shell[data-theme="system"] .agent-audit-grid article,
   .app-shell[data-theme="system"] .agent-run-columns article,
   .app-shell[data-theme="system"] .agent-distribution-runbooks article,
   .app-shell[data-theme="system"] .agent-provider-panel,
@@ -8694,6 +8742,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-run-output,
 .app-shell[data-high-contrast="true"] .agent-control-center,
 .app-shell[data-high-contrast="true"] .agent-control-grid article,
+.app-shell[data-high-contrast="true"] .agent-audit-trail,
+.app-shell[data-high-contrast="true"] .agent-audit-grid article,
 .app-shell[data-high-contrast="true"] .agent-run-columns article,
 .app-shell[data-high-contrast="true"] .agent-distribution-runbooks article,
 .app-shell[data-high-contrast="true"] .agent-provider-panel,
@@ -10172,6 +10222,8 @@ select:hover {
 .agent-run-output,
 .agent-control-center,
 .agent-control-grid article,
+.agent-audit-trail,
+.agent-audit-grid article,
 .agent-run-columns article,
 .agent-distribution-runbooks article,
 .agent-provider-panel,
@@ -10340,6 +10392,79 @@ select:hover {
 }
 
 .agent-control-grid li p {
+  color: #2d3746;
+  font-size: 12px;
+}
+
+.agent-audit-trail {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #596b7f;
+  background: #f8fafc;
+}
+
+.agent-audit-trail > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-audit-trail > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-audit-trail > header span,
+.agent-audit-trail > header small {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-audit-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-audit-grid article {
+  display: grid;
+  gap: 6px;
+}
+
+.agent-audit-grid h3,
+.agent-audit-grid dl,
+.agent-audit-grid ul {
+  margin: 0;
+}
+
+.agent-audit-grid dl,
+.agent-audit-grid ul {
+  display: grid;
+  gap: 5px;
+}
+
+.agent-audit-grid dl div {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.agent-audit-grid dt {
+  color: #526171;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.agent-audit-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+}
+
+.agent-audit-grid ul {
+  padding-left: 18px;
   color: #2d3746;
   font-size: 12px;
 }
@@ -11591,6 +11716,7 @@ select:hover {
 
   .agent-plan-grid,
   .agent-control-grid,
+  .agent-audit-grid,
   .agent-run-columns,
   .agent-distribution-runbooks,
   .agent-provider-grid,
