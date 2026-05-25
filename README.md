@@ -194,6 +194,10 @@ web app.
 - CodeMirror editing with Markdown highlighting, diagnostics gutter, line
   numbers, word wrap, find/replace, smart list continuation, bracket pairing,
   word count, character count, and reading-time status.
+- Keyboard-first operation for collapsed-toolbars and deep work: Cmd/Ctrl
+  shortcuts cover save/save-as, new/open/open-folder, find, export, direct HTML
+  export, bold/italic, command palette, Docs Live, AI Agent Workspace, Review
+  readiness, Export readiness, and shortcut help.
 - Command palette for app actions, natural-language AI agent instructions, AI
   route suggestions for Docs Live, AI Paste cleanup, Review, Export readiness,
   Outline mode, and provider handoff, plus document-aware navigation across

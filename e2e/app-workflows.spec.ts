@@ -1721,6 +1721,32 @@ test("supports keyboard-only operation for deep workbench controls", async ({ pa
   await expect(commandDialog).toBeHidden();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("outline");
 
+  const primaryKey = process.platform === "darwin" ? "Meta" : "Control";
+  await page.locator("#document-workspace").focus();
+  await page.keyboard.press(`${primaryKey}+F`);
+  await expect(page.locator(".cm-panel.cm-search")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press(`${primaryKey}+Shift+R`);
+  await expect(page.getByLabel("View mode")).toHaveValue("review");
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("review");
+  await page.keyboard.press(`${primaryKey}+Shift+X`);
+  await expect(page.getByLabel("View mode")).toHaveValue("export");
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
+  await page.keyboard.press(`${primaryKey}+Shift+A`);
+  const shortcutAgent = page.getByRole("dialog", { name: "AI agent workspace" });
+  await expect(shortcutAgent).toBeVisible();
+  await shortcutAgent.getByLabel("Close AI agent workspace").click();
+  await expect(shortcutAgent).toBeHidden();
+  await page.keyboard.press(`${primaryKey}+Shift+L`);
+  const shortcutDocsLive = page.getByRole("dialog", { name: "Docs Live voice drafting" });
+  await expect(shortcutDocsLive).toBeVisible();
+  await shortcutDocsLive.getByLabel("Close Docs Live").click();
+  await expect(shortcutDocsLive).toBeHidden();
+  await page.keyboard.press(`${primaryKey}+Shift+H`);
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("help");
+  await expect(page.getByLabel("Selected help topic")).toContainText("Keyboard shortcuts");
+  await expect(page.getByLabel("Selected help topic")).toContainText("AI agent workspace");
+
   const diagnosticDocument = [
     "---",
     "title: Keyboard Diagnostics",

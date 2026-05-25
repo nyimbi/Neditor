@@ -5486,24 +5486,28 @@ const helpTopics = computed<HelpTopic[]>(() => [
     id: "keyboard-shortcuts",
     title: "Keyboard shortcuts",
     category: "settings",
-    summary: "Use common shortcuts for save, open, new, export, formatting, and command discovery.",
+    summary: "Use common shortcuts for files, search, AI drafting, review, export, formatting, and command discovery.",
     when: "Use this when you want to move quickly without relying on toolbar visibility.",
     steps: [
       "Use Cmd or Ctrl plus S to save, Shift plus Cmd or Ctrl plus S for Save As.",
-      "Use Cmd or Ctrl plus O to open, N for new, E for export, B for bold, and I for italic.",
-      "Use Cmd or Ctrl plus K, or Shift plus Cmd or Ctrl plus P, to open the command palette.",
+      "Use Cmd or Ctrl plus O to open a document, Shift plus Cmd or Ctrl plus O to open a folder, and N for a new document.",
+      "Use Cmd or Ctrl plus F for find, B for bold, I for italic, E for export, and Shift plus Cmd or Ctrl plus E for HTML export.",
+      "Use Shift plus Cmd or Ctrl plus A for the AI agent workspace, L for Docs Live, R for review, X for export readiness, H for shortcut help, and P or K for the command palette.",
       "Use the View toolbar to collapse toolbar rows when you need more writing space.",
     ],
     tips: [
       "The command palette is the fastest way to find actions while learning the app.",
+      "AI drafting, outline planning, review readiness, and distribution preparation all have direct shortcuts so collapsed toolbars remain practical.",
       "Toolbar text can be resized or hidden if you prefer icons only.",
     ],
     actions: [
       { label: "Command palette", run: () => (commandPaletteOpen.value = true) },
+      { label: "Docs Live", run: () => openDocsLive() },
+      { label: "AI agent workspace", run: () => openAgentWorkspace() },
       { label: "Collapse toolbars", run: () => setAllCommandToolbarsCollapsed(true) },
       { label: "Toolbar settings", run: () => (store.sidebar = "settings") },
     ],
-    keywords: ["shortcut", "keyboard", "command palette", "collapse", "toolbar"],
+    keywords: ["shortcut", "keyboard", "command palette", "collapse", "toolbar", "docs live", "agent", "review", "export"],
   },
   {
     id: "display-accessibility",
@@ -12567,31 +12571,76 @@ function sourceTargetForAnchor(anchor: string) {
   return null;
 }
 
+function isEditableShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.closest(".cm-editor")) return false;
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
+}
+
+function setWorkbenchDestination(
+  mode: typeof store.mode,
+  sidebar: typeof store.sidebar | null,
+  message: string,
+) {
+  store.mode = mode;
+  if (sidebar) store.sidebar = sidebar;
+  store.statusMessage = message;
+  void nextTick(() => workspacePane.value?.focus());
+}
+
 function handleShortcut(event: KeyboardEvent) {
-  if (!(event.metaKey || event.ctrlKey)) return;
-  if (event.key === "s") {
+  if (!(event.metaKey || event.ctrlKey) || isEditableShortcutTarget(event.target)) return;
+  const key = event.key.toLowerCase();
+  if (key === "s") {
     event.preventDefault();
     if (event.shiftKey) {
       void saveDocumentAs();
     } else {
       void saveDocument();
     }
-  } else if (event.key === "o") {
+  } else if (key === "o") {
     event.preventDefault();
-    void openDocument();
-  } else if (event.key === "n") {
+    if (event.shiftKey) {
+      void openFolder();
+    } else {
+      void openDocument();
+    }
+  } else if (key === "n") {
     event.preventDefault();
     store.newDocument();
-  } else if (event.key.toLowerCase() === "e") {
+  } else if (key === "f") {
     event.preventDefault();
-    void exportDocument();
-  } else if (event.key === "b") {
+    runEditorCommand(openSearchPanel);
+  } else if (key === "e") {
+    event.preventDefault();
+    if (event.shiftKey) {
+      void exportDocumentAs("html");
+    } else {
+      void exportDocument();
+    }
+  } else if (key === "b") {
     event.preventDefault();
     wrapSelection("**");
-  } else if (event.key === "i") {
+  } else if (key === "i") {
     event.preventDefault();
     wrapSelection("*");
-  } else if (event.key.toLowerCase() === "k" || (event.key.toLowerCase() === "p" && event.shiftKey)) {
+  } else if (key === "a" && event.shiftKey) {
+    event.preventDefault();
+    openAgentWorkspace();
+  } else if (key === "l" && event.shiftKey) {
+    event.preventDefault();
+    openDocsLive();
+  } else if (key === "r" && event.shiftKey) {
+    event.preventDefault();
+    setWorkbenchDestination("review", "review", "Opened review readiness from keyboard");
+  } else if (key === "x" && event.shiftKey) {
+    event.preventDefault();
+    setWorkbenchDestination("export", "exports", "Opened export readiness from keyboard");
+  } else if (key === "h" && event.shiftKey) {
+    event.preventDefault();
+    openHelp("keyboard-shortcuts");
+  } else if (key === "k" || (key === "p" && event.shiftKey)) {
     event.preventDefault();
     commandPaletteOpen.value = true;
   }

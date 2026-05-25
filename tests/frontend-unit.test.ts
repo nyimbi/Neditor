@@ -1990,6 +1990,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Help Center"));
   ok(app.includes('aria-label="Help center"'));
   ok(app.includes("filteredHelpTopics"));
+  ok(app.includes("isEditableShortcutTarget"));
+  ok(app.includes("setWorkbenchDestination"));
+  ok(app.includes('openHelp("keyboard-shortcuts")'));
+  ok(app.includes("Opened review readiness from keyboard"));
+  ok(app.includes("Opened export readiness from keyboard"));
+  ok(app.includes('exportDocumentAs("html")'));
+  ok(app.includes("Use Shift plus Cmd or Ctrl plus A for the AI agent workspace"));
   ok(app.includes("button-help-tooltip"));
   ok(app.includes('role="tooltip"'));
   ok(app.includes("handleButtonHelpEnter"));

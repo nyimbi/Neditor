@@ -137,12 +137,14 @@ Most recent local verification evidence:
   sidecar manifests, structured export progress-step reporting, blog/Substack
   publishing packages, LaTeX and Google Docs handoff exports, and precise
   no-bibliography citation readiness ranges.
-- `pnpm run test:e2e`: passed all 52 Chromium browser workbench workflows
-  locally on 2026-05-23 through the workspace-local Playwright Chromium cache
+- `pnpm run test:e2e`: passed all 58 Chromium browser workbench workflows
+  locally on 2026-05-25 through the workspace-local Playwright Chromium cache
   at `.tmp/ms-playwright`, including collapsible toolbars, HTML, blog/Substack,
-  LaTeX, Google Docs export-target handoffs, and deep keyboard-only operation
-  through tabs, command palette, diagnostics, table editor, conflict merge, and
-  preview focus paths, plus dedicated outline-mode CRUD.
+  LaTeX, Google Docs export-target handoffs, app-level shortcuts for search,
+  Review readiness, Export readiness, AI Agent Workspace, Docs Live, shortcut
+  help, and deep keyboard-only operation through tabs, command palette,
+  diagnostics, table editor, conflict merge, and preview focus paths, plus
+  dedicated outline-mode CRUD.
 - `cargo test --locked prepare_for_export_reports_missing_citation_sources_with_precise_ranges --lib -- --nocapture`:
   passed and proves no-bibliography citation readiness emits a broad source
   warning plus precise per-key missing citation diagnostics that are copied
@@ -915,7 +917,10 @@ Required next coverage:
 - Deeper workspace folder browsing, native document-set proof, and remaining
   tab drag/reorder edge cases.
 - Focus, export, review, and presentation mode local browser/native execution proof.
-- Broader keyboard shortcut coverage.
+- Broader keyboard shortcut coverage now includes app-level accelerators for
+  search, open folder, Docs Live, AI Agent Workspace, Review readiness, Export
+  readiness, HTML export, and shortcut help; remaining work is cross-platform
+  native accelerator proof and deeper editor-specific edge cases.
 - Theme/typography visual accessibility proof now has browser coverage and
   app-authored macOS Tauri webview evidence for dark theme, high contrast,
   reduced motion, editor font size, and preview typography; broader platform
@@ -1762,10 +1767,12 @@ Current evidence:
   checks those contracts, and the boot workflow harness asserts them.
 - The browser workflow `supports keyboard-only operation for deep workbench
   controls` now exercises keyboard activation/focus across document tabs, the
-  command palette result list, diagnostics source jumps, focusable preview
-  documents, table-editor cells/actions, stale-save conflict compare entry,
-  conflict modal Tab wrapping, merge-line add/reorder/remove controls, Escape
-  close, and focus restoration.
+  command palette result list, app-level shortcuts for search, Review
+  readiness, Export readiness, AI Agent Workspace, Docs Live, shortcut help,
+  diagnostics source jumps, focusable preview documents, table-editor
+  cells/actions, stale-save conflict compare entry, conflict modal Tab
+  wrapping, merge-line add/reorder/remove controls, Escape close, and focus
+  restoration.
 
 Finish:
 

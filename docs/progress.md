@@ -16,11 +16,10 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `b05f0d7 Make NEditor
-  approachable for business users`
+- Latest inspected committed baseline before this update: `a2820d5 Add document
+  set handoff manifests`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: accessibility manual sign-off verifier in
-  progress
+- Worktree before this log update: clean and aligned with `origin/main`
 
 ## Durable Planning Artifacts
 
@@ -32,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- The workbench now has a richer global shortcut layer for collapsed-toolbar
+  and keyboard-first use. Cmd/Ctrl shortcuts cover save/save-as, new/open,
+  open-folder, search, generic export, direct HTML export, formatting,
+  command-palette discovery, Docs Live, AI Agent Workspace, Review readiness,
+  Export readiness, and shortcut help while leaving ordinary form fields alone.
 - Open document sets are now first-class workspace objects instead of only tab
   group labels. The Files sidebar includes a Document Sets manager that shows
   open sets, assigns the active document to a set, renames every open document
@@ -2936,9 +2940,9 @@ Document-set manager verification:
    the WebDriver report attaches that native fallback proof where WebDriver is
    officially unavailable.
 3. Use failures from workflow tests to drive implementation fixes.
-4. Continue expanding browser coverage for remaining preview modes, broader
-   keyboard shortcuts, deeper workspace grouping, AI review-state workflows,
-   export progress edge cases, and table export modes.
+4. Continue expanding browser coverage for remaining preview modes, deeper
+   workspace grouping, AI review-state workflows, export progress edge cases,
+   table export modes, and cross-platform shortcut accelerators.
 5. Add macOS/Windows optional transform engine evidence.
 6. Only after behavior is locked, modularize oversized frontend/store/backend
    modules.
