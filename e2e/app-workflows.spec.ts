@@ -2577,6 +2577,36 @@ test("runs configurable Emacs and Vim-style editor keybinding modes", async ({ p
   await page.keyboard.press("a");
   await page.keyboard.insertText(" done");
   await expect.poll(() => editorText(page)).toContain("VIM Vim target done");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("I");
+  await expect(status).toContainText("Vim insert mode");
+  await page.keyboard.insertText("LINESTART ");
+  await expect.poll(() => editorText(page)).toContain("LINESTART VIM Vim target done");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("A");
+  await page.keyboard.insertText(" LINEEND");
+  await expect.poll(() => editorText(page)).toContain("LINESTART VIM Vim target done LINEEND");
+
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("o");
+  await expect(status).toContainText("Vim insert mode");
+  await page.keyboard.insertText("Delete me with dd");
+  await page.keyboard.press("Escape");
+  const beforePendingDeleteText = await editorText(page);
+  await page.keyboard.press("d");
+  await expect.poll(() => editorText(page)).toBe(beforePendingDeleteText);
+  await page.keyboard.press("d");
+  await expect.poll(() => editorText(page)).not.toContain("Delete me with dd");
+
+  await page.keyboard.press("G");
+  await page.keyboard.press("I");
+  await page.keyboard.insertText("\nword alpha beta");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("0");
+  await page.keyboard.press("w");
+  await page.keyboard.press("i");
+  await page.keyboard.insertText("WORD-");
+  await expect.poll(() => editorText(page)).toContain("word WORD-alpha beta");
 
   await page.getByRole("button", { name: "Save Workspace" }).click();
   await page.reload();

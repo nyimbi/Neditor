@@ -4094,6 +4094,7 @@ import {
   cursorLineUp,
   defaultKeymap,
   deleteCharForward,
+  deleteLine,
   deleteToLineEnd,
   emacsStyleKeymap,
   history,
@@ -4330,6 +4331,7 @@ let editorView: EditorView | null = null;
 let secondaryEditorView: EditorView | null = null;
 let syncingEditorFromStore = false;
 const vimInputMode = ref<"insert" | "normal">("insert");
+const vimPendingOperator = ref<"" | "d">("");
 const previewTextCommit = createDebouncedTextCommit((text) => store.updateText(text), {
   setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
   clearTimeout: (handle) => window.clearTimeout(handle),
@@ -8260,7 +8262,10 @@ watch(
     store.previewLineHeight,
   ],
   async () => {
-    if (store.editorKeymapMode !== "vim") vimInputMode.value = "insert";
+    if (store.editorKeymapMode !== "vim") {
+      vimInputMode.value = "insert";
+      vimPendingOperator.value = "";
+    }
     await nextTick();
     buildEditor();
     void store.persistWorkspace();
@@ -10655,9 +10660,20 @@ function smokeSnippetAround(text: string, needle: string) {
 }
 
 function vimEnterInsertMode(view: EditorView) {
+  vimPendingOperator.value = "";
   vimInputMode.value = "insert";
   view.focus();
   return true;
+}
+
+function vimInsertAtLineStart(view: EditorView) {
+  cursorLineStart(view);
+  return vimEnterInsertMode(view);
+}
+
+function vimAppendAtLineEnd(view: EditorView) {
+  cursorLineEnd(view);
+  return vimEnterInsertMode(view);
 }
 
 function vimInsertAfterCursor(view: EditorView) {
@@ -10678,6 +10694,54 @@ function vimOpenLineAbove(view: EditorView) {
   return vimEnterInsertMode(view);
 }
 
+function vimMoveCursor(view: EditorView, position: number) {
+  const docLength = view.state.doc.length;
+  view.dispatch({
+    selection: EditorSelection.cursor(Math.max(0, Math.min(docLength, position))),
+    scrollIntoView: true,
+  });
+  view.focus();
+  return true;
+}
+
+function vimWhitespace(char: string | undefined) {
+  return !char || /\s/.test(char);
+}
+
+function vimMoveWordForward(view: EditorView) {
+  const text = view.state.doc.toString();
+  let position = view.state.selection.main.head;
+  if (position >= text.length) return true;
+  if (vimWhitespace(text[position])) {
+    while (position < text.length && vimWhitespace(text[position])) position += 1;
+  } else {
+    while (position < text.length && !vimWhitespace(text[position])) position += 1;
+    while (position < text.length && vimWhitespace(text[position])) position += 1;
+  }
+  return vimMoveCursor(view, position);
+}
+
+function vimMoveWordEnd(view: EditorView) {
+  const text = view.state.doc.toString();
+  let position = Math.min(text.length - 1, view.state.selection.main.head + 1);
+  while (position < text.length && vimWhitespace(text[position])) position += 1;
+  while (position < text.length - 1 && !vimWhitespace(text[position + 1])) position += 1;
+  return vimMoveCursor(view, position);
+}
+
+function vimMoveWordBackward(view: EditorView) {
+  const text = view.state.doc.toString();
+  let position = Math.max(0, view.state.selection.main.head - 1);
+  while (position > 0 && vimWhitespace(text[position])) position -= 1;
+  while (position > 0 && !vimWhitespace(text[position - 1])) position -= 1;
+  return vimMoveCursor(view, position);
+}
+
+function vimDeleteCurrentLine(view: EditorView) {
+  vimPendingOperator.value = "";
+  return deleteLine(view);
+}
+
 function handleVimNormalKey(event: KeyboardEvent, view: EditorView) {
   if (event.metaKey || event.altKey) return false;
   if (event.ctrlKey) {
@@ -10687,15 +10751,27 @@ function handleVimNormalKey(event: KeyboardEvent, view: EditorView) {
     }
     return false;
   }
+  if (vimPendingOperator.value) {
+    if (vimPendingOperator.value === "d" && event.key === "d") {
+      event.preventDefault();
+      return vimDeleteCurrentLine(view);
+    }
+    vimPendingOperator.value = "";
+  }
   const run = {
     h: () => cursorCharLeft(view),
     j: () => cursorLineDown(view),
     k: () => cursorLineUp(view),
     l: () => cursorCharRight(view),
+    w: () => vimMoveWordForward(view),
+    e: () => vimMoveWordEnd(view),
+    b: () => vimMoveWordBackward(view),
     "0": () => cursorLineStart(view),
     $: () => cursorLineEnd(view),
     x: () => deleteCharForward(view),
     D: () => deleteToLineEnd(view),
+    I: () => vimInsertAtLineStart(view),
+    A: () => vimAppendAtLineEnd(view),
     i: () => vimEnterInsertMode(view),
     a: () => vimInsertAfterCursor(view),
     o: () => vimOpenLineBelow(view),
@@ -10707,6 +10783,11 @@ function handleVimNormalKey(event: KeyboardEvent, view: EditorView) {
   if (run) {
     event.preventDefault();
     return run();
+  }
+  if (event.key === "d") {
+    event.preventDefault();
+    vimPendingOperator.value = "d";
+    return true;
   }
   if (event.key.length === 1) {
     event.preventDefault();
@@ -10760,6 +10841,7 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
       { key: "Enter", run: continueMarkdownList },
       ...(store.editorKeymapMode === "emacs" ? emacsStyleKeymap : []),
       ...(store.editorKeymapMode === "vim" ? [{ key: "Escape", run: (view: EditorView) => {
+        vimPendingOperator.value = "";
         vimInputMode.value = "normal";
         view.focus();
         return true;

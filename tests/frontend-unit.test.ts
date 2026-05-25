@@ -2777,6 +2777,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('v-model="store.editorKeymapMode"'));
   ok(app.includes("emacsStyleKeymap"));
   ok(app.includes("handleVimNormalKey"));
+  ok(app.includes("vimPendingOperator"));
+  ok(app.includes("vimDeleteCurrentLine"));
+  ok(app.includes("vimMoveWordForward"));
+  ok(app.includes("vimMoveWordBackward"));
+  ok(app.includes("vimMoveWordEnd"));
   ok(app.includes("Vim-style mode starts in insert mode"));
   ok(types.includes("savedText?: string"));
   ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
@@ -3499,6 +3504,8 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow edited with Emacs-style line commands"));
   ok(app.includes("native workflow applied Vim keybinding mode"));
   ok(app.includes("native workflow edited with Vim normal insert and append"));
+  ok(app.includes("vimPendingOperator"));
+  ok(app.includes("vimDeleteCurrentLine"));
   ok(app.includes("collectNativeOutlineNavigationEvidence"));
   ok(app.includes("native workflow navigated outline heading to source"));
   ok(app.includes("collectNativeDiagnosticNavigationEvidence"));

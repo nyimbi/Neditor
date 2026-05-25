@@ -3097,6 +3097,15 @@ Local agent CLI workspace preparation:
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "routes natural language command palette instructions to AI workflow surfaces"` | Pass | Focused Chromium workflow proves command-palette provider routing, switching to the Codex CLI profile, preparing the local-agent workspace, and displaying the `.neditor/agent-handoffs` file path. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after adding local-agent workspace preparation to the Agent Workspace provider flow. |
 
+Editor keybinding parity:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after expanding Vim normal mode with explicit word-start/word-end motion, line-start/line-end insert/append, and `dd` pending-operator deletion. |
+| `pnpm run test:unit` | Pass | 49 frontend unit tests passed, including static guards for the Vim pending operator, word motions, line deletion, and keybinding wiring. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs configurable Emacs and Vim-style editor keybinding modes"` | Pass | Focused Chromium workflow proves Emacs line commands plus Vim normal-mode blocking, insert/append, `I`/`A`, `dd`, `w`, and persisted Vim settings. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after extending Vim normal-mode parity. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
