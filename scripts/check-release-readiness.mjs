@@ -22,6 +22,7 @@ const requiredReports = [
   requiredReport("ai-provider-evidence", ".tmp/ai-provider-evidence/report.json", [], aiProviderEvidenceAccepted),
   requiredReport("ai-runtime-evidence", ".tmp/ai-runtime-evidence/report.json", [], aiRuntimeEvidenceAccepted),
   requiredReport("security-review-evidence", ".tmp/security-review/report.json", [], securityReviewEvidenceAccepted),
+  requiredReport("spec-completion-matrix", ".tmp/spec-completion/report.json", [], specCompletionAccepted),
   requiredReport("release-ci-workflow", ".tmp/release-ci/workflow-report.json", [], releaseCiWorkflowAccepted),
   requiredReport("release-evidence-kit", ".tmp/release-evidence-kit/report.json", [], releaseEvidenceKitAccepted),
   requiredReport("desktop-command-smoke", ".tmp/desktop-smoke/native-command-report.json", [], desktopCommandPassed),
@@ -224,6 +225,16 @@ function collectEvidenceGaps(checks) {
       status: securityReview?.status || "pending-independent-security-review",
       evidence: ".tmp/security-review/report.json",
       detail: "Security controls are implemented locally, but independent security review sign-off with report hashes is still pending.",
+    });
+  }
+
+  const specCompletion = reports["spec-completion-matrix"];
+  if (Number(specCompletion?.summary?.openRows || 0) > 0) {
+    gaps.push({
+      id: "spec-completion-open-items",
+      status: specCompletion?.status || "partial-with-release-risks",
+      evidence: ".tmp/spec-completion/report.json",
+      detail: `${Number(specCompletion?.summary?.openRows || 0)} specification matrix row(s) remain Partial, Unverified, or Missing and must stay visible as release risks until direct evidence closes them.`,
     });
   }
 
@@ -550,6 +561,20 @@ function securityReviewEvidenceAccepted(report) {
       invalid === 0
         ? `securityReview=${report.status || "unknown"} accepted=${Number(report.summary?.acceptedEvidence || 0)}`
         : `invalid security review evidence count=${invalid}`,
+  };
+}
+
+function specCompletionAccepted(report) {
+  const issues = Array.isArray(report.issues) ? report.issues : [];
+  const rowCount = Number(report.summary?.totalRows || 0);
+  const schemaValid = report.schema === "neditor.spec-completion-report.v1";
+  const accepted = schemaValid && issues.length === 0 && rowCount >= 45;
+  return {
+    accepted,
+    status: report.status || "unknown",
+    detail: accepted
+      ? `specRows=${rowCount} open=${Number(report.summary?.openRows || 0)}`
+      : `schema=${schemaValid ? "ok" : "invalid"} rows=${rowCount} issues=${issues.length}`,
   };
 }
 

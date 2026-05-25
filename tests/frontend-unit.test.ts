@@ -2065,6 +2065,7 @@ test("local verification scripts expose local baseline checks", () => {
   const aiProviderCollector = readFileSync("scripts/collect-ai-provider-evidence.mjs", "utf8");
   const aiRuntimeEvidence = readFileSync("scripts/check-ai-runtime-evidence.mjs", "utf8");
   const securityReview = readFileSync("scripts/check-security-review-evidence.mjs", "utf8");
+  const specCompletion = readFileSync("scripts/check-spec-completion-matrix.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
   const googleDocsCollector = readFileSync("scripts/collect-google-docs-import-evidence.mjs", "utf8");
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
@@ -2098,6 +2099,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:release-signing"], "node scripts/check-release-signing.mjs");
   equal(scripts["check:release-readiness"], "node scripts/check-release-readiness.mjs");
   equal(scripts["check:security-review"], "node scripts/check-security-review-evidence.mjs");
+  equal(scripts["check:spec-completion"], "node scripts/check-spec-completion-matrix.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
   equal(scripts["collect:ai-provider"], "node scripts/collect-ai-provider-evidence.mjs");
   equal(scripts["collect:google-docs-import"], "node scripts/collect-google-docs-import-evidence.mjs");
@@ -2129,6 +2131,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"])'));
   ok(verification.includes('command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"])'));
   ok(verification.includes('command("Release signing evidence contract", "pnpm", ["run", "check:release-signing"])'));
+  ok(verification.includes('command("Spec completion matrix contract", "pnpm", ["run", "check:spec-completion"])'));
   ok(verification.includes('command("Release evidence kit generation", "pnpm", ["run", "collect:evidence-kit"])'));
   ok(verification.includes('command("Release evidence kit contract", "pnpm", ["run", "check:evidence-kit"])'));
   ok(verification.includes('command("Release readiness aggregation", "pnpm", ["run", "check:release-readiness"])'));
@@ -2192,6 +2195,15 @@ test("local verification scripts expose local baseline checks", () => {
   ok(securityReview.includes("findings.critical must be 0"));
   ok(securityReview.includes("signoff.approvedForRelease must be true"));
   ok(securityReview.includes("signoff.networkTelemetryAdded must be false"));
+  ok(specCompletion.includes("neditor.spec-completion-report.v1"));
+  ok(specCompletion.includes("partial-with-release-risks"));
+  ok(specCompletion.includes("Current major verification gaps"));
+  ok(specCompletion.includes("Next Matrix Work"));
+  ok(specCompletion.includes("openRows"));
+  ok(specCompletion.includes("Partial"));
+  ok(specCompletion.includes("Unverified"));
+  ok(specCompletion.includes("Missing"));
+  ok(specCompletion.includes("remaining gap is empty or placeholder"));
   ok(performanceProfile.includes("neditor.performance-profile-evidence.v1"));
   ok(performanceProfile.includes("NEDITOR_PERFORMANCE_PROFILE_EVIDENCE_DIR"));
   ok(performanceProfile.includes("NEDITOR_PERFORMANCE_PROFILE_EVIDENCE"));
@@ -2458,6 +2470,10 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("security-review-evidence"));
   ok(script.includes("independent-security-review-signoff"));
   ok(script.includes("securityReviewEvidenceAccepted"));
+  ok(script.includes("spec-completion-matrix"));
+  ok(script.includes("spec-completion-open-items"));
+  ok(script.includes("specCompletionAccepted"));
+  ok(script.includes("neditor.spec-completion-report.v1"));
   ok(script.includes("performance-profile-evidence"));
   ok(script.includes("release-device-native-performance-profile"));
   ok(script.includes("performanceProfileEvidenceAccepted"));

@@ -427,6 +427,12 @@ survive HTML, PDF, DOCX, PPTX, and Markdown bundle exports.
 - [Specification completion matrix](docs/spec-completion-matrix.md): current
   implementation evidence and remaining release risks against the product spec.
 
+`pnpm run check:spec-completion` turns that matrix into an executable release
+contract. It writes `.tmp/spec-completion/report.json`, validates every matrix
+row has a recognized status, direct evidence, and a substantive remaining gap
+when still Partial, Unverified, or Missing, and feeds open rows into release
+readiness as explicit production risks.
+
 ## Developer Quick Start
 
 ```sh
@@ -598,8 +604,8 @@ are missing or failed, and otherwise records remaining external evidence gaps
 such as Windows/Linux package artifacts, Windows/Linux WebDriver execution,
 release signing/notarization, live approved-provider endpoint proof, real Docs
 Live runtime device proof, independent security review sign-off, Google Docs
-live import/readback, optional missing engines, and human reviewer sign-off for
-accessibility or native-viewer export review.
+live import/readback, open specification matrix rows, optional missing engines,
+and human reviewer sign-off for accessibility or native-viewer export review.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
@@ -737,6 +743,9 @@ tracked conservatively in:
 
 Rows in the completion matrix move to complete only when current code, tests,
 workflow evidence, artifacts, and platform checks prove the requirement.
+`pnpm run check:spec-completion` enforces that discipline locally and
+`pnpm run check:release-readiness` keeps any open matrix rows visible in the
+release-readiness report until they are closed by direct evidence.
 
 ## License
 

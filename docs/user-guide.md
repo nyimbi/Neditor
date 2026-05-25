@@ -129,7 +129,8 @@ shows an **AI Control Center** with readiness score, next actions, source
 grounding, governance state, and distribution state so reviewers can see what is
 safe to do next before applying generated text. It also generates a **Release
 Evidence Bundle** covering audit trail, source grounding, review closure,
-approval metadata, provider proof, and distribution artifact requirements. The control center and reviewer
+approval metadata, provider proof, distribution artifact requirements, and
+per-target export or publishing evidence obligations. The control center and reviewer
 agents inspect the current Markdown for unresolved placeholders, citation TODOs,
 candidate claims with line numbers, unreviewed AI provenance markers,
 humanization findings for generic or overconfident phrasing, unresolved
