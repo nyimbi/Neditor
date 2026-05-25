@@ -127,6 +127,9 @@ Ask IT, a release manager, or a technical teammate when you need:
 
 - [User guide](docs/user-guide.md): practical writing, file, export, review,
   and troubleshooting guidance.
+- [AI-first platform roadmap](docs/ai-first-platform-roadmap.md): 50 concrete
+  changes for agentic composition, editing, review, distribution, governance,
+  and verification.
 - [Markdown extensions](docs/markdown-extensions.md): the extra document
   features NEditor understands.
 - [External transform setup](docs/external-transforms.md): optional diagram and

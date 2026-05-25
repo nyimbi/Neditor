@@ -64,6 +64,12 @@ only, or text only to match the density you want.
 
 ## AI-First Workflows
 
+For the full product direction, see the
+[AI-first platform roadmap](ai-first-platform-roadmap.md). It captures 50
+concrete changes across agentic creation, outline-first composition, revision,
+source grounding, review, distribution, provider operations, UI, governance,
+and verification.
+
 Use **Agent** when you know the outcome but not the exact sequence of document
 operations. Describe the goal in ordinary business language, for example:
 
