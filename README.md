@@ -222,7 +222,9 @@ web app.
   approved AI providers or local model gateways without storing secrets in the
   document. If policy allows direct calls, users can run the
   request with a session-only API key, preview the provider's Markdown response,
-  and apply it as review material without persisting the secret.
+  and apply it as review material without persisting the secret; imported
+  provider responses are wrapped in local `ai-source` and `ai-assisted`
+  needs-review provenance before they enter the document.
 - AI Create makes Docs Live the default first step for intent-led drafting,
   so users can begin with the outcome, audience, context, and placeholders
   instead of a blank page.

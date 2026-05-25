@@ -9,7 +9,7 @@ import {
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
 import { inspectAiRuntimeReadiness } from "../src/lib/aiRuntimeReadiness.js";
-import { buildAiProviderRequestPackage, executeAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
+import { buildAiProviderRequestPackage, buildAiProviderResponseReviewMarkdown, executeAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
 import {
   agenticWorkflowPlaybooks,
   buildAgenticLifecycleTaskBrief,
@@ -658,6 +658,25 @@ test("AI provider execution extracts Markdown without persisting secrets", async
   ok(calls[0].init.body.includes("approved-doc-model"));
 });
 
+test("AI provider responses are wrapped as governed review drafts", () => {
+  const reviewDraft = buildAiProviderResponseReviewMarkdown("# Provider Draft\n\nARR grows by 18%.", {
+    profileLabel: "OpenAI-compatible JSON",
+    model: "approved-doc-model",
+    runId: "agent-20260524T100000-demo",
+    generatedAt: "2026-05-24T10:00:00.000Z",
+  });
+
+  ok(reviewDraft.includes("## AI Provider Response Review Draft"));
+  ok(reviewDraft.includes("```ai-source"));
+  ok(reviewDraft.includes("provider: OpenAI-compatible JSON"));
+  ok(reviewDraft.includes("model: approved-doc-model"));
+  ok(reviewDraft.includes("status: needs-review"));
+  ok(reviewDraft.includes("source=NEditor Provider Handoff"));
+  ok(reviewDraft.includes("### Provider Output"));
+  ok(reviewDraft.includes("# Provider Draft"));
+  ok(reviewDraft.includes("### Review Before Use"));
+});
+
 test("preview debounce coalesces edits inside the spec timing budget", () => {
   ok(PREVIEW_DEBOUNCE_MS <= 100);
   const commits: string[] = [];
@@ -1048,6 +1067,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Build provider request"));
   ok(app.includes("Copy provider package"));
   ok(app.includes("Run provider request"));
+  ok(app.includes("buildAiProviderResponseReviewMarkdown"));
+  ok(app.includes("Apply wraps this output in needs-review provenance"));
   ok(app.includes("Session API key"));
   ok(app.includes("executeAiProviderRequestPackage"));
   ok(app.includes('aria-label="AI provider response"'));

@@ -39,6 +39,13 @@ export interface AiProviderExecutionResult {
   rawText: string;
 }
 
+export interface AiProviderResponseReviewOptions {
+  profileLabel?: string;
+  model?: string;
+  runId?: string;
+  generatedAt?: string;
+}
+
 export type AiProviderFetch = (input: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{
   ok: boolean;
   status: number;
@@ -159,6 +166,41 @@ export async function executeAiProviderRequestPackage(
     markdown,
     rawText,
   };
+}
+
+export function buildAiProviderResponseReviewMarkdown(markdown: string, options: AiProviderResponseReviewOptions = {}) {
+  const generatedAt = options.generatedAt || new Date().toISOString();
+  const provider = normalizeField(options.profileLabel, 120) || "Approved AI provider";
+  const model = normalizeField(options.model, 120) || "provider-selected-model";
+  const runId = normalizeField(options.runId, 120);
+  const promptSummary = runId ? `Provider response imported for agent run ${runId}` : "Provider response imported through NEditor Agent Workspace";
+  return [
+    "## AI Provider Response Review Draft",
+    "",
+    "```ai-source",
+    `provider: ${sanitizeMarkerValue(provider)}`,
+    `model: ${sanitizeMarkerValue(model)}`,
+    `date: ${generatedAt}`,
+    `promptSummary: ${sanitizeMarkerValue(promptSummary)}`,
+    "reviewedBy: ",
+    "reviewedAt: ",
+    "status: needs-review",
+    "```",
+    "",
+    `<!-- ai-assisted: status=needs-review | reviewedBy= | reviewedAt= | source=NEditor Provider Handoff | promptSummary=${sanitizeMarkerValue(promptSummary)} -->`,
+    "",
+    "### Provider Output",
+    "",
+    markdown.trim() || "(Provider returned no Markdown body.)",
+    "",
+    "### Review Before Use",
+    "",
+    "- [ ] Confirm the provider output preserved the requested document structure and lifecycle task intent.",
+    "- [ ] Verify every factual claim, number, date, citation, and approval statement against source evidence.",
+    "- [ ] Keep this response marked needs-review until a human accepts the imported content.",
+    "- [ ] Run NEditor review readiness and target export readiness before distribution.",
+    "",
+  ].join("\n");
 }
 
 function buildSystemPrompt(run: AgenticWorkflowRun) {
@@ -404,6 +446,10 @@ function normalizeField(value: string | undefined, limit: number) {
 function normalizeEnvName(value: string | undefined) {
   const normalized = (value || "").trim().replace(/[^A-Z0-9_]/gi, "_").toUpperCase();
   return /^[A-Z][A-Z0-9_]{2,80}$/.test(normalized) ? normalized : "";
+}
+
+function sanitizeMarkerValue(value: string) {
+  return value.replace(/[\r\n`|]/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 240);
 }
 
 function shellEscape(value: string) {

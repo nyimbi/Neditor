@@ -2286,7 +2286,7 @@
               <header>
                 <div>
                   <strong>Provider response</strong>
-                  <span>{{ agentProviderResult.status }} {{ agentProviderResult.statusText }}</span>
+                  <span>{{ agentProviderResult.status }} {{ agentProviderResult.statusText }} | Apply wraps this output in needs-review provenance.</span>
                 </div>
                 <button type="button" @click="applyAgentProviderResponse">Apply response</button>
               </header>
@@ -2488,6 +2488,7 @@ import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnost
 import {
   aiProviderProfiles,
   buildAiProviderRequestPackage,
+  buildAiProviderResponseReviewMarkdown,
   executeAiProviderRequestPackage,
   type AiProviderExecutionResult,
   type AiProviderProfileId,
@@ -4118,7 +4119,12 @@ async function runAgentProviderRequest() {
 }
 function applyAgentProviderResponse() {
   if (!agentProviderResult.value) return;
-  applyAgentMarkdown(agentProviderResult.value.markdown, agentRun.value?.applicationMode || "append-packet");
+  const reviewMarkdown = buildAiProviderResponseReviewMarkdown(agentProviderResult.value.markdown, {
+    profileLabel: agentProviderPackage.value?.profile.label,
+    model: agentProviderPackage.value?.profile.model,
+    runId: agentRun.value?.auditTrail.runId,
+  });
+  applyAgentMarkdown(reviewMarkdown, agentRun.value?.applicationMode || "append-packet");
   if (agentRun.value) recordAgentRunHistory(agentRun.value, "provider-applied", agentProviderPackage.value?.profile.label || "");
   store.statusMessage = "Applied provider response for human review";
   closeAgentWorkspace();

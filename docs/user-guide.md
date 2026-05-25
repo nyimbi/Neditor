@@ -126,8 +126,9 @@ provider secrets into Markdown.
 If policy allows direct execution, enter the API key in **Session API key** and
 choose **Run provider request**. The key is held only in the open dialog, is not
 written to the document, and is cleared when the session ends. Review the
-provider response before using **Apply response**, because the imported text is
-still marked for human review.
+provider response before using **Apply response**. NEditor wraps imported
+provider output in local `ai-source` and `ai-assisted` needs-review provenance,
+so a provider response cannot enter the document as approved final copy.
 
 Use **AI Create** when the next action is clearly to create a first draft. It
 opens Docs Live with an intent-first workflow: document type, outline, spoken or
