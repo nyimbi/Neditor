@@ -2128,11 +2128,30 @@
           <header>
             <div>
               <strong>Workflow Playbooks</strong>
-              <span>Start from a governed document workflow, then edit the instruction as needed.</span>
+              <span>{{ filteredAgenticWorkflowPlaybooks.length }} of {{ agenticWorkflowPlaybooks.length }} governed starts match the current filters.</span>
             </div>
           </header>
+          <section class="agent-playbook-filters" aria-label="Filter agent workflow playbooks">
+            <label>
+              Search
+              <input v-model="agentPlaybookQuery" type="search" placeholder="board, grant, policy, Substack, LaTeX" />
+            </label>
+            <label>
+              Focus
+              <select v-model="agentPlaybookFocusFilter">
+                <option v-for="focus in agentPlaybookFocusOptions" :key="focus.value" :value="focus.value">{{ focus.label }}</option>
+              </select>
+            </label>
+            <label>
+              Output target
+              <select v-model="agentPlaybookTargetFilter">
+                <option v-for="target in agentPlaybookTargetOptions" :key="target.value" :value="target.value">{{ target.label }}</option>
+              </select>
+            </label>
+          </section>
+          <p v-if="!filteredAgenticWorkflowPlaybooks.length" class="sidebar-hint">No playbooks match the current filters.</p>
           <div class="agent-playbook-grid">
-            <article v-for="playbook in agenticWorkflowPlaybooks" :key="playbook.id">
+            <article v-for="playbook in filteredAgenticWorkflowPlaybooks" :key="playbook.id">
               <header>
                 <div>
                   <strong>{{ playbook.label }}</strong>
@@ -2140,6 +2159,9 @@
                 </div>
                 <button type="button" @click="applyAgentWorkflowPlaybook(playbook)">Use</button>
               </header>
+              <p class="agent-playbook-meta">
+                {{ agentPlaybookFocusLabel(playbook) }} | {{ agentPlaybookTargets(playbook).map((target) => target.toUpperCase()).join(", ") || "No fixed export target" }}
+              </p>
               <dl>
                 <div>
                   <dt>Best for</dt>
@@ -3158,6 +3180,9 @@ const agentSourcePackText = ref("");
 const agentSourcePackKind = ref<AgenticSourcePackItemKind>("note");
 const agentSourcePackLabel = ref("");
 const agentSourcePackDetail = ref("");
+const agentPlaybookQuery = ref("");
+const agentPlaybookFocusFilter = ref("all");
+const agentPlaybookTargetFilter = ref<"all" | ExportTarget>("all");
 const agentPlan = ref<AgenticWorkflowPlan | null>(null);
 const agentRun = ref<AgenticWorkflowRun | null>(null);
 const agentLifecycleTaskStates = ref<Record<string, AgentLifecycleTaskState>>({});
@@ -3630,6 +3655,45 @@ const canRunAgentProvider = computed(() => {
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
 });
 const agentSourcePackPreview = computed(() => buildAgenticSourcePack(agentSourcePackText.value));
+const agentPlaybookFocusOptions = [
+  { value: "all", label: "All workflows" },
+  { value: "approval", label: "Approval and governance" },
+  { value: "proposal", label: "Proposals and funding" },
+  { value: "operations", label: "Operations and policy" },
+  { value: "strategy", label: "Strategy and research" },
+  { value: "technical", label: "Technical and LaTeX" },
+  { value: "publishing", label: "Publishing and release" },
+  { value: "revision", label: "Revision and polishing" },
+] as const;
+const agentPlaybookTargetOptions: Array<{ value: "all" | ExportTarget; label: string }> = [
+  { value: "all", label: "All output targets" },
+  { value: "pdf", label: "PDF" },
+  { value: "docx", label: "DOCX" },
+  { value: "html", label: "HTML" },
+  { value: "blog", label: "Blog" },
+  { value: "substack", label: "Substack" },
+  { value: "latex", label: "LaTeX" },
+  { value: "google-docs", label: "Google Docs" },
+];
+const filteredAgenticWorkflowPlaybooks = computed(() => {
+  const query = agentPlaybookQuery.value.trim().toLowerCase();
+  return agenticWorkflowPlaybooks.filter((playbook) => {
+    const targetMatches = agentPlaybookTargetFilter.value === "all" || agentPlaybookTargets(playbook).includes(agentPlaybookTargetFilter.value);
+    const focusMatches = agentPlaybookFocusFilter.value === "all" || agentPlaybookFocus(playbook) === agentPlaybookFocusFilter.value;
+    const searchable = [
+      playbook.label,
+      playbook.summary,
+      playbook.instruction,
+      agentPlaybookFocusLabel(playbook),
+      ...playbook.bestFor,
+      ...playbook.expectedOutputs,
+      ...agentPlaybookTargets(playbook),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return targetMatches && focusMatches && (!query || searchable.includes(query));
+  });
+});
 const agentProviderSourcePackMarkdown = computed(() =>
   agentProviderPackage.value ? formatAiProviderSourcePack(agentProviderPackage.value.sourcePack) : "",
 );
@@ -4088,7 +4152,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
     summary: "Start complex document work from reusable AI playbooks, then generate governed packets with reviewers, section work queues, and export runbooks.",
     when: "Use this when the document needs more than one step, such as creation plus revision, evidence review, approval, provider handoff, and distribution.",
     steps: [
-      "Open Agent Workspace and choose a playbook such as Board Memo To Approval, Client Proposal Package, SOP From Outline, Technical Paper With LaTeX, Publish To Blog And Substack, or Executive Revision Pass.",
+      "Open Agent Workspace and filter playbooks by focus or output target so business users can find board, proposal, SOP, technical, publishing, strategy, policy, release-notes, grant, or executive revision workflows.",
       "Edit the generated instruction so it names the audience, owner, deadline, evidence, reviewer, and target delivery channels.",
       "Plan the workflow to inspect lanes, missing inputs, placeholders, outline, and next actions.",
       "Generate the agent packet, then review the AI Control Center, reviewer agents, section work queue, audit trail, and distribution runbooks before applying or sending to a provider.",
@@ -4103,8 +4167,10 @@ const helpTopics = computed<HelpTopic[]>(() => [
       { label: "Open Agent Workspace", run: () => openAgentWorkspace() },
       { label: "Board memo playbook", run: () => openAgentWorkspace(agenticWorkflowPlaybooks[0]?.instruction || "") },
       { label: "Publishing playbook", run: () => openAgentWorkspace(agenticWorkflowPlaybooks.find((playbook) => playbook.id === "publish-to-blog-and-substack")?.instruction || "") },
+      { label: "Policy playbook", run: () => openAgentWorkspace(agenticWorkflowPlaybooks.find((playbook) => playbook.id === "policy-to-approval")?.instruction || "") },
+      { label: "Grant playbook", run: () => openAgentWorkspace(agenticWorkflowPlaybooks.find((playbook) => playbook.id === "grant-application-review")?.instruction || "") },
     ],
-    keywords: ["agent", "playbook", "workflow", "board memo", "proposal", "SOP", "substack", "provider"],
+    keywords: ["agent", "playbook", "workflow", "board memo", "proposal", "SOP", "substack", "policy", "grant", "strategy", "release notes", "provider"],
   },
   {
     id: "agent-lifecycle-governance",
@@ -4478,9 +4544,9 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
     title: "Run a workflow playbook",
     mode: "Agent Workspace",
     summary: "Start common business workflows from reusable agent instructions.",
-    detail: "Agent Workspace playbooks turn board approvals, proposals, SOPs, technical papers, publishing packages, and executive revision passes into editable governed workflows.",
+    detail: "Agent Workspace playbooks turn board approvals, proposals, SOPs, strategy memos, policies, release notes, grant applications, technical papers, publishing packages, and executive revision passes into editable governed workflows.",
     points: [
-      "Choose a playbook and adjust the instruction for the current document.",
+      "Filter playbooks by focus, output target, or search term, then adjust the instruction for the current document.",
       "Inspect missing inputs, reviewer agents, and section work queue before applying output.",
       "Build a provider package when an approved model should continue the workflow.",
     ],
@@ -4745,6 +4811,41 @@ function applyAgentWorkflowPlaybook(playbook: AgenticWorkflowPlaybook) {
   agentContextAnswers.value = "";
   buildAgentWorkspacePlan();
   store.statusMessage = `Loaded ${playbook.label} playbook`;
+}
+function agentPlaybookTargets(playbook: AgenticWorkflowPlaybook): ExportTarget[] {
+  const text = [playbook.instruction, playbook.summary, ...playbook.expectedOutputs].join(" ").toLowerCase();
+  const targets: ExportTarget[] = [];
+  const patterns: Array<[ExportTarget, RegExp]> = [
+    ["pdf", /\bpdf\b/],
+    ["docx", /\bdocx|word\b/],
+    ["html", /\bhtml|web\b/],
+    ["blog", /\bblog\b/],
+    ["substack", /\bsubstack|newsletter\b/],
+    ["latex", /\blatex|tex\b/],
+    ["google-docs", /\bgoogle docs?\b/],
+    ["pptx", /\bpptx|slides?|deck\b/],
+    ["markdown-bundle", /\bmarkdown bundle|source package\b/],
+  ];
+  for (const [target, pattern] of patterns) {
+    if (pattern.test(text)) targets.push(target);
+  }
+  return targets;
+}
+function agentPlaybookFocus(playbook: AgenticWorkflowPlaybook) {
+  const text = [playbook.id, playbook.label, playbook.summary, playbook.instruction, ...playbook.bestFor, ...playbook.expectedOutputs]
+    .join(" ")
+    .toLowerCase();
+  if (/\b(substack|blog|publish|release notes|announcement|newsletter)\b/.test(text)) return "publishing";
+  if (/\b(technical|latex|research|architecture|academic|paper)\b/.test(text)) return "technical";
+  if (/\b(strategy|market|portfolio|research notes)\b/.test(text)) return "strategy";
+  if (/\b(policy|sop|operating procedure|control|compliance|governance)\b/.test(text)) return "operations";
+  if (/\b(proposal|grant|funding|client|statement of work)\b/.test(text)) return "proposal";
+  if (/\b(revision|revise|rewrite|executive audience|humanization)\b/.test(text)) return "revision";
+  if (/\b(approval|board|decision|risk|sign-off)\b/.test(text)) return "approval";
+  return "approval";
+}
+function agentPlaybookFocusLabel(playbook: AgenticWorkflowPlaybook) {
+  return agentPlaybookFocusOptions.find((option) => option.value === agentPlaybookFocus(playbook))?.label || "Workflow";
 }
 function syncAgentProviderProfile() {
   const profile = aiProviderProfiles.find((item) => item.id === agentProviderId.value) || aiProviderProfiles[0];
@@ -11916,6 +12017,13 @@ select:hover {
   font-size: 12px;
 }
 
+.agent-playbook-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.55fr) minmax(150px, 0.55fr);
+  gap: 8px;
+  align-items: end;
+}
+
 .agent-playbook-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -11944,6 +12052,14 @@ select:hover {
 .agent-playbook-grid header span {
   color: #526171;
   font-size: 12px;
+}
+
+.agent-playbook-meta {
+  margin: 0;
+  color: #526171;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .agent-playbook-grid dl {
@@ -14072,6 +14188,10 @@ select:hover {
 
   .docs-live-placeholder-add,
   .docs-live-placeholder-grid [role="row"] {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-playbook-filters {
     grid-template-columns: 1fr;
   }
 
