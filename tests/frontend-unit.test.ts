@@ -87,6 +87,7 @@ import {
   normalizeDocsLiveDraftHistory,
   WORKSPACE_SCHEMA_VERSION,
 } from "../src/lib/workspacePersistence.js";
+import { nextVimWordStart, previousVimWordStart, vimWordEnd } from "../src/lib/vimKeybindings.js";
 import {
   appendConflictMergeLine,
   appendConflictMergePart,
@@ -332,6 +333,18 @@ test("markdown list continuation handles tasks numbers and blockquotes", () => {
   deepEqual(markdownListContinuation("  - "), { kind: "exit", fromColumn: 0, replacement: "  " });
   deepEqual(markdownListContinuation("> - [ ] "), { kind: "exit", fromColumn: 2, replacement: "" });
   equal(markdownListContinuation("plain paragraph"), null);
+});
+
+test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
+  const text = "word alpha beta";
+  equal(nextVimWordStart(text, 0), 5);
+  equal(nextVimWordStart(text, 4), 5);
+  equal(nextVimWordStart(text, 5), 11);
+  equal(vimWordEnd(text, 0), 3);
+  equal(vimWordEnd(text, 4), 9);
+  equal(previousVimWordStart(text, text.length), 11);
+  equal(previousVimWordStart(text, 10), 5);
+  equal(previousVimWordStart(text, 5), 0);
 });
 
 test("editable outline planner creates document skeletons before drafting content", () => {
@@ -2138,6 +2151,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const businessDocs = readFileSync("src/lib/businessDocuments.ts", "utf8");
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
   const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
+  const vimKeybindings = readFileSync("src/lib/vimKeybindings.ts", "utf8");
 
   ok(app.includes(':data-toolbar-display="store.toolbarDisplay"'));
   ok(app.includes(':style="appShellStyle"'));
@@ -2778,10 +2792,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("emacsStyleKeymap"));
   ok(app.includes("handleVimNormalKey"));
   ok(app.includes("vimPendingOperator"));
-  ok(app.includes("vimDeleteCurrentLine"));
-  ok(app.includes("vimMoveWordForward"));
-  ok(app.includes("vimMoveWordBackward"));
-  ok(app.includes("vimMoveWordEnd"));
+  ok(vimKeybindings.includes("vimDeleteCurrentLine"));
+  ok(vimKeybindings.includes("vimMoveWordForward"));
+  ok(vimKeybindings.includes("vimMoveWordBackward"));
+  ok(vimKeybindings.includes("vimMoveWordEnd"));
   ok(app.includes("Vim-style mode starts in insert mode"));
   ok(types.includes("savedText?: string"));
   ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
@@ -3430,6 +3444,7 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
 
 test("desktop launch smoke records native UI workbench surfaces", () => {
   const app = readFileSync("src/App.vue", "utf8");
+  const vimKeybindings = readFileSync("src/lib/vimKeybindings.ts", "utf8");
   const rust = readFileSync("src-tauri/src/lib.rs", "utf8");
   const smoke = readFileSync("scripts/check-desktop-smoke.mjs", "utf8");
 
@@ -3505,7 +3520,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow applied Vim keybinding mode"));
   ok(app.includes("native workflow edited with Vim normal insert and append"));
   ok(app.includes("vimPendingOperator"));
-  ok(app.includes("vimDeleteCurrentLine"));
+  ok(vimKeybindings.includes("vimDeleteCurrentLine"));
   ok(app.includes("collectNativeOutlineNavigationEvidence"));
   ok(app.includes("native workflow navigated outline heading to source"));
   ok(app.includes("collectNativeDiagnosticNavigationEvidence"));

@@ -3106,6 +3106,15 @@ Editor keybinding parity:
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs configurable Emacs and Vim-style editor keybinding modes"` | Pass | Focused Chromium workflow proves Emacs line commands plus Vim normal-mode blocking, insert/append, `I`/`A`, `dd`, `w`, and persisted Vim settings. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after extending Vim normal-mode parity. |
 
+Frontend architecture modularization:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after moving Vim normal-mode command handling and word-motion helpers from `src/App.vue` into `src/lib/vimKeybindings.ts`. |
+| `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including direct coverage for pure Vim word-start/word-end helper semantics and static wiring guards for the extracted module. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs configurable Emacs and Vim-style editor keybinding modes"` | Pass | Focused Chromium workflow re-proved the extracted keybinding module through the real editor UI. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after extracting the Vim keybinding module. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
