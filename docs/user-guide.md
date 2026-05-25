@@ -565,6 +565,11 @@ boundaries.
   Use the conflict workflow instead of forcing an overwrite.
 - If an external transform is disabled, configure the executable path, probe
   it, and trust the engine explicitly.
+- If an external transform fails differently by platform, open Help and search
+  for "external transform troubleshooting". The in-app guide covers macOS
+  quarantine/executable permissions, Windows `.exe` paths and package-manager
+  shims, Linux executable bits/package paths, PlantUML file mode, timeouts,
+  empty output, disabled trust, and stale cache evidence.
 - If an export is blocked, open export readiness and fix errors before writing
   the artifact.
 - If Playwright browser workflows cannot run locally, install the browser

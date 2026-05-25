@@ -1389,6 +1389,9 @@ Finish:
   disabled engine paths.
 - Preserve diagnostics for missing executable, non-executable path, timeout,
   bad syntax, sidecar not produced, output limit, and stderr warnings.
+- In-app Help now includes an External transform troubleshooting topic with
+  macOS, Windows, and Linux path/permission guidance plus actions for Engine
+  settings, Diagnostics, Templates, and Export readiness.
 - Keep `docs/external-transform-platform-evidence.md` current when optional
   engines are installed, upgraded, or verified on another platform.
 

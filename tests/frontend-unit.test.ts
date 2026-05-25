@@ -1990,6 +1990,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Help Center"));
   ok(app.includes('aria-label="Help center"'));
   ok(app.includes("filteredHelpTopics"));
+  ok(app.includes("External transform troubleshooting"));
+  ok(app.includes("full `.exe` path instead of an ambiguous package-manager shim on Windows"));
+  ok(app.includes("permission, timeout, empty-output, disabled-trust, stale-cache"));
   ok(app.includes("isEditableShortcutTarget"));
   ok(app.includes("setWorkbenchDestination"));
   ok(app.includes('openHelp("keyboard-shortcuts")'));

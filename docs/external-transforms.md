@@ -115,10 +115,16 @@ If an engine is installed through a package manager shim, verify that the shim w
 
 ## Troubleshooting
 
-- If an engine reports permission errors, verify the file is executable and not quarantined.
+- In the app, open Help and search for "external transform troubleshooting" for
+  the guided UI workflow that routes to Engine settings, Diagnostics, Templates,
+  and Export readiness.
+- If an engine reports permission errors, verify the file is executable and not quarantined. On macOS, only remove quarantine from a trusted installed tool. On Linux, confirm the executable bit and package path. On Windows, prefer the full `.exe` path over package-manager shims when diagnostics are ambiguous.
 - If output is empty, increase diagnostics by running the same executable manually with a tiny sample.
-- If execution times out, reduce diagram complexity before increasing the timeout.
+- If execution times out, reduce diagram complexity before increasing the timeout. Increase timeouts only for trusted engines and rerun Probe after changing timeout or path settings.
 - If trust is disabled, NEditor will not execute the engine and will use native fallback behavior where available.
 - If cache output appears stale, change the source or engine path. NEditor also
   invalidates cached external output when the executable at the trusted path
   changes size or modified time.
+- If PlantUML behaves differently from other engines, keep it in file mode;
+  Graphviz and D2 normally use stdin, while Pikchr can use native fallback for
+  simple business diagrams.

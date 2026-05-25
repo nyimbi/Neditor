@@ -1698,6 +1698,21 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await expect(page.getByLabel("Selected help topic")).toContainText("50 product changes");
   await expect(page.getByLabel("Selected help topic")).toContainText("release evidence bundles");
 
+  await page.getByLabel("Search help").fill("cache stale windows");
+  await expect(page.getByRole("button", { name: /External transform troubleshooting/ })).toBeVisible();
+  await page.getByRole("button", { name: /External transform troubleshooting/ }).click();
+  await expect(page.getByLabel("Selected help topic")).toContainText("If permission is denied");
+  await expect(page.getByLabel("Selected help topic")).toContainText("output is empty or stale");
+  await expect(page.getByLabel("Selected help topic")).toContainText("full `.exe` path");
+  await expect(page.getByLabel("Selected help topic")).toContainText("PlantUML usually works best in file mode");
+
+  await page.getByRole("button", { name: "Engine settings" }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("settings");
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Settings" })).toBeVisible();
+
+  await page.locator(".command-bar").getByRole("button", { name: "Help" }).click();
+  await page.getByLabel("Search help").fill("substack");
+  await page.getByRole("button", { name: /Export and publishing/ }).click();
   await page.getByRole("button", { name: "Export panel" }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
   await expect(page.locator(".sidebar").getByRole("heading", { name: "Export" })).toBeVisible();

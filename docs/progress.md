@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Help now includes an External transform troubleshooting topic for Graphviz,
+  D2, Pikchr, PlantUML, and executable transform failures, including
+  platform-specific path/permission guidance, timeout/empty-output/trust/cache
+  recovery steps, and direct routing to Engine settings, Diagnostics,
+  Templates, and Export readiness.
 - The Review sidebar now has browser workflow proof for adding unresolved
   review comments, adding change notes, updating the semantic review summary,
   inserting audit markers into Markdown, and resolving comments from the UI.
