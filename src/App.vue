@@ -9219,6 +9219,38 @@ async function collectNativeEditorErgonomicsEvidence(record: (name: string, pass
       JSON.stringify(evidence.settings),
     );
 
+    const beforeFold = document.querySelectorAll(".cm-foldPlaceholder").length;
+    if (editorView) {
+      foldAll(editorView);
+    }
+    await waitForNativeWorkflowCondition(() => document.querySelectorAll(".cm-foldPlaceholder").length > 0, 1200);
+    const foldedPlaceholderCount = document.querySelectorAll(".cm-foldPlaceholder").length;
+    const foldedText = document.querySelector(".cm-content")?.textContent?.replace(/\s+/g, " ").trim() || "";
+    if (editorView) {
+      unfoldAll(editorView);
+    }
+    await waitForNativeWorkflowCondition(() => document.querySelectorAll(".cm-foldPlaceholder").length === 0, 1200);
+    const afterUnfold = document.querySelectorAll(".cm-foldPlaceholder").length;
+    const unfoldedText = document.querySelector(".cm-content")?.textContent?.replace(/\s+/g, " ").trim() || "";
+    evidence.foldState = {
+      beforeFold,
+      foldedPlaceholderCount,
+      afterUnfold,
+      foldedTextIncludesPlaceholder: foldedText.includes("folded"),
+      unfoldedTextIncludesMetrics: unfoldedText.includes("Metrics") && unfoldedText.includes("First item"),
+    };
+    record(
+      "native workflow folded and unfolded markdown visual state",
+      Boolean(
+        beforeFold === 0 &&
+          foldedPlaceholderCount > 0 &&
+          afterUnfold === 0 &&
+          (evidence.foldState as { foldedTextIncludesPlaceholder: boolean }).foldedTextIncludesPlaceholder &&
+          (evidence.foldState as { unfoldedTextIncludesMetrics: boolean }).unfoldedTextIncludesMetrics,
+      ),
+      JSON.stringify(evidence.foldState),
+    );
+
     runEditorCommand(openSearchPanel);
     await nextTick();
     const searchPanel = document.querySelector(".cm-search");

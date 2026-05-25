@@ -3033,6 +3033,17 @@ Native diagnostic and preview source-map proof:
 | `pnpm run test:tauri-webdriver` | Pass | macOS WebDriver remains an official skip, and the script refreshed the native launch fallback proof against the current smoke artifacts. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after the native fallback refresh. |
 
+Native fold visual-state proof:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding native fold placeholder evidence to the editor ergonomics smoke. |
+| `pnpm run test:unit` | Pass | 47 frontend unit tests passed, including static guards for the new fold visual-state assertion and validator coverage. |
+| `pnpm run build` | Pass | Production Vite build passed after threading fold visual-state evidence through the app-authored smoke. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Release-profile Tauri binary rebuilt with the updated smoke path. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | App-authored launched-webview smoke passed with 103 assertions. The report records `editorErgonomicsEvidence.foldState` with `beforeFold: 0`, `foldedPlaceholderCount: 2`, `afterUnfold: 0`, placeholder text visible while folded, and restored Metrics/list text after unfold. |
+| `pnpm run test:tauri-webdriver` | Pass | macOS WebDriver remains an official skip, and the script refreshed the native launch fallback proof against the current smoke artifacts. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

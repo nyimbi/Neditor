@@ -457,6 +457,7 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow reported editor word statistics",
     "native workflow exposed spellcheck editor attributes",
     "native workflow rendered line numbers word wrap and folding gutter",
+    "native workflow folded and unfolded markdown visual state",
     "native workflow opened editor search panel",
     "native workflow replaced editor search target",
     "native workflow continued markdown list in editor",
@@ -658,6 +659,11 @@ function validateNativeWorkflowReport(launchReport) {
     !String(editorErgonomicsEvidence.settings?.ariaLabel || "").includes("Markdown") ||
     !String(editorErgonomicsEvidence.settings?.wordStats || "").includes("words") ||
     !String(editorErgonomicsEvidence.settings?.wordStats || "").includes("characters") ||
+    Number(editorErgonomicsEvidence.foldState?.beforeFold || 0) !== 0 ||
+    Number(editorErgonomicsEvidence.foldState?.foldedPlaceholderCount || 0) < 1 ||
+    Number(editorErgonomicsEvidence.foldState?.afterUnfold || 0) !== 0 ||
+    editorErgonomicsEvidence.foldState?.foldedTextIncludesPlaceholder !== true ||
+    editorErgonomicsEvidence.foldState?.unfoldedTextIncludesMetrics !== true ||
     editorErgonomicsEvidence.searchReplace?.searchPanelOpen !== true ||
     editorErgonomicsEvidence.searchReplace?.containsReplacement !== true ||
     editorErgonomicsEvidence.searchReplace?.containsOriginal !== false ||

@@ -3295,6 +3295,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow reported editor word statistics"));
   ok(app.includes("native workflow exposed spellcheck editor attributes"));
   ok(app.includes("native workflow rendered line numbers word wrap and folding gutter"));
+  ok(app.includes("native workflow folded and unfolded markdown visual state"));
   ok(app.includes("native workflow opened editor search panel"));
   ok(app.includes("native workflow replaced editor search target"));
   ok(app.includes("native workflow opened Docs Live from native writing tools menu"));
@@ -3321,6 +3322,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow jumped preview table artifact to source"));
   ok(app.includes("native workflow jumped preview equation artifact to source"));
   ok(smoke.includes("native workflow report did not include editor ergonomics evidence"));
+  ok(smoke.includes("foldedPlaceholderCount"));
   ok(smoke.includes("native workflow report did not include split source pane evidence"));
   ok(smoke.includes("native workflow report did not include editor keybinding evidence"));
   ok(smoke.includes("native workflow report did not include outline navigation evidence"));
