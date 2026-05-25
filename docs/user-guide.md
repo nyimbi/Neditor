@@ -99,7 +99,8 @@ The same packet includes a **Lifecycle Task Board** that turns the whole
 document workflow into owned tasks across creation, composition, editing,
 revision, review, and distribution. Use **Run task** when a task should route
 you to Docs Live, Outline, AI Paste, Review, or Export readiness from the
-agent's plan.
+agent's plan. Use **Insert brief** or **Copy brief** when a task should become a
+durable Markdown work order for a reviewer, writer, or distribution owner.
 The packet also includes an
 **Agent Audit Trail** with run ID, deterministic fingerprints for instruction,
 context, source, and output payloads, rollback guidance, and review events.

@@ -10,7 +10,13 @@ import {
 } from "../src/lib/asyncGuards.js";
 import { inspectAiRuntimeReadiness } from "../src/lib/aiRuntimeReadiness.js";
 import { buildAiProviderRequestPackage, executeAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
-import { agenticWorkflowPlaybooks, buildAgenticSectionWorkBrief, buildAgenticWorkflowPlan, buildAgenticWorkflowRun } from "../src/lib/agenticWorkflows.js";
+import {
+  agenticWorkflowPlaybooks,
+  buildAgenticLifecycleTaskBrief,
+  buildAgenticSectionWorkBrief,
+  buildAgenticWorkflowPlan,
+  buildAgenticWorkflowRun,
+} from "../src/lib/agenticWorkflows.js";
 import {
   bibliographyEntryStub,
   bibliographyStubsForMissingKeys,
@@ -550,6 +556,10 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(sectionBrief.includes("### Drafting Instruction"));
   ok(sectionBrief.includes("### Completion Criteria"));
   ok(sectionBrief.includes("### Assigned Reviewers"));
+  const taskBrief = buildAgenticLifecycleTaskBrief(run.lifecycleTasks.find((task) => task.sectionId) || run.lifecycleTasks[0]);
+  ok(taskBrief.includes("```ai-lifecycle-task"));
+  ok(taskBrief.includes("### Evidence Checklist"));
+  ok(taskBrief.includes("### Handoff Notes"));
   ok(run.distributionChecklist.some((item) => item.startsWith("Substack newsletter package:")));
   ok(run.reviewChecklist.some((item) => item.includes("human-reviewed")));
 });
@@ -999,6 +1009,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent lifecycle task board"'));
   ok(app.includes("agentRun.lifecycleTasks"));
   ok(app.includes("runAgentLifecycleTask"));
+  ok(app.includes("insertAgentLifecycleTaskBrief"));
+  ok(app.includes("copyAgentLifecycleTaskBrief"));
+  ok(app.includes("buildAgenticLifecycleTaskBrief"));
+  ok(app.includes("Insert brief"));
+  ok(app.includes("Copy brief"));
   ok(app.includes("task.sectionId"));
   ok(app.includes("task.target"));
   ok(app.includes("Lifecycle Task Board"));

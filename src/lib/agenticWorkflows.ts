@@ -393,6 +393,40 @@ export function buildAgenticSectionWorkBrief(section: AgenticSectionWorkItem, re
   ].join("\n");
 }
 
+export function buildAgenticLifecycleTaskBrief(task: AgenticLifecycleTask): string {
+  const metadata = [
+    `id: ${task.id}`,
+    `lane: ${task.lane}`,
+    `owner: ${task.owner}`,
+    `status: ${task.status}`,
+    `action: ${task.action}`,
+    task.sectionId ? `sectionId: ${task.sectionId}` : "",
+    task.target ? `target: ${task.target}` : "",
+  ].filter(Boolean);
+  return [
+    `## ${task.title} Task Brief`,
+    "",
+    "```ai-lifecycle-task",
+    ...metadata,
+    "```",
+    "",
+    "### Next Step",
+    "",
+    task.nextStep,
+    "",
+    "### Evidence Checklist",
+    "",
+    ...task.evidence.map((item) => `- [ ] ${item}`),
+    "",
+    "### Handoff Notes",
+    "",
+    "- [ ] Record who completed the task and when.",
+    "- [ ] Keep unresolved assumptions visible in review notes.",
+    "- [ ] Preserve AI provenance and run identifiers until human approval is complete.",
+    "",
+  ].join("\n");
+}
+
 function detectLanes(corpus: string): AgenticWorkflowLane[] {
   const detected = laneSignals.flatMap(([lane, signal]) => (signal.test(corpus) ? [lane] : []));
   if (!detected.length) return ["create", "review"];

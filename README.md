@@ -206,7 +206,8 @@ web app.
   for readiness score, source grounding, governance
   state, next actions, an agentic lifecycle task board that turns creation,
   composition, editing, revision, review, and distribution into runnable
-  owned tasks, target-specific distribution runbooks, AI provenance,
+  owned tasks with insertable/copyable Markdown task briefs, target-specific
+  distribution runbooks, AI provenance,
   blockers, an Agent Audit Trail with run ID,
   fingerprints, rollback plan, review events, and safe apply behavior for
   replacing a document, replacing selected text, or appending a review packet.

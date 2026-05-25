@@ -2025,7 +2025,11 @@
                     <small>{{ task.lane }} | {{ task.status }} | {{ task.owner }}</small>
                     <strong>{{ task.title }}</strong>
                     <p>{{ task.nextStep }}</p>
-                    <button type="button" @click="runAgentLifecycleTask(task)">Run task</button>
+                    <div class="agent-lifecycle-actions">
+                      <button type="button" @click="runAgentLifecycleTask(task)">Run task</button>
+                      <button type="button" @click="insertAgentLifecycleTaskBrief(task)">Insert brief</button>
+                      <button type="button" @click="copyAgentLifecycleTaskBrief(task)">Copy brief</button>
+                    </div>
                   </div>
                   <ul>
                     <li v-for="item in task.evidence" :key="item">{{ item }}</li>
@@ -2493,6 +2497,7 @@ import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
   agenticWorkflowPlaybooks,
+  buildAgenticLifecycleTaskBrief,
   buildAgenticSectionWorkBrief,
   buildAgenticWorkflowPlan,
   buildAgenticWorkflowRun,
@@ -4222,6 +4227,21 @@ function runAgentLifecycleTask(task: AgenticLifecycleTask) {
     action: task.action,
     status: task.status === "ready" ? "ready" : "needs-input",
   });
+}
+function insertAgentLifecycleTaskBrief(task: AgenticLifecycleTask) {
+  insertBlock(buildAgenticLifecycleTaskBrief(task));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = `Inserted ${task.title} task brief`;
+}
+async function copyAgentLifecycleTaskBrief(task: AgenticLifecycleTask) {
+  const brief = buildAgenticLifecycleTaskBrief(task);
+  try {
+    await navigator.clipboard?.writeText(brief);
+    store.statusMessage = `Copied ${task.title} task brief`;
+  } catch {
+    store.statusMessage = `${task.title} task brief is ready to copy`;
+  }
 }
 function runAgentPlanReview() {
   closeAgentWorkspace();
@@ -11006,7 +11026,14 @@ select:hover {
   font-size: 11px;
 }
 
-.agent-lifecycle-board button {
+.agent-lifecycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.agent-lifecycle-actions button {
   width: fit-content;
   min-height: 28px;
   padding: 4px 8px;
