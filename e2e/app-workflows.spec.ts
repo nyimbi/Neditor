@@ -1077,6 +1077,26 @@ async function installTauriMock(page: Page, stateKey: string) {
         revealedPaths.push(normalizePath(args.path as string));
         return null;
       }
+      if (cmd === "prepare_local_agent_handoff") {
+        const request = args.request as { profile_id: string; prompt_markdown: string; workspace_path?: string | null };
+        const command = request.profile_id === "claude-code-cli" ? "claude" : request.profile_id === "opencode-cli" ? "opencode" : "codex";
+        const label = request.profile_id === "claude-code-cli" ? "Claude Code" : request.profile_id === "opencode-cli" ? "OpenCode" : "Codex";
+        const workspacePath = normalizePath(request.workspace_path || "/workspace");
+        const handoffPath = `${workspacePath}/.neditor/agent-handoffs/neditor-${request.profile_id}-e2e.md`;
+        setFile(handoffPath, request.prompt_markdown);
+        return {
+          profile_id: request.profile_id,
+          label,
+          command,
+          available: true,
+          executable_path: `/usr/local/bin/${command}`,
+          workspace_path: workspacePath,
+          handoff_path: handoffPath,
+          launch_command: [command],
+          instructions: [`Start ${label} from the workspace path below.`],
+          warnings: [],
+        };
+      }
       if (cmd === "compile_document_with_options") {
         const request = args.request as { text: string; file_path?: string | null };
         if (compileDelayMs > 0) await delay(compileDelayMs);
@@ -1793,6 +1813,12 @@ test("routes natural language command palette instructions to AI workflow surfac
   await expect(agent.getByLabel("AI provider handoff")).toBeVisible();
   await expect(agent.getByLabel("AI provider request package")).toContainText("OpenAI-compatible");
   await expect(agent.getByLabel("AI provider request Markdown")).toHaveValue(/Google Docs/);
+
+  await agent.getByLabel("Provider profile").selectOption("codex-cli");
+  await agent.getByRole("button", { name: "Build provider request" }).click();
+  await expect(agent.getByLabel("Local agent handoff")).toContainText("Codex workspace handoff");
+  await agent.getByRole("button", { name: "Prepare local agent workspace" }).click();
+  await expect(agent.getByLabel("Local agent handoff")).toContainText("/workspace/.neditor/agent-handoffs/neditor-codex-cli-e2e.md");
 });
 
 test("turns agent claim inventory findings into citation TODOs", async ({ page }) => {

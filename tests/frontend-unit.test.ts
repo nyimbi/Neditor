@@ -15,6 +15,9 @@ import {
   buildAiProviderResponseReviewMarkdown,
   executeAiProviderRequestPackage,
   formatAiProviderSourcePack,
+  isLocalAgentCliProfile,
+  localAgentCliProfileById,
+  localAgentCliProfiles,
 } from "../src/lib/aiProviderPackages.js";
 import {
   agenticWorkflowPlaybooks,
@@ -1392,8 +1395,12 @@ test("AI provider packages redact secrets and preserve agent governance context"
     equal(cliPackage.profile.endpoint, "");
     equal(cliPackage.profile.authHeader, "");
     ok(cliPackage.markdown.includes("## Local Agent Handoff"));
+    ok(cliPackage.markdown.includes(localAgentCliProfileById(profileId)?.command || ""));
     ok(cliPackage.checklist.some((item) => item.includes("approved provider workspace")));
+    ok(isLocalAgentCliProfile(profileId));
   }
+  equal(localAgentCliProfiles.length, 3);
+  equal(isLocalAgentCliProfile("openai-compatible"), false);
 });
 
 test("AI provider execution extracts Markdown without persisting secrets", async () => {
@@ -2560,6 +2567,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Build provider request"));
   ok(app.includes("Copy provider package"));
   ok(app.includes("Copy source pack"));
+  ok(app.includes("Prepare local agent"));
+  ok(app.includes("prepareLocalAgentHandoff"));
+  ok(app.includes("prepare_local_agent_handoff"));
+  ok(app.includes('aria-label="Local agent handoff"'));
+  ok(app.includes("localAgentHandoffResult"));
   ok(app.includes("copyAgentProviderSourcePack"));
   ok(app.includes("agentProviderSourcePackMarkdown"));
   ok(app.includes('aria-label="AI provider source evidence pack"'));

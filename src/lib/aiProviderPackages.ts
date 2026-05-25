@@ -60,6 +60,13 @@ export interface AiProviderExecutionResult {
   rawText: string;
 }
 
+export interface LocalAgentCliProfile {
+  id: Extract<AiProviderProfileId, "claude-code-cli" | "codex-cli" | "opencode-cli">;
+  command: string;
+  label: string;
+  workspaceHint: string;
+}
+
 export interface AiProviderResponseReviewOptions {
   profileLabel?: string;
   model?: string;
@@ -167,8 +174,37 @@ export const aiProviderProfiles: AiProviderProfile[] = [
   },
 ];
 
+export const localAgentCliProfiles: LocalAgentCliProfile[] = [
+  {
+    id: "claude-code-cli",
+    command: "claude",
+    label: "Claude Code",
+    workspaceHint: "Open Claude Code from the document folder and ask it to work from the prepared handoff file.",
+  },
+  {
+    id: "codex-cli",
+    command: "codex",
+    label: "Codex",
+    workspaceHint: "Open Codex from the document folder and ask it to work from the prepared handoff file.",
+  },
+  {
+    id: "opencode-cli",
+    command: "opencode",
+    label: "OpenCode",
+    workspaceHint: "Open OpenCode from the document folder and ask it to work from the prepared handoff file.",
+  },
+];
+
 export function providerProfileById(id: string | undefined): AiProviderProfile {
   return aiProviderProfiles.find((profile) => profile.id === id) || aiProviderProfiles[0];
+}
+
+export function localAgentCliProfileById(id: string | undefined): LocalAgentCliProfile | undefined {
+  return localAgentCliProfiles.find((profile) => profile.id === id);
+}
+
+export function isLocalAgentCliProfile(id: string | undefined): id is LocalAgentCliProfile["id"] {
+  return Boolean(localAgentCliProfileById(id));
 }
 
 export function buildAiProviderRequestPackage(
@@ -555,6 +591,7 @@ function buildMarkdown(
   curl: string,
   checklist: string[],
 ) {
+  const localAgent = localAgentCliProfileById(profile.id);
   return [
     `# ${profile.label} Request Package`,
     "",
@@ -584,12 +621,12 @@ function buildMarkdown(
     "",
     fencedBlock("json", JSON.stringify(requestBody, null, 2)),
     "",
-    cliHandoffCommand(profile) ? "## Local Agent Handoff" : "",
-    cliHandoffCommand(profile) ? "" : "",
-    cliHandoffCommand(profile) ? "Start the local agent from the document workspace, paste this package, and ask it to return Markdown plus a review note:" : "",
-    cliHandoffCommand(profile) ? "" : "",
-    cliHandoffCommand(profile) ? fencedBlock("bash", cliHandoffCommand(profile)) : "",
-    cliHandoffCommand(profile) ? "" : "",
+    localAgent ? "## Local Agent Handoff" : "",
+    localAgent ? "" : "",
+    localAgent ? `${localAgent.workspaceHint} Return Markdown plus a review note.` : "",
+    localAgent ? "" : "",
+    localAgent ? fencedBlock("bash", localAgent.command) : "",
+    localAgent ? "" : "",
     curl ? "## cURL Starter" : "",
     curl ? "" : "",
     curl ? fencedBlock("bash", curl) : "",
@@ -598,13 +635,6 @@ function buildMarkdown(
     .filter((line, index, lines) => line || lines[index - 1] !== "")
     .join("\n")
     .trimEnd() + "\n";
-}
-
-function cliHandoffCommand(profile: AiProviderProfile) {
-  if (profile.id === "claude-code-cli") return "claude";
-  if (profile.id === "codex-cli") return "codex";
-  if (profile.id === "opencode-cli") return "opencode";
-  return "";
 }
 
 function fencedBlock(language: string, value: string) {

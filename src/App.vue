@@ -2873,6 +2873,9 @@
           <button type="button" :disabled="!agentRun" @click="buildAgentProviderPackage">Build provider request</button>
           <button type="button" :disabled="!agentProviderPackage" @click="copyAgentProviderPackage">Copy provider package</button>
           <button type="button" :disabled="!agentProviderPackage" @click="copyAgentProviderSourcePack">Copy source pack</button>
+          <button type="button" :disabled="!canPrepareLocalAgentHandoff" @click="prepareLocalAgentHandoff">
+            {{ localAgentHandoffBusy ? "Preparing agent..." : "Prepare local agent" }}
+          </button>
           <button type="button" :disabled="!canRunAgentProvider" @click="runAgentProviderRequest">
             {{ agentProviderBusy ? "Running provider..." : "Run provider request" }}
           </button>
@@ -3783,6 +3786,40 @@
               </label>
               <textarea :value="agentProviderPackage.markdown" rows="12" readonly aria-label="AI provider request Markdown"></textarea>
             </section>
+            <section v-if="agentProviderPackage && currentLocalAgentProfile" class="agent-provider-output local-agent-handoff" aria-label="Local agent handoff">
+              <header>
+                <div>
+                  <strong>{{ currentLocalAgentProfile.label }} workspace handoff</strong>
+                  <span>{{ currentLocalAgentProfile.workspaceHint }}</span>
+                </div>
+                <button type="button" :disabled="!canPrepareLocalAgentHandoff" @click="prepareLocalAgentHandoff">
+                  {{ localAgentHandoffBusy ? "Preparing..." : "Prepare local agent workspace" }}
+                </button>
+              </header>
+              <dl v-if="localAgentHandoffResult" class="local-agent-handoff-details">
+                <div>
+                  <dt>CLI</dt>
+                  <dd>{{ localAgentHandoffResult.command }} {{ localAgentHandoffResult.available ? "available" : "not found" }}</dd>
+                </div>
+                <div>
+                  <dt>Workspace</dt>
+                  <dd>{{ localAgentHandoffResult.workspace_path }}</dd>
+                </div>
+                <div>
+                  <dt>Handoff file</dt>
+                  <dd>{{ localAgentHandoffResult.handoff_path }}</dd>
+                </div>
+                <div>
+                  <dt>Launch command</dt>
+                  <dd>{{ localAgentHandoffResult.launch_command.join(" ") }}</dd>
+                </div>
+              </dl>
+              <ul v-if="localAgentHandoffResult">
+                <li v-for="item in localAgentHandoffResult.instructions" :key="item">{{ item }}</li>
+                <li v-for="item in localAgentHandoffResult.warnings" :key="item">{{ item }}</li>
+              </ul>
+              <p v-if="localAgentHandoffError" class="field-error">{{ localAgentHandoffError }}</p>
+            </section>
             <section v-if="agentProviderResult" class="agent-provider-output" aria-label="AI provider response">
               <header>
                 <div>
@@ -4076,10 +4113,13 @@ import {
   buildAiProviderResponseReviewMarkdown,
   executeAiProviderRequestPackage,
   formatAiProviderSourcePack,
+  isLocalAgentCliProfile,
+  localAgentCliProfileById,
   type AiProviderExecutionResult,
   type AiProviderProfileId,
   type AiProviderRequestPackage,
   type AiProviderSourcePack,
+  type LocalAgentCliProfile,
 } from "./lib/aiProviderPackages";
 import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
@@ -4236,6 +4276,18 @@ type ImportedRfpSource = {
   extraction_method: string;
   warnings: string[];
 };
+type LocalAgentHandoffResponse = {
+  profile_id: string;
+  label: string;
+  command: string;
+  available: boolean;
+  executable_path?: string | null;
+  workspace_path: string;
+  handoff_path: string;
+  launch_command: string[];
+  instructions: string[];
+  warnings: string[];
+};
 
 declare global {
   interface Window {
@@ -4325,6 +4377,9 @@ const agentProviderPackage = ref<AiProviderRequestPackage | null>(null);
 const agentProviderApiKey = ref("");
 const agentProviderBusy = ref(false);
 const agentProviderResult = ref<AiProviderExecutionResult | null>(null);
+const localAgentHandoffBusy = ref(false);
+const localAgentHandoffResult = ref<LocalAgentHandoffResponse | null>(null);
+const localAgentHandoffError = ref("");
 const agentTaskLaneFilter = ref<"all" | AgenticWorkflowLane>("all");
 const agentTaskStatusFilter = ref<"all" | AgentLifecycleExecutionStatus>("all");
 const agentTaskOwnerFilter = ref("all");
@@ -4908,6 +4963,8 @@ const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
 });
+const currentLocalAgentProfile = computed<LocalAgentCliProfile | undefined>(() => localAgentCliProfileById(agentProviderPackage.value?.profile.id || agentProviderId.value));
+const canPrepareLocalAgentHandoff = computed(() => Boolean(agentProviderPackage.value && currentLocalAgentProfile.value && !localAgentHandoffBusy.value));
 const agentSourcePackPreview = computed(() => buildAgenticSourcePack(agentSourcePackText.value));
 const agentPlaybookFocusOptions = [
   { value: "all", label: "All workflows" },
@@ -6497,6 +6554,8 @@ function syncAgentProviderProfile() {
   agentProviderModel.value = profile.model;
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
+  localAgentHandoffResult.value = null;
+  localAgentHandoffError.value = "";
 }
 function buildAgentWorkspacePlan() {
   flushEditorTextToStore();
@@ -6515,6 +6574,8 @@ function buildAgentWorkspacePlan() {
   agentAutomationTaskStates.value = {};
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
+  localAgentHandoffResult.value = null;
+  localAgentHandoffError.value = "";
   store.statusMessage = `Planned ${agentPlan.value.steps.length} agent workflow steps`;
 }
 function generateAgentWorkspaceRun() {
@@ -6540,6 +6601,8 @@ function generateAgentWorkspaceRun() {
   );
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
+  localAgentHandoffResult.value = null;
+  localAgentHandoffError.value = "";
   recordAgentRunHistory(agentRun.value, "generated");
   store.statusMessage = `Generated agent packet for ${agentRun.value.plan.lanes.length} workflow lanes`;
 }
@@ -6961,7 +7024,32 @@ function buildAgentProviderPackage() {
     agentProviderPackage.value.sourcePack,
   );
   agentProviderResult.value = null;
+  localAgentHandoffResult.value = null;
+  localAgentHandoffError.value = "";
   store.statusMessage = `Built ${agentProviderPackage.value.profile.label} request package`;
+}
+async function prepareLocalAgentHandoff() {
+  if (!agentProviderPackage.value || !isLocalAgentCliProfile(agentProviderPackage.value.profile.id) || localAgentHandoffBusy.value) return;
+  localAgentHandoffBusy.value = true;
+  localAgentHandoffResult.value = null;
+  localAgentHandoffError.value = "";
+  try {
+    localAgentHandoffResult.value = await invoke<LocalAgentHandoffResponse>("prepare_local_agent_handoff", {
+      request: {
+        profile_id: agentProviderPackage.value.profile.id,
+        prompt_markdown: agentProviderPackage.value.markdown,
+        workspace_path: localAgentWorkspacePath(),
+      },
+    });
+    const availability = localAgentHandoffResult.value.available ? "is available" : "was not found on PATH";
+    store.statusMessage = `Prepared ${localAgentHandoffResult.value.label} handoff; ${localAgentHandoffResult.value.command} ${availability}`;
+  } catch (error) {
+    localAgentHandoffError.value = error instanceof Error ? error.message : String(error);
+    store.lastError = localAgentHandoffError.value;
+    store.statusMessage = "Local agent handoff could not be prepared";
+  } finally {
+    localAgentHandoffBusy.value = false;
+  }
 }
 async function runAgentProviderRequest() {
   if (!agentProviderPackage.value || agentProviderBusy.value) return;
@@ -7008,6 +7096,12 @@ async function copyAgentProviderSourcePack() {
   } catch {
     store.statusMessage = "Provider source evidence pack is ready to copy";
   }
+}
+function localAgentWorkspacePath() {
+  const path = active.value.path || "";
+  if (!path.trim()) return "";
+  const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return slash > 0 ? path.slice(0, slash) : path;
 }
 function applyAgentWorkspaceRun() {
   const run = agentRun.value;
@@ -14744,12 +14838,17 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-provider-panel header span,
 .app-shell[data-theme="dark"] .agent-provider-output header span,
 .app-shell[data-theme="dark"] .agent-provider-output ul,
+.app-shell[data-theme="dark"] .local-agent-handoff-details dt,
 .app-shell[data-theme="dark"] .docs-live-runtime header span,
 .app-shell[data-theme="dark"] .docs-live-runtime li,
 .app-shell[data-theme="dark"] .docs-live-workflow header span,
 .app-shell[data-theme="dark"] .docs-live-section-cards span,
 .app-shell[data-theme="dark"] .sidebar-hint {
   color: #aebdcc;
+}
+
+.app-shell[data-theme="dark"] .local-agent-handoff-details dd {
+  color: #e6edf5;
 }
 
 .app-shell[data-theme="dark"] .help-topic-button:hover,
@@ -14922,12 +15021,17 @@ select:hover {
   .app-shell[data-theme="system"] .agent-provider-panel header span,
   .app-shell[data-theme="system"] .agent-provider-output header span,
   .app-shell[data-theme="system"] .agent-provider-output ul,
+  .app-shell[data-theme="system"] .local-agent-handoff-details dt,
   .app-shell[data-theme="system"] .docs-live-runtime header span,
   .app-shell[data-theme="system"] .docs-live-runtime li,
   .app-shell[data-theme="system"] .docs-live-workflow header span,
   .app-shell[data-theme="system"] .docs-live-section-cards span,
   .app-shell[data-theme="system"] .sidebar-hint {
     color: #aebdcc;
+  }
+
+  .app-shell[data-theme="system"] .local-agent-handoff-details dd {
+    color: #e6edf5;
   }
 
   .app-shell[data-theme="system"] .help-topic-button:hover,
@@ -18314,6 +18418,31 @@ select:hover {
   margin: 0;
   padding-left: 18px;
   color: #2d3746;
+  font-size: 12px;
+}
+
+.local-agent-handoff-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.local-agent-handoff-details div {
+  min-width: 0;
+}
+
+.local-agent-handoff-details dt {
+  color: #526171;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.local-agent-handoff-details dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  color: #17202d;
   font-size: 12px;
 }
 

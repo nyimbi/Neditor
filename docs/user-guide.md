@@ -450,6 +450,11 @@ NEditor is built for drafts that need evidence before publication.
   facts where required, and import the response as a review draft. If direct
   execution is allowed, use a session-only key and apply the response only after
   checking the provider output.
+- For Claude Code, Codex, and OpenCode profiles, use **Prepare local agent
+  workspace** to write the governed prompt package under
+  `.neditor/agent-handoffs` in the active document folder. NEditor reports the
+  exact launch command, whether the selected CLI is present on `PATH`, and the
+  handoff file path so the local agent can work from the same project context.
 - Use `ai-source` blocks and AI-assisted section metadata so generated content
   can be marked as needing review or human-reviewed.
 

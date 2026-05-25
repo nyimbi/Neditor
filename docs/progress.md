@@ -3085,6 +3085,18 @@ Equation editor and EPUB export:
 | `cargo check --locked` in `src-tauri` | Pass | Rust command/backend code compiles with the EPUB renderer, native RFP importer, and updated export command target set. |
 | `git diff --check` and `cargo fmt --check` | Pass | No whitespace errors and Rust formatting is clean. |
 
+Local agent CLI workspace preparation:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked local_agent --lib` in `src-tauri` | Pass | Native local-agent tests prove unsupported profiles are rejected, Codex handoff Markdown is written under `.neditor/agent-handoffs`, and executable discovery is resolved through an allowlisted command path. |
+| `cargo check --locked` in `src-tauri` | Pass | The new `prepare_local_agent_handoff` Tauri command compiles with the registered app invoke handler. |
+| `pnpm run check` | Pass | Vue typecheck passed after wiring local-agent handoff state, result rendering, and command invocation. |
+| `pnpm run test:unit` | Pass | 49 frontend unit tests passed, including guards for Claude Code, Codex, OpenCode local-agent profile metadata and the new local-agent workspace UI. |
+| `pnpm run build` | Pass | Production Vite build passed with the local-agent handoff panel and native invoke wiring. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "routes natural language command palette instructions to AI workflow surfaces"` | Pass | Focused Chromium workflow proves command-palette provider routing, switching to the Codex CLI profile, preparing the local-agent workspace, and displaying the `.neditor/agent-handoffs` file path. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after adding local-agent workspace preparation to the Agent Workspace provider flow. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

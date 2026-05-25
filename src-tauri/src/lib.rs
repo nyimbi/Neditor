@@ -28,6 +28,7 @@ mod html_preview;
 mod indexing;
 mod layout;
 mod link_validation;
+mod local_agents;
 mod manifest;
 mod markdown_tables;
 mod paged_document;
@@ -89,6 +90,7 @@ use git::{
 use git_support::run_git;
 #[cfg(test)]
 use git_types::{GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRequest};
+use local_agents::prepare_local_agent_handoff;
 use rfp_import::import_rfp_source;
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
 use tauri::{
@@ -148,6 +150,7 @@ pub fn run() {
             export_document,
             prepare_for_export,
             import_rfp_source,
+            prepare_local_agent_handoff,
             create_snapshot,
             list_snapshots,
             restore_snapshot,
