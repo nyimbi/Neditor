@@ -192,9 +192,12 @@ web app.
   Markdown document skeleton before writing the body text.
 - AI Agent Workspace turns a plain-language instruction into an agentic plan
   across creation, composition, editing, revision, review, and distribution. It
-  identifies lanes, missing inputs, placeholder values, suggested outline,
-  revision intent, export targets, and runnable next steps that route into Docs
-  Live, AI Paste cleanup, Review, or Export readiness. It can also generate a
+  includes one-click workflow playbooks for board approvals, client proposals,
+  SOPs, technical/LaTeX papers, blog/Substack publishing, and executive
+  revision passes, then identifies lanes, missing inputs, placeholder values,
+  suggested outline, revision intent, export targets, and runnable next steps
+  that route into Docs Live, AI Paste cleanup, Review, or Export readiness. It
+  can also generate a
   complete agent packet with a Docs Live draft, selection-aware revision
   proposal, QA gates, named reviewer agents for editorial, evidence, risk,
   citation, governance, and export readiness, a section-by-section work queue

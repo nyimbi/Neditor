@@ -10,7 +10,7 @@ import {
 } from "../src/lib/asyncGuards.js";
 import { inspectAiRuntimeReadiness } from "../src/lib/aiRuntimeReadiness.js";
 import { buildAiProviderRequestPackage, executeAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
-import { buildAgenticWorkflowPlan, buildAgenticWorkflowRun } from "../src/lib/agenticWorkflows.js";
+import { agenticWorkflowPlaybooks, buildAgenticWorkflowPlan, buildAgenticWorkflowRun } from "../src/lib/agenticWorkflows.js";
 import {
   bibliographyEntryStub,
   bibliographyStubsForMissingKeys,
@@ -461,6 +461,27 @@ test("agentic workflow planner coordinates creation revision review and distribu
   ok(plan.steps.some((step) => step.action === "prepare-export"));
 });
 
+test("agentic workflow playbooks cover common business and publishing starts", () => {
+  ok(agenticWorkflowPlaybooks.length >= 6);
+  ok(agenticWorkflowPlaybooks.some((playbook) => playbook.id === "board-memo-to-approval"));
+  ok(agenticWorkflowPlaybooks.some((playbook) => playbook.instruction.includes("Substack")));
+  ok(agenticWorkflowPlaybooks.every((playbook) => playbook.bestFor.length >= 3));
+  ok(agenticWorkflowPlaybooks.every((playbook) => playbook.expectedOutputs.length >= 4));
+
+  const publishingPlan = buildAgenticWorkflowPlan({
+    instruction: agenticWorkflowPlaybooks.find((playbook) => playbook.id === "publish-to-blog-and-substack")?.instruction || "",
+    documentTitle: "Market Note",
+    documentText: "# Market Note\n\nDraft.",
+  });
+
+  ok(publishingPlan.lanes.includes("revise"));
+  ok(publishingPlan.lanes.includes("review"));
+  ok(publishingPlan.lanes.includes("distribute"));
+  ok(publishingPlan.distributionTargets.includes("blog"));
+  ok(publishingPlan.distributionTargets.includes("substack"));
+  ok(publishingPlan.distributionTargets.includes("html"));
+});
+
 test("agentic workflow run generates auditable creation and distribution packets", () => {
   const run = buildAgenticWorkflowRun({
     instruction:
@@ -571,6 +592,8 @@ test("AI provider packages redact secrets and preserve agent governance context"
   equal(providerPackage.redactedHeaders.Authorization, "Bearer ${CLIENT_AI_KEY}");
   ok(providerPackage.systemPrompt.includes("preserve Markdown structure"));
   ok(providerPackage.userPrompt.includes("Capital Allocation Memo"));
+  ok(providerPackage.userPrompt.includes("Reviewer agents:"));
+  ok(providerPackage.userPrompt.includes("Section work queue:"));
   ok(providerPackage.userPrompt.includes("Required response"));
   ok(JSON.stringify(providerPackage.requestBody).includes("approved-doc-model"));
   ok(providerPackage.curl.includes("${CLIENT_AI_KEY}"));
@@ -935,6 +958,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("NEditor Guided Demo"));
   ok(app.includes("guidedDemoSteps"));
   ok(app.includes("AI Agent Workspace"));
+  ok(app.includes('aria-label="Agent workflow playbooks"'));
+  ok(app.includes("agenticWorkflowPlaybooks"));
+  ok(app.includes("applyAgentWorkflowPlaybook"));
+  ok(app.includes("Workflow Playbooks"));
   ok(app.includes("buildAgenticWorkflowPlan"));
   ok(app.includes("buildAgenticWorkflowRun"));
   ok(app.includes("agentPlan"));

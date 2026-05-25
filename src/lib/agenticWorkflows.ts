@@ -43,6 +43,15 @@ export interface AgenticWorkflowPlan {
   steps: AgenticWorkflowStep[];
 }
 
+export interface AgenticWorkflowPlaybook {
+  id: string;
+  label: string;
+  summary: string;
+  instruction: string;
+  bestFor: string[];
+  expectedOutputs: string[];
+}
+
 export interface AgenticWorkflowRunRequest extends AgenticWorkflowRequest {
   generatedAt?: string;
 }
@@ -142,6 +151,63 @@ export interface AgenticSectionWorkItem {
 }
 
 const agentPlannerVersion = "agentic-workflow-v3-control-audit";
+
+export const agenticWorkflowPlaybooks: AgenticWorkflowPlaybook[] = [
+  {
+    id: "board-memo-to-approval",
+    label: "Board Memo To Approval",
+    summary: "Create a decision-ready board memo, identify missing evidence, review risks, and prepare controlled PDF plus Google Docs handoff.",
+    instruction:
+      "Create a board memo for senior decision makers, compose it section by section, check evidence gaps, review risks and approvals, humanize the tone, then prepare PDF and Google Docs distribution.",
+    bestFor: ["Board papers", "executive decisions", "investment approvals"],
+    expectedOutputs: ["Board memo draft", "risk and evidence review", "PDF handoff", "Google Docs collaboration package"],
+  },
+  {
+    id: "proposal-to-client-package",
+    label: "Client Proposal Package",
+    summary: "Turn rough notes into a client-facing proposal with placeholders, proof points, review checks, and DOCX/PDF export readiness.",
+    instruction:
+      "Create a client proposal from the current notes, structure the offer, clarify audience value, add placeholders for client, owner, evidence, pricing, and deadline, review claims and tone, then prepare DOCX and PDF distribution.",
+    bestFor: ["Consulting proposals", "sales documents", "statements of work"],
+    expectedOutputs: ["Proposal draft", "placeholder checklist", "claim review", "DOCX/PDF package"],
+  },
+  {
+    id: "sop-from-outline",
+    label: "SOP From Outline",
+    summary: "Use an outline or rough process notes to build an operating procedure with responsibilities, checks, exceptions, and review gates.",
+    instruction:
+      "Use the current outline to create a standard operating procedure, flesh out each section systematically, add responsibilities, inputs, outputs, exceptions, controls, and review gates, then prepare HTML and Google Docs distribution.",
+    bestFor: ["Operating procedures", "training documents", "policy rollouts"],
+    expectedOutputs: ["Procedure draft", "section work queue", "control checklist", "HTML/Google Docs handoff"],
+  },
+  {
+    id: "technical-paper-with-latex",
+    label: "Technical Paper With LaTeX",
+    summary: "Build a technical or research document with citation discipline, equations, evidence review, and LaTeX export checks.",
+    instruction:
+      "Create a technical paper from the current outline or notes, compose each section, check citations, equations, tables, references, assumptions, and evidence, then prepare LaTeX, PDF, and Google Docs distribution.",
+    bestFor: ["Research notes", "technical architecture", "academic drafts"],
+    expectedOutputs: ["Technical draft", "citation review", "LaTeX export checklist", "PDF/Google Docs package"],
+  },
+  {
+    id: "publish-to-blog-and-substack",
+    label: "Publish To Blog And Substack",
+    summary: "Transform a draft into web and newsletter copy with editorial cleanup, metadata, links, excerpts, and publishing evidence.",
+    instruction:
+      "Revise the current document for web readers, humanize the voice, tighten headings, verify claims and links, create an excerpt, tags, subject line, preview text, and call to action, then prepare blog, Substack, and HTML distribution.",
+    bestFor: ["Thought leadership", "newsletters", "public announcements"],
+    expectedOutputs: ["Web-ready revision", "publishing metadata", "link/citation review", "blog/Substack/HTML packages"],
+  },
+  {
+    id: "executive-revision-pass",
+    label: "Executive Revision Pass",
+    summary: "Rewrite selected text or a whole document for executives, preserving facts while tightening decisions, risks, and next actions.",
+    instruction:
+      "Revise the selected text or current document for an executive audience, make it concise and decision-oriented, preserve verified facts, surface risks and assumptions, add reviewer handoff notes, and prepare export readiness for PDF and DOCX.",
+    bestFor: ["CFO review", "CEO updates", "leadership briefings"],
+    expectedOutputs: ["Selection-aware revision", "risk review", "humanization pass", "PDF/DOCX readiness"],
+  },
+];
 
 const exportSignals: Array<[ExportTarget, RegExp]> = [
   ["html", /\bhtml|website|web page|landing page\b/i],

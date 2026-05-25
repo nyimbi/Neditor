@@ -183,6 +183,12 @@ function buildUserPrompt(run: AgenticWorkflowRun) {
     "",
     `Suggested outline:\n${run.plan.suggestedOutline}`,
     "",
+    `Reviewer agents:\n${run.reviewerAgents.map((agent) => `- ${agent.label} [${agent.status}]: ${agent.mandate}`).join("\n")}`,
+    "",
+    `Section work queue:\n${run.sectionWorkQueue
+      .map((section) => `- ${section.order}. ${section.heading} (${section.lane}; reviewers: ${section.reviewerAgentIds.join(", ")}): ${section.draftingInstruction}`)
+      .join("\n")}`,
+    "",
     run.revision
       ? `Revision proposal to improve:\n${run.revision.proposedText}`
       : `Agent draft packet to improve:\n${run.markdown}`,

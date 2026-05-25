@@ -1868,6 +1868,35 @@
             placeholder="Create a board memo for the executive team, revise it for the CFO, check evidence gaps, and prepare PDF plus Google Docs distribution."
           ></textarea>
         </label>
+        <section class="agent-playbooks" aria-label="Agent workflow playbooks">
+          <header>
+            <div>
+              <strong>Workflow Playbooks</strong>
+              <span>Start from a governed document workflow, then edit the instruction as needed.</span>
+            </div>
+          </header>
+          <div class="agent-playbook-grid">
+            <article v-for="playbook in agenticWorkflowPlaybooks" :key="playbook.id">
+              <header>
+                <div>
+                  <strong>{{ playbook.label }}</strong>
+                  <span>{{ playbook.summary }}</span>
+                </div>
+                <button type="button" @click="applyAgentWorkflowPlaybook(playbook)">Use</button>
+              </header>
+              <dl>
+                <div>
+                  <dt>Best for</dt>
+                  <dd>{{ playbook.bestFor.join(", ") }}</dd>
+                </div>
+                <div>
+                  <dt>Outputs</dt>
+                  <dd>{{ playbook.expectedOutputs.join(", ") }}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </section>
         <div class="agent-workspace-actions">
           <button type="submit">Plan agent workflow</button>
           <button type="button" :disabled="!agentPlan" @click="generateAgentWorkspaceRun">Generate agent packet</button>
@@ -2419,8 +2448,10 @@ import {
 import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
+  agenticWorkflowPlaybooks,
   buildAgenticWorkflowPlan,
   buildAgenticWorkflowRun,
+  type AgenticWorkflowPlaybook,
   type AgenticWorkflowPlan,
   type AgenticWorkflowRun,
   type AgenticWorkflowStep,
@@ -3875,6 +3906,11 @@ function openAgentWorkspace(seedInstruction = "") {
 }
 function closeAgentWorkspace() {
   agentWorkspaceOpen.value = false;
+}
+function applyAgentWorkflowPlaybook(playbook: AgenticWorkflowPlaybook) {
+  agentInstruction.value = playbook.instruction;
+  buildAgentWorkspacePlan();
+  store.statusMessage = `Loaded ${playbook.label} playbook`;
 }
 function syncAgentProviderProfile() {
   const profile = aiProviderProfiles.find((item) => item.id === agentProviderId.value) || aiProviderProfiles[0];
@@ -8667,6 +8703,8 @@ select:hover {
 .app-shell[data-theme="dark"] .help-keywords span,
 .app-shell[data-theme="dark"] .guided-demo-card,
 .app-shell[data-theme="dark"] .guided-demo-steps span,
+.app-shell[data-theme="dark"] .agent-playbooks,
+.app-shell[data-theme="dark"] .agent-playbook-grid article,
 .app-shell[data-theme="dark"] .agent-plan > header,
 .app-shell[data-theme="dark"] .agent-plan-grid article,
 .app-shell[data-theme="dark"] .agent-missing-inputs,
@@ -8707,6 +8745,10 @@ select:hover {
 .app-shell[data-theme="dark"] .guided-demo-modal header p,
 .app-shell[data-theme="dark"] .guided-demo-card small,
 .app-shell[data-theme="dark"] .agent-workspace-modal header p,
+.app-shell[data-theme="dark"] .agent-playbooks > header span,
+.app-shell[data-theme="dark"] .agent-playbook-grid header span,
+.app-shell[data-theme="dark"] .agent-playbook-grid dt,
+.app-shell[data-theme="dark"] .agent-playbook-grid dd,
 .app-shell[data-theme="dark"] .agent-plan > header span,
 .app-shell[data-theme="dark"] .agent-plan > header small,
 .app-shell[data-theme="dark"] .agent-step-list small,
@@ -8782,6 +8824,8 @@ select:hover {
   .app-shell[data-theme="system"] .help-keywords span,
   .app-shell[data-theme="system"] .guided-demo-card,
   .app-shell[data-theme="system"] .guided-demo-steps span,
+  .app-shell[data-theme="system"] .agent-playbooks,
+  .app-shell[data-theme="system"] .agent-playbook-grid article,
   .app-shell[data-theme="system"] .agent-plan > header,
   .app-shell[data-theme="system"] .agent-plan-grid article,
   .app-shell[data-theme="system"] .agent-missing-inputs,
@@ -8822,6 +8866,10 @@ select:hover {
   .app-shell[data-theme="system"] .guided-demo-modal header p,
   .app-shell[data-theme="system"] .guided-demo-card small,
   .app-shell[data-theme="system"] .agent-workspace-modal header p,
+  .app-shell[data-theme="system"] .agent-playbooks > header span,
+  .app-shell[data-theme="system"] .agent-playbook-grid header span,
+  .app-shell[data-theme="system"] .agent-playbook-grid dt,
+  .app-shell[data-theme="system"] .agent-playbook-grid dd,
   .app-shell[data-theme="system"] .agent-plan > header span,
   .app-shell[data-theme="system"] .agent-plan > header small,
   .app-shell[data-theme="system"] .agent-step-list small,
@@ -8882,6 +8930,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .help-keywords span,
 .app-shell[data-high-contrast="true"] .guided-demo-card,
 .app-shell[data-high-contrast="true"] .guided-demo-steps span,
+.app-shell[data-high-contrast="true"] .agent-playbooks,
+.app-shell[data-high-contrast="true"] .agent-playbook-grid article,
 .app-shell[data-high-contrast="true"] .agent-plan > header,
 .app-shell[data-high-contrast="true"] .agent-plan-grid article,
 .app-shell[data-high-contrast="true"] .agent-missing-inputs,
@@ -10336,6 +10386,85 @@ select:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.agent-playbooks {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d8e0e8;
+  border-left: 3px solid #6857a8;
+  background: #fbfaff;
+}
+
+.agent-playbooks > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-playbooks > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-playbooks > header span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-playbook-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-playbook-grid article {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+}
+
+.agent-playbook-grid header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.agent-playbook-grid header div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-playbook-grid header span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-playbook-grid dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.agent-playbook-grid dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-playbook-grid dt {
+  color: #526171;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.agent-playbook-grid dd {
+  margin: 0;
+  color: #2d3746;
+  font-size: 12px;
 }
 
 .agent-plan {
@@ -12067,6 +12196,7 @@ select:hover {
   }
 
   .agent-plan-grid,
+  .agent-playbook-grid,
   .agent-control-grid,
   .agent-reviewer-grid,
   .agent-audit-grid,

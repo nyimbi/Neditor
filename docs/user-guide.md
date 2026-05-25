@@ -67,6 +67,8 @@ operations. Describe the goal in ordinary business language, for example:
 
 The AI Agent Workspace converts that instruction into a visible plan:
 
+- workflow playbooks for board approvals, client proposals, SOPs, technical
+  papers, blog/Substack publishing, and executive revision passes;
 - creation, composition, editing, revision, review, and distribution lanes;
 - missing inputs such as audience, owner, deadline, tone, evidence, reviewer,
   or approval status;
