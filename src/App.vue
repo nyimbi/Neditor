@@ -1379,27 +1379,27 @@
           </label>
           <label>
             Version
-            <input :value="String(active.compile?.metadata.version || '')" @change="setFrontMatterField('version', inputValue($event))" />
+            <input :value="String(active.compile?.metadata.version || '')" @input="setFrontMatterField('version', inputValue($event))" @change="setFrontMatterField('version', inputValue($event))" />
           </label>
           <label>
             Document set
-            <input :value="String(active.compile?.metadata.documentSet || '')" @change="setFrontMatterField('documentSet', inputValue($event))" />
+            <input :value="String(active.compile?.metadata.documentSet || '')" @input="setFrontMatterField('documentSet', inputValue($event))" @change="setFrontMatterField('documentSet', inputValue($event))" />
           </label>
           <label>
             Owner
-            <input :value="String(active.compile?.metadata.owner || '')" @change="setFrontMatterField('owner', inputValue($event))" />
+            <input :value="String(active.compile?.metadata.owner || '')" @input="setFrontMatterField('owner', inputValue($event))" @change="setFrontMatterField('owner', inputValue($event))" />
           </label>
           <label>
             Release target
-            <input :value="String(active.compile?.metadata.releaseTarget || '')" @change="setFrontMatterField('releaseTarget', inputValue($event))" />
+            <input :value="String(active.compile?.metadata.releaseTarget || '')" @input="setFrontMatterField('releaseTarget', inputValue($event))" @change="setFrontMatterField('releaseTarget', inputValue($event))" />
           </label>
           <label>
             Approved by
-            <input :value="String(active.compile?.metadata.approvedBy || '')" @change="setFrontMatterField('approvedBy', inputValue($event))" />
+            <input :value="String(active.compile?.metadata.approvedBy || '')" @input="setFrontMatterField('approvedBy', inputValue($event))" @change="setFrontMatterField('approvedBy', inputValue($event))" />
           </label>
           <label>
             Approved at
-            <input :value="String(active.compile?.metadata.approvedAt || '')" @change="setFrontMatterField('approvedAt', inputValue($event))" />
+            <input :value="String(active.compile?.metadata.approvedAt || '')" @input="setFrontMatterField('approvedAt', inputValue($event))" @change="setFrontMatterField('approvedAt', inputValue($event))" />
           </label>
           <button type="button" @click="setApprovalTimestampNow">Set approval time</button>
           <label>
@@ -1710,6 +1710,7 @@
               min="1"
               max="30000"
               step="250"
+              @input="store.setTransformTimeout(Number(eventValue($event)))"
               @change="store.setTransformTimeout(Number(eventValue($event)))"
             />
           </label>
