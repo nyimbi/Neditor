@@ -2511,6 +2511,15 @@ function buildReleaseEvidenceBundle(input: {
         : "No distribution target is active.",
       Boolean(distributionTargetPlans.length),
     ),
+    ...distributionTargetPlans.map((targetPlan) =>
+      releaseEvidenceItem(
+        `${targetPlan.label} evidence`,
+        "Distribution Agent",
+        "needs-review",
+        `${targetPlan.target} handoff requires ${targetPlan.preflightChecks.length} preflight check(s), ${targetPlan.handoffSteps.length} handoff step(s), and evidence: ${targetPlan.evidenceRequired.join("; ")}.`,
+        true,
+      ),
+    ),
     releaseEvidenceItem(
       "Approval metadata",
       "Governance Agent",

@@ -746,6 +746,14 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Release Evidence Bundle"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent audit trail" && item.status === "available"));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Substack newsletter package evidence" && item.requiredBeforeRelease));
+  ok(
+    run.releaseEvidenceBundle.items.some(
+      (item) =>
+        item.label === "Google Docs collaboration package evidence" &&
+        item.detail.includes("Google Drive import/readback evidence"),
+    ),
+  );
   const releaseAuditPackage = buildAgenticReleaseEvidenceAuditPackage(run);
   ok(releaseAuditPackage.includes("## NEditor Release Evidence Audit Package"));
   ok(releaseAuditPackage.includes("## Release Evidence Bundle"));
@@ -754,6 +762,8 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(releaseAuditPackage.includes("### Target Runbooks"));
   ok(run.markdown.includes("Substack newsletter package"));
   ok(run.markdown.includes("Google Docs collaboration package"));
+  ok(run.markdown.includes("Substack newsletter package evidence"));
+  ok(run.markdown.includes("Google Docs collaboration package evidence"));
   ok(run.auditTrail.runId.startsWith("agent-20260524T10000"));
   equal(run.auditTrail.applicationMode, "replace-document");
   equal(run.auditTrail.instructionFingerprint.length, 16);

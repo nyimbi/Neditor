@@ -234,8 +234,8 @@ web app.
   for coverage, sequencing, duplication, depth, and specificity, deterministic
   humanization findings for generic, repetitive, vague, or overconfident
   language, a release evidence bundle for audit trail, source grounding, review
-  closure, approval metadata, provider proof, and distribution artifact
-  requirements, a
+  closure, approval metadata, provider proof, distribution artifact
+  requirements, and per-target export or publishing evidence obligations, a
   section-by-section work queue with drafting instructions, completion criteria, assigned reviewers, per-section
   work-brief insertion, and focused Docs Live handoff that can replace the
   matching Markdown section instead of appending duplicate section copy, an
