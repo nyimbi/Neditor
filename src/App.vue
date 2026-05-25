@@ -814,6 +814,40 @@
             </label>
             <p class="sidebar-hint">{{ tocManagerSummary }}</p>
           </section>
+          <h3>Local data sources</h3>
+          <section class="reference-manager" aria-label="Local data source manager">
+            <p class="sidebar-hint">{{ dataSourceManagerSummary }}</p>
+            <div class="reference-inline-form">
+              <label>
+                Source name
+                <input v-model="dataSourceNameDraft" placeholder="Revenue, Accounts, Settings" />
+              </label>
+              <label>
+                File path
+                <input v-model="dataSourcePathDraft" placeholder="data/revenue.csv" />
+              </label>
+              <label>
+                Type
+                <select v-model="dataSourceTypeDraft" aria-label="Data source type">
+                  <option v-for="type in dataSourceTypeOptions" :key="type" :value="type">{{ type.toUpperCase() }}</option>
+                </select>
+              </label>
+              <button type="button" :disabled="!dataSourcePathDraft.trim()" @click="addFrontMatterDataSource">Add data source</button>
+            </div>
+            <div class="reference-actions">
+              <button type="button" @click="insertDataSourceTemplate">Insert data source template</button>
+            </div>
+            <article v-for="source in frontMatterDataSourceRows" :key="source.id" class="snapshot-row" :data-status="source.status">
+              <p>{{ source.name || source.path || "Unnamed data source" }}</p>
+              <small>{{ source.kind.toUpperCase() }} | {{ source.status }} | {{ source.source }}{{ source.line ? ` | line ${source.line}` : "" }}</small>
+              <small v-if="source.path">{{ source.path }}</small>
+              <small v-if="source.detail">{{ source.detail }}</small>
+              <div class="reference-actions">
+                <button v-if="source.line" type="button" @click="goToSourceTarget({ line: source.line })">Go to source</button>
+              </div>
+            </article>
+            <p v-if="!frontMatterDataSourceRows.length" class="sidebar-hint">No local CSV, TSV, JSON, or YAML data sources declared in front matter.</p>
+          </section>
           <h3>Captions and Lists</h3>
           <section class="reference-manager" aria-label="Captions and generated lists manager">
             <div class="reference-actions">
@@ -3664,6 +3698,21 @@ interface ReferenceLabelRow {
   source_file?: string | null;
 }
 
+type SupportedDataSourceKind = "csv" | "tsv" | "json" | "yaml";
+type FrontMatterDataSourceKind = SupportedDataSourceKind | string;
+type FrontMatterDataSourceStatus = "ready" | "missing-path" | "unsupported-type" | "blocked-path";
+
+interface FrontMatterDataSourceRow {
+  id: string;
+  name: string;
+  path: string;
+  kind: FrontMatterDataSourceKind;
+  source: string;
+  status: FrontMatterDataSourceStatus;
+  detail: string;
+  line: number;
+}
+
 type HelpCategory = "basics" | "writing" | "structure" | "content" | "review" | "export" | "settings";
 
 interface HelpTopicAction {
@@ -3875,6 +3924,10 @@ const tocNumberedDraft = ref(false);
 const indexSnippet = "[INDEX]\n";
 const indexTermDraft = ref("");
 const indexExcludeDraft = ref("");
+const dataSourceTypeOptions: SupportedDataSourceKind[] = ["csv", "tsv", "json", "yaml"];
+const dataSourceNameDraft = ref("");
+const dataSourcePathDraft = ref("");
+const dataSourceTypeDraft = ref<SupportedDataSourceKind>("csv");
 const bibliographySnippet = "[BIBLIOGRAPHY]\n";
 const bibliographyTemplateSnippet = "```bibtex\n@misc{source2026,\n  title = {Source title},\n  author = {Author},\n  year = {2026}\n}\n```\n";
 const listOfFiguresSnippet = "[LIST_OF_FIGURES]\n";
@@ -4265,6 +4318,13 @@ const tocManagerSummary = computed(() => {
   const depth = frontMatterScalarValue(active.value.text, "tocDepth") || "default";
   const numbered = frontMatterScalarValue(active.value.text, "tocNumbered") || frontMatterScalarValue(active.value.text, "numberedHeadings") || "false";
   return `Front matter TOC: ${tocEnabled || "not set"} | depth: ${depth} | numbered: ${numbered}`;
+});
+const frontMatterDataSourceRows = computed(() => parseFrontMatterDataSources(active.value.text));
+const dataSourceManagerSummary = computed(() => {
+  const rows = frontMatterDataSourceRows.value;
+  const ready = rows.filter((row) => row.status === "ready").length;
+  const blocked = rows.length - ready;
+  return `${rows.length} local data sources | ${ready} ready | ${blocked} need attention`;
 });
 const captionedReferenceItems = computed<CaptionedReferenceItem[]>(() =>
   (active.value.compile?.document_ast.blocks || []).flatMap((block: DocumentBlock) => {
@@ -9424,6 +9484,32 @@ function applyTocSettings() {
   store.statusMessage = `Applied TOC settings: H1-H${depth}, ${tocNumberedDraft.value ? "numbered" : "plain"} entries`;
 }
 
+function insertDataSourceTemplate() {
+  store.updateText(
+    appendFrontMatterDataSource(active.value.text, {
+      name: "Revenue",
+      path: "data/revenue.csv",
+      kind: "csv",
+    }),
+  );
+  store.statusMessage = "Inserted local data source template";
+}
+
+function addFrontMatterDataSource() {
+  const path = dataSourcePathDraft.value.trim();
+  if (!path) return;
+  store.updateText(
+    appendFrontMatterDataSource(active.value.text, {
+      name: dataSourceNameDraft.value.trim() || dataSourceNameFromPath(path),
+      path,
+      kind: dataSourceTypeDraft.value,
+    }),
+  );
+  dataSourceNameDraft.value = "";
+  dataSourcePathDraft.value = "";
+  store.statusMessage = `Added ${dataSourceTypeDraft.value.toUpperCase()} data source`;
+}
+
 function setDocumentStatus(status: string) {
   if (!releaseStatuses.includes(status)) return;
   setFrontMatterField("status", status);
@@ -9448,6 +9534,29 @@ function upsertFrontMatterField(text: string, key: string, value: string) {
     lines[existingIndex] = line;
   } else {
     lines.splice(endIndex, 0, line);
+  }
+  return lines.join("\n");
+}
+
+function appendFrontMatterDataSource(
+  text: string,
+  source: { name: string; path: string; kind: SupportedDataSourceKind },
+) {
+  const entry = [
+    `  - name: ${yamlInlineString(source.name || dataSourceNameFromPath(source.path))}`,
+    `    path: ${yamlInlineString(source.path)}`,
+    `    type: ${source.kind}`,
+  ];
+  const lines = text.startsWith("---\n") ? text.split("\n") : ["---", "---", "", ...text.split("\n")];
+  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
+  if (endIndex <= 0) return `---\ndataSources:\n${entry.join("\n")}\n---\n\n${text}`;
+  const startIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trim() === "dataSources:");
+  if (startIndex > 0) {
+    let insertIndex = startIndex + 1;
+    while (insertIndex < endIndex && (/^\s/.test(lines[insertIndex]) || lines[insertIndex].trim() === "")) insertIndex += 1;
+    lines.splice(insertIndex, 0, ...entry);
+  } else {
+    lines.splice(endIndex, 0, "dataSources:", ...entry);
   }
   return lines.join("\n");
 }
@@ -9503,6 +9612,142 @@ function frontMatterListValues(text: string, key: string) {
     values.push(match[1].trim().replace(/^["']|["']$/g, ""));
   }
   return Array.from(new Set(values));
+}
+
+function parseFrontMatterDataSources(text: string): FrontMatterDataSourceRow[] {
+  if (!text.startsWith("---\n")) return [];
+  const lines = text.split("\n");
+  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
+  if (endIndex <= 0) return [];
+  const rows: FrontMatterDataSourceRow[] = [];
+  let section = "";
+  let current: Partial<FrontMatterDataSourceRow> | null = null;
+  const flushCurrent = () => {
+    if (!current) return;
+    rows.push(normalizeFrontMatterDataSource(current, rows.length));
+    current = null;
+  };
+  for (let index = 1; index < endIndex; index += 1) {
+    const raw = lines[index];
+    const topLevel = raw.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+    if (topLevel) {
+      flushCurrent();
+      section = topLevel[1];
+      const aliasKind = dataSourceAliasKind(section);
+      if (aliasKind && topLevel[2].trim().startsWith("[")) {
+        for (const item of topLevel[2].trim().replace(/^\[|\]$/g, "").split(",")) {
+          const path = cleanYamlScalar(item);
+          if (path) {
+            rows.push(normalizeFrontMatterDataSource({ path, kind: aliasKind, source: section, line: index + 1 }, rows.length));
+          }
+        }
+      }
+      continue;
+    }
+    if (section === "dataSources") {
+      const item = raw.match(/^\s*-\s*(.*)$/);
+      if (item) {
+        flushCurrent();
+        current = { source: section, line: index + 1 };
+        applyDataSourcePair(current, item[1]);
+        continue;
+      }
+      const pair = raw.match(/^\s+([\w-]+):\s*(.*)$/);
+      if (pair && current) {
+        applyDataSourcePair(current, `${pair[1]}: ${pair[2]}`);
+      }
+      continue;
+    }
+    const aliasKind = dataSourceAliasKind(section);
+    if (aliasKind) {
+      const item = raw.match(/^\s*-\s*(.+)$/);
+      if (item) {
+        rows.push(
+          normalizeFrontMatterDataSource(
+            {
+              path: cleanYamlScalar(item[1]),
+              kind: aliasKind,
+              source: section,
+              line: index + 1,
+            },
+            rows.length,
+          ),
+        );
+      }
+    }
+  }
+  flushCurrent();
+  return rows;
+}
+
+function applyDataSourcePair(row: Partial<FrontMatterDataSourceRow>, pairText: string) {
+  const pair = pairText.match(/^([\w-]+):\s*(.*)$/);
+  if (!pair) {
+    if (pairText.trim()) row.path = cleanYamlScalar(pairText);
+    return;
+  }
+  const key = pair[1];
+  const value = cleanYamlScalar(pair[2]);
+  if (key === "name" || key === "title") row.name = value;
+  if (key === "path" || key === "file") row.path = value;
+  if (key === "type" || key === "kind") row.kind = normalizeDataSourceKind(value);
+}
+
+function normalizeFrontMatterDataSource(row: Partial<FrontMatterDataSourceRow>, index: number): FrontMatterDataSourceRow {
+  const path = row.path || "";
+  const kind = row.kind || normalizeDataSourceKind(path.split(".").pop() || "");
+  const status = dataSourceStatus(path, kind);
+  return {
+    id: `${row.source || "dataSources"}-${row.line || 0}-${path || index}`,
+    name: row.name || dataSourceNameFromPath(path),
+    path,
+    kind,
+    source: row.source || "dataSources",
+    status,
+    detail: dataSourceStatusDetail(status, path, kind),
+    line: row.line || 0,
+  };
+}
+
+function dataSourceAliasKind(section: string): FrontMatterDataSourceKind | null {
+  const aliases: Record<string, FrontMatterDataSourceKind> = {
+    csvFiles: "csv",
+    tsvFiles: "tsv",
+    jsonFiles: "json",
+    yamlFiles: "yaml",
+    ymlFiles: "yaml",
+  };
+  return aliases[section] || null;
+}
+
+function normalizeDataSourceKind(value: string): FrontMatterDataSourceKind {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "yml") return "yaml";
+  if (dataSourceTypeOptions.includes(normalized as SupportedDataSourceKind)) return normalized;
+  return normalized || "csv";
+}
+
+function dataSourceStatus(path: string, kind: FrontMatterDataSourceKind): FrontMatterDataSourceStatus {
+  if (!path) return "missing-path";
+  if (!dataSourceTypeOptions.includes(kind as SupportedDataSourceKind)) return "unsupported-type";
+  if (path.startsWith("/") || path.includes("..")) return "blocked-path";
+  return "ready";
+}
+
+function dataSourceStatusDetail(status: FrontMatterDataSourceStatus, path: string, kind: FrontMatterDataSourceKind) {
+  if (status === "missing-path") return "Add a local file path inside the document folder.";
+  if (status === "unsupported-type") return `Use CSV, TSV, JSON, or YAML instead of ${kind}.`;
+  if (status === "blocked-path") return `${path} is outside the document folder; keep data sources local to the project.`;
+  return "Ready for compiler import and export manifest evidence.";
+}
+
+function dataSourceNameFromPath(path: string) {
+  const file = path.split(/[\\/]/).pop() || "Data source";
+  return file.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function cleanYamlScalar(value: string) {
+  return value.trim().replace(/\s+#.*$/, "").replace(/^["']|["']$/g, "");
 }
 
 function yamlInlineString(value: string) {

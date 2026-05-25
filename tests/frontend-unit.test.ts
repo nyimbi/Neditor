@@ -1946,6 +1946,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("applyTocSettings"));
   ok(app.includes("frontMatterScalarValue"));
   ok(app.includes("Applied TOC settings"));
+  ok(app.includes('aria-label="Local data source manager"'));
+  ok(app.includes("frontMatterDataSourceRows"));
+  ok(app.includes("dataSourceManagerSummary"));
+  ok(app.includes("parseFrontMatterDataSources"));
+  ok(app.includes("appendFrontMatterDataSource"));
+  ok(app.includes("insertDataSourceTemplate"));
+  ok(app.includes("addFrontMatterDataSource"));
+  ok(app.includes("Data source type"));
+  ok(app.includes("blocked-path"));
   ok(app.includes('aria-label="Captions and generated lists manager"'));
   ok(app.includes("captionedReferenceItems"));
   ok(app.includes("captionManagerSummary"));

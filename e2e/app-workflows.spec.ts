@@ -2350,6 +2350,49 @@ test("runs command palette citation glossary and index navigation", async ({ pag
   await expect.poll(() => editorText(page)).toContain("[GLOSSARY]");
 });
 
+test("manages front matter data sources from the references panel", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/data-source-ui.md",
+    [
+      "---",
+      "title: Data Source UI",
+      "status: draft",
+      "dataSources:",
+      "  - name: Revenue",
+      "    path: data/revenue.csv",
+      "    type: csv",
+      "  - name: Escape",
+      "    path: ../secret.json",
+      "    type: json",
+      "jsonFiles:",
+      "  - data/accounts.json",
+      "---",
+      "",
+      "# Data Source UI",
+      "",
+      "Data source manager proof.",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/data-source-ui.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByLabel("Sidebar panel").selectOption("references");
+
+  const dataSources = page.getByRole("region", { name: "Local data source manager" });
+  await expect(dataSources).toContainText("3 local data sources | 2 ready | 1 need attention");
+  await expect(dataSources.locator(".snapshot-row").filter({ hasText: "Revenue" })).toContainText("CSV | ready");
+  await expect(dataSources.locator(".snapshot-row").filter({ hasText: "Escape" })).toContainText("blocked-path");
+  await expect(dataSources).toContainText("data/accounts.json");
+
+  await dataSources.getByPlaceholder("Revenue, Accounts, Settings").fill("Targets");
+  await dataSources.getByPlaceholder("data/revenue.csv").fill("data/targets.tsv");
+  await dataSources.getByLabel("Data source type").selectOption("tsv");
+  await dataSources.getByRole("button", { name: "Add data source" }).click();
+  await expect.poll(() => editorText(page)).toContain('name: "Targets"');
+  await expect.poll(() => editorText(page)).toContain('path: "data/targets.tsv"');
+  await expect.poll(() => editorText(page)).toContain("type: tsv");
+});
+
 test("runs command palette open document and workspace file navigation", async ({ page }) => {
   await setMockFileText(page, "/workspace/command-first.md", "# Command First\n\nFirst command document body.");
   await setMockFileText(page, "/workspace/command-second.md", "# Command Second\n\nSecond command document body.");
