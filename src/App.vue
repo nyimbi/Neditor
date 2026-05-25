@@ -1972,6 +1972,7 @@
           <button type="button" :disabled="!agentRun" @click="applyAgentWorkspaceRun">Apply agent output</button>
           <button type="button" :disabled="!agentRun" @click="buildAgentProviderPackage">Build provider request</button>
           <button type="button" :disabled="!agentProviderPackage" @click="copyAgentProviderPackage">Copy provider package</button>
+          <button type="button" :disabled="!agentProviderPackage" @click="copyAgentProviderSourcePack">Copy source pack</button>
           <button type="button" :disabled="!canRunAgentProvider" @click="runAgentProviderRequest">
             {{ agentProviderBusy ? "Running provider..." : "Run provider request" }}
           </button>
@@ -2386,6 +2387,10 @@
               <ul>
                 <li v-for="item in agentProviderPackage.checklist" :key="item">{{ item }}</li>
               </ul>
+              <label>
+                Source evidence pack
+                <textarea :value="agentProviderSourcePackMarkdown" rows="8" readonly aria-label="AI provider source evidence pack"></textarea>
+              </label>
               <textarea :value="agentProviderPackage.markdown" rows="12" readonly aria-label="AI provider request Markdown"></textarea>
             </section>
             <section v-if="agentProviderResult" class="agent-provider-output" aria-label="AI provider response">
@@ -2610,6 +2615,7 @@ import {
   buildAiProviderRequestPackage,
   buildAiProviderResponseReviewMarkdown,
   executeAiProviderRequestPackage,
+  formatAiProviderSourcePack,
   type AiProviderExecutionResult,
   type AiProviderProfileId,
   type AiProviderRequestPackage,
@@ -3167,6 +3173,9 @@ const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
 });
+const agentProviderSourcePackMarkdown = computed(() =>
+  agentProviderPackage.value ? formatAiProviderSourcePack(agentProviderPackage.value.sourcePack) : "",
+);
 const latestAgentRunHistory = computed(() => store.agentRunHistory[0] || null);
 const activeAgentControlCenter = computed(() => agentRun.value?.controlCenter || latestAgentRunHistory.value?.controlCenter || null);
 const agentTaskLaneOptions: Array<"all" | AgenticWorkflowLane> = ["all", "create", "compose", "edit", "revise", "review", "distribute"];
@@ -4505,6 +4514,15 @@ async function copyAgentProviderPackage() {
     store.statusMessage = "Copied provider request package";
   } catch {
     store.statusMessage = "Provider request package is ready to copy";
+  }
+}
+async function copyAgentProviderSourcePack() {
+  if (!agentProviderPackage.value) return;
+  try {
+    await navigator.clipboard?.writeText(agentProviderSourcePackMarkdown.value);
+    store.statusMessage = "Copied provider source evidence pack";
+  } catch {
+    store.statusMessage = "Provider source evidence pack is ready to copy";
   }
 }
 function applyAgentWorkspaceRun() {

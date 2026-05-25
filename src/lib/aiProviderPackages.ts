@@ -236,7 +236,7 @@ function buildUserPrompt(run: AgenticWorkflowRun, sourcePack: AiProviderSourcePa
     "",
     `Suggested outline:\n${run.plan.suggestedOutline}`,
     "",
-    `Source evidence pack:\n${formatSourcePack(sourcePack)}`,
+    `Source evidence pack:\n${formatAiProviderSourcePack(sourcePack)}`,
     "",
     `Reviewer agents:\n${run.reviewerAgents.map((agent) => `- ${agent.label} [${agent.status}]: ${agent.mandate}`).join("\n")}`,
     "",
@@ -309,7 +309,7 @@ function buildAiProviderSourcePack(run: AgenticWorkflowRun): AiProviderSourcePac
   };
 }
 
-function formatSourcePack(sourcePack: AiProviderSourcePack) {
+export function formatAiProviderSourcePack(sourcePack: AiProviderSourcePack) {
   return [
     "Context sources:",
     ...sourcePack.contextSources.map((item) => `- ${item}`),
@@ -487,7 +487,7 @@ function buildMarkdown(
     "",
     "## Source Evidence Pack",
     "",
-    fencedBlock("text", formatSourcePack(sourcePack)),
+    fencedBlock("text", formatAiProviderSourcePack(sourcePack)),
     "",
     "## Redacted Headers",
     "",

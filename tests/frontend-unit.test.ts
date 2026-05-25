@@ -9,7 +9,12 @@ import {
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
 import { inspectAiRuntimeReadiness } from "../src/lib/aiRuntimeReadiness.js";
-import { buildAiProviderRequestPackage, buildAiProviderResponseReviewMarkdown, executeAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
+import {
+  buildAiProviderRequestPackage,
+  buildAiProviderResponseReviewMarkdown,
+  executeAiProviderRequestPackage,
+  formatAiProviderSourcePack,
+} from "../src/lib/aiProviderPackages.js";
 import {
   agenticWorkflowPlaybooks,
   buildAgenticLifecycleTaskBrief,
@@ -770,6 +775,8 @@ test("AI provider packages redact secrets and preserve agent governance context"
   ok(providerPackage.sourcePack.claimReview.some((item) => item.includes("Revenue grows by 18%")));
   ok(providerPackage.sourcePack.cleanupBlockers.some((item) => item.includes("comprehensive analysis")));
   ok(providerPackage.sourcePack.governanceBlockers.some((item) => item.includes("unresolved review comment")));
+  ok(formatAiProviderSourcePack(providerPackage.sourcePack).includes("Claims and citation review:"));
+  ok(formatAiProviderSourcePack(providerPackage.sourcePack).includes("Distribution blockers:"));
   ok(providerPackage.userPrompt.includes("Reviewer agents:"));
   ok(providerPackage.userPrompt.includes("Lifecycle task board:"));
   ok(providerPackage.userPrompt.includes("Final human approval and release readiness"));
@@ -1386,6 +1393,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("distributionTargetPlans"));
   ok(app.includes("Build provider request"));
   ok(app.includes("Copy provider package"));
+  ok(app.includes("Copy source pack"));
+  ok(app.includes("copyAgentProviderSourcePack"));
+  ok(app.includes("agentProviderSourcePackMarkdown"));
+  ok(app.includes('aria-label="AI provider source evidence pack"'));
   ok(app.includes("Run provider request"));
   ok(app.includes("buildAiProviderResponseReviewMarkdown"));
   ok(app.includes("Apply wraps this output in needs-review provenance"));
