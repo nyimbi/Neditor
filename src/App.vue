@@ -2058,6 +2058,10 @@
                     <strong>{{ section.heading }}</strong>
                     <p>{{ section.draftingInstruction }}</p>
                     <span>Reviewers: {{ section.reviewerAgentIds.join(", ") }}</span>
+                    <div class="agent-section-actions">
+                      <button type="button" @click="insertAgentSectionBrief(section)">Insert brief</button>
+                      <button type="button" @click="draftAgentSectionWithDocsLive(section)">Draft in Docs Live</button>
+                    </div>
                   </div>
                   <ul>
                     <li v-for="item in section.completionCriteria" :key="item">{{ item }}</li>
@@ -2449,11 +2453,13 @@ import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
   agenticWorkflowPlaybooks,
+  buildAgenticSectionWorkBrief,
   buildAgenticWorkflowPlan,
   buildAgenticWorkflowRun,
   type AgenticWorkflowPlaybook,
   type AgenticWorkflowPlan,
   type AgenticWorkflowRun,
+  type AgenticSectionWorkItem,
   type AgenticWorkflowStep,
 } from "./lib/agenticWorkflows";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
@@ -4092,6 +4098,44 @@ function hydrateDocsLiveFromAgentPlan() {
   closeAgentWorkspace();
   docsLiveOpen.value = true;
   store.statusMessage = "Sent agent plan to Docs Live";
+}
+function insertAgentSectionBrief(section: AgenticSectionWorkItem) {
+  const run = agentRun.value;
+  if (!run) return;
+  insertBlock(buildAgenticSectionWorkBrief(section, run.reviewerAgents));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = `Inserted ${section.heading} section brief`;
+}
+function draftAgentSectionWithDocsLive(section: AgenticSectionWorkItem) {
+  const run = agentRun.value;
+  if (!run) return;
+  const reviewerLines = section.reviewerAgentIds
+    .map((id) => run.reviewerAgents.find((agent) => agent.id === id))
+    .filter((agent): agent is NonNullable<typeof agent> => Boolean(agent))
+    .map((agent) => `- ${agent.label} [${agent.status}]: ${agent.mandate}`);
+  docsLiveDocumentType.value = run.plan.documentType;
+  docsLiveTitle.value = `${run.plan.title} - ${section.heading}`;
+  docsLiveOutlineText.value = `${"  ".repeat(Math.max(0, section.level - 1))}- ${section.heading}`;
+  docsLiveContext.value = [
+    run.plan.context,
+    "",
+    `Section drafting instruction: ${section.draftingInstruction}`,
+    "",
+    "Completion criteria:",
+    ...section.completionCriteria.map((item) => `- ${item}`),
+    "",
+    "Assigned reviewer agents:",
+    ...reviewerLines,
+  ].join("\n");
+  docsLivePlaceholderText.value = run.plan.placeholderText;
+  docsLiveQuestionnaireAnswerText.value = `Draft only this section first: ${section.heading}. Keep unresolved facts visible and preserve reviewer handoff notes.`;
+  docsLiveDraftingDepth.value = "detailed";
+  docsLiveInsertMode.value = "append";
+  refreshDocsLiveQuestionnaire();
+  closeAgentWorkspace();
+  docsLiveOpen.value = true;
+  store.statusMessage = `Sent ${section.heading} to Docs Live`;
 }
 function runAgentPlanReview() {
   closeAgentWorkspace();
@@ -10836,6 +10880,19 @@ select:hover {
 .agent-section-workqueue p,
 .agent-section-workqueue ul {
   margin: 0;
+}
+
+.agent-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.agent-section-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .agent-section-workqueue small {

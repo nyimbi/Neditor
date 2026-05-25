@@ -92,7 +92,10 @@ governance, and export readiness so each review lane has findings and required
 actions instead of one undifferentiated checklist. It also includes a
 section-by-section work queue with drafting instructions, completion criteria,
 and assigned reviewer agents so a team can build the document systematically
-from outline to reviewed sections. The packet also includes an
+from outline to reviewed sections. Each queued section can insert a visible work
+brief into the Markdown source or open Docs Live preloaded with that section's
+instruction, criteria, placeholders, and reviewer agents for focused drafting.
+The packet also includes an
 **Agent Audit Trail** with run ID, deterministic fingerprints for instruction,
 context, source, and output payloads, rollback guidance, and review events.
 Generated and applied runs are also saved in local workspace history so a user

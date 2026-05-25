@@ -346,6 +346,35 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   };
 }
 
+export function buildAgenticSectionWorkBrief(section: AgenticSectionWorkItem, reviewerAgents: AgenticReviewerAgent[]): string {
+  const reviewerLabels = section.reviewerAgentIds.map((id) => reviewerAgents.find((agent) => agent.id === id)?.label || titleCase(id));
+  return [
+    `## ${section.heading} Work Brief`,
+    "",
+    "```ai-section-task",
+    `id: ${section.id}`,
+    `order: ${section.order}`,
+    `level: ${section.level}`,
+    `lane: ${section.lane}`,
+    `reviewers: ${section.reviewerAgentIds.join(", ")}`,
+    "status: needs-draft",
+    "```",
+    "",
+    "### Drafting Instruction",
+    "",
+    section.draftingInstruction,
+    "",
+    "### Completion Criteria",
+    "",
+    ...section.completionCriteria.map((item) => `- [ ] ${item}`),
+    "",
+    "### Assigned Reviewers",
+    "",
+    ...reviewerLabels.map((label) => `- [ ] ${label}`),
+    "",
+  ].join("\n");
+}
+
 function detectLanes(corpus: string): AgenticWorkflowLane[] {
   const detected = laneSignals.flatMap(([lane, signal]) => (signal.test(corpus) ? [lane] : []));
   if (!detected.length) return ["create", "review"];

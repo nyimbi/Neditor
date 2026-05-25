@@ -10,7 +10,7 @@ import {
 } from "../src/lib/asyncGuards.js";
 import { inspectAiRuntimeReadiness } from "../src/lib/aiRuntimeReadiness.js";
 import { buildAiProviderRequestPackage, executeAiProviderRequestPackage } from "../src/lib/aiProviderPackages.js";
-import { agenticWorkflowPlaybooks, buildAgenticWorkflowPlan, buildAgenticWorkflowRun } from "../src/lib/agenticWorkflows.js";
+import { agenticWorkflowPlaybooks, buildAgenticSectionWorkBrief, buildAgenticWorkflowPlan, buildAgenticWorkflowRun } from "../src/lib/agenticWorkflows.js";
 import {
   bibliographyEntryStub,
   bibliographyStubsForMissingKeys,
@@ -538,6 +538,11 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.sectionWorkQueue.every((section) => section.completionCriteria.length >= 4));
   ok(run.sectionWorkQueue.some((section) => section.reviewerAgentIds.includes("export")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Section work queue prepared")));
+  const sectionBrief = buildAgenticSectionWorkBrief(run.sectionWorkQueue[0], run.reviewerAgents);
+  ok(sectionBrief.includes("```ai-section-task"));
+  ok(sectionBrief.includes("### Drafting Instruction"));
+  ok(sectionBrief.includes("### Completion Criteria"));
+  ok(sectionBrief.includes("### Assigned Reviewers"));
   ok(run.distributionChecklist.some((item) => item.startsWith("Substack newsletter package:")));
   ok(run.reviewChecklist.some((item) => item.includes("human-reviewed")));
 });
@@ -980,6 +985,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent section work queue"'));
   ok(app.includes("agentRun.sectionWorkQueue"));
   ok(app.includes("section.completionCriteria"));
+  ok(app.includes("insertAgentSectionBrief"));
+  ok(app.includes("draftAgentSectionWithDocsLive"));
+  ok(app.includes("Draft in Docs Live"));
   ok(app.includes('aria-label="Agent audit trail"'));
   ok(app.includes("agentRun.auditTrail"));
   ok(app.includes("Rollback plan"));
