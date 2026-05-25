@@ -241,6 +241,9 @@ web app.
   provider responses are wrapped in local `ai-source` and `ai-assisted`
   needs-review provenance before they enter the document, and provider-applied
   history records the wrapped review draft that was actually inserted.
+  The References panel also includes a Citation TODO workflow for adding,
+  resolving, deferring, jumping to, and exporting citation blockers as a
+  reviewer-ready Markdown audit.
   The Help Center and guided demo include AI Governance steps that show
   non-technical users how to route lifecycle tasks, insert or copy task briefs,
   review provider packages, and apply provider output only as governed

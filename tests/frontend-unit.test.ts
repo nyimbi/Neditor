@@ -29,6 +29,13 @@ import {
   normalizeCitationKey,
 } from "../src/lib/bibliographyManager.js";
 import { buildConflictDiff } from "../src/lib/conflict.js";
+import {
+  citationTodoAuditMarkdown,
+  citationTodoComment,
+  deferCitationTodo,
+  extractCitationTodoItems,
+  resolveCitationTodo,
+} from "../src/lib/citationTodoWorkflow.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
 import {
   buildDocsLiveDraft,
@@ -181,6 +188,30 @@ test("bibliography manager helpers generate repairable citation snippets", () =>
     bibliographyStubsForMissingKeys(["@missing2026", "missing2026", "other key"]),
     "```bibtex\n@misc{missing2026,\n  title = {TODO: Add title},\n  author = {TODO},\n  year = {TODO}\n}\n\n@misc{other-key,\n  title = {TODO: Add title},\n  author = {TODO},\n  year = {TODO}\n}\n```\n",
   );
+});
+
+test("citation TODO workflow extracts resolves defers and audits blockers", () => {
+  const source = [
+    "# Draft",
+    "Revenue grew by 18%. citation TODO",
+    "<!-- citation-todo: deferred | reason: Waiting on finance; needs citation -->",
+    "Margin improved. needs citation",
+  ].join("\n");
+  const todos = extractCitationTodoItems(source);
+
+  equal(todos.length, 3);
+  equal(todos[0].status, "open");
+  equal(todos[1].status, "deferred");
+  equal(todos[1].note, "Waiting on finance; needs citation");
+
+  const resolved = resolveCitationTodo(source, todos[0], "[@finance2026]", "Audited forecast");
+  ok(resolved.includes("Revenue grew by 18%. [@finance2026] <!-- citation-resolved: Audited forecast -->"));
+  ok(!extractCitationTodoItems(resolved).some((item) => item.line === 2));
+
+  const deferred = deferCitationTodo(source, todos[2], "Need source owner");
+  ok(deferred.includes("<!-- citation-todo: deferred | reason: Need source owner | original: needs citation -->"));
+  ok(citationTodoComment("Board pack --> source").includes("Board pack source"));
+  ok(citationTodoAuditMarkdown(todos).includes("Line 2 (open): Revenue grew by 18%. [citation TODO]"));
 });
 
 test("conflict diff keeps local and external edits aligned for merge UI", () => {
@@ -1325,6 +1356,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Context answers and constraints"));
   ok(app.includes("Replan with answers"));
   ok(app.includes("These answers feed the next plan, packet, Docs Live handoff, and provider request."));
+  ok(app.includes('aria-label="Citation TODO workflow"'));
+  ok(app.includes("citationTodoItems"));
+  ok(app.includes("openCitationTodoCount"));
+  ok(app.includes("insertCitationTodoAudit"));
+  ok(app.includes("copyCitationTodoAudit"));
+  ok(app.includes("resolveCitationTodoItem"));
+  ok(app.includes("deferCitationTodoItem"));
   ok(app.includes("Generate agent packet"));
   ok(app.includes("Apply agent output"));
   ok(app.includes('aria-label="Agent generated output"'));

@@ -752,6 +752,37 @@
               <button type="button" :disabled="!missingCitationKeys.length" @click="insertMissingCitationStubs">Insert missing key stubs</button>
             </div>
           </section>
+          <section class="reference-manager" aria-label="Citation TODO workflow">
+            <header>
+              <div>
+                <strong>Citation TODO Workflow</strong>
+                <span>{{ openCitationTodoCount }} open | {{ deferredCitationTodoCount }} deferred</span>
+              </div>
+            </header>
+            <label>
+              Source key or citation
+              <input v-model="citationTodoKey" placeholder="@source2026 or [@source2026, p. 12]" />
+            </label>
+            <label>
+              Resolution or deferral note
+              <input v-model="citationTodoNote" placeholder="Source, page, owner, or deferral reason" />
+            </label>
+            <div class="reference-actions">
+              <button type="button" @click="insertCitationTodo">Add TODO</button>
+              <button type="button" :disabled="!citationTodoItems.length" @click="insertCitationTodoAudit">Insert audit</button>
+              <button type="button" :disabled="!citationTodoItems.length" @click="copyCitationTodoAudit">Copy audit</button>
+            </div>
+            <article v-for="todo in citationTodoItems" :key="todo.id" class="snapshot-row" :data-status="todo.status">
+              <p>{{ todo.excerpt }}</p>
+              <small>Line {{ todo.line }} | {{ todo.status }}{{ todo.note ? ` | ${todo.note}` : "" }}</small>
+              <div class="reference-actions">
+                <button type="button" @click="goToCitationTodo(todo)">Go to TODO</button>
+                <button type="button" :disabled="!citationTodoKey.trim()" @click="resolveCitationTodoItem(todo)">Resolve</button>
+                <button type="button" @click="deferCitationTodoItem(todo)">Defer</button>
+              </div>
+            </article>
+            <p v-if="!citationTodoItems.length" class="sidebar-hint">No citation TODOs detected.</p>
+          </section>
           <button
             v-for="citation in active.compile?.semantic.citation_references || []"
             :key="`${citation.key}-${citation.line}-${citation.column}`"
@@ -2639,6 +2670,14 @@ import {
   type AgenticWorkflowStep,
 } from "./lib/agenticWorkflows";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
+import {
+  citationTodoAuditMarkdown,
+  citationTodoComment,
+  deferCitationTodo,
+  extractCitationTodoItems,
+  resolveCitationTodo,
+  type CitationTodoItem,
+} from "./lib/citationTodoWorkflow";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import {
   buildDocsLiveDraft,
@@ -2801,6 +2840,8 @@ const conflictMergeParts = ref<ConflictMergePart[]>([]);
 const commandQuery = ref("");
 const reviewCommentText = ref("");
 const changeNoteText = ref("");
+const citationTodoKey = ref("");
+const citationTodoNote = ref("");
 const selectedTableIndex = ref(0);
 const outlineDraftText = ref("- Executive Summary\n  - Decision Needed\n  - Key Risks\n- Financial Case\n- Next Steps");
 const outlineDraftTitle = ref("");
@@ -3310,6 +3351,9 @@ const missingCitationKeys = computed(() => {
     .filter((key) => !byKey.has(key));
   return Array.from(new Set(keys)).sort();
 });
+const citationTodoItems = computed(() => extractCitationTodoItems(active.value.text));
+const openCitationTodoCount = computed(() => citationTodoItems.value.filter((item) => item.status === "open").length);
+const deferredCitationTodoCount = computed(() => citationTodoItems.value.filter((item) => item.status === "deferred").length);
 const resolvedCitationEntries = computed(() => {
   const citedKeys = new Set((active.value.compile?.semantic.citation_references || []).map((citation) => citation.key));
   return (active.value.compile?.bibliography || []).filter((entry) => citedKeys.has(entry.key));
@@ -7890,6 +7934,55 @@ function insertCitationReference(key: string) {
 function insertMissingCitationStubs() {
   const snippet = bibliographyStubsForMissingKeys(missingCitationKeys.value);
   if (snippet) insertBlock(snippet);
+}
+
+function insertCitationTodo() {
+  flushEditorTextToStore();
+  insertBlock(citationTodoComment(citationTodoNote.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted citation TODO";
+}
+
+function citationTodoReference() {
+  const value = citationTodoKey.value.trim();
+  if (!value) return "";
+  return /^\[\s*@/.test(value) ? value : citationReferenceSnippet(value);
+}
+
+function resolveCitationTodoItem(todo: CitationTodoItem) {
+  flushEditorTextToStore();
+  const reference = citationTodoReference();
+  if (!reference) return;
+  store.updateText(resolveCitationTodo(active.value.text, todo, reference, citationTodoNote.value));
+  store.statusMessage = `Resolved citation TODO on line ${todo.line}`;
+}
+
+function deferCitationTodoItem(todo: CitationTodoItem) {
+  flushEditorTextToStore();
+  store.updateText(deferCitationTodo(active.value.text, todo, citationTodoNote.value));
+  store.statusMessage = `Deferred citation TODO on line ${todo.line}`;
+}
+
+function insertCitationTodoAudit() {
+  flushEditorTextToStore();
+  insertBlock(citationTodoAuditMarkdown(citationTodoItems.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted citation TODO audit";
+}
+
+async function copyCitationTodoAudit() {
+  flushEditorTextToStore();
+  const audit = citationTodoAuditMarkdown(citationTodoItems.value);
+  try {
+    await navigator.clipboard?.writeText(audit);
+    store.statusMessage = "Copied citation TODO audit";
+  } catch {
+    store.statusMessage = "Citation TODO audit is ready to copy";
+  }
+}
+
+function goToCitationTodo(todo: CitationTodoItem) {
+  void goToSourceTarget({ line: todo.line, column: todo.column, end_column: todo.column + todo.marker.length });
 }
 
 function setFrontMatterField(key: string, value: string) {

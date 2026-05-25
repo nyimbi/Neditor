@@ -1,4 +1,5 @@
 import { buildDocsLiveDraft, docsLiveDocumentTypes, normalizeDocsLiveDocumentType, type DocsLiveDocumentType } from "./docsLive.js";
+import { extractCitationTodoItems } from "./citationTodoWorkflow.js";
 import { outlinePlanFromMarkdown } from "./documentOutline.js";
 import type { ExportTarget } from "./workspacePersistence.js";
 
@@ -1862,9 +1863,7 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
         .filter(Boolean),
     ),
   ).slice(0, 12);
-  const citationTodos = Array.from(
-    new Set([...documentText.matchAll(/(?:citation TODO|source needed|needs citation|TODO:\s*add citation|cite needed)/gi)].map((match) => match[0])),
-  ).slice(0, 12);
+  const citationTodos = Array.from(new Set(extractCitationTodoItems(documentText).map((item) => item.excerpt))).slice(0, 12);
   const unreviewedAiSources = [...documentText.matchAll(/```ai-source[\s\S]*?```/g)].filter((block) => !/\bstatus:\s*human-reviewed\b/i.test(block[0])).length;
   const unreviewedAiAssisted = [...documentText.matchAll(/<!--\s*ai-assisted:[\s\S]*?-->/g)].filter((marker) => !/\bstatus\s*=\s*human-reviewed\b/i.test(marker[0])).length;
   const unresolvedComments = [...documentText.matchAll(/<!--\s*comment:\s*unresolved\b/gi)].length;
