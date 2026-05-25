@@ -23,6 +23,7 @@ import {
   buildAgenticReleaseEvidenceAuditPackage,
   buildAgenticSectionWorkBrief,
   buildAgenticSourcePack,
+  buildAgenticTransformRecommendationMarkdown,
   buildAgenticWorkflowPlan,
   buildAgenticWorkflowRun,
   serializeAgenticSourcePackItem,
@@ -806,6 +807,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("## Section Work Queue"));
   ok(run.markdown.includes("## Section Draft History"));
   ok(run.markdown.includes("```ai-section-draft"));
+  ok(run.markdown.includes("## Agent-Selected Transforms"));
   ok(run.markdown.includes("Section contract:"));
   ok(run.markdown.includes("Contract risk:"));
   ok(run.markdown.includes("Completion criteria:"));
@@ -817,6 +819,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Outline variant comparison" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Section contract cards" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Composable section draft history" && item.requiredBeforeRelease));
+  ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent-selected transforms" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Agent automation scheduler" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Pre-review rehearsal" && item.requiredBeforeRelease));
   ok(run.releaseEvidenceBundle.items.some((item) => item.label === "Distribution artifacts" && item.status === "needs-review"));
@@ -833,6 +836,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(releaseAuditPackage.includes("## Release Evidence Bundle"));
   ok(releaseAuditPackage.includes("## Agent Audit Trail"));
   ok(releaseAuditPackage.includes("## Section Draft History"));
+  ok(releaseAuditPackage.includes("## Agent-Selected Transforms"));
   ok(releaseAuditPackage.includes("## Agent Lifecycle Task Board"));
   ok(releaseAuditPackage.includes("### Target Runbooks"));
   ok(run.markdown.includes("Substack newsletter package"));
@@ -858,6 +862,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.lifecycleTasks.some((task) => task.id === "task-pre-review-rehearsal" && task.evidence.some((item) => item.includes("Missing Evidence"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-section-draft-history" && task.evidence.some((item) => item.includes("v01"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-agent-automation-scheduler" && task.evidence.some((item) => item.includes("export"))));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-agent-transform-recommendations" && task.evidence.some((item) => item.includes("Decision comparison"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-outline-variants" && task.evidence.some((item) => item.includes("Executive-first"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-intake-context" && task.evidence.some((item) => item.includes("Document intent"))));
   ok(run.lifecycleTasks.some((task) => task.owner === "Docs Live Section Agent" && task.action === "generate-docs-live-draft" && task.sectionId));
@@ -870,6 +875,7 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Lifecycle task board prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Section draft history preserved")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Automation scheduler queued")));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Transform recommendations prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Pre-review rehearsal prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline variant comparison prepared")));
   ok(run.auditTrail.reviewEvents.some((item) => item.includes("Outline critique prepared")));
@@ -892,6 +898,17 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.sectionDraftHistory.every((item) => item.restorePointMarkdown.includes("workflow: composable-section-draft-history")));
   ok(run.sectionDraftHistory.every((item) => item.reviewerNotes.length >= 1));
   ok(run.sectionDraftHistory.every((item) => item.sectionFingerprint.length === 16));
+  ok(run.transformRecommendations.length >= 4);
+  ok(run.transformRecommendations.some((item) => item.kind === "calc" && item.templateId?.startsWith("calc-business")));
+  ok(run.transformRecommendations.some((item) => item.kind === "chart"));
+  ok(run.transformRecommendations.some((item) => item.label === "Source-to-claim ledger"));
+  ok(run.transformRecommendations.some((item) => item.kind === "publishing"));
+  ok(run.transformRecommendations.every((item) => item.evidenceRequired.length >= 3));
+  ok(run.transformRecommendations.every((item) => /```|\| --- \|/.test(item.suggestedMarkdown)));
+  const transformBrief = buildAgenticTransformRecommendationMarkdown(run.transformRecommendations[0]);
+  ok(transformBrief.includes("```ai-transform-recommendation"));
+  ok(transformBrief.includes("workflow: agent-selected-transform"));
+  ok(transformBrief.includes("Narrative review trigger:"));
   equal(run.automationQueue.length, 6);
   ok(run.automationQueue.every((item) => item.safeToAutoRun));
   ok(run.automationQueue.some((item) => item.kind === "export-preflight" && item.action === "prepare-export"));
@@ -1358,6 +1375,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
           },
         ],
         automationTaskCount: 6,
+        transformRecommendationCount: 5,
         reviewerCount: 6,
         preReviewPromptCount: 7,
         taskCount: 14,
@@ -1653,6 +1671,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       },
     ],
     automationTaskCount: 6,
+    transformRecommendationCount: 5,
     reviewerCount: 6,
     preReviewPromptCount: 7,
     taskCount: 14,
@@ -2122,6 +2141,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("draftAgentSectionHistoryWithDocsLive"));
   ok(app.includes("copyAgentSectionDraftRestorePoint"));
   ok(app.includes("agentRunHistorySectionDraftSummary"));
+  ok(app.includes('aria-label="Agent transform recommendations"'));
+  ok(app.includes("agentRun.transformRecommendations"));
+  ok(app.includes("Agent-Selected Transforms"));
+  ok(app.includes("insertAgentTransformRecommendation"));
+  ok(app.includes("copyAgentTransformRecommendation"));
+  ok(app.includes("openTransformTemplatesFromAgent"));
+  ok(app.includes("buildAgenticTransformRecommendationMarkdown"));
+  ok(app.includes("transformRecommendationCount"));
   ok(app.includes("agentSectionDraftingDepthOptions"));
   ok(app.includes("agentPlan.outlineVariants"));
   ok(app.includes("hydrateDocsLiveFromOutlineVariant"));

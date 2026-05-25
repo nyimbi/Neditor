@@ -265,6 +265,7 @@ export interface AgenticWorkflowRun {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  transformRecommendations: AgenticTransformRecommendation[];
   automationQueue: AgenticAutomationTask[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
@@ -329,6 +330,33 @@ export interface AgenticDistributionTargetPlan {
   preflightChecks: string[];
   handoffSteps: string[];
   evidenceRequired: string[];
+}
+
+export type AgenticTransformRecommendationKind =
+  | "calc"
+  | "chart"
+  | "table"
+  | "diagram"
+  | "timeline"
+  | "roadmap"
+  | "schema"
+  | "equation"
+  | "publishing";
+
+export interface AgenticTransformRecommendation {
+  id: string;
+  kind: AgenticTransformRecommendationKind;
+  label: string;
+  purpose: string;
+  insertionTarget: string;
+  sectionId?: string;
+  templateId?: string;
+  sourceSignal: string;
+  narrativeReviewTrigger: string;
+  evidenceRequired: string[];
+  riskLevel: "low" | "medium" | "high";
+  suggestedMarkdown: string;
+  owner: string;
 }
 
 export type AgenticAutomationTaskKind =
@@ -702,6 +730,12 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     draftMarkdown: draft?.markdown || "",
     generatedAt,
   });
+  const transformRecommendations = buildTransformRecommendations({
+    plan,
+    sectionWorkQueue,
+    documentEvidence,
+    distributionTargetPlans,
+  });
   const preReviewRehearsal = buildPreReviewRehearsal({
     plan,
     reviewerAgents,
@@ -718,6 +752,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     distributionTargetPlans,
     controlCenter,
     blockers,
+    transformRecommendations,
   });
   const lifecycleTasks = buildLifecycleTasks({
     plan,
@@ -726,6 +761,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    transformRecommendations,
     automationQueue,
     preReviewRehearsal,
     distributionTargetPlans,
@@ -743,6 +779,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    transformRecommendations,
     automationQueue,
     preReviewRehearsal,
     documentEvidence,
@@ -762,6 +799,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    transformRecommendations,
     automationQueue,
     preReviewRehearsal,
     distributionTargetPlans,
@@ -781,6 +819,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    transformRecommendations,
     automationQueue,
     outlineCritique,
     preReviewRehearsal,
@@ -806,6 +845,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    transformRecommendations,
     automationQueue,
     outlineCritique,
     preReviewRehearsal,
@@ -897,6 +937,40 @@ export function buildAgenticLifecycleTaskBrief(task: AgenticLifecycleTask): stri
   ].join("\n");
 }
 
+export function buildAgenticTransformRecommendationMarkdown(item: AgenticTransformRecommendation): string {
+  const metadata = [
+    `id: ${item.id}`,
+    `kind: ${item.kind}`,
+    `owner: ${item.owner}`,
+    `riskLevel: ${item.riskLevel}`,
+    item.templateId ? `templateId: ${item.templateId}` : "",
+    item.sectionId ? `sectionId: ${item.sectionId}` : "",
+    `insertionTarget: ${sanitizeMarkerValue(item.insertionTarget)}`,
+    "status: needs-review",
+  ].filter(Boolean);
+  return [
+    `## ${item.label}`,
+    "",
+    "<!-- ai-assisted: needs-review | source: NEditor Agent Workspace | workflow: agent-selected-transform -->",
+    "",
+    "```ai-transform-recommendation",
+    ...metadata,
+    "```",
+    "",
+    item.purpose,
+    "",
+    `Source signal: ${item.sourceSignal}`,
+    "",
+    `Narrative review trigger: ${item.narrativeReviewTrigger}`,
+    "",
+    "Evidence required:",
+    ...item.evidenceRequired.map((evidence) => `- [ ] ${evidence}`),
+    "",
+    item.suggestedMarkdown.trim(),
+    "",
+  ].join("\n");
+}
+
 export function buildAgenticReleaseEvidenceAuditPackage(run: AgenticWorkflowRun): string {
   return [
     "## NEditor Release Evidence Audit Package",
@@ -914,6 +988,7 @@ export function buildAgenticReleaseEvidenceAuditPackage(run: AgenticWorkflowRun)
     ...controlCenterMarkdown(run.controlCenter),
     ...reviewerAgentsMarkdown(run.reviewerAgents),
     ...sectionDraftHistoryMarkdown(run.sectionDraftHistory),
+    ...transformRecommendationsMarkdown(run.transformRecommendations),
     ...automationQueueMarkdown(run.automationQueue),
     ...lifecycleTasksMarkdown(run.lifecycleTasks),
     ...(run.distributionTargetPlans.length ? distributionTargetRunbookMarkdown(run.distributionTargetPlans) : ["## Distribution Runbooks", "", "No distribution target runbooks were staged for this run.", ""]),
@@ -2145,6 +2220,7 @@ function buildLifecycleTasks(input: {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  transformRecommendations: AgenticTransformRecommendation[];
   automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -2152,7 +2228,7 @@ function buildLifecycleTasks(input: {
   documentEvidence: AgenticDocumentEvidence;
   outlineCritique: AgenticOutlineCritiqueItem[];
 }): AgenticLifecycleTask[] {
-  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, sectionDraftHistory, automationQueue, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
+  const { plan, revision, editAcceptanceQueue, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, automationQueue, preReviewRehearsal, distributionTargetPlans, blockers, documentEvidence, outlineCritique } = input;
   const tasks: AgenticLifecycleTask[] = [];
   const hasBlockers = blockers.length > 0;
   const baseStatus: AgenticControlStatus = hasBlockers ? "needs-input" : "ready";
@@ -2337,6 +2413,19 @@ function buildLifecycleTasks(input: {
     });
   }
 
+  if (transformRecommendations.length) {
+    tasks.push({
+      id: "task-agent-transform-recommendations",
+      lane: "compose",
+      title: "Review agent-selected transform recommendations",
+      owner: "Transform Agent",
+      status: transformRecommendations.some((item) => item.riskLevel === "high") ? "needs-input" : "ready",
+      action: "open-review",
+      evidence: transformRecommendations.slice(0, 10).map((item) => `${titleCase(item.kind)} ${item.label}: ${item.sourceSignal}`),
+      nextStep: "Choose, insert, validate, or reject recommended calc, chart, table, diagram, timeline, schema, equation, or publishing blocks before narrative depends on them.",
+    });
+  }
+
   if (automationQueue.length) {
     tasks.push({
       id: "task-agent-automation-scheduler",
@@ -2394,6 +2483,7 @@ function buildLifecycleTasks(input: {
 
   return limitLifecycleTasks(tasks, [
     "task-agent-automation-scheduler",
+    "task-agent-transform-recommendations",
     "task-section-draft-history",
     "task-pre-review-rehearsal",
     "task-final-release-readiness",
@@ -2676,6 +2766,250 @@ function buildSectionDraftRestorePoint(
     "",
   ];
   return lines.filter((line) => line !== undefined).join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
+function buildTransformRecommendations(input: {
+  plan: AgenticWorkflowPlan;
+  sectionWorkQueue: AgenticSectionWorkItem[];
+  documentEvidence: AgenticDocumentEvidence;
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
+}): AgenticTransformRecommendation[] {
+  const { plan, sectionWorkQueue, documentEvidence, distributionTargetPlans } = input;
+  const recommendations: AgenticTransformRecommendation[] = [];
+  const corpus = [
+    plan.instruction,
+    plan.context,
+    plan.placeholderText,
+    plan.sourcePack.markdown,
+    ...plan.sourcePack.items.flatMap((item) => [item.label, item.detail]),
+    ...sectionWorkQueue.flatMap((section) => [section.heading, section.contract.purpose, section.contract.desiredDecision]),
+    ...documentEvidence.claimInventory.map((claim) => claim.text),
+    ...distributionTargetPlans.flatMap((target) => [target.label, ...target.preflightChecks, ...target.evidenceRequired]),
+  ]
+    .join("\n")
+    .toLowerCase();
+  const target = (signal: RegExp, fallback = "Current cursor") => {
+    const section = sectionWorkQueue.find((item) => signal.test(item.heading) || signal.test(item.contract.purpose));
+    return {
+      sectionId: section?.id,
+      insertionTarget: section ? `Section ${section.order}: ${section.heading}` : fallback,
+    };
+  };
+  const add = (item: Omit<AgenticTransformRecommendation, "id">) => {
+    const id = `transform-${item.kind}-${stableFingerprint([item.kind, item.label, item.insertionTarget, item.sourceSignal].join("\n")).slice(0, 10)}`;
+    if (recommendations.some((candidate) => candidate.id === id || candidate.label === item.label)) return;
+    recommendations.push({ id, ...item });
+  };
+
+  if (/\b(roi|payback|investment|budget|financial|finance|forecast|revenue|arr|margin|cost|pricing|runway|cash|npv|irr)\b/.test(corpus)) {
+    const location = target(/\b(financial|finance|investment|business case|pricing|budget|cost|forecast|evidence|analysis|recommendation)\b/i);
+    add({
+      kind: "calc",
+      label: "Financial model calculation",
+      purpose: "Ground the financial argument in a reusable calculation before prose depends on ROI, margin, forecast, or budget claims.",
+      ...location,
+      templateId: /\b(runway|cash|burn)\b/.test(corpus) ? "calc-business-runway" : /\b(pricing|price|margin)\b/.test(corpus) ? "calc-business-pricing-sensitivity" : "calc-business-roi",
+      sourceSignal: "Financial, ROI, pricing, revenue, ARR, budget, forecast, or runway language detected in the instruction, source pack, or outline.",
+      narrativeReviewTrigger: "Any changed financial input must create a review task for the recommendation, risk, and executive summary narrative.",
+      evidenceRequired: ["Named source for each input value", "Reviewer confirmation of assumptions", "Export preview with rendered calculation output"],
+      riskLevel: "high",
+      suggestedMarkdown: [
+        "```calc",
+        "investment = 125000",
+        "annual_benefit = 52000",
+        "annual_cost = 9000",
+        "net_annual_benefit = annual_benefit - annual_cost",
+        "roi = net_annual_benefit / investment",
+        "payback_years = investment / net_annual_benefit",
+        "```",
+        "ROI: {{=roi | percent}}",
+        "Payback: {{=payback_years}} years",
+      ].join("\n"),
+      owner: "Transform Agent",
+    });
+  }
+
+  if (/\b(kpi|metrics?|forecast|growth|retention|churn|pipeline|conversion|cohort|revenue|arr|trend|series|chart)\b/.test(corpus)) {
+    const location = target(/\b(metrics?|kpi|forecast|evidence|findings|analysis|results|growth|retention)\b/i);
+    add({
+      kind: "chart",
+      label: "Metric trend chart",
+      purpose: "Turn recurring metrics into a visual checkpoint so the narrative can be reviewed against the plotted values.",
+      ...location,
+      templateId: /\b(kpi|metrics?)\b/.test(corpus) ? "chart-business-kpi" : "chart-finance-line",
+      sourceSignal: "Metric, KPI, forecast, growth, retention, cohort, or trend language detected.",
+      narrativeReviewTrigger: "When a chart value changes, review every sentence that interprets trend, causality, risk, or recommendation strength.",
+      evidenceRequired: ["Metric definitions", "Source period for every value", "Rendered chart preview before export"],
+      riskLevel: "medium",
+      suggestedMarkdown: [
+        "```chart",
+        "type: line",
+        "title: Monthly metric trend",
+        "x: Month",
+        "y: Value",
+        "data:",
+        "  - [Jan, 120]",
+        "  - [Feb, 135]",
+        "  - [Mar, 148]",
+        "```",
+      ].join("\n"),
+      owner: "Data Narrative Agent",
+    });
+  }
+
+  if (/\b(option|tradeoff|comparison|scenario|sensitivity|risk|assumption|vendor|proposal|recommendation|decision)\b/.test(corpus)) {
+    const location = target(/\b(option|tradeoff|risk|recommendation|decision|analysis|scenario|assumption)\b/i);
+    add({
+      kind: "table",
+      label: "Decision comparison table",
+      purpose: "Make options, assumptions, evidence, and recommendation logic scannable before a reviewer approves the narrative.",
+      ...location,
+      sourceSignal: "Decision, option, scenario, sensitivity, risk, proposal, or recommendation language detected.",
+      narrativeReviewTrigger: "Changing an option score or assumption should reopen the recommendation paragraph and risk register.",
+      evidenceRequired: ["Source or owner for each option", "Decision criteria", "Reviewer note for the chosen recommendation"],
+      riskLevel: "high",
+      suggestedMarkdown: [
+        "| Option | Evidence | Upside | Risk | Recommendation |",
+        "| --- | --- | --- | --- | --- |",
+        "| Option A | Source or owner | Expected benefit | Key risk | Accept / revise / reject |",
+        "| Option B | Source or owner | Expected benefit | Key risk | Accept / revise / reject |",
+      ].join("\n"),
+      owner: "Strategy Agent",
+    });
+  }
+
+  if (/\b(deadline|timeline|roadmap|implementation|rollout|milestone|phase|schedule|launch|q[1-4]|due)\b/.test(corpus)) {
+    const location = target(/\b(timeline|roadmap|implementation|rollout|next steps?|milestone|schedule|launch)\b/i);
+    add({
+      kind: /\b(roadmap|phase|rollout)\b/.test(corpus) ? "roadmap" : "timeline",
+      label: "Milestone timeline",
+      purpose: "Convert dates, owners, and dependencies into a structured timeline that the plan narrative can reference safely.",
+      ...location,
+      templateId: /\b(roadmap|phase|rollout)\b/.test(corpus) ? "roadmap-product-release" : "timeline-project-plan",
+      sourceSignal: "Timeline, deadline, implementation, rollout, milestone, schedule, quarter, or launch language detected.",
+      narrativeReviewTrigger: "Any moved milestone must reopen owner commitments, deadline claims, and distribution preflight notes.",
+      evidenceRequired: ["Owner for every milestone", "Date or date range source", "Dependency or blocker for each critical path item"],
+      riskLevel: "medium",
+      suggestedMarkdown: [
+        "```timeline",
+        "title: Delivery timeline",
+        "2026-06-01: Confirm scope and source owners",
+        "2026-06-15: Complete review-ready draft",
+        "2026-06-30: Export and distribution sign-off",
+        "```",
+      ].join("\n"),
+      owner: "Delivery Agent",
+    });
+  }
+
+  if (/\b(api|openapi|schema|json|data model|architecture|system|integration|workflow|process|diagram|mermaid)\b/.test(corpus)) {
+    const location = target(/\b(architecture|api|schema|data model|integration|workflow|process|technical|method)\b/i);
+    add({
+      kind: /\b(schema|openapi|json)\b/.test(corpus) ? "schema" : "diagram",
+      label: "Architecture or schema block",
+      purpose: "Represent systems, APIs, data shape, or workflows as structured output before technical prose is finalized.",
+      ...location,
+      templateId: /\b(openapi|api)\b/.test(corpus) ? "openapi-starter" : /\b(schema|json)\b/.test(corpus) ? "json-schema-object" : "mermaid-process-flow",
+      sourceSignal: "API, schema, JSON, architecture, integration, process, workflow, diagram, or Mermaid language detected.",
+      narrativeReviewTrigger: "Changing a node, field, endpoint, or edge should trigger review of implementation, dependency, and risk sections.",
+      evidenceRequired: ["System or API owner", "Version or interface source", "Rendered diagram/schema validation before export"],
+      riskLevel: "high",
+      suggestedMarkdown: [
+        "```mermaid",
+        "flowchart LR",
+        "  Source[Source data] --> Agent[Document agent]",
+        "  Agent --> Review[Human review]",
+        "  Review --> Export[Distribution package]",
+        "```",
+      ].join("\n"),
+      owner: "Technical Agent",
+    });
+  }
+
+  if (documentEvidence.claimInventory.length || plan.sourcePack.items.length || /\b(citation|source|reference|evidence|claim|bibliography|quote)\b/.test(corpus)) {
+    const location = target(/\b(evidence|source|reference|claim|findings|analysis|appendix|citation)\b/i, "Review or evidence section");
+    add({
+      kind: "table",
+      label: "Source-to-claim ledger",
+      purpose: "Bind claims to sources so an agent can detect stale narrative when source data or citations change.",
+      ...location,
+      sourceSignal: "Claims, source-pack items, citation TODOs, references, or evidence language detected.",
+      narrativeReviewTrigger: "Any source status change must reopen claims, executive summary, and export readiness.",
+      evidenceRequired: ["Claim text", "Source owner or reference", "Verification status", "Reviewer decision"],
+      riskLevel: documentEvidence.claimInventory.length ? "high" : "medium",
+      suggestedMarkdown: [
+        "| Claim | Source | Status | Narrative section to review |",
+        "| --- | --- | --- | --- |",
+        "| Material claim or number | Source title, file, URL, or owner | pending / verified / rejected | Section heading |",
+      ].join("\n"),
+      owner: "Evidence Agent",
+    });
+  }
+
+  if (/\b(latex|equation|formula|scientific|research|paper|academic|method|molarity|dose|hypothesis)\b/.test(corpus)) {
+    const location = target(/\b(method|equation|formula|analysis|research|technical|appendix)\b/i);
+    add({
+      kind: "equation",
+      label: "Equation review block",
+      purpose: "Stage equations and scientific assumptions where LaTeX export, citations, and calculation checks can be reviewed together.",
+      ...location,
+      templateId: /\b(dose|weight)\b/.test(corpus) ? "calc-science-dose" : "calc-science-molarity",
+      sourceSignal: "LaTeX, equation, formula, scientific, research, method, dose, or hypothesis language detected.",
+      narrativeReviewTrigger: "When a formula, unit, or parameter changes, review the method, findings, and limitations prose.",
+      evidenceRequired: ["Units and parameter definitions", "Source for formula or method", "LaTeX/PDF export proof"],
+      riskLevel: "high",
+      suggestedMarkdown: [
+        "```calc",
+        "mass_g = 5.84",
+        "moles = 0.1",
+        "molar_mass = mass_g / moles",
+        "```",
+        "Equation check: {{=molar_mass}} g/mol",
+      ].join("\n"),
+      owner: "Scientific Review Agent",
+    });
+  }
+
+  if (distributionTargetPlans.some((targetPlan) => targetPlan.target === "blog" || targetPlan.target === "substack" || targetPlan.target === "html")) {
+    add({
+      kind: "publishing",
+      label: "Publishing metadata table",
+      purpose: "Prepare channel-specific metadata and reuse it across blog, Substack, and HTML distribution checks.",
+      insertionTarget: "Distribution or publishing handoff",
+      sourceSignal: "Blog, Substack, newsletter, or HTML distribution target detected.",
+      narrativeReviewTrigger: "Changing title, excerpt, subject line, CTA, or tags should reopen the first paragraph and distribution preview.",
+      evidenceRequired: ["Channel title", "Excerpt or preview text", "CTA", "Link and metadata preview"],
+      riskLevel: "medium",
+      suggestedMarkdown: [
+        "| Channel | Title | Excerpt / preview text | Tags | CTA |",
+        "| --- | --- | --- | --- | --- |",
+        "| Blog | Working title | Search/social excerpt | tag-1, tag-2 | Primary action |",
+        "| Substack | Subject line | Inbox preview | tag-1, tag-2 | Reader action |",
+      ].join("\n"),
+      owner: "Distribution Agent",
+    });
+  }
+
+  if (!recommendations.length) {
+    add({
+      kind: "table",
+      label: "Document evidence table",
+      purpose: "Create a lightweight source and decision ledger before the agent drafts or revises unsupported prose.",
+      insertionTarget: "Review or evidence section",
+      sourceSignal: "No specific transform signal was detected, so the agent recommends a general evidence ledger.",
+      narrativeReviewTrigger: "Any evidence status change should reopen related claims and reviewer handoff notes.",
+      evidenceRequired: ["Claim or decision", "Source or owner", "Status", "Reviewer note"],
+      riskLevel: "low",
+      suggestedMarkdown: [
+        "| Item | Source or owner | Status | Review note |",
+        "| --- | --- | --- | --- |",
+        "| Claim, decision, or assumption | Source title, file, URL, or owner | pending / verified | Human review note |",
+      ].join("\n"),
+      owner: "Evidence Agent",
+    });
+  }
+
+  return recommendations.slice(0, 10);
 }
 
 function buildSectionContract(
@@ -3345,8 +3679,9 @@ function buildAutomationQueue(input: {
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   controlCenter: AgenticControlCenter;
   blockers: string[];
+  transformRecommendations: AgenticTransformRecommendation[];
 }): AgenticAutomationTask[] {
-  const { plan, documentEvidence, outlineCritique, distributionTargetPlans, controlCenter, blockers } = input;
+  const { plan, documentEvidence, outlineCritique, distributionTargetPlans, controlCenter, blockers, transformRecommendations } = input;
   const evidenceBlockerCount =
     documentEvidence.unresolvedPlaceholders.length +
     documentEvidence.citationTodos.length +
@@ -3362,6 +3697,9 @@ function buildAutomationQueue(input: {
       : "",
     /\b(calc|chart|diagram|timeline|roadmap|table|schema|openapi|latex|equation)\b/i.test(plan.instruction)
       ? "Instruction mentions transform, table, diagram, schema, equation, or data work."
+      : "",
+    transformRecommendations.length
+      ? `Agent selected ${transformRecommendations.length} transform recommendation(s): ${transformRecommendations.map((item) => item.label).join("; ")}.`
       : "",
   ].filter(Boolean);
   const tasks: AgenticAutomationTask[] = [
@@ -3394,7 +3732,7 @@ function buildAutomationQueue(input: {
       kind: "transform-validation",
       label: "Validate recommended transforms and templates",
       owner: "Transform Agent",
-      status: transformHints.length ? "needs-input" : "ready",
+      status: transformRecommendations.some((item) => item.riskLevel === "high") || transformHints.length ? "needs-input" : "ready",
       trigger: "Run before inserting calc, table, chart, diagram, timeline, roadmap, schema, QR, or equation blocks.",
       action: "open-review",
       evidence: transformHints.length ? transformHints : ["No transform-specific source cues detected in the current run."],
@@ -3499,6 +3837,7 @@ function buildAuditTrail(input: {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  transformRecommendations: AgenticTransformRecommendation[];
   automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   documentEvidence: AgenticDocumentEvidence;
@@ -3520,6 +3859,7 @@ function buildAuditTrail(input: {
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    transformRecommendations,
     automationQueue,
     preReviewRehearsal,
     documentEvidence,
@@ -3573,6 +3913,21 @@ function buildAuditTrail(input: {
       item.sourceFingerprint,
       item.acceptanceStatus,
       ...item.reviewerNotes,
+    ]),
+    ...transformRecommendations.flatMap((item) => [
+      item.id,
+      item.kind,
+      item.label,
+      item.purpose,
+      item.insertionTarget,
+      item.sectionId || "",
+      item.templateId || "",
+      item.sourceSignal,
+      item.narrativeReviewTrigger,
+      item.riskLevel,
+      item.owner,
+      item.suggestedMarkdown,
+      ...item.evidenceRequired,
     ]),
     ...automationQueue.flatMap((item) => [
       item.id,
@@ -3670,6 +4025,7 @@ function buildAuditTrail(input: {
       `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
       `Lifecycle task board prepared for ${lifecycleTasks.length} task(s) across ${Array.from(new Set(lifecycleTasks.map((task) => task.lane))).map(titleCase).join(", ")}.`,
       `Section draft history preserved ${sectionDraftHistory.length} composable draft restore point(s).`,
+      `Transform recommendations prepared ${transformRecommendations.length} agent-selected structured block(s) for calc, chart, table, diagram, timeline, schema, equation, or publishing work.`,
       `Automation scheduler queued ${automationQueue.length} safe local check(s) with destructive actions kept manual.`,
       `Pre-review rehearsal prepared ${preReviewRehearsal.length} likely reviewer question, objection, redline, or missing-evidence prompt(s).`,
       `Outline variant comparison prepared ${plan.outlineVariants.length} alternative structure(s) for user selection before drafting.`,
@@ -3712,13 +4068,14 @@ function buildReleaseEvidenceBundle(input: {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  transformRecommendations: AgenticTransformRecommendation[];
   automationQueue: AgenticAutomationTask[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   documentEvidence: AgenticDocumentEvidence;
   blockers: string[];
 }): AgenticReleaseEvidenceBundle {
-  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, sectionDraftHistory, automationQueue, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
+  const { plan, auditTrail, controlCenter, lifecycleTasks, reviewerAgents, sectionWorkQueue, sectionDraftHistory, transformRecommendations, automationQueue, preReviewRehearsal, distributionTargetPlans, documentEvidence, blockers } = input;
   const taskBlockers = lifecycleTasks.filter((task) => task.status === "blocked" || task.status === "needs-input");
   const reviewerBlockers = reviewerAgents.filter((agent) => agent.status !== "ready");
   const items: AgenticReleaseEvidenceItem[] = [
@@ -3781,6 +4138,15 @@ function buildReleaseEvidenceBundle(input: {
       sectionDraftHistory.length
         ? `${sectionDraftHistory.length} section draft restore point(s) preserve prompt summaries, rationale, reviewer notes, fingerprints, and reusable Markdown.`
         : "No section draft restore points were generated.",
+      true,
+    ),
+    releaseEvidenceItem(
+      "Agent-selected transforms",
+      "Transform Agent",
+      transformRecommendations.length ? "needs-review" : "missing",
+      transformRecommendations.length
+        ? `${transformRecommendations.length} recommended calc, chart, table, diagram, timeline, schema, equation, or publishing block(s) are linked to source signals and narrative review triggers.`
+        : "No agent-selected structured transform recommendations were prepared.",
       true,
     ),
     releaseEvidenceItem(
@@ -4649,6 +5015,7 @@ function buildRunMarkdown(input: {
   reviewerAgents: AgenticReviewerAgent[];
   sectionWorkQueue: AgenticSectionWorkItem[];
   sectionDraftHistory: AgenticSectionDraftHistoryItem[];
+  transformRecommendations: AgenticTransformRecommendation[];
   automationQueue: AgenticAutomationTask[];
   outlineCritique: AgenticOutlineCritiqueItem[];
   preReviewRehearsal: AgenticPreReviewRehearsalItem[];
@@ -4671,6 +5038,7 @@ function buildRunMarkdown(input: {
     reviewerAgents,
     sectionWorkQueue,
     sectionDraftHistory,
+    transformRecommendations,
     automationQueue,
     outlineCritique,
     preReviewRehearsal,
@@ -4786,6 +5154,7 @@ function buildRunMarkdown(input: {
   lines.push(...preReviewRehearsalMarkdown(preReviewRehearsal));
   lines.push(...sectionWorkQueueMarkdown(sectionWorkQueue));
   lines.push(...sectionDraftHistoryMarkdown(sectionDraftHistory));
+  lines.push(...transformRecommendationsMarkdown(transformRecommendations));
   lines.push(...automationQueueMarkdown(automationQueue));
   lines.push(...auditTrailMarkdown(auditTrail));
   lines.push(...releaseEvidenceBundleMarkdown(releaseEvidenceBundle));
@@ -5146,6 +5515,48 @@ function sectionDraftHistoryMarkdown(items: AgenticSectionDraftHistoryItem[]) {
       "Restore point:",
       "",
       fencedBlock("markdown", item.restorePointMarkdown),
+      "",
+    );
+  }
+  return lines;
+}
+
+function transformRecommendationsMarkdown(items: AgenticTransformRecommendation[]) {
+  if (!items.length) {
+    return ["## Agent-Selected Transforms", "", "No transform recommendations were prepared for this run.", ""];
+  }
+  const lines = [
+    "## Agent-Selected Transforms",
+    "",
+    "| Kind | Recommendation | Target | Risk | Trigger |",
+    "| --- | --- | --- | --- | --- |",
+    ...items.map(
+      (item) =>
+        `| ${item.kind} | ${escapeTableCell(item.label)} | ${escapeTableCell(item.insertionTarget)} | ${item.riskLevel} | ${escapeTableCell(item.narrativeReviewTrigger)} |`,
+    ),
+    "",
+  ];
+  for (const item of items) {
+    lines.push(
+      `### ${item.label}`,
+      "",
+      `Owner: ${item.owner}`,
+      "",
+      `Kind: ${item.kind}`,
+      "",
+      ...(item.templateId ? [`Template: ${item.templateId}`, ""] : []),
+      `Insertion target: ${item.insertionTarget}`,
+      "",
+      `Source signal: ${item.sourceSignal}`,
+      "",
+      `Narrative review trigger: ${item.narrativeReviewTrigger}`,
+      "",
+      "Evidence required:",
+      ...item.evidenceRequired.map((evidence) => `- [ ] ${evidence}`),
+      "",
+      "Suggested block:",
+      "",
+      fencedBlock("markdown", item.suggestedMarkdown.trim()),
       "",
     );
   }

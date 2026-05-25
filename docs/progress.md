@@ -2852,6 +2852,13 @@ Compiler media inventory verification:
 | `pnpm run test:unit` | Pass | Frontend static coverage now requires the Compiler output inventory to expose explicit Media map and Figure media uses rows. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "navigates compiler diagnostics" --project chromium` | Pass | The browser workflow opens a document with a figure and diagnostic target, then proves the Diagnostics sidebar reports `Media map` with one media file and `Figure media uses` with one figure use beside the source-ranged diagnostic inventory. |
 
+Agent-selected transform recommendation verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 46 frontend unit tests passed, including agentic runs that produce source-grounded calc, chart, table, timeline/schema/equation/publishing recommendations with suggested Markdown, lifecycle tasks, audit events, release evidence, UI insertion/copy actions, and persisted run-history counts. |
+| `pnpm run check:ai-roadmap` | Pass | The AI-first roadmap verifier treats Agent-Selected Transforms as a required product surface for roadmap items 29 and 30 and passed the 50-change roadmap contract. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

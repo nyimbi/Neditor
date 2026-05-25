@@ -60,6 +60,7 @@ const productSurfaceChecks = [
   ["Document memory", app],
   ["Section contract", app],
   ["Section Draft History", app],
+  ["Agent-Selected Transforms", app],
   ["Outline variants", app],
   ["Agent workflow playbooks", app],
   ["AI control center", app],
