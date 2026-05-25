@@ -61,6 +61,7 @@ export interface AgenticWorkflowRun {
   revision: AgenticWorkflowRevision | null;
   controlCenter: AgenticControlCenter;
   auditTrail: AgenticAuditTrail;
+  reviewerAgents: AgenticReviewerAgent[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -114,6 +115,18 @@ export interface AgenticAuditTrail {
   applicationMode: AgenticWorkflowRun["applicationMode"];
   rollbackPlan: string[];
   reviewEvents: string[];
+}
+
+export type AgenticReviewerAgentId = "editor" | "evidence" | "risk" | "citation" | "governance" | "export";
+export type AgenticReviewerAgentStatus = "ready" | "needs-review" | "blocked";
+
+export interface AgenticReviewerAgent {
+  id: AgenticReviewerAgentId;
+  label: string;
+  mandate: string;
+  status: AgenticReviewerAgentStatus;
+  findings: string[];
+  requiredActions: string[];
 }
 
 const agentPlannerVersion = "agentic-workflow-v3-control-audit";
@@ -207,11 +220,13 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   const blockers = buildRunBlockers(plan, hasDocument, hasSelection);
   const applicationMode = inferApplicationMode(plan, hasDocument, hasSelection);
   const controlCenter = buildControlCenter({ plan, blockers, hasDocument, hasSelection, revision, distributionTargetPlans });
+  const reviewerAgents = buildReviewerAgents({ plan, draftMarkdown: draft?.markdown || "", revision, controlCenter, distributionTargetPlans, blockers });
   const auditTrail = buildAuditTrail({
     plan,
     request,
     revision,
     draftMarkdown: draft?.markdown || "",
+    reviewerAgents,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -225,6 +240,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     revision,
     controlCenter,
     auditTrail,
+    reviewerAgents,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -240,6 +256,7 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
     revision,
     controlCenter,
     auditTrail,
+    reviewerAgents,
     reviewChecklist,
     distributionChecklist,
     distributionTargetPlans,
@@ -503,6 +520,132 @@ function buildDistributionChecklist(plan: AgenticWorkflowPlan, targetPlans: Agen
   ]);
 }
 
+function buildReviewerAgents(input: {
+  plan: AgenticWorkflowPlan;
+  draftMarkdown: string;
+  revision: AgenticWorkflowRevision | null;
+  controlCenter: AgenticControlCenter;
+  distributionTargetPlans: AgenticDistributionTargetPlan[];
+  blockers: string[];
+}): AgenticReviewerAgent[] {
+  const { plan, draftMarkdown, revision, controlCenter, distributionTargetPlans, blockers } = input;
+  const evidenceValue = extractKeyValue(plan.placeholderText, "evidence");
+  const hasSpecificEvidence = Boolean(evidenceValue && !/^TBD\b/i.test(evidenceValue));
+  const hasDraft = Boolean(draftMarkdown.trim());
+  const missingInputs = plan.missingInputs.join(", ");
+  const hardBlockers = blockers.filter((blocker) => !blocker.startsWith("Missing input:"));
+  const distributionLabels = distributionTargetPlans.map((target) => target.label).join(", ");
+
+  return [
+    reviewerAgent({
+      id: "editor",
+      label: "Editorial Reviewer",
+      mandate: "Improve clarity, audience fit, structure, tone, and human readability before anyone treats the packet as final copy.",
+      findings: [
+        plan.suggestedOutline.trim() ? "Outline is available as an editorial structure for section-by-section review." : "No outline was available to validate narrative structure.",
+        hasDraft ? "Generated draft exists and needs audience-fit and stale phrase cleanup." : revision ? "Revision proposal exists and needs before/after editorial comparison." : "No generated body copy is present yet.",
+        `Tone target: ${extractKeyValue(plan.placeholderText, "tone") || "professional and direct"}.`,
+      ],
+      requiredActions: [
+        missingInputs.includes("audience") ? "Confirm the intended audience before approving voice, detail level, and calls to action." : "",
+        revision ? "Compare the proposed revision to the source text for meaning drift and over-compression." : "",
+        hasDraft ? "Run a humanization pass for generic AI phrasing, repetition, and claims that sound confident without support." : "",
+      ],
+    }),
+    reviewerAgent({
+      id: "evidence",
+      label: "Evidence Reviewer",
+      mandate: "Trace claims, numbers, dates, and decisions back to named source material before approval.",
+      findings: [
+        hasSpecificEvidence ? `Evidence expectation captured: ${evidenceValue}.` : "Evidence is still generic or missing.",
+        controlCenter.sourceGrounding.some((item) => item.label === "Current document" && item.status === "available")
+          ? "Current document context is available for source comparison."
+          : "Current document source text is not available for full grounding.",
+      ],
+      requiredActions: [
+        hasSpecificEvidence ? "Verify every material claim against the supplied evidence before final export." : "Supply source evidence, data references, or citation expectations before final approval.",
+        "Mark unsupported claims with citation TODOs instead of letting them ship as confident assertions.",
+      ],
+    }),
+    reviewerAgent({
+      id: "risk",
+      label: "Risk Reviewer",
+      mandate: "Surface decision risk, operational assumptions, missing approvals, and blocker severity.",
+      findings: [
+        blockers.length ? `${blockers.length} blocker or missing-input item(s) remain.` : "No blocker items were generated for this packet.",
+        plan.lanes.includes("distribute") ? "Distribution is in scope, so approval and release risk must be checked explicitly." : "Distribution is not currently in scope.",
+      ],
+      requiredActions: [
+        ...hardBlockers,
+        blockers.length && !hardBlockers.length ? "Resolve all missing-input blockers before marking the packet approved." : "",
+        plan.lanes.includes("distribute") ? "Confirm approval status, reviewer, and release owner before any external handoff." : "",
+      ],
+    }),
+    reviewerAgent({
+      id: "citation",
+      label: "Citation Reviewer",
+      mandate: "Ensure citation expectations, bibliography notes, links, and source markers survive drafting and export.",
+      findings: [
+        plan.instruction.match(/\bcitations?|references?|sources?\b/i) ? "The instruction explicitly asks for source or citation review." : "Citation handling is inferred from evidence and review requirements.",
+        plan.distributionTargets.includes("latex") ? "LaTeX export requires bibliography, labels, equations, and cross-reference checks." : "No LaTeX-specific citation target is active.",
+      ],
+      requiredActions: [
+        "Add citation TODOs beside factual claims that do not have a named source.",
+        plan.distributionTargets.includes("html") || plan.distributionTargets.includes("blog") || plan.distributionTargets.includes("substack")
+          ? "Check external links, canonical URL expectations, and visible source notes for web publishing."
+          : "",
+        plan.distributionTargets.includes("latex") ? "Confirm bibliography entries and citation keys compile in the exported TeX source." : "",
+      ],
+    }),
+    reviewerAgent({
+      id: "governance",
+      label: "Governance Reviewer",
+      mandate: "Keep AI provenance, audit fingerprints, rollback instructions, and human review status visible.",
+      findings: [
+        "AI source metadata, control-center status, and audit fingerprints are included in the run packet.",
+        `Apply mode is ${inferApplicationMode(plan, Boolean(controlCenter.sourceGrounding.find((item) => item.label === "Current document" && item.status === "available")), Boolean(controlCenter.sourceGrounding.find((item) => item.label === "Selected text" && item.status === "available")))}.`,
+      ],
+      requiredActions: [
+        "Do not remove AI provenance until a human reviewer has accepted the generated section or packet.",
+        "Retain run ID, source fingerprint, and output fingerprint in review notes when applying agent output.",
+      ],
+    }),
+    reviewerAgent({
+      id: "export",
+      label: "Export Reviewer",
+      mandate: "Validate channel-specific packaging, manifests, previews, and distribution evidence before release.",
+      findings: [
+        distributionTargetPlans.length ? `Target runbooks staged for ${distributionLabels}.` : "No export or publishing target is selected yet.",
+        distributionTargetPlans.length
+          ? "Each target has preflight checks, handoff steps, and evidence requirements."
+          : "Export reviewer cannot complete target checks until a target is chosen.",
+      ],
+      requiredActions: [
+        distributionTargetPlans.length ? "Run export readiness for every target and keep manifest evidence with the review record." : "Choose at least one target before claiming distribution readiness.",
+        ...distributionTargetPlans.map((target) => `${target.label}: ${target.evidenceRequired[0]}`),
+      ],
+    }),
+  ];
+}
+
+function reviewerAgent(input: Omit<AgenticReviewerAgent, "status">): AgenticReviewerAgent {
+  const requiredActions = input.requiredActions.filter(Boolean);
+  const findings = input.findings.filter(Boolean);
+  const status: AgenticReviewerAgentStatus =
+    requiredActions.some((item) => /\b(blocked|no document|no export|supply|resolve all|choose at least one)\b/i.test(item)) ||
+    findings.some((item) => /\bnot available|missing\b/i.test(item))
+      ? "blocked"
+      : requiredActions.length
+        ? "needs-review"
+        : "ready";
+  return {
+    ...input,
+    status,
+    findings,
+    requiredActions,
+  };
+}
+
 function buildControlCenter(input: {
   plan: AgenticWorkflowPlan;
   blockers: string[];
@@ -542,6 +685,7 @@ function buildAuditTrail(input: {
   request: AgenticWorkflowRunRequest;
   revision: AgenticWorkflowRevision | null;
   draftMarkdown: string;
+  reviewerAgents: AgenticReviewerAgent[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
@@ -549,12 +693,25 @@ function buildAuditTrail(input: {
   applicationMode: AgenticWorkflowRun["applicationMode"];
   generatedAt: string;
 }): AgenticAuditTrail {
-  const { plan, request, revision, draftMarkdown, reviewChecklist, distributionChecklist, distributionTargetPlans, blockers, applicationMode, generatedAt } = input;
+  const {
+    plan,
+    request,
+    revision,
+    draftMarkdown,
+    reviewerAgents,
+    reviewChecklist,
+    distributionChecklist,
+    distributionTargetPlans,
+    blockers,
+    applicationMode,
+    generatedAt,
+  } = input;
   const contextPayload = [plan.context, plan.placeholderText, plan.suggestedOutline, plan.revisionInstruction].join("\n---\n");
   const sourcePayload = [request.documentTitle || "", request.documentText || "", request.selectedText || ""].join("\n---\n");
   const outputPayload = [
     draftMarkdown,
     revision?.proposedText || "",
+    ...reviewerAgents.flatMap((agent) => [agent.id, agent.label, agent.mandate, agent.status, ...agent.findings, ...agent.requiredActions]),
     ...reviewChecklist,
     ...distributionChecklist,
     ...distributionTargetPlans.flatMap((target) => [target.target, target.label, ...target.preflightChecks, ...target.handoffSteps, ...target.evidenceRequired]),
@@ -574,6 +731,7 @@ function buildAuditTrail(input: {
       "Agent plan generated from current instruction, document context, and selection state.",
       "AI provenance metadata attached to generated packet.",
       blockers.length ? `Human review required before release because ${blockers.length} blocker item(s) remain.` : "No blocker items detected at packet generation time.",
+      `Reviewer agents prepared for ${reviewerAgents.map((agent) => agent.label).join(", ")}.`,
       distributionTargetPlans.length
         ? `Distribution evidence requirements staged for ${distributionTargetPlans.map((target) => target.label).join(", ")}.`
         : "No distribution target selected at packet generation time.",
@@ -833,13 +991,26 @@ function buildRunMarkdown(input: {
   revision: AgenticWorkflowRevision | null;
   controlCenter: AgenticControlCenter;
   auditTrail: AgenticAuditTrail;
+  reviewerAgents: AgenticReviewerAgent[];
   reviewChecklist: string[];
   distributionChecklist: string[];
   distributionTargetPlans: AgenticDistributionTargetPlan[];
   blockers: string[];
   generatedAt: string;
 }) {
-  const { plan, draftMarkdown, revision, controlCenter, auditTrail, reviewChecklist, distributionChecklist, distributionTargetPlans, blockers, generatedAt } = input;
+  const {
+    plan,
+    draftMarkdown,
+    revision,
+    controlCenter,
+    auditTrail,
+    reviewerAgents,
+    reviewChecklist,
+    distributionChecklist,
+    distributionTargetPlans,
+    blockers,
+    generatedAt,
+  } = input;
   const lines = [
     "---",
     `title: ${yamlScalar(`${plan.title} Agent Run`)}`,
@@ -883,6 +1054,7 @@ function buildRunMarkdown(input: {
     lines.push("### Blockers", "", ...blockers.map((blocker) => `- [ ] ${blocker}`), "");
   }
   lines.push(...controlCenterMarkdown(controlCenter));
+  lines.push(...reviewerAgentsMarkdown(reviewerAgents));
   lines.push(...auditTrailMarkdown(auditTrail));
   if (draftMarkdown.trim()) {
     lines.push("## Generated Draft", "", draftMarkdown.trim(), "");
@@ -950,6 +1122,27 @@ function controlCenterMarkdown(controlCenter: AgenticControlCenter) {
     ...controlCenter.distribution.map((item) => `- ${item.label} [${item.status}]: ${item.detail}`),
     "",
   ];
+}
+
+function reviewerAgentsMarkdown(reviewerAgents: AgenticReviewerAgent[]) {
+  const lines = ["## Review Agents", ""];
+  for (const agent of reviewerAgents) {
+    lines.push(
+      `### ${agent.label}`,
+      "",
+      `Status: ${agent.status}`,
+      "",
+      `Mandate: ${agent.mandate}`,
+      "",
+      "Findings:",
+      ...agent.findings.map((item) => `- ${item}`),
+      "",
+      "Required actions:",
+      ...agent.requiredActions.map((item) => `- [ ] ${item}`),
+      "",
+    );
+  }
+  return lines;
 }
 
 function auditTrailMarkdown(auditTrail: AgenticAuditTrail) {

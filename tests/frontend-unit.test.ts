@@ -487,6 +487,9 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("### Target Runbooks"));
   ok(run.markdown.includes("## AI Control Center"));
   ok(run.markdown.includes("### Source Grounding"));
+  ok(run.markdown.includes("## Review Agents"));
+  ok(run.markdown.includes("### Editorial Reviewer"));
+  ok(run.markdown.includes("### Export Reviewer"));
   ok(run.markdown.includes("## Agent Audit Trail"));
   ok(run.markdown.includes("### Rollback Plan"));
   ok(run.markdown.includes("Substack newsletter package"));
@@ -503,6 +506,11 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Evidence" && item.status === "available"));
   ok(run.controlCenter.governance.some((item) => item.label === "AI provenance" && item.status === "available"));
   ok(run.controlCenter.distribution.some((item) => item.label === "Substack newsletter package"));
+  equal(run.reviewerAgents.length, 6);
+  ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.findings.some((item) => item.includes("Outline"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "evidence" && agent.requiredActions.some((item) => item.includes("Verify every material claim"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "export" && agent.requiredActions.some((item) => item.includes("Google Docs collaboration package"))));
+  ok(run.auditTrail.reviewEvents.some((item) => item.includes("Reviewer agents prepared")));
   ok(run.distributionChecklist.some((item) => item.startsWith("Substack newsletter package:")));
   ok(run.reviewChecklist.some((item) => item.includes("human-reviewed")));
 });
@@ -510,7 +518,7 @@ test("agentic workflow run generates auditable creation and distribution packets
 test("agentic workflow run proposes selection-aware revisions with review metadata", () => {
   const run = buildAgenticWorkflowRun({
     instruction:
-      "Revise this for the CFO, make it concise, humanize the tone, then check risks. audience: finance committee owner: Strategy deadline: June 1 evidence: signed forecast",
+      "Revise this for the CFO, make it concise, humanize the tone, then check risks. audience: finance committee owner: Strategy deadline: June 1 tone: concise evidence: signed forecast reviewer: CFO",
     documentTitle: "Expansion Options",
     documentText: "# Expansion Options\n\nDraft body.",
     selectedText:
@@ -528,6 +536,8 @@ test("agentic workflow run proposes selection-aware revisions with review metada
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Selected text" && item.status === "available"));
   ok(run.controlCenter.governance.some((item) => item.label === "Revision audit" && item.status === "available"));
   ok(run.controlCenter.nextActions.some((action) => action.lane === "revise"));
+  ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("Compare the proposed revision"))));
+  ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.findings.some((item) => item.includes("No blocker"))));
   equal(run.auditTrail.applicationMode, "replace-selection");
   ok(run.auditTrail.rollbackPlan.some((item) => item.includes("editor undo")));
   ok(run.markdown.includes("Apply mode: replace-selection"));
@@ -928,6 +938,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Agent generated output"'));
   ok(app.includes('aria-label="AI control center"'));
   ok(app.includes("agentRun.controlCenter"));
+  ok(app.includes('aria-label="Agent reviewer agents"'));
+  ok(app.includes("agentRun.reviewerAgents"));
+  ok(app.includes("reviewer.requiredActions"));
   ok(app.includes('aria-label="Agent audit trail"'));
   ok(app.includes("agentRun.auditTrail"));
   ok(app.includes("Rollback plan"));

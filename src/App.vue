@@ -1982,6 +1982,38 @@
                 </article>
               </section>
             </section>
+            <section class="agent-reviewer-agents" aria-label="Agent reviewer agents">
+              <header>
+                <div>
+                  <strong>Review Agents</strong>
+                  <span>Specialized agent checks for editorial quality, evidence, risk, citations, governance, and export readiness.</span>
+                </div>
+                <small>{{ agentRun.reviewerAgents.length }} reviewers</small>
+              </header>
+              <section class="agent-reviewer-grid">
+                <article v-for="reviewer in agentRun.reviewerAgents" :key="reviewer.id" :data-status="reviewer.status">
+                  <header>
+                    <div>
+                      <strong>{{ reviewer.label }}</strong>
+                      <span>{{ reviewer.status }}</span>
+                    </div>
+                  </header>
+                  <p>{{ reviewer.mandate }}</p>
+                  <div>
+                    <h3>Findings</h3>
+                    <ul>
+                      <li v-for="item in reviewer.findings" :key="item">{{ item }}</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h3>Required actions</h3>
+                    <ul>
+                      <li v-for="item in reviewer.requiredActions" :key="item">{{ item }}</li>
+                    </ul>
+                  </div>
+                </article>
+              </section>
+            </section>
             <section class="agent-audit-trail" aria-label="Agent audit trail">
               <header>
                 <div>
@@ -8621,6 +8653,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-run-output,
 .app-shell[data-theme="dark"] .agent-control-center,
 .app-shell[data-theme="dark"] .agent-control-grid article,
+.app-shell[data-theme="dark"] .agent-reviewer-agents,
+.app-shell[data-theme="dark"] .agent-reviewer-grid article,
 .app-shell[data-theme="dark"] .agent-audit-trail,
 .app-shell[data-theme="dark"] .agent-audit-grid article,
 .app-shell[data-theme="dark"] .agent-history,
@@ -8654,6 +8688,10 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-step-list small,
 .app-shell[data-theme="dark"] .agent-run-output > header span,
 .app-shell[data-theme="dark"] .agent-run-output > header small,
+.app-shell[data-theme="dark"] .agent-reviewer-agents > header span,
+.app-shell[data-theme="dark"] .agent-reviewer-agents > header small,
+.app-shell[data-theme="dark"] .agent-reviewer-grid article header span,
+.app-shell[data-theme="dark"] .agent-reviewer-grid ul,
 .app-shell[data-theme="dark"] .agent-run-columns ul,
 .app-shell[data-theme="dark"] .agent-distribution-runbooks ul,
 .app-shell[data-theme="dark"] .agent-provider-panel header span,
@@ -8723,6 +8761,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-run-output,
   .app-shell[data-theme="system"] .agent-control-center,
   .app-shell[data-theme="system"] .agent-control-grid article,
+  .app-shell[data-theme="system"] .agent-reviewer-agents,
+  .app-shell[data-theme="system"] .agent-reviewer-grid article,
   .app-shell[data-theme="system"] .agent-audit-trail,
   .app-shell[data-theme="system"] .agent-audit-grid article,
   .app-shell[data-theme="system"] .agent-history,
@@ -8756,6 +8796,10 @@ select:hover {
   .app-shell[data-theme="system"] .agent-step-list small,
   .app-shell[data-theme="system"] .agent-run-output > header span,
   .app-shell[data-theme="system"] .agent-run-output > header small,
+  .app-shell[data-theme="system"] .agent-reviewer-agents > header span,
+  .app-shell[data-theme="system"] .agent-reviewer-agents > header small,
+  .app-shell[data-theme="system"] .agent-reviewer-grid article header span,
+  .app-shell[data-theme="system"] .agent-reviewer-grid ul,
   .app-shell[data-theme="system"] .agent-run-columns ul,
   .app-shell[data-theme="system"] .agent-distribution-runbooks ul,
   .app-shell[data-theme="system"] .agent-provider-panel header span,
@@ -8810,6 +8854,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-run-output,
 .app-shell[data-high-contrast="true"] .agent-control-center,
 .app-shell[data-high-contrast="true"] .agent-control-grid article,
+.app-shell[data-high-contrast="true"] .agent-reviewer-agents,
+.app-shell[data-high-contrast="true"] .agent-reviewer-grid article,
 .app-shell[data-high-contrast="true"] .agent-audit-trail,
 .app-shell[data-high-contrast="true"] .agent-audit-grid article,
 .app-shell[data-high-contrast="true"] .agent-history,
@@ -10292,6 +10338,8 @@ select:hover {
 .agent-run-output,
 .agent-control-center,
 .agent-control-grid article,
+.agent-reviewer-agents,
+.agent-reviewer-grid article,
 .agent-audit-trail,
 .agent-audit-grid article,
 .agent-history,
@@ -10464,6 +10512,76 @@ select:hover {
 }
 
 .agent-control-grid li p {
+  color: #2d3746;
+  font-size: 12px;
+}
+
+.agent-reviewer-agents {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid #6d668d;
+  background: #fbfaff;
+}
+
+.agent-reviewer-agents > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-reviewer-agents > header div,
+.agent-reviewer-grid article,
+.agent-reviewer-grid article header div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-reviewer-agents > header span,
+.agent-reviewer-agents > header small,
+.agent-reviewer-grid article header span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.agent-reviewer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-reviewer-grid article {
+  gap: 8px;
+  border-left: 3px solid #7fa2cd;
+}
+
+.agent-reviewer-grid article[data-status="needs-review"] {
+  border-left-color: #c68a1a;
+}
+
+.agent-reviewer-grid article[data-status="blocked"] {
+  border-left-color: #b34040;
+}
+
+.agent-reviewer-grid article header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-reviewer-grid h3,
+.agent-reviewer-grid p,
+.agent-reviewer-grid ul {
+  margin: 0;
+}
+
+.agent-reviewer-grid h3 {
+  font-size: 12px;
+}
+
+.agent-reviewer-grid ul {
+  display: grid;
+  gap: 4px;
+  padding-left: 18px;
   color: #2d3746;
   font-size: 12px;
 }
@@ -11850,6 +11968,7 @@ select:hover {
 
   .agent-plan-grid,
   .agent-control-grid,
+  .agent-reviewer-grid,
   .agent-audit-grid,
   .agent-history li,
   .agent-history dl,

@@ -84,7 +84,10 @@ selection-aware revision proposal when editing or revision is requested, QA
 gates, distribution gates, and blockers for missing inputs. The packet also
 shows an **AI Control Center** with readiness score, next actions, source
 grounding, governance state, and distribution state so reviewers can see what is
-safe to do next before applying generated text. The same packet includes an
+safe to do next before applying generated text. The same packet includes named
+reviewer agents for editorial quality, evidence grounding, risk, citations,
+governance, and export readiness so each review lane has findings and required
+actions instead of one undifferentiated checklist. The packet also includes an
 **Agent Audit Trail** with run ID, deterministic fingerprints for instruction,
 context, source, and output payloads, rollback guidance, and review events.
 Generated and applied runs are also saved in local workspace history so a user
