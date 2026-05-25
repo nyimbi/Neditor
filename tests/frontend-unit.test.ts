@@ -1753,6 +1753,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Replace matching section"));
   ok(app.includes("replaceOrAppendMarkdownSection"));
   ok(app.includes("Applied Docs Live draft to"));
+  ok(app.includes("appendDocsLiveDraftForReview"));
+  ok(app.includes("copyDocsLiveDraft"));
+  ok(app.includes("Appended Docs Live draft for review"));
+  ok(app.includes("Copied Docs Live draft"));
+  ok(app.includes("docs-live-draft-actions"));
   ok(app.includes("Draft in Docs Live"));
   ok(app.includes('aria-label="Agent audit trail"'));
   ok(app.includes("agentRun.auditTrail"));

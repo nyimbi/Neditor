@@ -216,7 +216,9 @@ strategy plans, project plans, research briefs, policies, meeting briefs,
 business cases, operating procedures, technical architecture documents, ADRs,
 release notes, contract briefs, marketing briefs, and customer case studies.
 Each blueprint supplies a default outline, context questions, section focus, QA
-prompts, humanization tasks, and reviewer handoff notes.
+prompts, humanization tasks, and reviewer handoff notes. After generation, copy
+the draft for external review, append it as review material, or apply it with
+the selected replace/append/selection/section mode.
 
 Before relying on dictation or clipboard-assisted cleanup, use **Check AI
 runtime** in Docs Live. The report checks secure runtime context, Web Speech,

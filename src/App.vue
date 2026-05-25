@@ -2024,6 +2024,10 @@
           <header>
             <strong>{{ docsLiveDraft?.sections.length || 0 }} drafted sections</strong>
             <span>{{ docsLiveDraft?.title }}</span>
+            <div class="docs-live-draft-actions">
+              <button type="button" @click="appendDocsLiveDraftForReview">Append for review</button>
+              <button type="button" @click="copyDocsLiveDraft">Copy draft</button>
+            </div>
           </header>
           <textarea :value="docsLiveGeneratedMarkdown" rows="12" readonly aria-label="Docs Live generated Markdown"></textarea>
         </section>
@@ -9637,6 +9641,23 @@ function applyDocsLiveDraft() {
   closeDocsLive();
 }
 
+function appendDocsLiveDraftForReview() {
+  if (!docsLiveGeneratedMarkdown.value.trim()) return;
+  store.updateText(`${active.value.text.trimEnd()}\n\n${docsLiveGeneratedMarkdown.value}`);
+  store.sidebar = "review";
+  store.statusMessage = "Appended Docs Live draft for review";
+}
+
+async function copyDocsLiveDraft() {
+  if (!docsLiveGeneratedMarkdown.value.trim()) return;
+  try {
+    await navigator.clipboard?.writeText(docsLiveGeneratedMarkdown.value);
+    store.statusMessage = "Copied Docs Live draft";
+  } catch {
+    store.statusMessage = "Docs Live draft is ready to copy";
+  }
+}
+
 function toggleDocsLiveDictation() {
   if (docsLiveListening.value) {
     stopDocsLiveDictation();
@@ -14036,6 +14057,19 @@ select:hover {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.docs-live-draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.docs-live-draft-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .docs-live-voice-actions span,
