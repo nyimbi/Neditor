@@ -232,7 +232,9 @@ web app.
   publishing drafts, and other supported business documents, a review comment
   resolution queue with per-comment required actions, resolution options, task
   notes, and blocker status, named reviewer agents for editorial, evidence, risk,
-  citation, governance, and export readiness, deterministic outline critique
+  citation, governance, and export readiness, a first-class claim inventory with
+  source jumps, insertable/copyable audit tables, and one-click citation TODO
+  creation for unsupported facts, deterministic outline critique
   for coverage, sequencing, duplication, depth, and specificity, deterministic
   humanization findings for generic, repetitive, vague, or overconfident
   language, a release evidence bundle for audit trail, source grounding, review

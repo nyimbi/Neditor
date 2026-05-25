@@ -1469,6 +1469,36 @@ test("routes natural language command palette instructions to AI workflow surfac
   await expect(agent.getByLabel("AI provider request Markdown")).toHaveValue(/Google Docs/);
 });
 
+test("turns agent claim inventory findings into citation TODOs", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/claim-inventory.md",
+    [
+      "---",
+      "title: Claim Inventory",
+      "status: draft",
+      "---",
+      "",
+      "# Claim Inventory",
+      "",
+      "Revenue increased 18% in 2026 because renewal expansion improved.",
+      "The company will launch the premium plan in Q3 FY2026.",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/claim-inventory.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByRole("button", { name: "Agent" }).click();
+  const agent = page.getByRole("dialog", { name: "AI agent workspace" });
+  await agent.getByLabel("What should NEditor do?").fill("Review claims and evidence, prepare PDF distribution, and create citation TODOs for unsupported facts.");
+  await agent.getByRole("button", { name: "Generate agent packet" }).click();
+  const claimInventory = agent.getByRole("region", { name: "Agent claim inventory" });
+  await expect(claimInventory).toContainText("Revenue increased 18%");
+  await expect(claimInventory).toContainText("launch the premium plan");
+  await claimInventory.locator(".snapshot-row").filter({ hasText: "Revenue increased 18%" }).getByRole("button", { name: "Add citation TODO" }).click();
+  await expect.poll(() => editorText(page)).toContain("citation-todo");
+  await expect.poll(() => editorText(page)).toContain("Revenue increased 18%");
+});
+
 test("exposes keyboard skip links to primary workbench regions", async ({ page }) => {
   for (const [linkName, targetSelector] of [
     ["Skip to commands", "#main-commands"],

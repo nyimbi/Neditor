@@ -2560,6 +2560,27 @@
                 </article>
               </section>
             </section>
+            <section v-if="agentRun.documentEvidence.claimInventory.length" class="agent-claim-inventory" aria-label="Agent claim inventory">
+              <header>
+                <div>
+                  <strong>Claim Inventory</strong>
+                  <span>Trace numbers, dates, commitments, quotes, and risk claims before approval.</span>
+                </div>
+                <small>{{ agentRun.documentEvidence.claimInventory.length }} claims</small>
+              </header>
+              <div class="agent-section-actions">
+                <button type="button" @click="insertAgentClaimInventoryAudit">Insert claim audit</button>
+                <button type="button" @click="copyAgentClaimInventoryAudit">Copy claim audit</button>
+              </div>
+              <article v-for="claim in agentRun.documentEvidence.claimInventory" :key="`${claim.sourceLine}-${claim.text}`" class="snapshot-row" :data-status="claim.kind">
+                <p>{{ claim.text }}</p>
+                <small>Line {{ claim.sourceLine }} | {{ claim.kind }} | {{ claim.reason }}</small>
+                <div class="reference-actions">
+                  <button type="button" @click="goToSourceTarget({ line: claim.sourceLine })">Go to claim</button>
+                  <button type="button" @click="insertClaimCitationTodo(claim)">Add citation TODO</button>
+                </div>
+              </article>
+            </section>
             <section
               v-if="agentRun.documentEvidence.reviewCommentResolutions.length"
               class="agent-review-comment-queue"
@@ -3359,6 +3380,7 @@ import {
   type AgenticWorkflowRun,
   type AgenticLifecycleTask,
   type AgenticEditAcceptanceItem,
+  type AgenticDocumentClaim,
   type AgenticReviewCommentResolution,
   type AgenticSectionWorkItem,
   type AgenticWorkflowStep,
@@ -9616,6 +9638,52 @@ function insertCitationTodoAudit() {
   insertBlock(citationTodoAuditMarkdown(citationTodoItems.value));
   store.updateText(editorView?.state.doc.toString() || active.value.text);
   store.statusMessage = "Inserted citation TODO audit";
+}
+
+function agentClaimInventoryAuditMarkdown(claims: AgenticDocumentClaim[]) {
+  if (!claims.length) return "## Claim Inventory Audit\n\nNo current-document claims were detected for source review.\n";
+  return [
+    "## Claim Inventory Audit",
+    "",
+    "| Line | Type | Review trigger | Claim text |",
+    "| ---: | --- | --- | --- |",
+    ...claims.map(
+      (claim) =>
+        `| ${claim.sourceLine} | ${claim.kind} | ${markdownTableCell(claim.reason)} | ${markdownTableCell(claim.text)} |`,
+    ),
+    "",
+  ].join("\n");
+}
+
+function insertAgentClaimInventoryAudit() {
+  if (!agentRun.value) return;
+  flushEditorTextToStore();
+  insertBlock(agentClaimInventoryAuditMarkdown(agentRun.value.documentEvidence.claimInventory));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted agent claim inventory audit";
+}
+
+async function copyAgentClaimInventoryAudit() {
+  if (!agentRun.value) return;
+  const audit = agentClaimInventoryAuditMarkdown(agentRun.value.documentEvidence.claimInventory);
+  try {
+    await navigator.clipboard?.writeText(audit);
+    store.statusMessage = "Copied agent claim inventory audit";
+  } catch {
+    store.statusMessage = "Agent claim inventory audit is ready to copy";
+  }
+}
+
+function insertClaimCitationTodo(claim: AgenticDocumentClaim) {
+  citationTodoNote.value = `Line ${claim.sourceLine}: ${claim.reason} | ${claim.text}`;
+  flushEditorTextToStore();
+  insertBlock(citationTodoComment(citationTodoNote.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = `Inserted citation TODO for claim on line ${claim.sourceLine}`;
+}
+
+function markdownTableCell(value: string) {
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
 }
 
 async function copyCitationTodoAudit() {

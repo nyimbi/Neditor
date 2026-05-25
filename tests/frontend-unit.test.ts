@@ -1912,6 +1912,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("item.sectionCount"));
   ok(app.includes("item.taskCount"));
   ok(app.includes("Source grounding"));
+  ok(app.includes('aria-label="Agent claim inventory"'));
+  ok(app.includes("insertAgentClaimInventoryAudit"));
+  ok(app.includes("copyAgentClaimInventoryAudit"));
+  ok(app.includes("insertClaimCitationTodo"));
+  ok(app.includes("Claim Inventory Audit"));
+  ok(app.includes("Add citation TODO"));
   ok(app.includes("Distribution state"));
   ok(app.includes('aria-label="Agent distribution target runbooks"'));
   ok(app.includes("distributionTargetPlans"));
