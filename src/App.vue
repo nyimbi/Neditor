@@ -976,17 +976,31 @@
             </article>
           </section>
           <h3>Cross references</h3>
-          <button
-            v-for="reference in active.compile?.semantic.cross_references || []"
-            :key="`${reference.key}-${reference.line}`"
-            class="outline-row"
-            type="button"
-            @click="goToCrossReference(reference)"
-          >
-            {{ reference.key }}: {{ reference.resolved ? "resolved" : "missing" }}
-          </button>
+          <section class="reference-manager" aria-label="Cross reference manager">
+            <p class="sidebar-hint">{{ crossReferenceManagerSummary }}</p>
+            <article v-for="reference in crossReferenceRows" :key="`${reference.key}-${reference.line}-${reference.column}`" class="snapshot-row" :data-status="reference.resolved ? 'ready' : 'missing'">
+              <p>{{ reference.key }}</p>
+              <small>{{ reference.target_kind }} | {{ reference.resolved ? "resolved" : "missing" }} | line {{ reference.line }}</small>
+              <div class="reference-actions">
+                <button type="button" @click="goToCrossReference(reference)">Go to reference</button>
+                <button type="button" @click="insertCrossReferenceForLabel(reference.key)">Insert another</button>
+              </div>
+            </article>
+            <p v-if="!crossReferenceRows.length" class="sidebar-hint">No cross references detected.</p>
+          </section>
           <h3>Labels</h3>
-          <p v-for="label in active.compile?.semantic.labels || []" :key="label">{{ label }}</p>
+          <section class="reference-manager" aria-label="Reference label inventory">
+            <p class="sidebar-hint">{{ referenceLabelManagerSummary }}</p>
+            <article v-for="label in referenceLabelRows" :key="`${label.kind}-${label.key}`" class="snapshot-row">
+              <p>{{ label.key }}</p>
+              <small>{{ label.kind }} | {{ label.title }}{{ label.line ? ` | line ${label.line}` : "" }}</small>
+              <div class="reference-actions">
+                <button type="button" @click="goToReferenceLabel(label)">Go to label</button>
+                <button type="button" @click="insertCrossReferenceForLabel(label.key)">Insert reference</button>
+              </div>
+            </article>
+            <p v-if="!referenceLabelRows.length" class="sidebar-hint">No labels detected.</p>
+          </section>
         </template>
 
         <template v-else-if="store.sidebar === 'exports'">
@@ -3288,7 +3302,7 @@ import {
   type TableSortDirection,
 } from "./lib/tables";
 import { useDocumentsStore } from "./stores/documents";
-import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument } from "./types";
+import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument } from "./types";
 
 const store = useDocumentsStore();
 type ExportTarget = typeof store.exportTarget;
@@ -3565,6 +3579,17 @@ interface CaptionedReferenceItem {
   caption?: string | null;
   label: string;
   status: "ready" | "missing-label" | "missing-caption";
+  line: number;
+  end_line: number;
+  source_file?: string | null;
+}
+
+type CrossReferenceRow = SemanticDocument["cross_references"][number];
+
+interface ReferenceLabelRow {
+  key: string;
+  kind: "heading" | "figure" | "table" | "equation" | "label";
+  title: string;
   line: number;
   end_line: number;
   source_file?: string | null;
@@ -4197,6 +4222,67 @@ const outlineHeadings = computed(() =>
     ];
   }),
 );
+const crossReferenceRows = computed<CrossReferenceRow[]>(() => active.value.compile?.semantic.cross_references || []);
+const referenceLabelRows = computed<ReferenceLabelRow[]>(() => {
+  const seen = new Set<string>();
+  const rows: ReferenceLabelRow[] = [];
+  for (const heading of outlineHeadings.value) {
+    if (!heading.anchor || seen.has(heading.anchor)) continue;
+    seen.add(heading.anchor);
+    rows.push({
+      key: heading.anchor,
+      kind: "heading",
+      title: heading.text,
+      line: heading.line,
+      end_line: heading.end_line,
+      source_file: heading.source_file,
+    });
+  }
+  for (const item of captionedReferenceItems.value) {
+    if (!item.id || seen.has(item.id)) continue;
+    seen.add(item.id);
+    rows.push({
+      key: item.id,
+      kind: item.kind,
+      title: item.caption || item.label,
+      line: item.line,
+      end_line: item.end_line,
+      source_file: item.source_file,
+    });
+  }
+  for (const key of active.value.compile?.semantic.labels || []) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      key,
+      kind: "label",
+      title: key,
+      line: 0,
+      end_line: 0,
+      source_file: null,
+    });
+  }
+  return rows.sort((left, right) => {
+    const leftLine = left.line || Number.MAX_SAFE_INTEGER;
+    const rightLine = right.line || Number.MAX_SAFE_INTEGER;
+    return leftLine - rightLine || left.key.localeCompare(right.key);
+  });
+});
+const crossReferenceManagerSummary = computed(() => {
+  const missing = crossReferenceRows.value.filter((reference) => !reference.resolved).length;
+  const resolved = crossReferenceRows.value.length - missing;
+  return `${crossReferenceRows.value.length} references | ${resolved} resolved | ${missing} missing | ${referenceLabelRows.value.length} labels`;
+});
+const referenceLabelManagerSummary = computed(() => {
+  const counts = referenceLabelRows.value.reduce(
+    (totals, label) => {
+      totals[label.kind] += 1;
+      return totals;
+    },
+    { heading: 0, figure: 0, table: 0, equation: 0, label: 0 },
+  );
+  return `${counts.heading} headings | ${counts.figure} figures | ${counts.table} tables | ${counts.equation} equations | ${counts.label} other labels`;
+});
 const outlineModeHeadings = computed<OutlineModeHeading[]>(() =>
   outlineHeadings.value.filter((heading) => heading.level <= 4 && (!heading.source_file || !active.value.path || heading.source_file === active.value.path)),
 );
@@ -10754,6 +10840,25 @@ function goToSearchTerm(term: string) {
 
 function goToCrossReference(reference: { line: number; column?: number | null; end_column?: number | null; source_file?: string | null }) {
   void goToSourceTarget(reference);
+}
+
+function insertCrossReferenceForLabel(key: string) {
+  const label = key.trim();
+  if (!label) return;
+  insertBlock(`See {@${label}}.`);
+  store.statusMessage = `Inserted cross reference to ${label}`;
+}
+
+function goToReferenceLabel(label: ReferenceLabelRow) {
+  if (label.line > 0) {
+    void goToSourceTarget({
+      source_file: label.source_file || null,
+      line: label.line,
+      end_line: label.end_line || label.line,
+    });
+    return;
+  }
+  goToSearchTerm(label.key);
 }
 
 function goToTransformArtifact(artifact: TransformPreviewItem) {

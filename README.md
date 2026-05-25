@@ -318,7 +318,8 @@ web app.
   export manifests, semantic AST, paged-document model, diagnostics, and
   transform artifacts.
 - Cross references for headings, figures, tables, equations, appendices, and
-  decision records, with broken-reference diagnostics.
+  decision records, with broken-reference diagnostics and a References sidebar
+  inventory for jumping to source labels or inserting reusable links.
 - Rich document blocks for callouts, equations, figures, captions, layout
   sections, review comments, change notes, AI provenance, and approval metadata.
 

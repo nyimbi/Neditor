@@ -1905,6 +1905,18 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Insert list of figures"));
   ok(app.includes("Insert list of tables"));
   ok(app.includes("Insert reference"));
+  ok(app.includes('aria-label="Cross reference manager"'));
+  ok(app.includes('aria-label="Reference label inventory"'));
+  ok(app.includes("CrossReferenceRow"));
+  ok(app.includes("ReferenceLabelRow"));
+  ok(app.includes("crossReferenceRows"));
+  ok(app.includes("referenceLabelRows"));
+  ok(app.includes("crossReferenceManagerSummary"));
+  ok(app.includes("referenceLabelManagerSummary"));
+  ok(app.includes("insertCrossReferenceForLabel"));
+  ok(app.includes("goToReferenceLabel"));
+  ok(app.includes("Insert another"));
+  ok(app.includes("Go to label"));
   ok(app.includes('aria-label="Index manager"'));
   ok(app.includes("indexTermDraft"));
   ok(app.includes("indexExcludeDraft"));
