@@ -34,7 +34,11 @@ Recent pushed checkpoints visible in current git history:
 - Split editor panes are no longer deferred. The View toolbar and Settings now
   expose a persisted Dual source toggle that mounts two synchronized
   CodeMirror source panes for the active document. Edits in either pane use the
-  same document store, preview compile, save, watcher, and export path.
+  same document store, preview compile, save, watcher, and export path. A
+  focused Chromium workflow now opens a long document, edits from both panes,
+  verifies peer-pane/live-preview synchronization, and checks that primary-pane
+  scroll drives preview sync without secondary-pane scroll hijacking the
+  preview position.
 - Editor keybinding modes are no longer deferred. Settings now persists
   Default, Emacs-style, and Vim-style modes; Emacs mode uses CodeMirror's
   native Emacs keymap, and Vim-style mode adds visible insert/normal state plus

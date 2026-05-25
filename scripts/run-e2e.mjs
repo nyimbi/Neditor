@@ -95,6 +95,9 @@ function workflowEvidence(command, stdout) {
     editableOutlinePlanning:
       /outline/i.test(commandText) ||
       output.includes("creates a document skeleton from an editable outline plan"),
+    splitSourcePanes:
+      /split source/i.test(commandText) ||
+      output.includes("syncs split source panes through editing, preview, and primary scroll"),
     exportWorkflows:
       /export/i.test(commandText) ||
       output.includes("runs export readiness, success, and failure workflows"),

@@ -163,7 +163,8 @@ Requirements:
 - Pin tabs.
 - Recently closed documents.
 - Restore previous workspace.
-- Split editor panes in later versions.
+- Split editor panes for comparing, drafting, and revising different parts of
+  the same Markdown document.
 
 ## 6. Core Application Requirements
 

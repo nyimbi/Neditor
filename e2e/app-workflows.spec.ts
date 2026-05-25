@@ -2237,6 +2237,71 @@ test("updates the live preview after source edits", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Live preview text from source editing.");
 });
 
+test("syncs split source panes through editing, preview, and primary scroll", async ({ page }) => {
+  await setMockFileText(
+    page,
+    "/workspace/split-source.md",
+    [
+      "---",
+      "title: Split Source Proof",
+      "status: draft",
+      "---",
+      "",
+      "# Split Source Proof",
+      "",
+      "Opening context for dual-pane authoring.",
+      "",
+      ...Array.from({ length: 32 }, (_, index) => [`## Existing Section ${index + 1}`, "", `Business note ${index + 1}.`, ""]).flat(),
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/split-source.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const splitGrid = page.locator(".editor-split-grid");
+  const splitToggle = page.locator(".compact-check", { hasText: "Dual source" }).getByLabel("Split source editor panes");
+  await splitToggle.check();
+  await expect(splitGrid).toHaveAttribute("data-split-source", "true");
+  await expect(page.locator(".editor-host .cm-content")).toHaveCount(2);
+
+  const primaryEditor = page.getByRole("textbox", { name: "Primary Markdown editor" });
+  const secondaryEditor = page.getByRole("textbox", { name: "Secondary Markdown editor" });
+  await expect(primaryEditor).toBeVisible();
+  await expect(secondaryEditor).toBeVisible();
+
+  await secondaryEditor.click();
+  await moveEditorCursorToEnd(page);
+  await page.keyboard.insertText("\n\n## Secondary Pane Draft\nThis section was authored from the secondary pane.");
+
+  await primaryEditor.click();
+  await moveEditorCursorToEnd(page);
+  await expect(page.locator(".editor-host-primary .cm-line").filter({ hasText: "## Secondary Pane Draft" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Live preview" })).toContainText("This section was authored from the secondary pane.");
+
+  await moveEditorCursorToEnd(page);
+  await page.keyboard.insertText("\n\n## Primary Pane Revision\nThis section was authored from the primary pane.");
+
+  await secondaryEditor.click();
+  await moveEditorCursorToEnd(page);
+  await expect(page.locator(".editor-host-secondary .cm-line").filter({ hasText: "## Primary Pane Revision" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Live preview" })).toContainText("This section was authored from the primary pane.");
+
+  const primaryScroller = page.locator(".editor-host-primary .cm-scroller");
+  const secondaryScroller = page.locator(".editor-host-secondary .cm-scroller");
+  const previewPane = page.locator(".preview-pane");
+  await primaryScroller.evaluate((element) => {
+    element.scrollTop = element.scrollHeight * 0.8;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await expect.poll(() => previewPane.evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+
+  const previewBeforeSecondaryScroll = await previewPane.evaluate((element) => element.scrollTop);
+  await secondaryScroller.evaluate((element) => {
+    element.scrollTop = element.scrollHeight * 0.2;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await expect.poll(() => previewPane.evaluate((element) => element.scrollTop)).toBe(previewBeforeSecondaryScroll);
+});
+
 test("keeps large document editing and preview updates responsive", async ({ page }) => {
   const largeDocument = [
     "---",

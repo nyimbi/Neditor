@@ -1495,8 +1495,10 @@ Finish:
 - Clear UX for missing documents during restore. Browser archived workflow run `26148828614`
   covers this workflow.
 - Split source editor panes are implemented as a persisted dual-source toggle;
-  remaining work is browser/native workflow proof for dual-pane editing and
-  long-document ergonomics.
+  focused browser proof now covers dual-pane editing from both panes,
+  peer-pane/live-preview synchronization, primary preview-scroll sync, and
+  secondary-pane scroll isolation on a long document. Remaining work is native
+  desktop dual-pane editing and pointer/scroll ergonomics proof.
 
 ### 10. Editor Ergonomics
 
