@@ -31,6 +31,12 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Editor keybinding modes are no longer deferred. Settings now persists
+  Default, Emacs-style, and Vim-style modes; Emacs mode uses CodeMirror's
+  native Emacs keymap, and Vim-style mode adds visible insert/normal state plus
+  common normal-mode navigation/edit commands without adding a dependency.
+  The status bar reports the active keybinding mode, and the Help Center
+  documents the supported key sets for keyboard-first writers.
 - Smart Markdown list continuation now covers more business-writing edge cases:
   tab-indented lists, zero-padded ordered lists, uppercase checked task lists,
   and nested blockquoted numbered lists, with width-preserving ordered-list

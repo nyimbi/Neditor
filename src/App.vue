@@ -1627,6 +1627,14 @@
           <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
           <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
           <label><input v-model="store.codeFolding" type="checkbox" /> Code folding</label>
+          <label>
+            Editor keybindings
+            <select v-model="store.editorKeymapMode">
+              <option value="default">Default</option>
+              <option value="emacs">Emacs-style navigation</option>
+              <option value="vim">Vim-style modal navigation</option>
+            </select>
+          </label>
           <label><input v-model="store.highContrast" type="checkbox" /> High contrast</label>
           <label><input v-model="store.reducedMotion" type="checkbox" /> Reduced motion</label>
           <label><input v-model="store.autosave" type="checkbox" /> Autosave existing files</label>
@@ -1923,6 +1931,7 @@
         <button type="button" @click="saveConflictCopy">Save copy</button>
       </span>
       <span class="word-stats" :aria-label="`Document statistics: ${wordStats}`">{{ wordStats }}</span>
+      <span class="keymap-status" :aria-label="`Editor keybinding mode: ${editorKeymapStatus}`">{{ editorKeymapStatus }}</span>
       <span
         v-if="previewTimingStatus"
         class="preview-timing"
@@ -3684,7 +3693,27 @@ import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorSelection, EditorState, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, keymap, lineNumbers, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
-import { addCursorAbove, addCursorBelow, defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import {
+  addCursorAbove,
+  addCursorBelow,
+  cursorCharLeft,
+  cursorCharRight,
+  cursorDocEnd,
+  cursorDocStart,
+  cursorLineDown,
+  cursorLineEnd,
+  cursorLineStart,
+  cursorLineUp,
+  defaultKeymap,
+  deleteCharForward,
+  deleteToLineEnd,
+  emacsStyleKeymap,
+  history,
+  historyKeymap,
+  insertNewlineAndIndent,
+  redo,
+  undo,
+} from "@codemirror/commands";
 import { codeFolding, foldAll, foldGutter, foldKeymap, unfoldAll } from "@codemirror/language";
 import { markdown } from "@codemirror/lang-markdown";
 import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap, selectNextOccurrence } from "@codemirror/search";
@@ -3863,6 +3892,7 @@ const commandPaletteDialog = ref<HTMLElement | null>(null);
 const conflictDialog = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
 let syncingEditorFromStore = false;
+const vimInputMode = ref<"insert" | "normal">("insert");
 const previewTextCommit = createDebouncedTextCommit((text) => store.updateText(text), {
   setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
   clearTimeout: (handle) => window.clearTimeout(handle),
@@ -4713,6 +4743,11 @@ const wordStats = computed(() => {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   const minutes = words ? Math.max(1, Math.ceil(words / 220)) : 0;
   return `${words} words | ${text.length} characters | ${minutes} min read`;
+});
+const editorKeymapStatus = computed(() => {
+  if (store.editorKeymapMode === "vim") return `Vim ${vimInputMode.value} mode`;
+  if (store.editorKeymapMode === "emacs") return "Emacs-style keys";
+  return "Default keys";
 });
 const previewTimingStatus = computed(() => {
   if (store.lastPreviewCompileDurationMs === null) return "";
@@ -5592,11 +5627,14 @@ const helpTopics = computed<HelpTopic[]>(() => [
       "Use Cmd or Ctrl plus O to open a document, Shift plus Cmd or Ctrl plus O to open a folder, and N for a new document.",
       "Use Cmd or Ctrl plus F for find, B for bold, I for italic, E for export, and Shift plus Cmd or Ctrl plus E for HTML export.",
       "Use Shift plus Cmd or Ctrl plus A for the AI agent workspace, L for Docs Live, R for review, X for export readiness, H for shortcut help, and P or K for the command palette.",
+      "Choose Default, Emacs-style, or Vim-style editor keybindings in Settings when your writing muscle memory depends on a modal or terminal-style editor.",
       "Use the View toolbar to collapse toolbar rows when you need more writing space.",
     ],
     tips: [
       "The command palette is the fastest way to find actions while learning the app.",
       "AI drafting, outline planning, review readiness, and distribution preparation all have direct shortcuts so collapsed toolbars remain practical.",
+      "Vim-style mode starts in insert mode; press Escape for normal mode, then use h/j/k/l, 0, $, x, D, i, a, o, O, u, Ctrl+R, g, and G.",
+      "Emacs-style mode adds familiar Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Ctrl+P, Ctrl+N, Ctrl+D, and Ctrl+K navigation/editing keys.",
       "Toolbar text can be resized or hidden if you prefer icons only.",
     ],
     actions: [
@@ -5606,7 +5644,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
       { label: "Collapse toolbars", run: () => setAllCommandToolbarsCollapsed(true) },
       { label: "Toolbar settings", run: () => (store.sidebar = "settings") },
     ],
-    keywords: ["shortcut", "keyboard", "command palette", "collapse", "toolbar", "docs live", "agent", "review", "export"],
+    keywords: ["shortcut", "keyboard", "keybinding", "vim", "emacs", "command palette", "collapse", "toolbar", "docs live", "agent", "review", "export"],
   },
   {
     id: "display-accessibility",
@@ -7642,6 +7680,7 @@ watch(
     store.wordWrap,
     store.lineNumbers,
     store.codeFolding,
+    store.editorKeymapMode,
     store.theme,
     store.previewTheme,
     store.toolbarDisplay,
@@ -7657,10 +7696,16 @@ watch(
     store.previewLineHeight,
   ],
   () => {
+    if (store.editorKeymapMode !== "vim") vimInputMode.value = "insert";
     buildEditor();
     void store.persistWorkspace();
   },
 );
+
+watch(vimInputMode, (mode) => {
+  if (!editorView) return;
+  editorView.contentDOM.setAttribute("data-vim-mode", store.editorKeymapMode === "vim" ? mode : "");
+});
 
 watch(
   () => [store.autosave, store.autosaveDelayMs, store.autoSnapshot, store.snapshotIntervalMs, store.snapshotStorage],
@@ -9319,6 +9364,67 @@ function smokeSnippetAround(text: string, needle: string) {
   return text.slice(start, start + 800);
 }
 
+function vimEnterInsertMode(view: EditorView) {
+  vimInputMode.value = "insert";
+  view.focus();
+  return true;
+}
+
+function vimInsertAfterCursor(view: EditorView) {
+  cursorCharRight(view);
+  return vimEnterInsertMode(view);
+}
+
+function vimOpenLineBelow(view: EditorView) {
+  cursorLineEnd(view);
+  insertNewlineAndIndent(view);
+  return vimEnterInsertMode(view);
+}
+
+function vimOpenLineAbove(view: EditorView) {
+  cursorLineStart(view);
+  insertNewlineAndIndent(view);
+  cursorLineUp(view);
+  return vimEnterInsertMode(view);
+}
+
+function handleVimNormalKey(event: KeyboardEvent, view: EditorView) {
+  if (event.metaKey || event.altKey) return false;
+  if (event.ctrlKey) {
+    if (event.key.toLowerCase() === "r") {
+      event.preventDefault();
+      return redo(view);
+    }
+    return false;
+  }
+  const run = {
+    h: () => cursorCharLeft(view),
+    j: () => cursorLineDown(view),
+    k: () => cursorLineUp(view),
+    l: () => cursorCharRight(view),
+    "0": () => cursorLineStart(view),
+    $: () => cursorLineEnd(view),
+    x: () => deleteCharForward(view),
+    D: () => deleteToLineEnd(view),
+    i: () => vimEnterInsertMode(view),
+    a: () => vimInsertAfterCursor(view),
+    o: () => vimOpenLineBelow(view),
+    O: () => vimOpenLineAbove(view),
+    u: () => undo(view),
+    G: () => cursorDocEnd(view),
+    g: () => cursorDocStart(view),
+  }[event.key];
+  if (run) {
+    event.preventDefault();
+    return run();
+  }
+  if (event.key.length === 1) {
+    event.preventDefault();
+    return true;
+  }
+  return false;
+}
+
 watch(diagnosticSignature, () => {
   if (editorView) forceLinting(editorView);
 });
@@ -9355,11 +9461,19 @@ function editorExtensions() {
       role: "textbox",
       "aria-label": "Markdown editor",
       "aria-multiline": "true",
+      "data-keymap-mode": store.editorKeymapMode,
+      "data-vim-mode": store.editorKeymapMode === "vim" ? vimInputMode.value : "",
       spellcheck: "true",
       autocapitalize: "sentences",
     }),
     keymap.of([
       { key: "Enter", run: continueMarkdownList },
+      ...(store.editorKeymapMode === "emacs" ? emacsStyleKeymap : []),
+      ...(store.editorKeymapMode === "vim" ? [{ key: "Escape", run: (view: EditorView) => {
+        vimInputMode.value = "normal";
+        view.focus();
+        return true;
+      } }] : []),
       ...closeBracketsKeymap,
       ...defaultKeymap,
       ...historyKeymap,
@@ -9367,6 +9481,10 @@ function editorExtensions() {
       ...(store.codeFolding ? foldKeymap : []),
     ]),
     EditorView.domEventHandlers({
+      keydown: (event, view) => {
+        if (store.editorKeymapMode !== "vim" || vimInputMode.value !== "normal") return false;
+        return handleVimNormalKey(event, view);
+      },
       scroll: () => {
         syncPreviewScrollFromEditor();
       },

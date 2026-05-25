@@ -1361,6 +1361,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     toolbarDisplay: "icons",
     toolbarTextSize: 20,
     toolbarCollapsedRows: ["file", "view", "file", "", 42],
+    editorKeymapMode: "vim",
     codeFolding: false,
     editorPaneRatio: 0.95,
     editorFontSize: 99,
@@ -1650,6 +1651,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(migrated.toolbarDisplay, "icons");
   equal(migrated.toolbarTextSize, 15);
   deepEqual(migrated.toolbarCollapsedRows, ["file", "view"]);
+  equal(migrated.editorKeymapMode, "vim");
   equal(migrated.codeFolding, false);
   equal(migrated.editorPaneRatio, 0.75);
   equal(migrated.editorFontSize, 22);
@@ -2586,6 +2588,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('store.sidebar === \'templates\''));
   ok(store.includes("toolbarTextSize: 10"));
   ok(store.includes("toolbarCollapsedRows: []"));
+  ok(store.includes('editorKeymapMode: "default"'));
+  ok(app.includes('v-model="store.editorKeymapMode"'));
+  ok(app.includes("emacsStyleKeymap"));
+  ok(app.includes("handleVimNormalKey"));
+  ok(app.includes("Vim-style mode starts in insert mode"));
   ok(types.includes("savedText?: string"));
   ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
   ok(store.includes("doc.savedText = response.text"));

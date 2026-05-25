@@ -82,6 +82,14 @@ The remaining work is primarily about workflow proof, artifact fidelity,
 cross-platform validation, and reducing risk in oversized modules after
 behavior is locked.
 
+Editor keybinding mode update:
+
+- Deferred Vim/Emacs support is now implemented as a persisted editor setting
+  with Default, Emacs-style, and Vim-style options. Emacs-style mode uses
+  CodeMirror's Emacs keymap. Vim-style mode provides visible insert/normal
+  state plus common normal-mode navigation and editing commands, and the Help
+  Center documents the supported command set.
+
 ## Current Verification Snapshot
 
 Latest pushed code commit inspected before this update:

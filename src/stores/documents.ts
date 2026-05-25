@@ -26,6 +26,7 @@ import {
   normalizeGitIntegrationPreferences,
   normalizePersistedWorkspaceForSave,
   type DocsLiveDraftHistoryItem,
+  type EditorKeymapMode,
   type ExportDefaults,
   type ExportProfile,
   type ExportTarget,
@@ -348,6 +349,7 @@ export const useDocumentsStore = defineStore("documents", {
     toolbarTextSize: 10,
     toolbarCollapsedRows: [] as string[],
     editorPaneRatio: 0.5,
+    editorKeymapMode: "default" as EditorKeymapMode,
     wordWrap: true,
     lineNumbers: true,
     codeFolding: true,
@@ -486,6 +488,9 @@ export const useDocumentsStore = defineStore("documents", {
         if (typeof persisted.toolbarTextSize === "number") this.toolbarTextSize = clampToolbarTextSize(persisted.toolbarTextSize);
         if (Array.isArray(persisted.toolbarCollapsedRows)) this.toolbarCollapsedRows = persisted.toolbarCollapsedRows;
         if (typeof persisted.editorPaneRatio === "number") this.editorPaneRatio = clampPaneRatio(persisted.editorPaneRatio);
+        if (persisted.editorKeymapMode === "default" || persisted.editorKeymapMode === "emacs" || persisted.editorKeymapMode === "vim") {
+          this.editorKeymapMode = persisted.editorKeymapMode;
+        }
         if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
         if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
         if (typeof persisted.codeFolding === "boolean") this.codeFolding = persisted.codeFolding;
@@ -555,6 +560,7 @@ export const useDocumentsStore = defineStore("documents", {
         toolbarTextSize: this.toolbarTextSize,
         toolbarCollapsedRows: this.toolbarCollapsedRows,
         editorPaneRatio: this.editorPaneRatio,
+        editorKeymapMode: this.editorKeymapMode,
         wordWrap: this.wordWrap,
         lineNumbers: this.lineNumbers,
         codeFolding: this.codeFolding,

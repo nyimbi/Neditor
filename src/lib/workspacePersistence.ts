@@ -56,6 +56,7 @@ export type SidebarPanel =
   | "settings";
 export type ThemePreference = "system" | "light" | "dark";
 export type ToolbarDisplay = "both" | "icons" | "text";
+export type EditorKeymapMode = "default" | "emacs" | "vim";
 export type TransformInputMode = "stdin" | "file";
 
 export interface ExportDefaults {
@@ -329,6 +330,7 @@ export interface PersistedWorkspace {
   toolbarTextSize?: number;
   toolbarCollapsedRows?: string[];
   editorPaneRatio?: number;
+  editorKeymapMode?: EditorKeymapMode;
   wordWrap?: boolean;
   lineNumbers?: boolean;
   codeFolding?: boolean;
@@ -1048,6 +1050,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   }
   const editorPaneRatio = numberValue(raw.editorPaneRatio);
   if (editorPaneRatio !== undefined) migrated.editorPaneRatio = clampPaneRatio(editorPaneRatio);
+  const editorKeymapMode = enumValue(raw.editorKeymapMode, ["default", "emacs", "vim"] as const);
+  if (editorKeymapMode) migrated.editorKeymapMode = editorKeymapMode;
   for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot"] as const) {
     const value = booleanValue(raw[key]);
     if (value !== undefined) migrated[key] = value;
