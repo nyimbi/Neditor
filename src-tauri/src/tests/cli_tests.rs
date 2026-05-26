@@ -385,6 +385,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     let root = temp_workspace_path("support-bundle");
     fs::create_dir_all(&root).expect("create support root");
     let report_path = root.join("readiness.json");
+    let spec_path = root.join("spec-completion.json");
     let output_path = root.join("support").join("bundle.json");
     let readiness = serde_json::json!({
         "generatedAt": "2026-05-26T12:20:00.000Z",
@@ -406,6 +407,35 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         serde_json::to_string_pretty(&readiness).expect("readiness json"),
     )
     .expect("write readiness fixture");
+    let spec_completion = serde_json::json!({
+        "generatedAt": "2026-05-26T12:25:00.000Z",
+        "status": "partial-with-release-risks",
+        "summary": {
+            "totalRows": 3,
+            "completeRows": 1,
+            "partialRows": 2,
+            "openRows": 2
+        },
+        "openRows": [
+            {
+                "specSection": "6.5 File Operations",
+                "requirementArea": "Native dialogs",
+                "status": "Partial",
+                "remainingGap": "Broader native proof."
+            },
+            {
+                "specSection": "10.2 Safety",
+                "requirementArea": "External engines",
+                "status": "Partial",
+                "remainingGap": "Cross-platform proof."
+            }
+        ]
+    });
+    fs::write(
+        &spec_path,
+        serde_json::to_string_pretty(&spec_completion).expect("spec json"),
+    )
+    .expect("write spec fixture");
 
     let json = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -414,6 +444,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         root.to_string_lossy().to_string(),
         "--readiness-report".to_string(),
         report_path.to_string_lossy().to_string(),
+        "--spec-report".to_string(),
+        spec_path.to_string_lossy().to_string(),
         "--json".to_string(),
     ])
     .expect("support json");
@@ -426,6 +458,15 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert_eq!(bundle["doctor"]["schema"], "neditor.ned-doctor.v1");
     assert_eq!(bundle["releaseReadiness"]["status"], "release-ready");
     assert_eq!(bundle["releaseReadiness"]["releaseReady"], true);
+    assert_eq!(
+        bundle["specCompletion"]["status"],
+        "partial-with-release-risks"
+    );
+    assert_eq!(bundle["specCompletion"]["summary"]["openRows"], 2);
+    assert_eq!(
+        bundle["specCompletion"]["openRows"][0]["requirementArea"],
+        "Native dialogs"
+    );
     assert!(bundle["recommendations"]
         .as_array()
         .expect("recommendations")
@@ -441,12 +482,17 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         root.to_string_lossy().to_string(),
         "--readiness-report".to_string(),
         report_path.to_string_lossy().to_string(),
+        "--spec-report".to_string(),
+        spec_path.to_string_lossy().to_string(),
         "--output".to_string(),
         output_path.to_string_lossy().to_string(),
     ])
     .expect("support output");
     assert_eq!(text.exit_code, 0);
     assert!(text.message.contains("NEditor support bundle"));
+    assert!(text
+        .message
+        .contains("Spec completion: partial-with-release-risks (2 open rows)"));
     assert!(text.message.contains("Wrote support bundle"));
     assert!(output_path.is_file());
     let written: serde_json::Value =
@@ -464,6 +510,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     let ipc_bundle = crate::cli::create_support_bundle(crate::cli::SupportBundleRequest {
         workspace: Some(root.to_string_lossy().to_string()),
         readiness_report: Some(report_path.to_string_lossy().to_string()),
+        spec_report: Some(spec_path.to_string_lossy().to_string()),
         output: Some(ipc_output_path.to_string_lossy().to_string()),
     })
     .expect("ipc support bundle");
@@ -547,6 +594,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--workspace"));
     assert!(zsh.message.contains("--report"));
     assert!(zsh.message.contains("--readiness-report"));
+    assert!(zsh.message.contains("--spec-report"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

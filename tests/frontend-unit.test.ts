@@ -3840,6 +3840,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned support-bundle --output support.json"));
   ok(app.includes("Support bundle"));
   ok(app.includes("redaction-safe setup and release-readiness handoff"));
+  ok(app.includes("specCompletion"));
+  ok(app.includes("Spec rows"));
   ok(app.includes("ned doctor"));
   ok(app.includes("Make NEditor the default Markdown reader"));
   ok(app.includes("Help: Docs Live"));

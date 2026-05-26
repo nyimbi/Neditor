@@ -3817,6 +3817,25 @@ Settings support-bundle action:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle IPC refactor. |
 | `git diff --check` | Pass | No whitespace errors are present in the Settings support-bundle diff. |
 
+Support bundle spec-completion summary:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after adding `--spec-report` and `spec_report` request support to `ned support-bundle` and `create_support_bundle`, including fixture coverage for open spec rows and text output. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --json` | Pass | Direct smoke returned `specCompletion` with `.tmp/spec-completion/report.json`, status `partial-with-release-risks`, 106 open rows, and capped open-row details while preserving redaction-safe privacy fields. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --output /private/tmp/neditor-spec-support-bundle-smoke.json` | Pass | Direct text smoke reported `Spec completion: partial-with-release-risks (106 open rows)` and wrote the support bundle JSON. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "creates support bundle handoff from settings"` | Pass | Focused Chromium smoke verified Settings support-bundle preview and saved-output rendering now include the 106 open spec rows count. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after adding spec-completion support bundle UI and static wiring checks. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed for support-bundle spec-completion report typing and rendering. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 65 tests after stabilizing Settings navigation and support-bundle mocks for the spec-completion handoff. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting spec-completion summaries in support bundles. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` and refreshed `.tmp/spec-completion/report.json` for support-bundle ingestion. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after extending support bundles with spec-completion summaries. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after extending support bundles with spec-completion summaries. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` with current-host evidence accepted and external proof blockers preserved. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle spec-completion implementation. |
+| `git diff --check` | Pass | No whitespace errors are present in the support-bundle spec-completion diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

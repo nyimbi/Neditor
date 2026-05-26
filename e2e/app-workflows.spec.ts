@@ -1035,6 +1035,51 @@ async function installTauriMock(page: Page, stateKey: string) {
       }
       if (cmd === "plugin:dialog|message") return confirmResponses.length ? (confirmResponses.shift() ? "Ok" : "Cancel") : "Ok";
       if (cmd === "plugin:dialog|confirm") return confirmResponses.length ? confirmResponses.shift() : true;
+      if (cmd === "pending_cli_open_paths") return [];
+      if (cmd === "list_transform_handler_installers") {
+        return [
+          {
+            id: "mock-transform-handlers",
+            label: "Mock transform handlers",
+            platform: "test",
+            manager: "mock",
+            summary: "Mock installer plan for browser workflow tests.",
+            installable: false,
+            requires_admin: false,
+            estimatedDownloadSize: "0 MB",
+            installLocation: "/workspace/.neditor/handlers",
+            engine_names: ["calc", "sql", "xlsx"],
+            commands: [],
+            handlers: ["calc", "sql", "xlsx"],
+            notes: [],
+          },
+        ];
+      }
+      if (cmd === "default_markdown_reader_plan") {
+        return {
+          supported: true,
+          applied: false,
+          platform: "test",
+          appName: "NEditor",
+          fileExtensions: ["md", "markdown", "mdown", "mkd"],
+          message: "NEditor is available as a Markdown reader.",
+          commands: [],
+          manual_steps: [],
+        };
+      }
+      if (cmd === "configure_default_markdown_reader") {
+        const enabled = Boolean(args?.request && (args.request as { enabled?: boolean }).enabled);
+        return {
+          supported: true,
+          applied: enabled,
+          platform: "test",
+          appName: "NEditor",
+          fileExtensions: ["md", "markdown", "mdown", "mkd"],
+          message: enabled ? "NEditor is configured as the default Markdown reader." : "Default Markdown reader integration is disabled.",
+          commands: [],
+          manual_steps: [],
+        };
+      }
       if (cmd === "create_support_bundle") {
         const output = typeof args?.request?.output === "string" ? args.request.output : undefined;
         return {
@@ -1052,6 +1097,11 @@ async function installTauriMock(page: Page, stateKey: string) {
             releaseReady: false,
             evidenceGaps: [{ id: "mock-gap", status: "pending" }],
             failures: [],
+          },
+          specCompletion: {
+            status: "partial-with-release-risks",
+            summary: { totalRows: 115, completeRows: 9, openRows: 106 },
+            openRows: [{ specSection: "Mock", requirementArea: "Mock gap", status: "Partial" }],
           },
           recommendations: ["Mock support recommendation"],
         };
@@ -1573,6 +1623,21 @@ async function editorText(page: Page) {
   return page.locator(".cm-content").innerText();
 }
 
+async function selectSidebarPanelOption(page: Page, panel: string) {
+  const selector = page.getByLabel("Sidebar panel");
+  if ((await selector.inputValue().catch(() => "")) === panel) {
+    await selector.selectOption(panel === "outline" ? "files" : "outline");
+  }
+  await selector.selectOption(panel);
+  await page.evaluate((panelId) => window.__NEDITOR_APP_E2E__?.setSidebar(panelId), panel);
+  await expect(selector).toHaveValue(panel);
+}
+
+async function openSettingsSection(page: Page, section: string) {
+  await selectSidebarPanelOption(page, "settings");
+  await page.evaluate((sectionId) => window.__NEDITOR_APP_E2E__?.selectConfigurationSection(sectionId), section);
+}
+
 async function moveEditorCursorToEnd(page: Page) {
   if (process.platform === "darwin") {
     await page.keyboard.press("Meta+End");
@@ -1671,6 +1736,8 @@ test.beforeEach(async ({ page }, testInfo: TestInfo) => {
   const stateKey = `__neditor_e2e_state__:${testInfo.titlePath.join(" / ")}`;
   await installTauriMock(page, stateKey);
   await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "Markdown editor" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => Boolean(window.__NEDITOR_APP_E2E__))).toBe(true);
 });
 
 test("boots the workbench and switches core view modes", async ({ page }) => {
@@ -1740,7 +1807,7 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
 });
 
 test("offers searchable contextual help with workflow actions", async ({ page }) => {
-  await page.getByLabel("Sidebar panel").selectOption("help");
+  await selectSidebarPanelOption(page, "help");
   await expect(page.locator(".sidebar").getByRole("heading", { name: "Help Center" })).toBeVisible();
   await expect(page.locator(".help-quick-actions").getByRole("button", { name: "Docs Live" })).toBeVisible();
   await expect(page.getByLabel("Selected help topic").getByText("Create, open, save, and orient yourself in the writing workspace.")).toBeVisible();
@@ -1807,7 +1874,7 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await agent.getByLabel("Provider profile").selectOption("openai-compatible");
   await agent.getByRole("button", { name: "Build provider request" }).click();
   await expect(agent.getByLabel("AI provider request package")).toContainText("approves this provider");
-  await expect(agent.getByLabel("AI provider request Markdown")).toHaveValue(/NEDITOR_AI_API_KEY/);
+  await expect(agent.getByLabel("AI provider request Markdown")).toHaveValue(/OPENAI_API_KEY/);
   await agent.getByRole("button", { name: "Send to Docs Live" }).click();
   await expect(page.getByRole("dialog", { name: "Docs Live voice drafting" })).toBeVisible();
   await page.getByRole("button", { name: "Close Docs Live" }).click();
@@ -1908,7 +1975,7 @@ test("exposes keyboard skip links to primary workbench regions", async ({ page }
 
 test("keeps primary workbench regions accessible across desktop and narrow viewports", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
-  await page.getByLabel("Sidebar panel").selectOption("outline");
+  await selectSidebarPanelOption(page, "outline");
   const workspace = page.locator(".workspace");
   const sidebar = page.locator(".sidebar");
   const editor = page.getByRole("region", { name: "Markdown source" });
@@ -2066,7 +2133,7 @@ test("supports keyboard-only operation for deep workbench controls", async ({ pa
   await queueDialogSelection(page, "/workspace/keyboard-diagnostics.md");
   await page.getByRole("button", { name: "Open", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await page.getByLabel("Sidebar panel").selectOption("diagnostics");
+  await selectSidebarPanelOption(page, "diagnostics");
 
   const inventory = page.getByLabel("Compiler output inventory");
   await expect(inventory).toContainText("Compiled Markdown");
@@ -2086,7 +2153,7 @@ test("supports keyboard-only operation for deep workbench controls", async ({ pa
   await page.getByRole("document", { name: /Rendered preview for Keyboard Diagnostics, draft/ }).focus();
   await expect(page.getByRole("document", { name: /Rendered preview for Keyboard Diagnostics, draft/ })).toBeFocused();
 
-  await page.getByLabel("Sidebar panel").selectOption("tables");
+  await selectSidebarPanelOption(page, "tables");
   const newTableButton = page.getByRole("button", { name: "New table" });
   await newTableButton.focus();
   await page.keyboard.press("Enter");
@@ -2109,7 +2176,7 @@ test("supports keyboard-only operation for deep workbench controls", async ({ pa
   await queueDialogSelection(page, "/workspace/keyboard-diagnostics.md");
   await page.getByRole("button", { name: "Open", exact: true }).focus();
   await page.keyboard.press("Space");
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await setMockFileText(page, "/workspace/keyboard-diagnostics.md", externalApprovedDocument());
   await page.getByRole("button", { name: "Save", exact: true }).focus();
@@ -2455,7 +2522,7 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await expect(page.locator(".status-bar")).toContainText("29 words | 189 characters | 1 min read");
   await expect(editorContent).toHaveAttribute("spellcheck", "true");
   await expect(editorContent).toHaveAttribute("autocapitalize", "sentences");
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "appearance");
 
   const appShell = page.locator(".app-shell");
   const previewPane = page.locator(".preview-pane");
@@ -2560,22 +2627,22 @@ test("persists editor settings and runs search plus heading commands", async ({ 
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Command Target");
-  await page.getByRole("button", { name: /Command Target Heading line/ }).click();
+  await page.getByRole("button", { name: /Command Target.*Heading line/ }).click();
   await expect(page.locator(".cm-line").filter({ hasText: "## Command Target" })).toBeVisible();
 });
 
 test("creates support bundle handoff from settings", async ({ page }) => {
-  await page.getByLabel("Sidebar panel").selectOption("settings");
-  await page.getByRole("button", { name: /Files and history/ }).click();
+  await openSettingsSection(page, "files");
   await expect(page.getByRole("heading", { name: "Support bundle" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Preview" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save JSON" })).toBeVisible();
   await expect(page.getByText("not document content or secrets")).toBeVisible();
 
   await page.getByRole("button", { name: "Preview" }).click();
-  await expect(page.getByText("Support bundle preview ready: current-host-ready-with-external-gaps, 1 evidence gaps")).toBeVisible();
+  await expect(page.getByText("Support bundle preview ready: current-host-ready-with-external-gaps, 1 evidence gaps, 106 open spec rows")).toBeVisible();
   await expect(page.getByText("Mock support recommendation")).toBeVisible();
   await expect(page.getByText("preview only")).toBeVisible();
+  await expect(page.locator("dd").getByText("106 open", { exact: true })).toBeVisible();
 
   await queueDialogSelection(page, "/workspace/neditor-support-bundle.json");
   await page.getByRole("button", { name: "Save JSON" }).click();
@@ -2600,7 +2667,7 @@ test("runs configurable Emacs and Vim-style editor keybinding modes", async ({ p
   );
   await queueDialogSelection(page, "/workspace/keybinding-modes.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "appearance");
 
   const editor = page.getByRole("textbox", { name: "Primary Markdown editor" });
   const keybindings = page.getByLabel("Editor keybindings");
@@ -2728,7 +2795,7 @@ test("navigates source from the outline sidebar", async ({ page }) => {
   await setMockFileText(page, "/workspace/outline-navigation.md", outlineDocument);
   await queueDialogSelection(page, "/workspace/outline-navigation.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
-  await page.getByLabel("Sidebar panel").selectOption("outline");
+  await selectSidebarPanelOption(page, "outline");
 
   await page.locator(".sidebar").getByRole("button", { name: "Outline Target" }).click();
 
@@ -2737,7 +2804,7 @@ test("navigates source from the outline sidebar", async ({ page }) => {
 });
 
 test("creates a document skeleton from an editable outline plan", async ({ page }) => {
-  await page.getByLabel("Sidebar panel").selectOption("outline");
+  await selectSidebarPanelOption(page, "outline");
   const sidebar = page.locator(".sidebar");
   await expect(sidebar.getByRole("heading", { name: "Plan" })).toBeVisible();
 
@@ -2953,7 +3020,7 @@ test("navigates compiler diagnostics to the source range", async ({ page }) => {
   await expect(page.locator(".cm-line").filter({ hasText: "DIAGNOSTIC_TARGET" })).toBeVisible();
   await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
 
-  await page.getByLabel("Sidebar panel").selectOption("diagnostics");
+  await selectSidebarPanelOption(page, "diagnostics");
 
   const diagnosticInventory = page.getByLabel("Compiler output inventory");
   await expect(diagnosticInventory).toContainText("Compiled Markdown");
@@ -3055,7 +3122,7 @@ test("runs command palette citation glossary and index navigation", async ({ pag
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("risk2026");
-  await page.getByRole("button", { name: "[@risk2026] Citation" }).click();
+  await page.getByRole("button", { name: /\[@risk2026.*Citation/ }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("references");
   await expect(page.locator(".cm-line").filter({ hasText: "Citation target cites" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Resolved references" })).toBeVisible();
@@ -3069,13 +3136,13 @@ test("runs command palette citation glossary and index navigation", async ({ pag
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("ARR");
-  await page.getByRole("button", { name: "ARR Glossary" }).click();
+  await page.getByRole("button", { name: /ARR.*Glossary/ }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("references");
   await expect(page.locator(".cm-line").filter({ hasText: "ARR: Annual recurring revenue." })).toBeVisible();
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Working Capital");
-  await page.getByRole("button", { name: "Working Capital Index" }).click();
+  await page.getByRole("button", { name: /Working Capital.*Index/ }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("references");
   await expect(page.locator(".cm-line").filter({ hasText: "Working capital" })).toBeVisible();
 
@@ -3153,7 +3220,7 @@ test("manages front matter data sources from the references panel", async ({ pag
   );
   await queueDialogSelection(page, "/workspace/data-source-ui.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
-  await page.getByLabel("Sidebar panel").selectOption("references");
+  await selectSidebarPanelOption(page, "references");
 
   const dataSources = page.getByRole("region", { name: "Local data source manager" });
   await expect(dataSources).toContainText("3 local data sources | 2 ready | 1 need attention");
@@ -3206,16 +3273,16 @@ test("runs command palette open document and workspace file navigation", async (
   await expect.poll(() => editorText(page)).toContain("Second command document body.");
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Command First");
-  await page.getByRole("button", { name: "Command First Open document" }).click();
+  await page.getByRole("button", { name: /Command First.*Open document/ }).click();
   await expect(page.locator(".document-tabs .tab.active")).toContainText("Command First");
   await expect.poll(() => editorText(page)).toContain("First command document body.");
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("workspace-target");
-  await page.getByRole("button", { name: "reports/workspace-target.md Workspace file" }).click();
+  await page.getByRole("button", { name: /reports\/workspace-target\.md.*Workspace file/ }).click();
   await expect(page.locator(".document-tabs .tab.active")).toContainText("Workspace Target");
   await expect.poll(() => editorText(page)).toContain("Workspace command body.");
-  await page.getByLabel("Sidebar panel").selectOption("files");
+  await selectSidebarPanelOption(page, "files");
   await expect.poll(() => activeFileRowText(page)).toContain("workspace-target.md");
 });
 
@@ -3236,7 +3303,7 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect.poll(() => editorText(page)).toContain("A -> B");
 
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "transforms");
   const engine = page.locator(".engine-row").filter({ has: page.getByRole("heading", { name: "d2" }) });
   const enginePath = engine.getByLabel("Engine path");
   const trusted = engine.getByLabel("Trusted");
@@ -3572,7 +3639,7 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await page.getByRole("button", { name: "Insert glossary section Snippet" }).click();
   await expect.poll(() => editorText(page)).toContain("[GLOSSARY]");
 
-  await page.getByLabel("Sidebar panel").selectOption("tables");
+  await selectSidebarPanelOption(page, "tables");
   await page.getByRole("button", { name: "New table" }).click();
   await page.getByLabel("Caption").fill("Workflow budget");
   await page.getByRole("button", { name: "Add totals row" }).click();
@@ -3591,7 +3658,7 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await expect(page.getByText("/workspace")).toBeVisible();
   await expect(page.getByRole("button", { name: /market\.md/ }).first()).toBeVisible();
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await expect.poll(() => editorText(page)).toContain("status: in-review");
   await expect(page).toHaveTitle("* Market Entry Report - NEditor");
@@ -3602,7 +3669,7 @@ test("opens, saves, duplicates, renames, reveals, and reverts mocked files", asy
   await queueDialogSelection(page, "/workspace/market copy.md");
   await page.getByRole("button", { name: "Duplicate" }).click();
   await expect.poll(() => mockFileText(page, "/workspace/market copy.md")).toContain("status: in-review");
-  await page.getByLabel("Sidebar panel").selectOption("files");
+  await selectSidebarPanelOption(page, "files");
   await page.locator(".sidebar").getByRole("button", { name: /market copy\.md/ }).click();
   await expect.poll(() => activeFileRowText(page)).toContain("market copy.md");
 
@@ -3625,7 +3692,7 @@ test("saves a document as a new file and reopens it from recently closed", async
   await queueDialogSelection(page, "/workspace/market.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("approved");
   await expect.poll(() => editorText(page)).toContain("status: approved");
 
@@ -3637,13 +3704,13 @@ test("saves a document as a new file and reopens it from recently closed", async
   await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
   await expect(page.locator(".document-tabs .tab.active")).not.toContainText("market-approved.md");
 
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "files");
   const recentlyClosed = page.getByLabel("Recently closed documents");
   await recentlyClosed.getByRole("button", { name: "/workspace/market-approved.md" }).click();
 
   await expect.poll(() => editorText(page)).toContain("status: approved");
   await expect(recentlyClosed.getByRole("button", { name: "/workspace/market-approved.md" })).toHaveCount(0);
-  await page.getByLabel("Sidebar panel").selectOption("files");
+  await selectSidebarPanelOption(page, "files");
   await expect.poll(() => activeFileRowText(page)).toContain("market-approved.md");
 });
 
@@ -3652,7 +3719,7 @@ test("runs snapshot restore and release tagging workflows", async ({ page }) => 
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.getByRole("status", { name: "Release status draft" })).toBeVisible();
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   const sidebar = page.locator(".sidebar");
   const releaseChecklist = sidebar.getByRole("region", { name: "Release readiness checklist" });
   await expect(releaseChecklist).toContainText("Release state");
@@ -3684,7 +3751,7 @@ test("runs snapshot restore and release tagging workflows", async ({ page }) => 
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: approved");
   await setMockFileText(page, "/workspace/market.md", await editorText(page));
 
-  await page.getByLabel("Sidebar panel").selectOption("versioning");
+  await selectSidebarPanelOption(page, "versioning");
   await expect(sidebar).toContainText("main | clean");
   await expect(sidebar).toContainText("Mock diff for browser workflow");
 
@@ -3710,7 +3777,7 @@ test("guides Git-free users through snapshot-first versioning", async ({ page })
   await setMockFileText(page, "/workspace/no-git/board-brief.md", "# Board Brief\n\nGit-free draft.");
   await queueDialogSelection(page, "/workspace/no-git/board-brief.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
-  await page.getByLabel("Sidebar panel").selectOption("versioning");
+  await selectSidebarPanelOption(page, "versioning");
 
   const sidebar = page.locator(".sidebar");
   await expect(sidebar.getByLabel("Git-free versioning guidance")).toContainText("Snapshot-first document history");
@@ -3761,7 +3828,7 @@ test("switches tabs, guards dirty closes, and prunes stale recent document paths
   await expect(page.locator(".document-tabs .tab.active")).toContainText("rename-target.md");
 
   await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "files");
   await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/rename-source.md" })).toHaveCount(0);
   await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/rename-target.md" })).toBeVisible();
   await expect(page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/rename-source.md" })).toHaveCount(0);
@@ -3771,7 +3838,7 @@ test("switches tabs, guards dirty closes, and prunes stale recent document paths
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
   await deleteMockFile(page, "/workspace/delete-after-close.md");
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "files");
   await expect(page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/delete-after-close.md" })).toBeVisible();
   await page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/delete-after-close.md" }).click();
   await expect(page.getByLabel("Recently closed documents").getByRole("button", { name: "/workspace/delete-after-close.md" })).toHaveCount(0);
@@ -3811,11 +3878,11 @@ test("reopens recent folders and prunes moved workspace paths", async ({ page })
 
   await queueDialogSelection(page, "/client");
   await page.getByRole("button", { name: "Open Folder", exact: true }).click();
-  await page.getByLabel("Sidebar panel").selectOption("files");
+  await selectSidebarPanelOption(page, "files");
   await expect(page.getByText("/client")).toBeVisible();
   await expect(page.getByRole("button", { name: /project-a\.md/ })).toBeVisible();
 
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "files");
   const recentFolders = page.getByLabel("Recent folders");
   await expect(recentFolders.getByRole("button", { name: "/client" })).toBeVisible();
   await deleteMockFile(page, "/client/project-a.md");
@@ -3831,14 +3898,14 @@ test("reopens recent folders and prunes moved workspace paths", async ({ page })
   await setMockFileText(page, "/workspace/move-target.md", "# Move Target\n\nMoved body.");
   await deleteMockFile(page, "/workspace/move-source.md");
 
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "files");
   const recentlyClosed = page.getByLabel("Recently closed documents");
   await expect(recentlyClosed.getByRole("button", { name: "/workspace/move-source.md" })).toBeVisible();
   await recentlyClosed.getByRole("button", { name: "/workspace/move-source.md" }).click();
   await expect(recentlyClosed.getByRole("button", { name: "/workspace/move-source.md" })).toHaveCount(0);
   await expect(page.getByText("Removed missing recent file move-source.md")).toBeVisible();
 
-  await page.getByLabel("Sidebar panel").selectOption("files");
+  await selectSidebarPanelOption(page, "files");
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(page.getByRole("button", { name: /move-target\.md/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /move-source\.md/ })).toHaveCount(0);
@@ -3895,7 +3962,7 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
   await expect(page.locator(".document-tabs .tab.active")).toContainText("Field Notes");
 
   await page.getByLabel("View mode").selectOption("review");
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await selectSidebarPanelOption(page, "settings");
   await page.locator(".cm-scroller").evaluate((element) => {
     element.scrollTop = element.scrollHeight;
     element.dispatchEvent(new Event("scroll", { bubbles: true }));
@@ -3913,10 +3980,10 @@ test("restores workspace tabs, active document, pins, mode, and sidebar after re
   await expect.poll(() => page.locator(".cm-scroller").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
   await expect.poll(() => editorText(page)).toContain("Observation 70");
   await expect.poll(() => page.locator(".preview-pane").evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "files");
   await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/field-notes.md" })).toBeVisible();
 
-  await page.getByLabel("Sidebar panel").selectOption("files");
+  await selectSidebarPanelOption(page, "files");
   await expect(page.getByText("/workspace")).toBeVisible();
   await expect.poll(() => activeFileRowText(page)).toContain("field-notes.md");
 });
@@ -4063,7 +4130,7 @@ test("skips missing restored files with a clear restore warning after reload", a
   await expect(page.locator(".document-tabs .tab")).toHaveCount(1);
   await expect(page.locator(".document-tabs .tab.active")).toContainText(/Kept Brief|kept-brief\.md/);
   await expect.poll(() => editorText(page)).toContain("Restored document body.");
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "files");
   await expect(page.getByLabel("Recent files").getByRole("button", { name: "/workspace/missing-brief.md" })).toHaveCount(0);
 });
 
@@ -4071,7 +4138,7 @@ test("blocks stale saves and preserves local conflict copies", async ({ page }) 
   await queueDialogSelection(page, "/workspace/market.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await expect.poll(() => editorText(page)).toContain("status: in-review");
 
@@ -4101,7 +4168,7 @@ test("blocks stale saves and preserves local conflict copies", async ({ page }) 
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("External disk edit.");
   await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: approved");
   await expect.poll(() => mockFileText(page, "/workspace/market local copy.md")).toContain("status: in-review");
-  await page.getByLabel("Sidebar panel").selectOption("files");
+  await selectSidebarPanelOption(page, "files");
   await expect.poll(() => activeFileRowText(page)).toContain("market local copy.md");
 });
 
@@ -4109,7 +4176,7 @@ test("merges external conflict text back into the original file", async ({ page 
   await queueDialogSelection(page, "/workspace/market.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await setMockFileText(page, "/workspace/market.md", externalApprovedDocument());
 
@@ -4159,7 +4226,7 @@ test("keeps local edits after reviewing an external conflict", async ({ page }) 
   await queueDialogSelection(page, "/workspace/market.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await setMockFileText(page, "/workspace/market.md", externalApprovedDocument());
 
@@ -4179,7 +4246,7 @@ test("accepts external conflict changes into the active document", async ({ page
   await queueDialogSelection(page, "/workspace/market.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await setMockFileText(page, "/workspace/market.md", externalApprovedDocument());
 
@@ -4240,7 +4307,7 @@ test("opens a root-file conflict when watcher events arrive during local edits",
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.locator(".status-bar")).toContainText("Native watch: 1 path");
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await expect.poll(() => editorText(page)).toContain("status: in-review");
 
@@ -4280,7 +4347,7 @@ test("recompiles clean master documents after included files change", async ({ p
 
   const preview = page.getByRole("region", { name: "Live preview" });
   await expect(preview).toContainText("Original included risk note.");
-  await page.getByLabel("Sidebar panel").selectOption("references");
+  await selectSidebarPanelOption(page, "references");
   const includeGraph = page.getByRole("region", { name: "Include graph" });
   await expect(includeGraph).toContainText("Depth 0");
   await expect(includeGraph).toContainText("market.md");
@@ -4314,12 +4381,12 @@ test("navigates include graph entries from references and commands", async ({ pa
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Open include chapters/risk.md");
-  await page.getByRole("button", { name: /Open include chapters\/risk\.md Include depth 0/ }).click();
+  await page.getByRole("button", { name: /Open include chapters\/risk\.md.*Include depth 0/ }).click();
   await expect.poll(() => editorText(page)).toContain("Original included risk note.");
 
   await queueDialogSelection(page, "/workspace/market.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
-  await page.getByLabel("Sidebar panel").selectOption("references");
+  await selectSidebarPanelOption(page, "references");
 
   const includeGraph = page.getByRole("region", { name: "Include graph" });
   await expect(includeGraph).toContainText("market.md");
@@ -4350,7 +4417,7 @@ test("opens included-file conflicts without overwriting dirty master drafts", as
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Original included risk note.");
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await page.locator(".sidebar").getByLabel("Status").selectOption("in-review");
   await expect.poll(() => editorText(page)).toContain("status: in-review");
 
@@ -4374,7 +4441,7 @@ test("opens included-file conflicts without overwriting dirty master drafts", as
 });
 
 test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {
-  await page.getByLabel("Sidebar panel").selectOption("tables");
+  await selectSidebarPanelOption(page, "tables");
   await page.getByRole("button", { name: "New table" }).click();
 
   await page.getByLabel("CSV/TSV paste").fill(
@@ -4421,7 +4488,7 @@ test("edits table structure with formats and cancels draft changes", async ({ pa
   await page.getByRole("button", { name: "Insert table Snippet" }).click();
   await expect.poll(() => editorText(page)).toContain("| Revenue | 125000 |");
 
-  await page.getByLabel("Sidebar panel").selectOption("tables");
+  await selectSidebarPanelOption(page, "tables");
   const markdownPreview = page.getByLabel("Markdown preview");
   await expect(page.getByLabel("Value, row 1, column B")).toHaveValue("125000");
 
@@ -4527,14 +4594,14 @@ test("toggles AI review state and clears provenance readiness warnings", async (
   );
   await expect.poll(() => editorText(page)).toContain("status: needs-review");
 
-  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await selectSidebarPanelOption(page, "exports");
   await page.getByRole("button", { name: "Prepare for export" }).click();
   await expect(page.locator("article.readiness").getByText("Needs attention", { exact: true })).toBeVisible();
   await expect(page.getByRole("list", { name: "Export readiness diagnostics" })).toContainText(
     "Document has AI-assisted sections that are not human-reviewed.",
   );
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await expect(page.locator(".sidebar")).toContainText("2 AI review pending");
   const sourceReview = page.locator(".sidebar article").filter({ hasText: "OpenAI / ChatGPT" });
   await sourceReview.getByLabel("Human reviewed").check();
@@ -4547,7 +4614,7 @@ test("toggles AI review state and clears provenance readiness warnings", async (
   await expect(page.locator(".sidebar")).toContainText("0 AI review pending");
   await expect(page.locator(".sidebar")).toContainText("2 AI reviewed");
 
-  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await selectSidebarPanelOption(page, "exports");
   await page.getByRole("button", { name: "Prepare for export" }).click();
   await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
   await expect(page.getByText("0 errors, 0 warnings, 0 info")).toBeVisible();
@@ -4572,7 +4639,7 @@ test("manages review comments and change notes from the review panel", async ({ 
   await queueDialogSelection(page, "/workspace/review-workflow.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
-  await page.getByLabel("Sidebar panel").selectOption("review");
+  await selectSidebarPanelOption(page, "review");
   await expect(page.locator(".snapshot-row").filter({ hasText: "draft | 0 unresolved | 0 resolved" })).toBeVisible();
 
   await page.getByLabel("New comment").fill("Confirm finance source.");
@@ -4651,7 +4718,7 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
   );
   await expect.poll(() => editorText(page)).toContain("a -> b");
 
-  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await selectSidebarPanelOption(page, "exports");
   await page.getByLabel("View mode").selectOption("export");
   const targetSelect = page.getByLabel("Target");
   const exportPreview = page.getByRole("region", { name: "Export preview summary" });
@@ -4710,13 +4777,13 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
 });
 
 test("saves and reapplies reusable export profiles", async ({ page }) => {
-  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await openSettingsSection(page, "exports");
   await page.getByLabel("Brand name").fill("Acme Board");
   await page.getByLabel("Brand color").fill("#006699");
   await page.getByLabel("Footer template").fill("Confidential");
   await page.getByLabel("Citation style").selectOption("ieee");
 
-  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await selectSidebarPanelOption(page, "exports");
   const targetSelect = page.getByLabel("Target");
   const layoutSelect = page.getByLabel("Layout preset");
   await targetSelect.selectOption("pdf");
@@ -4746,7 +4813,7 @@ test("saves and reapplies reusable export profiles", async ({ page }) => {
 
   await page.reload();
   await expect(page.getByRole("heading", { name: "Market Entry Report" })).toBeVisible();
-  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await selectSidebarPanelOption(page, "exports");
   await expect(page.getByLabel("Saved profile")).toContainText("Client PDF");
   await page.getByLabel("Saved profile").selectOption({ label: "Client PDF" });
   await expect(page.getByLabel("Target")).toHaveValue("pdf");
@@ -4781,7 +4848,7 @@ test("publishes and hands off extended export targets", async ({ page }) => {
   );
   await expect.poll(() => editorText(page)).toContain("Publishing Handoff");
 
-  await page.getByLabel("Sidebar panel").selectOption("exports");
+  await selectSidebarPanelOption(page, "exports");
   await page.getByLabel("View mode").selectOption("export");
   const targetSelect = page.getByLabel("Target");
   const exportPreview = page.getByRole("region", { name: "Export preview summary" });

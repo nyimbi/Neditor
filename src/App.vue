@@ -255,7 +255,13 @@
         </label>
         <label class="compact-field">
           <span>Panel</span>
-          <select v-show="!isToolbarCollapsed('view')" v-model="store.sidebar" aria-label="Sidebar panel">
+          <select
+            v-show="!isToolbarCollapsed('view')"
+            :value="store.sidebar"
+            aria-label="Sidebar panel"
+            @change="selectSidebarPanel(eventValue($event))"
+            @input="selectSidebarPanel(eventValue($event))"
+          >
             <option value="files">Files</option>
             <option value="outline">Outline</option>
             <option value="diagnostics">Diagnostics</option>
@@ -390,7 +396,15 @@
         </section>
       </section>
 
-      <aside v-show="store.mode !== 'outline'" id="document-sidebar" class="sidebar" aria-label="Document workspace" tabindex="-1">
+      <aside
+        v-show="store.mode !== 'outline'"
+        id="document-sidebar"
+        :key="store.sidebar"
+        :data-sidebar="store.sidebar"
+        class="sidebar"
+        aria-label="Document workspace"
+        tabindex="-1"
+      >
         <template v-if="store.sidebar === 'files'">
           <h2>Workspace</h2>
           <button type="button" @click="openFolder">Open folder</button>
@@ -1952,7 +1966,7 @@
           </section>
         </template>
 
-        <template v-else>
+        <template v-else-if="store.sidebar === 'settings'">
           <h2>Settings</h2>
           <section class="configuration-center" aria-label="NEditor configuration center">
             <nav class="configuration-center-nav" aria-label="Configuration sections">
@@ -2320,8 +2334,8 @@
             <p class="engine-setup-status" :class="defaultMarkdownReaderPlan?.applied ? 'ok' : defaultMarkdownReaderPlan?.supported ? '' : 'failed'" role="status">
               {{ defaultMarkdownReaderStatus || defaultMarkdownReaderPlan?.message || "Check default Markdown reader setup before changing OS file associations." }}
             </p>
-            <pre v-if="defaultMarkdownReaderPlan?.commands.length" class="transform-installer-commands">{{ defaultMarkdownReaderPlan.commands.join("\n") }}</pre>
-            <ul v-if="defaultMarkdownReaderPlan?.manual_steps.length" class="transform-installer-handlers">
+            <pre v-if="defaultMarkdownReaderPlan?.commands?.length" class="transform-installer-commands">{{ defaultMarkdownReaderPlan.commands.join("\n") }}</pre>
+            <ul v-if="defaultMarkdownReaderPlan?.manual_steps?.length" class="transform-installer-handlers">
               <li v-for="step in defaultMarkdownReaderPlan.manual_steps" :key="step">{{ step }}</li>
             </ul>
           </section>
@@ -2349,6 +2363,10 @@
               <div>
                 <dt>Gaps</dt>
                 <dd>{{ supportBundleReport.releaseReadiness?.evidenceGaps?.length || 0 }}</dd>
+              </div>
+              <div>
+                <dt>Spec rows</dt>
+                <dd>{{ supportBundleReport.specCompletion?.summary?.openRows || 0 }} open</dd>
               </div>
               <div>
                 <dt>Output</dt>
@@ -2425,7 +2443,7 @@
               Installer plan covers all external transform handlers currently registered by NEditor.
             </p>
             <p v-if="selectedTransformInstallerPlan" class="engine-summary">
-              Engines: {{ selectedTransformInstallerPlan.engine_names.join(", ") }}
+              Engines: {{ selectedTransformInstallerPlan.engine_names?.join(", ") || "none" }}
             </p>
             <ul v-if="selectedTransformInstallerPlan" class="transform-installer-handlers">
               <li v-for="handler in selectedTransformInstallerPlan.handlers" :key="handler">{{ handler }}</li>
@@ -2442,7 +2460,7 @@
               <button type="button" :disabled="!transformInstallerCommandText" @click="copyTransformInstallerCommands">Copy commands</button>
             </div>
             <p class="engine-setup-status" role="status">
-              {{ transformInstallerStatus || selectedTransformInstallerPlan?.notes.join(" ") || "Installer options will appear after setup loads." }}
+              {{ transformInstallerStatus || selectedTransformInstallerPlan?.notes?.join(" ") || "Installer options will appear after setup loads." }}
             </p>
           </section>
           <label>
@@ -5106,11 +5124,26 @@ type SupportBundleReport = {
     evidenceGaps?: unknown[];
     failures?: unknown[];
   };
+  specCompletion?: {
+    status?: string;
+    summary?: {
+      openRows?: number;
+      totalRows?: number;
+      completeRows?: number;
+    };
+    openRows?: unknown[];
+  };
   recommendations?: string[];
 };
 
 declare global {
   interface Window {
+    __NEDITOR_E2E__?: unknown;
+    __NEDITOR_APP_E2E__?: {
+      setSidebar(panelId: string): Promise<void>;
+      selectConfigurationSection(sectionId: string): Promise<void>;
+      state(): { mode: string; sidebar: string; configurationSection: string };
+    };
     __NEDITOR_DESKTOP_WORKFLOW__?: DesktopWorkflowTestHooks;
   }
 }
@@ -10029,6 +10062,25 @@ async function installDesktopWorkflowTestHooks() {
   };
 }
 
+function installE2eAppHooks() {
+  if (!window.__NEDITOR_E2E__) return;
+  window.__NEDITOR_APP_E2E__ = {
+    setSidebar: async (panelId: string) => {
+      selectSidebarPanel(panelId);
+      await nextTick();
+    },
+    selectConfigurationSection: async (sectionId: string) => {
+      selectConfigurationSection(sectionId);
+      await nextTick();
+    },
+    state: () => ({
+      mode: store.mode,
+      sidebar: store.sidebar,
+      configurationSection: selectedConfigurationSection.value,
+    }),
+  };
+}
+
 onMounted(async () => {
   await store.boot();
   await openPendingCliPaths();
@@ -10041,6 +10093,7 @@ onMounted(async () => {
   scheduleAutosave();
   scheduleAutoSnapshot();
   setWindowTitle(store.windowTitle);
+  installE2eAppHooks();
   void nextTick().then(async () => {
     await reportDesktopUiSmoke();
     await runDesktopWorkflowSmokeIfEnabled();
@@ -10071,6 +10124,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("scroll", hideButtonHelp, true);
   window.removeEventListener("click", handleAppMenuDocumentClick);
   delete window.__NEDITOR_DESKTOP_WORKFLOW__;
+  delete window.__NEDITOR_APP_E2E__;
   unlistenNativeMenuCommand?.();
   unlistenNativeMenuCommand = null;
   stopDocsLiveDictation();
@@ -13538,6 +13592,15 @@ function selectConfigurationSection(sectionId: string) {
   }
 }
 
+function selectSidebarPanel(panelId: string) {
+  const panels = ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "help", "settings"] as const;
+  if (!panels.includes(panelId as (typeof panels)[number])) return;
+  store.$patch({ sidebar: panelId as typeof store.sidebar });
+  if (panelId === "settings" && !defaultMarkdownReaderPlan.value) {
+    void loadDefaultMarkdownReaderPlan();
+  }
+}
+
 function openConfigurationSetup(stepId: string = "llm-access") {
   if (configurationSetupSteps.some((step) => step.id === stepId)) {
     configurationSetupStepId.value = stepId as ConfigurationSetupStepId;
@@ -13551,7 +13614,8 @@ function closeConfigurationSetup() {
 }
 
 async function openPendingCliPaths() {
-  const paths = await invoke<string[]>("pending_cli_open_paths").catch(() => []);
+  const response = await invoke<unknown>("pending_cli_open_paths").catch(() => []);
+  const paths = Array.isArray(response) ? response.filter((path): path is string => typeof path === "string" && path.trim().length > 0) : [];
   if (!paths.length) return;
   for (const path of paths) {
     try {
@@ -14624,7 +14688,8 @@ async function chooseTransformEngine(name: string) {
 
 async function loadTransformHandlerInstallers() {
   try {
-    transformInstallerPlans.value = await invoke<TransformHandlerInstallerPlan[]>("list_transform_handler_installers");
+    const response = await invoke<unknown>("list_transform_handler_installers");
+    transformInstallerPlans.value = Array.isArray(response) ? (response as TransformHandlerInstallerPlan[]) : [];
     if (!transformInstallerPlans.value.some((plan) => plan.id === selectedTransformInstallerId.value)) {
       selectedTransformInstallerId.value = transformInstallerPlans.value[0]?.id || "";
     }
@@ -14638,7 +14703,8 @@ async function loadTransformHandlerInstallers() {
 
 async function loadDefaultMarkdownReaderPlan() {
   try {
-    const response = await invoke<DefaultMarkdownReaderResponse>("default_markdown_reader_plan");
+    const response = await invoke<DefaultMarkdownReaderResponse | null>("default_markdown_reader_plan");
+    if (!response) throw new Error("Default Markdown reader plan is unavailable");
     defaultMarkdownReaderPlan.value = response;
     defaultMarkdownReaderEnabled.value = response.applied;
     defaultMarkdownReaderStatus.value = response.message;
@@ -14699,9 +14765,10 @@ async function createSupportBundleFromSettings(writeToFile: boolean) {
     supportBundleReport.value = report;
     const releaseStatus = report.releaseReadiness?.status || "unknown";
     const gaps = report.releaseReadiness?.evidenceGaps?.length || 0;
+    const specOpenRows = report.specCompletion?.summary?.openRows || 0;
     supportBundleStatus.value = report.writtenTo
       ? `Wrote support bundle to ${report.writtenTo}`
-      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps`;
+      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${specOpenRows} open spec rows`;
   } catch (error) {
     supportBundleReport.value = null;
     supportBundleStatus.value = error instanceof Error ? error.message : String(error);

@@ -130,10 +130,11 @@ readiness` reads `.tmp/release-readiness/report.json` without rerunning the
 verification suite and summarizes accepted checks, failed checks, external
 evidence gaps, and next commands; use `--json` for packaging dashboards and
 `--strict` when any remaining release gap should produce a non-zero exit code.
-`ned support-bundle` combines `ned doctor` and release-readiness summaries into
-a redaction-safe JSON handoff for help desks and release managers. It includes
-setup status, command paths, report paths, evidence-gap summaries, and
-recommendations, but not document content or secrets. `ned completions bash`,
+`ned support-bundle` combines `ned doctor`, release-readiness, and
+spec-completion summaries into a redaction-safe JSON handoff for help desks and
+release managers. It includes setup status, command paths, report paths,
+evidence-gap summaries, open specification rows, and recommendations, but not
+document content or secrets. `ned completions bash`,
 `ned completions zsh`, and `ned completions fish` print shell completion
 scripts so support teams can make the command easier to discover after
 installation. `ned doctor` prints a local installation and workspace setup
@@ -762,9 +763,9 @@ and human reviewer sign-off for accessibility or native-viewer export review.
 `ned readiness --json` reads that generated report for support, release, and
 packaging handoffs; `ned readiness --strict` exits non-zero until the report is
 publication-ready with no failed checks or evidence gaps.
-`ned support-bundle --output support.json` packages the local setup diagnostics
-and release-readiness summary into one supportable JSON file without including
-document content or secrets.
+`ned support-bundle --output support.json` packages the local setup diagnostics,
+release-readiness summary, and spec-completion summary into one supportable JSON
+file without including document content or secrets.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
