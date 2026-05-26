@@ -432,7 +432,7 @@ fn compiler_loads_project_level_variables_without_overriding_front_matter() {
     fs::create_dir_all(root.join(".neditor")).expect("create project vars dir");
     fs::write(
         root.join(".neditor").join("variables.yaml"),
-        "client: Project Client\nregion: West\nowner: Strategy Office\n",
+        "variables: !docs!vars\n  client: !docs!client Project Client\n  region: !docs!region West\n  owner: !docs!owner Strategy Office\n  review:\n    lead: !docs!person QA Lead\n",
     )
     .expect("write project variables");
     let doc = root.join("docs").join("report.md");
@@ -440,15 +440,16 @@ fn compiler_loads_project_level_variables_without_overriding_front_matter() {
     fs::write(&doc, "# Report").expect("write doc");
 
     let response = compile(CompileRequest {
-            text: "---\ntitle: Project Vars\nstatus: approved\napprovedBy: QA\nclient: Front Matter Client\n---\n# Project Vars\nPrepared for {{client}} in {{region}} by {{owner}}.\n".to_string(),
+            text: "---\ntitle: Project Vars\nstatus: approved\napprovedBy: QA\nclient: Front Matter Client\n---\n# Project Vars\nPrepared for {{client}} in {{region}} by {{owner}} with {{review.lead}}.\n".to_string(),
             file_path: Some(path_to_string(&doc)),
         });
 
     assert!(response
         .compiled_markdown
-        .contains("Prepared for Front Matter Client in West by Strategy Office."));
+        .contains("Prepared for Front Matter Client in West by Strategy Office with QA Lead."));
     assert_eq!(response.metadata["client"], "Front Matter Client");
     assert_eq!(response.metadata["region"], "West");
+    assert_eq!(response.metadata["review"]["lead"], "QA Lead");
     fs::remove_dir_all(root).expect("clean project vars test dir");
 }
 

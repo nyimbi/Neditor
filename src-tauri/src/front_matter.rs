@@ -239,7 +239,9 @@ pub(crate) fn merge_project_variables(
             return;
         }
     };
-    let mut variables = match serde_yaml::from_str::<Value>(&text) {
+    let mut variables = match parse_yaml_front_matter_value(&text)
+        .and_then(|variables| yaml_value_to_json(strip_yaml_value_tags(variables)))
+    {
         Ok(value) => value,
         Err(err) => {
             diagnostics.push(diag(

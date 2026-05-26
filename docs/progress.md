@@ -126,6 +126,9 @@ Recent pushed checkpoints visible in current git history:
   before JSON metadata conversion, so compiled document variables, currency
   filters, rendered data-source tables, and include-graph/export-manifest
   evidence still work when business templates use typed YAML annotations.
+  Project-level `.neditor/variables.yaml` files now use the same normalization
+  path, so tagged `variables:` wrappers and tagged project values merge into
+  document metadata without overriding explicit front matter.
 - Simple inline YAML maps now expand into dotted document variables as well.
   Compact business front matter such as `client: {name: Acme, tier:
   Enterprise}` and anchored defaults such as `defaults: &clientDefaults
