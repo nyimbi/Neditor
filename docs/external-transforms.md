@@ -13,6 +13,12 @@ You can also disable a configured external engine per transform. Disabled
 engines are not executed, do not produce trust warnings, and fall back to the
 embedded renderer when one exists.
 
+The Settings -> Transforms configurator includes a managed handler installer.
+It lists every registered external engine it covers, shows the exact package
+manager commands, can start allowlisted Homebrew or winget steps where the
+platform supports that flow, and keeps Linux/admin-specific setup copyable so
+the user can run it in a terminal and return to Probe each engine.
+
 Current platform evidence is tracked in
 [External transform platform evidence](external-transform-platform-evidence.md).
 

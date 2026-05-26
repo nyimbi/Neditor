@@ -1961,7 +1961,7 @@
                 :key="section.id"
                 type="button"
                 :class="{ active: selectedConfigurationSection === section.id }"
-                @click="selectedConfigurationSection = section.id"
+                @click="selectConfigurationSection(section.id)"
               >
                 <strong>{{ section.label }}</strong>
                 <small>{{ section.summary }}</small>
@@ -2335,7 +2335,7 @@
             <header>
               <div>
                 <h4>Download and install transform handlers</h4>
-                <span>Use a managed setup plan for Graphviz, D2, PlantUML, Pikchr, and SQLite before choosing trusted executable paths.</span>
+                <span>Use a managed setup plan for every external transform handler before choosing trusted executable paths.</span>
               </div>
               <button type="button" @click="loadTransformHandlerInstallers">Refresh installer options</button>
             </header>
@@ -2364,7 +2364,20 @@
                 <dt>Privilege</dt>
                 <dd>{{ selectedTransformInstallerPlan.requires_admin ? "May ask for administrator access" : "No administrator prompt expected from NEditor" }}</dd>
               </div>
+              <div>
+                <dt>Coverage</dt>
+                <dd>{{ transformInstallerCoverageSummary }}</dd>
+              </div>
             </dl>
+            <p v-if="missingTransformInstallerEngines.length" class="engine-setup-status failed" role="alert">
+              Missing installer coverage for {{ missingTransformInstallerEngines.join(", ") }}.
+            </p>
+            <p v-else-if="selectedTransformInstallerPlan" class="engine-setup-status ok" role="note">
+              Installer plan covers all external transform handlers currently registered by NEditor.
+            </p>
+            <p v-if="selectedTransformInstallerPlan" class="engine-summary">
+              Engines: {{ selectedTransformInstallerPlan.engine_names.join(", ") }}
+            </p>
             <ul v-if="selectedTransformInstallerPlan" class="transform-installer-handlers">
               <li v-for="handler in selectedTransformInstallerPlan.handlers" :key="handler">{{ handler }}</li>
             </ul>
@@ -2375,7 +2388,7 @@
                 :disabled="!selectedTransformInstallerPlan?.installable || transformInstallerBusy"
                 @click="startTransformHandlerInstall"
               >
-                {{ transformInstallerBusy ? "Starting..." : "Install all handlers" }}
+                {{ transformInstallerBusy ? "Starting..." : "Download/install all handlers" }}
               </button>
               <button type="button" :disabled="!transformInstallerCommandText" @click="copyTransformInstallerCommands">Copy commands</button>
             </div>
@@ -4999,6 +5012,7 @@ type TransformHandlerInstallerPlan = {
   label: string;
   platform: string;
   manager: string;
+  engine_names: string[];
   handlers: string[];
   commands: string[];
   installable: boolean;
@@ -6735,6 +6749,16 @@ const configurationSetupSummary = computed(() => `${configurationSetupStatus.val
 const selectedTransformInstallerPlan = computed(() =>
   transformInstallerPlans.value.find((plan) => plan.id === selectedTransformInstallerId.value) || transformInstallerPlans.value[0] || null,
 );
+const selectedTransformInstallerEngineNames = computed(() => new Set(selectedTransformInstallerPlan.value?.engine_names || []));
+const missingTransformInstallerEngines = computed(() =>
+  store.externalTransformEngines.map((engine) => engine.name).filter((name) => !selectedTransformInstallerEngineNames.value.has(name)),
+);
+const transformInstallerCoverageSummary = computed(() => {
+  const plan = selectedTransformInstallerPlan.value;
+  if (!plan) return "No installer plan selected";
+  const total = store.externalTransformEngines.length || plan.engine_names.length;
+  return `${plan.engine_names.length}/${total} external engines`;
+});
 const transformInstallerCommandText = computed(() => (selectedTransformInstallerPlan.value?.commands || []).join("\n"));
 const configurationCenterSections = computed(() => [
   {
@@ -13410,6 +13434,13 @@ function openTransformInstaller() {
   selectedConfigurationSection.value = "transforms";
   void loadTransformHandlerInstallers();
   store.statusMessage = "Opened transform handler installer";
+}
+
+function selectConfigurationSection(sectionId: string) {
+  selectedConfigurationSection.value = sectionId;
+  if (sectionId === "transforms" && !transformInstallerPlans.value.length) {
+    void loadTransformHandlerInstallers();
+  }
 }
 
 function openConfigurationSetup(stepId: string = "llm-access") {

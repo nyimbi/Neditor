@@ -7,6 +7,7 @@ pub(crate) struct TransformHandlerInstallerPlan {
     pub(crate) label: String,
     pub(crate) platform: String,
     pub(crate) manager: String,
+    pub(crate) engine_names: Vec<String>,
     pub(crate) handlers: Vec<String>,
     pub(crate) commands: Vec<String>,
     pub(crate) installable: bool,
@@ -101,11 +102,24 @@ pub(crate) fn transform_handler_install_steps_for_platform(
         ("windows", "windows-winget-all") => Some(vec![
             winget_install("Graphviz.Graphviz"),
             winget_install("Terrastruct.D2"),
+            winget_install("PlantUML.PlantUML"),
             winget_install("EclipseAdoptium.Temurin.21.JRE"),
             winget_install("SQLite.SQLite"),
+            winget_install("Rustlang.Rustup"),
+            TransformHandlerInstallerStep {
+                program: "cargo",
+                args: vec!["install", "pikchr-cli", "--locked"],
+            },
         ]),
         _ => None,
     }
+}
+
+pub(crate) fn installable_external_transform_engines() -> Vec<&'static str> {
+    vec![
+        "sql", "pikchr", "dot", "graphviz", "circo", "neato", "fdp", "osage", "twopi", "plantuml",
+        "d2",
+    ]
 }
 
 fn homebrew_transform_handler_plan() -> TransformHandlerInstallerPlan {
@@ -114,8 +128,9 @@ fn homebrew_transform_handler_plan() -> TransformHandlerInstallerPlan {
         "Install all handlers with Homebrew",
         "macOS",
         "Homebrew",
+        installable_external_transform_engines(),
         vec![
-            "Graphviz: dot, graphviz, circo, neato, fdp, osage, twopi",
+            "Graphviz package: dot, graphviz, circo, neato, fdp, osage, twopi",
             "D2",
             "PlantUML with Java runtime",
             "Pikchr",
@@ -137,24 +152,28 @@ fn windows_transform_handler_plan() -> TransformHandlerInstallerPlan {
         "Install core handlers with winget",
         "Windows",
         "winget",
+        installable_external_transform_engines(),
         vec![
-            "Graphviz: dot, graphviz, circo, neato, fdp, osage, twopi",
+            "Graphviz package: dot, graphviz, circo, neato, fdp, osage, twopi",
             "D2",
-            "PlantUML Java runtime",
+            "PlantUML plus Java runtime",
             "SQLite sql transform",
-            "Pikchr: copy the note below if a local package is unavailable",
+            "Pikchr CLI through Rust/Cargo",
         ],
         vec![
             "winget install --id Graphviz.Graphviz -e --accept-package-agreements --accept-source-agreements",
             "winget install --id Terrastruct.D2 -e --accept-package-agreements --accept-source-agreements",
+            "winget install --id PlantUML.PlantUML -e --accept-package-agreements --accept-source-agreements",
             "winget install --id EclipseAdoptium.Temurin.21.JRE -e --accept-package-agreements --accept-source-agreements",
             "winget install --id SQLite.SQLite -e --accept-package-agreements --accept-source-agreements",
+            "winget install --id Rustlang.Rustup -e --accept-package-agreements --accept-source-agreements",
+            "cargo install pikchr-cli --locked",
         ],
         true,
         false,
         vec![
             "winget package availability can vary by source; if a handler is missing, use the copied commands as a starting point in a terminal.",
-            "Install Pikchr manually or from source when your package source does not provide a trusted binary.",
+            "If Rustup updates PATH only after a new terminal starts, copy and rerun the Pikchr command from a terminal.",
         ],
     )
 }
@@ -165,8 +184,9 @@ fn linux_transform_handler_plan() -> TransformHandlerInstallerPlan {
         "Copy Linux package commands",
         "Linux",
         "system package manager",
+        installable_external_transform_engines(),
         vec![
-            "Graphviz: dot, graphviz, circo, neato, fdp, osage, twopi",
+            "Graphviz package: dot, graphviz, circo, neato, fdp, osage, twopi",
             "D2",
             "PlantUML with Java runtime",
             "Pikchr",
@@ -193,8 +213,9 @@ fn manual_transform_handler_plan(platform: &str) -> TransformHandlerInstallerPla
         "Copy transform handler checklist",
         platform,
         "manual",
+        installable_external_transform_engines(),
         vec![
-            "Graphviz: dot, graphviz, circo, neato, fdp, osage, twopi",
+            "Graphviz package: dot, graphviz, circo, neato, fdp, osage, twopi",
             "D2",
             "PlantUML with Java runtime",
             "Pikchr",
@@ -215,6 +236,7 @@ fn plan(
     label: &str,
     platform: &str,
     manager: &str,
+    engine_names: Vec<&str>,
     handlers: Vec<&str>,
     commands: Vec<&str>,
     installable: bool,
@@ -226,6 +248,7 @@ fn plan(
         label: label.to_string(),
         platform: platform.to_string(),
         manager: manager.to_string(),
+        engine_names: engine_names.into_iter().map(str::to_string).collect(),
         handlers: handlers.into_iter().map(str::to_string).collect(),
         commands: commands.into_iter().map(str::to_string).collect(),
         installable,

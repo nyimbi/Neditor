@@ -401,9 +401,11 @@ artifacts:
 - External executable engines require explicit trust, bounded execution, and
   clear setup/probe diagnostics.
 - Settings -> Transforms includes a transform handler installer. It shows the
-  exact package-manager commands for Graphviz, D2, PlantUML, Pikchr, and SQLite,
-  can start the supported allowlisted installer on the current platform, and
-  falls back to copyable commands when the platform needs terminal/admin setup.
+  exact package-manager commands for every external transform handler
+  currently registered by NEditor: SQLite, Pikchr, Graphviz/DOT variants, D2,
+  and PlantUML. It can start the supported allowlisted installer on the current
+  platform, and falls back to copyable commands when the platform needs
+  terminal/admin setup.
 
 ### Review, Release, And AI Governance
 

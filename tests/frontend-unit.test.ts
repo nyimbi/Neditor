@@ -3824,7 +3824,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("External execution is disabled"));
   ok(app.includes('aria-label="Transform handler installer"'));
   ok(app.includes("Download and install transform handlers"));
-  ok(app.includes("Install all handlers"));
+  ok(app.includes("Download/install all handlers"));
+  ok(app.includes("transformInstallerCoverageSummary"));
+  ok(app.includes("Installer plan covers all external transform handlers currently registered by NEditor."));
   ok(app.includes("list_transform_handler_installers"));
   ok(app.includes("install_transform_handlers"));
   ok(app.includes("openTransformInstaller"));
