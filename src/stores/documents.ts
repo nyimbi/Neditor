@@ -6,6 +6,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessDocuments";
 import { isAiSourceFenceOpener, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
+import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "../lib/transformTemplates";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import {
@@ -681,8 +682,8 @@ export const useDocumentsStore = defineStore("documents", {
           });
         } catch {
           missing.push(path);
-          this.recentFiles = this.recentFiles.filter((recent) => recent !== path);
-          this.recentlyClosed = this.recentlyClosed.filter((recent) => recent !== path);
+          this.recentFiles = forgetRecentItem(this.recentFiles, path);
+          this.recentlyClosed = forgetRecentItem(this.recentlyClosed, path);
         }
       }
       this.missingWorkspaceFiles = missing;
@@ -734,7 +735,7 @@ export const useDocumentsStore = defineStore("documents", {
       this.activeId = document.id;
       this.statusMessage = `Opened ${document.title}`;
       this.rememberFile(document.path);
-      this.recentlyClosed = this.recentlyClosed.filter((recent) => recent !== document.path);
+      this.recentlyClosed = forgetRecentItem(this.recentlyClosed, document.path);
       this.missingWorkspaceFiles = this.missingWorkspaceFiles.filter((missing) => missing !== document.path);
       if (!this.workspaceRoot) {
         const folder = folderFromPath(document.path);
@@ -1735,7 +1736,7 @@ export const useDocumentsStore = defineStore("documents", {
         const [closed] = this.documents.slice(index, index + 1);
         const closingActiveDocument = closed?.id === this.activeId;
         if (closed?.path) {
-          this.recentlyClosed = [closed.path, ...this.recentlyClosed.filter((recent) => recent !== closed.path)].slice(0, 20);
+          this.recentlyClosed = rememberRecentItem(this.recentlyClosed, closed.path, 20);
         }
         this.documents.splice(index, 1);
         if (closingActiveDocument) {
@@ -1776,21 +1777,21 @@ export const useDocumentsStore = defineStore("documents", {
     },
     rememberFile(path: string | null) {
       if (!path) return;
-      this.recentFiles = [path, ...this.recentFiles.filter((recent) => recent !== path)].slice(0, 20);
+      this.recentFiles = rememberRecentItem(this.recentFiles, path, 20);
     },
     forgetFilePath(path: string | null) {
       if (!path) return;
-      this.recentFiles = this.recentFiles.filter((recent) => recent !== path);
-      this.recentlyClosed = this.recentlyClosed.filter((recent) => recent !== path);
-      this.missingWorkspaceFiles = this.missingWorkspaceFiles.filter((missing) => missing !== path);
+      this.recentFiles = forgetRecentItem(this.recentFiles, path);
+      this.recentlyClosed = forgetRecentItem(this.recentlyClosed, path);
+      this.missingWorkspaceFiles = forgetRecentItem(this.missingWorkspaceFiles, path);
     },
     rememberFolder(path: string | null) {
       if (!path) return;
-      this.recentFolders = [path, ...this.recentFolders.filter((recent) => recent !== path)].slice(0, 12);
+      this.recentFolders = rememberRecentItem(this.recentFolders, path, 12);
     },
     forgetFolderPath(path: string | null) {
       if (!path) return;
-      this.recentFolders = this.recentFolders.filter((recent) => recent !== path);
+      this.recentFolders = forgetRecentItem(this.recentFolders, path);
       if (this.workspaceRoot === path) {
         this.workspaceRoot = null;
         this.workspaceFiles = [];

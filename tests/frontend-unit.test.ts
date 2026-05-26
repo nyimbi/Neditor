@@ -102,6 +102,7 @@ import {
   qualityRecommendationMarkdown,
 } from "../src/lib/qualityRecommendations.js";
 import { isAiSourceFenceOpener, markdownFenceOpener, rewriteAiSourceReviewBlock, stripMarkdownFencedBlocks } from "../src/lib/provenanceReview.js";
+import { forgetRecentItem, rememberRecentItem } from "../src/lib/recentItems.js";
 import {
   buildReleaseReadinessChecklist,
   formatReleaseChecklistSummary,
@@ -157,6 +158,14 @@ test("command palette helpers compact metadata into searchable text", () => {
     }),
     "open proposal open document proposal.md | set: rfp compliance matrix dirty unsaved",
   );
+});
+
+test("recent item helpers deduplicate limit and forget paths", () => {
+  deepEqual(rememberRecentItem(["a.md", "b.md", "c.md"], "b.md", 3), ["b.md", "a.md", "c.md"]);
+  deepEqual(rememberRecentItem(["a.md", "b.md", "c.md"], " d.md ", 3), ["d.md", "a.md", "b.md"]);
+  deepEqual(rememberRecentItem(["a.md"], "", 3), ["a.md"]);
+  deepEqual(forgetRecentItem(["a.md", "b.md", "c.md"], "b.md"), ["a.md", "c.md"]);
+  deepEqual(forgetRecentItem(["a.md"], null), ["a.md"]);
 });
 
 test("table parsing preserves captions, alignment, and escaped pipes", () => {

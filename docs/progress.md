@@ -3585,6 +3585,16 @@ Command palette helper extraction:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the frontend architecture evidence refresh. |
 | `git diff --check` | Pass | No whitespace errors are present in the command-palette helper extraction diff. |
 
+Recent item store helper extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after extracting recent file/folder/list dedupe and forget helpers to `src/lib/recentItems.ts`. |
+| `pnpm run test:unit` | Pass | 71 frontend unit/static tests passed, including direct recent-item deduplication, limit enforcement, whitespace trimming, and forget behavior. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting recent-item helper extraction; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the state-store evidence refresh. |
+| `git diff --check` | Pass | No whitespace errors are present in the recent-item helper extraction diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
