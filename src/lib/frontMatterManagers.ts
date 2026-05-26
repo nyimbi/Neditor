@@ -153,6 +153,7 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
     if (mergeMatch && parent && !parent.excluded) {
       for (const alias of yamlAliasNames(mergeMatch[1])) {
         for (const entry of mapAnchors.get(alias) || []) {
+          recordMapAnchorEntry(mapAnchors, parent, entry.key, entry.value, entry.line, true);
           setVariableRow(
             rows,
             {
@@ -193,14 +194,7 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
     if (value.startsWith("[") || value.startsWith("{")) continue;
     for (const owner of stack.filter((entry) => entry.anchor)) {
       const relativeKey = path.startsWith(`${owner.path}.`) ? path.slice(owner.path.length + 1) : "";
-      if (relativeKey) {
-        const entries = mapAnchors.get(owner.anchor) || [];
-        const existing = entries.findIndex((entry) => entry.key === relativeKey);
-        const anchoredEntry = { key: relativeKey, value, line: index + 1 };
-        if (existing >= 0) entries[existing] = anchoredEntry;
-        else entries.push(anchoredEntry);
-        mapAnchors.set(owner.anchor, entries);
-      }
+      if (relativeKey) recordMapAnchorEntry(mapAnchors, owner, relativeKey, value, index + 1);
     }
     setVariableRow(rows, {
       key: path,
@@ -447,6 +441,26 @@ function setVariableRow(rows: FrontMatterVariableRow[], row: FrontMatterVariable
     return;
   }
   rows.push(row);
+}
+
+function recordMapAnchorEntry(
+  mapAnchors: Map<string, Array<{ key: string; value: string; line: number }>>,
+  owner: { anchor: string },
+  key: string,
+  value: string,
+  line: number,
+  keepExisting = false,
+) {
+  if (!owner.anchor || !key) return;
+  const entries = mapAnchors.get(owner.anchor) || [];
+  const index = entries.findIndex((entry) => entry.key === key);
+  const anchoredEntry = { key, value, line };
+  if (index >= 0) {
+    if (!keepExisting) entries[index] = anchoredEntry;
+  } else {
+    entries.push(anchoredEntry);
+  }
+  mapAnchors.set(owner.anchor, entries);
 }
 
 function stripYamlComment(value: string) {

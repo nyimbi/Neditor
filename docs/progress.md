@@ -87,7 +87,8 @@ Recent pushed checkpoints visible in current git history:
   `!custom`, and `!<tag:yaml.org,2002:str>` can populate repeated client,
   owner, reviewer, budget, or region variables while explicit values still win.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
-  flow through simple merges as dotted variable names.
+  flow through simple merges as dotted variable names, and anchored maps can
+  inherit other anchored maps before being reused by a client or partner block.
 - Application navigation now exposes NEditor's capabilities through both menus
   and buttons. The workbench header has visible File, Edit, View, Writing
   Tools, Quality, Export, and Help menus that mirror the native desktop menu
@@ -3324,7 +3325,7 @@ Front matter manager merge keys and tags:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm exec tsc -p tsconfig.test.json` | Pass | Test TypeScript compilation passed after adding conservative tagged-scalar and simple merge-key handling. |
-| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Four focused frontend unit tests passed, including `!!str`, `!custom`, `!<tag:yaml.org,2002:str>`, simple `<<: *defaults` merges, list-form merge aliases, nested scalar defaults such as `address.city`/`delivery.timezone`, and explicit value override of merged defaults. |
+| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Four focused frontend unit tests passed, including `!!str`, `!custom`, `!<tag:yaml.org,2002:str>`, simple `<<: *defaults` merges, list-form merge aliases, nested scalar defaults such as `address.city`/`delivery.timezone`, inherited anchored-map defaults, and explicit value override of merged defaults. |
 
 Export metadata checklist modularization:
 

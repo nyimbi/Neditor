@@ -531,8 +531,11 @@ test("front matter managers resolve tagged scalars and simple merge aliases", ()
     "  reviewer: Backup Team",
     "  delivery:",
     "    timezone: EAT",
-    "client:",
+    "regionalDefaults: &regionalDefaults",
     "  <<: [*contactDefaults, *fallbackDefaults]",
+    "  region: EMEA",
+    "client:",
+    "  <<: [*regionalDefaults]",
     "  owner: Delivery Team",
     "  region: !<tag:yaml.org,2002:str> EMEA",
     "partner:",
@@ -553,6 +556,8 @@ test("front matter managers resolve tagged scalars and simple merge aliases", ()
   ok(rows.some((row) => row.key === "client.address.country" && row.value === "Kenya"));
   ok(rows.some((row) => row.key === "client.delivery.timezone" && row.value === "EAT"));
   ok(rows.some((row) => row.key === "client.region" && row.value === "EMEA"));
+  ok(rows.some((row) => row.key === "regionalDefaults.address.city" && row.value === "Nairobi"));
+  ok(rows.some((row) => row.key === "regionalDefaults.delivery.timezone" && row.value === "EAT"));
   ok(rows.some((row) => row.key === "partner.owner" && row.value === "Strategy # Lead"));
 });
 
