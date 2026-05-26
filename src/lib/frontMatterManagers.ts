@@ -425,9 +425,13 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
             (mapAnchors.get(itemValue.alias) || []).map((entry) => ({ ...entry, keepExisting: true })),
           );
         } else if (value.startsWith("{")) {
-          recordEntriesForPath(itemPath, itemExcluded, parseInlineYamlMap(value, anchors, mapAnchors, index + 1));
+          const inlineEntries = parseInlineYamlMap(value, anchors, mapAnchors, index + 1);
+          recordMapAnchorEntries(mapAnchors, itemValue.anchor, inlineEntries);
+          recordEntriesForPath(itemPath, itemExcluded, inlineEntries);
         } else if (value.startsWith("[")) {
-          recordEntriesForPath(itemPath, itemExcluded, parseInlineYamlSequence(value, anchors, mapAnchors, index + 1));
+          const inlineEntries = parseInlineYamlSequence(value, anchors, mapAnchors, index + 1);
+          recordMapAnchorEntries(mapAnchors, itemValue.anchor, inlineEntries);
+          recordEntriesForPath(itemPath, itemExcluded, inlineEntries);
         } else {
           if (value === "[]" || value === "{}") value = "";
           if (itemValue.anchor && value && !value.startsWith("[") && !value.startsWith("{")) anchors.set(itemValue.anchor, value);
@@ -882,6 +886,14 @@ function parseInlineYamlMap(
       }
       continue;
     }
+    if (entryValue.startsWith("[")) {
+      const nestedEntries = parseInlineYamlSequence(entryValue, anchors, mapAnchors, line);
+      recordMapAnchorEntries(mapAnchors, parsed.anchor, nestedEntries);
+      for (const nested of nestedEntries) {
+        entries.push({ ...nested, key: `${key}.${nested.key}` });
+      }
+      continue;
+    }
     if (entryValue === "|" || entryValue === ">" || entryValue.startsWith("[") || entryValue.startsWith("{")) continue;
     entries.push({ key, value: entryValue, line, keepExisting: false });
   }
@@ -909,7 +921,9 @@ function parseInlineYamlSequence(
     }
     if (entryValue === "[]" || entryValue === "{}") entryValue = "";
     if (entryValue.startsWith("{")) {
-      for (const entry of parseInlineYamlMap(entryValue, anchors, mapAnchors, line)) {
+      const nestedEntries = parseInlineYamlMap(entryValue, anchors, mapAnchors, line);
+      recordMapAnchorEntries(mapAnchors, parsed.anchor, nestedEntries);
+      for (const entry of nestedEntries) {
         entries.push({ ...entry, key: `${indexKey}.${entry.key}` });
       }
       return;
@@ -1042,6 +1056,18 @@ function recordMapAnchorEntry(
     entries.push(anchoredEntry);
   }
   mapAnchors.set(owner.anchor, entries);
+}
+
+function recordMapAnchorEntries(
+  mapAnchors: Map<string, Array<{ key: string; value: string; line: number }>>,
+  anchor: string,
+  entries: InlineYamlMapEntry[],
+) {
+  if (!anchor) return;
+  if (!mapAnchors.has(anchor)) mapAnchors.set(anchor, []);
+  for (const entry of entries) {
+    recordMapAnchorEntry(mapAnchors, { anchor }, entry.key, entry.value, entry.line, entry.keepExisting);
+  }
 }
 
 function stripYamlComment(value: string) {

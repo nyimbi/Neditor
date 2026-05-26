@@ -655,12 +655,13 @@ test("front matter managers expand simple inline object variables", () => {
   const source = [
     "---",
     "owner: &docOwner Strategy Office",
-    "defaults: &clientDefaults {owner: *docOwner, reviewer: QA Team, tier: \"Enterprise # priority\", address: {city: Nairobi, country: Kenya}}",
+    "defaults: &clientDefaults {owner: *docOwner, reviewer: QA Team, tier: \"Enterprise # priority\", approvers: [CFO, Legal], address: {city: Nairobi, country: Kenya}}",
     "client: {<<: *clientDefaults, name: Acme Corp, owner: Delivery Team, region: EMEA, address: {city: Lagos}}",
     "aliasClient: *clientDefaults",
     "reviewers: [*docOwner, Finance Team]",
-    "contacts: &contactList [{name: Jane, role: Sponsor}, {name: Eli, address: {city: Kigali}}]",
+    "contacts: &contactList [&primaryContact {name: Jane, role: Sponsor, reviewers: [Legal, Finance]}, {name: Eli, address: {city: Kigali}}]",
     "copiedContacts: *contactList",
+    "primaryContact: *primaryContact",
     "taggedDefaults: !client &taggedClient {owner: Tagged Owner, reviewer: Tagged Reviewer}",
     "taggedClient: *taggedClient",
     "milestones:",
@@ -698,12 +699,16 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "defaults.owner" && row.value === "Strategy Office"));
   ok(rows.some((row) => row.key === "defaults.reviewer" && row.value === "QA Team"));
   ok(rows.some((row) => row.key === "defaults.tier" && row.value === "Enterprise # priority"));
+  ok(rows.some((row) => row.key === "defaults.approvers.0" && row.value === "CFO"));
+  ok(rows.some((row) => row.key === "defaults.approvers.1" && row.value === "Legal"));
   ok(rows.some((row) => row.key === "defaults.address.city" && row.value === "Nairobi"));
   ok(rows.some((row) => row.key === "defaults.address.country" && row.value === "Kenya"));
   ok(rows.some((row) => row.key === "client.name" && row.value === "Acme Corp"));
   ok(rows.some((row) => row.key === "client.owner" && row.value === "Delivery Team"));
   ok(rows.some((row) => row.key === "client.reviewer" && row.value === "QA Team"));
   ok(rows.some((row) => row.key === "client.tier" && row.value === "Enterprise # priority"));
+  ok(rows.some((row) => row.key === "client.approvers.0" && row.value === "CFO"));
+  ok(rows.some((row) => row.key === "client.approvers.1" && row.value === "Legal"));
   ok(rows.some((row) => row.key === "client.region" && row.value === "EMEA"));
   ok(rows.some((row) => row.key === "client.address.city" && row.value === "Lagos"));
   ok(rows.some((row) => row.key === "client.address.country" && row.value === "Kenya"));
@@ -714,10 +719,15 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "reviewers.1" && row.value === "Finance Team"));
   ok(rows.some((row) => row.key === "contacts.0.name" && row.value === "Jane"));
   ok(rows.some((row) => row.key === "contacts.0.role" && row.value === "Sponsor"));
+  ok(rows.some((row) => row.key === "contacts.0.reviewers.0" && row.value === "Legal"));
+  ok(rows.some((row) => row.key === "contacts.0.reviewers.1" && row.value === "Finance"));
   ok(rows.some((row) => row.key === "contacts.1.name" && row.value === "Eli"));
   ok(rows.some((row) => row.key === "contacts.1.address.city" && row.value === "Kigali"));
   ok(rows.some((row) => row.key === "copiedContacts.0.name" && row.value === "Jane"));
+  ok(rows.some((row) => row.key === "copiedContacts.0.reviewers.1" && row.value === "Finance"));
   ok(rows.some((row) => row.key === "copiedContacts.1.address.city" && row.value === "Kigali"));
+  ok(rows.some((row) => row.key === "primaryContact.name" && row.value === "Jane"));
+  ok(rows.some((row) => row.key === "primaryContact.reviewers.0" && row.value === "Legal"));
   ok(rows.some((row) => row.key === "taggedDefaults.owner" && row.value === "Tagged Owner"));
   ok(rows.some((row) => row.key === "taggedClient.reviewer" && row.value === "Tagged Reviewer"));
   ok(rows.some((row) => row.key === "milestones.0.name" && row.value === "Discovery"));
@@ -737,6 +747,7 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "clientRows.0.owner" && row.value === "Sales Team"));
   ok(rows.some((row) => row.key === "clientRows.0.reviewer" && row.value === "QA Team"));
   ok(rows.some((row) => row.key === "clientRows.0.tier" && row.value === "Enterprise # priority"));
+  ok(rows.some((row) => row.key === "clientRows.0.approvers.0" && row.value === "CFO"));
   ok(rows.some((row) => row.key === "clientRows.0.address.city" && row.value === "Accra"));
   ok(rows.some((row) => row.key === "clientRows.0.address.country" && row.value === "Kenya"));
   ok(!rows.some((row) => row.key === "clientRows.0" && row.value.includes("<<")));

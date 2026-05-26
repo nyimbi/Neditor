@@ -122,7 +122,10 @@ Recent pushed checkpoints visible in current git history:
   `<<: *defaults` merge keys, so repeated client/contact rows inherit standard
   defaults while explicit list-item fields override them. Anchored block-list
   rows such as stakeholder records can also be reused elsewhere as direct map
-  aliases. Custom tags on inline maps and block-list rows are ignored for
+  aliases. Nested inline sequences inside compact maps now expand through
+  original declarations, merge defaults, and copied aliases, and compact
+  objects anchored inside inline sequence items can be reused later as direct
+  map aliases. Custom tags on inline maps and block-list rows are ignored for
   inventory purposes while their scalar fields remain available as document
   variables.
 - Application navigation now exposes NEditor's capabilities through both menus
