@@ -580,6 +580,11 @@ test("front matter managers expand simple inline object variables", () => {
     "blockReviewers:",
     "  - Legal",
     "  - Finance",
+    "stakeholders:",
+    "  - &primaryStakeholder",
+    "    name: Amina",
+    "    role: Executive Sponsor",
+    "primaryStakeholder: *primaryStakeholder",
     "clientRows:",
     "  - <<: *clientDefaults",
     "    name: MergeCo",
@@ -625,6 +630,10 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "milestones.1.owner" && row.value === "Finance Team"));
   ok(rows.some((row) => row.key === "blockReviewers.0" && row.value === "Legal"));
   ok(rows.some((row) => row.key === "blockReviewers.1" && row.value === "Finance"));
+  ok(rows.some((row) => row.key === "stakeholders.0.name" && row.value === "Amina"));
+  ok(rows.some((row) => row.key === "stakeholders.0.role" && row.value === "Executive Sponsor"));
+  ok(rows.some((row) => row.key === "primaryStakeholder.name" && row.value === "Amina"));
+  ok(rows.some((row) => row.key === "primaryStakeholder.role" && row.value === "Executive Sponsor"));
   ok(rows.some((row) => row.key === "clientRows.0.name" && row.value === "MergeCo"));
   ok(rows.some((row) => row.key === "clientRows.0.owner" && row.value === "Sales Team"));
   ok(rows.some((row) => row.key === "clientRows.0.reviewer" && row.value === "QA Team"));
