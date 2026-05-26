@@ -8566,6 +8566,21 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   ...store.documents.map((document) => ({
     name: document.title,
     group: "Open document",
+    description: [
+      document.path || "Untitled document",
+      documentSetName(document) ? `set: ${documentSetName(document)}` : "",
+      document.pinned ? "pinned" : "",
+      document.dirty ? "unsaved changes" : "saved",
+    ].filter(Boolean).join(" | "),
+    keywords: [
+      document.path || "",
+      document.title,
+      documentSetName(document),
+      document.compile?.semantic.title || "",
+      document.compile?.metadata.status ? `status ${document.compile.metadata.status}` : "",
+      document.pinned ? "pinned tab" : "",
+      document.dirty ? "dirty unsaved" : "clean saved",
+    ].filter(Boolean),
     run: () => activate(document.id),
   })),
   ...store.workspaceFiles
@@ -8573,11 +8588,15 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     .map((entry) => ({
       name: entry.relative_path,
       group: "Workspace file",
+      description: `${entry.name} | ${entry.path}`,
+      keywords: [entry.name, entry.path, entry.relative_path, entry.kind, `depth ${entry.depth}`],
       run: () => void store.openPath(entry.path),
     })),
   ...includeGraphItems.value.map((edge) => ({
     name: edge.commandLabel,
     group: `Include depth ${edge.depth}`,
+    description: `${edge.parentLabel} includes ${edge.childLabel}`,
+    keywords: [edge.parent, edge.child, edge.parentLabel, edge.childLabel, "include graph included file nested document"],
     run: () => void openIncludeChild(edge),
   })),
   ...((active.value.compile?.document_ast.blocks || []).flatMap((block) => {
@@ -8587,6 +8606,8 @@ const commands = computed<CommandPaletteCommand[]>(() => [
       {
         name: block.text,
         group: `Heading line ${line}`,
+        description: `Level ${block.level} heading in ${block.source?.source_file || active.value.title}`,
+        keywords: [block.anchor, `heading level ${block.level}`, `h${block.level}`, `line ${line}`, "outline section navigation"],
         run: () =>
           void goToSourceTarget({
             line,
@@ -8596,17 +8617,30 @@ const commands = computed<CommandPaletteCommand[]>(() => [
       },
     ];
   })),
-  ...((active.value.compile?.semantic.citation_references || []).map((citation) => ({
-    name: `[@${citation.key}]`,
-    group: "Citation",
-    run: () => {
-      store.sidebar = "references";
-      void goToSourceTarget(citation);
-    },
-  }))),
-  ...Object.keys(active.value.compile?.semantic.glossary || {}).map((term) => ({
+  ...((active.value.compile?.semantic.citation_references || []).map((citation) => {
+    const bibliographyTitle = bibliographyByKey.value.get(citation.key);
+    return {
+      name: `[@${citation.key}${citation.locator ? `, ${citation.locator}` : ""}]`,
+      group: "Citation",
+      description: bibliographyTitle || "Missing bibliography entry",
+      keywords: [
+        citation.key,
+        citation.locator || "",
+        citation.raw,
+        bibliographyTitle || "",
+        bibliographyByKey.value.has(citation.key) ? "bibliography cited source" : "missing bibliography entry citation todo",
+      ].filter(Boolean),
+      run: () => {
+        store.sidebar = "references";
+        void goToSourceTarget(citation);
+      },
+    };
+  })),
+  ...Object.entries(active.value.compile?.semantic.glossary || {}).map(([term, definition]) => ({
     name: term,
     group: "Glossary",
+    description: definition,
+    keywords: [term, definition, "definition glossary term"],
     run: () => {
       store.sidebar = "references";
       goToSearchTerm(term);
@@ -8615,6 +8649,8 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   ...((active.value.compile?.index_terms || []).map((term) => ({
     name: term,
     group: "Index",
+    description: `Indexed term in ${active.value.compile?.semantic.title || active.value.title}`,
+    keywords: [term, "index term marker indexed generated index"],
     run: () => {
       store.sidebar = "references";
       goToSearchTerm(term);
@@ -8623,6 +8659,15 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   ...((active.value.compile?.diagnostics || []).map((diagnostic) => ({
     name: diagnostic.message,
     group: `Diagnostic ${diagnostic.severity}`,
+    description: diagnostic.suggestion || diagnosticLocation(diagnostic) || "Document diagnostic",
+    keywords: [
+      diagnostic.message,
+      diagnostic.severity,
+      diagnostic.source_file || "",
+      diagnostic.suggestion || "",
+      diagnosticLocation(diagnostic),
+      ...diagnostic.related,
+    ].filter(Boolean),
     run: () => {
       store.sidebar = "diagnostics";
       if (diagnostic.line) void goToSourceTarget(diagnostic);

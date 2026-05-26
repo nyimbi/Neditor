@@ -3565,6 +3565,16 @@ Logo metadata diagnostic source ranges:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after documenting the richer diagnostics proof. |
 | `git diff --check` | Pass | No whitespace errors are present in the diagnostic and docs diff. |
 
+Command palette discoverability hardening:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 69 frontend unit/static tests passed, including evidence that command-palette search includes richer open-document, workspace, include, heading, citation, glossary, index, and diagnostic metadata. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed for dynamic palette metadata and computed bibliography reference access. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after updating command-palette evidence; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the command-palette evidence refresh. |
+| `git diff --check` | Pass | No whitespace errors are present in the UI, test, or docs diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
