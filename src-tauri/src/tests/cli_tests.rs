@@ -476,6 +476,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     .expect("write engine fixture");
     fs::create_dir_all(evidence_root.join("platform-evidence")).expect("create platform evidence");
     fs::create_dir_all(evidence_root.join("release-signing")).expect("create signing evidence");
+    fs::create_dir_all(evidence_root.join("rendered-export-audit"))
+        .expect("create rendered export evidence");
     fs::write(
         evidence_root.join("platform-evidence").join("report.json"),
         serde_json::to_string_pretty(&serde_json::json!({
@@ -620,6 +622,115 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
 }
 
 #[test]
+fn ned_cli_summarizes_release_evidence_reports() {
+    let root = temp_workspace_path("evidence-status");
+    let evidence_root = root.join("evidence");
+    fs::create_dir_all(evidence_root.join("platform-evidence")).expect("create platform evidence");
+    fs::create_dir_all(evidence_root.join("release-signing")).expect("create signing evidence");
+    fs::create_dir_all(evidence_root.join("rendered-export-audit"))
+        .expect("create rendered export evidence");
+    fs::write(
+        evidence_root.join("platform-evidence").join("report.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "generatedAt": "2026-05-26T13:00:00.000Z",
+            "status": "accepted",
+            "summary": {
+                "requiredPlatforms": 2,
+                "completePlatforms": 2,
+                "missingEvidence": 0,
+                "invalidEvidence": 0
+            }
+        }))
+        .expect("platform evidence json"),
+    )
+    .expect("write platform evidence");
+    fs::write(
+        evidence_root.join("release-signing").join("report.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "generatedAt": "2026-05-26T13:05:00.000Z",
+            "status": "pending-release-credentials",
+            "summary": {
+                "requiredPlatforms": 3,
+                "completePlatforms": 0,
+                "missingEvidence": 3,
+                "invalidEvidence": 0
+            }
+        }))
+        .expect("signing evidence json"),
+    )
+    .expect("write signing evidence");
+    fs::write(
+        evidence_root
+            .join("rendered-export-audit")
+            .join("visual-review-summary.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "generatedAt": "2026-05-26T13:10:00.000Z",
+            "humanSignoff": {
+                "status": "pending-human-review",
+                "template": "visual-review-signoff.template.json"
+            },
+            "automatedVisualReview": {
+                "status": "automated-reviewed",
+                "blockers": []
+            }
+        }))
+        .expect("rendered export evidence json"),
+    )
+    .expect("write rendered export evidence");
+
+    let text = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "evidence".to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
+    ])
+    .expect("evidence text");
+    assert_eq!(text.exit_code, 0);
+    assert!(text
+        .message
+        .contains("NEditor evidence status: needs-attention"));
+    assert!(text
+        .message
+        .contains("Reports: 1 ready, 2 need attention, 7 missing, 0 failed (10 total)"));
+    assert!(text.message.contains("Windows/Linux platform evidence"));
+    assert!(text
+        .message
+        .contains("Rendered export native-viewer signoff: pending-human-review"));
+
+    let json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "evidence-status".to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("evidence json");
+    assert_eq!(json.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&json.message).expect("evidence json");
+    assert_eq!(report["schema"], "neditor.ned-evidence-status.v1");
+    assert_eq!(report["status"], "needs-attention");
+    assert_eq!(report["summary"]["ready"], 1);
+    assert_eq!(report["summary"]["attention"], 2);
+    assert_eq!(report["summary"]["missing"], 7);
+    assert_eq!(report["reports"][0]["bucket"], "ready");
+    assert!(report["reports"].as_array().unwrap().iter().any(|item| {
+        item["id"] == "rendered-export-visual-signoff"
+            && item["status"] == "pending-human-review"
+            && item["bucket"] == "attention"
+    }));
+
+    let strict = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "evidence".to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
+        "--strict".to_string(),
+    ])
+    .expect("strict evidence");
+    assert_eq!(strict.exit_code, 1);
+}
+
+#[test]
 fn ned_cli_inspects_documents_without_writing_artifacts() {
     let source = temp_markdown_path("inspect");
     fs::write(&source, super::sample_document()).expect("write source markdown");
@@ -673,6 +784,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("init"));
     assert!(bash.message.contains("handlers"));
     assert!(bash.message.contains("readiness"));
+    assert!(bash.message.contains("evidence"));
     assert!(bash.message.contains("support-bundle"));
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
@@ -706,6 +818,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("init"));
     assert!(fish.message.contains("handlers"));
     assert!(fish.message.contains("readiness"));
+    assert!(fish.message.contains("evidence"));
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("epub"));
@@ -914,6 +1027,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned targets"));
     assert!(outcome.message.contains("ned handlers"));
     assert!(outcome.message.contains("ned readiness"));
+    assert!(outcome.message.contains("ned evidence"));
     assert!(outcome.message.contains("ned support-bundle"));
     assert!(outcome.message.contains("ned completions"));
     assert!(outcome.message.contains("ned doctor"));

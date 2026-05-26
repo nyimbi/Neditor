@@ -97,6 +97,7 @@ ned templates
 ned targets --json
 ned handlers --platform windows --commands-only
 ned readiness --json
+ned evidence --json
 ned support-bundle --workspace . --output support.json
 ned completions zsh
 ned doctor --workspace . --json
@@ -130,6 +131,12 @@ readiness` reads `.tmp/release-readiness/report.json` without rerunning the
 verification suite and summarizes accepted checks, failed checks, external
 evidence gaps, and next commands; use `--json` for packaging dashboards and
 `--strict` when any remaining release gap should produce a non-zero exit code.
+`ned evidence` reads the standard release evidence reports under `.tmp` (or a
+directory supplied with `--evidence-root`) and summarizes which platform,
+signing, Google Docs, AI, runtime, security, performance, rendered-export, and
+accessibility evidence reports are ready, need attention, are missing, or have
+failed. Use `ned evidence --strict` in support scripts when any report that
+matters for production publishing should return a non-zero exit code.
 `ned support-bundle` combines `ned doctor`, release-readiness,
 spec-completion, transform-engine probe summaries, and standard release evidence
 report statuses into a redaction-safe JSON handoff for help desks and release
@@ -765,6 +772,10 @@ and human reviewer sign-off for accessibility or native-viewer export review.
 `ned readiness --json` reads that generated report for support, release, and
 packaging handoffs; `ned readiness --strict` exits non-zero until the report is
 publication-ready with no failed checks or evidence gaps.
+`ned evidence --json` reads the same standard release evidence reports that feed
+release readiness and produces a support-friendly status summary for platform,
+signing, Google Docs, AI provider, AI runtime, performance, security, rendered
+export, and accessibility sign-off evidence.
 `ned support-bundle --output support.json` packages the local setup diagnostics,
 release-readiness summary, spec-completion summary, and transform-engine probe
 summary into one supportable JSON file without including document content or

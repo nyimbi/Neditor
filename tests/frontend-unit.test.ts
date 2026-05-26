@@ -3837,6 +3837,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("create_support_bundle"));
   ok(app.includes("ned file.md"));
   ok(app.includes("ned new proposal.md --template proposal"));
+  ok(app.includes("ned evidence --json"));
   ok(app.includes("ned support-bundle --output support.json"));
   ok(app.includes("Support bundle"));
   ok(app.includes("redaction-safe setup and release-readiness handoff"));
@@ -3846,6 +3847,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Engines"));
   ok(app.includes("evidenceReportSummary"));
   ok(app.includes("Evidence reports"));
+  const cli = readFileSync("src-tauri/src/cli.rs", "utf8");
+  ok(cli.includes('"evidence"'));
+  ok(cli.includes("neditor.ned-evidence-status.v1"));
+  ok(cli.includes("run_evidence_command"));
+  ok(cli.includes("support_bundle_evidence_reports"));
   ok(app.includes("ned doctor"));
   ok(app.includes("Make NEditor the default Markdown reader"));
   ok(app.includes("Help: Docs Live"));

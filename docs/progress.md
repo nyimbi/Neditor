@@ -3875,6 +3875,23 @@ Support bundle release-evidence report summary:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle release evidence report implementation. |
 | `git diff --check` | Pass | No whitespace errors are present in the support-bundle release evidence report diff. |
 
+`ned evidence` release-evidence report inspection:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after adding `ned evidence` / `ned evidence-status`, `--json`, `--strict`, and `--evidence-root` support, including fixture coverage for ready, attention, missing, strict-failure, completion, help, and nested rendered-export human sign-off status handling. |
+| `src-tauri/target/debug/ned evidence --json` | Pass | Direct smoke returned schema `neditor.ned-evidence-status.v1`, status `needs-attention`, 10 tracked evidence reports, and the nested rendered-export status `pending-human-review` instead of a generic present marker. |
+| `src-tauri/target/debug/ned evidence --strict` | Pass with expected nonzero exit | Direct strict smoke exited `1` because the current host still has 10 release evidence reports needing attention; text output included next commands for collecting/ingesting evidence and rerunning release readiness. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the dedicated evidence command implementation. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding Settings guidance for `ned evidence --json`. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 74 tests, including static assertions that CLI docs and Settings expose the evidence command contract. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting the evidence command in business-friendly README guidance. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while the CLI now exposes release-evidence status directly. |
+| `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration remains valid after extending the packaged `ned` surface. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after extending the packaged `ned` surface. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves evidence inspection without claiming external proof completion. |
+| Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

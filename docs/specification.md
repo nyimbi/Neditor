@@ -192,12 +192,12 @@ Packaging targets:
 Packaged builds must also include the `ned` command-line helper for file open,
 workspace initialization, document inspection, export conversion, default
 Markdown reader setup guidance, setup diagnostics, transform handler discovery,
-release-readiness report inspection, and a redaction-safe support bundle that
-combines setup diagnostics with release evidence, spec-completion summaries, and
-transform-engine probe summaries plus standard release evidence report statuses.
-The CLI must support JSON output for automation and strict non-zero modes for
-release gates so non-technical support teams can verify an installation without
-learning the developer toolchain.
+release-readiness report inspection, release evidence report status inspection,
+and a redaction-safe support bundle that combines setup diagnostics with release
+evidence, spec-completion summaries, and transform-engine probe summaries plus
+standard release evidence report statuses. The CLI must support JSON output for
+automation and strict non-zero modes for release gates so non-technical support
+teams can verify an installation without learning the developer toolchain.
 
 ### 6.2 Primary Layout
 

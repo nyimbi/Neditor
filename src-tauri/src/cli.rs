@@ -62,6 +62,8 @@ const CLI_COMMANDS: &[&str] = &[
     "transform-handlers",
     "readiness",
     "release-readiness",
+    "evidence",
+    "evidence-status",
     "support",
     "support-bundle",
     "completions",
@@ -162,6 +164,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
+        "evidence" | "evidence-status" => run_evidence_command(&args[2..]),
         "support" | "support-bundle" => run_support_bundle_command(&args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
@@ -957,6 +960,65 @@ fn run_readiness_command(args: &[String]) -> Result<CliOutcome, String> {
     })
 }
 
+fn run_evidence_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut strict = false;
+    let mut evidence_root_path = PathBuf::from(".tmp");
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--strict" => strict = true,
+            "--evidence-root" => {
+                index += 1;
+                evidence_root_path = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--evidence-root requires a directory path".to_string())?,
+                );
+            }
+            value => return Err(format!("Unsupported evidence option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let reports = support_bundle_evidence_reports(&evidence_root_path);
+    let summary = support_bundle_evidence_report_summary(&reports);
+    let attention = number_field_u64(&summary, "attention");
+    let missing = number_field_u64(&summary, "missing");
+    let failed = number_field_u64(&summary, "failed");
+    let ready = number_field_u64(&summary, "ready");
+    let total = number_field_u64(&summary, "total");
+    let status = if failed > 0 {
+        "failed"
+    } else if attention > 0 || missing > 0 {
+        "needs-attention"
+    } else {
+        "ready"
+    };
+    let report = json!({
+        "schema": "neditor.ned-evidence-status.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "status": status,
+        "evidenceRoot": path_to_display(&evidence_root_path),
+        "summary": summary,
+        "reports": reports,
+        "nextCommands": evidence_next_commands(status, &evidence_root_path),
+    });
+    let exit_code = if strict && status != "ready" { 1 } else { 0 };
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code,
+        });
+    }
+
+    Ok(CliOutcome {
+        message: evidence_text_report(&report, total, ready, attention, missing, failed),
+        exit_code,
+    })
+}
+
 fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut json_output = false;
     let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -1420,6 +1482,55 @@ fn readiness_next_commands(report: &Value) -> Vec<String> {
     commands
 }
 
+fn evidence_next_commands(status: &str, evidence_root: &Path) -> Vec<String> {
+    let root = path_to_display(evidence_root);
+    let mut commands = vec![format!("ned evidence --evidence-root {root} --json")];
+    if status != "ready" {
+        commands.push("pnpm run collect:evidence-kit".to_string());
+        commands.push("pnpm run ingest:evidence -- <evidence-kit-directory>".to_string());
+        commands.push("pnpm run check:release-readiness".to_string());
+    }
+    commands
+}
+
+fn evidence_text_report(
+    report: &Value,
+    total: u64,
+    ready: u64,
+    attention: u64,
+    missing: u64,
+    failed: u64,
+) -> String {
+    let status = readiness_string_field(report, "status").unwrap_or("unknown");
+    let root = readiness_string_field(report, "evidenceRoot").unwrap_or(".tmp");
+    let reports = readiness_array_field(report, "reports");
+    let mut lines = vec![
+        format!("NEditor evidence status: {status}"),
+        format!("Evidence root: {root}"),
+        format!(
+            "Reports: {ready} ready, {attention} need attention, {missing} missing, {failed} failed ({total} total)"
+        ),
+    ];
+    if !reports.is_empty() {
+        lines.push("Evidence reports:".to_string());
+        for item in reports {
+            let label = readiness_string_field(&item, "label").unwrap_or("Evidence report");
+            let item_status = readiness_string_field(&item, "status").unwrap_or("unknown");
+            let bucket = readiness_string_field(&item, "bucket").unwrap_or("attention");
+            let path = readiness_string_field(&item, "reportPath").unwrap_or("unknown");
+            lines.push(format!("  - {label}: {item_status} [{bucket}] {path}"));
+        }
+    }
+    let next_commands = readiness_array_field(report, "nextCommands");
+    if !next_commands.is_empty() {
+        lines.push("Next commands:".to_string());
+        for command in next_commands.iter().filter_map(Value::as_str) {
+            lines.push(format!("  - {command}"));
+        }
+    }
+    lines.join("\n")
+}
+
 fn build_support_bundle_report(
     workspace: &Path,
     readiness_report_path: &Path,
@@ -1787,10 +1898,7 @@ fn support_bundle_evidence_reports(evidence_root: &Path) -> Vec<Value> {
         match read_json_report(&path) {
             Ok(report) => {
                 let summary = report.get("summary").cloned().unwrap_or_else(|| json!({}));
-                let status = readiness_string_field(&report, "status")
-                    .or_else(|| readiness_string_field(&report, "result"))
-                    .or_else(|| readiness_string_field(&summary, "status"))
-                    .unwrap_or("present");
+                let status = support_bundle_evidence_status(&report, &summary);
                 json!({
                     "id": id,
                     "label": label,
@@ -1813,6 +1921,23 @@ fn support_bundle_evidence_reports(evidence_root: &Path) -> Vec<Value> {
         }
     })
     .collect()
+}
+
+fn support_bundle_evidence_status<'a>(report: &'a Value, summary: &'a Value) -> &'a str {
+    readiness_string_field(report, "status")
+        .or_else(|| readiness_string_field(report, "result"))
+        .or_else(|| readiness_string_field(summary, "status"))
+        .or_else(|| {
+            report
+                .get("humanSignoff")
+                .and_then(|value| readiness_string_field(value, "status"))
+        })
+        .or_else(|| {
+            report
+                .get("automatedVisualReview")
+                .and_then(|value| readiness_string_field(value, "status"))
+        })
+        .unwrap_or("present")
 }
 
 fn support_bundle_evidence_report_summary(reports: &[Value]) -> Value {
@@ -2294,6 +2419,9 @@ _ned() {{
       readiness|release-readiness)
         COMPREPLY=( $(compgen -W "--json --strict --report" -- "$cur") )
         ;;
+      evidence|evidence-status)
+        COMPREPLY=( $(compgen -W "--json --strict --evidence-root" -- "$cur") )
+        ;;
       support|support-bundle)
         COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --engine-report --evidence-root --output" -- "$cur") )
         ;;
@@ -2367,6 +2495,9 @@ _ned() {{
       ;;
     readiness|release-readiness)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when release gaps remain]' '--report[read a specific release-readiness report]:file:_files'
+      ;;
+    evidence|evidence-status)
+      _arguments '--json[print machine-readable JSON]' '--strict[fail when any evidence report needs attention]' '--evidence-root[read standard release evidence reports from a .tmp-style root]:directory:_files -/'
       ;;
     support|support-bundle)
       _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--engine-report[attach a specific transform engine probe report]:file:_files' '--evidence-root[attach standard release evidence reports from a .tmp-style root]:directory:_files -/' '--output[write support bundle JSON]:file:_files'
@@ -2450,6 +2581,12 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from readiness release-readiness' -l strict"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from readiness release-readiness' -l report -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence evidence-status' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence evidence-status' -l strict"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence evidence-status' -l evidence-root -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l json"
             .to_string(),
@@ -2790,6 +2927,7 @@ fn help_text() -> String {
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json]"
             .to_string(),
+        "  ned evidence [--json] [--strict] [--evidence-root .tmp]".to_string(),
         "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--engine-report path] [--evidence-root .tmp] [--output support.json]"
             .to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),
