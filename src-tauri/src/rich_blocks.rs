@@ -316,6 +316,9 @@ fn latex_wrapper_command(input: &str) -> Option<(&'static str, usize)> {
         "vec" => "math-vec",
         "bar" | "overline" => "math-overline",
         "underline" => "math-underline",
+        "mathbb" => "math-blackboard",
+        "mathcal" => "math-calligraphic",
+        "mathrm" => "math-roman",
         _ => return None,
     };
     Some((class_name, name.len() + 1))
@@ -343,6 +346,7 @@ fn matrix_bracket_class(environment: &str) -> Option<&'static str> {
         "pmatrix" => Some("matrix-round"),
         "bmatrix" => Some("matrix-square"),
         "vmatrix" => Some("matrix-vertical"),
+        "cases" => Some("matrix-cases"),
         _ => None,
     }
 }
@@ -457,6 +461,10 @@ fn latex_command(input: &str) -> Option<LatexCommand<'_>> {
         "tan" => "tan",
         "log" => "log",
         "ln" => "ln",
+        "lim" => "lim",
+        "min" => "min",
+        "max" => "max",
+        "Pr" => "Pr",
         "left" | "right" => "",
         "lt" => "&lt;",
         "gt" => "&gt;",

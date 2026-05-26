@@ -150,6 +150,57 @@ fn compiler_renders_extended_latex_equation_notation() {
 }
 
 #[test]
+fn compiler_renders_piecewise_and_styled_latex_equations() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Piecewise Math\nstatus: approved\napprovedBy: QA\n---\n# Piecewise Math\nInline \\(\\mathbb{R} \\to \\mathcal{F}\\) and \\(\\mathrm{Var}(X) = \\Pr(X > 0)\\).\n\n$$\nf(x)=\\begin{cases} x^2 & x \\ge 0 \\\\ -x & x < 0 \\end{cases} + \\lim_{n \\to \\infty} a_n\n$$ {#eq:piecewise caption=\"Piecewise risk model\"}\n\nSee {@eq:piecewise}.\n".to_string(),
+        file_path: None,
+    });
+
+    assert!(response.html.contains("class=\"math-blackboard\""));
+    assert!(response.html.contains("class=\"math-calligraphic\""));
+    assert!(response.html.contains("class=\"math-roman\""));
+    assert!(response.html.contains("Pr"));
+    assert!(response.html.contains("lim"));
+    assert!(response.html.contains("≥"));
+    assert!(response.html.contains("∞"));
+    assert!(response.html.contains("class=\"math-matrix matrix-cases\""));
+    assert!(response.html.contains("<td>x<sup>2</sup></td>"));
+    assert!(response.html.contains("<td>x ≥ 0</td>"));
+    assert!(response.html.contains("Equation 1: Piecewise risk model"));
+    assert!(response
+        .compiled_markdown
+        .contains("See [Equation piecewise](#eq:piecewise)."));
+    assert!(response.document_ast.blocks.iter().any(|block| {
+        matches!(
+            block,
+            DocumentBlock::Equation { id, caption, text, .. }
+                if id.as_deref() == Some("eq:piecewise")
+                    && caption.as_deref() == Some("Piecewise risk model")
+                    && text.contains("\\begin{cases}")
+        )
+    }));
+
+    let options = json!({});
+    let html = render_full_html(&response, &options);
+    assert!(html.contains(".math-matrix.matrix-cases::before"));
+    assert!(html.contains(".math-blackboard"));
+
+    let docx = render_docx_bytes(&response, &options).expect("docx piecewise math");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("Equation: eq:piecewise"));
+    assert!(docx_document.contains("Piecewise risk model"));
+    assert!(docx_document.contains("\\begin{cases}"));
+
+    let pptx = render_pptx_bytes(&response, &options).expect("pptx piecewise math");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/");
+    assert!(pptx_slides.iter().any(|slide| {
+        slide.contains("Equation: eq:piecewise")
+            && slide.contains("Piecewise risk model")
+            && slide.contains("\\begin{cases}")
+    }));
+}
+
+#[test]
 fn compiler_renders_markdown_footnotes() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Footnotes\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\n---\n# Footnotes\nA governed claim.[^risk]\n\n[^risk]: Reviewed by compliance.\n    Includes second-line evidence.\n".to_string(),

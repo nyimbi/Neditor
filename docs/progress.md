@@ -2759,6 +2759,17 @@ Extended LaTeX equation notation verification:
 | `pnpm exec playwright test --list` | Pass | Browser harness discovery still lists 41 Chromium workflow tests. |
 | `git diff --check` | Pass | No whitespace errors after the extended LaTeX renderer update. |
 
+Piecewise and styled LaTeX equation verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_piecewise_and_styled_latex_equations --lib` | Pass | Focused compiler proof covers piecewise `cases` equations, blackboard/calligraphic/roman identifiers, probability and limit operators, equation captions/references, preview/export CSS, AST capture, and DOCX/PPTX text fallback evidence. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is clean after the piecewise/styled LaTeX renderer update. |
+| `pnpm run check:docs` | Pass | 15 Markdown files were checked after updating the equation docs, matrix, TODO, and progress log; local links resolve. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with the current equation evidence recorded. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the equation renderer update. |
+| `git diff --check` | Pass | No whitespace errors after the piecewise/styled LaTeX renderer update. |
+
 AI paste code fence cleanup verification:
 
 | Command | Result | Evidence |

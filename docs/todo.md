@@ -1184,7 +1184,9 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   superscripts, subscripts, arrows, approximation/infinity symbols, Omega,
   simple matrix environments, optional-index roots, text spans, overline,
   underline, hat/vector wrappers, left/right delimiters, set/logic symbols,
-  ellipses, preview/export CSS, AST capture, and DOCX/PPTX text evidence.
+  ellipses, piecewise `cases` equations, `\mathbb{}`, `\mathcal{}`,
+  `\mathrm{}`, probability and limit operators, preview/export CSS, AST
+  capture, and DOCX/PPTX text evidence.
   Remaining work is rendered visual QA and additional LaTeX permutations beyond
   the native subset.
 - Citations, bibliography, locators, missing keys, duplicate keys, and CSL

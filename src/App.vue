@@ -21805,6 +21805,20 @@ select:hover {
   font-family: inherit;
 }
 
+.preview-document .math-blackboard {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+}
+
+.preview-document .math-calligraphic {
+  font-family: "Snell Roundhand", "Apple Chancery", cursive;
+}
+
+.preview-document .math-roman {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: normal;
+}
+
 .preview-document .math-hat::before,
 .preview-document .math-vec::before {
   display: block;
@@ -21866,6 +21880,14 @@ select:hover {
 .preview-document .math-matrix.matrix-vertical::before,
 .preview-document .math-matrix.matrix-vertical::after {
   content: "|";
+}
+
+.preview-document .math-matrix.matrix-cases::before {
+  content: "{";
+}
+
+.preview-document .math-matrix.matrix-cases::after {
+  content: "";
 }
 
 .preview-document .math-matrix table {

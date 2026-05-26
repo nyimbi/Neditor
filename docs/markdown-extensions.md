@@ -245,7 +245,10 @@ The native renderer covers common equation syntax used in business, finance,
 and academic drafts, including fractions, roots, superscripts, subscripts,
 Greek letters, sums, products, integrals, arrows, approximate/equality symbols,
 infinity, partial/nabla symbols, and simple `matrix`, `pmatrix`, `bmatrix`, and
-`vmatrix` environments.
+`vmatrix` environments. It also covers common technical-writing notation such
+as piecewise `cases`, blackboard/calligraphic/roman identifiers, probability
+operators, and limits while preserving the original LaTeX as the export
+fallback text for Office-oriented targets.
 
 ## Citations And Bibliography
 
