@@ -22,56 +22,119 @@ pub(crate) fn inject_generated_sections(
     bibliography: &[BibliographyEntry],
     glossary: &BTreeMap<String, String>,
 ) -> String {
-    let wants_toc = text.contains("[TOC]") || generated_toc_requested(metadata);
     let mut output = text.to_string();
+    let toc_marker_present = generated_section_marker_requested(&output, "[TOC]");
+    let wants_toc = toc_marker_present || generated_toc_requested(metadata);
     if wants_toc {
         let toc = render_toc(
             headings,
             toc_depth(metadata),
             toc_numbering_enabled(metadata),
         );
-        output = output.replace("[TOC]", &format!("## Table of Contents\n\n{toc}"));
-        if !text.contains("[TOC]") {
+        output =
+            replace_generated_marker(&output, "[TOC]", &format!("## Table of Contents\n\n{toc}"));
+        if !toc_marker_present {
             output = format!("## Table of Contents\n\n{toc}\n\n{output}");
         }
     }
-    if output.contains("[LIST_OF_FIGURES]") || generated_figure_list_requested(metadata) {
+    let figure_list_marker_present =
+        generated_section_marker_requested(&output, "[LIST_OF_FIGURES]");
+    if figure_list_marker_present || generated_figure_list_requested(metadata) {
         let list = render_caption_list("Figure", &collect_figure_entries(&output));
-        output = output.replace(
+        output = replace_generated_marker(
+            &output,
             "[LIST_OF_FIGURES]",
             &format!("## List of Figures\n\n{list}"),
         );
-        if !text.contains("[LIST_OF_FIGURES]") {
+        if !figure_list_marker_present {
             output = format!("## List of Figures\n\n{list}\n\n{output}");
         }
     }
-    if output.contains("[LIST_OF_TABLES]") || generated_table_list_requested(metadata) {
+    let table_list_marker_present = generated_section_marker_requested(&output, "[LIST_OF_TABLES]");
+    if table_list_marker_present || generated_table_list_requested(metadata) {
         let list = render_caption_list("Table", &collect_table_entries(&output));
-        output = output.replace("[LIST_OF_TABLES]", &format!("## List of Tables\n\n{list}"));
-        if !text.contains("[LIST_OF_TABLES]") {
+        output = replace_generated_marker(
+            &output,
+            "[LIST_OF_TABLES]",
+            &format!("## List of Tables\n\n{list}"),
+        );
+        if !table_list_marker_present {
             output = format!("## List of Tables\n\n{list}\n\n{output}");
         }
     }
-    if output.contains("[INDEX]") || generated_index_section_requested(metadata) {
+    let index_marker_present = generated_section_marker_requested(&output, "[INDEX]");
+    if index_marker_present || generated_index_section_requested(metadata) {
         let index = render_index_entries(index_entries);
-        output = output.replace("[INDEX]", &format!("## Index\n\n{index}"));
-        if !text.contains("[INDEX]") {
+        output = replace_generated_marker(&output, "[INDEX]", &format!("## Index\n\n{index}"));
+        if !index_marker_present {
             output = format!("## Index\n\n{index}\n\n{output}");
         }
     }
-    if output.contains("[GLOSSARY]") || generated_glossary_section_requested(metadata) {
+    let glossary_marker_present = generated_section_marker_requested(&output, "[GLOSSARY]");
+    if glossary_marker_present || generated_glossary_section_requested(metadata) {
         let section = render_glossary_entries(glossary);
-        output = output.replace("[GLOSSARY]", &format!("## Glossary\n\n{section}"));
-        if !text.contains("[GLOSSARY]") {
+        output =
+            replace_generated_marker(&output, "[GLOSSARY]", &format!("## Glossary\n\n{section}"));
+        if !glossary_marker_present {
             output = format!("## Glossary\n\n{section}\n\n{output}");
         }
     }
-    if output.contains("[BIBLIOGRAPHY]") {
+    if generated_section_marker_requested(&output, "[BIBLIOGRAPHY]") {
         let references = render_bibliography_entries(bibliography, citation_style(metadata));
-        output = output.replace(
+        output = replace_generated_marker(
+            &output,
             "[BIBLIOGRAPHY]",
             &format!("## Bibliography\n\n{references}"),
         );
+    }
+    output
+}
+
+pub(crate) fn generated_section_marker_requested(text: &str, marker: &str) -> bool {
+    let mut fence_marker = None;
+    for segment in text.split_inclusive('\n') {
+        let line = segment.strip_suffix('\n').unwrap_or(segment);
+        let code_line = line.strip_suffix('\r').unwrap_or(line);
+        if let Some(active_marker) = fence_marker {
+            if code_line.trim_start().starts_with(active_marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(next_marker) = fenced_code_marker(code_line) {
+            fence_marker = Some(next_marker);
+            continue;
+        }
+        if line.contains(marker) {
+            return true;
+        }
+    }
+    false
+}
+
+fn replace_generated_marker(text: &str, marker: &str, replacement: &str) -> String {
+    let mut output = String::with_capacity(text.len() + replacement.len());
+    let mut fence_marker = None;
+    for segment in text.split_inclusive('\n') {
+        let has_newline = segment.ends_with('\n');
+        let line = segment.strip_suffix('\n').unwrap_or(segment);
+        let code_line = line.strip_suffix('\r').unwrap_or(line);
+        if let Some(active_marker) = fence_marker {
+            output.push_str(segment);
+            if code_line.trim_start().starts_with(active_marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(next_marker) = fenced_code_marker(code_line) {
+            output.push_str(segment);
+            fence_marker = Some(next_marker);
+            continue;
+        }
+        output.push_str(&line.replace(marker, replacement));
+        if has_newline {
+            output.push('\n');
+        }
     }
     output
 }

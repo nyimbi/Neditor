@@ -129,6 +129,10 @@ Recent pushed checkpoints visible in current git history:
   `toc: {enabled: true, depth: 2, numbered: true}` in addition to the legacy
   flat `tocDepth` and `tocNumbered` keys, and the DOCX TOC field uses the same
   shared depth lookup.
+- Generated-section markers are now fence-aware: Markdown examples containing
+  `[TOC]`, `[INDEX]`, `[GLOSSARY]`, `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, or
+  `[LIST_OF_TABLES]` stay intact inside code fences while real outside markers
+  still render.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.

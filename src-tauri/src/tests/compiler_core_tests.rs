@@ -160,6 +160,28 @@ fn compiler_renders_empty_bibliography_placeholder() {
 }
 
 #[test]
+fn compiler_ignores_generated_section_markers_inside_code_fences() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Marker Examples\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Marker Examples\n\n```markdown\n[TOC]\n[INDEX]\n[GLOSSARY]\n[BIBLIOGRAPHY]\n[LIST_OF_FIGURES]\n[LIST_OF_TABLES]\n```\n\nAcme Strategy appears here.\nAcme Strategy appears again.\n\n[INDEX]\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert!(response.compiled_markdown.contains(
+        "```markdown\n[TOC]\n[INDEX]\n[GLOSSARY]\n[BIBLIOGRAPHY]\n[LIST_OF_FIGURES]\n[LIST_OF_TABLES]\n```"
+    ));
+    assert!(response.compiled_markdown.contains("## Index"));
+    assert!(!response.compiled_markdown.contains("## Table of Contents"));
+    assert!(!response.compiled_markdown.contains("## Bibliography"));
+    assert!(!response.compiled_markdown.contains("## Glossary"));
+    assert!(!response.compiled_markdown.contains("## List of Figures"));
+    assert!(!response.compiled_markdown.contains("## List of Tables"));
+    assert!(!response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("Generated bibliography was requested")));
+}
+
+#[test]
 fn compiler_supports_default_document_variables() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Defaults\nstatus: approved\napprovedBy: QA\nclient: Acme\n---\n# Defaults\nPrepared for {{client | default:Fallback}} in {{region | default:\"East Africa\"}}.\nStill missing {{owner}}.\n".to_string(),

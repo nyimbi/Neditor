@@ -20,6 +20,7 @@ use crate::{
     generated_sections::{
         generated_figure_list_requested as figure_list_requested_from_metadata,
         generated_glossary_section_requested, generated_index_section_requested,
+        generated_section_marker_requested,
         generated_table_list_requested as table_list_requested_from_metadata,
         generated_toc_requested as toc_requested_from_metadata, inject_generated_sections,
     },
@@ -175,17 +176,22 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         .iter()
         .map(|entry| entry.term.clone())
         .collect::<Vec<_>>();
-    let generated_figure_list_requested = reference_markdown.contains("[LIST_OF_FIGURES]")
-        || figure_list_requested_from_metadata(&metadata);
-    let generated_table_list_requested = reference_markdown.contains("[LIST_OF_TABLES]")
-        || table_list_requested_from_metadata(&metadata);
-    let generated_toc_requested =
-        reference_markdown.contains("[TOC]") || toc_requested_from_metadata(&metadata);
-    let generated_bibliography_requested = reference_markdown.contains("[BIBLIOGRAPHY]");
+    let generated_figure_list_requested =
+        generated_section_marker_requested(&reference_markdown, "[LIST_OF_FIGURES]")
+            || figure_list_requested_from_metadata(&metadata);
+    let generated_table_list_requested =
+        generated_section_marker_requested(&reference_markdown, "[LIST_OF_TABLES]")
+            || table_list_requested_from_metadata(&metadata);
+    let generated_toc_requested = generated_section_marker_requested(&reference_markdown, "[TOC]")
+        || toc_requested_from_metadata(&metadata);
+    let generated_bibliography_requested =
+        generated_section_marker_requested(&reference_markdown, "[BIBLIOGRAPHY]");
     let generated_index_requested =
-        reference_markdown.contains("[INDEX]") || generated_index_section_requested(&metadata);
-    let generated_glossary_requested = reference_markdown.contains("[GLOSSARY]")
-        || generated_glossary_section_requested(&metadata);
+        generated_section_marker_requested(&reference_markdown, "[INDEX]")
+            || generated_index_section_requested(&metadata);
+    let generated_glossary_requested =
+        generated_section_marker_requested(&reference_markdown, "[GLOSSARY]")
+            || generated_glossary_section_requested(&metadata);
     let layout_directives = collect_fence_bodies(&interpolated, "layout");
     let comments = collect_comments(&interpolated);
     let change_notes = collect_change_notes(&interpolated);
