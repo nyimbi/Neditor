@@ -96,18 +96,22 @@ Recent pushed checkpoints visible in current git history:
   aliases plus direct single-file scalar declarations. Anchored source maps with
   nested lists remain map defaults instead of being misclassified as
   source-list aliases, and aliased block-list source rows can start with
-  `<<: *defaults` merge defaults.
-- The same front-matter manager now resolves simple scalar anchors and aliases
-  and surfaces folded/literal block scalars as usable document-variable values,
-  so repeated owners/reviewers and short multiline summaries can be inserted
-  through the References sidebar instead of disappearing from the variable list.
+  `<<: *defaults` merge defaults. Dotted/namespaced anchor names such as
+  `&source.defaults` and `*source.path.default` now resolve in data-source
+  defaults and scalar source paths.
+- The same front-matter manager now resolves simple and namespaced scalar
+  anchors and aliases and surfaces folded/literal block scalars as usable
+  document-variable values, so repeated owners/reviewers and short multiline
+  summaries can be inserted through the References sidebar instead of
+  disappearing from the variable list.
 - Simple front-matter merge defaults and tagged scalars are now handled in the
   document-variable inventory. Common YAML such as `<<: *defaults`, `!!str`,
   `!custom`, and `!<tag:yaml.org,2002:str>` can populate repeated client,
   owner, reviewer, budget, or region variables while explicit values still win.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
-  flow through simple merges as dotted variable names, and anchored maps can
-  inherit other anchored maps before being reused by a client or partner block.
+  flow through simple merges as dotted variable names, and anchored maps,
+  including dotted/namespaced anchors such as `&client.defaults`, can inherit
+  other anchored maps before being reused by a client or partner block.
 - Simple inline YAML maps now expand into dotted document variables as well.
   Compact business front matter such as `client: {name: Acme, tier:
   Enterprise}` and anchored defaults such as `defaults: &clientDefaults

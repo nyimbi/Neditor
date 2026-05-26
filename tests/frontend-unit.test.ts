@@ -768,6 +768,36 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "deal.billing.amount" && row.value === "125000"));
 });
 
+test("front matter managers resolve namespaced anchor aliases", () => {
+  const source = [
+    "---",
+    "sourceDefaults: &source.defaults {name: Namespaced Revenue, path: data/namespaced-revenue.csv, type: csv}",
+    "sourcePathDefault: &source.path.default data/namespaced-inline.json",
+    "clientDefaults: &client.defaults {owner: Strategy Office, reviewers: [CFO, Legal], address: {city: Nairobi}}",
+    "client:",
+    "  <<: *client.defaults",
+    "  owner: Delivery Team",
+    "dataSources:",
+    "  - <<: *source.defaults",
+    "  - name: Namespaced Inline",
+    "    path: *source.path.default",
+    "    type: json",
+    "---",
+    "",
+    "# Namespaced",
+  ].join("\n");
+
+  const variables = parseFrontMatterVariables(source);
+  ok(variables.some((row) => row.key === "clientDefaults.owner" && row.value === "Strategy Office"));
+  ok(variables.some((row) => row.key === "client.owner" && row.value === "Delivery Team"));
+  ok(variables.some((row) => row.key === "client.reviewers.0" && row.value === "CFO"));
+  ok(variables.some((row) => row.key === "client.address.city" && row.value === "Nairobi"));
+
+  const sources = parseFrontMatterDataSources(source);
+  ok(sources.some((row) => row.name === "Namespaced Revenue" && row.path === "data/namespaced-revenue.csv"));
+  ok(sources.some((row) => row.name === "Namespaced Inline" && row.path === "data/namespaced-inline.json" && row.kind === "json"));
+});
+
 test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   const text = "word alpha beta";
   equal(nextVimWordStart(text, 0), 5);

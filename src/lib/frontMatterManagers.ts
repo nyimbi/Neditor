@@ -52,6 +52,10 @@ const metadataVariableExcludedKeys = new Set([
   "app_version",
 ]);
 
+const yamlAnchorNamePattern = "[A-Za-z0-9_.-]+";
+const yamlAliasScalarRegex = new RegExp(`^\\*(${yamlAnchorNamePattern})$`);
+const yamlAnchorPrefixRegex = new RegExp(`^&(${yamlAnchorNamePattern})(?:\\s+|$)(.*)$`);
+
 export function appendFrontMatterDataSource(
   text: string,
   source: { name: string; path: string; kind: SupportedDataSourceKind },
@@ -791,7 +795,7 @@ function cleanYamlScalar(value: string) {
 function parseYamlScalar(value: string) {
   const withoutComment = stripYamlComment(value).trim();
   const decorated = stripLeadingYamlDecorators(withoutComment);
-  const alias = decorated.scalar.match(/^\*([A-Za-z0-9_-]+)$/)?.[1] || "";
+  const alias = decorated.scalar.match(yamlAliasScalarRegex)?.[1] || "";
   return {
     anchor: decorated.anchor,
     alias,
@@ -805,7 +809,7 @@ function stripLeadingYamlDecorators(value: string) {
   let previous = "";
   while (scalar && scalar !== previous) {
     previous = scalar;
-    const anchorMatch = scalar.match(/^&([A-Za-z0-9_-]+)(?:\s+|$)(.*)$/);
+    const anchorMatch = scalar.match(yamlAnchorPrefixRegex);
     if (anchorMatch) {
       anchor = anchorMatch[1];
       scalar = anchorMatch[2].trim();
@@ -1029,11 +1033,11 @@ function findInlineYamlKeySeparator(value: string) {
 
 function yamlAliasNames(value: string) {
   const scalar = stripLeadingYamlDecorators(stripYamlComment(value).trim()).scalar.replace(/^<<:\s*/, "");
-  const direct = scalar.match(/^\*([A-Za-z0-9_-]+)$/)?.[1];
+  const direct = scalar.match(yamlAliasScalarRegex)?.[1];
   if (direct) return [direct];
   if (!scalar.startsWith("[") || !scalar.endsWith("]")) return [];
   return splitInlineYamlList(scalar)
-    .map((item) => cleanYamlScalar(item).match(/^\*([A-Za-z0-9_-]+)$/)?.[1] || "")
+    .map((item) => cleanYamlScalar(item).match(yamlAliasScalarRegex)?.[1] || "")
     .filter(Boolean);
 }
 
