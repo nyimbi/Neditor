@@ -85,6 +85,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
   const mapAnchors = new Map<string, Array<{ key: string; value: string; line: number }>>();
   let section = "";
   let current: Partial<FrontMatterDataSourceRow> | null = null;
+  let currentMapAnchor: { anchor: string; indent: number } | null = null;
   const flushCurrent = () => {
     if (!current) return;
     rows.push(normalizeFrontMatterDataSource(current, rows.length));
@@ -92,12 +93,18 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
   };
   for (let index = 1; index < endIndex; index += 1) {
     const raw = lines[index];
+    const rawIndent = yamlIndentWidth(raw.match(/^\s*/)?.[0] || "");
     const topLevel = raw.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
     if (topLevel) {
       flushCurrent();
+      currentMapAnchor = null;
       section = topLevel[1];
       const aliasKind = dataSourceAliasKind(section);
       const parsedTopLevel = parseYamlScalar(topLevel[2]);
+      if (parsedTopLevel.anchor && hasIndentedYamlChildren(lines, endIndex, index, 0)) {
+        if (!mapAnchors.has(parsedTopLevel.anchor)) mapAnchors.set(parsedTopLevel.anchor, []);
+        currentMapAnchor = { anchor: parsedTopLevel.anchor, indent: 0 };
+      }
       if (parsedTopLevel.anchor && parsedTopLevel.value && !parsedTopLevel.value.startsWith("[") && !parsedTopLevel.value.startsWith("{")) {
         anchors.set(parsedTopLevel.anchor, parsedTopLevel.value);
       }
@@ -129,6 +136,19 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
         }
       }
       continue;
+    }
+    if (currentMapAnchor && rawIndent > currentMapAnchor.indent) {
+      const anchorPair = raw.match(/^\s+([A-Za-z][\w-]*):\s*(.*)$/);
+      if (anchorPair) {
+        const parsed = parseYamlScalar(anchorPair[2]);
+        const value = parsed.alias ? anchors.get(parsed.alias) || parsed.value : parsed.value;
+        if (parsed.anchor && value && !value.startsWith("[") && !value.startsWith("{")) anchors.set(parsed.anchor, value);
+        if (value && !value.startsWith("[") && !value.startsWith("{") && value !== "|" && value !== ">") {
+          recordMapAnchorEntry(mapAnchors, currentMapAnchor, anchorPair[1], value, index + 1);
+        }
+      }
+    } else {
+      currentMapAnchor = null;
     }
     if (section === "dataSources") {
       const item = raw.match(/^\s*-\s*(.*)$/);
