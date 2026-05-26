@@ -21,6 +21,37 @@
     </nav>
 
     <header class="titlebar">
+      <nav class="app-menu-bar" aria-label="Application menus" @keydown="handleAppMenuKeydown">
+        <div v-for="menu in appMenus" :key="menu.id" class="app-menu">
+          <button
+            type="button"
+            class="app-menu-trigger"
+            :aria-label="`${menu.label} menu`"
+            :aria-expanded="openAppMenuId === menu.id"
+            aria-haspopup="menu"
+            @click="toggleAppMenu(menu.id)"
+          >
+            {{ menu.label }}
+          </button>
+          <section v-if="openAppMenuId === menu.id" class="app-menu-panel" role="menu" :aria-label="`${menu.label} menu`">
+            <div v-for="group in menu.groups" :key="group.id" class="app-menu-group" role="group" :aria-label="group.label">
+              <span class="app-menu-group-label">{{ group.label }}</span>
+              <button
+                v-for="item in group.items"
+                :key="item.id"
+                type="button"
+                role="menuitem"
+                :disabled="item.disabled"
+                :title="item.help || item.label"
+                @click="runAppMenuItem(item)"
+              >
+                <span>{{ item.label }}</span>
+                <small v-if="item.help">{{ item.help }}</small>
+              </button>
+            </div>
+          </section>
+        </div>
+      </nav>
       <section class="document-tabs" aria-label="Open documents">
         <section
           v-for="group in groupedDocuments"
@@ -1723,6 +1754,49 @@
             <p>{{ reviewSummary.status }} | {{ reviewSummary.unresolved }} unresolved | {{ reviewSummary.resolved }} resolved</p>
             <small>{{ reviewSummary.changeNotes }} change notes | {{ reviewSummary.aiPending }} AI review pending | {{ reviewSummary.aiReviewed }} AI reviewed</small>
           </article>
+          <section class="quality-recommendations" aria-label="Quality improvement recommendations">
+            <header>
+              <h3>Quality recommendations</h3>
+              <span>{{ qualityRecommendationSummary }}</span>
+            </header>
+            <p>Deterministic QA scans surface evidence gaps, review risks, structure issues, and concrete quality-improvement actions before human review or export.</p>
+            <div class="release-readiness-actions">
+              <button type="button" @click="runQualityReview">Run QA review</button>
+              <button type="button" @click="insertQualityImprovementReport">Insert QA report</button>
+              <button type="button" @click="openQualityAgent">Improve with agent</button>
+            </div>
+            <article
+              v-for="item in qualityImprovementRecommendations"
+              :key="item.id"
+              class="snapshot-row"
+              :data-status="item.severity"
+            >
+              <strong>{{ item.label }}</strong>
+              <p>{{ item.recommendation }}</p>
+              <small>{{ item.action }}</small>
+            </article>
+          </section>
+          <section class="release-readiness-checklist" aria-label="Release readiness checklist">
+            <header>
+              <h3>Release readiness</h3>
+              <span>{{ releaseChecklistSummary }}</span>
+            </header>
+            <p>{{ releaseChecklistHelp }}</p>
+            <div class="release-readiness-actions">
+              <button type="button" @click="applyReleaseMetadataScaffold">Prepare release metadata</button>
+              <button type="button" @click="insertReleaseReadinessAudit">Insert release audit</button>
+            </div>
+            <article
+              v-for="item in releaseReadinessChecklist"
+              :key="item.id"
+              class="snapshot-row"
+              :data-status="item.status"
+            >
+              <strong>{{ item.label }}</strong>
+              <p>{{ item.detail }}</p>
+              <small>{{ item.action }}</small>
+            </article>
+          </section>
           <h3>Release</h3>
           <label>
             Status
@@ -4360,6 +4434,39 @@ interface ExportMetadataChecklistItem {
   detail: string;
   suggestion: string;
 }
+type ReleaseChecklistStatus = "complete" | "missing" | "needs-review";
+interface ReleaseChecklistItem {
+  id: string;
+  label: string;
+  status: ReleaseChecklistStatus;
+  detail: string;
+  action: string;
+}
+type QualityRecommendationSeverity = "pass" | "improve" | "risk" | "blocker";
+interface QualityRecommendation {
+  id: string;
+  label: string;
+  severity: QualityRecommendationSeverity;
+  recommendation: string;
+  action: string;
+}
+interface AppMenuItem {
+  id: string;
+  label: string;
+  help?: string;
+  disabled?: boolean;
+  run: () => unknown;
+}
+interface AppMenuGroup {
+  id: string;
+  label: string;
+  items: AppMenuItem[];
+}
+interface AppMenu {
+  id: string;
+  label: string;
+  groups: AppMenuGroup[];
+}
 type WindowTitleTarget = {
   setTitle(title: string): Promise<void>;
 };
@@ -4564,6 +4671,7 @@ const docsLiveRuntimeChecking = ref(false);
 const docsLiveRuntimeReport = ref<AiRuntimeReadinessReport | null>(null);
 const desktopWorkflowSmokeActive = ref(false);
 const commandPaletteOpen = ref(false);
+const openAppMenuId = ref<string | null>(null);
 const conflictOpen = ref(false);
 const mergedConflictText = ref("");
 const conflictMergeParts = ref<ConflictMergePart[]>([]);
@@ -5812,6 +5920,196 @@ const reviewSummary = computed(() => {
     aiReviewed: aiItems.filter((item) => item.status === "human-reviewed").length,
   };
 });
+const qualityImprovementRecommendations = computed<QualityRecommendation[]>(() => {
+  const text = active.value.text;
+  const semantic = active.value.compile?.semantic;
+  const diagnostics = active.value.compile?.diagnostics || [];
+  const recommendations: QualityRecommendation[] = [];
+  const unresolved = (semantic?.comments || []).filter((comment) => comment.state !== "resolved").length;
+  const aiPending = [...(semantic?.ai_sources || []), ...(semantic?.ai_assisted_sections || [])].filter((item) => item.status !== "human-reviewed").length;
+  const placeholderCount = (text.match(/\{\{[^}]+\}\}|\b(?:TODO|TBD|FIXME)\b/gi) || []).length;
+  const citationCount = (text.match(/\[@[A-Za-z0-9_:.#$%&+?~\/-]+\]/g) || []).length;
+  const bibliographyPresent = /\[BIBLIOGRAPHY\]|```bibtex|^@(?:article|book|misc|techreport|inproceedings)\{/im.test(text);
+  const headings = (text.match(/^#{1,4}\s+\S.+$/gm) || []).length;
+  const longParagraphs = text
+    .split(/\n{2,}/)
+    .filter((paragraph) => !paragraph.trim().startsWith("#") && paragraph.trim().split(/\s+/).length > 95).length;
+  const genericPhrases = text.match(/\b(?:leverage|robust|seamless|cutting-edge|world-class|game-changing|holistic|synergy)\b/gi) || [];
+  const diagnosticErrors = diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
+  const diagnosticWarnings = diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length;
+
+  if (diagnosticErrors || diagnosticWarnings) {
+    recommendations.push({
+      id: "compiler-diagnostics",
+      label: "Compiler diagnostics",
+      severity: diagnosticErrors ? "blocker" : "risk",
+      recommendation: `${diagnosticErrors} errors and ${diagnosticWarnings} warnings need review before export.`,
+      action: "Open Diagnostics, fix blocking issues, then re-run QA and export readiness.",
+    });
+  }
+  if (placeholderCount) {
+    recommendations.push({
+      id: "placeholders",
+      label: "Unresolved placeholders",
+      severity: "risk",
+      recommendation: `${placeholderCount} placeholders or TODO markers remain in the document.`,
+      action: "Resolve values, mark unknowns as explicit assumptions, or keep them in a reviewer handoff section.",
+    });
+  }
+  if (citationCount && !bibliographyPresent) {
+    recommendations.push({
+      id: "citation-evidence",
+      label: "Citation evidence",
+      severity: "risk",
+      recommendation: `${citationCount} citation marker(s) are present but no bibliography block is visible.`,
+      action: "Insert bibliography entries or add citation TODOs for every unsupported source.",
+    });
+  }
+  if (unresolved) {
+    recommendations.push({
+      id: "review-comments",
+      label: "Review comments",
+      severity: "risk",
+      recommendation: `${unresolved} unresolved review comment(s) still need a decision.`,
+      action: "Resolve comments, defer them with owner/date, or document why they are acceptable for this release.",
+    });
+  }
+  if (aiPending) {
+    recommendations.push({
+      id: "ai-provenance",
+      label: "AI provenance",
+      severity: "risk",
+      recommendation: `${aiPending} AI-assisted source or section marker(s) are not human reviewed.`,
+      action: "Inspect the generated material, remove AI cruft, verify claims, and mark reviewed only after human sign-off.",
+    });
+  }
+  if (headings < 2) {
+    recommendations.push({
+      id: "structure",
+      label: "Document structure",
+      severity: "improve",
+      recommendation: "The document has fewer than two headings, making navigation, outline review, and export structure weaker.",
+      action: "Use Outline mode or Docs Live to add chapters, sections, subsections, and review checkpoints.",
+    });
+  }
+  if (longParagraphs) {
+    recommendations.push({
+      id: "readability",
+      label: "Readability",
+      severity: "improve",
+      recommendation: `${longParagraphs} long paragraph(s) may be hard for business reviewers to scan.`,
+      action: "Split long paragraphs into shorter points, lists, examples, or decision tables.",
+    });
+  }
+  if (genericPhrases.length) {
+    recommendations.push({
+      id: "humanization",
+      label: "Humanization",
+      severity: "improve",
+      recommendation: `${Array.from(new Set(genericPhrases.map((phrase) => phrase.toLowerCase()))).slice(0, 5).join(", ")} may read as generic AI wording.`,
+      action: "Replace broad adjectives with named facts, proof points, constraints, and concrete reader outcomes.",
+    });
+  }
+  if (!recommendations.length) {
+    recommendations.push({
+      id: "qa-ready",
+      label: "QA baseline",
+      severity: "pass",
+      recommendation: "No obvious deterministic QA blockers were found in structure, citations, placeholders, comments, or AI review state.",
+      action: "Run export readiness and a human review pass before external distribution.",
+    });
+  }
+  return recommendations;
+});
+const qualityRecommendationSummary = computed(() => {
+  const counts = qualityImprovementRecommendations.value.reduce<Record<QualityRecommendationSeverity, number>>(
+    (acc, item) => {
+      acc[item.severity] += 1;
+      return acc;
+    },
+    { pass: 0, improve: 0, risk: 0, blocker: 0 },
+  );
+  return `${counts.blocker} blockers, ${counts.risk} risks, ${counts.improve} improvements`;
+});
+const releaseReadinessChecklist = computed<ReleaseChecklistItem[]>(() => {
+  const text = active.value.text;
+  const semantic = active.value.compile?.semantic;
+  const status = frontMatterAnyScalar(text, ["status"]) || semantic?.status || "draft";
+  const version = frontMatterAnyScalar(text, ["version"]);
+  const owner = frontMatterAnyScalar(text, ["owner"]);
+  const releaseTarget = frontMatterAnyScalar(text, ["releaseTarget"]);
+  const approvedBy = frontMatterAnyScalar(text, ["approvedBy", "reviewer"]);
+  const approvedAt = frontMatterAnyScalar(text, ["approvedAt"]);
+  const comments = semantic?.comments || [];
+  const unresolved = comments.filter((comment) => comment.state !== "resolved").length;
+  const changeNotes = semantic?.change_notes.length || 0;
+  const aiItems = [...(semantic?.ai_sources || []), ...(semantic?.ai_assisted_sections || [])];
+  const aiPending = aiItems.filter((item) => item.status !== "human-reviewed").length;
+  const approved = status === "approved" || status === "published";
+  return [
+    {
+      id: "release-state",
+      label: "Release state",
+      status: approved ? "complete" : "needs-review",
+      detail: approved ? `${status} release state is set.` : `Current status is ${status}.`,
+      action: "Set status to approved or published when the document is final.",
+    },
+    {
+      id: "release-metadata",
+      label: "Ownership metadata",
+      status: version && owner && releaseTarget ? "complete" : "missing",
+      detail: [
+        version ? `version ${version}` : "missing version",
+        owner ? `owner ${owner}` : "missing owner",
+        releaseTarget ? `target ${releaseTarget}` : "missing releaseTarget",
+      ].join(" | "),
+      action: "Capture version, owner, and release target before export or tagging.",
+    },
+    {
+      id: "approval-audit",
+      label: "Approval audit",
+      status: approvedBy && approvedAt ? "complete" : "missing",
+      detail: approvedBy && approvedAt ? `${approvedBy} at ${approvedAt}` : "approvedBy/reviewer or approvedAt is missing.",
+      action: "Record approver and approval timestamp for traceability.",
+    },
+    {
+      id: "review-comments",
+      label: "Review comments",
+      status: unresolved ? "needs-review" : "complete",
+      detail: unresolved ? `${unresolved} unresolved review comment(s).` : "No unresolved review comments.",
+      action: "Resolve comments or record why they are accepted for release.",
+    },
+    {
+      id: "change-notes",
+      label: "Change notes",
+      status: changeNotes ? "complete" : "needs-review",
+      detail: changeNotes ? `${changeNotes} change note(s) recorded.` : "No change notes recorded.",
+      action: "Add a change note for the release delta or review decision.",
+    },
+    {
+      id: "ai-review",
+      label: "AI review",
+      status: aiPending ? "needs-review" : "complete",
+      detail: aiPending ? `${aiPending} AI-assisted item(s) still need human review.` : "AI provenance is reviewed or not present.",
+      action: "Mark AI-assisted sources and sections as human reviewed before final release.",
+    },
+  ];
+});
+const releaseChecklistSummary = computed(() => {
+  const counts = releaseReadinessChecklist.value.reduce<Record<ReleaseChecklistStatus, number>>(
+    (acc, item) => {
+      acc[item.status] += 1;
+      return acc;
+    },
+    { complete: 0, missing: 0, "needs-review": 0 },
+  );
+  return `${counts.complete} complete, ${counts.missing} missing, ${counts["needs-review"]} need review`;
+});
+const releaseChecklistHelp = computed(() =>
+  releaseReadinessChecklist.value.every((item) => item.status === "complete")
+    ? "The document has the local release metadata and review audit expected before tagging or external distribution."
+    : "Resolve release metadata, approvals, comments, change notes, and AI review state before final export or tagging.",
+);
 const citationStyle = computed(() =>
   String(active.value.compile?.metadata.citationStyle || active.value.compile?.metadata.cslStyle || store.bibliographyDefaults.citationStyle),
 );
@@ -6758,6 +7056,9 @@ const guidedDemoCompletionPercent = computed(() =>
 const guidedDemoCompletionSummary = computed(() =>
   `${guidedDemoCompletedCount.value}/${guidedDemoSteps.value.length} demo capabilities completed: AI creation, playbooks, lifecycle tasks, provider governance, outline, composition, templates, review, and export.`,
 );
+function businessTemplateById(id: BusinessDocumentTemplate["id"]) {
+  return businessDocumentTemplates.find((template) => template.id === id) || businessDocumentTemplates[0];
+}
 const commandBarGroups = computed<CommandBarGroup[]>(() => [
   {
     id: "document",
@@ -6792,7 +7093,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     label: "Write",
     actions: [
       { id: "docs-live", label: "Docs Live", title: "Open voice-guided document drafting", icon: "mic", primary: true, run: () => openDocsLive() },
-      { id: "biz-wizard", label: "Wizard", title: "Open the AI document creation wizard for common business documents", icon: "ai", primary: true, run: () => startBusinessDocumentWizard(businessDocumentTemplates[1]) },
+      { id: "biz-wizard", label: "Wizards", title: "Open the AI document creation wizard for common business, education, technical, and creative documents", icon: "ai", primary: true, run: () => openDocumentWizardHub() },
       { id: "biz-identity", label: "Identity", title: "Set up reusable business identity values", icon: "settings", run: () => openBusinessProfile() },
       { id: "bold", label: "Bold", title: "Bold selection", icon: "bold", run: () => wrapSelection("**") },
       { id: "italic", label: "Italic", title: "Italic selection", icon: "italic", run: () => wrapSelection("*") },
@@ -6800,6 +7101,17 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "link", label: "Link", title: "Insert link", icon: "link", run: () => wrapSelection("[", "](https://)") },
       { id: "heading", label: "Heading", title: "Insert second-level heading", icon: "heading", run: () => insertAtLineStart("## ") },
       { id: "fence", label: "Fence", title: "Insert code fence", icon: "fence", run: () => insertBlock(codeFenceSnippet) },
+    ],
+  },
+  {
+    id: "create",
+    label: "Wizards",
+    actions: [
+      { id: "lesson-plan", label: "Lesson", title: "Create a lesson plan with Docs Live", icon: "ai", run: () => startBusinessDocumentWizard(businessTemplateById("lesson-plan")) },
+      { id: "textbook", label: "Textbook", title: "Create a technical textbook chapter", icon: "ai", run: () => startBusinessDocumentWizard(businessTemplateById("technical-textbook")) },
+      { id: "novel", label: "Novel", title: "Plan or draft a novel", icon: "ai", run: () => startBusinessDocumentWizard(businessTemplateById("novel")) },
+      { id: "podcast", label: "Podcast", title: "Create a podcast script", icon: "ai", run: () => startBusinessDocumentWizard(businessTemplateById("podcast-script")) },
+      { id: "movie", label: "Movie", title: "Create a movie script or screenplay plan", icon: "ai", run: () => startBusinessDocumentWizard(businessTemplateById("movie-script")) },
     ],
   },
   {
@@ -6840,11 +7152,22 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "demo", label: "Demo", title: "Start guided product demo", icon: "help", run: () => openGuidedDemo() },
     ],
   },
+  {
+    id: "quality",
+    label: "Quality",
+    actions: [
+      { id: "qa-review", label: "QA Review", title: "Run quality assurance and improvement recommendations", icon: "comment", primary: true, run: () => runQualityReview() },
+      { id: "qa-report", label: "QA Report", title: "Insert the quality improvement report", icon: "comment", run: () => insertQualityImprovementReport() },
+      { id: "qa-agent", label: "Improve", title: "Open an AI agent quality-improvement workflow", icon: "agent", run: () => openQualityAgent() },
+      { id: "release-ready", label: "Release", title: "Prepare release metadata", icon: "snapshot", run: () => applyReleaseMetadataScaffold() },
+      { id: "release-audit", label: "Audit", title: "Insert release readiness audit", icon: "snapshot", run: () => insertReleaseReadinessAudit() },
+    ],
+  },
 ]);
 const commandToolbarDefinitions = [
   { id: "file", label: "File", groupIds: ["document", "manage"] },
-  { id: "writing", label: "Writing", groupIds: ["write", "insert"] },
-  { id: "review-navigation", label: "Review & Navigate", groupIds: ["navigate", "review"] },
+  { id: "writing", label: "Writing", groupIds: ["write", "create", "insert"] },
+  { id: "review-navigation", label: "Review & Navigate", groupIds: ["navigate", "review", "quality"] },
 ];
 const toolbarCollapseRowIds = [...commandToolbarDefinitions.map((row) => row.id), "view"];
 const commandToolbarRows = computed<CommandToolbarRow[]>(() => {
@@ -6858,6 +7181,222 @@ const commandToolbarRows = computed<CommandToolbarRow[]>(() => {
     }),
   }));
 });
+const appMenus = computed<AppMenu[]>(() => [
+  {
+    id: "file",
+    label: "File",
+    groups: [
+      {
+        id: "document",
+        label: "Document",
+        items: [
+          { id: "new", label: "New Document", help: "Create a blank Markdown document.", run: () => store.newDocument() },
+          { id: "open", label: "Open Document", help: "Open a Markdown file from disk.", run: () => openDocument() },
+          { id: "save", label: "Save", help: "Save the active document.", run: () => saveDocument() },
+          { id: "save-as", label: "Save As", help: "Save the active document to a new path.", run: () => saveDocumentAs() },
+          { id: "close", label: "Close Document", help: "Close the active tab.", run: () => closeDocument(active.value.id) },
+        ],
+      },
+      {
+        id: "manage",
+        label: "Manage",
+        items: [
+          { id: "open-folder", label: "Open Folder", help: "Browse a folder as a writing workspace.", run: () => openFolder() },
+          { id: "save-workspace", label: "Save Workspace", help: "Persist open tabs, groups, and view state.", run: () => saveWorkspace() },
+          { id: "rename", label: "Rename", help: "Rename the active document.", run: () => renameDocument() },
+          { id: "duplicate", label: "Duplicate", help: "Duplicate the active document.", run: () => duplicateDocument() },
+          { id: "reveal", label: "Reveal", help: "Reveal the active file in the file manager.", run: () => store.revealActive() },
+          { id: "revert", label: "Revert", help: "Reload the active document from its saved state.", run: () => store.revertActive() },
+          { id: "snapshot", label: "Create Snapshot", help: "Capture a recovery or release snapshot.", run: () => snapshotActive() },
+        ],
+      },
+    ],
+  },
+  {
+    id: "edit",
+    label: "Edit",
+    groups: [
+      {
+        id: "search",
+        label: "Search and Selection",
+        items: [
+          { id: "find", label: "Find and Replace", help: "Open editor search and replace.", run: () => runEditorCommand(openSearchPanel) },
+          { id: "find-next", label: "Find Next", help: "Move to the next match.", run: () => runEditorCommand(findNext) },
+          { id: "find-prev", label: "Find Previous", help: "Move to the previous match.", run: () => runEditorCommand(findPrevious) },
+          { id: "multi-next", label: "Select Next Occurrence", help: "Add the next matching occurrence to the selection.", run: () => runEditorCommand(selectNextOccurrence) },
+          { id: "cursor-above", label: "Add Cursor Above", help: "Create a multi-cursor above.", run: () => runEditorCommand(addCursorAbove) },
+          { id: "cursor-below", label: "Add Cursor Below", help: "Create a multi-cursor below.", run: () => runEditorCommand(addCursorBelow) },
+        ],
+      },
+      {
+        id: "markdown",
+        label: "Markdown",
+        items: [
+          { id: "bold", label: "Bold", help: "Wrap the selection in bold Markdown.", run: () => wrapSelection("**") },
+          { id: "italic", label: "Italic", help: "Wrap the selection in italic Markdown.", run: () => wrapSelection("*") },
+          { id: "code", label: "Inline Code", help: "Wrap the selection as inline code.", run: () => wrapSelection("`") },
+          { id: "link", label: "Link", help: "Create a Markdown link.", run: () => wrapSelection("[", "](https://)") },
+          { id: "heading", label: "Heading", help: "Insert a second-level heading marker.", run: () => insertAtLineStart("## ") },
+        ],
+      },
+    ],
+  },
+  {
+    id: "view",
+    label: "View",
+    groups: [
+      {
+        id: "modes",
+        label: "Modes",
+        items: [
+          { id: "split", label: "Split View", help: "Show source and preview together.", run: () => (store.mode = "split") },
+          { id: "source", label: "Source Only", help: "Show only the Markdown editor.", run: () => (store.mode = "source") },
+          { id: "preview", label: "Preview Only", help: "Show only rendered preview.", run: () => (store.mode = "preview") },
+          { id: "focus", label: "Focus Mode", help: "Write with fewer panes visible.", run: () => (store.mode = "focus") },
+          { id: "outline", label: "Outline Mode", help: "CRUD chapters, sections, subsections, and subsubsections.", run: () => { store.mode = "outline"; store.sidebar = "outline"; } },
+          { id: "export", label: "Export Preview", help: "Review delivery output and export readiness.", run: () => { store.mode = "export"; store.sidebar = "exports"; } },
+          { id: "review", label: "Review Mode", help: "Show source, preview, comments, QA, and release state.", run: () => { store.mode = "review"; store.sidebar = "review"; } },
+        ],
+      },
+      {
+        id: "layout",
+        label: "Layout",
+        items: [
+          { id: "outline-panel", label: "Document Outline", help: "Open the outline sidebar.", run: () => showOutline() },
+          { id: "exports-panel", label: "Export Panel", help: "Open distribution and export controls.", run: () => (store.sidebar = "exports") },
+          { id: "settings", label: "Settings", help: "Tune toolbar, editor, preview, and accessibility settings.", run: () => (store.sidebar = "settings") },
+          { id: "collapse-toolbars", label: "Collapse Toolbars", help: "Recover vertical writing space.", run: () => setAllCommandToolbarsCollapsed(true) },
+          { id: "expand-toolbars", label: "Expand Toolbars", help: "Show all toolbar rows.", run: () => setAllCommandToolbarsCollapsed(false) },
+        ],
+      },
+    ],
+  },
+  {
+    id: "writing",
+    label: "Writing Tools",
+    groups: [
+      {
+        id: "ai",
+        label: "AI-first writing",
+        items: [
+          { id: "ai-create", label: "AI Create Document", help: "Open Docs Live as a document creation wizard.", run: () => startAiDocumentCreation() },
+          { id: "docs-live", label: "Docs Live", help: "Dictate and structure a draft with context and placeholders.", run: () => openDocsLive() },
+          { id: "agent", label: "AI Agent Workspace", help: "Plan, revise, review, and distribute with governed agent workflows.", run: () => openAgentWorkspace() },
+          { id: "ai-paste", label: "Clean AI Paste", help: "Clean pasted AI output and add provenance.", run: () => openAiPaste() },
+          { id: "commands", label: "Command Palette", help: "Search every command or route a natural-language AI instruction.", run: () => (commandPaletteOpen.value = true) },
+        ],
+      },
+      {
+        id: "insert",
+        label: "Insert",
+        items: [
+          { id: "table", label: "Table", help: "Insert a Markdown table scaffold.", run: () => insertBlock(tableSnippet) },
+          { id: "figure", label: "Figure", help: "Insert a figure scaffold.", run: () => insertFigureSnippet() },
+          { id: "calc", label: "Calculation", help: "Insert a calculation block.", run: () => insertBlock(calcSnippet) },
+          { id: "equation", label: "Equation Editor", help: "Open equation templates and LaTeX insertion.", run: () => openEquationEditor() },
+          { id: "toc", label: "Table of Contents", help: "Insert a generated TOC marker.", run: () => insertBlock(tocSnippet) },
+          { id: "templates", label: "Transform Templates", help: "Open reusable calc, chart, diagram, data, and API templates.", run: () => openTransformTemplates() },
+        ],
+      },
+      {
+        id: "wizards",
+        label: "Document wizards",
+        items: businessDocumentTemplates.map((template) => ({
+          id: `wizard-${template.id}`,
+          label: template.label,
+          help: template.summary,
+          run: () => startBusinessDocumentWizard(template),
+        })),
+      },
+      {
+        id: "parts",
+        label: "Reusable parts",
+        items: businessDocumentSnippets.map((snippet) => ({
+          id: `part-${snippet.id}`,
+          label: snippet.label,
+          help: snippet.summary,
+          run: () => insertBusinessSnippet(snippet),
+        })),
+      },
+    ],
+  },
+  {
+    id: "quality",
+    label: "Quality",
+    groups: [
+      {
+        id: "qa",
+        label: "Assurance and improvement",
+        items: [
+          { id: "qa-review", label: "Run QA Review", help: "Scan for quality risks and improvement recommendations.", run: () => runQualityReview() },
+          { id: "qa-report", label: "Insert QA Report", help: "Insert the current recommendations as a review artifact.", run: () => insertQualityImprovementReport() },
+          { id: "qa-agent", label: "Improve with Agent", help: "Open an agent workflow seeded with current QA findings.", run: () => openQualityAgent() },
+          { id: "review-readiness", label: "Review Readiness", help: "Open the Review sidebar and AI Control Center.", run: () => runAgentPlanReview() },
+          { id: "release-metadata", label: "Prepare Release Metadata", help: "Scaffold status, version, owner, target, and approvals.", run: () => applyReleaseMetadataScaffold() },
+          { id: "release-audit", label: "Insert Release Audit", help: "Insert release readiness evidence.", run: () => insertReleaseReadinessAudit() },
+        ],
+      },
+      {
+        id: "governance",
+        label: "Governance",
+        items: [
+          { id: "comment", label: "Insert Review Comment", help: "Add an unresolved review comment marker.", run: () => insertBlock(commentSnippet) },
+          { id: "ai-source", label: "Insert AI Source", help: "Add AI provenance metadata.", run: () => insertBlock(aiSnippet) },
+          { id: "citation-audit", label: "Insert Citation TODO Audit", help: "Insert open citation TODOs.", run: () => insertBlock(citationTodoAuditMarkdown(citationTodoItems.value)) },
+          { id: "automation-audit", label: "Insert Agent Automation Audit", help: "Append agent automation evidence if a run exists.", disabled: !agentRun.value, run: () => insertAgentAutomationAudit() },
+        ],
+      },
+    ],
+  },
+  {
+    id: "export",
+    label: "Export",
+    groups: [
+      {
+        id: "prepare",
+        label: "Readiness",
+        items: [
+          { id: "prepare", label: "Prepare for Export", help: "Run target-aware readiness validation.", run: () => prepareForExport() },
+          { id: "metadata", label: "Prepare Metadata", help: "Scaffold target-specific distribution metadata.", run: () => applyExportMetadataScaffold() },
+          { id: "export-current", label: "Export Selected Target", help: "Export using the selected target and settings.", disabled: store.exportBusy, run: () => exportDocument() },
+          { id: "profiles", label: "Export Profiles", help: "Open saved export profiles.", run: () => { store.mode = "export"; store.sidebar = "exports"; } },
+        ],
+      },
+      {
+        id: "targets",
+        label: "Targets",
+        items: (Object.keys(nativeMenuExportTargets) as Array<keyof typeof nativeMenuExportTargets>).map((commandId) => {
+          const target = nativeMenuExportTargets[commandId];
+          return {
+            id: `export-${target}`,
+            label: exportTargetLabels[target] || target,
+            help: `Export or package this document as ${exportTargetLabels[target] || target}.`,
+            disabled: store.exportBusy,
+            run: () => exportDocumentAs(target),
+          };
+        }),
+      },
+    ],
+  },
+  {
+    id: "help",
+    label: "Help",
+    groups: [
+      {
+        id: "learn",
+        label: "Learn",
+        items: [
+          { id: "help-center", label: "NEditor Help Center", help: "Open searchable guidance.", run: () => openHelp() },
+          { id: "demo", label: "Guided Demo", help: "Walk through NEditor capabilities.", run: () => openGuidedDemo() },
+          { id: "getting-started", label: "Getting Started", help: "Learn the workbench basics.", run: () => openHelp("getting-started") },
+          { id: "docs-live", label: "Docs Live", help: "Learn AI-first drafting.", run: () => openHelp("docs-live") },
+          { id: "export-help", label: "Export and Publishing", help: "Learn export targets and handoffs.", run: () => openHelp("export-publishing") },
+          { id: "shortcuts", label: "Keyboard Shortcuts", help: "Review shortcut and toolbar controls.", run: () => openHelp("keyboard-shortcuts") },
+        ],
+      },
+    ],
+  },
+]);
 const toolbarCollapseRows = computed(() => [...commandToolbarRows.value.map((row) => ({ id: row.id, label: row.label })), { id: "view", label: "View" }]);
 const collapsedToolbarRows = computed(() => toolbarCollapseRows.value.filter((row) => store.toolbarCollapsedRows.includes(row.id)));
 const normalizedToolbarCollapsedRows = (ids: string[]) =>
@@ -6878,6 +7417,32 @@ function toggleToolbarRow(id: string) {
 }
 function setAllCommandToolbarsCollapsed(collapsed: boolean) {
   store.toolbarCollapsedRows = collapsed ? [...toolbarCollapseRowIds] : [];
+}
+function toggleAppMenu(menuId: string) {
+  openAppMenuId.value = openAppMenuId.value === menuId ? null : menuId;
+}
+function closeAppMenus() {
+  openAppMenuId.value = null;
+}
+async function runAppMenuItem(item: AppMenuItem) {
+  if (item.disabled) return;
+  closeAppMenus();
+  try {
+    await item.run();
+  } catch (error) {
+    store.lastError = error instanceof Error ? error.message : String(error);
+    store.statusMessage = `${item.label} failed`;
+  }
+}
+function handleAppMenuKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeAppMenus();
+  }
+}
+function handleAppMenuDocumentClick(event: MouseEvent) {
+  const target = event.target as Element | null;
+  if (!target?.closest(".app-menu-bar")) closeAppMenus();
 }
 function helpCategoryLabel(category: HelpCategory) {
   return helpCategoryOptions.find((option) => option.id === category)?.label || "Help";
@@ -8165,7 +8730,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
   { name: "Open AI agent workspace", group: "AI", run: () => openAgentWorkspace() },
   { name: "AI: Create document", group: "AI", run: () => startAiDocumentCreation() },
-  { name: "AI: Document creation wizard", group: "AI", run: () => startBusinessDocumentWizard(businessDocumentTemplates[1]) },
+  { name: "AI: Document creation wizard", group: "AI", run: () => openDocumentWizardHub() },
   { name: "AI: Compose from outline", group: "AI", run: () => openDocsLiveFromOutline() },
   { name: "AI: Review and clean pasted text", group: "AI", run: () => openAiPaste() },
   { name: "Open Docs Live", group: "AI", run: () => openDocsLive() },
@@ -8224,6 +8789,11 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Italic selection", group: "Markdown", run: () => wrapSelection("*") },
   { name: "Inline code selection", group: "Markdown", run: () => wrapSelection("`") },
   { name: "Add review comment", group: "Review", run: () => (store.sidebar = "review") },
+  { name: "Run QA recommendations", group: "Quality", description: "Scan the current document for quality assurance and quality improvement recommendations.", keywords: ["quality assurance", "quality improvement", "qa", "recommendations"], run: () => runQualityReview() },
+  { name: "Insert QA improvement report", group: "Quality", description: "Insert a Markdown report of the current quality recommendations.", keywords: ["quality report", "qa report", "review"], run: () => insertQualityImprovementReport() },
+  { name: "Improve document with agent", group: "Quality", description: "Open an AI agent workflow seeded with current QA findings.", keywords: ["improve", "humanize", "quality", "agent"], run: () => openQualityAgent() },
+  { name: "Prepare release metadata", group: "Review", run: () => applyReleaseMetadataScaffold() },
+  { name: "Insert release readiness audit", group: "Review", run: () => insertReleaseReadinessAudit() },
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
   { name: "Open transform templates", group: "Transforms", run: () => openTransformTemplates() },
   { name: "Set up business identity", group: "Templates", run: () => openBusinessProfile() },
@@ -8454,6 +9024,15 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-save-workspace":
       await saveWorkspace();
       break;
+    case "neditor-rename-document":
+      await renameDocument();
+      break;
+    case "neditor-duplicate-document":
+      await duplicateDocument();
+      break;
+    case "neditor-create-snapshot":
+      await snapshotActive();
+      break;
     case "neditor-open-search":
       runEditorCommand(openSearchPanel);
       break;
@@ -8502,6 +9081,36 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-open-templates":
       store.sidebar = "templates";
       break;
+    case "neditor-open-document-wizards":
+      openDocumentWizardHub();
+      break;
+    case "neditor-wizard-lesson-plan":
+      startBusinessDocumentWizard(businessTemplateById("lesson-plan"));
+      break;
+    case "neditor-wizard-lesson-content":
+      startBusinessDocumentWizard(businessTemplateById("lesson-content"));
+      break;
+    case "neditor-wizard-technical-textbook":
+      startBusinessDocumentWizard(businessTemplateById("technical-textbook"));
+      break;
+    case "neditor-wizard-novel":
+      startBusinessDocumentWizard(businessTemplateById("novel"));
+      break;
+    case "neditor-wizard-podcast-script":
+      startBusinessDocumentWizard(businessTemplateById("podcast-script"));
+      break;
+    case "neditor-wizard-movie-script":
+      startBusinessDocumentWizard(businessTemplateById("movie-script"));
+      break;
+    case "neditor-wizard-proposal":
+      startBusinessDocumentWizard(businessTemplateById("proposal"));
+      break;
+    case "neditor-wizard-rfp-response":
+      startBusinessDocumentWizard(businessTemplateById("rfp"));
+      break;
+    case "neditor-wizard-tender-response":
+      startBusinessDocumentWizard(businessTemplateById("tender"));
+      break;
     case "neditor-open-docs-live":
       openDocsLive();
       break;
@@ -8513,6 +9122,21 @@ async function runNativeMenuCommand(command: string) {
       break;
     case "neditor-clean-ai-paste":
       openAiPaste();
+      break;
+    case "neditor-run-qa-review":
+      runQualityReview();
+      break;
+    case "neditor-insert-qa-report":
+      insertQualityImprovementReport();
+      break;
+    case "neditor-improve-with-agent":
+      openQualityAgent();
+      break;
+    case "neditor-prepare-release-metadata":
+      applyReleaseMetadataScaffold();
+      break;
+    case "neditor-insert-release-audit":
+      insertReleaseReadinessAudit();
       break;
     case "neditor-open-help":
       openHelp();
@@ -8564,6 +9188,7 @@ onMounted(async () => {
   window.addEventListener("mouseout", handleButtonHelpLeave);
   window.addEventListener("focusout", handleButtonHelpLeave);
   window.addEventListener("scroll", hideButtonHelp, true);
+  window.addEventListener("click", handleAppMenuDocumentClick);
 });
 
 onBeforeUnmount(() => {
@@ -8580,6 +9205,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("mouseout", handleButtonHelpLeave);
   window.removeEventListener("focusout", handleButtonHelpLeave);
   window.removeEventListener("scroll", hideButtonHelp, true);
+  window.removeEventListener("click", handleAppMenuDocumentClick);
   delete window.__NEDITOR_DESKTOP_WORKFLOW__;
   unlistenNativeMenuCommand?.();
   unlistenNativeMenuCommand = null;
@@ -12002,6 +12628,15 @@ function openTransformTemplates() {
   });
 }
 
+function openDocumentWizardHub(query = "") {
+  store.sidebar = "templates";
+  businessTemplateQuery.value = query;
+  void nextTick(() => {
+    document.querySelector<HTMLInputElement>('[aria-label="AI document creation wizard"] input')?.focus();
+  });
+  store.statusMessage = "Opened document creation wizards";
+}
+
 function templateFillFields(template: Pick<TransformTemplate, "body" | "transform">) {
   return transformTemplateFillFields(template);
 }
@@ -12835,6 +13470,74 @@ function setFrontMatterField(key: string, value: string) {
   store.updateText(upsertFrontMatterField(active.value.text, key, value.trim()));
 }
 
+function runQualityReview() {
+  flushEditorTextToStore();
+  store.sidebar = "review";
+  store.statusMessage = `QA review found ${qualityRecommendationSummary.value}`;
+}
+
+function qualityRecommendationMarkdown() {
+  const generatedAt = new Date().toISOString();
+  const rows = qualityImprovementRecommendations.value
+    .map((item) => `| ${markdownTableCell(item.label)} | ${item.severity} | ${markdownTableCell(item.recommendation)} | ${markdownTableCell(item.action)} |`)
+    .join("\n");
+  return [
+    "## Quality Assurance and Improvement Report",
+    "",
+    `Generated: ${generatedAt}`,
+    `Summary: ${qualityRecommendationSummary.value}`,
+    "",
+    "| Area | Severity | Recommendation | Action |",
+    "| --- | --- | --- | --- |",
+    rows,
+    "",
+  ].join("\n");
+}
+
+function insertQualityImprovementReport() {
+  flushEditorTextToStore();
+  insertBlock(qualityRecommendationMarkdown());
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted QA improvement report";
+}
+
+function openQualityAgent() {
+  const findings = qualityImprovementRecommendations.value
+    .map((item) => `- ${item.label} (${item.severity}): ${item.action}`)
+    .join("\n");
+  openAgentWorkspace([
+    "Run a quality assurance and quality improvement pass on the current document.",
+    "Preserve the author's intent, verify claims, resolve placeholders, remove generic AI wording, improve structure and readability, and prepare a review-ready revision plan.",
+    findings,
+  ].join("\n"));
+}
+
+function applyReleaseMetadataScaffold() {
+  flushEditorTextToStore();
+  let nextText = active.value.text;
+  const today = new Date().toISOString();
+  const profileOwner = store.businessProfile.companyName || store.businessProfile.fullName || "TODO owner";
+  if (!frontMatterAnyScalar(nextText, ["status"])) nextText = upsertFrontMatterField(nextText, "status", "in-review");
+  if (!frontMatterAnyScalar(nextText, ["version"])) nextText = upsertFrontMatterField(nextText, "version", "0.1.0");
+  if (!frontMatterAnyScalar(nextText, ["owner"])) nextText = upsertFrontMatterField(nextText, "owner", profileOwner);
+  if (!frontMatterAnyScalar(nextText, ["releaseTarget"])) nextText = upsertFrontMatterField(nextText, "releaseTarget", store.exportTarget || "review package");
+  if (!frontMatterAnyScalar(nextText, ["approvedBy", "reviewer"])) nextText = upsertFrontMatterField(nextText, "approvedBy", "TODO reviewer");
+  if (!frontMatterAnyScalar(nextText, ["approvedAt"])) nextText = upsertFrontMatterField(nextText, "approvedAt", today);
+  store.updateText(nextText);
+  store.statusMessage = "Prepared release metadata scaffold";
+  void nextTick(() => syncEditorViewFromActiveDocument());
+}
+
+function insertReleaseReadinessAudit() {
+  const rows = releaseReadinessChecklist.value
+    .map((item) => `| ${markdownTableCell(item.label)} | ${item.status} | ${markdownTableCell(item.detail)} | ${markdownTableCell(item.action)} |`)
+    .join("\n");
+  insertBlock(`## Release Readiness Audit\n\n| Area | Status | Detail | Action |\n| --- | --- | --- | --- |\n${rows}\n`);
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted release readiness audit";
+}
+
 function applyExportMetadataScaffold() {
   flushEditorTextToStore();
   const target = store.exportTarget;
@@ -13475,6 +14178,7 @@ async function saveDocument() {
     await saveDocumentAs();
     return;
   }
+  flushEditorTextToStore();
   await store.saveActive();
 }
 
@@ -13484,8 +14188,11 @@ async function saveDocumentAs() {
     (await save({
       filters: [{ name: "Markdown", extensions: ["md"] }],
       defaultPath: active.value.title.endsWith(".md") ? active.value.title : `${active.value.title}.md`,
-    }));
-  if (path) await store.saveActive(path);
+  }));
+  if (path) {
+    flushEditorTextToStore();
+    await store.saveActive(path);
+  }
 }
 
 async function desktopWorkflowSmokeMarkdownPath() {
@@ -15208,6 +15915,7 @@ select:hover {
 }
 
 .app-shell[data-theme="dark"] .titlebar,
+.app-shell[data-theme="dark"] .app-menu-panel,
 .app-shell[data-theme="dark"] .command-bar,
 .app-shell[data-theme="dark"] .status-bar {
   border-color: #29384a;
@@ -15226,6 +15934,24 @@ select:hover {
 .app-shell[data-theme="dark"] .icon-command.primary {
   border-color: #587ea9;
   background: #203b58;
+}
+
+.app-shell[data-theme="dark"] .app-menu-trigger,
+.app-shell[data-theme="dark"] .app-menu-group button {
+  color: #e6edf5;
+}
+
+.app-shell[data-theme="dark"] .app-menu-trigger:hover,
+.app-shell[data-theme="dark"] .app-menu-trigger:focus-visible,
+.app-shell[data-theme="dark"] .app-menu-trigger[aria-expanded="true"],
+.app-shell[data-theme="dark"] .app-menu-group button:hover,
+.app-shell[data-theme="dark"] .app-menu-group button:focus-visible {
+  background: #203247;
+}
+
+.app-shell[data-theme="dark"] .app-menu-group,
+.app-shell[data-theme="dark"] .app-menu-bar {
+  border-color: #34465a;
 }
 
 .app-shell[data-theme="dark"] .tab,
@@ -15391,6 +16117,7 @@ select:hover {
   }
 
   .app-shell[data-theme="system"] .titlebar,
+  .app-shell[data-theme="system"] .app-menu-panel,
   .app-shell[data-theme="system"] .command-bar,
   .app-shell[data-theme="system"] .status-bar {
     border-color: #29384a;
@@ -15409,6 +16136,24 @@ select:hover {
   .app-shell[data-theme="system"] .icon-command.primary {
     border-color: #587ea9;
     background: #203b58;
+  }
+
+  .app-shell[data-theme="system"] .app-menu-trigger,
+  .app-shell[data-theme="system"] .app-menu-group button {
+    color: #e6edf5;
+  }
+
+  .app-shell[data-theme="system"] .app-menu-trigger:hover,
+  .app-shell[data-theme="system"] .app-menu-trigger:focus-visible,
+  .app-shell[data-theme="system"] .app-menu-trigger[aria-expanded="true"],
+  .app-shell[data-theme="system"] .app-menu-group button:hover,
+  .app-shell[data-theme="system"] .app-menu-group button:focus-visible {
+    background: #203247;
+  }
+
+  .app-shell[data-theme="system"] .app-menu-group,
+  .app-shell[data-theme="system"] .app-menu-bar {
+    border-color: #34465a;
   }
 
   .app-shell[data-theme="system"] .tab,
@@ -15574,6 +16319,7 @@ select:hover {
 }
 
 .app-shell[data-high-contrast="true"] .titlebar,
+.app-shell[data-high-contrast="true"] .app-menu-panel,
 .app-shell[data-high-contrast="true"] .command-bar,
 .app-shell[data-high-contrast="true"] .trust-prompt,
 .app-shell[data-high-contrast="true"] .status-bar,
@@ -15716,6 +16462,110 @@ select:hover {
   padding: 0 10px;
   border-bottom: 1px solid #c9d2dc;
   background: #f7f9fb;
+}
+
+.app-menu-bar {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  gap: 1px;
+  min-width: 0;
+  height: 30px;
+  padding-right: 6px;
+  border-right: 1px solid #d7dee7;
+}
+
+.app-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.app-menu-trigger {
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+  color: #26364a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.app-menu-trigger:hover,
+.app-menu-trigger:focus-visible,
+.app-menu-trigger[aria-expanded="true"] {
+  border-color: #c5d0dc;
+  background: #eef5ff;
+}
+
+.app-menu-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  display: grid;
+  gap: 6px;
+  width: max-content;
+  min-width: 270px;
+  max-width: min(420px, 88vw);
+  max-height: min(72vh, 720px);
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #b8c5d4;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgba(23, 37, 54, 0.18);
+}
+
+.app-menu-group {
+  display: grid;
+  gap: 2px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.app-menu-group:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.app-menu-group-label {
+  padding: 3px 7px;
+  color: #65758a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.app-menu-group button {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  min-height: 30px;
+  padding: 5px 8px;
+  border-color: transparent;
+  background: transparent;
+  color: #172439;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.app-menu-group button:hover,
+.app-menu-group button:focus-visible {
+  border-color: #c9d8e8;
+  background: #eef5ff;
+}
+
+.app-menu-group button small {
+  max-width: 360px;
+  color: #65758a;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .document-tabs {
@@ -16850,6 +17700,76 @@ select:hover {
 
 .export-metadata-checklist .snapshot-row[data-status="optional"] {
   border-left: 3px solid #7b8794;
+}
+
+.release-readiness-checklist,
+.quality-recommendations {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #c8d2df;
+  border-left: 3px solid #275da8;
+  background: #f8fbff;
+}
+
+.quality-recommendations {
+  border-left-color: #5d55a5;
+}
+
+.release-readiness-checklist header,
+.quality-recommendations header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.release-readiness-checklist h3,
+.release-readiness-checklist p,
+.quality-recommendations h3,
+.quality-recommendations p {
+  margin: 0;
+}
+
+.release-readiness-checklist header span,
+.release-readiness-checklist p,
+.release-readiness-checklist small,
+.quality-recommendations header span,
+.quality-recommendations p,
+.quality-recommendations small {
+  color: #526171;
+}
+
+.release-readiness-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.release-readiness-checklist .snapshot-row[data-status="complete"] {
+  border-left: 3px solid #2f855a;
+}
+
+.release-readiness-checklist .snapshot-row[data-status="missing"],
+.release-readiness-checklist .snapshot-row[data-status="needs-review"] {
+  border-left: 3px solid #c68a1a;
+}
+
+.quality-recommendations .snapshot-row[data-status="pass"] {
+  border-left: 3px solid #2f855a;
+}
+
+.quality-recommendations .snapshot-row[data-status="improve"] {
+  border-left: 3px solid #4575b4;
+}
+
+.quality-recommendations .snapshot-row[data-status="risk"] {
+  border-left: 3px solid #c68a1a;
+}
+
+.quality-recommendations .snapshot-row[data-status="blocker"] {
+  border-left: 3px solid #b42318;
 }
 
 .readiness,
@@ -20467,6 +21387,17 @@ select:hover {
 }
 
 @media (max-width: 900px) {
+  .app-menu-bar {
+    max-width: 52vw;
+    overflow-x: auto;
+  }
+
+  .app-menu-panel {
+    position: fixed;
+    top: 38px;
+    left: 8px;
+  }
+
   .command-bar {
     max-height: none;
     overflow-y: visible;

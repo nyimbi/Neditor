@@ -230,6 +230,22 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             "Save Document As",
         )?)
         .separator()
+        .item(&menu_item(
+            app,
+            "neditor-rename-document",
+            "Rename Document",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-duplicate-document",
+            "Duplicate Document",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-create-snapshot",
+            "Create Snapshot",
+        )?)
+        .separator()
         .item(&export_menu)
         .separator()
         .item(&menu_item(app, "neditor-open-folder", "Open Folder")?)
@@ -264,6 +280,54 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .fullscreen()
         .build()?;
 
+    let document_wizards_menu = SubmenuBuilder::new(app, "Document Wizards")
+        .item(&menu_item(
+            app,
+            "neditor-open-document-wizards",
+            "Open Wizard Hub",
+        )?)
+        .separator()
+        .item(&menu_item(app, "neditor-wizard-proposal", "Proposal")?)
+        .item(&menu_item(
+            app,
+            "neditor-wizard-rfp-response",
+            "RFP Response",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-wizard-tender-response",
+            "Tender Response",
+        )?)
+        .separator()
+        .item(&menu_item(
+            app,
+            "neditor-wizard-lesson-plan",
+            "Lesson Plan",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-wizard-lesson-content",
+            "Lesson Content",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-wizard-technical-textbook",
+            "Technical Textbook",
+        )?)
+        .separator()
+        .item(&menu_item(app, "neditor-wizard-novel", "Novel")?)
+        .item(&menu_item(
+            app,
+            "neditor-wizard-podcast-script",
+            "Podcast Script",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-wizard-movie-script",
+            "Movie Script",
+        )?)
+        .build()?;
+
     let writing_tools_menu = SubmenuBuilder::new(app, "Writing Tools")
         .item(&menu_item(app, "neditor-open-search", "Find and Replace")?)
         .separator()
@@ -288,6 +352,7 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             "neditor-open-templates",
             "Transform Templates",
         )?)
+        .item(&document_wizards_menu)
         .separator()
         .item(&menu_item(app, "neditor-open-docs-live", "Docs Live")?)
         .item(&menu_item(
@@ -301,6 +366,35 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             "AI Create Document",
         )?)
         .item(&menu_item(app, "neditor-clean-ai-paste", "Clean AI Paste")?)
+        .build()?;
+
+    let quality_menu = SubmenuBuilder::new(app, "Quality")
+        .item(&menu_item(
+            app,
+            "neditor-run-qa-review",
+            "Run QA Recommendations",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-insert-qa-report",
+            "Insert QA Report",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-improve-with-agent",
+            "Improve with Agent",
+        )?)
+        .separator()
+        .item(&menu_item(
+            app,
+            "neditor-prepare-release-metadata",
+            "Prepare Release Metadata",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-insert-release-audit",
+            "Insert Release Audit",
+        )?)
         .build()?;
 
     let help_menu = SubmenuBuilder::new(app, "Help")
@@ -332,6 +426,7 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             &edit_menu,
             &view_menu,
             &writing_tools_menu,
+            &quality_menu,
             &help_menu,
         ],
     )

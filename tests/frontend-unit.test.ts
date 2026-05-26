@@ -490,6 +490,12 @@ test("Docs Live covers business technical legal marketing and customer document 
     "rfq-response",
     "tender-response",
     "tutorial",
+    "lesson-plan",
+    "lesson-content",
+    "technical-textbook",
+    "novel",
+    "podcast-script",
+    "movie-script",
     "operating-procedure",
     "technical-architecture",
     "adr",
@@ -508,6 +514,9 @@ test("Docs Live covers business technical legal marketing and customer document 
   equal(normalizeDocsLiveDocumentType("Prepare an RFQ quotation response"), "rfq-response");
   equal(normalizeDocsLiveDocumentType("Create a tender submission checklist"), "tender-response");
   equal(normalizeDocsLiveDocumentType("Write a tutorial walkthrough"), "tutorial");
+  equal(normalizeDocsLiveDocumentType("Create a lesson plan for algebra"), "lesson-plan");
+  equal(normalizeDocsLiveDocumentType("Draft a technical textbook chapter with exercises"), "technical-textbook");
+  equal(normalizeDocsLiveDocumentType("Write a podcast episode script"), "podcast-script");
 
   const draft = buildDocsLiveDraft({
     documentType: "contract brief",
@@ -545,6 +554,12 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(businessDocumentTemplates.some((template) => template.id === "rfp"));
   ok(businessDocumentTemplates.some((template) => template.id === "rfq"));
   ok(businessDocumentTemplates.some((template) => template.id === "tutorial"));
+  ok(businessDocumentTemplates.some((template) => template.id === "lesson-plan"));
+  ok(businessDocumentTemplates.some((template) => template.id === "lesson-content"));
+  ok(businessDocumentTemplates.some((template) => template.id === "technical-textbook"));
+  ok(businessDocumentTemplates.some((template) => template.id === "novel"));
+  ok(businessDocumentTemplates.some((template) => template.id === "podcast-script"));
+  ok(businessDocumentTemplates.some((template) => template.id === "movie-script"));
   ok(agenticCliIntegrations.some((integration) => integration.command === "claude"));
   ok(agenticCliIntegrations.some((integration) => integration.command === "codex"));
   ok(agenticCliIntegrations.some((integration) => integration.command === "opencode"));
@@ -2161,6 +2176,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes(':style="appShellStyle"'));
   ok(app.includes('aria-label="Toolbar button display"'));
   ok(app.includes('aria-label="Toolbar text size"'));
+  ok(app.includes('aria-label="Application menus"'));
+  ok(app.includes("appMenus"));
+  ok(app.includes("openAppMenuId"));
+  ok(app.includes("runAppMenuItem"));
+  ok(app.includes('id: "quality"'));
+  ok(app.includes('label: "Writing Tools"'));
   ok(app.includes("toolbarCollapsedRows"));
   ok(app.includes("command-toolbar-heading"));
   ok(app.includes("collapsed-toolbar-tray"));
@@ -2177,6 +2198,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Help Center"));
   ok(app.includes('aria-label="Business document creation"'));
   ok(app.includes('aria-label="AI document creation wizard"'));
+  ok(app.includes("lesson-plan"));
+  ok(app.includes("lesson-content"));
+  ok(app.includes("technical-textbook"));
+  ok(app.includes("podcast-script"));
+  ok(app.includes("movie-script"));
   ok(app.includes('aria-label="Native RFP response wizard"'));
   ok(app.includes('aria-label="RFP analysis results"'));
   ok(app.includes("analyzeRfpSource"));
@@ -2459,6 +2485,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("active.compile?.metadata.releaseTarget"));
   ok(app.includes("Release target"));
   ok(app.includes("releaseTarget"));
+  ok(app.includes('aria-label="Release readiness checklist"'));
+  ok(app.includes('aria-label="Quality improvement recommendations"'));
+  ok(app.includes("qualityImprovementRecommendations"));
+  ok(app.includes("runQualityReview"));
+  ok(app.includes("insertQualityImprovementReport"));
+  ok(app.includes("openQualityAgent"));
+  ok(app.includes("releaseReadinessChecklist"));
+  ok(app.includes("applyReleaseMetadataScaffold"));
+  ok(app.includes("insertReleaseReadinessAudit"));
   ok(app.includes("runAgentLifecycleTask"));
   ok(app.includes("insertAgentLifecycleTaskBrief"));
   ok(app.includes("copyAgentLifecycleTaskBrief"));
@@ -2762,8 +2797,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("native workflow restored workspace tabs with active pinned and scroll state"));
   ok(app.includes("flushEditorTextToStore();"));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Export")'));
+  ok(tauriLib.includes('SubmenuBuilder::new(app, "File")'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Edit")'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "View")'));
+  ok(tauriLib.includes('SubmenuBuilder::new(app, "Writing Tools")'));
+  ok(tauriLib.includes('SubmenuBuilder::new(app, "Document Wizards")'));
+  ok(tauriLib.includes('SubmenuBuilder::new(app, "Quality")'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Help")'));
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
   ok(tauriLib.includes('"neditor-export-epub", "EPUB Export"'));
@@ -2771,6 +2810,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
   ok(tauriLib.includes('"neditor-open-agent-workspace",'));
   ok(tauriLib.includes('"neditor-ai-create-document",'));
+  ok(tauriLib.includes('"neditor-run-qa-review",'));
+  ok(tauriLib.includes('"neditor-insert-qa-report",'));
+  ok(tauriLib.includes('"neditor-wizard-lesson-plan",'));
+  ok(tauriLib.includes('"neditor-wizard-movie-script",'));
   ok(tauriLib.includes('"neditor-guided-demo", "Guided Demo"'));
   ok(tauriLib.includes('"neditor-help-exports",'));
   ok(tauriConf.includes("connect-src 'self' ipc: https:"));
@@ -2779,6 +2822,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('case "neditor-mode-outline"'));
   ok(app.includes('case "neditor-open-help"'));
   ok(app.includes('case "neditor-open-agent-workspace"'));
+  ok(app.includes('case "neditor-run-qa-review"'));
+  ok(app.includes('case "neditor-wizard-technical-textbook"'));
   ok(app.includes('case "neditor-ai-create-document"'));
   ok(app.includes('case "neditor-guided-demo"'));
   ok(tauriLib.includes('app.emit("neditor-menu-command", id)'));

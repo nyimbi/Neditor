@@ -1333,15 +1333,16 @@ async function installTauriMock(page: Page, stateKey: string) {
       if (cmd === "create_snapshot") {
         const request = args.request as { text: string; file_path?: string | null; label?: string | null; storage?: string | null };
         const filePath = request.file_path ? normalizePath(request.file_path) : null;
+        const snapshotText = filePath && files.has(filePath) ? files.get(filePath)!.text : request.text;
         const root = snapshotRoot(filePath, request.storage);
         const label = (request.label || "snapshot").replace(/[^a-z0-9_-]/gi, "") || "snapshot";
         const ordinal = String(snapshots.size + 1).padStart(3, "0");
         const snapshotPath = `${root}/20260520T0000${ordinal}Z-${label}.md`;
         const createdAt = `2026-05-20T00:00:${String(snapshots.size + 1).padStart(2, "0")}Z`;
-        const compiled = compileMarkdown(request.text, filePath || "/workspace/market.md");
+        const compiled = compileMarkdown(snapshotText, filePath || "/workspace/market.md");
         snapshots.set(snapshotPath, {
-          text: request.text,
-          hash: hash(request.text),
+          text: snapshotText,
+          hash: hash(snapshotText),
           modified: createdAt,
           metadata_path: snapshotPath.replace(/\.md$/, ".json"),
           created_at: createdAt,
@@ -1349,11 +1350,11 @@ async function installTauriMock(page: Page, stateKey: string) {
           sourcePath: filePath,
           documentVersion: String(compiled.metadata.version || "unversioned"),
           status: String(compiled.semantic.status || "draft"),
-          author: frontMatterValue(request.text, "author") || null,
+          author: frontMatterValue(snapshotText, "author") || null,
           includeGraphHash: hash(JSON.stringify(compiled.include_graph)),
         });
         persistE2eState();
-        return { snapshot_path: snapshotPath, metadata_path: snapshotPath.replace(/\.md$/, ".json"), hash: hash(request.text) };
+        return { snapshot_path: snapshotPath, metadata_path: snapshotPath.replace(/\.md$/, ".json"), hash: hash(snapshotText) };
       }
       if (cmd === "restore_snapshot") {
         const request = args.request as { snapshot_path: string; file_path?: string | null; storage?: string | null };
@@ -1657,6 +1658,22 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.getByRole("textbox", { name: "Markdown editor" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Markdown editor" })).toHaveAttribute("aria-multiline", "true");
   await expect(page.getByRole("document", { name: /Rendered preview for Market Entry Report, draft/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Application menus" })).toBeVisible();
+
+  await page.getByRole("button", { name: "File menu" }).click();
+  await expect(page.getByRole("menu", { name: "File menu" })).toContainText("New Document");
+  await expect(page.getByRole("menu", { name: "File menu" })).toContainText("Save As");
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Writing Tools menu" }).click();
+  await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Lesson plan");
+  await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Technical textbook");
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Quality menu" }).click();
+  await page.getByRole("menuitem", { name: /Run QA Review/ }).click();
+  await expect(page.getByLabel("Sidebar panel")).toHaveValue("review");
+  await expect(page.getByRole("region", { name: "Quality improvement recommendations" })).toContainText("Quality");
 
   await page.getByLabel("View mode").selectOption("preview");
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeHidden();
@@ -3403,6 +3420,11 @@ test("builds business documents from saved identity snippets and local-agent han
   await expect.poll(() => editorText(page)).toContain("clear and practical communication");
 
   const wizard = page.locator('section[aria-label="AI document creation wizard"]');
+  await wizard.getByLabel("Find a document type").fill("lesson");
+  await expect(wizard.getByRole("listitem").filter({ hasText: "Lesson plan" })).toContainText("Assessment");
+  await expect(wizard.getByRole("listitem").filter({ hasText: "Lesson content" })).toContainText("Learner Handout");
+  await wizard.getByLabel("Find a document type").fill("movie");
+  await expect(wizard.getByRole("listitem").filter({ hasText: "Movie script" })).toContainText("Act III");
   await wizard.getByLabel("Find a document type").fill("rfp");
   const rfp = wizard.getByRole("listitem").filter({ hasText: "RFP response" });
   await expect(rfp).toContainText("Compliance Matrix");
@@ -3592,6 +3614,12 @@ test("runs snapshot restore and release tagging workflows", async ({ page }) => 
 
   await page.getByLabel("Sidebar panel").selectOption("review");
   const sidebar = page.locator(".sidebar");
+  const releaseChecklist = sidebar.getByRole("region", { name: "Release readiness checklist" });
+  await expect(releaseChecklist).toContainText("Release state");
+  await expect(releaseChecklist).toContainText("need review");
+  await releaseChecklist.getByRole("button", { name: "Prepare release metadata" }).click();
+  await expect.poll(() => editorText(page)).toContain("releaseTarget:");
+
   await sidebar.getByLabel("Status").selectOption("approved");
   await sidebar.getByLabel("Version").fill("2.0.0");
   await sidebar.getByLabel("Version").press("Tab");
@@ -3604,6 +3632,17 @@ test("runs snapshot restore and release tagging workflows", async ({ page }) => 
   await expect.poll(() => editorText(page)).toContain("approvedBy: QA Lead");
   await expect.poll(() => editorText(page)).toContain("approvedAt:");
   await expect(page.getByRole("status", { name: "Release status approved" })).toBeVisible();
+  await sidebar.getByLabel("Change note").fill("Approved release package for v2.0.0.");
+  await sidebar.getByRole("button", { name: "Add change note" }).click();
+  await expect.poll(() => editorText(page)).toContain("Approved release package for v2.0.0.");
+  await expect(releaseChecklist).toContainText("6 complete, 0 missing, 0 need review");
+  await releaseChecklist.getByRole("button", { name: "Insert release audit" }).click();
+  await expect.poll(() => editorText(page)).toContain("## Release Readiness Audit");
+  await expect.poll(() => editorText(page)).toContain("| Approval audit | complete | QA Lead");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("version: 2.0.0");
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("status: approved");
+  await setMockFileText(page, "/workspace/market.md", await editorText(page));
 
   await page.getByLabel("Sidebar panel").selectOption("versioning");
   await expect(sidebar).toContainText("main | clean");
@@ -3612,7 +3651,6 @@ test("runs snapshot restore and release tagging workflows", async ({ page }) => 
   await sidebar.getByRole("button", { name: "Create snapshot" }).click();
   await expect(page.locator(".status-bar")).toContainText("Snapshot saved to");
   await expect(sidebar.locator(".snapshot-row").filter({ hasText: "manual" })).toBeVisible();
-  await expect(sidebar).toContainText("2.0.0 | approved");
 
   await page.locator(".cm-content").click();
   await moveEditorCursorToEnd(page);

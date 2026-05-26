@@ -19,6 +19,12 @@ export interface BusinessProfileField {
 
 export type BusinessDocumentKind =
   | "tutorial"
+  | "lesson-plan"
+  | "lesson-content"
+  | "technical-textbook"
+  | "novel"
+  | "podcast-script"
+  | "movie-script"
   | "proposal"
   | "rfp"
   | "rfq"
@@ -152,6 +158,60 @@ export const businessDocumentTemplates: BusinessDocumentTemplate[] = [
     bestFor: ["Customer enablement", "Internal training", "Step-by-step adoption"],
     aiPrompt: "Build a practical tutorial with prerequisites, learning goals, walkthrough steps, checks, and troubleshooting.",
     outline: ["Learning Goals", "Audience and Prerequisites", "Before You Begin", "Step-by-Step Walkthrough", "Practice Exercise", "Troubleshooting", "Next Steps"],
+  },
+  {
+    id: "lesson-plan",
+    label: "Lesson plan",
+    summary: "Creates a classroom-ready teaching plan with objectives, flow, assessment, and differentiation.",
+    docsLiveType: "lesson-plan",
+    bestFor: ["Teachers", "Corporate training", "Workshop facilitators"],
+    aiPrompt: "Create a practical lesson plan with objectives, standards or prerequisites, materials, timed activities, checks for understanding, assessment, differentiation, and extension work.",
+    outline: ["Learning Objectives", "Standards and Prerequisites", "Materials", "Lesson Flow", "Guided Practice", "Assessment", "Differentiation", "Homework or Extension"],
+  },
+  {
+    id: "lesson-content",
+    label: "Lesson content",
+    summary: "Builds the teachable content, examples, prompts, checks, and handouts for a lesson.",
+    docsLiveType: "lesson-content",
+    bestFor: ["Course authors", "Instructional designers", "Enablement teams"],
+    aiPrompt: "Create lesson content with a hook, concise explanations, worked examples, practice activities, knowledge checks, teacher notes, and learner-facing handouts.",
+    outline: ["Opening Hook", "Core Explanation", "Worked Example", "Practice Activity", "Knowledge Check", "Discussion Prompts", "Teacher Notes", "Learner Handout"],
+  },
+  {
+    id: "technical-textbook",
+    label: "Technical textbook",
+    summary: "Drafts a rigorous textbook chapter with concepts, technical depth, examples, exercises, and references.",
+    docsLiveType: "technical-textbook",
+    bestFor: ["Technical education", "Certification courses", "Engineering documentation"],
+    aiPrompt: "Create a technical textbook chapter that defines terms, explains concepts, provides equations or code where useful, includes worked examples, exercises, pitfalls, summaries, glossary terms, and references.",
+    outline: ["Chapter Overview", "Learning Outcomes", "Conceptual Foundation", "Technical Deep Dive", "Worked Examples", "Exercises", "Common Pitfalls", "Chapter Summary", "Further Reading"],
+  },
+  {
+    id: "novel",
+    label: "Novel",
+    summary: "Plans fiction with premise, characters, setting, act structure, chapter beats, and revision notes.",
+    docsLiveType: "novel",
+    bestFor: ["Fiction drafting", "Story bibles", "Developmental editing"],
+    aiPrompt: "Create a novel planning and drafting packet with genre, premise, character arcs, setting rules, act structure, chapter beats, themes, and revision questions.",
+    outline: ["Premise", "Characters", "Setting", "Act I", "Act II", "Act III", "Chapter Beats", "Themes", "Revision Notes"],
+  },
+  {
+    id: "podcast-script",
+    label: "Podcast script",
+    summary: "Creates episode scripts with cold open, host segments, guest questions, sponsor copy, and production notes.",
+    docsLiveType: "podcast-script",
+    bestFor: ["Podcast episodes", "Interview shows", "Narrative audio"],
+    aiPrompt: "Create a podcast episode script with show brief, cold open, intro, segmented host copy, guest questions, sponsor or promo reads, outro, timing, transitions, and production notes.",
+    outline: ["Show Brief", "Cold Open", "Intro", "Segment 1", "Segment 2", "Guest Questions", "Sponsor or Promo Read", "Outro", "Production Notes"],
+  },
+  {
+    id: "movie-script",
+    label: "Movie script",
+    summary: "Develops screenplay structure with logline, characters, acts, key scenes, dialogue notes, and production constraints.",
+    docsLiveType: "movie-script",
+    bestFor: ["Screenplays", "Film treatments", "Scene planning"],
+    aiPrompt: "Create a movie script planning packet with logline, character arcs, world and tone, three-act structure, key scenes, dialogue notes, visual motifs, and production constraints.",
+    outline: ["Logline", "Characters", "World and Tone", "Act I", "Act II", "Act III", "Key Scenes", "Dialogue Notes", "Production Constraints"],
   },
   {
     id: "proposal",

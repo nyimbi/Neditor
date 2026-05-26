@@ -860,6 +860,7 @@ export const useDocumentsStore = defineStore("documents", {
       }
       doc.path = response.path;
       doc.title = titleFromPath(response.path);
+      doc.text = response.text;
       doc.savedHash = response.hash;
       doc.savedText = response.text;
       doc.modified = response.modified;
@@ -1458,8 +1459,9 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async createSnapshot(label = "manual") {
       const doc = this.activeDocument;
+      const snapshotText = doc.dirty ? doc.text : doc.savedText || doc.text;
       return invoke<{ snapshot_path: string }>("create_snapshot", {
-        request: { text: doc.text, file_path: doc.path, label, storage: this.snapshotStorage },
+        request: { text: snapshotText, file_path: doc.path, label, storage: this.snapshotStorage },
       });
     },
     async snapshotActive(label = "manual") {

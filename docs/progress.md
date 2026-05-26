@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-25
+Updated: 2026-05-26
 
 ## Active Goal
 
@@ -31,6 +31,20 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Application navigation now exposes NEditor's capabilities through both menus
+  and buttons. The workbench header has visible File, Edit, View, Writing
+  Tools, Quality, Export, and Help menus that mirror the native desktop menu
+  surface, while the command bar groups file operations, writing/insert
+  actions, review/navigation, quality, creation wizards, and view controls into
+  multiple collapsible toolbars. The new Quality surface scans diagnostics,
+  placeholders, citation gaps, unresolved comments, AI provenance, weak
+  structure, long paragraphs, and generic AI phrasing, then offers QA review,
+  report insertion, and agentic improvement actions from the Review sidebar,
+  in-app menus, native menus, and toolbar buttons. Docs Live and the document
+  wizard catalog now include lesson plans, lesson content, technical textbooks,
+  novels, podcast scripts, and movie scripts, and save/snapshot flows now flush
+  current editor text before persisting so menu-driven file actions operate on
+  the latest document state.
 - Split editor panes are no longer deferred. The View toolbar and Settings now
   expose a persisted Dual source toggle that mounts two synchronized
   CodeMirror source panes for the active document. Edits in either pane use the
@@ -154,7 +168,7 @@ Recent pushed checkpoints visible in current git history:
   tab is inactive and not the current watcher root. When the user switches back,
   the active-tab watcher setup immediately compares the saved root-file hash
   against disk, reloads clean documents, clears the dirty marker, and reports
-  `Reloaded external changes`; the full browser suite now passes 61 Chromium
+  `Reloaded external changes`; the full browser suite now passes 64 Chromium
   workflows including the inactive-tab watcher case.
 - Preview click-to-source navigation now covers non-heading anchored artifacts.
   Clicking a rendered figure, table, or equation with a stable preview anchor
@@ -1141,7 +1155,7 @@ P2/P3 gaps:
 
 ## Verification Status
 
-Current verification recorded on 2026-05-21 through 2026-05-25:
+Current verification recorded on 2026-05-21 through 2026-05-26:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
@@ -3182,6 +3196,21 @@ Frontend architecture modularization:
 | `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including direct coverage for pure Vim word-start/word-end helper semantics and static wiring guards for the extracted module. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs configurable Emacs and Vim-style editor keybinding modes"` | Pass | Focused Chromium workflow re-proved the extracted keybinding module through the real editor UI. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after extracting the Vim keybinding module. |
+
+Menus, quality recommendations, and expanded document wizards:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding visible application menus, expanded toolbar groups, quality recommendation actions, wizard buttons, and current-text save/snapshot flushing. |
+| `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including static guards for the in-app menus, native menu command mapping, quality recommendation UI/actions, and the lesson/textbook/novel/podcast/movie wizard metadata. |
+| `cargo fmt --check` in `src-tauri` | Pass | Native menu additions are formatted after applying `cargo fmt`. |
+| `cargo check --locked` in `src-tauri` | Pass | Rust backend compiled after adding native File, Document Wizards, and Quality menu entries. |
+| `git diff --check` | Pass | No whitespace errors are present in the current diff. |
+| `pnpm run build` | Pass | Production Vue/Vite build passed with the visible menu bar, expanded command groups, and quality recommendation sidebar. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting the menu, QA, and wizard exposure; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the evidence refresh. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests, including visible File/Writing Tools/Quality menus, menu-routed QA review, expanded wizard access, save/snapshot restore, and extended export workflows. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing full-suite browser evidence. |
 
 ## Next Execution Order
 

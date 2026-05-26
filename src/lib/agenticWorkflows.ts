@@ -2248,6 +2248,36 @@ function qualityGateProfiles(): Record<DocsLiveDocumentType, Array<Omit<AgenticQ
       qualityGate("Step Usability", "Instructions are ordered, testable, and include checks, examples, and failure guidance.", ["Steps are action-oriented", "Troubleshooting present"]),
       qualityGate("Review Readiness", "Screenshots, examples, permissions, and terminology are marked for verification before publishing.", ["Examples reviewed", "Terminology checked"]),
     ],
+    "lesson-plan": [
+      qualityGate("Instructional Outcome", "Learning objectives, standards or prerequisites, materials, and assessment evidence are explicit.", ["Objectives present", "Assessment evidence listed"]),
+      qualityGate("Lesson Flow", "Warm-up, instruction, practice, checks, closure, and extension work are sequenced for the available time.", ["Timed flow present", "Practice and closure included"]),
+      qualityGate("Learner Support", "Differentiation, accommodations, common misconceptions, and teacher notes are visible.", ["Differentiation present", "Misconceptions addressed"]),
+    ],
+    "lesson-content": [
+      qualityGate("Teachability", "Explanations, examples, activities, and checks are clear enough for the intended learner level.", ["Examples present", "Knowledge checks present"]),
+      qualityGate("Content Accuracy", "Definitions, facts, equations, and examples are marked for source or subject-matter review.", ["Facts reviewed", "Source notes present"]),
+      qualityGate("Reusable Materials", "Teacher notes, learner handouts, discussion prompts, and practice materials are separated for reuse.", ["Teacher notes present", "Handout content present"]),
+    ],
+    "technical-textbook": [
+      qualityGate("Technical Rigor", "Definitions, assumptions, equations, code, diagrams, and standards are accurate and consistently named.", ["Definitions present", "Technical assumptions reviewed"]),
+      qualityGate("Learning Design", "Outcomes, worked examples, exercises, pitfalls, summaries, and further reading support mastery.", ["Exercises present", "Worked examples present"]),
+      qualityGate("Reference Integrity", "Claims, formulas, external standards, and glossary terms are citation-ready before publication.", ["References present", "Glossary terms reviewed"]),
+    ],
+    novel: [
+      qualityGate("Story Spine", "Premise, genre, protagonist goal, conflict, stakes, and act or chapter beats are coherent.", ["Premise present", "Stakes and conflict named"]),
+      qualityGate("Character Arc", "Character motivations, secrets, relationships, and change arcs are specific enough for drafting.", ["Character goals present", "Arc notes present"]),
+      qualityGate("Voice and Continuity", "Point of view, tense, setting rules, themes, and continuity notes are consistent.", ["POV and tense set", "Continuity notes present"]),
+    ],
+    "podcast-script": [
+      qualityGate("Episode Shape", "Cold open, intro, segment goals, transitions, outro, and calls to action are timed and clear.", ["Segments present", "Timing notes present"]),
+      qualityGate("Audio Production", "Host copy, guest questions, sound cues, sponsor reads, and production notes are separated.", ["Production notes present", "Sponsor or CTA reviewed"]),
+      qualityGate("Audience Fit", "Tone, episode promise, claims, and listener takeaway match the show format.", ["Audience named", "Takeaway present"]),
+    ],
+    "movie-script": [
+      qualityGate("Screen Story", "Logline, protagonist, conflict, stakes, act turns, and key scenes are visually playable.", ["Logline present", "Act turns present"]),
+      qualityGate("Scene Craft", "Dialogue notes, visual motifs, locations, production constraints, and pacing are explicit.", ["Scene beats present", "Production constraints listed"]),
+      qualityGate("Continuity and Tone", "Character arcs, world rules, rating constraints, and tonal promises remain consistent.", ["Character arcs present", "Tone reviewed"]),
+    ],
     "strategy-plan": [
       qualityGate("Strategic Choice", "The plan names the strategic bet, alternatives rejected, and tradeoffs.", ["Choice stated", "Rejected alternatives captured"]),
       qualityGate("Execution Measures", "Roadmap, owners, milestones, and measurable outcomes are tied to evidence.", ["Owners and milestones present", "Metrics source-backed"]),
