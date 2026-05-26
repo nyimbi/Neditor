@@ -1259,8 +1259,13 @@ fn prepare_for_export_reports_target_specific_release_metadata_blockers() {
 
         assert!(!report.ready, "{target} should require release metadata");
         assert_eq!(report.error_count, 1, "{target}: {:#?}", report.diagnostics);
+        let expected_warning_count = match target {
+            "blog" | "substack" => 2,
+            "epub" => 1,
+            _ => 0,
+        };
         assert_eq!(
-            report.warning_count, 0,
+            report.warning_count, expected_warning_count,
             "{target}: {:#?}",
             report.diagnostics
         );
@@ -1314,6 +1319,91 @@ fn prepare_for_export_reports_target_specific_release_metadata_blockers() {
         options: json!({ "warnOnDirtyGit": false }),
     });
     assert!(pdf_report.ready, "{:#?}", pdf_report.diagnostics);
+}
+
+#[test]
+fn prepare_for_export_validates_public_distribution_metadata() {
+    let source = "---\ntitle: Public Metadata\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: public site\nsummary: Ready for public distribution.\ntags: strategy, operations\ncanonicalUrl: draft/public-metadata\nlanguage: en_US\n---\n# Public Metadata\n".to_string();
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source,
+        file_path: None,
+        target: "blog".to_string(),
+        options: json!({ "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready, "{:#?}", report.diagnostics);
+    assert_eq!(report.error_count, 2, "{:#?}", report.diagnostics);
+    assert_eq!(report.warning_count, 0, "{:#?}", report.diagnostics);
+    assert_readiness_contains(&report, "canonicalUrl metadata must be an absolute");
+    assert_readiness_contains(
+        &report,
+        "language metadata must be a valid BCP-47-style language tag",
+    );
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .related
+        .iter()
+        .any(|item| item == "metadata:canonicalUrl")));
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .related
+        .iter()
+        .any(|item| item == "metadata:language")));
+    assert_eq!(report.manifest.readiness.error_count, 2);
+}
+
+#[test]
+fn prepare_for_export_reports_public_distribution_metadata_warnings() {
+    let source = "---\ntitle: Publishing Metadata\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: executive newsletter\ncanonicalUrl: https://example.com/publishing-metadata\nlanguage: en-US\n---\n# Publishing Metadata\n".to_string();
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source,
+        file_path: None,
+        target: "substack".to_string(),
+        options: json!({ "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready, "{:#?}", report.diagnostics);
+    assert_eq!(report.error_count, 0, "{:#?}", report.diagnostics);
+    assert_eq!(report.warning_count, 2, "{:#?}", report.diagnostics);
+    assert_readiness_contains(&report, "Publishing exports should include a description");
+    assert_readiness_contains(
+        &report,
+        "Publishing exports should include tags or keywords",
+    );
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .related
+        .iter()
+        .any(|item| item == "missing:description-or-excerpt")));
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .related
+        .iter()
+        .any(|item| item == "missing:tags-or-keywords")));
+    assert_eq!(report.manifest.readiness.warning_count, 2);
+}
+
+#[test]
+fn prepare_for_export_validates_public_distribution_options() {
+    let source = "---\ntitle: Option Metadata\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\n---\n# Option Metadata\n".to_string();
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source,
+        file_path: None,
+        target: "html".to_string(),
+        options: json!({
+            "warnOnDirtyGit": false,
+            "canonicalUrl": "example.com/not-absolute",
+            "htmlLanguage": "en US",
+            "language": 42,
+            "htmlDescription": false
+        }),
+    });
+
+    assert!(!report.ready, "{:#?}", report.diagnostics);
+    assert_eq!(report.error_count, 4, "{:#?}", report.diagnostics);
+    assert_readiness_contains(&report, "canonicalUrl must be an absolute");
+    assert_readiness_contains(
+        &report,
+        "htmlLanguage must be a valid BCP-47-style language tag",
+    );
+    assert_readiness_contains(&report, "language must be a string");
+    assert_readiness_contains(&report, "htmlDescription must be a string");
 }
 
 #[test]

@@ -335,6 +335,10 @@ fn validate_export_settings(
         ));
     }
     validate_optional_string(options, "watermark", "Export watermark", diagnostics);
+    validate_optional_string(options, "htmlDescription", "htmlDescription", diagnostics);
+    validate_url_option(options, "canonicalUrl", "canonicalUrl", diagnostics);
+    validate_language_option(options, "htmlLanguage", "htmlLanguage", diagnostics);
+    validate_language_option(options, "language", "language", diagnostics);
     validate_brand_color_option(options, diagnostics);
     validate_default_citation_style_option(options, diagnostics);
     validate_default_brand_profile_option(options, diagnostics);
@@ -398,6 +402,48 @@ fn validate_optional_string(
         return None;
     };
     Some(text.to_string())
+}
+
+fn validate_url_option(
+    options: &Value,
+    key: &str,
+    label: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(value) = validate_optional_string(options, key, label, diagnostics) else {
+        return;
+    };
+    if !value.trim().is_empty() && !is_http_url(&value) {
+        diagnostics.push(diag(
+            "error",
+            format!("{label} must be an absolute http:// or https:// URL."),
+            None,
+            None,
+            Some(
+                "Use the final public URL for this document or remove the field until it is known.",
+            ),
+        ));
+    }
+}
+
+fn validate_language_option(
+    options: &Value,
+    key: &str,
+    label: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(value) = validate_optional_string(options, key, label, diagnostics) else {
+        return;
+    };
+    if !value.trim().is_empty() && !is_language_tag(&value) {
+        diagnostics.push(diag(
+            "error",
+            format!("{label} must be a valid BCP-47-style language tag."),
+            None,
+            None,
+            Some("Use values such as en, en-US, fr, or pt-BR."),
+        ));
+    }
 }
 
 fn validate_brand_color_option(options: &Value, diagnostics: &mut Vec<DocumentDiagnostic>) {
@@ -680,6 +726,8 @@ fn validate_target_specific_export_readiness(
     metadata: &Value,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
+    validate_distribution_metadata(target, metadata, diagnostics);
+
     if !release_metadata_required_for_target(target) {
         return;
     }
@@ -729,6 +777,188 @@ fn validate_target_specific_export_readiness(
         }
         diagnostics.push(diagnostic);
     }
+}
+
+fn validate_distribution_metadata(
+    target: &str,
+    metadata: &Value,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if matches!(target, "html" | "blog" | "substack") {
+        validate_metadata_url(target, metadata, "canonicalUrl", diagnostics);
+        validate_metadata_url(target, metadata, "canonical_url", diagnostics);
+    }
+
+    if matches!(target, "html" | "blog" | "substack" | "epub") {
+        for key in ["language", "lang", "locale"] {
+            validate_metadata_language(target, metadata, key, diagnostics);
+        }
+    }
+
+    if matches!(target, "blog" | "substack") {
+        let description_missing =
+            first_metadata_string(metadata, &["description", "summary", "subtitle", "excerpt"])
+                .map(|value| value.trim().is_empty())
+                .unwrap_or(true);
+        if description_missing {
+            push_distribution_warning(
+                target,
+                "missing:description-or-excerpt",
+                "Publishing exports should include a description, summary, subtitle, or excerpt for previews and RSS handoff.",
+                "Add front matter such as description, summary, subtitle, or excerpt before publishing.",
+                diagnostics,
+            );
+        }
+
+        let tags_missing = metadata_string_list(metadata, "tags").is_empty()
+            && metadata_string_list(metadata, "keywords").is_empty();
+        if tags_missing {
+            push_distribution_warning(
+                target,
+                "missing:tags-or-keywords",
+                "Publishing exports should include tags or keywords for platform discovery and archive management.",
+                "Add tags or keywords front matter before publishing.",
+                diagnostics,
+            );
+        }
+    }
+
+    if target == "epub" {
+        let creator_missing =
+            first_metadata_string(metadata, &["author", "approvedBy", "reviewer"])
+                .map(|value| value.trim().is_empty())
+                .unwrap_or(true);
+        if creator_missing {
+            push_distribution_warning(
+                target,
+                "missing:author-or-reviewer",
+                "EPUB exports should include an author, approver, or reviewer for reader metadata.",
+                "Add author, approvedBy, or reviewer front matter before distributing the ebook.",
+                diagnostics,
+            );
+        }
+    }
+}
+
+fn validate_metadata_url(
+    target: &str,
+    metadata: &Value,
+    key: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(value) = metadata_string(metadata, key).filter(|value| !value.trim().is_empty())
+    else {
+        return;
+    };
+    if is_http_url(&value) {
+        return;
+    }
+    let mut diagnostic = diag(
+        "error",
+        format!("{key} metadata must be an absolute http:// or https:// URL for {target} export."),
+        None,
+        None,
+        Some("Use the final public URL or remove the canonical URL until it is known."),
+    );
+    diagnostic.related.push(format!("target:{target}"));
+    diagnostic.related.push(format!("metadata:{key}"));
+    diagnostics.push(diagnostic);
+}
+
+fn validate_metadata_language(
+    target: &str,
+    metadata: &Value,
+    key: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(value) = metadata_string(metadata, key).filter(|value| !value.trim().is_empty())
+    else {
+        return;
+    };
+    if is_language_tag(&value) {
+        return;
+    }
+    let mut diagnostic = diag(
+        "error",
+        format!("{key} metadata must be a valid BCP-47-style language tag for {target} export."),
+        None,
+        None,
+        Some("Use values such as en, en-US, fr, or pt-BR."),
+    );
+    diagnostic.related.push(format!("target:{target}"));
+    diagnostic.related.push(format!("metadata:{key}"));
+    diagnostics.push(diagnostic);
+}
+
+fn push_distribution_warning(
+    target: &str,
+    related: &str,
+    message: &str,
+    suggestion: &str,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let mut diagnostic = diag("warning", message, None, None, Some(suggestion));
+    diagnostic.related.push(format!("target:{target}"));
+    diagnostic.related.push(related.to_string());
+    diagnostics.push(diagnostic);
+}
+
+fn first_metadata_string(metadata: &Value, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| metadata_string(metadata, key))
+}
+
+fn metadata_string_list(metadata: &Value, key: &str) -> Vec<String> {
+    let Some(value) = metadata.get(key) else {
+        return Vec::new();
+    };
+    if let Some(items) = value.as_array() {
+        return items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::trim)
+            .filter(|item| !item.is_empty())
+            .map(str::to_string)
+            .collect();
+    }
+    value
+        .as_str()
+        .map(|text| {
+            text.split(',')
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn is_http_url(value: &str) -> bool {
+    let trimmed = value.trim();
+    let Some(rest) = trimmed
+        .strip_prefix("https://")
+        .or_else(|| trimmed.strip_prefix("http://"))
+    else {
+        return false;
+    };
+    let host = rest
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or_default()
+        .trim();
+    !host.is_empty()
+        && !host.contains(char::is_whitespace)
+        && !host.starts_with('.')
+        && !host.ends_with('.')
+}
+
+fn is_language_tag(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.len() > 35 {
+        return false;
+    }
+    trimmed.split('-').all(|part| {
+        !part.is_empty() && part.len() <= 8 && part.chars().all(|ch| ch.is_ascii_alphanumeric())
+    })
 }
 
 fn release_metadata_required_for_target(target: &str) -> bool {

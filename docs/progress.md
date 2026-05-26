@@ -3104,6 +3104,21 @@ Direct EPUB export affordances:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the EPUB affordance evidence update. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing the full-suite browser workflow evidence. |
 
+Target-specific public metadata readiness:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked prepare_for_export_validates_public_distribution_metadata --lib -- --nocapture` in `src-tauri` | Pass | Blog readiness now blocks malformed front matter `canonicalUrl` values and invalid `language` tags before writing public publishing packages, and copies both diagnostics into manifest readiness. |
+| `cargo test --locked prepare_for_export_reports_public_distribution_metadata_warnings --lib -- --nocapture` in `src-tauri` | Pass | Substack/blog readiness now warns when a publishing handoff lacks description/summary/subtitle/excerpt metadata or tags/keywords for previews, RSS, discovery, and archive management. |
+| `cargo test --locked prepare_for_export_validates_public_distribution_options --lib -- --nocapture` in `src-tauri` | Pass | HTML readiness now rejects malformed `canonicalUrl`, invalid `htmlLanguage`, non-string `language`, and non-string `htmlDescription` options before rendering. |
+| `cargo test --locked prepare_for_export_reports_target_specific_release_metadata_blockers --lib -- --nocapture` in `src-tauri` | Pass | Existing target-specific release blockers still pass after adding public metadata diagnostics, with publishing and EPUB metadata warnings now counted explicitly. |
+| `cargo test --locked export_command_tests --lib` in `src-tauri` | Pass | Full export command suite passed with 32 tests after the public metadata readiness additions, covering package exports, manifests, dirty-Git warnings, output-path checks, and target-specific readiness diagnostics. |
+| `cargo check --locked` in `src-tauri` | Pass | Rust backend check passed after adding public metadata validators and readiness diagnostics. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after refreshing browser evidence for the current source files. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting public metadata readiness evidence; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the validation evidence update. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing browser workflow evidence. |
+
 Toolbar space recovery and Vim operator parity:
 
 | Command | Result | Evidence |
