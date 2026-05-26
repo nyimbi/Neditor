@@ -3,8 +3,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     env, fs,
+    io::{self, Read},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 const APP_BUNDLE_NAME: &str = "NEditor";
@@ -23,6 +25,7 @@ const SUPPORTED_EXPORT_TARGETS: &[&str] = &[
     "google-docs",
     "epub",
 ];
+const STDOUT_EXPORT_TARGETS: &[&str] = &["html", "latex"];
 const NEW_DOCUMENT_TEMPLATES: &[&str] = &[
     "blank",
     "proposal",
@@ -86,6 +89,13 @@ pub fn run_cli() -> i32 {
 }
 
 pub fn run_cli_with_args(args: &[String]) -> Result<CliOutcome, String> {
+    run_cli_with_args_and_stdin(args, None)
+}
+
+pub(crate) fn run_cli_with_args_and_stdin(
+    args: &[String],
+    stdin_text: Option<&str>,
+) -> Result<CliOutcome, String> {
     let command = args.get(1).map(String::as_str).unwrap_or("--help");
     if command != "--help" && command != "-h" && is_direct_open_candidate(command) {
         return run_open_command(&args[1..]);
@@ -101,7 +111,7 @@ pub fn run_cli_with_args(args: &[String]) -> Result<CliOutcome, String> {
         }),
         "new" => run_new_command(&args[2..]),
         "open" => run_open_command(&args[2..]),
-        "convert" | "export" => run_convert_command(&args[2..]),
+        "convert" | "export" => run_convert_command(&args[2..], stdin_text),
         "templates" => run_list_command("templates", NEW_DOCUMENT_TEMPLATES, &args[2..]),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
@@ -246,7 +256,7 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
     })
 }
 
-fn run_convert_command(args: &[String]) -> Result<CliOutcome, String> {
+fn run_convert_command(args: &[String], stdin_text: Option<&str>) -> Result<CliOutcome, String> {
     let mut input: Option<String> = None;
     let mut target = "pdf".to_string();
     let mut output: Option<String> = None;
@@ -271,6 +281,12 @@ fn run_convert_command(args: &[String]) -> Result<CliOutcome, String> {
                         .to_string(),
                 );
             }
+            "--stdout" => {
+                if output.as_deref().is_some_and(|path| path != "-") {
+                    return Err("--stdout cannot be combined with --output.".to_string());
+                }
+                output = Some("-".to_string());
+            }
             "--output-dir" | "-d" => {
                 index += 1;
                 output_dir = Some(
@@ -287,10 +303,10 @@ fn run_convert_command(args: &[String]) -> Result<CliOutcome, String> {
                     .ok_or_else(|| "--option requires key=value".to_string())?;
                 apply_cli_option(&mut options, pair)?;
             }
-            value if value.starts_with('-') => {
-                return Err(format!("Unsupported convert option '{value}'"));
-            }
             value => {
+                if value.starts_with('-') && value != "-" {
+                    return Err(format!("Unsupported convert option '{value}'"));
+                }
                 if input.is_some() {
                     return Err("Only one input document can be converted at a time.".to_string());
                 }
@@ -306,9 +322,26 @@ fn run_convert_command(args: &[String]) -> Result<CliOutcome, String> {
                 .to_string(),
         );
     }
-    let input_path = canonical_path_string(&PathBuf::from(input.ok_or_else(|| {
+    let output_to_stdout = output.as_deref() == Some("-");
+    if output_to_stdout {
+        if targets.len() != 1 {
+            return Err("--stdout supports exactly one export target.".to_string());
+        }
+        if output_dir.is_some() {
+            return Err("--stdout cannot be combined with --output-dir.".to_string());
+        }
+        if !is_stdout_export_target(&targets[0]) {
+            return Err(format!(
+                "--stdout is only supported for text export targets: {}",
+                STDOUT_EXPORT_TARGETS.join(", ")
+            ));
+        }
+        include_manifest = false;
+    }
+    let input_arg = input.ok_or_else(|| {
         "Usage: ned convert <file.md> --to pdf,docx --output-dir exports".to_string()
-    })?))?;
+    })?;
+    let (text, file_path, input_path) = read_cli_input_document(&input_arg, stdin_text)?;
     let output_dir = output_dir.map(PathBuf::from);
     if let Some(directory) = output_dir.as_ref() {
         fs::create_dir_all(directory).map_err(|err| {
@@ -322,25 +355,36 @@ fn run_convert_command(args: &[String]) -> Result<CliOutcome, String> {
     object.insert("includeManifest".to_string(), Value::Bool(include_manifest));
     options = Value::Object(object);
 
-    let text = fs::read_to_string(&input_path)
-        .map_err(|err| format!("Could not read input document {input_path}: {err}"))?;
     let mut messages = Vec::new();
     let include_target_suffix = targets.len() > 1;
     for target in targets {
-        let output_path = target_output_path(
-            &input_path,
-            &target,
-            output.as_ref(),
-            output_dir.as_ref(),
-            include_target_suffix,
-        );
+        let output_path = if output_to_stdout {
+            stdout_temp_output_path(&target)
+        } else {
+            target_output_path(
+                &input_path,
+                &target,
+                output.as_ref(),
+                output_dir.as_ref(),
+                include_target_suffix,
+            )
+        };
         let response = export_document(ExportRequest {
             text: text.clone(),
-            file_path: Some(input_path.clone()),
+            file_path: file_path.clone(),
             target: target.clone(),
             output_path: output_path.to_string_lossy().to_string(),
             options: options.clone(),
         })?;
+        if output_to_stdout {
+            let payload = fs::read_to_string(&response.output_path)
+                .map_err(|err| format!("Could not read stdout export: {err}"))?;
+            let _ = fs::remove_file(&response.output_path);
+            return Ok(CliOutcome {
+                message: payload,
+                exit_code: 0,
+            });
+        }
         messages.push(format!(
             "Exported {target} to {}{}",
             response.output_path,
@@ -704,6 +748,32 @@ fn is_markdown_like_output_path(path: &Path) -> bool {
     )
 }
 
+fn read_cli_input_document(
+    input_arg: &str,
+    stdin_text: Option<&str>,
+) -> Result<(String, Option<String>, String), String> {
+    if input_arg == "-" {
+        let text = if let Some(text) = stdin_text {
+            text.to_string()
+        } else {
+            let mut text = String::new();
+            io::stdin()
+                .read_to_string(&mut text)
+                .map_err(|err| format!("Could not read Markdown from stdin: {err}"))?;
+            text
+        };
+        return Ok((text, None, "stdin.md".to_string()));
+    }
+    let input_path = canonical_path_string(&PathBuf::from(input_arg))?;
+    let text = fs::read_to_string(&input_path)
+        .map_err(|err| format!("Could not read input document {input_path}: {err}"))?;
+    Ok((text, Some(input_path.clone()), input_path))
+}
+
+fn is_stdout_export_target(target: &str) -> bool {
+    STDOUT_EXPORT_TARGETS.contains(&target)
+}
+
 fn title_from_path(path: &Path) -> String {
     path.file_stem()
         .and_then(|stem| stem.to_str())
@@ -825,6 +895,18 @@ fn target_extension(target: &str) -> &'static str {
     }
 }
 
+fn stdout_temp_output_path(target: &str) -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    env::temp_dir().join(format!(
+        "neditor-ned-stdout-{}-{nanos}.{}",
+        std::process::id(),
+        target_extension(target)
+    ))
+}
+
 fn bash_completion_script() -> String {
     let commands = CLI_COMMANDS.join(" ");
     let templates = NEW_DOCUMENT_TEMPLATES.join(" ");
@@ -863,7 +945,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--dry-run" -- "$cur") )
         ;;
       convert|export)
-        COMPREPLY=( $(compgen -W "--to --output --output-dir --no-manifest --option" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--to --output --output-dir --stdout --no-manifest --option" -- "$cur") )
         ;;
       templates|targets)
         COMPREPLY=( $(compgen -W "--json" -- "$cur") )
@@ -917,7 +999,7 @@ _ned() {{
       _arguments '*:markdown file:_files -g "*.md"' '--dry-run[preview action]'
       ;;
     convert|export)
-      _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--output[output file]:file:_files' '--output-dir[output directory]:directory:_files -/' '--no-manifest[skip sidecar manifest]' '--option[set export option key=value]:option:'
+      _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--output[output file, or - for text stdout]:file:_files' '--output-dir[output directory]:directory:_files -/' '--stdout[write supported text export to stdout]' '--no-manifest[skip sidecar manifest]' '--option[set export option key=value]:option:'
       ;;
     templates|targets)
       _arguments '--json[print machine-readable JSON]'
@@ -975,6 +1057,7 @@ fn fish_completion_script() -> String {
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l output-dir -s d -r"
             .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from convert export' -l stdout".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l no-manifest"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l option -r".to_string(),
@@ -1082,7 +1165,8 @@ fn help_text() -> String {
         "  ned new <file.md> [--template proposal] [--title \"Client Proposal\"] [--open]"
             .to_string(),
         "  ned open <file.md> [more.md] [--dry-run]".to_string(),
-        "  ned convert <file.md> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
+        "  ned convert <file.md|-> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
+        "  ned convert <file.md|-> --to html --stdout".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json]".to_string(),
         "  ned targets [--json]".to_string(),

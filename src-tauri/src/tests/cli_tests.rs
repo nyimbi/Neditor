@@ -130,6 +130,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert_eq!(zsh.exit_code, 0);
     assert!(zsh.message.contains("#compdef ned"));
     assert!(zsh.message.contains("--output-dir"));
+    assert!(zsh.message.contains("--stdout"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -171,6 +172,58 @@ fn ned_cli_converts_markdown_to_html_export() {
     let html = fs::read_to_string(&output).expect("html output");
     assert!(html.contains("Test Report"));
     assert!(!output.with_extension("html.manifest.json").exists());
+}
+
+#[test]
+fn ned_cli_writes_supported_text_exports_to_stdout() {
+    let source = temp_markdown_path("convert-stdout");
+    fs::write(&source, super::sample_document()).expect("write source markdown");
+    let args = vec![
+        "ned".to_string(),
+        "convert".to_string(),
+        source.to_string_lossy().to_string(),
+        "--to".to_string(),
+        "html".to_string(),
+        "--stdout".to_string(),
+    ];
+    let outcome = crate::cli::run_cli_with_args(&args).expect("stdout html");
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.message.contains("<!doctype html>"));
+    assert!(outcome.message.contains("Test Report"));
+    assert!(!outcome.message.contains("Exported html"));
+
+    let stdin_args = vec![
+        "ned".to_string(),
+        "convert".to_string(),
+        "-".to_string(),
+        "--to".to_string(),
+        "latex".to_string(),
+        "--stdout".to_string(),
+    ];
+    let latex = crate::cli::run_cli_with_args_and_stdin(
+        &stdin_args,
+        Some("# Pipe Report\n\nA scripted document.\n"),
+    )
+    .expect("stdin latex");
+    assert_eq!(latex.exit_code, 0);
+    assert!(latex.message.contains("Pipe Report"));
+    assert!(!latex.message.contains("Exported latex"));
+}
+
+#[test]
+fn ned_cli_rejects_binary_stdout_exports() {
+    let source = temp_markdown_path("convert-stdout-binary");
+    fs::write(&source, super::sample_document()).expect("write source markdown");
+    let args = vec![
+        "ned".to_string(),
+        "convert".to_string(),
+        source.to_string_lossy().to_string(),
+        "--to".to_string(),
+        "pdf".to_string(),
+        "--stdout".to_string(),
+    ];
+    let error = crate::cli::run_cli_with_args(&args).expect_err("binary stdout blocked");
+    assert!(error.contains("text export targets: html, latex"));
 }
 
 #[test]
@@ -242,6 +295,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert_eq!(outcome.exit_code, 0);
     assert!(outcome.message.contains("ned convert"));
     assert!(outcome.message.contains("--output-dir"));
+    assert!(outcome.message.contains("--stdout"));
     assert!(outcome.message.contains("ned new"));
     assert!(outcome.message.contains("ned templates"));
     assert!(outcome.message.contains("ned targets"));

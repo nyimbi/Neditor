@@ -87,6 +87,8 @@ ned new proposal.md --template proposal --title "Client Expansion Proposal"
 ned open board-paper.md
 ned convert board-paper.md --to pdf --output board-paper.pdf
 ned convert board-paper.md --to pdf,docx,html --output-dir exports
+ned convert board-paper.md --to html --stdout
+cat board-paper.md | ned convert - --to latex --stdout
 ned export proposal.md --to docx --output proposal.docx
 ned templates
 ned targets --json
@@ -102,18 +104,21 @@ and `ned export` run the same local export pipeline used by the app for HTML,
 PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, Google Docs package,
 and EPUB outputs. Use comma-separated targets, or `--to all`, with
 `--output-dir` when you need a complete delivery pack for review, legal,
-publishing, and archive handoff. `ned templates` and `ned targets` list the
-installed starter documents and export formats, with `--json` output for help
-desk scripts and deployment checks. `ned completions bash`, `ned completions
-zsh`, and `ned completions fish` print shell completion scripts so support
-teams can make the command easier to discover after installation. `ned doctor`
-prints a quick local installation report with the app binary, default-reader
-automation status, export targets, and starter templates; use `ned doctor
---json` when you want machine-readable support evidence. In the app, open
-**Settings -> Files** to review the `ned` usage summary and request NEditor as
-the default Markdown reader. Some operating systems require user confirmation
-or a helper such as `duti`; NEditor shows the exact commands and manual steps
-instead of silently changing protected OS settings.
+publishing, and archive handoff. Text-safe exports such as HTML and LaTeX can
+write to stdout, including piped Markdown input with `ned convert - --to html
+--stdout`; binary package formats stay file-based to avoid corrupt terminal
+output. `ned templates` and `ned targets` list the installed starter documents
+and export formats, with `--json` output for help desk scripts and deployment
+checks. `ned completions bash`, `ned completions zsh`, and `ned completions
+fish` print shell completion scripts so support teams can make the command
+easier to discover after installation. `ned doctor` prints a quick local
+installation report with the app binary, default-reader automation status,
+export targets, and starter templates; use `ned doctor --json` when you want
+machine-readable support evidence. In the app, open **Settings -> Files** to
+review the `ned` usage summary and request NEditor as the default Markdown
+reader. Some operating systems require user confirmation or a helper such as
+`duti`; NEditor shows the exact commands and manual steps instead of silently
+changing protected OS settings.
 
 ### Everyday Business Workflows
 
