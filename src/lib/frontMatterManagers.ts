@@ -20,6 +20,13 @@ export interface FrontMatterVariableRow {
   line: number;
 }
 
+interface InlineYamlMapEntry {
+  key: string;
+  value: string;
+  line: number;
+  keepExisting: boolean;
+}
+
 export const DATA_SOURCE_TYPE_OPTIONS: SupportedDataSourceKind[] = ["csv", "tsv", "json", "yaml"];
 
 const frontMatterVariableExcludedKeys = new Set([
@@ -182,6 +189,44 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
       value = collectYamlBlockScalar(lines, endIndex, index, indent, value);
       if (parsed.anchor && value) anchors.set(parsed.anchor, value);
       if (!excluded && value) setVariableRow(rows, { key: path, value, status: "ready", line: index + 1 });
+      continue;
+    }
+    if (value.startsWith("{")) {
+      const inlineEntries = parseInlineYamlMap(value, anchors, mapAnchors, index + 1);
+      if (parsed.anchor) {
+        if (!mapAnchors.has(parsed.anchor)) mapAnchors.set(parsed.anchor, []);
+        for (const entry of inlineEntries) {
+          recordMapAnchorEntry(mapAnchors, { anchor: parsed.anchor }, entry.key, entry.value, entry.line, entry.keepExisting);
+        }
+      }
+      for (const owner of stack.filter((entry) => entry.anchor)) {
+        const relativeKey = path.startsWith(`${owner.path}.`) ? path.slice(owner.path.length + 1) : "";
+        if (!relativeKey) continue;
+        for (const entry of inlineEntries) {
+          recordMapAnchorEntry(
+            mapAnchors,
+            owner,
+            `${relativeKey}.${entry.key}`,
+            entry.value,
+            entry.line,
+            entry.keepExisting,
+          );
+        }
+      }
+      if (!excluded) {
+        for (const entry of inlineEntries) {
+          setVariableRow(
+            rows,
+            {
+              key: `${path}.${entry.key}`,
+              value: entry.value,
+              status: entry.value ? "ready" : "empty",
+              line: entry.line,
+            },
+            entry.keepExisting,
+          );
+        }
+      }
       continue;
     }
     if (parsed.anchor && value && !value.startsWith("[") && !value.startsWith("{")) anchors.set(parsed.anchor, value);
@@ -388,10 +433,48 @@ function splitInlineYamlList(value: string) {
   const trimmed = stripYamlComment(value).trim();
   if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) return [];
   const inner = trimmed.slice(1, -1);
+  return splitInlineYamlCollection(inner);
+}
+
+function parseInlineYamlMap(
+  value: string,
+  anchors: Map<string, string>,
+  mapAnchors: Map<string, Array<{ key: string; value: string; line: number }>>,
+  line: number,
+): InlineYamlMapEntry[] {
+  const trimmed = stripYamlComment(value).trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return [];
+  const entries: InlineYamlMapEntry[] = [];
+  for (const item of splitInlineYamlCollection(trimmed.slice(1, -1))) {
+    const separator = findInlineYamlKeySeparator(item);
+    if (separator < 0) continue;
+    const key = cleanYamlScalar(item.slice(0, separator)).trim();
+    const rawValue = item.slice(separator + 1).trim();
+    if (key === "<<") {
+      for (const alias of yamlAliasNames(rawValue)) {
+        for (const entry of mapAnchors.get(alias) || []) {
+          entries.push({ ...entry, keepExisting: true });
+        }
+      }
+      continue;
+    }
+    if (!/^[A-Za-z][\w-]*$/.test(key)) continue;
+    const parsed = parseYamlScalar(rawValue);
+    let entryValue = parsed.alias ? anchors.get(parsed.alias) || parsed.value : parsed.value;
+    if (parsed.anchor && entryValue && !entryValue.startsWith("[") && !entryValue.startsWith("{")) anchors.set(parsed.anchor, entryValue);
+    if (entryValue === "[]" || entryValue === "{}") entryValue = "";
+    if (entryValue === "|" || entryValue === ">" || entryValue.startsWith("[") || entryValue.startsWith("{")) continue;
+    entries.push({ key, value: entryValue, line, keepExisting: false });
+  }
+  return entries;
+}
+
+function splitInlineYamlCollection(inner: string) {
   const items: string[] = [];
   let quote = "";
   let escaped = false;
   let current = "";
+  let depth = 0;
   for (const char of inner) {
     if (escaped) {
       current += char;
@@ -413,7 +496,17 @@ function splitInlineYamlList(value: string) {
       current += char;
       continue;
     }
-    if (char === "," && !quote) {
+    if (!quote && (char === "[" || char === "{")) {
+      depth += 1;
+      current += char;
+      continue;
+    }
+    if (!quote && (char === "]" || char === "}")) {
+      depth = Math.max(0, depth - 1);
+      current += char;
+      continue;
+    }
+    if (char === "," && !quote && depth === 0) {
       if (current.trim()) items.push(current.trim());
       current = "";
       continue;
@@ -422,6 +515,42 @@ function splitInlineYamlList(value: string) {
   }
   if (current.trim()) items.push(current.trim());
   return items;
+}
+
+function findInlineYamlKeySeparator(value: string) {
+  let quote = "";
+  let escaped = false;
+  let depth = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (quote === "\"" && char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if ((char === "\"" || char === "'") && !quote) {
+      quote = char;
+      continue;
+    }
+    if (char === quote) {
+      quote = "";
+      continue;
+    }
+    if (quote) continue;
+    if (char === "[" || char === "{") {
+      depth += 1;
+      continue;
+    }
+    if (char === "]" || char === "}") {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (char === ":" && depth === 0) return index;
+  }
+  return -1;
 }
 
 function yamlAliasNames(value: string) {

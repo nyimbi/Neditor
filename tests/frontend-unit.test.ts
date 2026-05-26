@@ -561,6 +561,36 @@ test("front matter managers resolve tagged scalars and simple merge aliases", ()
   ok(rows.some((row) => row.key === "partner.owner" && row.value === "Strategy # Lead"));
 });
 
+test("front matter managers expand simple inline object variables", () => {
+  const source = [
+    "---",
+    "owner: &docOwner Strategy Office",
+    "defaults: &clientDefaults {owner: *docOwner, reviewer: QA Team, tier: \"Enterprise # priority\"}",
+    "client: {<<: *clientDefaults, name: Acme Corp, owner: Delivery Team, region: EMEA}",
+    "portfolio: &portfolioDefaults",
+    "  billing: {currency: USD, amount: 125000}",
+    "deal:",
+    "  <<: *portfolioDefaults",
+    "---",
+    "",
+    "# Inline",
+  ].join("\n");
+
+  const rows = parseFrontMatterVariables(source);
+  ok(rows.some((row) => row.key === "defaults.owner" && row.value === "Strategy Office"));
+  ok(rows.some((row) => row.key === "defaults.reviewer" && row.value === "QA Team"));
+  ok(rows.some((row) => row.key === "defaults.tier" && row.value === "Enterprise # priority"));
+  ok(rows.some((row) => row.key === "client.name" && row.value === "Acme Corp"));
+  ok(rows.some((row) => row.key === "client.owner" && row.value === "Delivery Team"));
+  ok(rows.some((row) => row.key === "client.reviewer" && row.value === "QA Team"));
+  ok(rows.some((row) => row.key === "client.tier" && row.value === "Enterprise # priority"));
+  ok(rows.some((row) => row.key === "client.region" && row.value === "EMEA"));
+  ok(rows.some((row) => row.key === "portfolio.billing.currency" && row.value === "USD"));
+  ok(rows.some((row) => row.key === "portfolio.billing.amount" && row.value === "125000"));
+  ok(rows.some((row) => row.key === "deal.billing.currency" && row.value === "USD"));
+  ok(rows.some((row) => row.key === "deal.billing.amount" && row.value === "125000"));
+});
+
 test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   const text = "word alpha beta";
   equal(nextVimWordStart(text, 0), 5);
