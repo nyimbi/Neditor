@@ -206,7 +206,8 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         &glossary,
     );
     let index_marker_markdown = strip_index_markers(&with_toc);
-    let transform_options = TransformExecutionOptions::from_compile_options(options);
+    let transform_options =
+        TransformExecutionOptions::from_compile_options(options, root_path.as_deref());
     let (transformed_markdown, transform_artifacts) = apply_transforms(
         &index_marker_markdown,
         &source_map,

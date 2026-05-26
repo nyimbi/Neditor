@@ -209,6 +209,67 @@ fn sql_transform_requires_read_only_trusted_queries() {
 }
 
 #[test]
+fn sql_transform_runs_trusted_sqlite_query_against_document_relative_database() {
+    let Some(sqlite3) = installed_command_path("NEDITOR_TEST_SQLITE3", "sqlite3") else {
+        eprintln!("skipping live sqlite transform proof; sqlite3 is not installed");
+        return;
+    };
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-live-sql-transform-{unique}"));
+    let data_dir = root.join("data");
+    fs::create_dir_all(&data_dir).expect("test data root");
+    let database_path = data_dir.join("revenue.sqlite");
+    let setup = std::process::Command::new(&sqlite3)
+        .arg(&database_path)
+        .arg(
+            "CREATE TABLE revenue(region TEXT, amount INTEGER);\
+             INSERT INTO revenue VALUES ('East', 120), ('West', 95);",
+        )
+        .output()
+        .expect("run sqlite setup");
+    assert!(
+        setup.status.success(),
+        "sqlite setup failed: {}",
+        String::from_utf8_lossy(&setup.stderr)
+    );
+
+    let doc_path = root.join("report.md");
+    let response = compile_with_options(
+        CompileRequest {
+            text: "---\ntitle: SQL Proof\nstatus: approved\napprovedBy: QA\n---\n# SQL Proof\n```sql database=\"data/revenue.sqlite\"\nSELECT region, amount FROM revenue ORDER BY amount DESC;\n```\n"
+                .to_string(),
+            file_path: Some(path_to_string(&doc_path)),
+        },
+        &json!({
+            "transformEnginePaths": {"sql": path_to_string(&sqlite3)},
+            "trustedTransformEngines": {"sql": true},
+            "transformTimeoutMs": 5000
+        }),
+    );
+
+    assert!(response.html.contains("transform-sql"));
+    assert!(response.html.contains("<td>East</td>"));
+    assert!(response.html.contains("<td>120</td>"));
+    assert!(response.html.contains("<td>West</td>"));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "sql"
+            && artifact.execution_kind == "embedded"
+            && artifact.diagnostics.iter().any(|diagnostic| diagnostic
+                .suggestion
+                .as_deref()
+                .is_some_and(|suggestion| suggestion.contains("without a shell")))));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+}
+
+#[test]
 fn table_formulas_resolve_forward_refs_and_report_cycles() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Formula Cycles\nstatus: approved\napprovedBy: QA\n---\n# Formula Cycles\n| Metric | Value |\n| --- | ---: |\n| Forward | =B2 |\n| Source | 42 |\n| Cycle A | =B4 |\n| Cycle B | =B3 |\n".to_string(),

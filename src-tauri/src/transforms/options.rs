@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
 pub(crate) struct TransformExecutionOptions {
@@ -7,19 +8,30 @@ pub(crate) struct TransformExecutionOptions {
     trusted_engines: HashMap<String, bool>,
     disabled_engines: HashMap<String, bool>,
     input_modes: HashMap<String, String>,
+    document_dir: Option<PathBuf>,
     pub(crate) timeout_ms: Option<u64>,
 }
 
 impl TransformExecutionOptions {
-    pub(crate) fn from_compile_options(options: Option<&Value>) -> Self {
+    pub(crate) fn from_compile_options(
+        options: Option<&Value>,
+        document_path: Option<&Path>,
+    ) -> Self {
+        let document_dir = document_path
+            .and_then(|path| path.parent())
+            .map(Path::to_path_buf);
         let Some(options) = options else {
-            return Self::default();
+            return Self {
+                document_dir,
+                ..Self::default()
+            };
         };
         Self {
             engine_paths: string_map_option(options, "transformEnginePaths"),
             trusted_engines: bool_map_option(options, "trustedTransformEngines"),
             disabled_engines: bool_map_option(options, "disabledTransformEngines"),
             input_modes: string_map_option(options, "transformInputModes"),
+            document_dir,
             timeout_ms: options.get("transformTimeoutMs").and_then(Value::as_u64),
         }
     }
@@ -77,6 +89,17 @@ impl TransformExecutionOptions {
                 }
             })
             .cloned()
+    }
+
+    pub(crate) fn resolve_document_path(&self, value: &str) -> PathBuf {
+        let path = PathBuf::from(value);
+        if path.is_absolute() {
+            path
+        } else if let Some(document_dir) = &self.document_dir {
+            document_dir.join(path)
+        } else {
+            path
+        }
     }
 }
 

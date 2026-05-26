@@ -497,7 +497,8 @@ web app.
   `=10+15`, `=SUM(2,3)`, and named table references.
 - Data transforms for CSV, TSV, JSON, YAML, SQLite SQL, OpenAPI, and JSON
   Schema produce preview/export-safe artifacts. SQL transforms are read-only
-  SQLite table queries behind explicit engine trust.
+  SQLite table queries behind explicit engine trust, and relative database paths
+  resolve from the current Markdown document's folder.
 
 ### Diagrams And Transform Blocks
 

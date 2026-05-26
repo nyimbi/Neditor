@@ -3718,9 +3718,11 @@ Spreadsheet table exchange and SQL transform:
 | `pnpm run test:unit` | Pass | Frontend unit/static tests passed with guards for CSV/XLSX import/export actions, SQL transform insertion, and SQL template registration. |
 | `cargo test --locked table_tests::spreadsheet_table_import_export_round_trips_csv_and_xlsx --lib` | Pass | Rust table tests proved native CSV import, XLSX export, XLSX import, and CSV export through the new spreadsheet exchange commands. |
 | `cargo test --locked table_tests::sql_transform_requires_read_only_trusted_queries --lib` | Pass | Rust transform tests proved SQL mutation blocking and trust gating for sqlite-backed SQL transforms. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked sql_transform_runs_trusted_sqlite_query_against_document_relative_database --lib` | Pass | Focused Rust test created a real SQLite database under the document folder, configured the installed `sqlite3` executable as a trusted SQL engine, resolved `database="data/revenue.sqlite"` relative to the Markdown file, ran a read-only `SELECT`, and rendered the live query result as a `transform-sql` table without error diagnostics. |
 | `cargo test --locked ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | IPC registration and documentation coverage passed after adding `import_spreadsheet_table` and `export_markdown_tables` to the coverage ledger. |
 | `pnpm run check:docs` | Pass | Markdown links resolved after documenting spreadsheet exchange and SQL transform evidence. |
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after refreshing Tables/data and Later transforms evidence. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting remains clean after resolving document-relative SQL database paths. |
 | `git diff --check` | Pass | No whitespace errors are present in the spreadsheet exchange and SQL transform diff. |
 
 `ned` document inspection:
