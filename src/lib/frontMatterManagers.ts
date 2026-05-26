@@ -54,8 +54,12 @@ const metadataVariableExcludedKeys = new Set([
 
 const yamlAnchorNamePattern = "[A-Za-z0-9_.:/@-]+";
 const yamlKeyNamePattern = "[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)*";
+const yamlTagNamePattern = "[A-Za-z0-9_.:/@-]+";
 const yamlAliasScalarRegex = new RegExp(`^\\*(${yamlAnchorNamePattern})$`);
 const yamlAnchorPrefixRegex = new RegExp(`^&(${yamlAnchorNamePattern})(?:\\s+|$)(.*)$`);
+const yamlTagPrefixRegex = new RegExp(
+  `^(?:!<[^>]+>|!!${yamlTagNamePattern}|!${yamlTagNamePattern}!${yamlTagNamePattern}|!${yamlTagNamePattern})(?:\\s+|$)(.*)$`,
+);
 const yamlKeyScalarRegex = new RegExp(`^${yamlKeyNamePattern}$`);
 const yamlKeyValueRegex = new RegExp(`^(${yamlKeyNamePattern}):\\s*(.*)$`);
 const yamlMaybeIndentedKeyValueRegex = new RegExp(`^(\\s*)(${yamlKeyNamePattern}):\\s*(.*)$`);
@@ -825,7 +829,7 @@ function stripLeadingYamlDecorators(value: string) {
       scalar = anchorMatch[2].trim();
       continue;
     }
-    const tagMatch = scalar.match(/^(?:!![A-Za-z0-9_.:/-]+|![A-Za-z0-9_.:/-]+|!<[^>]+>)(?:\s+|$)(.*)$/);
+    const tagMatch = scalar.match(yamlTagPrefixRegex);
     if (tagMatch) {
       scalar = tagMatch[1].trim();
     }

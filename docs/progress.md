@@ -86,12 +86,13 @@ Recent pushed checkpoints visible in current git history:
   block-map `<<: *defaults` merge maps for repeated `name`, `type`, or `kind`
   values, and expanded data-source rows can start with `- <<: *defaults` before
   overriding fields such as `path` or `name`; expanded row fields also resolve
-  scalar aliases such as `path: *sourcePath`. Custom tags on compact
-  data-source objects, inline lists, and alias lists are ignored for inventory
-  purposes, and anchored compact objects inside inline lists can be reused by
-  later compact data-source rows. Top-level `dataSources: *alias` declarations
-  can now reuse anchored source maps, source paths, inline source lists, or
-  block source lists, and legacy alias sections such as `csvFiles`,
+  scalar aliases such as `path: *sourcePath`. Custom tags, including
+  tag-handle forms such as `!docs!sources`, on compact data-source objects,
+  inline lists, and alias lists are ignored for inventory purposes, and
+  anchored compact objects inside inline lists can be reused by later compact
+  data-source rows. Top-level `dataSources: *alias` declarations can now reuse
+  anchored source maps, source paths, inline source lists, or block source
+  lists, and legacy alias sections such as `csvFiles`,
   `jsonFiles`, and `ymlFiles` resolve scalar, inline-list, and block-list
   aliases plus direct single-file scalar declarations. Anchored source maps with
   nested lists remain map defaults instead of being misclassified as
@@ -111,8 +112,9 @@ Recent pushed checkpoints visible in current git history:
   remain hidden from the document-variable manager.
 - Simple front-matter merge defaults and tagged scalars are now handled in the
   document-variable inventory. Common YAML such as `<<: *defaults`, `!!str`,
-  `!custom`, and `!<tag:yaml.org,2002:str>` can populate repeated client,
-  owner, reviewer, budget, or region variables while explicit values still win.
+  `!custom`, `!docs!channel`, and `!<tag:yaml.org,2002:str>` can populate
+  repeated client, owner, reviewer, budget, or region variables while explicit
+  values still win.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
   flow through simple merges as dotted variable names, and anchored maps,
   including dotted or slash-namespaced anchors such as `&client.defaults` and

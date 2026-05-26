@@ -459,6 +459,7 @@ test("front matter managers inventory data sources and document variables", () =
     "    type: json",
     "dataSources: [{name: Compact YAML, path: data/compact.yml, type: yml}, {<<: *sourceDefaults, title: Profile JSON, file: data/profile-compact.json, kind: json}]",
     "dataSources: !sources [{name: Tagged List, path: data/tagged-list.json, type: json}]",
+    "dataSources: !docs!sources [{name: Handle Tagged List, path: data/handle-tagged-list.yaml, type: yaml}]",
     "dataSources: [data/direct-inline.csv, *inlineScalarPath]",
     "dataSources: [!source &inlineSourceBase {name: Inline Source Base, path: data/inline-base.json, type: json}, {<<: *inlineSourceBase, name: Inline Source Override, path: data/inline-override.data}]",
     "dataSources: !source {name: Single Compact, path: data/single.csv, type: csv}",
@@ -501,6 +502,7 @@ test("front matter managers inventory data sources and document variables", () =
     ["Compact YAML", "data/compact.yml", "yaml", "ready", "dataSources"],
     ["Profile JSON", "data/profile-compact.json", "json", "ready", "dataSources"],
     ["Tagged List", "data/tagged-list.json", "json", "ready", "dataSources"],
+    ["Handle Tagged List", "data/handle-tagged-list.yaml", "yaml", "ready", "dataSources"],
     ["Direct Inline", "data/direct-inline.csv", "csv", "ready", "dataSources"],
     ["Inline Scalar", "data/inline-scalar.tsv", "tsv", "ready", "dataSources"],
     ["Inline Source Base", "data/inline-base.json", "json", "ready", "dataSources"],
@@ -614,6 +616,7 @@ test("front matter managers resolve tagged scalars and simple merge aliases", ()
     "  owner: !role \"Strategy # Lead\"",
     "  reviewer: !!str QA Team",
     "  budget: !<tag:yaml.org,2002:int> 125000",
+    "  channel: !docs!channel Partner",
     "  address:",
     "    city: Nairobi",
     "    country: Kenya",
@@ -639,9 +642,11 @@ test("front matter managers resolve tagged scalars and simple merge aliases", ()
   ok(rows.some((row) => row.key === "defaults.owner" && row.value === "Strategy # Lead"));
   ok(rows.some((row) => row.key === "defaults.reviewer" && row.value === "QA Team"));
   ok(rows.some((row) => row.key === "defaults.budget" && row.value === "125000"));
+  ok(rows.some((row) => row.key === "defaults.channel" && row.value === "Partner"));
   ok(rows.some((row) => row.key === "client.owner" && row.value === "Delivery Team"));
   ok(rows.some((row) => row.key === "client.reviewer" && row.value === "QA Team"));
   ok(rows.some((row) => row.key === "client.budget" && row.value === "125000"));
+  ok(rows.some((row) => row.key === "client.channel" && row.value === "Partner"));
   ok(rows.some((row) => row.key === "client.address.city" && row.value === "Nairobi"));
   ok(rows.some((row) => row.key === "client.address.country" && row.value === "Kenya"));
   ok(rows.some((row) => row.key === "client.delivery.timezone" && row.value === "EAT"));
@@ -665,6 +670,7 @@ test("front matter managers expand simple inline object variables", () => {
     "copiedContacts: *contactList",
     "primaryContact: *primaryContact",
     "taggedDefaults: !client &taggedClient {owner: Tagged Owner, reviewer: Tagged Reviewer}",
+    "handleTaggedDefaults: !docs!client {owner: Handle Tagged Owner, reviewer: Handle Tagged Reviewer}",
     "taggedClient: *taggedClient",
     "milestones:",
     "  - name: Discovery",
@@ -740,6 +746,8 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "primaryContact.reviewers.0" && row.value === "Legal"));
   ok(rows.some((row) => row.key === "taggedDefaults.owner" && row.value === "Tagged Owner"));
   ok(rows.some((row) => row.key === "taggedClient.reviewer" && row.value === "Tagged Reviewer"));
+  ok(rows.some((row) => row.key === "handleTaggedDefaults.owner" && row.value === "Handle Tagged Owner"));
+  ok(rows.some((row) => row.key === "handleTaggedDefaults.reviewer" && row.value === "Handle Tagged Reviewer"));
   ok(rows.some((row) => row.key === "milestones.0.name" && row.value === "Discovery"));
   ok(rows.some((row) => row.key === "milestones.0.owner" && row.value === "Strategy Office"));
   ok(rows.some((row) => row.key === "milestones.0.due" && row.value === "2026-06-01"));
