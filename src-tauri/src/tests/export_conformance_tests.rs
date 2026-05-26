@@ -1812,7 +1812,7 @@ fn heading_appendix_and_decision_references_survive_cross_target_exports() {
 #[test]
 fn front_matter_index_survives_cross_target_exports() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: Index Export\nstatus: approved\napprovedBy: QA\nindex: true\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Working capital{#index:Liquidity} marker.\n".to_string(),
+            text: "---\ntitle: Index Export\nstatus: approved\napprovedBy: QA\nindex:\n  enabled: true\n  terms:\n    - Buyer Intent\n    - term: Executive Sponsor\n      anchor: market-analysis\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Buyer Intent appears as metadata-driven index evidence. Working capital{#index:Liquidity} marker.\n".to_string(),
             file_path: None,
         });
     let options = json!({});
@@ -1824,6 +1824,12 @@ fn front_matter_index_survives_cross_target_exports() {
     assert!(response
         .compiled_markdown
         .contains("- [Liquidity](#follow-up)"));
+    assert!(response
+        .compiled_markdown
+        .contains("- [Buyer Intent](#follow-up)"));
+    assert!(response
+        .compiled_markdown
+        .contains("- [Executive Sponsor](#market-analysis)"));
     assert!(!response.compiled_markdown.contains("[INDEX]"));
     assert!(!response.compiled_markdown.contains("{#index:Liquidity}"));
 
@@ -1831,24 +1837,32 @@ fn front_matter_index_survives_cross_target_exports() {
     assert!(html.contains("<h2 id=\"index\">Index</h2>"));
     assert!(html.contains(r##"<a href="#market-analysis">Acme Strategy</a>"##));
     assert!(html.contains(r##"<a href="#follow-up">Liquidity</a>"##));
+    assert!(html.contains(r##"<a href="#follow-up">Buyer Intent</a>"##));
+    assert!(html.contains(r##"<a href="#market-analysis">Executive Sponsor</a>"##));
 
     let pdf = render_pdf_bytes(&response, &options);
     let pdf_text = String::from_utf8_lossy(&pdf);
     assert!(pdf_text.contains("Index"));
     assert!(pdf_text.contains("Acme Strategy"));
     assert!(pdf_text.contains("Liquidity"));
+    assert!(pdf_text.contains("Buyer Intent"));
+    assert!(pdf_text.contains("Executive Sponsor"));
 
     let docx = render_docx_bytes(&response, &options).expect("docx index bytes");
     let docx_document = zip_entry_text(&docx, "word/document.xml");
     assert!(docx_document.contains("Index"));
     assert!(docx_document.contains("Acme Strategy"));
     assert!(docx_document.contains("Liquidity"));
+    assert!(docx_document.contains("Buyer Intent"));
+    assert!(docx_document.contains("Executive Sponsor"));
 
     let pptx = render_pptx_bytes(&response, &options).expect("pptx index bytes");
     let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
     assert!(pptx_slides.contains("Index"));
     assert!(pptx_slides.contains("Acme Strategy"));
     assert!(pptx_slides.contains("Liquidity"));
+    assert!(pptx_slides.contains("Buyer Intent"));
+    assert!(pptx_slides.contains("Executive Sponsor"));
 
     let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
         .expect("index bundle bytes");
@@ -1856,6 +1870,8 @@ fn front_matter_index_survives_cross_target_exports() {
     assert!(bundled_text.contains("Index"));
     assert!(bundled_text.contains("Acme Strategy"));
     assert!(bundled_text.contains("Liquidity"));
+    assert!(bundled_text.contains("Buyer Intent"));
+    assert!(bundled_text.contains("Executive Sponsor"));
 }
 
 #[test]

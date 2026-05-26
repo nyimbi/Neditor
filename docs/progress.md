@@ -139,7 +139,9 @@ Recent pushed checkpoints visible in current git history:
   `indexTerms`, `index_terms`, and `index.keywords`, including comma-separated
   strings and structured entries such as `{term, anchor}`, while
   `index.exclude` and `indexExclude` use the same shared metadata lookup and
-  continue to suppress forbidden terms.
+  continue to suppress forbidden terms. The cross-target export proof now carries
+  both prose-linked and explicitly anchored metadata-defined index terms through
+  HTML, PDF, DOCX, PPTX, and Markdown bundle outputs.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
   flow through simple merges as dotted variable names, and anchored maps,
   including dotted or slash-namespaced anchors such as `&client.defaults` and
