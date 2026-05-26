@@ -25,6 +25,10 @@ pub(crate) struct DocumentValidationInput<'a> {
     pub(crate) index_terms: &'a [String],
     pub(crate) generated_glossary_requested: bool,
     pub(crate) glossary_term_count: usize,
+    pub(crate) generated_figure_list_requested: bool,
+    pub(crate) figure_count: usize,
+    pub(crate) generated_table_list_requested: bool,
+    pub(crate) table_count: usize,
     pub(crate) comments: &'a [ReviewComment],
     pub(crate) change_notes: &'a [ChangeNote],
     pub(crate) ai_sources: &'a [AiSource],
@@ -292,6 +296,30 @@ fn validate_generated_reference_sections(
             Some("Add a glossary fenced block or disable the generated glossary section before final export."),
         );
         diagnostic.related.push("glossary entries: 0".to_string());
+        diagnostics.push(diagnostic);
+    }
+    if input.generated_figure_list_requested && input.figure_count == 0 {
+        let mut diagnostic = diag(
+            "warning",
+            "Generated list of figures was requested but no figures were found.",
+            None,
+            None,
+            Some("Add figures with labels/captions or disable the generated list of figures before final export."),
+        );
+        diagnostic.related.push("figures: 0".to_string());
+        diagnostics.push(diagnostic);
+    }
+    if input.generated_table_list_requested && input.table_count == 0 {
+        let mut diagnostic = diag(
+            "warning",
+            "Generated list of tables was requested but no tables were found.",
+            None,
+            None,
+            Some(
+                "Add captioned tables or disable the generated list of tables before final export.",
+            ),
+        );
+        diagnostic.related.push("tables: 0".to_string());
         diagnostics.push(diagnostic);
     }
 }

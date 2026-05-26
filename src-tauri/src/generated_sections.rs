@@ -44,19 +44,7 @@ pub(crate) fn inject_generated_sections(
             output = format!("## Table of Contents\n\n{toc}\n\n{output}");
         }
     }
-    if output.contains("[LIST_OF_FIGURES]")
-        || metadata_bool(
-            metadata,
-            &[
-                "listOfFigures",
-                "listOfFigures.enabled",
-                "list_of_figures",
-                "figures.list",
-                "figures.list.enabled",
-                "captionLists.figures",
-            ],
-        )
-    {
+    if output.contains("[LIST_OF_FIGURES]") || generated_figure_list_requested(metadata) {
         let list = render_caption_list("Figure", &collect_figure_entries(&output));
         output = output.replace(
             "[LIST_OF_FIGURES]",
@@ -66,19 +54,7 @@ pub(crate) fn inject_generated_sections(
             output = format!("## List of Figures\n\n{list}\n\n{output}");
         }
     }
-    if output.contains("[LIST_OF_TABLES]")
-        || metadata_bool(
-            metadata,
-            &[
-                "listOfTables",
-                "listOfTables.enabled",
-                "list_of_tables",
-                "tables.list",
-                "tables.list.enabled",
-                "captionLists.tables",
-            ],
-        )
-    {
+    if output.contains("[LIST_OF_TABLES]") || generated_table_list_requested(metadata) {
         let list = render_caption_list("Table", &collect_table_entries(&output));
         output = output.replace("[LIST_OF_TABLES]", &format!("## List of Tables\n\n{list}"));
         if !text.contains("[LIST_OF_TABLES]") {
@@ -155,6 +131,34 @@ fn metadata_bool(metadata: &Value, keys: &[&str]) -> bool {
 fn metadata_u64(metadata: &Value, keys: &[&str]) -> Option<u64> {
     keys.iter()
         .find_map(|key| metadata_lookup(metadata, key).and_then(Value::as_u64))
+}
+
+pub(crate) fn generated_figure_list_requested(metadata: &Value) -> bool {
+    metadata_bool(
+        metadata,
+        &[
+            "listOfFigures",
+            "listOfFigures.enabled",
+            "list_of_figures",
+            "figures.list",
+            "figures.list.enabled",
+            "captionLists.figures",
+        ],
+    )
+}
+
+pub(crate) fn generated_table_list_requested(metadata: &Value) -> bool {
+    metadata_bool(
+        metadata,
+        &[
+            "listOfTables",
+            "listOfTables.enabled",
+            "list_of_tables",
+            "tables.list",
+            "tables.list.enabled",
+            "captionLists.tables",
+        ],
+    )
 }
 
 pub(crate) fn generated_index_section_requested(metadata: &Value) -> bool {

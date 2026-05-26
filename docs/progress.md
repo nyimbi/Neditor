@@ -139,6 +139,9 @@ Recent pushed checkpoints visible in current git history:
   `captionLists.figures: true`, `captionLists.tables: true`,
   `figures.list.enabled`, and `tables.list.enabled`, so business templates can
   request lists of figures/tables without inserting explicit markers.
+- Export readiness now warns when generated lists of figures or tables are
+  requested but the document has no figures or tables, and carries those
+  diagnostics into manifest readiness alongside empty index/glossary warnings.
 - Automatic indexes now honor metadata-defined terms from `index.terms`,
   `indexTerms`, `index_terms`, and `index.keywords`, including comma-separated
   strings and structured entries such as `{term, anchor}`, while

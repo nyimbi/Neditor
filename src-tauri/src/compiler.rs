@@ -13,11 +13,14 @@ use crate::{
     diagnostics::DocumentDiagnostic,
     document_ast::{
         attach_source_ranges, attach_transform_artifacts, build_document_ast, AstDocumentMetadata,
+        DocumentBlock,
     },
     footnotes::render_footnotes,
     front_matter::{merge_project_variables, parse_front_matter, render_front_matter_data_sources},
     generated_sections::{
+        generated_figure_list_requested as figure_list_requested_from_metadata,
         generated_glossary_section_requested, generated_index_section_requested,
+        generated_table_list_requested as table_list_requested_from_metadata,
         inject_generated_sections,
     },
     html_preview::markdown_to_html,
@@ -172,6 +175,10 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         .iter()
         .map(|entry| entry.term.clone())
         .collect::<Vec<_>>();
+    let generated_figure_list_requested = reference_markdown.contains("[LIST_OF_FIGURES]")
+        || figure_list_requested_from_metadata(&metadata);
+    let generated_table_list_requested = reference_markdown.contains("[LIST_OF_TABLES]")
+        || table_list_requested_from_metadata(&metadata);
     let generated_index_requested =
         reference_markdown.contains("[INDEX]") || generated_index_section_requested(&metadata);
     let generated_glossary_requested = reference_markdown.contains("[GLOSSARY]")
@@ -228,6 +235,16 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
     });
     attach_transform_artifacts(&mut document_ast, &transform_artifacts);
     validate_layout_directives(&document_ast.blocks, &mut diagnostics);
+    let figure_count = document_ast
+        .blocks
+        .iter()
+        .filter(|block| matches!(block, DocumentBlock::Figure { .. }))
+        .count();
+    let table_count = document_ast
+        .blocks
+        .iter()
+        .filter(|block| matches!(block, DocumentBlock::Table { .. }))
+        .count();
     let preview_headings = extract_headings(&layout_markdown);
     let heading_anchors = preview_headings
         .iter()
@@ -262,6 +279,10 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
             index_terms: &index_terms,
             generated_glossary_requested,
             glossary_term_count: glossary.len(),
+            generated_figure_list_requested,
+            figure_count,
+            generated_table_list_requested,
+            table_count,
             comments: &comments,
             change_notes: &change_notes,
             ai_sources: &ai_sources,

@@ -665,7 +665,7 @@ fn prepare_for_export_blocks_malformed_reference_markers_in_manifest() {
 #[test]
 fn prepare_for_export_reports_empty_generated_reference_sections() {
     let report = prepare_for_export(PrepareExportRequest {
-        text: "---\ntitle: Empty Reference Sections\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\nindex: true\nglossarySection: true\n---\nplain text only.\n"
+        text: "---\ntitle: Empty Reference Sections\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\nindex: true\nglossarySection: true\ncaptionLists:\n  figures: true\n  tables: true\n---\nplain text only.\n"
             .to_string(),
         file_path: None,
         target: "pdf".to_string(),
@@ -674,8 +674,8 @@ fn prepare_for_export_reports_empty_generated_reference_sections() {
 
     assert!(!report.ready);
     assert_eq!(report.error_count, 0);
-    assert_eq!(report.warning_count, 2, "{:#?}", report.diagnostics);
-    assert_eq!(report.manifest.readiness.warning_count, 2);
+    assert_eq!(report.warning_count, 4, "{:#?}", report.diagnostics);
+    assert_eq!(report.manifest.readiness.warning_count, 4);
     assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
     assert_readiness_contains(
         &report,
@@ -684,6 +684,14 @@ fn prepare_for_export_reports_empty_generated_reference_sections() {
     assert_readiness_contains(
         &report,
         "Generated glossary was requested but no glossary entries were found.",
+    );
+    assert_readiness_contains(
+        &report,
+        "Generated list of figures was requested but no figures were found.",
+    );
+    assert_readiness_contains(
+        &report,
+        "Generated list of tables was requested but no tables were found.",
     );
     assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
         .related
