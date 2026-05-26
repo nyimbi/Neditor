@@ -79,10 +79,11 @@ Recent pushed checkpoints visible in current git history:
   comma-containing inline data-source lists, `yml` aliases, URL/Windows/parent
   traversal path blocking, filenames that legitimately contain `..`, compact
   `dataSources` objects such as `{name, path, type}`, and top-level inline
-  `dataSources: {...}` objects or `dataSources: [{...}]` lists. Compact
-  data-source objects can also reuse scalar anchors plus inline or block-map
-  `<<: *defaults` merge maps for repeated `name`, `type`, or `kind` values,
-  and expanded data-source rows can start with `- <<: *defaults` before
+  `dataSources: {...}` objects, `dataSources: [{...}]` lists, or inline scalar
+  path lists such as `dataSources: [data/customers.csv]`. Compact data-source
+  objects can also reuse scalar anchors plus inline or block-map `<<: *defaults`
+  merge maps for repeated `name`, `type`, or `kind` values, and expanded
+  data-source rows can start with `- <<: *defaults` before
   overriding fields such as `path` or `name`; expanded row fields also resolve
   scalar aliases such as `path: *sourcePath`. Custom tags on compact
   data-source objects, inline lists, and alias lists are ignored for inventory
@@ -3338,7 +3339,7 @@ Front matter manager YAML edge cases:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm exec tsc -p tsconfig.test.json` | Pass | Test TypeScript compilation passed after hardening `src/lib/frontMatterManagers.ts`. |
-| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Focused frontend unit coverage passed for CRLF front matter, quote-aware YAML comments, comma-containing inline lists, compact inline `dataSources` block objects plus top-level object/list declarations, scalar aliases and inline/block-map `<<: *defaults` inside compact data-source objects, expanded data-source row scalar aliases such as `path: *sourcePath`, top-level `dataSources: *alias` reuse of anchored maps, scalar paths, inline source lists, and block source lists, legacy alias-section scalar, inline-list, and block-list aliases, anchored compact objects reused by later inline-list rows, expanded `dataSources` rows beginning with `- <<: *defaults`, custom tags on compact data-source objects, inline lists, and alias lists, `yml` alias normalization, URL/Windows/parent traversal path blocking, safe filenames containing `..`, scalar anchors/aliases, and folded/literal block scalar variables. |
+| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Focused frontend unit coverage passed for CRLF front matter, quote-aware YAML comments, comma-containing inline lists, compact inline `dataSources` block objects plus top-level object/list declarations, scalar path entries inside inline `dataSources` lists, scalar aliases and inline/block-map `<<: *defaults` inside compact data-source objects, expanded data-source row scalar aliases such as `path: *sourcePath`, top-level `dataSources: *alias` reuse of anchored maps, scalar paths, inline source lists, and block source lists, legacy alias-section scalar, inline-list, and block-list aliases, anchored compact objects reused by later inline-list rows, expanded `dataSources` rows beginning with `- <<: *defaults`, custom tags on compact data-source objects, inline lists, and alias lists, `yml` alias normalization, URL/Windows/parent traversal path blocking, safe filenames containing `..`, scalar anchors/aliases, and folded/literal block scalar variables. |
 | `pnpm run check` | Pass | Vue typecheck passed after the front-matter parser hardening. |
 | `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting front-matter manager edge-case coverage; all local links resolved. |
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the front-matter addendum evidence. |

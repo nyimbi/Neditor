@@ -155,10 +155,8 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
           const aliasedValue = anchors.get(parsedTopLevel.alias) || "";
           if (aliasedValue.startsWith("[")) {
             for (const item of splitInlineYamlList(aliasedValue)) {
-              const itemRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
-              if (applyInlineDataSourceObject(itemRow, item, anchors, mapAnchors)) {
-                rows.push(normalizeFrontMatterDataSource(itemRow, rows.length));
-              }
+              const itemRow = parseDataSourceListItem(item, section, index + 1, anchors, mapAnchors);
+              if (itemRow) rows.push(normalizeFrontMatterDataSource(itemRow, rows.length));
             }
           } else if (aliasedValue) {
             rows.push(normalizeFrontMatterDataSource({ ...aliasedRow, path: aliasedValue }, rows.length));
@@ -167,10 +165,8 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       }
       if (section === "dataSources" && parsedTopLevel.value.startsWith("[")) {
         for (const item of splitInlineYamlList(parsedTopLevel.value)) {
-          const inlineRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
-          if (applyInlineDataSourceObject(inlineRow, item, anchors, mapAnchors)) {
-            rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
-          }
+          const inlineRow = parseDataSourceListItem(item, section, index + 1, anchors, mapAnchors);
+          if (inlineRow) rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
         }
       }
       if (aliasKind && parsedTopLevel.value.startsWith("[")) {
@@ -631,6 +627,20 @@ function applyInlineDataSourceObject(
     applyDataSourcePair(row, `${entry.key}: ${entry.value}`);
   }
   return true;
+}
+
+function parseDataSourceListItem(
+  item: string,
+  source: string,
+  line: number,
+  anchors: Map<string, string>,
+  mapAnchors: Map<string, Array<{ key: string; value: string; line: number }>>,
+) {
+  const row: Partial<FrontMatterDataSourceRow> = { source, line };
+  if (!applyInlineDataSourceObject(row, item, anchors, mapAnchors)) {
+    applyDataSourcePair(row, item, anchors);
+  }
+  return row.path || row.name || row.kind ? row : null;
 }
 
 function normalizeFrontMatterDataSource(row: Partial<FrontMatterDataSourceRow>, index: number): FrontMatterDataSourceRow {
