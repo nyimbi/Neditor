@@ -127,6 +127,16 @@ struct WorkspaceScaffoldStatus {
     recommended_command: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentTemplateInfo {
+    id: &'static str,
+    label: &'static str,
+    category: &'static str,
+    summary: &'static str,
+    best_for: &'static [&'static str],
+}
+
 pub fn run_cli() -> i32 {
     let args = env::args().collect::<Vec<_>>();
     match run_cli_with_args(&args) {
@@ -170,7 +180,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "convert" | "export" => run_convert_command(&args[2..], stdin_text),
         "inspect" => run_inspect_command(&args[2..], stdin_text),
         "validate" | "check" => run_validate_command(&args[2..], stdin_text),
-        "templates" => run_list_command("templates", NEW_DOCUMENT_TEMPLATES, &args[2..]),
+        "templates" => run_templates_command(&args[2..]),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
@@ -892,6 +902,91 @@ fn run_default_reader_command(args: &[String]) -> Result<CliOutcome, String> {
     Ok(CliOutcome {
         message: default_reader_message(&response),
         exit_code,
+    })
+}
+
+fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut ids_only = false;
+    let mut category: Option<String> = None;
+    let mut query: Option<String> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--ids-only" => ids_only = true,
+            "--category" => {
+                index += 1;
+                category = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--category requires a category name".to_string())?
+                        .to_string(),
+                );
+            }
+            "--query" | "--search" => {
+                index += 1;
+                query = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--query requires search text".to_string())?
+                        .to_string(),
+                );
+            }
+            value => return Err(format!("Unsupported templates option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let category_filter = category
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let query_filter = query
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let templates = document_template_catalog()
+        .into_iter()
+        .filter(|template| {
+            category_filter.as_deref().map_or(true, |category| {
+                template.category.to_ascii_lowercase() == category
+            })
+        })
+        .filter(|template| {
+            query_filter
+                .as_deref()
+                .map_or(true, |query| template_matches_query(template, query))
+        })
+        .collect::<Vec<_>>();
+    let ids = templates
+        .iter()
+        .map(|template| template.id)
+        .collect::<Vec<_>>();
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-templates.v1",
+                "count": templates.len(),
+                "filters": {
+                    "category": category_filter,
+                    "query": query_filter,
+                },
+                "templates": ids,
+                "templateDetails": templates,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    if ids_only {
+        return Ok(CliOutcome {
+            message: ids.join("\n"),
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: templates_text_report(&templates),
+        exit_code: 0,
     })
 }
 
@@ -2283,6 +2378,156 @@ fn capitalize_word(word: &str) -> String {
     }
 }
 
+fn document_template_catalog() -> Vec<DocumentTemplateInfo> {
+    vec![
+        DocumentTemplateInfo {
+            id: "blank",
+            label: "Blank Document",
+            category: "General",
+            summary: "Minimal Markdown document with title and draft status.",
+            best_for: &["freeform writing", "scratch drafts", "custom structure"],
+        },
+        DocumentTemplateInfo {
+            id: "proposal",
+            label: "Client Proposal",
+            category: "Business development",
+            summary: "Client-facing proposal with executive summary, approach, timeline, commercials, and review handoff.",
+            best_for: &["sales proposals", "consulting offers", "commercial recommendations"],
+        },
+        DocumentTemplateInfo {
+            id: "rfp",
+            label: "Request For Proposal",
+            category: "Procurement",
+            summary: "Buyer-side RFP scaffold with scope, vendor instructions, evaluation criteria, and response matrix.",
+            best_for: &["procurement packages", "vendor selection", "formal buyer requirements"],
+        },
+        DocumentTemplateInfo {
+            id: "rfp-response",
+            label: "RFP Response",
+            category: "Business development",
+            summary: "Seller-side response scaffold with compliance matrix, technical response, delivery plan, pricing, and final verification.",
+            best_for: &["RFP responses", "compliance matrices", "bid teams"],
+        },
+        DocumentTemplateInfo {
+            id: "rfq",
+            label: "Request For Quote",
+            category: "Procurement",
+            summary: "Quote request with line items, commercial terms, award criteria, and vendor quote instructions.",
+            best_for: &["pricing requests", "goods and services quotes", "supplier comparison"],
+        },
+        DocumentTemplateInfo {
+            id: "tender",
+            label: "Tender Package",
+            category: "Procurement",
+            summary: "Formal tender scaffold with eligibility, mandatory documents, specifications, instructions, and evaluation method.",
+            best_for: &["public tenders", "formal bids", "regulated procurement"],
+        },
+        DocumentTemplateInfo {
+            id: "report",
+            label: "Business Report",
+            category: "Business analysis",
+            summary: "Decision report with executive summary, evidence, calculation starter, recommendations, risks, and next steps.",
+            best_for: &["management reports", "analysis memos", "decision support"],
+        },
+        DocumentTemplateInfo {
+            id: "tutorial",
+            label: "Tutorial",
+            category: "Education",
+            summary: "Step-by-step tutorial with outcome, prerequisites, checks, troubleshooting, and next steps.",
+            best_for: &["how-to guides", "training material", "customer enablement"],
+        },
+        DocumentTemplateInfo {
+            id: "lesson-plan",
+            label: "Lesson Plan",
+            category: "Education",
+            summary: "Instructor plan with objectives, audience, prerequisites, flow, learner evidence, and assessment.",
+            best_for: &["classroom planning", "workshops", "training sessions"],
+        },
+        DocumentTemplateInfo {
+            id: "lesson-content",
+            label: "Lesson Content",
+            category: "Education",
+            summary: "Learner-facing lesson content with concept sequence, guided practice, independent practice, and assessment items.",
+            best_for: &["course content", "student handouts", "learning modules"],
+        },
+        DocumentTemplateInfo {
+            id: "textbook",
+            label: "Textbook",
+            category: "Long-form",
+            summary: "Book scaffold with audience positioning, chapter outline, worked examples, exercises, and drafting plan.",
+            best_for: &["textbooks", "manuals", "structured long-form education"],
+        },
+        DocumentTemplateInfo {
+            id: "technical-textbook",
+            label: "Technical Textbook",
+            category: "Long-form",
+            summary: "Technical long-form scaffold sharing the textbook structure with audience, level, prerequisites, chapters, and examples.",
+            best_for: &["technical books", "engineering manuals", "expert curriculum"],
+        },
+        DocumentTemplateInfo {
+            id: "novel",
+            label: "Novel",
+            category: "Creative writing",
+            summary: "Narrative scaffold with premise, cast, act outline, and review checklist for voice, pacing, continuity, and scene purpose.",
+            best_for: &["fiction planning", "plot outlines", "chapter drafting"],
+        },
+        DocumentTemplateInfo {
+            id: "podcast-script",
+            label: "Podcast Script",
+            category: "Media",
+            summary: "Episode script scaffold with brief, cold open, segment rundown, host script, and production notes.",
+            best_for: &["podcasts", "interviews", "audio publishing"],
+        },
+        DocumentTemplateInfo {
+            id: "movie-script",
+            label: "Movie Script",
+            category: "Media",
+            summary: "Screen story scaffold with logline, characters, treatment, scene starter, and script review checklist.",
+            best_for: &["screenplays", "film treatments", "story development"],
+        },
+        DocumentTemplateInfo {
+            id: "business-case",
+            label: "Business Case",
+            category: "Business analysis",
+            summary: "Investment case with decision required, rationale, options, financial calculation starter, and implementation plan.",
+            best_for: &["investment decisions", "project approvals", "ROI analysis"],
+        },
+        DocumentTemplateInfo {
+            id: "executive-brief",
+            label: "Executive Brief",
+            category: "Executive communication",
+            summary: "Concise executive briefing with bottom line, what changed, evidence, options, and decision ask.",
+            best_for: &["leadership updates", "board briefs", "decision memos"],
+        },
+    ]
+}
+
+fn template_matches_query(template: &DocumentTemplateInfo, query: &str) -> bool {
+    template.id.to_ascii_lowercase().contains(query)
+        || template.label.to_ascii_lowercase().contains(query)
+        || template.category.to_ascii_lowercase().contains(query)
+        || template.summary.to_ascii_lowercase().contains(query)
+        || template
+            .best_for
+            .iter()
+            .any(|value| value.to_ascii_lowercase().contains(query))
+}
+
+fn templates_text_report(templates: &[DocumentTemplateInfo]) -> String {
+    if templates.is_empty() {
+        return "No NEditor document templates match those filters.".to_string();
+    }
+    let mut lines = vec![format!("NEditor document templates ({}):", templates.len())];
+    for template in templates {
+        lines.push(format!(
+            "  - {} [{}] {}: {}",
+            template.id, template.category, template.label, template.summary
+        ));
+    }
+    lines.push("Use `ned new <file.md> --template <id> --json` to create one.".to_string());
+    lines.join("\n")
+}
+
 fn new_document_markdown(template: &str, title: &str) -> Result<String, String> {
     let template = template.trim().to_ascii_lowercase();
     if !NEW_DOCUMENT_TEMPLATES.contains(&template.as_str()) {
@@ -2538,8 +2783,11 @@ _ned() {{
       validate|check)
         COMPREPLY=( $(compgen -W "--to --json --strict --option" -- "$cur") )
         ;;
-      templates|targets)
+      targets)
         COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+        ;;
+      templates)
+        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search" -- "$cur") )
         ;;
       handlers|transform-handlers)
         COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
@@ -2615,7 +2863,10 @@ _ned() {{
     validate|check)
       _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--json[print machine-readable JSON]' '--strict[treat warnings as non-zero]' '--option[set export option key=value]:option:'
       ;;
-    templates|targets)
+    templates)
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:'
+      ;;
+    targets)
       _arguments '--json[print machine-readable JSON]'
       ;;
     handlers|transform-handlers)
@@ -2701,6 +2952,10 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l option -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates targets inspect doctor' -l json"
             .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l query -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l search -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l commands-only"
@@ -3099,7 +3354,7 @@ fn help_text() -> String {
         "  ned inspect <file.md|-> [--json]".to_string(),
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
-        "  ned templates [--json]".to_string(),
+        "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json]"

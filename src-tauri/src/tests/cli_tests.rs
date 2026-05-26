@@ -295,6 +295,8 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     let templates = crate::cli::run_cli_with_args(&["ned".to_string(), "templates".to_string()])
         .expect("templates list");
     assert_eq!(templates.exit_code, 0);
+    assert!(templates.message.contains("NEditor document templates"));
+    assert!(templates.message.contains("Business development"));
     assert!(templates.message.contains("proposal"));
     assert!(templates.message.contains("tender"));
     assert!(templates.message.contains("rfp-response"));
@@ -309,6 +311,16 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     let template_report: serde_json::Value =
         serde_json::from_str(&templates_json.message).expect("templates json");
     assert_eq!(template_report["schema"], "neditor.ned-templates.v1");
+    assert_eq!(template_report["count"], 17);
+    assert!(template_report["templateDetails"]
+        .as_array()
+        .expect("template details")
+        .iter()
+        .any(|template| template["id"] == "tender"
+            && template["category"] == "Procurement"
+            && template["summary"]
+                .as_str()
+                .is_some_and(|summary| summary.contains("tender"))));
     for template in [
         "rfp",
         "rfq",
@@ -322,6 +334,30 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
             .expect("templates")
             .contains(&serde_json::json!(template)));
     }
+    let filtered = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "templates".to_string(),
+        "--category".to_string(),
+        "Procurement".to_string(),
+        "--query".to_string(),
+        "quote".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("filtered templates json");
+    let filtered_report: serde_json::Value =
+        serde_json::from_str(&filtered.message).expect("filtered templates json");
+    assert_eq!(filtered_report["count"], 1);
+    assert_eq!(filtered_report["templates"][0], "rfq");
+
+    let ids_only = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "templates".to_string(),
+        "--category".to_string(),
+        "Media".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("template ids only");
+    assert_eq!(ids_only.message, "podcast-script\nmovie-script");
 
     let targets = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

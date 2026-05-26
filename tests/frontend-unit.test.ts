@@ -3837,6 +3837,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("create_support_bundle"));
   ok(app.includes("ned file.md"));
   ok(app.includes("ned open file.md --dry-run --json"));
+  ok(app.includes("ned templates --category Procurement --json"));
   ok(app.includes("ned new tender.md --template tender --json"));
   ok(app.includes("ned new podcast.md --template podcast-script --json"));
   ok(app.includes("ned evidence --json"));
@@ -3854,6 +3855,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(cli.includes('"evidence"'));
   ok(cli.includes("neditor.ned-open.v1"));
   ok(cli.includes("neditor.ned-new.v1"));
+  ok(cli.includes("templateDetails"));
+  ok(cli.includes("--ids-only"));
   ok(cli.includes("neditor.ned-evidence-status.v1"));
   ok(cli.includes("neditor.ned-default-reader.v1"));
   ok(cli.includes("run_evidence_command"));

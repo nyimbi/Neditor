@@ -93,7 +93,7 @@ cat board-paper.md | ned convert - --to latex --stdout
 ned inspect board-paper.md --json
 ned validate board-paper.md --to pdf --json
 ned export proposal.md --to docx --output proposal.docx
-ned templates
+ned templates --category Procurement --json
 ned targets --json
 ned handlers --platform windows --commands-only
 ned readiness --json
@@ -127,7 +127,10 @@ pipeline without writing an artifact; use `--json` for CI, and `--strict` when
 warnings should fail a release gate. `ned inspect` reads a document or stdin
 and reports title, status, outline, word counts, includes, transforms,
 diagnostics, and available export targets without writing any artifacts. `ned
-templates` and `ned targets` list the installed starter documents and export
+templates` explains the installed starter documents with categories, summaries,
+and best-fit uses; use `ned templates --category Procurement --json` or
+`ned templates --query podcast --ids-only` when help desk scripts need filtered
+template discovery. `ned targets` lists export
 formats, with `--json` output for help desk scripts and deployment checks. `ned
 handlers` lists copyable setup plans for optional transform handlers such as
 Graphviz, D2, PlantUML, Pikchr, and SQLite; use `--commands-only` when a support

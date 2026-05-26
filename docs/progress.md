@@ -3948,6 +3948,24 @@ Expanded `ned new` business and publishing starters:
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local document-creation capability without claiming external release proof completion. |
 | Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
 
+Rich `ned templates` discovery:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after replacing the generic template list with rich metadata, category/query filters, `--ids-only`, JSON `templateDetails`, completion/help updates, and filtered discovery assertions. |
+| `src-tauri/target/debug/ned templates --category Procurement --query quote --json` | Pass | Direct smoke returned schema `neditor.ned-templates.v1`, normalized filters, `count: 1`, template id `rfq`, and metadata with label, category, summary, and best-fit uses. |
+| `src-tauri/target/debug/ned templates --category Media --ids-only` | Pass | Direct smoke returned only `podcast-script` and `movie-script` for script-friendly filtered discovery. |
+| `src-tauri/target/debug/ned templates --query executive` | Pass | Direct text smoke returned a readable filtered catalog with template IDs, categories, labels, summaries, and the `ned new <file.md> --template <id> --json` next step. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for rich template discovery. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after updating Settings CLI guidance for filtered template discovery. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 74 tests, including static assertions that Settings and CLI source expose filtered template discovery and metadata. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting filtered template discovery in README and specification. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while packaged CLI template discovery is now stronger for non-technical users and support scripts. |
+| `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration remains valid after extending the packaged `ned templates` surface. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after extending the packaged `ned templates` surface. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local template discovery without claiming external release proof completion. |
+| Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

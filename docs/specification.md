@@ -205,6 +205,10 @@ procurement, education, long-form, and media documents including proposals,
 RFPs, RFP responses, RFQs, tenders, tutorials, lesson plans, lesson content,
 technical textbooks, novels, podcast scripts, movie scripts, business cases, and
 executive briefs.
+Template discovery must be useful to non-technical users and support automation:
+the CLI should expose stable IDs, human labels, categories, summaries, best-fit
+uses, JSON metadata, category filters, and search filters before a user creates a
+document.
 
 ### 6.2 Primary Layout
 
