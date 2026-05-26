@@ -88,6 +88,8 @@ pub fn run_cli_with_args(args: &[String]) -> Result<CliOutcome, String> {
         "new" => run_new_command(&args[2..]),
         "open" => run_open_command(&args[2..]),
         "convert" | "export" => run_convert_command(&args[2..]),
+        "templates" => run_list_command("templates", NEW_DOCUMENT_TEMPLATES, &args[2..]),
+        "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
         "doctor" => run_doctor_command(&args[2..]),
         other => Err(format!("Unknown ned command '{other}'.\n\n{}", help_text())),
@@ -350,6 +352,27 @@ fn run_default_reader_command(args: &[String]) -> Result<CliOutcome, String> {
         } else {
             1
         },
+    })
+}
+
+fn run_list_command(kind: &str, values: &[&str], args: &[String]) -> Result<CliOutcome, String> {
+    let json_output = args.iter().any(|arg| arg == "--json");
+    if let Some(unsupported) = args.iter().find(|arg| !matches!(arg.as_str(), "--json")) {
+        return Err(format!("Unsupported {kind} option '{unsupported}'"));
+    }
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": format!("neditor.ned-{kind}.v1"),
+                kind: values,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: values.join("\n"),
+        exit_code: 0,
     })
 }
 
@@ -858,6 +881,8 @@ fn help_text() -> String {
         "  ned open <file.md> [more.md] [--dry-run]".to_string(),
         "  ned convert <file.md> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
+        "  ned templates [--json]".to_string(),
+        "  ned targets [--json]".to_string(),
         "  ned doctor [--json] [--strict]".to_string(),
         "  ned default-reader --status".to_string(),
         "  ned default-reader --enable".to_string(),

@@ -82,6 +82,33 @@ fn ned_cli_doctor_reports_json_capabilities() {
 }
 
 #[test]
+fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
+    let templates = crate::cli::run_cli_with_args(&["ned".to_string(), "templates".to_string()])
+        .expect("templates list");
+    assert_eq!(templates.exit_code, 0);
+    assert!(templates.message.contains("proposal"));
+    assert!(templates.message.contains("rfp-response"));
+
+    let targets = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "targets".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("targets json");
+    assert_eq!(targets.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&targets.message).expect("targets json");
+    assert_eq!(report["schema"], "neditor.ned-targets.v1");
+    assert!(report["targets"]
+        .as_array()
+        .expect("targets")
+        .contains(&serde_json::json!("docx")));
+    assert!(report["targets"]
+        .as_array()
+        .expect("targets")
+        .contains(&serde_json::json!("epub")));
+}
+
+#[test]
 fn ned_cli_converts_markdown_to_html_export() {
     let source = temp_markdown_path("convert");
     let output = source.with_extension("html");
@@ -174,6 +201,8 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned convert"));
     assert!(outcome.message.contains("--output-dir"));
     assert!(outcome.message.contains("ned new"));
+    assert!(outcome.message.contains("ned templates"));
+    assert!(outcome.message.contains("ned targets"));
     assert!(outcome.message.contains("ned doctor"));
     assert!(outcome.message.contains("docx"));
     assert!(outcome.message.contains("epub"));
