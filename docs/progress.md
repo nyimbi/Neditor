@@ -103,7 +103,10 @@ Recent pushed checkpoints visible in current git history:
   renders the suggestions as an editable assistance layer so users can add one
   into the context answers and replan instead of letting the system silently
   invent business facts, and generated agent packets carry the same
-  `AI Step Assistance` evidence table.
+  `AI Step Assistance` evidence table. Accepting a suggestion now uses a shared
+  `appendAgenticStepAssistanceContext` helper that preserves existing context,
+  appends the suggested answer, and carries rationale plus context signals into
+  the next replan.
 - The References sidebar front-matter manager parser is now more tolerant of
   business-document YAML edge cases: CRLF front matter, quoted `#` characters,
   comma-containing inline data-source lists, `yml` aliases, URL/Windows/parent
@@ -1418,7 +1421,7 @@ Current verification recorded on 2026-05-21 through 2026-05-27:
 | `pnpm run check:cli` | Pass | 21 focused CLI tests passed and the `ned` binary rebuilt. Coverage includes `.neditor/business-profile.json` scaffold creation, repeated `--set` updates, camelCase business profile fields, schema `neditor.ned-profile.v1`, Markdown identity output, Docs Live placeholder output, dry-run protection, alias command support, shell-completion generation, and unknown-field validation. |
 | `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding Settings CLI copy and guards that the CLI source exposes the profile command, profile schema, and scaffold file. |
 | `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting scriptable business profile setup and agentic step assistance in the README, specification, completion matrix, and progress log. |
-| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding Agent Workspace `stepAssistance`, generated `AI Step Assistance` packet evidence, UI controls for adding suggested answers into context, and static UI guards for the assistance section. |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding Agent Workspace `stepAssistance`, generated `AI Step Assistance` packet evidence, UI controls for adding suggested answers into context, the shared `appendAgenticStepAssistanceContext` helper that carries rationale/context signals into replanning, and static UI guards for the assistance section. |
 | `pnpm run check:ai-roadmap` | Pass | AI-first roadmap contract passed for 50 changes across 10 sections and wrote `.tmp/ai-first-roadmap/report.json` after the agentic step-assistance update. |
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks`: 116 matrix rows, 9 complete, and 107 still partial/open after adding the explicit 11.4 step-assistance row. |
 | `pnpm run check:release-readiness` | Pass with external gaps | Wrote `.tmp/release-readiness/report.json` with status `current-host-ready-with-external-gaps` and 15 evidence gaps; current host checks remain accepted, but release evidence still needs signing/notarization, Windows/Linux package and WebDriver proof, live Google Docs import/readback, final Homebrew cask/artifact proof, live AI provider proof, real-device AI runtime proof, release-device performance profiling, independent security review, native-viewer/export human sign-off, and assistive-technology sign-off. |

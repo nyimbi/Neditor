@@ -977,6 +977,26 @@ export function buildAgenticWorkflowRun(request: AgenticWorkflowRunRequest): Age
   };
 }
 
+export function agenticStepAssistanceContextBlock(assistance: AgenticStepAssistance): string {
+  const contextSignals = assistance.contextUsed.length
+    ? ["Context signals:", ...assistance.contextUsed.map((signal) => `- ${signal}`)]
+    : [];
+  return [
+    `[${assistance.lane}] ${assistance.stepLabel}`,
+    assistance.suggestedAnswer,
+    `Rationale: ${assistance.rationale}`,
+    ...contextSignals,
+  ]
+    .join("\n")
+    .trim();
+}
+
+export function appendAgenticStepAssistanceContext(existing: string, assistance: AgenticStepAssistance): string {
+  const block = agenticStepAssistanceContextBlock(assistance);
+  const current = existing.trim();
+  return current ? `${current}\n\n${block}` : block;
+}
+
 export function buildAgenticSectionWorkBrief(section: AgenticSectionWorkItem, reviewerAgents: AgenticReviewerAgent[]): string {
   const reviewerLabels = section.reviewerAgentIds.map((id) => reviewerAgents.find((agent) => agent.id === id)?.label || titleCase(id));
   return [

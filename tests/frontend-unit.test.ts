@@ -31,6 +31,7 @@ import {
   buildAgenticTransformRecommendationMarkdown,
   buildAgenticWorkflowPlan,
   buildAgenticWorkflowRun,
+  appendAgenticStepAssistanceContext,
   serializeAgenticSourcePackItem,
 } from "../src/lib/agenticWorkflows.js";
 import {
@@ -1833,6 +1834,14 @@ test("agentic workflow planner coordinates creation revision review and distribu
   ok(plan.stepAssistance.some((assistance) => assistance.stepId === "intent" && assistance.suggestedAnswer.includes("executive team")));
   ok(plan.stepAssistance.some((assistance) => assistance.suggestedAnswer.includes("Strategy")));
   ok(plan.stepAssistance.every((assistance) => assistance.contextUsed.some((signal) => signal.includes("Context completeness"))));
+
+  const intentAssistance = plan.stepAssistance.find((assistance) => assistance.stepId === "intent");
+  ok(intentAssistance);
+  const appendedContext = appendAgenticStepAssistanceContext("audience: board", intentAssistance!);
+  ok(appendedContext.startsWith("audience: board\n\n[create]"));
+  ok(appendedContext.includes("Rationale:"));
+  ok(appendedContext.includes("Context signals:"));
+  ok(appendedContext.includes("Context completeness"));
 });
 
 test("agentic workflow planner uses context answers to close missing inputs", () => {

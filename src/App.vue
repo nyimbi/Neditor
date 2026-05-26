@@ -4869,6 +4869,7 @@ import {
   buildAgenticTransformRecommendationMarkdown,
   buildAgenticWorkflowPlan,
   buildAgenticWorkflowRun,
+  appendAgenticStepAssistanceContext,
   serializeAgenticSourcePackItem,
   stableFingerprint,
   type AgenticSourcePackItemKind,
@@ -9376,8 +9377,7 @@ function runAgentControlAction(action: AgenticNextAction | AgentRunHistoryNextAc
   });
 }
 function appendAgentStepAssistance(assistance: AgenticStepAssistance) {
-  const block = [`[${assistance.lane}] ${assistance.stepLabel}`, assistance.suggestedAnswer].join("\n");
-  agentContextAnswers.value = appendTextBlock(agentContextAnswers.value, block);
+  agentContextAnswers.value = appendAgenticStepAssistanceContext(agentContextAnswers.value, assistance);
   agentPlan.value = null;
   agentRun.value = null;
   agentProviderPackage.value = null;
