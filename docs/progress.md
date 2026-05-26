@@ -104,7 +104,11 @@ Recent pushed checkpoints visible in current git history:
   anchors and aliases and surfaces folded/literal block scalars as usable
   document-variable values, so repeated owners/reviewers and short multiline
   summaries can be inserted through the References sidebar instead of
-  disappearing from the variable list.
+  disappearing from the variable list. Dotted metadata keys such as
+  `client.name`, nested `account.owner.name`, and inline map keys such as
+  `{proposal.dueDate: 2026-07-01}` now surface as the same dotted variables
+  users insert in document templates, while excluded roots such as `brand.*`
+  remain hidden from the document-variable manager.
 - Simple front-matter merge defaults and tagged scalars are now handled in the
   document-variable inventory. Common YAML such as `<<: *defaults`, `!!str`,
   `!custom`, and `!<tag:yaml.org,2002:str>` can populate repeated client,
@@ -112,8 +116,8 @@ Recent pushed checkpoints visible in current git history:
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
   flow through simple merges as dotted variable names, and anchored maps,
   including dotted or slash-namespaced anchors such as `&client.defaults` and
-  `&business/client.defaults`, can inherit other anchored maps before being
-  reused by a client or partner block.
+  `&business/client.defaults`, can inherit dotted-key defaults from other
+  anchored maps before being reused by a client or partner block.
 - Simple inline YAML maps now expand into dotted document variables as well.
   Compact business front matter such as `client: {name: Acme, tier:
   Enterprise}` and anchored defaults such as `defaults: &clientDefaults

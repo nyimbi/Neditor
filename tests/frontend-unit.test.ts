@@ -798,6 +798,40 @@ test("front matter managers resolve namespaced anchor aliases", () => {
   ok(sources.some((row) => row.name === "Namespaced Inline" && row.path === "data/namespaced-inline.json" && row.kind === "json"));
 });
 
+test("front matter managers expand dotted metadata keys", () => {
+  const source = [
+    "---",
+    "client.name: Acme Corp",
+    "client.owner: &client.owner Strategy Office",
+    "client.empty:",
+    "brand.color: teal",
+    "account:",
+    "  renewal.value: 125000",
+    "  owner.name: *client.owner",
+    "compact: {client.name: Compact Co, proposal.dueDate: 2026-07-01}",
+    "inlineDefaults: &inline.defaults {account.tier: Enterprise, account.region: EMEA}",
+    "deal:",
+    "  <<: *inline.defaults",
+    "  account.tier: Strategic",
+    "---",
+    "",
+    "# Dotted",
+  ].join("\n");
+
+  const rows = parseFrontMatterVariables(source);
+  ok(rows.some((row) => row.key === "client.name" && row.value === "Acme Corp"));
+  ok(rows.some((row) => row.key === "client.owner" && row.value === "Strategy Office"));
+  ok(rows.some((row) => row.key === "client.empty" && row.status === "empty"));
+  ok(rows.some((row) => row.key === "account.renewal.value" && row.value === "125000"));
+  ok(rows.some((row) => row.key === "account.owner.name" && row.value === "Strategy Office"));
+  ok(rows.some((row) => row.key === "compact.client.name" && row.value === "Compact Co"));
+  ok(rows.some((row) => row.key === "compact.proposal.dueDate" && row.value === "2026-07-01"));
+  ok(rows.some((row) => row.key === "inlineDefaults.account.tier" && row.value === "Enterprise"));
+  ok(rows.some((row) => row.key === "deal.account.tier" && row.value === "Strategic"));
+  ok(rows.some((row) => row.key === "deal.account.region" && row.value === "EMEA"));
+  ok(!rows.some((row) => row.key === "brand.color"));
+});
+
 test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   const text = "word alpha beta";
   equal(nextVimWordStart(text, 0), 5);

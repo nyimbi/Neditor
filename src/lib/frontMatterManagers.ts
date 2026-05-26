@@ -53,8 +53,14 @@ const metadataVariableExcludedKeys = new Set([
 ]);
 
 const yamlAnchorNamePattern = "[A-Za-z0-9_.:/@-]+";
+const yamlKeyNamePattern = "[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)*";
 const yamlAliasScalarRegex = new RegExp(`^\\*(${yamlAnchorNamePattern})$`);
 const yamlAnchorPrefixRegex = new RegExp(`^&(${yamlAnchorNamePattern})(?:\\s+|$)(.*)$`);
+const yamlKeyScalarRegex = new RegExp(`^${yamlKeyNamePattern}$`);
+const yamlKeyValueRegex = new RegExp(`^(${yamlKeyNamePattern}):\\s*(.*)$`);
+const yamlMaybeIndentedKeyValueRegex = new RegExp(`^(\\s*)(${yamlKeyNamePattern}):\\s*(.*)$`);
+const yamlTopLevelKeyValueRegex = new RegExp(`^(${yamlKeyNamePattern}):\\s*(.*)$`);
+const yamlIndentedKeyValueRegex = new RegExp(`^\\s+(${yamlKeyNamePattern}):\\s*(.*)$`);
 
 export function appendFrontMatterDataSource(
   text: string,
@@ -117,7 +123,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
   for (let index = 1; index < endIndex; index += 1) {
     const raw = lines[index];
     const rawIndent = yamlIndentWidth(raw.match(/^\s*/)?.[0] || "");
-    const topLevel = raw.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+    const topLevel = raw.match(yamlTopLevelKeyValueRegex);
     if (topLevel) {
       flushCurrent();
       stopSequenceAnchor();
@@ -228,7 +234,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       continue;
     }
     if (currentMapAnchor && rawIndent > currentMapAnchor.indent) {
-      const anchorPair = raw.match(/^\s+([A-Za-z][\w-]*):\s*(.*)$/);
+      const anchorPair = raw.match(yamlIndentedKeyValueRegex);
       if (anchorPair) {
         const parsed = parseYamlScalar(anchorPair[2]);
         const value = parsed.alias ? anchors.get(parsed.alias) || parsed.value : parsed.value;
@@ -374,7 +380,7 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
       if (itemAnchor && !mapAnchors.has(itemAnchor)) mapAnchors.set(itemAnchor, []);
       if (itemHasChildren || itemAnchor) stack.push({ indent: itemIndent, path: itemPath, excluded: itemExcluded, anchor: itemAnchor });
       const itemMerge = itemDecorated.scalar.match(/^<<:\s*(.*)$/);
-      const itemPair = itemDecorated.scalar.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+      const itemPair = itemDecorated.scalar.match(yamlKeyValueRegex);
       if (itemMerge) {
         recordEntriesForPath(
           itemPath,
@@ -446,12 +452,12 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
       }
       continue;
     }
-    const match = raw.match(/^(\s*)([A-Za-z][\w-]*):\s*(.*)$/);
+    const match = raw.match(yamlMaybeIndentedKeyValueRegex);
     if (!match) continue;
     const indent = yamlIndentWidth(match[1]);
     const key = match[2];
     const path = parent ? `${parent.path}.${key}` : key;
-    const excluded = Boolean(parent?.excluded || (!parent && frontMatterVariableExcludedKeys.has(key)));
+    const excluded = Boolean(parent?.excluded || (!parent && frontMatterVariableExcludedKeys.has(rootYamlKey(key))));
     const hasChildren = hasIndentedYamlChildren(lines, endIndex, index, indent);
     const parsed = parseYamlScalar(match[3]);
     if (parsed.anchor && hasChildren && !mapAnchors.has(parsed.anchor)) mapAnchors.set(parsed.anchor, []);
@@ -760,6 +766,10 @@ function yamlIndentWidth(indent: string) {
   return indent.replace(/\t/g, "  ").length;
 }
 
+function rootYamlKey(key: string) {
+  return key.split(".")[0] || key;
+}
+
 function hasIndentedYamlChildren(lines: string[], endIndex: number, index: number, indent: number) {
   for (let nextIndex = index + 1; nextIndex < endIndex; nextIndex += 1) {
     const next = lines[nextIndex];
@@ -872,7 +882,7 @@ function parseInlineYamlMap(
       }
       continue;
     }
-    if (!/^[A-Za-z][\w-]*$/.test(key)) continue;
+    if (!yamlKeyScalarRegex.test(key)) continue;
     const parsed = parseYamlScalar(rawValue);
     let entryValue = parsed.alias ? anchors.get(parsed.alias) || parsed.value : parsed.value;
     if (parsed.anchor && entryValue && !entryValue.startsWith("[") && !entryValue.startsWith("{")) anchors.set(parsed.anchor, entryValue);
