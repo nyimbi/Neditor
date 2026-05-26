@@ -4678,7 +4678,9 @@ test("publishes and hands off extended export targets", async ({ page }) => {
     await expect(exportPreview).toContainText("ready");
 
     await queueDialogSelection(page, target.path);
-    await page.getByRole("button", { name: "Export document" }).click();
+    await page
+      .getByRole("button", { name: target.value === "epub" ? "Export EPUB" : "Export document" })
+      .click();
     await expect(exportResult).toContainText(`Output: ${target.path}`);
     await expect(exportResult).toContainText(`Manifest: ${target.path}.manifest.json`);
     await expect(exportResult).toContainText(`Mock ${target.value} export wrote ${target.path}`);

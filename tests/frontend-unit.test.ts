@@ -2716,12 +2716,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("native workflow generated Docs Live section draft from native writing tools menu"));
   ok(app.includes("native workflow applied Docs Live section draft for review"));
   ok(app.includes("Export HTML"));
+  ok(app.includes("Export EPUB"));
   ok(app.includes('id: "export-html", label: "HTML Export", title: "Export standalone HTML"'));
+  ok(app.includes('id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package"'));
   ok(app.includes('aria-label="HTML export options"'));
   ok(app.includes("HTML delivery"));
   ok(app.includes("store.exportDefaults.htmlLanguage"));
   ok(app.includes("store.exportDefaults.canonicalUrl"));
   ok(app.includes("exportDocumentAs(\"html\")"));
+  ok(app.includes("exportDocumentAs(\"epub\")"));
   ok(app.includes('aria-label="Export profiles"'));
   ok(app.includes("saveCurrentExportProfile"));
   ok(store.includes("saveCurrentExportProfile"));
@@ -2736,6 +2739,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(store.includes("normalizeDocsLiveDraftHistory"));
   ok(app.includes('listen<string>("neditor-menu-command"'));
   ok(app.includes('"neditor-export-html": "html"'));
+  ok(app.includes('"neditor-export-epub": "epub"'));
   ok(app.includes("collectNativeMenuCommandEvidence"));
   ok(app.includes("native workflow inserted table from native writing tools menu"));
   ok(app.includes("collectNativeWorkspaceTabEvidence"));
@@ -2746,6 +2750,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('SubmenuBuilder::new(app, "View")'));
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Help")'));
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
+  ok(tauriLib.includes('"neditor-export-epub", "EPUB Export"'));
   ok(tauriLib.includes('"neditor-open-docs-live", "Docs Live"'));
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
   ok(tauriLib.includes('"neditor-open-agent-workspace",'));

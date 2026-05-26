@@ -3091,6 +3091,19 @@ Calc block diagnostic precision:
 | --- | --- | --- |
 | `cargo test --locked calc_blocks_resolve_forward_refs_and_report_cycles --lib` in `src-tauri` | Pass | Focused compiler proof now checks cyclic calc block diagnostics include the Markdown source file, exact formula source line, start/end columns, formula-name related context, and dependency related context. |
 
+Direct EPUB export affordances:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the direct EPUB toolbar, Export panel, command-palette, and help-action routes. |
+| `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including static guards for direct EPUB export commands, toolbar metadata, native menu mapping, and command wiring. |
+| `cargo test --locked export_document_writes_epub_package --lib` in `src-tauri` | Pass | Focused native export proof still writes a valid `.epub` package with EPUB container, OPF metadata, navigation, XHTML body, stylesheet, embedded manifest, and packaged text fallback. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "publishes and hands off extended export targets"` | Pass | Focused Chromium workflow passed and now uses the direct **Export EPUB** button for the EPUB target while preserving readiness, output-path, manifest-path, and status evidence. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the direct EPUB flow change, restoring the full-suite browser evidence expected by release readiness. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting direct EPUB access in the README, user guide, progress log, and spec completion matrix; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the EPUB affordance evidence update. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing the full-suite browser workflow evidence. |
+
 Local agent CLI workspace preparation:
 
 | Command | Result | Evidence |

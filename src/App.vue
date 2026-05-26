@@ -1451,6 +1451,14 @@
               </span>
               Export HTML
             </button>
+            <button type="button" :disabled="store.exportBusy" @click="exportDocumentAs('epub')">
+              <span class="button-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path v-for="path in toolbarIconPaths('epub')" :key="path" :d="path"></path>
+                </svg>
+              </span>
+              Export EPUB
+            </button>
             <button type="button" :disabled="store.exportBusy" @click="prepareForExport">Prepare for export</button>
             <button type="button" :disabled="store.exportBusy" @click="exportDocument">Export document</button>
           </div>
@@ -4744,6 +4752,7 @@ type ToolbarIconName =
   | "expand"
   | "help"
   | "html"
+  | "epub"
   | "pin"
   | "close";
 
@@ -4835,6 +4844,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   expand: ["M9 7l5 5-5 5"],
   help: ["M9 9a3 3 0 1 1 5.4 1.8c-.7 1.1-2.4 1.5-2.4 3.2", "M12 18h.01", "M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z"],
   html: ["M8 8l-4 4 4 4", "M16 8l4 4-4 4", "M14 5l-4 14"],
+  epub: ["M5 5h7a4 4 0 0 1 4 4v10H9a4 4 0 0 0-4-4z", "M19 5h-7a4 4 0 0 0-4 4v10h7a4 4 0 0 1 4-4z", "M8 9h4", "M12 9h4", "M8 13h4", "M12 13h4"],
   pin: ["M14 4l6 6-4 1-4 6-1 3-1-1-3-3-3-3-1-1 3-1 6-4z", "M9 15l-5 5"],
   close: ["M6 6l12 12", "M18 6L6 18"],
 };
@@ -6127,6 +6137,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
       { label: "Export panel", run: () => (store.sidebar = "exports") },
       { label: "Prepare export", run: () => prepareForExport() },
       { label: "Export HTML", run: () => exportDocumentAs("html") },
+      { label: "Export EPUB", run: () => exportDocumentAs("epub") },
     ],
     keywords: ["html", "pdf", "docx", "pptx", "blog", "substack", "latex", "google docs", "epub", "ebook"],
   },
@@ -6373,6 +6384,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "save", label: "Save", title: "Save document", icon: "save", primary: true, run: () => saveDocument() },
       { id: "save-as", label: "Save As", title: "Save document as", icon: "saveAs", run: () => saveDocumentAs() },
       { id: "export-html", label: "HTML Export", title: "Export standalone HTML", icon: "html", run: () => exportDocumentAs("html") },
+      { id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package", icon: "epub", run: () => exportDocumentAs("epub") },
       { id: "export", label: "Export", title: "Export document", icon: "export", disabled: store.exportBusy, run: () => exportDocument() },
     ],
   },
@@ -7756,6 +7768,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Duplicate document", group: "File", run: () => void duplicateDocument() },
   { name: "Prepare for export", group: "Export", run: () => void prepareForExport() },
   { name: "Export HTML", group: "Export", run: () => void exportDocumentAs("html") },
+  { name: "Export EPUB", group: "Export", run: () => void exportDocumentAs("epub") },
   { name: "Export document", group: "Export", run: () => void exportDocument() },
   { name: "Create snapshot", group: "Versioning", run: () => void snapshotActive() },
   { name: "Refresh Git diff", group: "Versioning", run: () => void store.refreshGitDiff() },

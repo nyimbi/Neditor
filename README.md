@@ -426,6 +426,9 @@ preview HTML as the only source of truth.
 HTML export is available as a first-class File menu action (`File` -> `Export`
 -> `HTML Export`), a toolbar command, a command-palette command, and the default
 Export panel target.
+EPUB export is also directly available from `File` -> `Export` -> `EPUB Export`,
+the document toolbar, the Export panel, and the command palette for ebook
+handoffs that should not require hunting through the target picker first.
 
 | Target | What it is for | Current support |
 | --- | --- | --- |

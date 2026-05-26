@@ -541,7 +541,9 @@ direct `.tex` file and use the regular sidecar manifest when `includeManifest`
 is enabled.
 EPUB exports write a direct `.epub` package with the required `mimetype`,
 container file, OPF metadata, navigation document, XHTML body, stylesheet, text
-fallback, packaged media, and embedded NEditor manifest.
+fallback, packaged media, and embedded NEditor manifest. Use **Export EPUB**
+from the Export panel, document toolbar, command palette, or native
+`File` -> `Export` menu when the document is ready for ebook review.
 
 ## Versioning And Snapshots
 
