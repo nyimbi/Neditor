@@ -116,7 +116,10 @@ Recent pushed checkpoints visible in current git history:
   `profile: {name: ...}` forms exist, and sibling dotted fallback keys such as
   `profile.owner` still resolve when the nested `profile` map does not contain
   that leaf, so document authors can use compact dotted metadata without
-  breaking explicit structured YAML.
+  breaking explicit structured YAML. The same lookup now has project-variable
+  coverage, so `.neditor/variables.yaml` can supply compact dotted defaults
+  like `profile.owner` and `layout.header` without overriding explicit nested
+  front matter.
 - Simple front-matter merge defaults and tagged scalars are now handled in the
   document-variable inventory. Common YAML such as `<<: *defaults`, `!!str`,
   `!custom`, `!docs!channel`, and `!<tag:yaml.org,2002:str>` can populate
