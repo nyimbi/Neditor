@@ -1413,9 +1413,18 @@ fn compiler_reports_broken_local_markdown_links() {
         .related
         .iter()
         .any(|related| related.contains("docs/missing.png")));
-    assert!(response
+    let broken_logo = response
         .diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.message.contains("Broken logo path")));
+        .find(|diagnostic| diagnostic.message.contains("Broken logo path"))
+        .expect("broken logo diagnostic");
+    assert_eq!(broken_logo.line, Some(6));
+    assert!(broken_logo.column.is_some());
+    assert!(broken_logo.end_column > broken_logo.column);
+    assert_eq!(broken_logo.source_file.as_deref(), Some(root_doc.as_str()));
+    assert!(broken_logo
+        .related
+        .iter()
+        .any(|related| related.contains("docs/missing-logo.svg")));
     fs::remove_dir_all(root).expect("clean link test dir");
 }

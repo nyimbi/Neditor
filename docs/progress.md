@@ -3555,6 +3555,16 @@ Emacs editor keybinding hardening:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after refreshing the Vim/Emacs evidence row. |
 | `git diff --check` | Pass | No whitespace errors are present in the editor keybinding diff. |
 
+Logo metadata diagnostic source ranges:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compiler_reports_broken_local_markdown_links --lib` in `src-tauri` | Pass | Focused compiler diagnostic verification passed for broken Markdown links, images, and front-matter logo source ranges. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting is clean after the logo diagnostic range hardening. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after refreshing diagnostic evidence; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after documenting the richer diagnostics proof. |
+| `git diff --check` | Pass | No whitespace errors are present in the diagnostic and docs diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

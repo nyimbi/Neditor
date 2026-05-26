@@ -226,7 +226,13 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         &source_map,
         &mut diagnostics,
     );
-    validate_logo_path(&metadata, root_path.as_deref(), &mut diagnostics);
+    validate_logo_path(
+        &metadata,
+        &source,
+        &root_file,
+        root_path.as_deref(),
+        &mut diagnostics,
+    );
     validate_link_paths(
         &table_formula_markdown,
         root_path.as_deref(),
