@@ -135,6 +135,10 @@ Recent pushed checkpoints visible in current git history:
 - Generated glossary sections now accept structured `glossary.enabled: true`
   metadata in addition to `[GLOSSARY]`, `glossary: true`, and the legacy
   `glossarySection` aliases.
+- Generated caption lists now accept structured front matter such as
+  `captionLists.figures: true`, `captionLists.tables: true`,
+  `figures.list.enabled`, and `tables.list.enabled`, so business templates can
+  request lists of figures/tables without inserting explicit markers.
 - Automatic indexes now honor metadata-defined terms from `index.terms`,
   `indexTerms`, `index_terms`, and `index.keywords`, including comma-separated
   strings and structured entries such as `{term, anchor}`, while

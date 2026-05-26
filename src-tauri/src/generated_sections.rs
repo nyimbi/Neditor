@@ -45,7 +45,17 @@ pub(crate) fn inject_generated_sections(
         }
     }
     if output.contains("[LIST_OF_FIGURES]")
-        || metadata_bool(metadata, &["listOfFigures", "list_of_figures"])
+        || metadata_bool(
+            metadata,
+            &[
+                "listOfFigures",
+                "listOfFigures.enabled",
+                "list_of_figures",
+                "figures.list",
+                "figures.list.enabled",
+                "captionLists.figures",
+            ],
+        )
     {
         let list = render_caption_list("Figure", &collect_figure_entries(&output));
         output = output.replace(
@@ -57,7 +67,17 @@ pub(crate) fn inject_generated_sections(
         }
     }
     if output.contains("[LIST_OF_TABLES]")
-        || metadata_bool(metadata, &["listOfTables", "list_of_tables"])
+        || metadata_bool(
+            metadata,
+            &[
+                "listOfTables",
+                "listOfTables.enabled",
+                "list_of_tables",
+                "tables.list",
+                "tables.list.enabled",
+                "captionLists.tables",
+            ],
+        )
     {
         let list = render_caption_list("Table", &collect_table_entries(&output));
         output = output.replace("[LIST_OF_TABLES]", &format!("## List of Tables\n\n{list}"));
