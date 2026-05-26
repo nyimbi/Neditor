@@ -211,6 +211,48 @@ fn ned_cli_writes_supported_text_exports_to_stdout() {
 }
 
 #[test]
+fn ned_cli_validates_export_readiness_without_writing_artifacts() {
+    let source = temp_markdown_path("validate-ready");
+    fs::write(&source, super::sample_document()).expect("write source markdown");
+    let args = vec![
+        "ned".to_string(),
+        "validate".to_string(),
+        source.to_string_lossy().to_string(),
+        "--to".to_string(),
+        "html".to_string(),
+        "--json".to_string(),
+    ];
+    let outcome = crate::cli::run_cli_with_args(&args).expect("validate json");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("validate json");
+    assert_eq!(report["schema"], "neditor.ned-validate.v1");
+    assert_eq!(report["target"], "html");
+    assert_eq!(report["errorCount"], 0);
+    assert!(report["warningCount"].as_u64().is_some());
+    assert_eq!(report["manifest"]["export_target"], "html");
+    assert!(!source.with_extension("html").exists());
+
+    let blocked_args = vec![
+        "ned".to_string(),
+        "check".to_string(),
+        "-".to_string(),
+        "--to".to_string(),
+        "pptx".to_string(),
+    ];
+    let blocked = crate::cli::run_cli_with_args_and_stdin(
+        &blocked_args,
+        Some("# Pipeline Draft\n\nA draft without release metadata.\n"),
+    )
+    .expect("blocked readiness");
+    assert_eq!(blocked.exit_code, 1);
+    assert!(blocked
+        .message
+        .contains("Export readiness for pptx: not ready"));
+    assert!(blocked.message.contains("Diagnostics:"));
+    assert!(blocked.message.contains("release"));
+}
+
+#[test]
 fn ned_cli_rejects_binary_stdout_exports() {
     let source = temp_markdown_path("convert-stdout-binary");
     fs::write(&source, super::sample_document()).expect("write source markdown");
@@ -297,6 +339,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("--output-dir"));
     assert!(outcome.message.contains("--stdout"));
     assert!(outcome.message.contains("ned new"));
+    assert!(outcome.message.contains("ned validate"));
     assert!(outcome.message.contains("ned templates"));
     assert!(outcome.message.contains("ned targets"));
     assert!(outcome.message.contains("ned completions"));

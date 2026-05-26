@@ -1,4 +1,6 @@
-use crate::export_commands::{export_document, ExportRequest};
+use crate::export_commands::{
+    export_document, prepare_for_export, ExportReadinessReport, ExportRequest, PrepareExportRequest,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -40,6 +42,8 @@ const CLI_COMMANDS: &[&str] = &[
     "open",
     "convert",
     "export",
+    "validate",
+    "check",
     "templates",
     "targets",
     "completions",
@@ -112,6 +116,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "new" => run_new_command(&args[2..]),
         "open" => run_open_command(&args[2..]),
         "convert" | "export" => run_convert_command(&args[2..], stdin_text),
+        "validate" | "check" => run_validate_command(&args[2..], stdin_text),
         "templates" => run_list_command("templates", NEW_DOCUMENT_TEMPLATES, &args[2..]),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
@@ -397,6 +402,84 @@ fn run_convert_command(args: &[String], stdin_text: Option<&str>) -> Result<CliO
     Ok(CliOutcome {
         message: messages.join("\n"),
         exit_code: 0,
+    })
+}
+
+fn run_validate_command(args: &[String], stdin_text: Option<&str>) -> Result<CliOutcome, String> {
+    let mut input: Option<String> = None;
+    let mut target = "pdf".to_string();
+    let mut json_output = false;
+    let mut strict = false;
+    let mut options = json!({});
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--to" | "-t" => {
+                index += 1;
+                target = args
+                    .get(index)
+                    .ok_or_else(|| "--to requires an export target".to_string())?
+                    .to_string();
+            }
+            "--json" => json_output = true,
+            "--strict" => strict = true,
+            "--option" => {
+                index += 1;
+                let pair = args
+                    .get(index)
+                    .ok_or_else(|| "--option requires key=value".to_string())?;
+                apply_cli_option(&mut options, pair)?;
+            }
+            value => {
+                if value.starts_with('-') && value != "-" {
+                    return Err(format!("Unsupported validate option '{value}'"));
+                }
+                if input.is_some() {
+                    return Err("Only one input document can be validated at a time.".to_string());
+                }
+                input = Some(value.to_string());
+            }
+        }
+        index += 1;
+    }
+    let targets = parse_export_targets(&target)?;
+    if targets.len() != 1 {
+        return Err("Validate checks exactly one export target at a time.".to_string());
+    }
+    let input_arg =
+        input.ok_or_else(|| "Usage: ned validate <file.md|-> --to pdf [--json]".to_string())?;
+    let (text, file_path, _) = read_cli_input_document(&input_arg, stdin_text)?;
+    let report = prepare_for_export(PrepareExportRequest {
+        text,
+        file_path,
+        target: targets[0].clone(),
+        options,
+    });
+    let exit_code = if report.error_count > 0 || (strict && report.warning_count > 0) {
+        1
+    } else {
+        0
+    };
+    if json_output {
+        let message = serde_json::to_string_pretty(&json!({
+            "schema": "neditor.ned-validate.v1",
+            "target": targets[0],
+            "strict": strict,
+            "ready": report.ready,
+            "exitCode": exit_code,
+            "errorCount": report.error_count,
+            "warningCount": report.warning_count,
+            "infoCount": report.info_count,
+            "diagnostics": report.diagnostics,
+            "manifest": report.manifest,
+            "progressSteps": report.progress_steps,
+        }))
+        .map_err(|err| err.to_string())?;
+        return Ok(CliOutcome { message, exit_code });
+    }
+    Ok(CliOutcome {
+        message: validate_text_report(&targets[0], strict, &report),
+        exit_code,
     })
 }
 
@@ -947,6 +1030,9 @@ _ned() {{
       convert|export)
         COMPREPLY=( $(compgen -W "--to --output --output-dir --stdout --no-manifest --option" -- "$cur") )
         ;;
+      validate|check)
+        COMPREPLY=( $(compgen -W "--to --json --strict --option" -- "$cur") )
+        ;;
       templates|targets)
         COMPREPLY=( $(compgen -W "--json" -- "$cur") )
         ;;
@@ -1001,6 +1087,9 @@ _ned() {{
     convert|export)
       _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--output[output file, or - for text stdout]:file:_files' '--output-dir[output directory]:directory:_files -/' '--stdout[write supported text export to stdout]' '--no-manifest[skip sidecar manifest]' '--option[set export option key=value]:option:'
       ;;
+    validate|check)
+      _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--json[print machine-readable JSON]' '--strict[treat warnings as non-zero]' '--option[set export option key=value]:option:'
+      ;;
     templates|targets)
       _arguments '--json[print machine-readable JSON]'
       ;;
@@ -1042,6 +1131,9 @@ fn fish_completion_script() -> String {
         lines.push(format!(
             "complete -c ned -n '__fish_seen_subcommand_from convert export' -l to -s t -a '{target}'"
         ));
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from validate check' -l to -s t -a '{target}'"
+        ));
     }
     for shell in COMPLETION_SHELLS {
         lines.push(format!(
@@ -1063,6 +1155,9 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l option -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates targets doctor' -l json"
             .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from validate check' -l json".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from validate check' -l strict".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from validate check' -l option -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from doctor' -l strict".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l status".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l enable".to_string(),
@@ -1156,6 +1251,38 @@ fn default_reader_message(response: &DefaultMarkdownReaderResponse) -> String {
     lines.join("\n")
 }
 
+fn validate_text_report(target: &str, strict: bool, report: &ExportReadinessReport) -> String {
+    let status = if report.ready { "ready" } else { "not ready" };
+    let mut lines = vec![format!(
+        "Export readiness for {target}: {status} ({} errors, {} warnings, {} info)",
+        report.error_count, report.warning_count, report.info_count
+    )];
+    if strict && report.warning_count > 0 {
+        lines.push("Strict mode treats warnings as a non-zero result.".to_string());
+    }
+    if report.diagnostics.is_empty() {
+        lines.push("No readiness diagnostics.".to_string());
+        return lines.join("\n");
+    }
+    lines.push("Diagnostics:".to_string());
+    for diagnostic in &report.diagnostics {
+        let location = match (&diagnostic.source_file, diagnostic.line) {
+            (Some(source), Some(line)) => format!(" [{source}:{line}]"),
+            (Some(source), None) => format!(" [{source}]"),
+            (None, Some(line)) => format!(" [line {line}]"),
+            (None, None) => String::new(),
+        };
+        lines.push(format!(
+            "- {}{}: {}",
+            diagnostic.severity, location, diagnostic.message
+        ));
+        if let Some(suggestion) = diagnostic.suggestion.as_ref() {
+            lines.push(format!("  suggestion: {suggestion}"));
+        }
+    }
+    lines.join("\n")
+}
+
 fn help_text() -> String {
     vec![
         "ned - NEditor command line".to_string(),
@@ -1167,6 +1294,7 @@ fn help_text() -> String {
         "  ned open <file.md> [more.md] [--dry-run]".to_string(),
         "  ned convert <file.md|-> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
         "  ned convert <file.md|-> --to html --stdout".to_string(),
+        "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json]".to_string(),
         "  ned targets [--json]".to_string(),
