@@ -453,6 +453,41 @@ test("front matter managers inventory data sources and document variables", () =
   equal(parseFrontMatterDataSources(appended)[0]?.status, "ready");
 });
 
+test("front matter managers handle CRLF quoted YAML and safer path checks", () => {
+  const source = [
+    "---",
+    "title: \"Demo # final\"",
+    "csvFiles: [\"data/revenue,2026.csv\", 'data/archive..old.csv'] # inline comment",
+    "dataSources:",
+    "  - name: \"Revenue # Final\"",
+    "    path: \"data/revenue # final.yml\"",
+    "    type: yml",
+    "  - name: Remote",
+    "    path: https://example.com/data.csv",
+    "    type: csv",
+    "  - name: Windows",
+    "    path: C:\\\\Users\\\\demo\\\\data.csv",
+    "    type: csv",
+    "  - name: Parent",
+    "    path: data/../secrets.csv",
+    "    type: csv",
+    "---",
+    "",
+    "# Demo",
+  ].join("\r\n");
+
+  const variables = parseFrontMatterVariables(source);
+  ok(variables.some((row) => row.key === "title" && row.value === "Demo # final"));
+
+  const sources = parseFrontMatterDataSources(source);
+  ok(sources.some((row) => row.path === "data/revenue,2026.csv" && row.status === "ready"));
+  ok(sources.some((row) => row.path === "data/archive..old.csv" && row.status === "ready"));
+  ok(sources.some((row) => row.name === "Revenue # Final" && row.path === "data/revenue # final.yml" && row.kind === "yaml"));
+  ok(sources.some((row) => row.name === "Remote" && row.status === "blocked-path"));
+  ok(sources.some((row) => row.name === "Windows" && row.status === "blocked-path"));
+  ok(sources.some((row) => row.name === "Parent" && row.status === "blocked-path"));
+});
+
 test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   const text = "word alpha beta";
   equal(nextVimWordStart(text, 0), 5);

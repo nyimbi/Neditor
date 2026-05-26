@@ -54,7 +54,7 @@ export function appendFrontMatterDataSource(
     `    path: ${yamlInlineString(source.path)}`,
     `    type: ${source.kind}`,
   ];
-  const lines = text.startsWith("---\n") ? text.split("\n") : ["---", "---", "", ...text.split("\n")];
+  const lines = startsWithFrontMatter(text) ? text.split(/\r?\n/) : ["---", "---", "", ...text.split(/\r?\n/)];
   const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
   if (endIndex <= 0) return `---\ndataSources:\n${entry.join("\n")}\n---\n\n${text}`;
   const startIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trim() === "dataSources:");
@@ -69,8 +69,8 @@ export function appendFrontMatterDataSource(
 }
 
 export function parseFrontMatterDataSources(text: string): FrontMatterDataSourceRow[] {
-  if (!text.startsWith("---\n")) return [];
-  const lines = text.split("\n");
+  if (!startsWithFrontMatter(text)) return [];
+  const lines = text.split(/\r?\n/);
   const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
   if (endIndex <= 0) return [];
   const rows: FrontMatterDataSourceRow[] = [];
@@ -89,7 +89,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       section = topLevel[1];
       const aliasKind = dataSourceAliasKind(section);
       if (aliasKind && topLevel[2].trim().startsWith("[")) {
-        for (const item of topLevel[2].trim().replace(/^\[|\]$/g, "").split(",")) {
+        for (const item of splitInlineYamlList(topLevel[2])) {
           const path = cleanYamlScalar(item);
           if (path) {
             rows.push(normalizeFrontMatterDataSource({ path, kind: aliasKind, source: section, line: index + 1 }, rows.length));
@@ -135,8 +135,8 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
 }
 
 export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[] {
-  if (!text.startsWith("---\n")) return [];
-  const lines = text.split("\n");
+  if (!startsWithFrontMatter(text)) return [];
+  const lines = text.split(/\r?\n/);
   const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
   if (endIndex <= 0) return [];
   const rows: FrontMatterVariableRow[] = [];
@@ -232,7 +232,7 @@ function normalizeDataSourceKind(value: string): FrontMatterDataSourceKind {
 function dataSourceStatus(path: string, kind: FrontMatterDataSourceKind): FrontMatterDataSourceStatus {
   if (!path) return "missing-path";
   if (!DATA_SOURCE_TYPE_OPTIONS.includes(kind as SupportedDataSourceKind)) return "unsupported-type";
-  if (path.startsWith("/") || path.includes("..")) return "blocked-path";
+  if (isBlockedLocalDataSourcePath(path)) return "blocked-path";
   return "ready";
 }
 
@@ -285,7 +285,97 @@ function hasIndentedYamlChildren(lines: string[], endIndex: number, index: numbe
 }
 
 function cleanYamlScalar(value: string) {
-  return value.trim().replace(/\s+#.*$/, "").replace(/^["']|["']$/g, "");
+  const withoutComment = stripYamlComment(value).trim();
+  if (withoutComment.length >= 2) {
+    const quote = withoutComment[0];
+    if ((quote === "\"" || quote === "'") && withoutComment.endsWith(quote)) {
+      const body = withoutComment.slice(1, -1);
+      return quote === "'" ? body.replace(/''/g, "'") : body.replace(/\\"/g, "\"");
+    }
+  }
+  return withoutComment;
+}
+
+function startsWithFrontMatter(text: string) {
+  return /^---\r?\n/.test(text);
+}
+
+function splitInlineYamlList(value: string) {
+  const trimmed = stripYamlComment(value).trim();
+  if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) return [];
+  const inner = trimmed.slice(1, -1);
+  const items: string[] = [];
+  let quote = "";
+  let escaped = false;
+  let current = "";
+  for (const char of inner) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+    if (quote === "\"" && char === "\\") {
+      current += char;
+      escaped = true;
+      continue;
+    }
+    if ((char === "\"" || char === "'") && !quote) {
+      quote = char;
+      current += char;
+      continue;
+    }
+    if (char === quote) {
+      quote = "";
+      current += char;
+      continue;
+    }
+    if (char === "," && !quote) {
+      if (current.trim()) items.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) items.push(current.trim());
+  return items;
+}
+
+function stripYamlComment(value: string) {
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (quote === "\"" && char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if ((char === "\"" || char === "'") && !quote) {
+      quote = char;
+      continue;
+    }
+    if (char === quote) {
+      quote = "";
+      continue;
+    }
+    if (char === "#" && !quote && (index === 0 || /\s/.test(value[index - 1]))) {
+      return value.slice(0, index).trimEnd();
+    }
+  }
+  return value;
+}
+
+function isBlockedLocalDataSourcePath(path: string) {
+  const normalized = path.trim().replace(/\\/g, "/");
+  return (
+    normalized.startsWith("/") ||
+    normalized.startsWith("//") ||
+    /^[a-z][a-z0-9+.-]*:/i.test(normalized) ||
+    normalized.split("/").some((segment) => segment === "..")
+  );
 }
 
 function yamlInlineString(value: string) {
