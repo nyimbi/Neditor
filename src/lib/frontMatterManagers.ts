@@ -150,6 +150,30 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
   const stack: Array<{ indent: number; path: string; excluded: boolean; anchor: string }> = [];
   const anchors = new Map<string, string>();
   const mapAnchors = new Map<string, Array<{ key: string; value: string; line: number }>>();
+  const sequenceIndexes = new Map<string, number>();
+  const recordScalarForPath = (path: string, excluded: boolean, value: string, line: number, keepExisting = false) => {
+    for (const owner of stack.filter((entry) => entry.anchor)) {
+      const relativeKey = path.startsWith(`${owner.path}.`) ? path.slice(owner.path.length + 1) : "";
+      if (relativeKey) recordMapAnchorEntry(mapAnchors, owner, relativeKey, value, line, keepExisting);
+    }
+    if (!excluded) {
+      setVariableRow(
+        rows,
+        {
+          key: path,
+          value,
+          status: value ? "ready" : "empty",
+          line,
+        },
+        keepExisting,
+      );
+    }
+  };
+  const recordEntriesForPath = (path: string, excluded: boolean, entries: InlineYamlMapEntry[]) => {
+    for (const entry of entries) {
+      recordScalarForPath(`${path}.${entry.key}`, excluded, entry.value, entry.line, entry.keepExisting);
+    }
+  };
   for (let index = 1; index < endIndex; index += 1) {
     const raw = lines[index];
     const indentMatch = raw.match(/^(\s*)/);
@@ -171,6 +195,79 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
             },
             true,
           );
+        }
+      }
+      continue;
+    }
+    const itemMatch = raw.match(/^(\s*)-\s*(.*)$/);
+    if (itemMatch && parent) {
+      const itemIndent = yamlIndentWidth(itemMatch[1]);
+      const itemIndexKey = `${parent.path}:${itemIndent}`;
+      const itemIndex = sequenceIndexes.get(itemIndexKey) || 0;
+      sequenceIndexes.set(itemIndexKey, itemIndex + 1);
+      const itemPath = `${parent.path}.${itemIndex}`;
+      const itemExcluded = parent.excluded;
+      const itemHasChildren = hasIndentedYamlChildren(lines, endIndex, index, itemIndent);
+      const itemDecorated = stripLeadingYamlDecorators(stripYamlComment(itemMatch[2]).trim());
+      const itemAnchor = itemDecorated.anchor;
+      if (itemAnchor && !mapAnchors.has(itemAnchor)) mapAnchors.set(itemAnchor, []);
+      if (itemHasChildren || itemAnchor) stack.push({ indent: itemIndent, path: itemPath, excluded: itemExcluded, anchor: itemAnchor });
+      const itemPair = itemDecorated.scalar.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+      if (itemPair) {
+        const itemKey = itemPair[1];
+        const itemValue = parseYamlScalar(itemPair[2]);
+        let value = itemValue.alias ? anchors.get(itemValue.alias) || itemValue.value : itemValue.value;
+        const fieldPath = `${itemPath}.${itemKey}`;
+        if (itemValue.alias && mapAnchors.has(itemValue.alias)) {
+          recordEntriesForPath(
+            fieldPath,
+            itemExcluded,
+            (mapAnchors.get(itemValue.alias) || []).map((entry) => ({ ...entry, keepExisting: true })),
+          );
+        } else if (value.startsWith("{")) {
+          const inlineEntries = parseInlineYamlMap(value, anchors, mapAnchors, index + 1);
+          if (itemValue.anchor) {
+            if (!mapAnchors.has(itemValue.anchor)) mapAnchors.set(itemValue.anchor, []);
+            for (const entry of inlineEntries) {
+              recordMapAnchorEntry(mapAnchors, { anchor: itemValue.anchor }, entry.key, entry.value, entry.line, entry.keepExisting);
+            }
+          }
+          recordEntriesForPath(fieldPath, itemExcluded, inlineEntries);
+        } else if (value.startsWith("[")) {
+          const inlineEntries = parseInlineYamlSequence(value, anchors, mapAnchors, index + 1);
+          if (itemValue.anchor) {
+            if (!mapAnchors.has(itemValue.anchor)) mapAnchors.set(itemValue.anchor, []);
+            for (const entry of inlineEntries) {
+              recordMapAnchorEntry(mapAnchors, { anchor: itemValue.anchor }, entry.key, entry.value, entry.line, entry.keepExisting);
+            }
+          }
+          recordEntriesForPath(fieldPath, itemExcluded, inlineEntries);
+        } else if (value || !itemHasChildren) {
+          if (value === "[]" || value === "{}") value = "";
+          if (itemValue.anchor && value && !value.startsWith("[") && !value.startsWith("{")) anchors.set(itemValue.anchor, value);
+          if (value !== "|" && value !== ">" && !value.startsWith("[") && !value.startsWith("{")) {
+            recordScalarForPath(fieldPath, itemExcluded, value, index + 1);
+          }
+        }
+      } else if (itemDecorated.scalar) {
+        const itemValue = parseYamlScalar(itemMatch[2]);
+        let value = itemValue.alias ? anchors.get(itemValue.alias) || itemValue.value : itemValue.value;
+        if (itemValue.alias && mapAnchors.has(itemValue.alias)) {
+          recordEntriesForPath(
+            itemPath,
+            itemExcluded,
+            (mapAnchors.get(itemValue.alias) || []).map((entry) => ({ ...entry, keepExisting: true })),
+          );
+        } else if (value.startsWith("{")) {
+          recordEntriesForPath(itemPath, itemExcluded, parseInlineYamlMap(value, anchors, mapAnchors, index + 1));
+        } else if (value.startsWith("[")) {
+          recordEntriesForPath(itemPath, itemExcluded, parseInlineYamlSequence(value, anchors, mapAnchors, index + 1));
+        } else {
+          if (value === "[]" || value === "{}") value = "";
+          if (itemValue.anchor && value && !value.startsWith("[") && !value.startsWith("{")) anchors.set(itemValue.anchor, value);
+          if (value !== "|" && value !== ">" && !value.startsWith("[") && !value.startsWith("{")) {
+            recordScalarForPath(itemPath, itemExcluded, value, index + 1);
+          }
         }
       }
       continue;

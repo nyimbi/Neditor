@@ -571,6 +571,15 @@ test("front matter managers expand simple inline object variables", () => {
     "reviewers: [*docOwner, Finance Team]",
     "contacts: &contactList [{name: Jane, role: Sponsor}, {name: Eli, address: {city: Kigali}}]",
     "copiedContacts: *contactList",
+    "milestones:",
+    "  - name: Discovery",
+    "    owner: *docOwner",
+    "    due: 2026-06-01",
+    "  - name: Proposal",
+    "    owner: Finance Team",
+    "blockReviewers:",
+    "  - Legal",
+    "  - Finance",
     "portfolio: &portfolioDefaults",
     "  billing: {currency: USD, amount: 125000}",
     "deal:",
@@ -604,6 +613,13 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "contacts.1.address.city" && row.value === "Kigali"));
   ok(rows.some((row) => row.key === "copiedContacts.0.name" && row.value === "Jane"));
   ok(rows.some((row) => row.key === "copiedContacts.1.address.city" && row.value === "Kigali"));
+  ok(rows.some((row) => row.key === "milestones.0.name" && row.value === "Discovery"));
+  ok(rows.some((row) => row.key === "milestones.0.owner" && row.value === "Strategy Office"));
+  ok(rows.some((row) => row.key === "milestones.0.due" && row.value === "2026-06-01"));
+  ok(rows.some((row) => row.key === "milestones.1.name" && row.value === "Proposal"));
+  ok(rows.some((row) => row.key === "milestones.1.owner" && row.value === "Finance Team"));
+  ok(rows.some((row) => row.key === "blockReviewers.0" && row.value === "Legal"));
+  ok(rows.some((row) => row.key === "blockReviewers.1" && row.value === "Finance"));
   ok(rows.some((row) => row.key === "portfolio.billing.currency" && row.value === "USD"));
   ok(rows.some((row) => row.key === "portfolio.billing.amount" && row.value === "125000"));
   ok(rows.some((row) => row.key === "deal.billing.currency" && row.value === "USD"));
