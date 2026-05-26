@@ -46,6 +46,13 @@ Recent pushed checkpoints visible in current git history:
   unreviewed AI provenance; formats the status summary and Help guidance; and
   generates the insertable release audit Markdown. Frontend unit coverage
   directly verifies both missing-governance and approved-document paths.
+- Export distribution metadata checks now have a dedicated typed implementation
+  module instead of living only inside the workbench component.
+  `src/lib/exportMetadataChecklist.ts` builds target-specific publishing,
+  release-approval, canonical URL, language, tag, and EPUB creator/outline
+  preflight items; formats checklist summaries; and supplies Help guidance for
+  the Export sidebar. Frontend unit coverage directly verifies blog publishing
+  metadata and EPUB handoff readiness decisions without mounting the UI.
 - Docs Live textbook and novel wizards now start with structure instead of
   prose. Technical textbooks lock textbook architecture, chapter order,
   prerequisites, learning outcomes, examples, exercises, and assessment logic
@@ -3260,6 +3267,19 @@ Release readiness extraction and long-form wizard sequencing:
 | `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting release-readiness extraction and long-form wizard sequencing; all local links resolved. |
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the evidence refresh. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the release-readiness extraction and textbook/novel wizard sequencing changes. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` with refreshed browser workflow evidence. |
+
+Export metadata checklist modularization:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after moving Export sidebar distribution metadata checklist logic from `src/App.vue` into `src/lib/exportMetadataChecklist.ts`. |
+| `pnpm run test:unit` | Pass | 56 frontend unit tests passed, including direct blog publishing metadata and EPUB handoff readiness checklist coverage. |
+| `git diff --check` | Pass | No whitespace errors are present in the export metadata checklist extraction diff. |
+| `pnpm run build` | Pass | Production Vue/Vite build passed with the extracted Export sidebar checklist module. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting export metadata checklist modularization; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the frontend architecture evidence refresh. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the Export sidebar checklist extraction. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` with refreshed browser workflow evidence. |
 
 ## Next Execution Order

@@ -72,6 +72,11 @@ import {
   upsertDocsLivePlaceholder,
 } from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
+import {
+  buildExportMetadataChecklist,
+  exportMetadataChecklistHelp,
+  formatExportMetadataChecklistSummary,
+} from "../src/lib/exportMetadataChecklist.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
 import { extractMarkdownSection, findMarkdownSectionRange, replaceOrAppendMarkdownSection } from "../src/lib/markdownSectionMerge.js";
 import {
@@ -912,6 +917,60 @@ test("release readiness checklist and audit pass for approved documents", () => 
   ok(markdown.includes("## Release Readiness Audit"));
   ok(markdown.includes("| Ownership metadata | complete | version 2.0.0"));
   ok(markdown.includes("QA Lead"));
+});
+
+test("export metadata checklist validates publishing and ebook handoff readiness", () => {
+  const blogChecklist = buildExportMetadataChecklist({
+    target: "blog",
+    text: [
+      "---",
+      "status: draft",
+      "owner: Publishing",
+      "releaseTarget: Blog",
+      "canonicalUrl: ftp://example.com/post",
+      "tags:",
+      "  - strategy",
+      "  - launch",
+      "---",
+      "",
+      "# Launch Post",
+    ].join("\n"),
+    metadata: {
+      description: "A concise launch note for public publication.",
+      language: "en-US",
+    },
+  });
+
+  const blogStatusById = new Map(blogChecklist.map((item) => [item.id, item.status]));
+  equal(blogStatusById.get("release-approval"), "missing");
+  equal(blogStatusById.get("public-description"), "complete");
+  equal(blogStatusById.get("canonical-url"), "invalid");
+  equal(blogStatusById.get("publishing-tags"), "complete");
+  equal(blogStatusById.get("language"), "complete");
+  equal(formatExportMetadataChecklistSummary(blogChecklist), "3 complete, 1 missing, 1 invalid, 0 optional");
+  ok(exportMetadataChecklistHelp("blog").includes("blog package"));
+
+  const epubChecklist = buildExportMetadataChecklist({
+    target: "epub",
+    text: [
+      "---",
+      "status: published",
+      "owner: Editorial",
+      "releaseTarget: EPUB",
+      "approvedBy: QA Lead",
+      "approvedAt: 2026-05-26",
+      "author: Jane Doe",
+      "language: pt-BR",
+      "---",
+      "",
+      "# Chapter 1",
+    ].join("\n"),
+    metadata: {},
+    outlineCount: 4,
+  });
+
+  deepEqual(epubChecklist.map((item) => item.status), ["complete", "complete", "complete", "complete"]);
+  ok(epubChecklist.some((item) => item.id === "epub-outline" && item.detail.includes("4 heading entries")));
 });
 
 test("agentic workflow planner coordinates creation revision review and distribution", () => {

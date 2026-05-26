@@ -4359,6 +4359,15 @@ import {
   type DocsLivePlaceholderKind,
   type DocsLivePlaceholderReviewStatus,
 } from "./lib/docsLive";
+import {
+  buildExportMetadataChecklist,
+  DISTRIBUTION_APPROVAL_TARGETS as distributionApprovalTargets,
+  exportMetadataChecklistHelp,
+  EXPORT_TARGET_LABELS as exportTargetLabels,
+  formatExportMetadataChecklistSummary,
+  PUBLIC_METADATA_TARGETS as publicMetadataTargets,
+  type ExportMetadataChecklistItem,
+} from "./lib/exportMetadataChecklist";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
 import { markdownListContinuation } from "./lib/markdownEditing";
 import { replaceOrAppendMarkdownSection } from "./lib/markdownSectionMerge";
@@ -4439,14 +4448,6 @@ import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument
 
 const store = useDocumentsStore();
 type ExportTarget = typeof store.exportTarget;
-type ExportMetadataChecklistStatus = "complete" | "missing" | "invalid" | "optional";
-interface ExportMetadataChecklistItem {
-  id: string;
-  label: string;
-  status: ExportMetadataChecklistStatus;
-  detail: string;
-  suggestion: string;
-}
 interface AppMenuItem {
   id: string;
   label: string;
@@ -5545,129 +5546,21 @@ const compilerOutputInventory = computed<CompilerOutputInventoryItem[]>(() => {
     outputInventoryItem("Export manifest", manifest, (value) => `${value.included_files.length} files, ${value.transform_artifacts.length} transforms`),
   ];
 });
-const publicMetadataTargets = new Set(["html", "blog", "substack", "epub"]);
-const distributionApprovalTargets = new Set(["pptx", "blog", "substack", "google-docs", "epub"]);
-const exportTargetLabels: Record<string, string> = {
-  html: "HTML",
-  pdf: "PDF",
-  docx: "DOCX",
-  pptx: "PPTX",
-  "markdown-bundle": "Markdown bundle",
-  markdown: "Markdown bundle",
-  blog: "blog package",
-  substack: "Substack package",
-  latex: "LaTeX",
-  "google-docs": "Google Docs package",
-  epub: "EPUB ebook",
-};
 const publicMetadataOptionsVisible = computed(() => publicMetadataTargets.has(store.exportTarget));
 const publicMetadataOptionsTitle = computed(() =>
   store.exportTarget === "epub" ? "Reader metadata" : store.exportTarget === "html" ? "HTML delivery" : "Publishing metadata",
 );
 const exportDistributionChecklist = computed<ExportMetadataChecklistItem[]>(() => {
-  const target = store.exportTarget;
-  const metadata = active.value.compile?.metadata || {};
-  const items: ExportMetadataChecklistItem[] = [];
-
-  if (distributionApprovalTargets.has(target)) {
-    const status = metadataText(metadata, ["status"]) || "draft";
-    const approver = metadataText(metadata, ["approvedBy", "reviewer"]);
-    const approvedAt = metadataText(metadata, ["approvedAt"]);
-    const owner = metadataText(metadata, ["owner"]);
-    const releaseTarget = metadataText(metadata, ["releaseTarget"]);
-    const missing = [
-      !["approved", "published"].includes(status) ? "approved or published status" : "",
-      !approver ? "approvedBy or reviewer" : "",
-      !approvedAt ? "approvedAt" : "",
-      !owner ? "owner" : "",
-      !releaseTarget ? "releaseTarget" : "",
-    ].filter(Boolean);
-    items.push({
-      id: "release-approval",
-      label: "Release approval",
-      status: missing.length ? "missing" : "complete",
-      detail: missing.length ? `Missing ${missing.join(", ")}.` : `Approved for ${releaseTarget || exportTargetLabels[target]}.`,
-      suggestion: "Use the Review panel or Add suggested metadata before external distribution.",
-    });
-  }
-
-  if (target === "html" || target === "blog" || target === "substack") {
-    const description = exportOptionOrMetadata("htmlDescription", metadata, ["description", "summary", "subtitle", "excerpt"]);
-    items.push({
-      id: "public-description",
-      label: target === "html" ? "Search/social description" : "Publishing preview",
-      status: description ? "complete" : target === "html" ? "optional" : "missing",
-      detail: description ? trimForChecklist(description) : "No description, summary, subtitle, or excerpt is available.",
-      suggestion: target === "html" ? "Add a description for richer link previews." : "Add a description or excerpt before publishing.",
-    });
-
-    const canonical = exportOptionOrMetadata("canonicalUrl", metadata, ["canonicalUrl", "canonical_url"]);
-    items.push({
-      id: "canonical-url",
-      label: "Canonical URL",
-      status: canonical ? (isPublicHttpUrl(canonical) ? "complete" : "invalid") : "optional",
-      detail: canonical ? canonical : "No canonical URL set yet.",
-      suggestion: "Use the final public http:// or https:// URL when one exists.",
-    });
-  }
-
-  if (target === "blog" || target === "substack") {
-    const tags = metadataList(metadata, ["tags", "keywords"]);
-    items.push({
-      id: "publishing-tags",
-      label: "Tags and keywords",
-      status: tags.length ? "complete" : "missing",
-      detail: tags.length ? tags.join(", ") : "No tags or keywords are present.",
-      suggestion: "Add tags or keywords so publishing packages are easier to find and archive.",
-    });
-  }
-
-  if (publicMetadataTargets.has(target)) {
-    const language = exportOptionOrMetadata("htmlLanguage", metadata, ["language", "lang", "locale"]);
-    items.push({
-      id: "language",
-      label: target === "epub" ? "Reader language" : "Document language",
-      status: language ? (isLanguageTag(language) ? "complete" : "invalid") : "optional",
-      detail: language ? language : "Will default to en.",
-      suggestion: "Use a language tag such as en, en-US, fr, or pt-BR.",
-    });
-  }
-
-  if (target === "epub") {
-    const creator = metadataText(metadata, ["author", "approvedBy", "reviewer"]);
-    const outlineCount = active.value.compile?.semantic.outline.length || 0;
-    items.push({
-      id: "epub-creator",
-      label: "Ebook creator",
-      status: creator ? "complete" : "missing",
-      detail: creator || "No author, approver, or reviewer is present.",
-      suggestion: "Add author, approvedBy, or reviewer so reader metadata is clear.",
-    });
-    items.push({
-      id: "epub-outline",
-      label: "Reader outline",
-      status: outlineCount ? "complete" : "missing",
-      detail: outlineCount ? `${outlineCount} heading entries available.` : "No heading outline is available.",
-      suggestion: "Add chapter or section headings before exporting an ebook.",
-    });
-  }
-
-  return items;
+  return buildExportMetadataChecklist({
+    target: store.exportTarget,
+    text: active.value.text,
+    metadata: active.value.compile?.metadata,
+    exportDefaults: store.exportDefaults,
+    outlineCount: active.value.compile?.semantic.outline.length || 0,
+  });
 });
-const exportDistributionChecklistSummary = computed(() => {
-  const counts = exportDistributionChecklist.value.reduce<Record<ExportMetadataChecklistStatus, number>>(
-    (acc, item) => {
-      acc[item.status] += 1;
-      return acc;
-    },
-    { complete: 0, missing: 0, invalid: 0, optional: 0 },
-  );
-  return `${counts.complete} complete, ${counts.missing} missing, ${counts.invalid} invalid, ${counts.optional} optional`;
-});
-const exportDistributionChecklistHelp = computed(() => {
-  const target = exportTargetLabels[store.exportTarget] || store.exportTarget;
-  return `Preflight metadata for ${target} before writing files. Prepare for export still runs the authoritative backend validation.`;
-});
+const exportDistributionChecklistSummary = computed(() => formatExportMetadataChecklistSummary(exportDistributionChecklist.value));
+const exportDistributionChecklistHelp = computed(() => exportMetadataChecklistHelp(store.exportTarget));
 const exportPreviewSummary = computed(() => {
   const manifest = store.exportReadiness?.manifest || active.value.compile?.export_manifest;
   const readiness = store.exportReadiness;
@@ -13460,65 +13353,6 @@ function upsertFrontMatterField(text: string, key: string, value: string) {
     lines.splice(endIndex, 0, line);
   }
   return lines.join("\n");
-}
-
-function exportOptionOrMetadata(optionKey: keyof typeof store.exportDefaults, metadata: Record<string, unknown>, metadataKeys: string[]) {
-  const option = store.exportDefaults[optionKey];
-  if (typeof option === "string" && option.trim()) return option.trim();
-  return metadataText(metadata, metadataKeys);
-}
-
-function metadataText(metadata: Record<string, unknown>, keys: string[]) {
-  for (const key of keys) {
-    const value = metadataValueAtPath(metadata, key);
-    if (typeof value === "string" && value.trim()) return value.trim();
-    if (typeof value === "number" || typeof value === "boolean") return String(value);
-    const frontMatterValue = frontMatterScalarValue(active.value.text, key);
-    if (frontMatterValue.trim()) return frontMatterValue.trim();
-  }
-  return "";
-}
-
-function metadataList(metadata: Record<string, unknown>, keys: string[]) {
-  for (const key of keys) {
-    const value = metadataValueAtPath(metadata, key);
-    const values = Array.isArray(value)
-      ? value.map((item) => String(item).trim()).filter(Boolean)
-      : typeof value === "string"
-        ? value.split(",").map((item) => item.trim()).filter(Boolean)
-        : [];
-    if (values.length) return Array.from(new Set(values));
-    const frontMatterValues = frontMatterListValues(active.value.text, key);
-    if (frontMatterValues.length) return frontMatterValues;
-  }
-  return [];
-}
-
-function metadataValueAtPath(metadata: Record<string, unknown>, key: string): unknown {
-  if (Object.prototype.hasOwnProperty.call(metadata, key)) return metadata[key];
-  return key.split(".").reduce<unknown>((current, part) => {
-    if (!current || typeof current !== "object") return undefined;
-    return (current as Record<string, unknown>)[part];
-  }, metadata);
-}
-
-function isPublicHttpUrl(value: string) {
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function isLanguageTag(value: string) {
-  const trimmed = value.trim();
-  return Boolean(trimmed) && trimmed.length <= 35 && trimmed.split("-").every((part) => Boolean(part) && part.length <= 8 && /^[a-z0-9]+$/i.test(part));
-}
-
-function trimForChecklist(value: string) {
-  const trimmed = value.trim();
-  return trimmed.length > 96 ? `${trimmed.slice(0, 93)}...` : trimmed;
 }
 
 function removeFrontMatterField(text: string, key: string) {
