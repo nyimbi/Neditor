@@ -205,6 +205,22 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
           rows.push(normalizeFrontMatterDataSource({ path: aliasedValue, kind: aliasKind, source: section, line: index + 1 }, rows.length));
         }
       }
+      if (
+        aliasKind &&
+        !parsedTopLevel.alias &&
+        parsedTopLevel.value &&
+        !parsedTopLevel.value.startsWith("{") &&
+        !parsedTopLevel.value.startsWith("[") &&
+        parsedTopLevel.value !== "|" &&
+        parsedTopLevel.value !== ">"
+      ) {
+        rows.push(
+          normalizeFrontMatterDataSource(
+            { path: parsedTopLevel.value, kind: aliasKind, source: section, line: index + 1 },
+            rows.length,
+          ),
+        );
+      }
       continue;
     }
     if (currentMapAnchor && rawIndent > currentMapAnchor.indent) {
