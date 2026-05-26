@@ -183,7 +183,11 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       }
       if (aliasKind && parsedTopLevel.alias) {
         const aliasedValue = anchors.get(parsedTopLevel.alias) || "";
-        if (aliasedValue.startsWith("[")) {
+        if (sequenceAnchors.has(parsedTopLevel.alias)) {
+          for (const itemRow of sequenceAnchors.get(parsedTopLevel.alias) || []) {
+            rows.push(normalizeFrontMatterDataSource({ ...itemRow, kind: aliasKind, source: section }, rows.length));
+          }
+        } else if (aliasedValue.startsWith("[")) {
           for (const item of splitInlineYamlList(aliasedValue)) {
             const path = resolveDataSourceScalar(item, anchors);
             if (path) rows.push(normalizeFrontMatterDataSource({ path, kind: aliasKind, source: section, line: index + 1 }, rows.length));
