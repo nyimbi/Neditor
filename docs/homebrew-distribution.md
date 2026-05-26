@@ -31,6 +31,20 @@ After producing a signed and notarized macOS zip or DMG, replace
 NEDITOR_HOMEBREW_CASK=/path/to/homebrew-neditor/Casks/neditor.rb pnpm run check:homebrew
 ```
 
+For release evidence kit returns, place the completed cask and signed artifact
+under a return directory as:
+
+```text
+homebrew/
+  neditor.rb
+  NEditor-<version>-macos.zip
+```
+
+The release host can import those files with `pnpm run ingest:evidence -- --source
+/path/to/return-dir`. Ingest stores them under `.tmp/homebrew/external/`, where
+`pnpm run check:homebrew` auto-detects them if `NEDITOR_HOMEBREW_CASK` and
+`NEDITOR_HOMEBREW_ARTIFACT` are not set.
+
 If Homebrew is installed on the release host, also run:
 
 ```sh

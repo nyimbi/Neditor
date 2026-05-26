@@ -5,6 +5,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const args = parseArgs(process.argv.slice(2));
 const sourceDir = resolve(args.source || process.env.NEDITOR_RELEASE_EVIDENCE_RETURN_DIR || join(root, ".tmp", "release-evidence-return"));
 const reportPath = resolve(args.report || join(root, ".tmp", "release-evidence-ingest", "report.json"));
@@ -61,6 +62,24 @@ const evidenceItems = [
     "signing/linux-signing-evidence.json",
     "linux/signing-evidence.json",
     "linux-signing-evidence.json",
+  ]),
+  item("homebrew-cask", ".tmp/homebrew/external/neditor.rb", "homebrew", [
+    "homebrew/neditor.rb",
+    "homebrew/Casks/neditor.rb",
+    "Casks/neditor.rb",
+    "neditor.rb",
+  ]),
+  item("homebrew-release-artifact", ".tmp/homebrew/external/neditor-release-artifact", "homebrew", [
+    `homebrew/NEditor-${packageJson.version}-macos.zip`,
+    `homebrew/NEditor-${packageJson.version}-macos.dmg`,
+    "homebrew/NEditor-macos.zip",
+    "homebrew/NEditor-macos.dmg",
+    "homebrew/neditor-release-artifact",
+    `NEditor-${packageJson.version}-macos.zip`,
+    `NEditor-${packageJson.version}-macos.dmg`,
+    "NEditor-macos.zip",
+    "NEditor-macos.dmg",
+    "neditor-release-artifact",
   ]),
   item("google-docs-import", ".tmp/google-docs-import/external/import-evidence.json", "google-docs", [
     "google-docs-import/external/import-evidence.json",
@@ -202,6 +221,7 @@ function runValidations(categories) {
   const commands = [];
   if (categories.has("platform")) commands.push(command("platform evidence", "pnpm", ["run", "check:platform-evidence"]));
   if (categories.has("signing")) commands.push(command("release signing evidence", "pnpm", ["run", "check:release-signing"]));
+  if (categories.has("homebrew")) commands.push(command("Homebrew release evidence", "pnpm", ["run", "check:homebrew"]));
   if (categories.has("google-docs")) commands.push(command("Google Docs import evidence", "pnpm", ["run", "check:google-docs-import"]));
   if (categories.has("ai-provider")) commands.push(command("AI provider evidence", "pnpm", ["run", "check:ai-provider"]));
   if (categories.has("ai-runtime")) commands.push(command("AI runtime evidence", "pnpm", ["run", "check:ai-runtime"]));

@@ -72,7 +72,7 @@ const runbooks = [
   {
     file: "runbooks/release-signing.md",
     title: "Credentialed Release Signing Proof",
-    gaps: ["release-signing-and-notarization"],
+    gaps: ["release-signing-and-notarization", "homebrew-macos-signing"],
     commands: [
       "git fetch --all --tags",
       `git checkout ${sourceCommit || "<source-commit>"}`,
@@ -88,6 +88,28 @@ const runbooks = [
       ".tmp/release-signing/external/win32/signing-evidence.json",
       ".tmp/release-signing/external/linux/signing-evidence.json",
     ],
+  },
+  {
+    file: "runbooks/homebrew-release.md",
+    title: "Homebrew Cask Release Proof",
+    gaps: ["homebrew-final-cask", "homebrew-release-artifact"],
+    commands: [
+      "git fetch --all --tags",
+      `git checkout ${sourceCommit || "<source-commit>"}`,
+      "git status --porcelain",
+      "pnpm install --frozen-lockfile",
+      "pnpm run build",
+      "./node_modules/.bin/tauri build --bundles app,dmg",
+      "Produce a signed and notarized macOS zip or DMG containing NEditor.app.",
+      "Copy packaging/homebrew/Casks/neditor.rb.template to Casks/neditor.rb in the project tap.",
+      `Replace __VERSION__ with ${packageJson.version} and __SHA256__ with shasum -a 256 output for the signed/notarized artifact.`,
+      "brew audit --cask --new Casks/neditor.rb",
+      "brew install --cask Casks/neditor.rb",
+      "brew uninstall --cask neditor",
+      "Copy the completed Casks/neditor.rb and release artifact into the return bundle.",
+      "pnpm run check:homebrew",
+    ],
+    returns: ["homebrew/neditor.rb", `homebrew/NEditor-${packageJson.version}-macos.zip or homebrew/NEditor-${packageJson.version}-macos.dmg`],
   },
   {
     file: "runbooks/google-docs-import.md",
@@ -213,7 +235,7 @@ const runbooks = [
   {
     file: "runbooks/spec-completion-closure.md",
     title: "Spec Completion Matrix Closure",
-    gaps: ["spec-completion-open-items"],
+    gaps: ["spec-completion-open-items", "homebrew-release-readiness"],
     commands: [
       "git fetch --all --tags",
       `git checkout ${sourceCommit || "<source-commit>"}`,

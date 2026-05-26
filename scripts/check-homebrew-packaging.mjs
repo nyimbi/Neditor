@@ -16,8 +16,12 @@ const README = readText("README.md");
 const issues = [];
 const blockers = [];
 
-const suppliedCaskPath = process.env.NEDITOR_HOMEBREW_CASK ? resolve(process.env.NEDITOR_HOMEBREW_CASK) : null;
-const suppliedArtifactPath = process.env.NEDITOR_HOMEBREW_ARTIFACT ? resolve(process.env.NEDITOR_HOMEBREW_ARTIFACT) : null;
+const suppliedCaskPath = process.env.NEDITOR_HOMEBREW_CASK
+  ? resolve(process.env.NEDITOR_HOMEBREW_CASK)
+  : defaultHomebrewCaskPath();
+const suppliedArtifactPath = process.env.NEDITOR_HOMEBREW_ARTIFACT
+  ? resolve(process.env.NEDITOR_HOMEBREW_ARTIFACT)
+  : defaultHomebrewArtifactPath();
 const releaseSigningReport = readOptionalJson(".tmp/release-signing/report.json");
 const releaseReadinessReport = readOptionalJson(".tmp/release-readiness/report.json");
 
@@ -164,6 +168,22 @@ function validateSuppliedArtifact(artifactPath, caskEvidence) {
 function macosSigningAccepted(report) {
   const darwin = report?.platforms?.find((platform) => platform?.platform === "darwin");
   return darwin?.status === "accepted";
+}
+
+function defaultHomebrewCaskPath() {
+  const path = join(root, ".tmp", "homebrew", "external", "neditor.rb");
+  return existsSync(path) ? path : null;
+}
+
+function defaultHomebrewArtifactPath() {
+  const candidates = [
+    join(root, ".tmp", "homebrew", "external", "neditor-release-artifact"),
+    join(root, ".tmp", "homebrew", "external", `NEditor-${packageJson.version}-macos.zip`),
+    join(root, ".tmp", "homebrew", "external", `NEditor-${packageJson.version}-macos.dmg`),
+    join(root, ".tmp", "homebrew", "external", "NEditor-macos.zip"),
+    join(root, ".tmp", "homebrew", "external", "NEditor-macos.dmg"),
+  ];
+  return candidates.find((path) => existsSync(path)) || null;
 }
 
 function bundleTargetsMacArtifact(targets) {

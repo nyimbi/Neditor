@@ -4294,6 +4294,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("rendered-export-native-viewer-human-signoff"));
   ok(evidenceKitCollector.includes("accessibility-assistive-technology-human-signoff"));
   ok(evidenceKitCollector.includes("optional-external-engines"));
+  ok(evidenceKitCollector.includes("homebrew-final-cask"));
+  ok(evidenceKitCollector.includes("homebrew-release-artifact"));
+  ok(evidenceKitCollector.includes("homebrew-macos-signing"));
+  ok(evidenceKitCollector.includes("runbooks/homebrew-release.md"));
   ok(evidenceKitCollector.includes("sourceTreeClean"));
   ok(evidenceKitCollector.includes("staleTemplates"));
   ok(evidenceKitCollector.includes("inspectTemplateFreshness"));
@@ -4322,6 +4326,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("runbooks/ai-provider-endpoint.md"));
   ok(evidenceKitChecker.includes("runbooks/ai-runtime-device.md"));
   ok(evidenceKitChecker.includes("runbooks/independent-security-review.md"));
+  ok(evidenceKitChecker.includes("runbooks/homebrew-release.md"));
   ok(evidenceKitChecker.includes("runbooks/release-device-performance-profile.md"));
   ok(evidenceKitChecker.includes("runbooks/optional-external-engines.md"));
   ok(evidenceKitChecker.includes("runbooks/spec-completion-closure.md"));
@@ -4339,6 +4344,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("must list final readiness command"));
   ok(evidenceIngest.includes("neditor.release-evidence-ingest.v1"));
   ok(evidenceIngest.includes("NEDITOR_RELEASE_EVIDENCE_RETURN_DIR"));
+  ok(evidenceIngest.includes("homebrew-cask"));
+  ok(evidenceIngest.includes("homebrew-release-artifact"));
+  ok(evidenceIngest.includes("homebrew/neditor.rb"));
+  ok(evidenceIngest.includes("check:homebrew"));
   ok(evidenceIngest.includes("external-engine-sqlite"));
   ok(evidenceIngest.includes("platform/win32-package-artifacts.json"));
   ok(evidenceIngest.includes("ai-provider/provider-evidence.json"));

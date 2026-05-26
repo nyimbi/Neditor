@@ -17,6 +17,7 @@ const expectedRunbooks = [
   "runbooks/windows-platform.md",
   "runbooks/linux-platform.md",
   "runbooks/release-signing.md",
+  "runbooks/homebrew-release.md",
   "runbooks/ai-provider-endpoint.md",
   "runbooks/ai-runtime-device.md",
   "runbooks/independent-security-review.md",
