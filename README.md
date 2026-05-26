@@ -83,6 +83,7 @@ Packaged developer and release builds include a command-line helper named
 
 ```sh
 ned board-paper.md
+ned init ~/Documents/client-pack --json
 ned new proposal.md --template proposal --title "Client Expansion Proposal"
 ned open board-paper.md
 ned convert board-paper.md --to pdf --output board-paper.pdf
@@ -100,16 +101,19 @@ ned default-reader --status
 ```
 
 `ned file.md` and `ned open` launch NEditor with one or more Markdown files.
-`ned new` creates a starter Markdown document from business templates such as
-proposal, RFP response, report, lesson plan, textbook, and novel. `ned convert`
-and `ned export` run the same local export pipeline used by the app for HTML,
-PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, Google Docs package,
-and EPUB outputs. Use comma-separated targets, or `--to all`, with
-`--output-dir` when you need a complete delivery pack for review, legal,
-publishing, and archive handoff. Text-safe exports such as HTML and LaTeX can
-write to stdout, including piped Markdown input with `ned convert - --to html
---stdout`; binary package formats stay file-based to avoid corrupt terminal
-output. `ned validate` and its alias `ned check` run the export-readiness
+`ned init` creates a reusable `.neditor` project scaffold with variables,
+standard business snippets, and a local-agent handoff folder; use `--dry-run`
+to preview the files and `--json` for help desk automation. `ned new` creates a
+starter Markdown document from business templates such as proposal, RFP
+response, report, lesson plan, textbook, and novel. `ned convert` and `ned
+export` run the same local export pipeline used by the app for HTML, PDF, DOCX,
+PPTX, Markdown bundle, blog, Substack, LaTeX, Google Docs package, and EPUB
+outputs. Use comma-separated targets, or `--to all`, with `--output-dir` when
+you need a complete delivery pack for review, legal, publishing, and archive
+handoff. Text-safe exports such as HTML and LaTeX can write to stdout,
+including piped Markdown input with `ned convert - --to html --stdout`; binary
+package formats stay file-based to avoid corrupt terminal output. `ned
+validate` and its alias `ned check` run the export-readiness
 pipeline without writing an artifact; use `--json` for CI, and `--strict` when
 warnings should fail a release gate. `ned inspect` reads a document or stdin
 and reports title, status, outline, word counts, includes, transforms,

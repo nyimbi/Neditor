@@ -3694,6 +3694,23 @@ Spreadsheet table exchange and SQL transform:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the CLI implementation. |
 | `git diff --check` | Pass | No whitespace errors are present in the `ned inspect` diff. |
 
+`ned` project workspace bootstrap:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed for `ned init` `.neditor` workspace scaffolding, idempotent reruns, dry-run behavior, shell completions, and help text coverage. |
+| `src-tauri/target/debug/ned init /private/tmp/neditor-ned-init-smoke-codex --force --json` | Pass | Direct smoke created `.neditor/README.md`, `.neditor/variables.yaml`, `.neditor/snippets/business.md`, and `.neditor/agent-handoffs/.gitkeep` with `neditor.ned-init.v1` JSON evidence. |
+| `src-tauri/target/debug/ned init /private/tmp/neditor-ned-init-smoke-dry --dry-run` | Pass | Direct dry-run smoke reported planned scaffold files without creating the target workspace. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after adding Settings copy for `ned init`. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the Settings command-line guidance refresh. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting `ned init` in the README. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding CLI bootstrap evidence to local file and Settings rows. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after the CLI bootstrap extension. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after the CLI bootstrap extension. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`, preserving external signing, notarization, and cross-host proof blockers. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the CLI bootstrap implementation. |
+| `git diff --check` | Pass | No whitespace errors are present in the `ned init` diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

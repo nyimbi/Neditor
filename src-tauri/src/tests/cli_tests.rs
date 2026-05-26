@@ -35,6 +35,63 @@ fn ned_cli_opens_markdown_paths_without_subcommand() {
 }
 
 #[test]
+fn ned_cli_initializes_project_workspace_scaffold() {
+    let root = temp_workspace_path("init");
+    fs::create_dir_all(&root).expect("create workspace root");
+    let args = vec![
+        "ned".to_string(),
+        "init".to_string(),
+        root.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ];
+    let outcome = crate::cli::run_cli_with_args(&args).expect("init workspace");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("init json");
+    assert_eq!(report["schema"], "neditor.ned-init.v1");
+    assert_eq!(report["dryRun"], false);
+    assert!(root.join(".neditor").join("README.md").is_file());
+    assert!(root.join(".neditor").join("variables.yaml").is_file());
+    assert!(root
+        .join(".neditor")
+        .join("snippets")
+        .join("business.md")
+        .is_file());
+    assert!(root
+        .join(".neditor")
+        .join("agent-handoffs")
+        .join(".gitkeep")
+        .is_file());
+    let variables =
+        fs::read_to_string(root.join(".neditor").join("variables.yaml")).expect("variables");
+    assert!(variables.contains("company:"));
+    assert!(variables.contains("review_date"));
+    let snippet = fs::read_to_string(root.join(".neditor").join("snippets").join("business.md"))
+        .expect("snippet");
+    assert!(snippet.contains("Compliance Matrix Starter"));
+    assert!(snippet.contains("{{profile.owner}}"));
+
+    let rerun = crate::cli::run_cli_with_args(&args).expect("idempotent init");
+    let rerun_report: serde_json::Value = serde_json::from_str(&rerun.message).expect("rerun json");
+    assert!(rerun_report["created"]
+        .as_array()
+        .expect("created")
+        .is_empty());
+    assert!(rerun_report["kept"].as_array().expect("kept").len() >= 4);
+
+    let dry_root = temp_workspace_path("init-dry-run");
+    let dry_args = vec![
+        "ned".to_string(),
+        "init".to_string(),
+        dry_root.to_string_lossy().to_string(),
+        "--dry-run".to_string(),
+    ];
+    let dry_run = crate::cli::run_cli_with_args(&dry_args).expect("dry-run init");
+    assert_eq!(dry_run.exit_code, 0);
+    assert!(dry_run.message.contains("Would initialize"));
+    assert!(!dry_root.exists());
+}
+
+#[test]
 fn ned_cli_creates_new_business_document_from_template() {
     let path = temp_markdown_path("new-proposal");
     let args = vec![
@@ -159,6 +216,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     .expect("bash completions");
     assert_eq!(bash.exit_code, 0);
     assert!(bash.message.contains("complete -F _ned ned"));
+    assert!(bash.message.contains("init"));
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
     assert!(bash.message.contains("markdown-bundle"));
@@ -182,6 +240,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     .expect("fish completions");
     assert_eq!(fish.exit_code, 0);
     assert!(fish.message.contains("complete -c ned"));
+    assert!(fish.message.contains("init"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("epub"));
 
@@ -381,6 +440,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned convert"));
     assert!(outcome.message.contains("--output-dir"));
     assert!(outcome.message.contains("--stdout"));
+    assert!(outcome.message.contains("ned init"));
     assert!(outcome.message.contains("ned new"));
     assert!(outcome.message.contains("ned inspect"));
     assert!(outcome.message.contains("ned validate"));
@@ -400,4 +460,12 @@ fn temp_markdown_path(label: &str) -> std::path::PathBuf {
         .expect("system time")
         .as_nanos();
     std::env::temp_dir().join(format!("neditor-ned-{label}-{unique}.md"))
+}
+
+fn temp_workspace_path(label: &str) -> std::path::PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .as_nanos();
+    std::env::temp_dir().join(format!("neditor-ned-{label}-{unique}"))
 }

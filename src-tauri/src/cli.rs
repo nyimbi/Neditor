@@ -43,6 +43,7 @@ const NEW_DOCUMENT_TEMPLATES: &[&str] = &[
     "novel",
 ];
 const CLI_COMMANDS: &[&str] = &[
+    "init",
     "new",
     "open",
     "convert",
@@ -119,6 +120,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
             message: format!("ned {}", env!("CARGO_PKG_VERSION")),
             exit_code: 0,
         }),
+        "init" => run_init_command(&args[2..]),
         "new" => run_new_command(&args[2..]),
         "open" => run_open_command(&args[2..]),
         "convert" | "export" => run_convert_command(&args[2..], stdin_text),
@@ -173,6 +175,105 @@ fn run_open_command(args: &[String]) -> Result<CliOutcome, String> {
     open_paths_in_neditor(&paths)?;
     Ok(CliOutcome {
         message: format!("Opening {} in NEditor", paths.join(", ")),
+        exit_code: 0,
+    })
+}
+
+fn run_init_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut directory: Option<String> = None;
+    let mut force = false;
+    let mut dry_run = false;
+    let mut json_output = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--force" => force = true,
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            value if value.starts_with('-') => {
+                return Err(format!("Unsupported init option '{value}'"));
+            }
+            value => {
+                if directory.is_some() {
+                    return Err(
+                        "Only one workspace directory can be initialized at a time.".to_string()
+                    );
+                }
+                directory = Some(value.to_string());
+            }
+        }
+        index += 1;
+    }
+    let root = directory
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let neditor_dir = root.join(".neditor");
+    let entries = workspace_init_entries(&root);
+    let mut created = Vec::new();
+    let mut updated = Vec::new();
+    let mut kept = Vec::new();
+
+    if !dry_run {
+        fs::create_dir_all(&neditor_dir).map_err(|err| {
+            format!(
+                "Could not create NEditor workspace directory {}: {err}",
+                neditor_dir.display()
+            )
+        })?;
+    }
+
+    for (path, content) in entries {
+        let existed = path.exists();
+        if dry_run {
+            if existed && !force {
+                kept.push(path_to_display(&path));
+            } else if existed {
+                updated.push(path_to_display(&path));
+            } else {
+                created.push(path_to_display(&path));
+            }
+            continue;
+        }
+        if existed && !force {
+            kept.push(path_to_display(&path));
+            continue;
+        }
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|err| {
+                format!(
+                    "Could not create workspace directory {}: {err}",
+                    parent.display()
+                )
+            })?;
+        }
+        fs::write(&path, content)
+            .map_err(|err| format!("Could not write workspace file {}: {err}", path.display()))?;
+        if existed {
+            updated.push(path_to_display(&path));
+        } else {
+            created.push(path_to_display(&path));
+        }
+    }
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-init.v1",
+                "workspace": path_to_display(&root),
+                "neditorDirectory": path_to_display(&neditor_dir),
+                "dryRun": dry_run,
+                "force": force,
+                "created": created,
+                "updated": updated,
+                "kept": kept,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+
+    Ok(CliOutcome {
+        message: init_text_report(&root, dry_run, force, &created, &updated, &kept),
         exit_code: 0,
     })
 }
@@ -1032,6 +1133,69 @@ fn new_document_markdown(template: &str, title: &str) -> Result<String, String> 
     Ok(body)
 }
 
+fn workspace_init_entries(root: &Path) -> Vec<(PathBuf, &'static str)> {
+    let base = root.join(".neditor");
+    vec![
+        (
+            base.join("README.md"),
+            "# NEditor Workspace\n\nThis folder stores reusable local project material for NEditor.\n\n- `variables.yaml` supplies project variables that documents can reference with `{{variable}}` placeholders.\n- `snippets/` stores reusable document parts for proposals, RFPs, reports, tutorials, and review handoffs.\n- `agent-handoffs/` stores generated local-agent packets for Claude Code, Codex, OpenCode, or private workflows.\n\nDo not store API keys, passwords, or client secrets in this folder.\n",
+        ),
+        (
+            base.join("variables.yaml"),
+            "# Project variables available to NEditor documents.\n# Replace these examples with values your documents reuse often.\nprofile:\n  owner: \"Your Name\"\n  email: \"you@example.com\"\ncompany:\n  name: \"Your Company\"\n  website: \"https://example.com\"\nclient:\n  name: \"Client Name\"\nproject:\n  name: \"Project Name\"\n  review_date: \"YYYY-MM-DD\"\n",
+        ),
+        (
+            base.join("snippets").join("business.md"),
+            "# Standard Business Snippets\n\n## Contact Block\n\n**Prepared by:** {{profile.owner}}  \n**Email:** {{profile.email}}  \n**Company:** {{company.name}}  \n**Website:** {{company.website}}\n\n## Review Handoff\n\n- Confirm scope, assumptions, pricing, dates, and cited evidence.\n- Resolve all placeholders and citation TODOs before external distribution.\n- Run export readiness for the required delivery formats.\n\n## Compliance Matrix Starter\n\n| ID | Requirement | Response | Evidence | Owner | Status |\n| --- | --- | --- | --- | --- | --- |\n| R1 | {{requirement}} | {{response}} | {{evidence}} | {{profile.owner}} | Draft |\n",
+        ),
+        (
+            base.join("agent-handoffs").join(".gitkeep"),
+            "",
+        ),
+    ]
+}
+
+fn init_text_report(
+    root: &Path,
+    dry_run: bool,
+    force: bool,
+    created: &[String],
+    updated: &[String],
+    kept: &[String],
+) -> String {
+    let action = if dry_run {
+        "Would initialize"
+    } else {
+        "Initialized"
+    };
+    let mut lines = vec![format!("{action} NEditor workspace at {}", root.display())];
+    if force {
+        lines.push("Force mode is enabled; existing scaffold files are overwritten.".to_string());
+    }
+    append_init_paths(&mut lines, "Created", created);
+    append_init_paths(&mut lines, "Updated", updated);
+    append_init_paths(&mut lines, "Kept existing", kept);
+    lines.push("Next steps:".to_string());
+    lines.push("  - Edit .neditor/variables.yaml with reusable names, company details, and project values.".to_string());
+    lines.push("  - Add reusable proposal, RFP, tutorial, and review handoff parts under .neditor/snippets/.".to_string());
+    lines.push(
+        "  - Use the Agent Workspace when you want governed local-agent handoff files.".to_string(),
+    );
+    lines.join("\n")
+}
+
+fn append_init_paths(lines: &mut Vec<String>, label: &str, paths: &[String]) {
+    if paths.is_empty() {
+        return;
+    }
+    lines.push(format!("{label}:"));
+    lines.extend(paths.iter().map(|path| format!("  - {path}")));
+}
+
+fn path_to_display(path: &Path) -> String {
+    path.to_string_lossy().to_string()
+}
+
 fn yaml_scalar(value: &str) -> String {
     if value
         .chars()
@@ -1137,6 +1301,9 @@ _ned() {{
 
   if [[ "$cur" == -* ]]; then
     case "$command" in
+      init)
+        COMPREPLY=( $(compgen -W "--dry-run --force --json" -- "$cur") )
+        ;;
       new)
         COMPREPLY=( $(compgen -W "--template --title --open --force --dry-run" -- "$cur") )
         ;;
@@ -1197,6 +1364,9 @@ _ned() {{
   shells=({shells})
 
   case $words[2] in
+    init)
+      _arguments '1:workspace directory:_files -/' '--dry-run[preview action]' '--force[replace scaffold files]' '--json[print machine-readable JSON]'
+      ;;
     new)
       _arguments '*:markdown file:_files -g "*.md"' '--template[choose starter template]:template:($templates)' '--title[set document title]:title:' '--open[open after creating]' '--force[replace existing file]' '--dry-run[preview action]'
       ;;
@@ -1263,6 +1433,9 @@ fn fish_completion_script() -> String {
         ));
     }
     lines.extend([
+        "complete -c ned -n '__fish_seen_subcommand_from init' -l json".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from init' -l force".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from init' -l dry-run".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from new' -l title".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from new' -l open".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from new' -l force".to_string(),
@@ -1517,6 +1690,7 @@ fn help_text() -> String {
         "".to_string(),
         "Usage:".to_string(),
         "  ned <file.md> [more.md]".to_string(),
+        "  ned init [workspace] [--dry-run] [--force] [--json]".to_string(),
         "  ned new <file.md> [--template proposal] [--title \"Client Proposal\"] [--open]"
             .to_string(),
         "  ned open <file.md> [more.md] [--dry-run]".to_string(),
