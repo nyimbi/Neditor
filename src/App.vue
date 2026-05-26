@@ -4381,6 +4381,7 @@ import {
   upsertFrontMatterField,
   upsertFrontMatterListField,
 } from "./lib/frontMatter";
+import { emacsSupplementalKeymap, type EmacsKillRing } from "./lib/emacsKeybindings";
 import {
   appendFrontMatterDataSource,
   DATA_SOURCE_TYPE_OPTIONS as dataSourceTypeOptions,
@@ -4560,6 +4561,7 @@ let secondaryEditorView: EditorView | null = null;
 let syncingEditorFromStore = false;
 const vimInputMode = ref<VimInputMode>("insert");
 const vimPendingOperator = ref<VimPendingOperator>("");
+const emacsKillRing: EmacsKillRing = { text: "" };
 const vimKeybindingController: VimKeybindingController = {
   pendingOperator: () => vimPendingOperator.value,
   setInputMode: (mode) => {
@@ -6559,7 +6561,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
       "The command palette is the fastest way to find actions while learning the app.",
       "AI drafting, outline planning, review readiness, and distribution preparation all have direct shortcuts so collapsed toolbars remain practical.",
       "Vim-style mode starts in insert mode; press Escape for normal mode, then use h/j/k/l, 0, ^, $, w, e, b, x, D, C, J, i, a, o, O, u, Ctrl+R, g, G, dd, dw, de, db, d0, d$, cw, and cc.",
-      "Emacs-style mode adds familiar Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Ctrl+P, Ctrl+N, Ctrl+D, and Ctrl+K navigation/editing keys.",
+      "Emacs-style mode adds familiar Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Ctrl+P, Ctrl+N, Ctrl+D, Ctrl+K, Ctrl+Y, Ctrl+W, Alt+D, Alt+Backspace, Alt+F, and Alt+B navigation/editing keys.",
       "Toolbar text can be resized or hidden if you prefer icons only.",
     ],
     actions: [
@@ -11492,6 +11494,7 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
     }),
     keymap.of([
       { key: "Enter", run: continueMarkdownList },
+      ...(store.editorKeymapMode === "emacs" ? emacsSupplementalKeymap(emacsKillRing) : []),
       ...(store.editorKeymapMode === "emacs" ? emacsStyleKeymap : []),
       ...(store.editorKeymapMode === "vim" ? [{ key: "Escape", run: (view: EditorView) => {
         resetVimPendingOperator(vimKeybindingController);

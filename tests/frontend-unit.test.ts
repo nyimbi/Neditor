@@ -72,6 +72,7 @@ import {
   upsertDocsLivePlaceholder,
 } from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
+import { emacsKillLineRange, emacsWordRange } from "../src/lib/emacsKeybindings.js";
 import {
   buildExportMetadataChecklist,
   exportMetadataChecklistHelp,
@@ -855,6 +856,16 @@ test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   deepEqual(vimMotionRange(text, 0, "w", "c"), { from: 0, to: 4 });
   deepEqual(vimMotionRange(text, 10, "b", "d"), { from: 5, to: 10 });
   deepEqual(vimMotionRange(text, 5, "e", "d"), { from: 5, to: 10 });
+});
+
+test("Emacs keybinding helpers preserve kill and word navigation semantics", () => {
+  const text = "alpha beta\nsecond line\n";
+  deepEqual(emacsKillLineRange(text, 2), { from: 2, to: 10, text: "pha beta" });
+  deepEqual(emacsKillLineRange(text, 10), { from: 10, to: 11, text: "\n" });
+  deepEqual(emacsWordRange(text, 0, "forward"), { from: 0, to: 5, text: "alpha" });
+  deepEqual(emacsWordRange(text, 6, "forward"), { from: 6, to: 10, text: "beta" });
+  deepEqual(emacsWordRange(text, 10, "backward"), { from: 6, to: 10, text: "beta" });
+  deepEqual(emacsWordRange(text, 18, "backward"), { from: 11, to: 18, text: "second " });
 });
 
 test("editable outline planner creates document skeletons before drafting content", () => {
@@ -3113,6 +3124,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
   const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
   const vimKeybindings = readFileSync("src/lib/vimKeybindings.ts", "utf8");
+  const emacsKeybindings = readFileSync("src/lib/emacsKeybindings.ts", "utf8");
 
   ok(app.includes(':data-toolbar-display="store.toolbarDisplay"'));
   ok(app.includes(':style="appShellStyle"'));
@@ -3801,6 +3813,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(store.includes('editorKeymapMode: "default"'));
   ok(app.includes('v-model="store.editorKeymapMode"'));
   ok(app.includes("emacsStyleKeymap"));
+  ok(app.includes("emacsSupplementalKeymap"));
+  ok(emacsKeybindings.includes("emacsKillLine"));
+  ok(emacsKeybindings.includes("emacsYank"));
+  ok(emacsKeybindings.includes("Alt-d"));
+  ok(emacsKeybindings.includes("Alt-Backspace"));
   ok(app.includes("handleVimNormalKey"));
   ok(app.includes("vimPendingOperator"));
   ok(vimKeybindings.includes("vimDeleteCurrentLine"));
