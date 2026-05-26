@@ -136,7 +136,9 @@ Recent pushed checkpoints visible in current git history:
 - Shared fenced-body collection now accepts both backtick and tilde fences for
   extension blocks such as `glossary`, `bibtex`, `hayagriva`, `bibliography`,
   and `layout`, keeping author Markdown syntax choices consistent across
-  generated sections and citation workflows.
+  generated sections and citation workflows. Non-target fenced examples are now
+  consumed as examples, so nested `glossary` or `bibtex` samples cannot leak
+  fake terms or references into the compiled document model.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.

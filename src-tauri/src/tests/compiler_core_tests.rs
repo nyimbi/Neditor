@@ -991,6 +991,34 @@ fn compiler_collects_tilde_fenced_glossary_and_bibliography() {
 }
 
 #[test]
+fn compiler_ignores_extension_blocks_inside_fenced_examples() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Extension Examples\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Extension Examples\nClaim [@real2026]. FakeTerm is shown only in an example.\n\n```markdown\n```glossary\nFakeTerm: Should remain example text.\n```\n\n```bibtex\n@article{fake2026, title={Example Only}}\n```\n```\n\n```bibtex\n@article{real2026,\n title={Real Evidence},\n author={Doe},\n year={2026}\n}\n```\n\n[BIBLIOGRAPHY]\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert!(response
+        .bibliography
+        .iter()
+        .any(|entry| entry.key == "real2026"));
+    assert!(!response
+        .bibliography
+        .iter()
+        .any(|entry| entry.key == "fake2026"));
+    assert!(!response.semantic.glossary.contains_key("FakeTerm"));
+    assert!(response
+        .compiled_markdown
+        .contains("- **real2026**. Real Evidence"));
+    assert!(!response.compiled_markdown.contains("- **fake2026**"));
+    assert!(!response.html.contains("class=\"glossary-term\""));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("Missing citation source")));
+}
+
+#[test]
 fn compiler_preserves_figure_float_semantics() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Floating Figure\nstatus: approved\napprovedBy: QA\n---\n# Floating Figure\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:float caption=\"Floating diagram\" float=\"right\"}\n".to_string(),

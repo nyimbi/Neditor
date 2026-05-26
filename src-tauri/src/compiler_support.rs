@@ -121,6 +121,11 @@ pub(crate) fn collect_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(
         if let Some(marker) = fenced_code_marker(line) {
             let info = line.trim_start().strip_prefix(marker).unwrap_or("").trim();
             if info.split_whitespace().next().unwrap_or("") != target {
+                for (_, body_line) in lines.by_ref() {
+                    if body_line.trim_start().starts_with(marker) {
+                        break;
+                    }
+                }
                 continue;
             }
             let mut body = String::new();
