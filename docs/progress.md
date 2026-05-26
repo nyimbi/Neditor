@@ -3527,6 +3527,15 @@ Shared front matter helper modularization:
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the shared front matter helper extraction. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` with refreshed browser workflow evidence. |
 
+RFP compliance verification hardening:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 68 frontend unit tests passed, including requirement-level evidence checklists, compliance coverage, and generated response verification sections. |
+| `pnpm run check` | Pass | Vue typecheck passed for the expanded RFP analysis shape and sidebar display. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after recording the RFP verification evidence; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after strengthening native RFP response verification. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

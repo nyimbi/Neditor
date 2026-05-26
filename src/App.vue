@@ -894,6 +894,7 @@
                 <span><strong>{{ rfpAnalysis.capabilities.length }}</strong> capabilities</span>
                 <span><strong>{{ rfpAnalysis.timelines.length }}</strong> timeline hints</span>
                 <span><strong>{{ rfpAnalysis.budgetHints.length }}</strong> budget hints</span>
+                <span><strong>{{ rfpAnalysis.verificationSummary.rowsNeedingEvidence }}</strong> evidence checks</span>
               </div>
               <details open>
                 <summary>Stated buyer intent</summary>
@@ -909,10 +910,13 @@
               </details>
               <details open>
                 <summary>Requirement verification</summary>
+                <ul>
+                  <li v-for="item in rfpAnalysis.verificationSummary.checklist" :key="`verify-${item}`">{{ item }}</li>
+                </ul>
                 <ol>
                   <li v-for="row in rfpAnalysis.complianceRows.slice(0, 12)" :key="row.id">
                     <strong>{{ row.id }}</strong> {{ row.text }}
-                    <small>{{ row.category }} | {{ row.responseSection }} | {{ row.verification }}</small>
+                    <small>{{ row.category }} | {{ row.responseSection }} | {{ row.complianceStatus }} | {{ row.verification }}</small>
                   </li>
                 </ol>
               </details>
@@ -12604,6 +12608,11 @@ function rfpResponseAnalysisBrief(analysis: RfpAnalysis) {
     analysis.source.url ? `URL: ${analysis.source.url}` : "",
     `Requirements: ${analysis.requirements.length}`,
     `Completeness score: ${analysis.completenessScore}/100`,
+    `Verification: ${analysis.verificationSummary.allRequirementsMapped ? "all extracted requirements mapped" : "coverage gaps detected"}`,
+    `Evidence checks: ${analysis.verificationSummary.rowsNeedingEvidence}`,
+    "",
+    "Requirement verification:",
+    ...analysis.verificationSummary.checklist.map((item) => `- ${item}`),
     "",
     "Stated intent:",
     ...analysis.statedIntent.map((item) => `- ${item}`),
@@ -12612,7 +12621,7 @@ function rfpResponseAnalysisBrief(analysis: RfpAnalysis) {
     ...analysis.impliedIntent.map((item) => `- ${item}`),
     "",
     "Requirements:",
-    ...analysis.requirements.map((item) => `- ${item.id} [${item.category}]: ${item.text} | ${item.responseStrategy}`),
+    ...analysis.complianceRows.map((item) => `- ${item.id} [${item.category}]: ${item.text} | ${item.responseStrategy} | ${item.complianceStatus} | ${item.verification}`),
     "",
     "Timeline hints:",
     ...analysis.timelines.map((item) => `- ${item}`),

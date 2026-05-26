@@ -1207,6 +1207,13 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(analysis.budgetHints.some((item) => item.includes("pricing")));
   ok(analysis.mandatoryAttachments.some((item) => item.includes("insurance certificate")));
   ok(analysis.complianceRows.every((row) => row.verification.includes("Compliance Matrix")));
+  equal(analysis.verificationSummary.totalRequirements, analysis.requirements.length);
+  equal(analysis.verificationSummary.complianceRows, analysis.complianceRows.length);
+  ok(analysis.verificationSummary.allRequirementsMapped);
+  ok(analysis.verificationSummary.rowsNeedingEvidence > 0);
+  ok(analysis.verificationSummary.checklist.some((item) => item.includes("Every extracted requirement")));
+  ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes(`source line ${row.sourceLine}`))));
+  ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes(row.owner))));
 
   const matrix = rfpComplianceMatrixMarkdown(analysis);
   ok(matrix.includes("| ID | Requirement | Category | Compliance status | Response section | Evidence / proof | Verification |"));
@@ -1218,6 +1225,9 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(response.includes("### Stated Intent"));
   ok(response.includes("### Implied Intent"));
   ok(response.includes("## Compliance Matrix"));
+  ok(response.includes("## Requirement Verification"));
+  ok(response.includes("### Requirement-Level Checks"));
+  ok(response.includes("Every extracted requirement has a compliance matrix row."));
   ok(response.includes("- [ ] Every RFP requirement appears in the compliance matrix."));
   ok(response.includes("source=NEditor RFP Response Wizard"));
 });

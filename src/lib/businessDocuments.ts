@@ -98,6 +98,15 @@ export interface RfpComplianceRow extends RfpRequirement {
   complianceStatus: "Responsive draft prepared" | "Needs evidence review";
   responseSection: string;
   verification: string;
+  verificationChecklist: string[];
+}
+
+export interface RfpVerificationSummary {
+  totalRequirements: number;
+  complianceRows: number;
+  rowsNeedingEvidence: number;
+  allRequirementsMapped: boolean;
+  checklist: string[];
 }
 
 export interface RfpAnalysis {
@@ -110,6 +119,7 @@ export interface RfpAnalysis {
   };
   requirements: RfpRequirement[];
   complianceRows: RfpComplianceRow[];
+  verificationSummary: RfpVerificationSummary;
   capabilities: string[];
   statedIntent: string[];
   impliedIntent: string[];
@@ -665,12 +675,8 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
   const capabilities = inferRfpCapabilities(requirements, normalizedText, normalizedProfile);
   const statedIntent = inferStatedRfpIntent(significantLines, requirements);
   const impliedIntent = inferImpliedRfpIntent(requirements, timelines, budgetHints, evaluationCriteria, mandatoryAttachments, normalizedProfile);
-  const complianceRows = requirements.map((requirement) => ({
-    ...requirement,
-    complianceStatus: requirement.evidenceNeeded.includes("placeholder") ? "Needs evidence review" as const : "Responsive draft prepared" as const,
-    responseSection: responseSectionForCategory(requirement.category),
-    verification: `Mapped to ${responseSectionForCategory(requirement.category)} and Compliance Matrix; reviewer must confirm evidence before submission.`,
-  }));
+  const complianceRows = requirements.map(buildRfpComplianceRow);
+  const verificationSummary = buildRfpVerificationSummary(requirements, complianceRows, mandatoryAttachments, evaluationCriteria);
   const risks = inferRfpRisks(requirements, timelines, budgetHints, mandatoryAttachments);
   const questions = inferRfpQuestions(requirements, timelines, budgetHints, evaluationCriteria, mandatoryAttachments, normalizedProfile);
   const warnings = inferRfpWarnings(input, normalizedText, requirements);
@@ -695,6 +701,7 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
     },
     requirements,
     complianceRows,
+    verificationSummary,
     capabilities,
     statedIntent,
     impliedIntent,
@@ -734,6 +741,7 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
   const attachmentBullets = markdownBullets(analysis.mandatoryAttachments, "Add mandatory forms, certificates, declarations, and signatures.");
   const riskBullets = markdownBullets(analysis.risks, "Review source RFP for risks, exceptions, and buyer constraints.");
   const questionBullets = markdownBullets(analysis.questions, "No open questions detected.");
+  const verificationBullets = analysis.verificationSummary.checklist.map((item) => `- [ ] ${item}`).join("\n");
   return fillBusinessTemplate(
     [
       "---",
@@ -782,6 +790,18 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "",
       rfpComplianceMatrixMarkdown(analysis),
       "",
+      "## Requirement Verification",
+      "",
+      verificationBullets || "- [ ] Re-run RFP analysis after importing the full source.",
+      "",
+      "### Requirement-Level Checks",
+      "",
+      ...analysis.complianceRows.flatMap((row) => [
+        `#### ${row.id}: ${row.category}`,
+        "",
+        ...row.verificationChecklist.map((item) => `- [ ] ${item}`),
+        "",
+      ]),
       "## Capability Match",
       "",
       capabilityBullets,
@@ -935,6 +955,64 @@ function responseStrategyForCategory(category: string, profile: Record<keyof Bus
     Requirement: "Answer directly, cite supporting evidence, and keep unresolved assumptions visible.",
   };
   return map[category] || map.Requirement;
+}
+
+function buildRfpComplianceRow(requirement: RfpRequirement): RfpComplianceRow {
+  const responseSection = responseSectionForCategory(requirement.category);
+  const needsEvidenceReview = requirementNeedsEvidenceReview(requirement);
+  const verificationChecklist = [
+    `${requirement.id} maps source line ${requirement.sourceLine} to ${responseSection}.`,
+    `Evidence required: ${requirement.evidenceNeeded}`,
+    `Owner assigned: ${requirement.owner}.`,
+    needsEvidenceReview
+      ? "Not fully verified until the owner attaches proof and a reviewer signs off."
+      : "Responsive draft prepared; reviewer should confirm before submission.",
+  ];
+  return {
+    ...requirement,
+    complianceStatus: needsEvidenceReview ? "Needs evidence review" : "Responsive draft prepared",
+    responseSection,
+    verification: `${requirement.id} mapped from source line ${requirement.sourceLine} to ${responseSection} and Compliance Matrix; evidence owner ${requirement.owner} must confirm proof before submission.`,
+    verificationChecklist,
+  };
+}
+
+function requirementNeedsEvidenceReview(requirement: RfpRequirement) {
+  if (!requirement.evidenceNeeded.trim()) return true;
+  return !/\b(no additional evidence|not applicable|n\/a)\b/i.test(requirement.evidenceNeeded);
+}
+
+function buildRfpVerificationSummary(
+  requirements: RfpRequirement[],
+  complianceRows: RfpComplianceRow[],
+  attachments: string[],
+  criteria: string[],
+): RfpVerificationSummary {
+  const rowIds = new Set(complianceRows.map((row) => row.id));
+  const allRequirementsMapped = requirements.length > 0 && requirements.every((requirement) => rowIds.has(requirement.id));
+  const rowsNeedingEvidence = complianceRows.filter((row) => row.complianceStatus === "Needs evidence review").length;
+  const checklist = [
+    `${requirements.length} extracted requirement(s) mapped to ${complianceRows.length} compliance row(s).`,
+    allRequirementsMapped
+      ? "Every extracted requirement has a compliance matrix row."
+      : "Coverage gap: one or more extracted requirements are missing compliance rows.",
+    rowsNeedingEvidence
+      ? `${rowsNeedingEvidence} row(s) still need attached evidence or reviewer sign-off before submission.`
+      : "No evidence-review blockers were detected in the extracted requirements.",
+    attachments.length
+      ? `${attachments.length} mandatory attachment hint(s) need checklist confirmation.`
+      : "No mandatory attachment hints were detected; confirm appendices manually.",
+    criteria.length
+      ? `${criteria.length} evaluation criteria hint(s) should be mirrored in the executive response and section scoring.`
+      : "No evaluation criteria hints were detected; confirm scoring weights manually.",
+  ];
+  return {
+    totalRequirements: requirements.length,
+    complianceRows: complianceRows.length,
+    rowsNeedingEvidence,
+    allRequirementsMapped,
+    checklist,
+  };
 }
 
 function evidenceForCategory(category: string) {
