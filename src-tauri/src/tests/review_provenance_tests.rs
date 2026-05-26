@@ -119,6 +119,38 @@ fn compiler_accepts_ai_provenance_block_name_aliases() {
 }
 
 #[test]
+fn compiler_collects_tilde_ai_sources_and_ignores_examples() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: AI Fence Handling\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# AI Fence Handling\n\n```markdown\n```ai-source\nprovider: Example Only\nstatus: needs-review\n```\n```\n\n~~~llm-source\ntool: Claude\ndeployment: approved-claude\ngeneratedAt: 2026-05-20T09:00:00Z\nprompt: Reviewed provenance\nreviewer: QA\nreviewDate: 2026-05-20T10:00:00Z\nstatus: human-reviewed\n~~~\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert_eq!(response.semantic.ai_sources.len(), 1);
+    let source = response
+        .semantic
+        .ai_sources
+        .first()
+        .expect("semantic ai source");
+    assert_eq!(source.provider, "Claude");
+    assert_eq!(source.model, "approved-claude");
+    assert_eq!(source.prompt_summary, "Reviewed provenance");
+    assert_eq!(source.reviewed_by, "QA");
+
+    let ast_sources = response
+        .document_ast
+        .blocks
+        .iter()
+        .filter_map(|block| match block {
+            DocumentBlock::AiSource { provenance, .. } => Some(provenance),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(ast_sources.len(), 1);
+    assert_eq!(ast_sources[0].provider, "Claude");
+}
+
+#[test]
 fn compiler_accepts_ai_assisted_comment_marker_aliases() {
     let response = compile(CompileRequest {
             text: "---\ntitle: AI Comment Aliases\nstatus: approved\napprovedBy: QA\n---\n<!-- ai-generated: status=human-reviewed | reviewer=Jane Doe | reviewedAt=2026-05-19 | provider=OpenAI | prompt=Generated intro -->\n# AI Comment Aliases\nReviewed body.\n\n<!-- llm-assisted: human-reviewed | reviewedBy=Sam Reviewer | reviewed_at=2026-05-20 | source=Claude | prompt_summary=Edited section -->\n## Reviewed Section\nReviewed section.\n"

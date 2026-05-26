@@ -1,4 +1,4 @@
-use crate::Heading;
+use crate::{compiler_support::fenced_code_marker, Heading};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -113,15 +113,19 @@ fn collect_ai_fence_bodies_with_lines(text: &str) -> Vec<(usize, String)> {
     let mut bodies = Vec::new();
     let mut lines = text.lines().enumerate();
     while let Some((line_index, line)) = lines.next() {
-        if line
-            .trim()
-            .strip_prefix("```")
-            .map(|info| is_ai_source_fence_language(info.split_whitespace().next().unwrap_or("")))
-            .unwrap_or(false)
-        {
+        if let Some(marker) = fenced_code_marker(line) {
+            let info = line.trim_start().strip_prefix(marker).unwrap_or("").trim();
+            if !is_ai_source_fence_language(info.split_whitespace().next().unwrap_or("")) {
+                for (_, body_line) in lines.by_ref() {
+                    if body_line.trim_start().starts_with(marker) {
+                        break;
+                    }
+                }
+                continue;
+            }
             let mut body = String::new();
             for (_, body_line) in lines.by_ref() {
-                if body_line.trim() == "```" {
+                if body_line.trim_start().starts_with(marker) {
                     break;
                 }
                 body.push_str(body_line);

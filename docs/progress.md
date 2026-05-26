@@ -143,6 +143,10 @@ Recent pushed checkpoints visible in current git history:
   such as `chart` render from either backtick or tilde fences, while unsupported
   or documentation/example fences are preserved inertly instead of allowing
   nested transform samples to execute.
+- AI provenance collection now follows the same fence policy: `ai-source`,
+  `ai-provenance`, and `llm-source` blocks can use backtick or tilde fences,
+  while nested provenance examples remain inert and do not create semantic
+  provenance records.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
