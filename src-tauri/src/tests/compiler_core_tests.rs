@@ -910,7 +910,7 @@ fn compiler_generates_glossary_sections_from_marker_and_metadata() {
     assert!(docx_document.contains("Customer acquisition cost."));
 
     let metadata_response = compile(CompileRequest {
-            text: "---\ntitle: Front Matter Glossary\nstatus: approved\napprovedBy: QA\nglossarySection: true\n---\n# Front Matter Glossary\n\n```glossary\nARR: Annual recurring revenue.\n```\n".to_string(),
+            text: "---\ntitle: Front Matter Glossary\nstatus: approved\napprovedBy: QA\nglossary:\n  enabled: true\n---\n# Front Matter Glossary\n\n```glossary\nARR: Annual recurring revenue.\n```\n".to_string(),
             file_path: None,
         });
 

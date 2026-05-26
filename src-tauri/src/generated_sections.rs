@@ -145,7 +145,13 @@ pub(crate) fn generated_index_section_requested(metadata: &Value) -> bool {
 pub(crate) fn generated_glossary_section_requested(metadata: &Value) -> bool {
     metadata_bool(
         metadata,
-        &["glossary", "glossarySection", "glossary_section"],
+        &[
+            "glossary",
+            "glossary.enabled",
+            "glossary.section",
+            "glossarySection",
+            "glossary_section",
+        ],
     )
 }
 

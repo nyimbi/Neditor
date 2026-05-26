@@ -129,6 +129,9 @@ Recent pushed checkpoints visible in current git history:
   `toc: {enabled: true, depth: 2, numbered: true}` in addition to the legacy
   flat `tocDepth` and `tocNumbered` keys, and the DOCX TOC field uses the same
   shared depth lookup.
+- Generated glossary sections now accept structured `glossary.enabled: true`
+  metadata in addition to `[GLOSSARY]`, `glossary: true`, and the legacy
+  `glossarySection` aliases.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
   flow through simple merges as dotted variable names, and anchored maps,
   including dotted or slash-namespaced anchors such as `&client.defaults` and
