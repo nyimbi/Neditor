@@ -150,6 +150,9 @@ Recent pushed checkpoints visible in current git history:
 - Review actions now use the same frontend provenance fence helper, so marking
   AI source blocks as reviewed works for tilde-fenced `llm-source` and other
   supported provenance aliases without mutating fenced Markdown examples.
+- Quality recommendations now recognize tilde-fenced `bibtex`, `hayagriva`,
+  and `bibliography` source blocks, keeping deterministic citation-evidence
+  warnings aligned with compiler-supported bibliography fences.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.

@@ -19,7 +19,7 @@ export interface QualityRecommendationInput {
 
 const PLACEHOLDER_RE = /\{\{[^}]+\}\}|\b(?:TODO|TBD|FIXME)\b/gi;
 const CITATION_RE = /\[@[A-Za-z0-9_:.#$%&+?~/-]+\]/g;
-const BIBLIOGRAPHY_RE = /\[BIBLIOGRAPHY\]|```bibtex|^@(?:article|book|misc|techreport|inproceedings)\{/im;
+const BIBLIOGRAPHY_RE = /\[BIBLIOGRAPHY\]|^(?:```|~~~)\s*(?:bibtex|hayagriva|bibliography)\b|^@(?:article|book|misc|techreport|inproceedings)\s*[{(]/im;
 const HEADING_RE = /^#{1,4}\s+\S.+$/gm;
 const GENERIC_AI_PHRASE_RE = /\b(?:leverage|robust|seamless|cutting-edge|world-class|game-changing|holistic|synergy)\b/gi;
 

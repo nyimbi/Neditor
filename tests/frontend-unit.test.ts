@@ -1367,6 +1367,34 @@ test("quality recommendations pass when a reviewed document has baseline structu
   equal(formatQualityRecommendationSummary(recommendations), "0 blockers, 0 risks, 0 improvements");
 });
 
+test("quality recommendations recognize tilde fenced bibliography sources", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "# Report",
+      "",
+      "## Evidence",
+      "",
+      "Document is concise and source-backed. [@doe2026]",
+      "",
+      "~~~hayagriva",
+      "doe2026:",
+      "  type: article",
+      "  title: Evidence",
+      "~~~",
+      "",
+    ].join("\n"),
+    semantic: {
+      title: "Report",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  ok(!recommendations.some((item) => item.id === "citation-evidence"));
+});
+
 test("AI source review helper supports tilde fences aliases and inert examples", () => {
   const lines = [
     "~~~llm-source",
