@@ -306,11 +306,22 @@ fn index_stop_word(token: &str) -> bool {
 fn first_term_anchor(text: &str, headings: &[Heading], term: &str) -> Option<String> {
     let mut heading_index = 0usize;
     let mut current_anchor = headings.first().map(|heading| heading.anchor.clone());
+    let mut fence_marker = None;
     for (zero_index, line) in text.lines().enumerate() {
         let line_number = zero_index + 1;
         while heading_index < headings.len() && headings[heading_index].line <= line_number {
             current_anchor = Some(headings[heading_index].anchor.clone());
             heading_index += 1;
+        }
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
+            continue;
+        }
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
+            continue;
         }
         if line.contains(term) {
             return current_anchor;

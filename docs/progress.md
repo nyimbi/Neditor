@@ -164,7 +164,8 @@ Recent pushed checkpoints visible in current git history:
   HTML, PDF, DOCX, PPTX, and Markdown bundle outputs.
 - Automatic index extraction now uses the shared Markdown fence detector, so
   both backtick and tilde fenced examples are ignored for bold terms, repeated
-  proper nouns, and explicit `{#index:...}` markers.
+  proper nouns, explicit `{#index:...}` markers, and metadata-defined term
+  anchor lookup.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
   flow through simple merges as dotted variable names, and anchored maps,
   including dotted or slash-namespaced anchors such as `&client.defaults` and
