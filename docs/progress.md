@@ -181,6 +181,10 @@ Recent pushed checkpoints visible in current git history:
 - Docs Live now distinguishes user-supplied outlines from generated fallback
   outlines: supplied outlines are marked locked, while document-type fallback
   outlines are marked suggested and must be reviewed before prose is accepted.
+- Native RFP DOCX import now scans every Word header/footer part plus footnotes,
+  endnotes, and comments in addition to the main document body, so requirement
+  language and buyer clarifications outside `word/document.xml` are not silently
+  omitted from the RFP response wizard intake.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.

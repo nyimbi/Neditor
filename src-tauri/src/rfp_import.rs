@@ -100,14 +100,9 @@ fn import_docx(request: &ImportRfpSourceRequest) -> Result<(String, String, Stri
     let mut archive =
         ZipArchive::new(file).map_err(|err| format!("Could not inspect DOCX package: {err}"))?;
     let mut parts = Vec::new();
-    for name in [
-        "word/document.xml",
-        "word/header1.xml",
-        "word/header2.xml",
-        "word/footer1.xml",
-        "word/footer2.xml",
-    ] {
-        if let Ok(mut file) = archive.by_name(name) {
+    let names = archive.file_names().map(str::to_string).collect::<Vec<_>>();
+    for name in docx_text_part_names(names) {
+        if let Ok(mut file) = archive.by_name(&name) {
             let mut xml = String::new();
             file.read_to_string(&mut xml)
                 .map_err(|err| format!("Could not read {name} from DOCX: {err}"))?;
@@ -125,6 +120,44 @@ fn import_docx(request: &ImportRfpSourceRequest) -> Result<(String, String, Stri
         title_from_path(&path),
         "native-docx-package-text".to_string(),
     ))
+}
+
+fn docx_text_part_names(names: Vec<String>) -> Vec<String> {
+    let mut ordered = Vec::new();
+    if names.iter().any(|name| name == "word/document.xml") {
+        ordered.push("word/document.xml".to_string());
+    }
+    for prefix in ["word/header", "word/footer"] {
+        let mut matches = names
+            .iter()
+            .filter(|name| docx_numbered_part_name(name, prefix))
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        matches.sort_unstable();
+        for name in matches {
+            ordered.push(name.to_string());
+        }
+    }
+    for name in [
+        "word/footnotes.xml",
+        "word/endnotes.xml",
+        "word/comments.xml",
+    ] {
+        if names.iter().any(|candidate| candidate == name) {
+            ordered.push(name.to_string());
+        }
+    }
+    ordered
+}
+
+fn docx_numbered_part_name(name: &str, prefix: &str) -> bool {
+    let Some(number) = name
+        .strip_prefix(prefix)
+        .and_then(|rest| rest.strip_suffix(".xml"))
+    else {
+        return false;
+    };
+    !number.is_empty() && number.chars().all(|ch| ch.is_ascii_digit())
 }
 
 fn import_pdf(
@@ -278,6 +311,37 @@ mod tests {
         );
         assert!(text.contains("Requirement A"));
         assert!(text.contains("Cell"));
+    }
+
+    #[test]
+    fn docx_text_part_names_cover_review_and_all_header_footer_parts() {
+        let names = docx_text_part_names(vec![
+            "[Content_Types].xml".to_string(),
+            "word/footer2.xml".to_string(),
+            "word/header3.xml".to_string(),
+            "word/headerStyles.xml".to_string(),
+            "word/document.xml".to_string(),
+            "word/comments.xml".to_string(),
+            "word/_rels/document.xml.rels".to_string(),
+            "word/footnotes.xml".to_string(),
+            "word/header1.xml".to_string(),
+            "word/endnotes.xml".to_string(),
+            "word/footer1.xml".to_string(),
+        ]);
+
+        assert_eq!(
+            names,
+            vec![
+                "word/document.xml",
+                "word/header1.xml",
+                "word/header3.xml",
+                "word/footer1.xml",
+                "word/footer2.xml",
+                "word/footnotes.xml",
+                "word/endnotes.xml",
+                "word/comments.xml",
+            ]
+        );
     }
 
     #[test]
