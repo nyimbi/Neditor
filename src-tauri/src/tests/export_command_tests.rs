@@ -197,6 +197,50 @@ fn export_document_writes_blog_and_substack_publish_packages() {
 }
 
 #[test]
+fn export_document_applies_public_metadata_options_to_publish_packages() {
+    let source = "---\ntitle: Metadata Options\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: public site\ntags:\n  - launch\n---\n# Metadata Options\n\nPublic package body.\n".to_string();
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let output = std::env::temp_dir().join(format!("neditor-public-metadata-{unique}.zip"));
+    let response = export_document(ExportRequest {
+        text: source,
+        file_path: None,
+        target: "blog".to_string(),
+        output_path: path_to_string(&output),
+        options: json!({
+            "warnOnDirtyGit": false,
+            "includeManifest": false,
+            "canonicalUrl": "https://example.com/metadata-options",
+            "htmlDescription": "A concise public preview for publishing.",
+            "language": "en-GB"
+        }),
+    })
+    .expect("blog export with public metadata options should pass");
+    let bytes = fs::read(&output).expect("publish package bytes");
+
+    assert_eq!(response.manifest.export_target, "blog");
+    let metadata = zip_entry_text(&bytes, "metadata.json");
+    assert!(metadata.contains("\"canonicalUrl\": \"https://example.com/metadata-options\""));
+    assert!(metadata.contains("\"description\": \"A concise public preview for publishing.\""));
+    assert!(metadata.contains("\"language\": \"en-GB\""));
+    let post_html = zip_entry_text(&bytes, "post.html");
+    assert!(post_html.contains(r#"<html lang="en-GB">"#));
+    assert!(post_html.contains(
+        r#"<meta name="description" content="A concise public preview for publishing.">"#
+    ));
+    assert!(
+        post_html.contains(r#"<link rel="canonical" href="https://example.com/metadata-options">"#)
+    );
+    let rss = zip_entry_text(&bytes, "rss-item.xml");
+    assert!(rss.contains("<link>https://example.com/metadata-options</link>"));
+    assert!(rss.contains("A concise public preview for publishing."));
+
+    fs::remove_file(output).expect("clean publish package");
+}
+
+#[test]
 fn export_document_writes_latex_and_google_docs_outputs() {
     let source = "---\ntitle: Research Brief\nsubtitle: Import-ready evidence pack\nauthor: NEditor QA\ndate: 2026-05-21\nversion: 2.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Research Ops\nreleaseTarget: Google Docs review room\n---\n# Research Brief\n\nA **business** brief with a [source link](https://example.com/evidence).\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Review | Operations |\n\nSee [Table controls](#tbl:controls).\n\n$$\nROI = \\frac{Gain}{Cost}\n$$ {#eq:roi caption=\"Return on investment\"}\n".to_string();
     let unique = SystemTime::now()
@@ -279,7 +323,7 @@ fn export_document_writes_epub_package() {
         file_path: None,
         target: "epub".to_string(),
         output_path: path_to_string(&output),
-        options: json!({ "warnOnDirtyGit": false, "includeManifest": false }),
+        options: json!({ "warnOnDirtyGit": false, "includeManifest": false, "language": "fr-CA" }),
     })
     .expect("epub export should pass");
     let bytes = fs::read(&output).expect("epub output");
@@ -299,6 +343,11 @@ fn export_document_writes_epub_package() {
     assert!(
         zip_entry_text(&bytes, "OEBPS/content.opf").contains("<dc:title>Ebook Brief</dc:title>")
     );
+    assert!(
+        zip_entry_text(&bytes, "OEBPS/content.opf").contains("<dc:language>fr-CA</dc:language>")
+    );
+    assert!(zip_entry_text(&bytes, "OEBPS/nav.xhtml").contains(r#"lang="fr-CA""#));
+    assert!(zip_entry_text(&bytes, "OEBPS/document.xhtml").contains(r#"lang="fr-CA""#));
     assert!(zip_entry_text(&bytes, "OEBPS/nav.xhtml").contains("Ebook Brief"));
     assert!(zip_entry_text(&bytes, "OEBPS/document.xhtml").contains("Score"));
     assert!(zip_entry_text(&bytes, "OEBPS/metadata/manifest.json")

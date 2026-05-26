@@ -22,7 +22,7 @@ pub(crate) fn render_blog_publish_package_bytes(
 
     zip.start_file("substack-copy.html", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_substack_copy_html(response).as_bytes())
+    zip.write_all(render_substack_copy_html(response, manifest).as_bytes())
         .map_err(|err| err.to_string())?;
 
     zip.start_file("post.txt", options)
@@ -50,7 +50,7 @@ pub(crate) fn render_blog_publish_package_bytes(
 
     zip.start_file("rss-item.xml", options)
         .map_err(|err| err.to_string())?;
-    zip.write_all(render_rss_item(response, &slug).as_bytes())
+    zip.write_all(render_rss_item(response, manifest, &slug).as_bytes())
         .map_err(|err| err.to_string())?;
 
     zip.start_file("README.md", options)
@@ -79,8 +79,9 @@ fn publish_metadata(response: &CompileResponse, manifest: &ExportManifest, slug:
             .or_else(|| metadata_string(&response.metadata, "publishedAt"))
             .or_else(|| metadata_string(&response.metadata, "approvedAt")),
         "status": response.semantic.status.clone(),
-        "canonicalUrl": metadata_string(&response.metadata, "canonicalUrl")
-            .or_else(|| metadata_string(&response.metadata, "canonical_url")),
+        "description": publish_description(response, manifest),
+        "canonicalUrl": publish_canonical_url(response, manifest),
+        "language": publish_language(response, manifest),
         "tags": publish_tags(response),
         "audience": target_persona_summary(&response.metadata),
         "sourceHash": manifest.source_hash.clone(),
@@ -95,7 +96,7 @@ fn publish_metadata(response: &CompileResponse, manifest: &ExportManifest, slug:
 }
 
 fn render_blog_html(response: &CompileResponse, manifest: &ExportManifest) -> String {
-    let subtitle = metadata_string(&response.metadata, "subtitle")
+    let subtitle = publish_description(response, manifest)
         .filter(|value| !value.trim().is_empty())
         .map(|value| format!("<p class=\"subtitle\">{}</p>", escape_html(&value)))
         .unwrap_or_default();
@@ -110,10 +111,25 @@ fn render_blog_html(response: &CompileResponse, manifest: &ExportManifest) -> St
         .map(|tag| format!("<span>{}</span>", escape_html(&tag)))
         .collect::<Vec<_>>()
         .join("");
+    let language = publish_language(response, manifest).unwrap_or_else(|| "en".to_string());
+    let description_meta = publish_description(response, manifest)
+        .map(|value| {
+            format!(
+                r#"<meta name="description" content="{}">"#,
+                escape_html(&value)
+            )
+        })
+        .unwrap_or_default();
+    let canonical = publish_canonical_url(response, manifest)
+        .map(|value| format!(r#"<link rel="canonical" href="{}">"#, escape_html(&value)))
+        .unwrap_or_default();
     format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title><meta name=\"generator\" content=\"NEditor\"><meta name=\"neditor-source-hash\" content=\"{}\"><style>{}</style></head><body><article><header><h1>{}</h1>{}<p class=\"byline\">{}{}</p><p class=\"tags\">{}</p></header>{}</article></body></html>",
+        "<!doctype html><html lang=\"{}\"><head><meta charset=\"utf-8\"><title>{}</title><meta name=\"generator\" content=\"NEditor\"><meta name=\"neditor-source-hash\" content=\"{}\">{}{}<style>{}</style></head><body><article><header><h1>{}</h1>{}<p class=\"byline\">{}{}</p><p class=\"tags\">{}</p></header>{}</article></body></html>",
+        escape_html(&language),
         escape_html(&response.semantic.title),
         escape_html(&manifest.source_hash),
+        description_meta,
+        canonical,
         blog_css(),
         escape_html(&response.semantic.title),
         subtitle,
@@ -124,8 +140,8 @@ fn render_blog_html(response: &CompileResponse, manifest: &ExportManifest) -> St
     )
 }
 
-fn render_substack_copy_html(response: &CompileResponse) -> String {
-    let subtitle = metadata_string(&response.metadata, "subtitle")
+fn render_substack_copy_html(response: &CompileResponse, manifest: &ExportManifest) -> String {
+    let subtitle = publish_description(response, manifest)
         .filter(|value| !value.trim().is_empty())
         .map(|value| format!("<p>{}</p>", escape_html(&value)))
         .unwrap_or_default();
@@ -137,12 +153,10 @@ fn render_substack_copy_html(response: &CompileResponse) -> String {
     )
 }
 
-fn render_rss_item(response: &CompileResponse, slug: &str) -> String {
-    let canonical = metadata_string(&response.metadata, "canonicalUrl")
-        .or_else(|| metadata_string(&response.metadata, "canonical_url"))
-        .unwrap_or_else(|| slug.to_string());
-    let description = metadata_string(&response.metadata, "subtitle")
-        .unwrap_or_else(|| response.semantic.title.clone());
+fn render_rss_item(response: &CompileResponse, manifest: &ExportManifest, slug: &str) -> String {
+    let canonical = publish_canonical_url(response, manifest).unwrap_or_else(|| slug.to_string());
+    let description =
+        publish_description(response, manifest).unwrap_or_else(|| response.semantic.title.clone());
     format!(
         "<item><title>{}</title><link>{}</link><guid>{}</guid><description>{}</description></item>",
         escape_xml(&response.semantic.title),
@@ -150,6 +164,41 @@ fn render_rss_item(response: &CompileResponse, slug: &str) -> String {
         escape_xml(&canonical),
         escape_xml(&description)
     )
+}
+
+fn publish_description(response: &CompileResponse, manifest: &ExportManifest) -> Option<String> {
+    export_option_string(manifest, "htmlDescription")
+        .or_else(|| metadata_string(&response.metadata, "description"))
+        .or_else(|| metadata_string(&response.metadata, "summary"))
+        .or_else(|| metadata_string(&response.metadata, "subtitle"))
+        .or_else(|| metadata_string(&response.metadata, "excerpt"))
+        .filter(|value| !value.trim().is_empty())
+}
+
+fn publish_canonical_url(response: &CompileResponse, manifest: &ExportManifest) -> Option<String> {
+    export_option_string(manifest, "canonicalUrl")
+        .or_else(|| metadata_string(&response.metadata, "canonicalUrl"))
+        .or_else(|| metadata_string(&response.metadata, "canonical_url"))
+        .filter(|value| !value.trim().is_empty())
+}
+
+fn publish_language(response: &CompileResponse, manifest: &ExportManifest) -> Option<String> {
+    export_option_string(manifest, "language")
+        .or_else(|| export_option_string(manifest, "htmlLanguage"))
+        .or_else(|| metadata_string(&response.metadata, "language"))
+        .or_else(|| metadata_string(&response.metadata, "lang"))
+        .or_else(|| metadata_string(&response.metadata, "locale"))
+        .filter(|value| !value.trim().is_empty())
+}
+
+fn export_option_string(manifest: &ExportManifest, key: &str) -> Option<String> {
+    manifest
+        .export_options
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 fn render_publish_readme(response: &CompileResponse, manifest: &ExportManifest) -> String {

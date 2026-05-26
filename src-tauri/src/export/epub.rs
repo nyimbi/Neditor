@@ -27,7 +27,7 @@ pub(crate) fn render_epub_bytes(
 
     zip.start_file("OEBPS/nav.xhtml", deflated)
         .map_err(|err| err.to_string())?;
-    zip.write_all(epub_nav_xhtml(response).as_bytes())
+    zip.write_all(epub_nav_xhtml(response, manifest).as_bytes())
         .map_err(|err| err.to_string())?;
 
     zip.start_file("OEBPS/document.xhtml", deflated)
@@ -80,9 +80,7 @@ fn epub_content_opf(
     let author = metadata_string(&response.metadata, "author")
         .or_else(|| metadata_string(&response.metadata, "approvedBy"))
         .unwrap_or_else(|| "NEditor".to_string());
-    let language = metadata_string(&response.metadata, "language")
-        .or_else(|| metadata_string(&response.metadata, "lang"))
-        .unwrap_or_else(|| "en".to_string());
+    let language = epub_language(response, manifest);
     let media_items = media
         .iter()
         .enumerate()
@@ -109,7 +107,8 @@ fn epub_content_opf(
     )
 }
 
-fn epub_nav_xhtml(response: &CompileResponse) -> String {
+fn epub_nav_xhtml(response: &CompileResponse, manifest: &ExportManifest) -> String {
+    let language = epub_language(response, manifest);
     let items = response
         .semantic
         .headings
@@ -126,7 +125,8 @@ fn epub_nav_xhtml(response: &CompileResponse) -> String {
         .collect::<Vec<_>>()
         .join("");
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en"><head><title>{}</title><link rel="stylesheet" type="text/css" href="styles/neditor.css"/></head><body><nav epub:type="toc" id="toc"><h1>Table of contents</h1><ol>{}</ol></nav></body></html>"#,
+        r#"<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{}"><head><title>{}</title><link rel="stylesheet" type="text/css" href="styles/neditor.css"/></head><body><nav epub:type="toc" id="toc"><h1>Table of contents</h1><ol>{}</ol></nav></body></html>"#,
+        escape_xml(&language),
         escape_xml(&response.semantic.title),
         items
     )
@@ -138,14 +138,38 @@ fn epub_document_xhtml(
     media: &[ExportMedia],
 ) -> String {
     let body_html = epub_body_html(response, media);
+    let language = epub_language(response, manifest);
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en"><head><title>{}</title><link rel="stylesheet" type="text/css" href="styles/neditor.css"/></head><body><section epub:type="titlepage" class="cover"><h1>{}</h1><p>Status: {}</p><p>Source hash: {}</p></section><main>{}</main></body></html>"#,
+        r#"<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{}"><head><title>{}</title><link rel="stylesheet" type="text/css" href="styles/neditor.css"/></head><body><section epub:type="titlepage" class="cover"><h1>{}</h1><p>Status: {}</p><p>Source hash: {}</p></section><main>{}</main></body></html>"#,
+        escape_xml(&language),
         escape_xml(&response.semantic.title),
         escape_xml(&response.semantic.title),
         escape_xml(&response.semantic.status),
         escape_xml(&manifest.source_hash),
         body_html
     )
+}
+
+fn epub_language(response: &CompileResponse, manifest: &ExportManifest) -> String {
+    manifest
+        .export_options
+        .get("language")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            manifest
+                .export_options
+                .get("htmlLanguage")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        })
+        .or_else(|| metadata_string(&response.metadata, "language"))
+        .or_else(|| metadata_string(&response.metadata, "lang"))
+        .unwrap_or_else(|| "en".to_string())
 }
 
 fn epub_body_html(response: &CompileResponse, media: &[ExportMedia]) -> String {

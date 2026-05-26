@@ -4707,6 +4707,18 @@ test("publishes and hands off extended export targets", async ({ page }) => {
     await targetSelect.selectOption(target.value);
     await expect(targetSelect).toHaveValue(target.value);
     await expect(exportPreview).toContainText(`${target.value.toUpperCase()} export preview`);
+    if (target.value === "blog") {
+      await page.getByRole("region", { name: "Public export metadata options" }).getByLabel("Description").fill("");
+      const checklist = page.getByRole("region", { name: "Distribution metadata checklist" });
+      await expect(checklist).toContainText("Release approval");
+      await expect(checklist).toContainText("Publishing preview");
+      await expect(checklist).toContainText("missing");
+      await checklist.getByRole("button", { name: "Add suggested metadata" }).click();
+      await expect.poll(() => editorText(page)).toContain("releaseTarget: blog package");
+      await expect.poll(() => editorText(page)).toContain("description: TODO public summary");
+      await expect.poll(() => editorText(page)).toContain('"todo"');
+      await expect(checklist).toContainText("Tags and keywords");
+    }
 
     await page.getByRole("button", { name: "Prepare for export" }).click();
     await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
