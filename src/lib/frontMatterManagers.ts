@@ -119,6 +119,15 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
           rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
         }
       }
+      if (section === "dataSources" && parsedTopLevel.alias) {
+        const aliasedRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
+        if (applyDataSourceMerge(aliasedRow, parsedTopLevel.value, mapAnchors)) {
+          rows.push(normalizeFrontMatterDataSource(aliasedRow, rows.length));
+        } else {
+          const path = anchors.get(parsedTopLevel.alias) || "";
+          if (path) rows.push(normalizeFrontMatterDataSource({ ...aliasedRow, path }, rows.length));
+        }
+      }
       if (section === "dataSources" && parsedTopLevel.value.startsWith("[")) {
         for (const item of splitInlineYamlList(parsedTopLevel.value)) {
           const inlineRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
@@ -510,12 +519,14 @@ function applyDataSourceMerge(
 ) {
   const aliases = yamlAliasNames(value);
   if (!aliases.length) return false;
+  let applied = false;
   for (const alias of aliases) {
     for (const entry of mapAnchors.get(alias) || []) {
       applyDataSourcePair(row, `${entry.key}: ${entry.value}`);
+      applied = true;
     }
   }
-  return true;
+  return applied;
 }
 
 function applyInlineDataSourceObject(
