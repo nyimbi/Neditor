@@ -155,7 +155,14 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       if (item) {
         flushCurrent();
         current = { source: section, line: index + 1 };
-        if (!applyInlineDataSourceObject(current, item[1], anchors, mapAnchors)) applyDataSourcePair(current, item[1]);
+        if (!applyDataSourceMerge(current, item[1], mapAnchors) && !applyInlineDataSourceObject(current, item[1], anchors, mapAnchors)) {
+          applyDataSourcePair(current, item[1]);
+        }
+        continue;
+      }
+      const mergePair = raw.match(/^\s+<<:\s*(.*)$/);
+      if (mergePair && current) {
+        applyDataSourceMerge(current, mergePair[1], mapAnchors);
         continue;
       }
       const pair = raw.match(/^\s+([\w-]+):\s*(.*)$/);
@@ -494,6 +501,21 @@ function applyDataSourcePair(row: Partial<FrontMatterDataSourceRow>, pairText: s
   if (key === "name" || key === "title") row.name = value;
   if (key === "path" || key === "file") row.path = value;
   if (key === "type" || key === "kind") row.kind = normalizeDataSourceKind(value);
+}
+
+function applyDataSourceMerge(
+  row: Partial<FrontMatterDataSourceRow>,
+  value: string,
+  mapAnchors: Map<string, Array<{ key: string; value: string; line: number }>>,
+) {
+  const aliases = yamlAliasNames(value);
+  if (!aliases.length) return false;
+  for (const alias of aliases) {
+    for (const entry of mapAnchors.get(alias) || []) {
+      applyDataSourcePair(row, `${entry.key}: ${entry.value}`);
+    }
+  }
+  return true;
 }
 
 function applyInlineDataSourceObject(
