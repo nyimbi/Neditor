@@ -3747,6 +3747,24 @@ Spreadsheet table exchange and SQL transform:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the CLI doctor implementation. |
 | `git diff --check` | Pass | No whitespace errors are present in the `ned doctor` diff. |
 
+`ned doctor --strict` workspace gate:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after promoting missing/incomplete workspace scaffolds into doctor warnings and preserving ready-workspace output without scaffold warnings. |
+| `src-tauri/target/debug/ned doctor --workspace /private/tmp/neditor-doctor-strict-missing --strict --json` | Pass | Direct smoke exited non-zero and returned `neditor.ned-doctor.v1` with `Workspace scaffold is workspace-missing` plus the exact `ned init ... --json` remediation command. |
+| `src-tauri/target/debug/ned init /private/tmp/neditor-doctor-strict-ready --force --json` | Pass | Direct setup smoke created the expected `.neditor` scaffold for the ready strict-doctor proof. |
+| `src-tauri/target/debug/ned doctor --workspace /private/tmp/neditor-doctor-strict-ready --json` | Pass | Direct smoke reported the workspace scaffold as ready and omitted workspace-scaffold warnings while preserving host-specific default-reader warning details. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after documenting strict workspace setup behavior. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the README-only strict-mode clarification. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting strict workspace setup behavior in the README. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the strict-doctor code and docs update. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after the strict doctor gate. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after the strict doctor gate. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`, preserving external signing, notarization, and cross-host proof blockers. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the strict doctor implementation. |
+| `git diff --check` | Pass | No whitespace errors are present in the strict doctor diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

@@ -130,7 +130,8 @@ after installation. `ned doctor` prints a local installation and workspace setup
 report with the app binary, default-reader automation status, `.neditor`
 scaffold status, transform handler setup coverage, export targets, and starter
 templates; use `ned doctor --workspace . --json` when you want machine-readable
-support evidence. In the app, open **Settings -> Files** to review the `ned` usage
+support evidence. In strict mode, missing or incomplete workspace scaffolding is
+a warning and produces a non-zero exit code. In the app, open **Settings -> Files** to review the `ned` usage
 summary and request NEditor as the default Markdown reader. Some operating
 systems require user confirmation or a helper such as `duti`; NEditor shows the
 exact commands and manual steps instead of silently changing protected OS

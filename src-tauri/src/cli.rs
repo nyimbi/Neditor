@@ -871,6 +871,7 @@ fn run_doctor_command(args: &[String]) -> Result<CliOutcome, String> {
     let warnings = doctor_warnings(
         app_binary.as_ref(),
         &default_reader,
+        &workspace_scaffold,
         &missing_handler_engines,
     );
     let status = if warnings.is_empty() {
@@ -1126,6 +1127,7 @@ fn command_available(command: &str) -> bool {
 fn doctor_warnings(
     app_binary: Option<&PathBuf>,
     default_reader: &DefaultMarkdownReaderResponse,
+    workspace_scaffold: &WorkspaceScaffoldStatus,
     missing_handler_engines: &[String],
 ) -> Vec<String> {
     let mut warnings = Vec::new();
@@ -1139,6 +1141,16 @@ fn doctor_warnings(
         warnings.push(format!(
             "Automatic default-reader setup is not currently available on this host: {}",
             default_reader.message
+        ));
+    }
+    if workspace_scaffold.status != "ready" {
+        warnings.push(format!(
+            "Workspace scaffold is {}; run {}",
+            workspace_scaffold.status,
+            workspace_scaffold
+                .recommended_command
+                .as_deref()
+                .unwrap_or("ned init . --json")
         ));
     }
     if !missing_handler_engines.is_empty() {

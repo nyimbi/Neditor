@@ -145,6 +145,13 @@ fn ned_cli_doctor_reports_json_capabilities() {
         .as_str()
         .expect("recommended command")
         .contains("ned init"));
+    assert!(report["warnings"]
+        .as_array()
+        .expect("warnings")
+        .iter()
+        .any(|warning| warning
+            .as_str()
+            .is_some_and(|value| value.contains("Workspace scaffold is not-initialized"))));
     assert!(report["transformHandlers"]["registeredEngines"]
         .as_array()
         .expect("registered engines")
@@ -165,6 +172,13 @@ fn ned_cli_doctor_reports_json_capabilities() {
         serde_json::from_str(&ready.message).expect("ready doctor json");
     assert_eq!(ready_report["workspaceScaffold"]["status"], "ready");
     assert!(ready_report["workspaceScaffold"]["recommended_command"].is_null());
+    assert!(!ready_report["warnings"]
+        .as_array()
+        .expect("ready warnings")
+        .iter()
+        .any(|warning| warning
+            .as_str()
+            .is_some_and(|value| value.contains("Workspace scaffold"))));
 }
 
 #[test]
