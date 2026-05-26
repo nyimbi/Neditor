@@ -105,15 +105,79 @@ fn ned_cli_converts_markdown_to_html_export() {
 }
 
 #[test]
+fn ned_cli_converts_to_multiple_targets_in_output_directory() {
+    let source = temp_markdown_path("convert-batch");
+    let output_dir = source.with_extension("outputs");
+    fs::write(&source, super::sample_document()).expect("write source markdown");
+    let args = vec![
+        "ned".to_string(),
+        "convert".to_string(),
+        source.to_string_lossy().to_string(),
+        "--to".to_string(),
+        "html,markdown-bundle".to_string(),
+        "--output-dir".to_string(),
+        output_dir.to_string_lossy().to_string(),
+    ];
+    let outcome = crate::cli::run_cli_with_args(&args).expect("batch convert");
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.message.contains("Exported html"));
+    assert!(outcome.message.contains("Exported markdown-bundle"));
+
+    let stem = source.file_stem().and_then(|stem| stem.to_str()).unwrap();
+    let html = output_dir.join(format!("{stem}-html.html"));
+    let bundle = output_dir.join(format!("{stem}-markdown-bundle.zip"));
+    assert!(html.is_file());
+    assert!(bundle.is_file());
+    assert!(html.with_extension("html.manifest.json").is_file());
+    assert!(bundle.with_extension("zip.manifest.json").is_file());
+    assert!(fs::read_to_string(html)
+        .expect("html output")
+        .contains("Test Report"));
+}
+
+#[test]
+fn ned_cli_gives_batch_exports_distinct_default_names() {
+    let source = temp_markdown_path("convert-batch-defaults");
+    fs::write(&source, super::sample_document()).expect("write source markdown");
+    let args = vec![
+        "ned".to_string(),
+        "convert".to_string(),
+        source.to_string_lossy().to_string(),
+        "--to".to_string(),
+        "html,latex".to_string(),
+        "--no-manifest".to_string(),
+    ];
+    let outcome = crate::cli::run_cli_with_args(&args).expect("batch convert default names");
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.message.contains("Exported html"));
+    assert!(outcome.message.contains("Exported latex"));
+
+    let html = source.with_file_name(format!(
+        "{}-html.html",
+        source.file_stem().and_then(|stem| stem.to_str()).unwrap()
+    ));
+    let latex = source.with_file_name(format!(
+        "{}-latex.tex",
+        source.file_stem().and_then(|stem| stem.to_str()).unwrap()
+    ));
+    assert!(html.is_file());
+    assert!(latex.is_file());
+    assert_ne!(fs::metadata(html).expect("html export").len(), 0);
+    assert_ne!(fs::metadata(latex).expect("latex export").len(), 0);
+}
+
+#[test]
 fn ned_cli_help_names_supported_conversion_targets() {
     let args = vec!["ned".to_string(), "--help".to_string()];
     let outcome = crate::cli::run_cli_with_args(&args).expect("help");
     assert_eq!(outcome.exit_code, 0);
     assert!(outcome.message.contains("ned convert"));
+    assert!(outcome.message.contains("--output-dir"));
     assert!(outcome.message.contains("ned new"));
     assert!(outcome.message.contains("ned doctor"));
     assert!(outcome.message.contains("docx"));
     assert!(outcome.message.contains("epub"));
+    assert!(outcome.message.contains("or all"));
     assert!(outcome.message.contains("rfp-response"));
 }
 

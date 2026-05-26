@@ -2312,7 +2312,7 @@
           <section v-show="selectedConfigurationSection === 'files'" class="configuration-center-panel" aria-label="Recent documents configuration">
           <section aria-label="Command line and default reader setup">
             <h3>Command line and default reader</h3>
-            <p class="sidebar-hint">Use <code>ned file.md</code> to open Markdown, <code>ned new proposal.md --template proposal</code> to start from a business scaffold, <code>ned convert file.md --to pdf --output file.pdf</code> for headless exports, and <code>ned doctor</code> for setup checks.</p>
+            <p class="sidebar-hint">Use <code>ned file.md</code> to open Markdown, <code>ned new proposal.md --template proposal</code> to start from a business scaffold, <code>ned convert file.md --to pdf,docx,html --output-dir exports</code> for headless delivery packs, and <code>ned doctor</code> for setup checks.</p>
             <label>
               <input :checked="defaultMarkdownReaderEnabled" type="checkbox" :disabled="defaultMarkdownReaderBusy" @change="toggleDefaultMarkdownReader($event)" />
               Make NEditor the default Markdown reader

@@ -233,6 +233,7 @@ fn run_convert_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut input: Option<String> = None;
     let mut target = "pdf".to_string();
     let mut output: Option<String> = None;
+    let mut output_dir: Option<String> = None;
     let mut include_manifest = true;
     let mut options = json!({});
     let mut index = 0;
@@ -250,6 +251,14 @@ fn run_convert_command(args: &[String]) -> Result<CliOutcome, String> {
                 output = Some(
                     args.get(index)
                         .ok_or_else(|| "--output requires a path".to_string())?
+                        .to_string(),
+                );
+            }
+            "--output-dir" | "-d" => {
+                index += 1;
+                output_dir = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--output-dir requires a directory".to_string())?
                         .to_string(),
                 );
             }
@@ -273,35 +282,59 @@ fn run_convert_command(args: &[String]) -> Result<CliOutcome, String> {
         }
         index += 1;
     }
-    let input_path =
-        canonical_path_string(&PathBuf::from(input.ok_or_else(|| {
-            "Usage: ned convert <file.md> --to pdf --output out.pdf".to_string()
-        })?))?;
-    let output_path = output
-        .map(PathBuf::from)
-        .unwrap_or_else(|| default_output_path(&input_path, &target));
+    let targets = parse_export_targets(&target)?;
+    if targets.len() > 1 && output.is_some() {
+        return Err(
+            "Use --output-dir for multi-target conversion; --output is only valid for one target."
+                .to_string(),
+        );
+    }
+    let input_path = canonical_path_string(&PathBuf::from(input.ok_or_else(|| {
+        "Usage: ned convert <file.md> --to pdf,docx --output-dir exports".to_string()
+    })?))?;
+    let output_dir = output_dir.map(PathBuf::from);
+    if let Some(directory) = output_dir.as_ref() {
+        fs::create_dir_all(directory).map_err(|err| {
+            format!(
+                "Could not create output directory {}: {err}",
+                directory.display()
+            )
+        })?;
+    }
     let mut object = options.as_object().cloned().unwrap_or_default();
     object.insert("includeManifest".to_string(), Value::Bool(include_manifest));
     options = Value::Object(object);
 
     let text = fs::read_to_string(&input_path)
         .map_err(|err| format!("Could not read input document {input_path}: {err}"))?;
-    let response = export_document(ExportRequest {
-        text,
-        file_path: Some(input_path.clone()),
-        target: target.clone(),
-        output_path: output_path.to_string_lossy().to_string(),
-        options,
-    })?;
-    Ok(CliOutcome {
-        message: format!(
+    let mut messages = Vec::new();
+    let include_target_suffix = targets.len() > 1;
+    for target in targets {
+        let output_path = target_output_path(
+            &input_path,
+            &target,
+            output.as_ref(),
+            output_dir.as_ref(),
+            include_target_suffix,
+        );
+        let response = export_document(ExportRequest {
+            text: text.clone(),
+            file_path: Some(input_path.clone()),
+            target: target.clone(),
+            output_path: output_path.to_string_lossy().to_string(),
+            options: options.clone(),
+        })?;
+        messages.push(format!(
             "Exported {target} to {}{}",
             response.output_path,
             response
                 .manifest_path
                 .map(|path| format!(" with manifest {path}"))
                 .unwrap_or_default()
-        ),
+        ));
+    }
+    Ok(CliOutcome {
+        message: messages.join("\n"),
         exit_code: 0,
     })
 }
@@ -678,7 +711,45 @@ fn yaml_scalar(value: &str) -> String {
 }
 
 fn default_output_path(input_path: &str, target: &str) -> PathBuf {
-    let extension = match target {
+    PathBuf::from(input_path).with_extension(target_extension(target))
+}
+
+fn target_output_path(
+    input_path: &str,
+    target: &str,
+    explicit_output: Option<&String>,
+    output_dir: Option<&PathBuf>,
+    include_target_suffix: bool,
+) -> PathBuf {
+    if let Some(path) = explicit_output {
+        return PathBuf::from(path);
+    }
+    if let Some(directory) = output_dir {
+        return directory.join(default_output_file_name(input_path, target, true));
+    }
+    if include_target_suffix {
+        let input = Path::new(input_path);
+        return input.with_file_name(default_output_file_name(input_path, target, true));
+    }
+    default_output_path(input_path, target)
+}
+
+fn default_output_file_name(input_path: &str, target: &str, include_target_suffix: bool) -> String {
+    let path = Path::new(input_path);
+    let stem = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("document");
+    let extension = target_extension(target);
+    if include_target_suffix {
+        format!("{stem}-{target}.{extension}")
+    } else {
+        format!("{stem}.{extension}")
+    }
+}
+
+fn target_extension(target: &str) -> &'static str {
+    match target {
         "html" => "html",
         "pdf" => "pdf",
         "docx" => "docx",
@@ -686,9 +757,41 @@ fn default_output_path(input_path: &str, target: &str) -> PathBuf {
         "latex" => "tex",
         "markdown-bundle" | "blog" | "substack" | "google-docs" => "zip",
         "epub" => "epub",
-        _ => target,
-    };
-    PathBuf::from(input_path).with_extension(extension)
+        _ => "out",
+    }
+}
+
+fn parse_export_targets(value: &str) -> Result<Vec<String>, String> {
+    let requested = value
+        .split(',')
+        .map(str::trim)
+        .filter(|target| !target.is_empty())
+        .collect::<Vec<_>>();
+    if requested.is_empty() {
+        return Err("--to requires at least one export target".to_string());
+    }
+    let mut targets = Vec::new();
+    for target in requested {
+        if target == "all" {
+            for supported_target in SUPPORTED_EXPORT_TARGETS {
+                if !targets.iter().any(|existing| existing == supported_target) {
+                    targets.push(supported_target.to_string());
+                }
+            }
+            continue;
+        }
+        if !SUPPORTED_EXPORT_TARGETS.contains(&target) {
+            return Err(format!(
+                "Unsupported export target '{}'. Supported targets: {}",
+                target,
+                SUPPORTED_EXPORT_TARGETS.join(", ")
+            ));
+        }
+        if !targets.iter().any(|existing| existing == target) {
+            targets.push(target.to_string());
+        }
+    }
+    Ok(targets)
 }
 
 fn apply_cli_option(options: &mut Value, pair: &str) -> Result<(), String> {
@@ -753,7 +856,7 @@ fn help_text() -> String {
         "  ned new <file.md> [--template proposal] [--title \"Client Proposal\"] [--open]"
             .to_string(),
         "  ned open <file.md> [more.md] [--dry-run]".to_string(),
-        "  ned convert <file.md> --to pdf --output out.pdf [--no-manifest]".to_string(),
+        "  ned convert <file.md> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned doctor [--json] [--strict]".to_string(),
         "  ned default-reader --status".to_string(),
@@ -761,7 +864,10 @@ fn help_text() -> String {
         "  ned --version".to_string(),
         "".to_string(),
         format!("Templates: {}", NEW_DOCUMENT_TEMPLATES.join(", ")),
-        format!("Targets: {}", SUPPORTED_EXPORT_TARGETS.join(", ")),
+        format!(
+            "Targets: {}, or all. Use comma-separated targets for delivery packs.",
+            SUPPORTED_EXPORT_TARGETS.join(", ")
+        ),
     ]
     .join("\n")
 }
