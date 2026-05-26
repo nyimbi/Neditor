@@ -4288,6 +4288,12 @@ import {
 import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
+  commandSearchText,
+  compactCommandKeywords,
+  joinCommandDescription,
+  type CommandPaletteSearchable,
+} from "./lib/commandPalette";
+import {
   agenticWorkflowPlaybooks,
   buildAgenticApprovalGateMarkdown,
   buildAgenticDataNarrativeAuditMarkdown,
@@ -4995,11 +5001,7 @@ interface CommandAgentRouteSuggestion {
   detail: string;
 }
 
-interface CommandPaletteCommand {
-  name: string;
-  group: string;
-  description?: string;
-  keywords?: string[];
+interface CommandPaletteCommand extends CommandPaletteSearchable {
   run: () => unknown;
 }
 
@@ -8566,13 +8568,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   ...store.documents.map((document) => ({
     name: document.title,
     group: "Open document",
-    description: [
+    description: joinCommandDescription([
       document.path || "Untitled document",
       documentSetName(document) ? `set: ${documentSetName(document)}` : "",
       document.pinned ? "pinned" : "",
       document.dirty ? "unsaved changes" : "saved",
-    ].filter(Boolean).join(" | "),
-    keywords: [
+    ]),
+    keywords: compactCommandKeywords([
       document.path || "",
       document.title,
       documentSetName(document),
@@ -8580,7 +8582,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
       document.compile?.metadata.status ? `status ${document.compile.metadata.status}` : "",
       document.pinned ? "pinned tab" : "",
       document.dirty ? "dirty unsaved" : "clean saved",
-    ].filter(Boolean),
+    ]),
     run: () => activate(document.id),
   })),
   ...store.workspaceFiles
@@ -8623,13 +8625,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
       name: `[@${citation.key}${citation.locator ? `, ${citation.locator}` : ""}]`,
       group: "Citation",
       description: bibliographyTitle || "Missing bibliography entry",
-      keywords: [
+      keywords: compactCommandKeywords([
         citation.key,
         citation.locator || "",
         citation.raw,
         bibliographyTitle || "",
         bibliographyByKey.value.has(citation.key) ? "bibliography cited source" : "missing bibliography entry citation todo",
-      ].filter(Boolean),
+      ]),
       run: () => {
         store.sidebar = "references";
         void goToSourceTarget(citation);
@@ -8660,23 +8662,20 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     name: diagnostic.message,
     group: `Diagnostic ${diagnostic.severity}`,
     description: diagnostic.suggestion || diagnosticLocation(diagnostic) || "Document diagnostic",
-    keywords: [
+    keywords: compactCommandKeywords([
       diagnostic.message,
       diagnostic.severity,
       diagnostic.source_file || "",
       diagnostic.suggestion || "",
       diagnosticLocation(diagnostic),
       ...diagnostic.related,
-    ].filter(Boolean),
+    ]),
     run: () => {
       store.sidebar = "diagnostics";
       if (diagnostic.line) void goToSourceTarget(diagnostic);
     },
   }))),
 ]);
-function commandSearchText(command: CommandPaletteCommand): string {
-  return [command.name, command.group, command.description || "", ...(command.keywords || [])].join(" ").toLowerCase();
-}
 const filteredCommands = computed(() => {
   const query = commandQuery.value.trim().toLowerCase();
   if (!query) return commands.value;

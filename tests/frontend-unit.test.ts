@@ -60,6 +60,7 @@ import {
   extractCitationTodoItems,
   resolveCitationTodo,
 } from "../src/lib/citationTodoWorkflow.js";
+import { commandSearchText, compactCommandKeywords, joinCommandDescription } from "../src/lib/commandPalette.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
 import {
   buildDocsLiveDraft,
@@ -143,6 +144,20 @@ import {
   validateTableDraft,
   type TableDraft,
 } from "../src/lib/tables.js";
+
+test("command palette helpers compact metadata into searchable text", () => {
+  deepEqual(compactCommandKeywords(["  Alpha  ", "", null, undefined, false, 42, true]), ["Alpha", "42", "true"]);
+  equal(joinCommandDescription(["Proposal.md", "", "set: RFP", "unsaved changes"]), "Proposal.md | set: RFP | unsaved changes");
+  equal(
+    commandSearchText({
+      name: "Open Proposal",
+      group: "Open document",
+      description: "Proposal.md | set: RFP",
+      keywords: ["compliance matrix", "dirty unsaved"],
+    }),
+    "open proposal open document proposal.md | set: rfp compliance matrix dirty unsaved",
+  );
+});
 
 test("table parsing preserves captions, alignment, and escaped pipes", () => {
   const [table] = parseMarkdownTables(

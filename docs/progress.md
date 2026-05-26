@@ -3575,6 +3575,16 @@ Command palette discoverability hardening:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the command-palette evidence refresh. |
 | `git diff --check` | Pass | No whitespace errors are present in the UI, test, or docs diff. |
 
+Command palette helper extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after extracting command-palette metadata compaction and search text helpers to `src/lib/commandPalette.ts`. |
+| `pnpm run test:unit` | Pass | 70 frontend unit/static tests passed, including direct command-palette metadata compaction, description joining, and searchable text coverage. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting command-palette helper extraction; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the frontend architecture evidence refresh. |
+| `git diff --check` | Pass | No whitespace errors are present in the command-palette helper extraction diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
