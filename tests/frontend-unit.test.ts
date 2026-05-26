@@ -933,6 +933,7 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   equal(draft.documentType, "proposal");
   equal(draft.title, "Acme Renewal Proposal");
   equal(draft.sections.length, 3);
+  equal(draft.workflow.find((step) => step.id === "outline")?.status, "complete");
   equal(draft.workflow[2].id, "draft");
   equal(draft.workflow[4].id, "humanize");
   equal(draft.workflow[5].id, "review");
@@ -1034,6 +1035,11 @@ test("Docs Live covers business technical legal marketing and customer document 
 
   equal(draft.documentType, "contract-brief");
   ok(draft.outlineText.includes("Commercial Terms"));
+  ok(draft.issues.some((issue) => issue.includes("generated a document-type outline")));
+  equal(draft.workflow.find((step) => step.id === "outline")?.status, "ready");
+  equal(draft.workflow.find((step) => step.id === "draft")?.status, "ready");
+  ok(draft.reviewPacket.contextSources.some((source) => source.includes("suggested document-type outline")));
+  ok(draft.markdown.includes("Suggested outline was generated from the document type"));
   ok(draft.questionnaire.includes("commercial, legal, operational, or data terms"));
   ok(draft.markdown.includes("Contract brief"));
   ok(draft.reviewPacket.sectionRunbook.some((item) => item.includes("Commercial Terms")));

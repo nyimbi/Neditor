@@ -603,16 +603,19 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
   const placeholders = extractDocsLivePlaceholders(placeholderInput);
   const placeholderEntries = hydrateDocsLivePlaceholderEntries(placeholders, docsLivePlaceholderEntries(placeholderInput));
   const title = resolveTitle(request, blueprint, placeholders);
-  const outlineText = resolveOutlineText(request, blueprint);
-  const outlineItems = parseOutlinePlan(outlineText);
+  const requestedOutlineText = (request.outline || "").trim();
+  const requestedOutlineItems = parseOutlinePlan(requestedOutlineText);
+  const outlineWasProvided = requestedOutlineItems.length > 0;
+  const outlineText = outlineWasProvided ? requestedOutlineText : resolveOutlineText(request, blueprint);
+  const outlineItems = outlineWasProvided ? requestedOutlineItems : parseOutlinePlan(outlineText);
   const sections = outlineItems.length ? outlineItems : blueprint.defaultOutline.map((section) => ({ level: 1, title: section }));
   const generatedAt = request.generatedAt || new Date().toISOString();
   const contextSentences = extractContextSentences(contextInput);
-  const issues = buildDraftIssues(request, placeholders, sections);
+  const issues = buildDraftIssues(request, placeholders, outlineWasProvided);
   const draftingDepth = normalizeDraftingDepth(request.draftingDepth);
   const sectionDrafts = sections.map((section, index) => buildSectionDraft(section, index, blueprint, placeholders, contextSentences));
-  const workflow = buildDocsLiveWorkflow(sectionDrafts, placeholders, contextSentences, issues, blueprint);
-  const reviewPacket = buildDocsLiveReviewPacket(request, sectionDrafts, placeholders, contextSentences, issues, blueprint);
+  const workflow = buildDocsLiveWorkflow(sectionDrafts, placeholders, contextSentences, issues, blueprint, outlineWasProvided);
+  const reviewPacket = buildDocsLiveReviewPacket(request, sectionDrafts, placeholders, contextSentences, issues, blueprint, outlineWasProvided);
   const markdown = humanizeDraftText(
     [
       "---",
@@ -653,7 +656,7 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
       "",
       "### Quality Assurance",
       "",
-      ...qualityChecklist(sections, placeholders, blueprint).map((item) => `- [ ] ${item}`),
+      ...qualityChecklist(sections, placeholders, blueprint, outlineWasProvided).map((item) => `- [ ] ${item}`),
       "",
       "### Humanization Pass",
       "",
@@ -781,10 +784,10 @@ function resolveTitle(request: DocsLiveDraftRequest, blueprint: DocsLiveBlueprin
   return subject ? `${subject} ${blueprint.label}` : blueprint.label;
 }
 
-function buildDraftIssues(request: DocsLiveDraftRequest, placeholders: Record<string, string>, sections: OutlinePlanItem[]) {
+function buildDraftIssues(request: DocsLiveDraftRequest, placeholders: Record<string, string>, outlineWasProvided: boolean) {
   const issues: string[] = [];
   if (!Object.keys(placeholders).length) issues.push("No placeholder values were detected; draft includes review prompts for missing specifics.");
-  if (!sections.length) issues.push("No usable outline was supplied; Docs Live used a document-type outline.");
+  if (!outlineWasProvided) issues.push("No usable outline was supplied; Docs Live generated a document-type outline that must be reviewed before drafting is accepted.");
   if (![request.context, request.transcript, request.questionnaireAnswers].some((value) => value?.trim())) {
     issues.push("No document context was supplied; section drafts are scaffolded for human completion.");
   }
@@ -797,16 +800,23 @@ function buildDocsLiveWorkflow(
   contextSentences: string[],
   issues: string[],
   blueprint: DocsLiveBlueprint,
+  outlineWasProvided: boolean,
 ): DocsLiveWorkflowStep[] {
   const workflow = workflowProfileFor(blueprint);
+  const outlineStatus = sections.length ? (outlineWasProvided ? "complete" : "ready") : "needs-input";
+  const outlineDetail = outlineWasProvided
+    ? blueprint.workflow
+      ? `${workflow.planningInstruction} ${sections.length} planned ${workflow.unitLabel}${sections.length === 1 ? "" : "s"} ready for systematic drafting.`
+      : `${sections.length} planned section${sections.length === 1 ? "" : "s"} ready for systematic drafting.`
+    : blueprint.workflow
+      ? `Docs Live generated ${sections.length} suggested ${workflow.unitLabel}${sections.length === 1 ? "" : "s"} from the document type. Review and approve the ${workflow.planningLabel.toLowerCase()} before prose is accepted.`
+      : `Docs Live generated ${sections.length} suggested outline section${sections.length === 1 ? "" : "s"} from the document type. Review and approve the outline before accepting the draft.`;
   return [
     {
       id: "outline",
-      label: blueprint.workflow ? `${workflow.planningLabel} locked` : "Outline locked",
-      status: sections.length ? "complete" : "needs-input",
-      detail: blueprint.workflow
-        ? `${workflow.planningInstruction} ${sections.length} planned ${workflow.unitLabel}${sections.length === 1 ? "" : "s"} ready for systematic drafting.`
-        : `${sections.length} planned section${sections.length === 1 ? "" : "s"} ready for systematic drafting.`,
+      label: outlineWasProvided ? (blueprint.workflow ? `${workflow.planningLabel} locked` : "Outline locked") : "Suggested outline ready",
+      status: outlineStatus,
+      detail: outlineDetail,
     },
     {
       id: "context",
@@ -819,8 +829,10 @@ function buildDocsLiveWorkflow(
     {
       id: "draft",
       label: workflow.sequencingLabel,
-      status: blueprint.workflow ? "ready" : "complete",
-      detail: blueprint.workflow
+      status: blueprint.workflow || !outlineWasProvided ? "ready" : "complete",
+      detail: !outlineWasProvided
+        ? "Draft text is a scaffold until the suggested outline is reviewed and accepted."
+        : blueprint.workflow
         ? `${workflow.sequencingInstruction} Start only after the ${workflow.planningLabel.toLowerCase()} approval gate is checked.`
         : "Each outline item receives a body draft, local evidence prompts, and a review handoff.",
     },
@@ -854,13 +866,19 @@ function buildDocsLiveReviewPacket(
   contextSentences: string[],
   issues: string[],
   blueprint: DocsLiveBlueprint,
+  outlineWasProvided: boolean,
 ): DocsLiveReviewPacket {
   const placeholderCount = Object.keys(placeholders).length;
   const workflow = workflowProfileFor(blueprint);
-  const contextSources = [
-    blueprint.workflow
+  const outlineContextSource = !outlineWasProvided
+    ? blueprint.workflow
+      ? `Docs Live generated a suggested ${workflow.planningLabel.toLowerCase()} from the document type; approve it before accepting prose.`
+      : "Docs Live generated a suggested document-type outline; approve it before accepting prose."
+    : blueprint.workflow
       ? `${workflow.planningInstruction} ${sections.length} planned ${workflow.unitLabel}${sections.length === 1 ? "" : "s"} locked before drafting.`
-      : `${sections.length} outline section${sections.length === 1 ? "" : "s"} locked before drafting.`,
+      : `${sections.length} outline section${sections.length === 1 ? "" : "s"} locked before drafting.`;
+  const contextSources = [
+    outlineContextSource,
     request.transcript?.trim() ? "Voice or dictated direction captured as drafting intent." : "Voice direction not supplied; use written context during review.",
     request.context?.trim() ? "Freeform document context captured." : "Freeform document context missing or minimal.",
     request.questionnaireAnswers?.trim()
@@ -1274,17 +1292,19 @@ function factSentence(placeholders: Record<string, string>) {
     .join("; ");
 }
 
-function qualityChecklist(sections: OutlinePlanItem[], placeholders: Record<string, string>, blueprint: DocsLiveBlueprint) {
+function qualityChecklist(sections: OutlinePlanItem[], placeholders: Record<string, string>, blueprint: DocsLiveBlueprint, outlineWasProvided: boolean) {
   const workflow = workflowProfileFor(blueprint);
   return [
     `Every planned section has a drafted body (${sections.length} section${sections.length === 1 ? "" : "s"}).`,
     ...(blueprint.workflow
       ? [
-          `${workflow.planningLabel} was locked before prose drafting began.`,
+          outlineWasProvided
+            ? `${workflow.planningLabel} was locked before prose drafting began.`
+            : `${workflow.planningLabel} was generated from the document type and must be approved before prose is accepted.`,
           `${workflow.sequencingLabel} was followed without skipping ahead or changing continuity silently.`,
           workflow.qualityInstruction,
         ]
-      : []),
+      : [outlineWasProvided ? "Outline was supplied before prose drafting began." : "Suggested outline was generated from the document type and must be approved before prose is accepted."]),
     "Each recommendation, risk, date, and amount is backed by source material.",
     "The opening section states the audience, decision, and desired next action.",
     Object.keys(placeholders).length ? "Placeholder values were inserted and checked for accuracy." : "Missing placeholder values were filled or explicitly marked.",

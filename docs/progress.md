@@ -178,6 +178,9 @@ Recent pushed checkpoints visible in current git history:
   business-authored `Approved`, `approved`, `PUBLISHED`, or `published` status
   values are classified consistently before UI checks or target-specific export
   gates run.
+- Docs Live now distinguishes user-supplied outlines from generated fallback
+  outlines: supplied outlines are marked locked, while document-type fallback
+  outlines are marked suggested and must be reviewed before prose is accepted.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
