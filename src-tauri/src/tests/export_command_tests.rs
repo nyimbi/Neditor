@@ -665,7 +665,7 @@ fn prepare_for_export_blocks_malformed_reference_markers_in_manifest() {
 #[test]
 fn prepare_for_export_reports_empty_generated_reference_sections() {
     let report = prepare_for_export(PrepareExportRequest {
-        text: "---\ntitle: Empty Reference Sections\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\ntoc:\n  enabled: true\nindex: true\nglossarySection: true\ncaptionLists:\n  figures: true\n  tables: true\n---\nplain text only.\n"
+        text: "---\ntitle: Empty Reference Sections\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\ntoc:\n  enabled: true\nindex: true\nglossarySection: true\ncaptionLists:\n  figures: true\n  tables: true\n---\nplain text only.\n\n[BIBLIOGRAPHY]\n"
             .to_string(),
         file_path: None,
         target: "pdf".to_string(),
@@ -674,8 +674,8 @@ fn prepare_for_export_reports_empty_generated_reference_sections() {
 
     assert!(!report.ready);
     assert_eq!(report.error_count, 0);
-    assert_eq!(report.warning_count, 5, "{:#?}", report.diagnostics);
-    assert_eq!(report.manifest.readiness.warning_count, 5);
+    assert_eq!(report.warning_count, 6, "{:#?}", report.diagnostics);
+    assert_eq!(report.manifest.readiness.warning_count, 6);
     assert_eq!(report.manifest.diagnostics.len(), report.diagnostics.len());
     assert_readiness_contains(
         &report,
@@ -684,6 +684,10 @@ fn prepare_for_export_reports_empty_generated_reference_sections() {
     assert_readiness_contains(
         &report,
         "Generated index was requested but no index terms were found.",
+    );
+    assert_readiness_contains(
+        &report,
+        "Generated bibliography was requested but no bibliography entries were found.",
     );
     assert_readiness_contains(
         &report,
@@ -705,6 +709,10 @@ fn prepare_for_export_reports_empty_generated_reference_sections() {
         .related
         .iter()
         .any(|related| related == "index terms: 0")));
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .related
+        .iter()
+        .any(|related| related == "bibliography entries: 0")));
     assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
         .related
         .iter()

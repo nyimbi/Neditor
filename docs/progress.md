@@ -132,6 +132,9 @@ Recent pushed checkpoints visible in current git history:
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
+- Export readiness now also warns when `[BIBLIOGRAPHY]` is present but no
+  bibliography entries are available, preventing an empty bibliography section
+  from quietly passing release checks.
 - PPTX agenda generation now follows the same structured TOC metadata path:
   `toc.enabled` and `tableOfContents.enabled` can automatically add an agenda
   slide without requiring the explicit `includeAgenda` export option.

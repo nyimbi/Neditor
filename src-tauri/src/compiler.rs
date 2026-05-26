@@ -181,6 +181,7 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         || table_list_requested_from_metadata(&metadata);
     let generated_toc_requested =
         reference_markdown.contains("[TOC]") || toc_requested_from_metadata(&metadata);
+    let generated_bibliography_requested = reference_markdown.contains("[BIBLIOGRAPHY]");
     let generated_index_requested =
         reference_markdown.contains("[INDEX]") || generated_index_section_requested(&metadata);
     let generated_glossary_requested = reference_markdown.contains("[GLOSSARY]")
@@ -279,6 +280,8 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
             duplicate_bibliography_keys: &duplicate_bibliography_keys,
             generated_toc_requested,
             heading_count: headings.len(),
+            generated_bibliography_requested,
+            bibliography_count: bibliography.len(),
             generated_index_requested,
             index_terms: &index_terms,
             generated_glossary_requested,

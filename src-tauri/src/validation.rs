@@ -23,6 +23,8 @@ pub(crate) struct DocumentValidationInput<'a> {
     pub(crate) duplicate_bibliography_keys: &'a [String],
     pub(crate) generated_toc_requested: bool,
     pub(crate) heading_count: usize,
+    pub(crate) generated_bibliography_requested: bool,
+    pub(crate) bibliography_count: usize,
     pub(crate) generated_index_requested: bool,
     pub(crate) index_terms: &'a [String],
     pub(crate) generated_glossary_requested: bool,
@@ -287,6 +289,19 @@ fn validate_generated_reference_sections(
             Some("Add document headings or disable the generated table of contents before final export."),
         );
         diagnostic.related.push("headings: 0".to_string());
+        diagnostics.push(diagnostic);
+    }
+    if input.generated_bibliography_requested && input.bibliography_count == 0 {
+        let mut diagnostic = diag(
+            "warning",
+            "Generated bibliography was requested but no bibliography entries were found.",
+            None,
+            None,
+            Some("Add bibliography front matter, a bibliography fenced block, or remove the bibliography marker before final export."),
+        );
+        diagnostic
+            .related
+            .push("bibliography entries: 0".to_string());
         diagnostics.push(diagnostic);
     }
     if input.generated_index_requested && input.index_terms.is_empty() {
