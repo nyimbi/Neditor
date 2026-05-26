@@ -459,6 +459,20 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
             .expect("recommended command")
             .contains("ned init")
     );
+
+    let ipc_output_path = root.join("support").join("ipc-bundle.json");
+    let ipc_bundle = crate::cli::create_support_bundle(crate::cli::SupportBundleRequest {
+        workspace: Some(root.to_string_lossy().to_string()),
+        readiness_report: Some(report_path.to_string_lossy().to_string()),
+        output: Some(ipc_output_path.to_string_lossy().to_string()),
+    })
+    .expect("ipc support bundle");
+    assert_eq!(ipc_bundle["schema"], "neditor.ned-support-bundle.v1");
+    assert_eq!(
+        ipc_bundle["writtenTo"],
+        ipc_output_path.to_string_lossy().as_ref()
+    );
+    assert!(ipc_output_path.is_file());
 }
 
 #[test]

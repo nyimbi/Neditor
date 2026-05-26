@@ -3834,8 +3834,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("pending_cli_open_paths"));
   ok(app.includes("default_markdown_reader_plan"));
   ok(app.includes("configure_default_markdown_reader"));
+  ok(app.includes("create_support_bundle"));
   ok(app.includes("ned file.md"));
   ok(app.includes("ned new proposal.md --template proposal"));
+  ok(app.includes("ned support-bundle --output support.json"));
+  ok(app.includes("Support bundle"));
+  ok(app.includes("redaction-safe setup and release-readiness handoff"));
   ok(app.includes("ned doctor"));
   ok(app.includes("Make NEditor the default Markdown reader"));
   ok(app.includes("Help: Docs Live"));

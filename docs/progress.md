@@ -3798,6 +3798,25 @@ Spreadsheet table exchange and SQL transform:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle CLI implementation. |
 | `git diff --check` | Pass | No whitespace errors are present in the support-bundle diff. |
 
+Settings support-bundle action:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after exposing the support-bundle builder as the `create_support_bundle` Tauri command and covering IPC-style file output through the same redaction-safe contract. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | IPC coverage ledger now documents `pending_cli_open_paths`, default-reader setup commands, and `create_support_bundle`, and remains synchronized with `tauri::generate_handler!`. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --json` | Pass | Direct smoke still returns `neditor.ned-support-bundle.v1` with setup diagnostics, release-readiness status, 16 external evidence gaps, recommendations, and no document content or secrets. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --output /private/tmp/neditor-settings-support-bundle-smoke.json` | Pass | Direct smoke wrote the support bundle JSON after the IPC refactor and printed the concise handoff summary used by Settings. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "creates support bundle handoff from settings"` | Pass | Focused Chromium smoke verified Settings -> Files and history exposes Support bundle, Preview, Save JSON, privacy copy, preview status, recommendations, and saved output path rendering. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after adding Settings preview/save controls for support bundles. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed for the Settings support-bundle UI, request typing, and status/report rendering. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after updating the IPC coverage ledger and specification. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding the app-facing support-bundle IPC contract. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after exposing support bundle creation from Settings. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after exposing support bundle creation from Settings. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` with all current-host checks accepted and external proof blockers preserved. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle IPC refactor. |
+| `git diff --check` | Pass | No whitespace errors are present in the Settings support-bundle diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

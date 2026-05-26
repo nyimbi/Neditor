@@ -1035,6 +1035,27 @@ async function installTauriMock(page: Page, stateKey: string) {
       }
       if (cmd === "plugin:dialog|message") return confirmResponses.length ? (confirmResponses.shift() ? "Ok" : "Cancel") : "Ok";
       if (cmd === "plugin:dialog|confirm") return confirmResponses.length ? confirmResponses.shift() : true;
+      if (cmd === "create_support_bundle") {
+        const output = typeof args?.request?.output === "string" ? args.request.output : undefined;
+        return {
+          schema: "neditor.ned-support-bundle.v1",
+          workspace: args?.request?.workspace || ".",
+          writtenTo: output,
+          privacy: {
+            documentContentIncluded: false,
+            secretsIncluded: false,
+            note: "This bundle includes setup status, command paths, report paths, and release evidence summaries only.",
+          },
+          doctor: { status: "ready", warnings: [] },
+          releaseReadiness: {
+            status: "current-host-ready-with-external-gaps",
+            releaseReady: false,
+            evidenceGaps: [{ id: "mock-gap", status: "pending" }],
+            failures: [],
+          },
+          recommendations: ["Mock support recommendation"],
+        };
+      }
       if (cmd === "write_desktop_ui_smoke_report") return null;
       if (cmd === "desktop_workflow_smoke_enabled") return false;
       if (cmd === "write_desktop_workflow_smoke_report") return null;
@@ -2541,6 +2562,25 @@ test("persists editor settings and runs search plus heading commands", async ({ 
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Command Target");
   await page.getByRole("button", { name: /Command Target Heading line/ }).click();
   await expect(page.locator(".cm-line").filter({ hasText: "## Command Target" })).toBeVisible();
+});
+
+test("creates support bundle handoff from settings", async ({ page }) => {
+  await page.getByLabel("Sidebar panel").selectOption("settings");
+  await page.getByRole("button", { name: /Files and history/ }).click();
+  await expect(page.getByRole("heading", { name: "Support bundle" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Preview" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save JSON" })).toBeVisible();
+  await expect(page.getByText("not document content or secrets")).toBeVisible();
+
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByText("Support bundle preview ready: current-host-ready-with-external-gaps, 1 evidence gaps")).toBeVisible();
+  await expect(page.getByText("Mock support recommendation")).toBeVisible();
+  await expect(page.getByText("preview only")).toBeVisible();
+
+  await queueDialogSelection(page, "/workspace/neditor-support-bundle.json");
+  await page.getByRole("button", { name: "Save JSON" }).click();
+  await expect(page.getByText("Wrote support bundle to /workspace/neditor-support-bundle.json")).toBeVisible();
+  await expect(page.locator("dd").getByText("/workspace/neditor-support-bundle.json", { exact: true })).toBeVisible();
 });
 
 test("runs configurable Emacs and Vim-style editor keybinding modes", async ({ page }) => {

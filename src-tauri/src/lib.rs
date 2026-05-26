@@ -57,7 +57,8 @@ use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
 use ai_cleanup::AiCleanupRequest;
 use cli::{
-    configure_default_markdown_reader, default_markdown_reader_plan, pending_cli_open_paths,
+    configure_default_markdown_reader, create_support_bundle, default_markdown_reader_plan,
+    pending_cli_open_paths,
 };
 #[cfg(test)]
 use compiler::compile;
@@ -160,6 +161,7 @@ pub fn run() {
             pending_cli_open_paths,
             default_markdown_reader_plan,
             configure_default_markdown_reader,
+            create_support_bundle,
             list_workspace_files,
             compile_document,
             compile_document_with_options,

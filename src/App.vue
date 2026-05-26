@@ -2325,6 +2325,40 @@
               <li v-for="step in defaultMarkdownReaderPlan.manual_steps" :key="step">{{ step }}</li>
             </ul>
           </section>
+          <section class="transform-handler-installer" aria-label="Support bundle">
+            <header>
+              <div>
+                <h4>Support bundle</h4>
+                <span>Create a redaction-safe setup and release-readiness handoff for help desks, release managers, or internal IT.</span>
+              </div>
+              <button type="button" :disabled="supportBundleBusy" title="Preview support diagnostics without writing a file" @click="previewSupportBundle">Preview</button>
+            </header>
+            <div class="support-bundle-actions">
+              <button type="button" :disabled="supportBundleBusy" title="Choose where to write the support bundle JSON" @click="saveSupportBundle">Save JSON</button>
+              <span>{{ supportBundleStatus || "The bundle contains setup status and evidence summaries, not document content or secrets." }}</span>
+            </div>
+            <dl v-if="supportBundleReport" class="transform-installer-summary">
+              <div>
+                <dt>Doctor</dt>
+                <dd>{{ supportBundleReport.doctor?.status || "unknown" }}</dd>
+              </div>
+              <div>
+                <dt>Release</dt>
+                <dd>{{ supportBundleReport.releaseReadiness?.status || "unknown" }}</dd>
+              </div>
+              <div>
+                <dt>Gaps</dt>
+                <dd>{{ supportBundleReport.releaseReadiness?.evidenceGaps?.length || 0 }}</dd>
+              </div>
+              <div>
+                <dt>Output</dt>
+                <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
+              </div>
+            </dl>
+            <ul v-if="supportBundleReport?.recommendations?.length" class="transform-installer-handlers">
+              <li v-for="recommendation in supportBundleReport.recommendations" :key="recommendation">{{ recommendation }}</li>
+            </ul>
+          </section>
           <section aria-label="Recent files">
             <h3>Recent files</h3>
             <button v-for="path in store.recentFiles" :key="path" class="outline-row" type="button" @click="store.openRecentPath(path)">
@@ -5049,6 +5083,31 @@ type DefaultMarkdownReaderResponse = {
   commands: string[];
   manual_steps: string[];
 };
+type SupportBundleReport = {
+  schema: string;
+  workspace?: string;
+  writtenTo?: string;
+  privacy?: {
+    documentContentIncluded: boolean;
+    secretsIncluded: boolean;
+    note: string;
+  };
+  doctor?: {
+    status?: string;
+    warnings?: string[];
+    workspaceScaffold?: {
+      status?: string;
+      recommended_command?: string | null;
+    };
+  };
+  releaseReadiness?: {
+    status?: string;
+    releaseReady?: boolean;
+    evidenceGaps?: unknown[];
+    failures?: unknown[];
+  };
+  recommendations?: string[];
+};
 
 declare global {
   interface Window {
@@ -5178,6 +5237,9 @@ const defaultMarkdownReaderBusy = ref(false);
 const defaultMarkdownReaderStatus = ref("");
 const defaultMarkdownReaderEnabled = ref(false);
 const defaultMarkdownReaderPlan = ref<DefaultMarkdownReaderResponse | null>(null);
+const supportBundleBusy = ref(false);
+const supportBundleStatus = ref("");
+const supportBundleReport = ref<SupportBundleReport | null>(null);
 const guidedDemoStepIndex = ref(0);
 const ttsBusy = ref(false);
 const ttsInspectionBusy = ref(false);
@@ -14604,6 +14666,47 @@ async function toggleDefaultMarkdownReader(event: Event) {
     if (event.target instanceof HTMLInputElement) event.target.checked = false;
   } finally {
     defaultMarkdownReaderBusy.value = false;
+  }
+}
+
+async function previewSupportBundle() {
+  await createSupportBundleFromSettings(false);
+}
+
+async function saveSupportBundle() {
+  await createSupportBundleFromSettings(true);
+}
+
+async function createSupportBundleFromSettings(writeToFile: boolean) {
+  supportBundleBusy.value = true;
+  try {
+    const workspace = localAgentWorkspacePath() || ".";
+    let output: string | undefined;
+    if (writeToFile) {
+      const selected = await save({
+        defaultPath: "neditor-support-bundle.json",
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!selected) {
+        supportBundleStatus.value = "Support bundle save cancelled";
+        return;
+      }
+      output = selected;
+    }
+    const report = await invoke<SupportBundleReport>("create_support_bundle", {
+      request: { workspace, output },
+    });
+    supportBundleReport.value = report;
+    const releaseStatus = report.releaseReadiness?.status || "unknown";
+    const gaps = report.releaseReadiness?.evidenceGaps?.length || 0;
+    supportBundleStatus.value = report.writtenTo
+      ? `Wrote support bundle to ${report.writtenTo}`
+      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps`;
+  } catch (error) {
+    supportBundleReport.value = null;
+    supportBundleStatus.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    supportBundleBusy.value = false;
   }
 }
 

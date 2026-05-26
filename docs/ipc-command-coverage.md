@@ -23,6 +23,10 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `duplicate_file` | `src-tauri/src/filesystem.rs` | `file_command_tests::file_duplicate_and_rename_commands_move_content` |
 | `reveal_path` | `src-tauri/src/filesystem.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `file_metadata` | `src-tauri/src/filesystem.rs` | `file_command_tests::file_duplicate_and_rename_commands_move_content`; `file_command_tests::stable_file_ipc_aliases_open_save_as_and_watch_paths` |
+| `pending_cli_open_paths` | `src-tauri/src/cli.rs` | `cli_tests::ned_cli_opens_markdown_paths_without_subcommand`; desktop launch smoke covers CLI-open path handoff |
+| `default_markdown_reader_plan` | `src-tauri/src/cli.rs` | `cli_tests::ned_cli_doctor_reports_json_capabilities`; Settings copy uses the same default-reader plan contract |
+| `configure_default_markdown_reader` | `src-tauri/src/cli.rs` | `cli_tests::ned_cli_doctor_reports_json_capabilities`; Settings checkbox invokes the guarded platform default-reader plan |
+| `create_support_bundle` | `src-tauri/src/cli.rs` | `cli_tests::ned_cli_creates_redaction_safe_support_bundles`; Settings support-bundle action invokes the same redaction-safe JSON contract |
 | `list_workspace_files` | `src-tauri/src/workspace_files.rs` | `file_command_tests::workspace_listing_skips_hidden_and_build_artifacts` |
 | `compile_document` | `src-tauri/src/compiler.rs` | `compiler_core_tests::compiler_resolves_metadata_variables_transforms_and_manifest` |
 | `compile_document_with_options` | `src-tauri/src/compiler.rs` | `export_option_tests::compile_options_supply_brand_profile_defaults`; `export_option_tests::compile_options_do_not_override_document_brand_profile` |

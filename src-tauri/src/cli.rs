@@ -83,6 +83,14 @@ pub(crate) struct DefaultMarkdownReaderRequest {
     pub(crate) enabled: bool,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SupportBundleRequest {
+    pub(crate) workspace: Option<String>,
+    pub(crate) readiness_report: Option<String>,
+    pub(crate) output: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub(crate) struct DefaultMarkdownReaderResponse {
     pub(crate) platform: String,
@@ -178,6 +186,27 @@ pub(crate) fn configure_default_markdown_reader(
     request: DefaultMarkdownReaderRequest,
 ) -> DefaultMarkdownReaderResponse {
     default_markdown_reader_response(request.enabled, request.enabled)
+}
+
+#[tauri::command]
+pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Value, String> {
+    let workspace = request
+        .workspace
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let readiness_report_path = request
+        .readiness_report
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(".tmp/release-readiness/report.json"));
+    let output_path = request
+        .output
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from);
+    let (report, _) =
+        build_support_bundle_report(&workspace, &readiness_report_path, output_path.as_deref())?;
+    Ok(report)
 }
 
 fn run_open_command(args: &[String]) -> Result<CliOutcome, String> {
@@ -939,68 +968,8 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
         index += 1;
     }
 
-    let workspace_display = path_to_display(&workspace);
-    let doctor_args = vec![
-        "--workspace".to_string(),
-        workspace.to_string_lossy().to_string(),
-        "--json".to_string(),
-    ];
-    let doctor_outcome = run_doctor_command(&doctor_args)?;
-    let doctor: Value =
-        serde_json::from_str(&doctor_outcome.message).map_err(|err| err.to_string())?;
-    let readiness = read_readiness_report(&readiness_report_path).unwrap_or_else(|err| {
-        json!({
-            "status": "missing",
-            "error": err,
-            "summary": {
-                "requiredChecks": 0,
-                "accepted": 0,
-                "failed": 0,
-                "evidenceGaps": 0
-            },
-            "checks": [],
-            "evidenceGaps": [],
-            "failures": []
-        })
-    });
-    let release_ready = readiness_release_ready(&readiness);
-    let recommendations = support_bundle_recommendations(&doctor, &readiness);
-    let mut report = json!({
-        "schema": "neditor.ned-support-bundle.v1",
-        "generatedAtUnixSeconds": unix_timestamp_seconds(),
-        "version": env!("CARGO_PKG_VERSION"),
-        "platform": env::consts::OS,
-        "arch": env::consts::ARCH,
-        "workspace": workspace_display,
-        "privacy": {
-            "documentContentIncluded": false,
-            "secretsIncluded": false,
-            "note": "This bundle includes setup status, command paths, report paths, and release evidence summaries only."
-        },
-        "doctor": doctor,
-        "releaseReadiness": {
-            "reportPath": path_to_display(&readiness_report_path),
-            "status": readiness_string_field(&readiness, "status").unwrap_or("unknown"),
-            "releaseReady": release_ready,
-            "generatedAt": readiness_string_field(&readiness, "generatedAt"),
-            "summary": readiness.get("summary").cloned().unwrap_or_else(|| json!({})),
-            "evidenceGaps": readiness_array_field(&readiness, "evidenceGaps"),
-            "failures": readiness_array_field(&readiness, "failures"),
-            "nextCommands": readiness_next_commands(&readiness),
-        },
-        "recommendations": recommendations,
-    });
-
-    let written_to = if let Some(path) = output_path.as_ref() {
-        write_json_report(path, &report)?;
-        let written = path_to_display(path);
-        if let Value::Object(fields) = &mut report {
-            fields.insert("writtenTo".to_string(), json!(written));
-        }
-        Some(path_to_display(path))
-    } else {
-        None
-    };
+    let (report, written_to) =
+        build_support_bundle_report(&workspace, &readiness_report_path, output_path.as_deref())?;
 
     if json_output {
         return Ok(CliOutcome {
@@ -1395,6 +1364,76 @@ fn readiness_next_commands(report: &Value) -> Vec<String> {
         commands.push("Proceed to signed package and distribution publishing checks".to_string());
     }
     commands
+}
+
+fn build_support_bundle_report(
+    workspace: &Path,
+    readiness_report_path: &Path,
+    output_path: Option<&Path>,
+) -> Result<(Value, Option<String>), String> {
+    let doctor_args = vec![
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ];
+    let doctor_outcome = run_doctor_command(&doctor_args)?;
+    let doctor: Value =
+        serde_json::from_str(&doctor_outcome.message).map_err(|err| err.to_string())?;
+    let readiness = read_readiness_report(readiness_report_path).unwrap_or_else(|err| {
+        json!({
+            "status": "missing",
+            "error": err,
+            "summary": {
+                "requiredChecks": 0,
+                "accepted": 0,
+                "failed": 0,
+                "evidenceGaps": 0
+            },
+            "checks": [],
+            "evidenceGaps": [],
+            "failures": []
+        })
+    });
+    let release_ready = readiness_release_ready(&readiness);
+    let recommendations = support_bundle_recommendations(&doctor, &readiness);
+    let mut report = json!({
+        "schema": "neditor.ned-support-bundle.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "version": env!("CARGO_PKG_VERSION"),
+        "platform": env::consts::OS,
+        "arch": env::consts::ARCH,
+        "workspace": path_to_display(workspace),
+        "privacy": {
+            "documentContentIncluded": false,
+            "secretsIncluded": false,
+            "note": "This bundle includes setup status, command paths, report paths, and release evidence summaries only."
+        },
+        "doctor": doctor,
+        "releaseReadiness": {
+            "reportPath": path_to_display(readiness_report_path),
+            "status": readiness_string_field(&readiness, "status").unwrap_or("unknown"),
+            "releaseReady": release_ready,
+            "generatedAt": readiness_string_field(&readiness, "generatedAt"),
+            "summary": readiness.get("summary").cloned().unwrap_or_else(|| json!({})),
+            "evidenceGaps": readiness_array_field(&readiness, "evidenceGaps"),
+            "failures": readiness_array_field(&readiness, "failures"),
+            "nextCommands": readiness_next_commands(&readiness),
+        },
+        "recommendations": recommendations,
+    });
+
+    let written_to = if let Some(path) = output_path {
+        write_json_report(path, &report)?;
+        let written = path_to_display(path);
+        if let Value::Object(fields) = &mut report {
+            fields.insert("writtenTo".to_string(), json!(written));
+        }
+        Some(path_to_display(path))
+    } else {
+        None
+    };
+
+    Ok((report, written_to))
 }
 
 fn support_bundle_recommendations(doctor: &Value, readiness: &Value) -> Vec<String> {

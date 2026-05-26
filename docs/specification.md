@@ -1631,6 +1631,13 @@ Initial commands:
 - `list_snapshots`
 - `restore_snapshot`
 
+Productization and setup commands:
+
+- `pending_cli_open_paths`
+- `default_markdown_reader_plan`
+- `configure_default_markdown_reader`
+- `create_support_bundle`
+
 ## 26. Data Storage
 
 Application data:
