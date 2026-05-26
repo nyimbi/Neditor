@@ -304,7 +304,7 @@ fn compiler_handles_document_variable_filter_edge_cases() {
 #[test]
 fn compiler_resolves_literal_dotted_front_matter_keys() {
     let response = compile(CompileRequest {
-        text: "---\ntitle: Dotted Keys\nstatus: approved\napprovedBy: QA\nclient.name: Acme Holdings\nclient.owner: Strategy Office\nprofile:\n  name: Nested Profile\nprofile.name: Literal Profile\nlayout.header: Board Pack\n---\n# Dotted Keys\nClient: {{client.name}}\nOwner: {{client.owner}}\nProfile: {{profile.name}}\nHeader: {{layout.header}}\nMissing: {{layout.footer | default=No footer}}\n".to_string(),
+        text: "---\ntitle: Dotted Keys\nstatus: approved\napprovedBy: QA\nclient.name: Acme Holdings\nclient.owner: Strategy Office\nprofile:\n  name: Nested Profile\nprofile.name: Literal Profile\nprofile.owner: Dotted Owner\nlayout.header: Board Pack\n---\n# Dotted Keys\nClient: {{client.name}}\nOwner: {{client.owner}}\nProfile: {{profile.name}}\nProfile Owner: {{profile.owner}}\nHeader: {{layout.header}}\nMissing: {{layout.footer | default=No footer}}\n".to_string(),
         file_path: None,
     });
 
@@ -315,6 +315,9 @@ fn compiler_resolves_literal_dotted_front_matter_keys() {
     assert!(response
         .compiled_markdown
         .contains("Profile: Nested Profile"));
+    assert!(response
+        .compiled_markdown
+        .contains("Profile Owner: Dotted Owner"));
     assert!(response.compiled_markdown.contains("Header: Board Pack"));
     assert!(response.compiled_markdown.contains("Missing: No footer"));
     assert!(!response

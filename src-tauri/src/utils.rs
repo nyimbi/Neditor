@@ -4,6 +4,10 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 
 pub(crate) fn metadata_lookup<'a>(metadata: &'a Value, path: &str) -> Option<&'a Value> {
+    metadata_lookup_nested(metadata, path).or_else(|| metadata.get(path))
+}
+
+fn metadata_lookup_nested<'a>(metadata: &'a Value, path: &str) -> Option<&'a Value> {
     let mut current = metadata;
     let parts = path.split('.').collect::<Vec<_>>();
     for (index, part) in parts.iter().enumerate() {

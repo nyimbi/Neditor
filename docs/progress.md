@@ -113,8 +113,10 @@ Recent pushed checkpoints visible in current git history:
 - The Rust compiler now resolves literal dotted front-matter keys through the
   same `{{client.name}}` variable syntax and export metadata lookup path. True
   nested maps still take precedence when both `profile.name` and
-  `profile: {name: ...}` forms exist, so document authors can use compact
-  dotted metadata without breaking explicit structured YAML.
+  `profile: {name: ...}` forms exist, and sibling dotted fallback keys such as
+  `profile.owner` still resolve when the nested `profile` map does not contain
+  that leaf, so document authors can use compact dotted metadata without
+  breaking explicit structured YAML.
 - Simple front-matter merge defaults and tagged scalars are now handled in the
   document-variable inventory. Common YAML such as `<<: *defaults`, `!!str`,
   `!custom`, `!docs!channel`, and `!<tag:yaml.org,2002:str>` can populate
