@@ -113,9 +113,9 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
           recordMapAnchorEntry(mapAnchors, { anchor: parsedTopLevel.anchor }, entry.key, entry.value, entry.line, entry.keepExisting);
         }
       }
-      if (section === "dataSources" && topLevel[2].trim().startsWith("{")) {
+      if (section === "dataSources" && parsedTopLevel.value.startsWith("{")) {
         const inlineRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
-        if (applyInlineDataSourceObject(inlineRow, topLevel[2], anchors, mapAnchors)) {
+        if (applyInlineDataSourceObject(inlineRow, parsedTopLevel.value, anchors, mapAnchors)) {
           rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
         }
       }
@@ -524,7 +524,7 @@ function applyInlineDataSourceObject(
   anchors: Map<string, string>,
   mapAnchors: Map<string, Array<{ key: string; value: string; line: number }>>,
 ) {
-  const trimmed = stripYamlComment(value).trim();
+  const trimmed = stripLeadingYamlDecorators(stripYamlComment(value).trim()).scalar;
   if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return false;
   const entries = parseInlineYamlMap(trimmed, anchors, mapAnchors, row.line || 0);
   if (!entries.length) return false;
