@@ -487,18 +487,18 @@ export const aiDocumentWizardSteps: AiDocumentWizardStep[] = [
   },
   {
     id: "outline",
-    label: "Create outline",
-    prompt: "Create or refine the chapter, section, subsection, and subsubsection structure before writing prose.",
+    label: "Create outline or plot",
+    prompt: "Create or refine the chapter, section, subsection, subsubsection, textbook architecture, or novel plot before writing prose.",
   },
   {
     id: "draft",
-    label: "Draft section by section",
-    prompt: "Generate each section systematically with placeholders preserved for facts, figures, approvals, and sources.",
+    label: "Draft sequentially",
+    prompt: "Generate each section or chapter in order only after the outline or plot is approved, preserving placeholders for facts, figures, approvals, and sources.",
   },
   {
     id: "qa",
-    label: "Quality assurance",
-    prompt: "Run checks for missing evidence, unsupported claims, stale assumptions, compliance gaps, and export readiness.",
+    label: "Quality assurance review",
+    prompt: "Run checks for missing evidence, unsupported claims, stale assumptions, compliance gaps, instructional quality, narrative quality, and export readiness.",
   },
   {
     id: "humanize",
@@ -582,6 +582,8 @@ export function businessTemplateMarkdown(template: BusinessDocumentTemplate, pro
       "",
       "[TOC]",
       "",
+      longFormTemplateGate(template),
+      "",
       ...template.outline.flatMap((heading) => [`## ${heading}`, "", sectionPromptForHeading(heading)]),
       "## AI Drafting Brief",
       "",
@@ -594,6 +596,28 @@ export function businessTemplateMarkdown(template: BusinessDocumentTemplate, pro
     ].join("\n"),
     profile,
   );
+}
+
+function longFormTemplateGate(template: BusinessDocumentTemplate) {
+  if (template.id === "technical-textbook") {
+    return [
+      "## Textbook Architecture Approval Gate",
+      "",
+      "- [ ] Define the reader level, prerequisites, chapter order, outcomes, notation, examples, exercises, and assessment path before drafting prose.",
+      "- [ ] Approve the outline before Chapter 1 is fleshed out.",
+      "- [ ] Draft chapters sequentially and run instructional quality review after the chapter sequence is complete.",
+    ].join("\n");
+  }
+  if (template.id === "novel") {
+    return [
+      "## Plot Architecture Approval Gate",
+      "",
+      "- [ ] Define the genre, premise, point of view, protagonist goal, conflict, stakes, world rules, act turns, chapter order, and continuity promises before drafting prose.",
+      "- [ ] Approve the plot outline before Chapter 1 is fleshed out.",
+      "- [ ] Draft chapters sequentially and run narrative quality review after the chapter sequence is complete.",
+    ].join("\n");
+  }
+  return "";
 }
 
 export function businessSnippetMarkdown(snippet: BusinessDocumentSnippet, profile: Partial<BusinessProfile> = {}) {

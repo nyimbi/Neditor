@@ -69,6 +69,11 @@ Recent pushed checkpoints visible in current git history:
   review. The business-document templates and Agent Workspace quality gates use
   the same outline/plot-first contract, and frontend unit coverage verifies the
   generated drafts, template metadata, and quality gates.
+- The long-form textbook and novel wizard output now includes first-class
+  architecture or plot approval gates, required planning artifacts, sequential
+  chapter draft queues, per-chapter acceptance criteria, and final instructional
+  or narrative quality review checklists so users can plan first, approve the
+  structure, then flesh out chapters in order.
 - Application navigation now exposes NEditor's capabilities through both menus
   and buttons. The workbench header has visible File, Edit, View, Writing
   Tools, Quality, Export, and Help menus that mirror the native desktop menu
@@ -3275,6 +3280,12 @@ Release readiness extraction and long-form wizard sequencing:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the evidence refresh. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the release-readiness extraction and textbook/novel wizard sequencing changes. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` with refreshed browser workflow evidence. |
+
+Long-form wizard planning gates:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 58 frontend unit tests passed after strengthening textbook and novel wizard generation with architecture/plot approval gates, planning-artifact tables, sequential chapter draft queues, per-chapter acceptance criteria, final instructional/narrative quality review checklists, and template gate coverage. |
 
 Export metadata checklist modularization:
 

@@ -134,10 +134,13 @@ interface DocsLiveBlueprint {
 interface DocsLiveWorkflowProfile {
   planningLabel: string;
   planningInstruction: string;
+  planningArtifacts: string[];
   sequencingLabel: string;
   sequencingInstruction: string;
+  sequenceAcceptance: string[];
   qualityLabel: string;
   qualityInstruction: string;
+  qualityChecks: string[];
   unitLabel: string;
 }
 
@@ -266,12 +269,31 @@ const blueprints: Record<DocsLiveDocumentType, DocsLiveBlueprint> = {
       planningLabel: "Textbook architecture",
       planningInstruction:
         "Lock the textbook outline before prose is drafted: chapter order, learning outcomes, prerequisites, examples, exercises, and assessment logic.",
+      planningArtifacts: [
+        "Subject scope and reader level",
+        "Prerequisite map and chapter order",
+        "Learning outcomes for every chapter",
+        "Notation, glossary terms, equations, code, or standards that must stay consistent",
+        "Worked examples, exercises, assessment path, and citation expectations",
+      ],
       sequencingLabel: "Sequential chapter drafting",
       sequencingInstruction:
         "Draft chapters in order, carrying definitions, notation, examples, exercises, and learner scaffolding forward only after the previous chapter contract is reviewed.",
+      sequenceAcceptance: [
+        "Chapter purpose, prerequisite dependency, and learner outcome are explicit before drafting.",
+        "New definitions, notation, equations, code, and examples are introduced once and reused consistently.",
+        "Exercises and checks reinforce the current chapter before relying on later material.",
+        "The chapter handoff names what the next chapter may assume.",
+      ],
       qualityLabel: "Instructional quality review",
       qualityInstruction:
         "Review the completed chapter sequence for technical accuracy, learning progression, equation/code integrity, exercise coverage, glossary consistency, and citation readiness.",
+      qualityChecks: [
+        "Technical claims, equations, code, diagrams, and standards are accurate and source-ready.",
+        "The learning progression has no skipped prerequisite, unexplained term, or silent notation change.",
+        "Examples, exercises, checks, and assessments match the stated outcomes.",
+        "Glossary, citations, review questions, and unresolved assumptions are ready for human review.",
+      ],
       unitLabel: "chapter",
     },
   },
@@ -302,12 +324,31 @@ const blueprints: Record<DocsLiveDocumentType, DocsLiveBlueprint> = {
       planningLabel: "Plot architecture",
       planningInstruction:
         "Lock the plot before prose is drafted: premise, character arcs, point of view, world rules, act turns, chapter order, and continuity promises.",
+      planningArtifacts: [
+        "Genre, premise, point of view, tense, and target reader promise",
+        "Protagonist goal, fear, flaw, pressure, and change arc",
+        "Central conflict, stakes, antagonistic force, and thematic question",
+        "World rules, continuity promises, act turns, and chapter beat outline",
+        "Voice, pacing, scene style, and revision constraints",
+      ],
       sequencingLabel: "Sequential chapter drafting",
       sequencingInstruction:
         "Draft chapters in order so causality, character motivation, tension, revelations, scene goals, and continuity evolve deliberately from one chapter to the next.",
+      sequenceAcceptance: [
+        "Chapter goal, conflict, turn, emotional consequence, and open question are clear before prose expansion.",
+        "Character motivation follows from the previous chapter rather than resetting.",
+        "Revelations, stakes, setting details, and continuity promises do not contradict earlier chapters.",
+        "The chapter ending gives the next chapter a specific causal handoff.",
+      ],
       qualityLabel: "Narrative quality review",
       qualityInstruction:
         "Review the completed chapter sequence for story logic, emotional causality, character arc movement, voice, pacing, scene necessity, continuity, and AI-sounding prose.",
+      qualityChecks: [
+        "Story logic, emotional causality, stakes escalation, and chapter-to-chapter continuity hold together.",
+        "Character choices reveal motivation, pressure, and change rather than summarizing intent.",
+        "Scenes earn their place through goal, conflict, turn, revelation, or consequence.",
+        "Voice, pacing, sensory specificity, dialogue, and prose texture do not read like generic AI output.",
+      ],
       unitLabel: "chapter",
     },
   },
@@ -593,6 +634,10 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
       "",
       docsLiveReviewMarker("Docs Live systematic outline-to-draft workflow"),
       "",
+      longFormPlanningGateMarkdown(blueprint, sectionDrafts),
+      "",
+      sequentialDraftQueueMarkdown(blueprint, sectionDrafts),
+      "",
       draftingPlanTable(workflow, sectionDrafts, draftingDepth, blueprint),
       "",
       reviewPacketMarkdown(reviewPacket, blueprint),
@@ -774,8 +819,10 @@ function buildDocsLiveWorkflow(
     {
       id: "draft",
       label: workflow.sequencingLabel,
-      status: "complete",
-      detail: blueprint.workflow ? workflow.sequencingInstruction : "Each outline item receives a body draft, local evidence prompts, and a review handoff.",
+      status: blueprint.workflow ? "ready" : "complete",
+      detail: blueprint.workflow
+        ? `${workflow.sequencingInstruction} Start only after the ${workflow.planningLabel.toLowerCase()} approval gate is checked.`
+        : "Each outline item receives a body draft, local evidence prompts, and a review handoff.",
     },
     {
       id: "qa",
@@ -899,6 +946,50 @@ function draftingPlanTable(
     "| Section | Drafting brief | QA focus |",
     "| --- | --- | --- |",
     ...sections.map((section) => `| ${escapeTableCell(section.title)} | ${escapeTableCell(section.draftingBrief)} | ${escapeTableCell(section.qaFocus)} |`),
+  ].join("\n");
+}
+
+function longFormPlanningGateMarkdown(blueprint: DocsLiveBlueprint, sections: DocsLiveSectionDraft[]) {
+  if (!blueprint.workflow) return "";
+  const profile = workflowProfileFor(blueprint);
+  const firstDraftUnit = sections.find((section) => /^chapter\s+\d+/i.test(section.title)) || sections[0];
+  return [
+    `## ${titleCase(profile.planningLabel)} Approval Gate`,
+    "",
+    `${profile.planningInstruction} Treat this as the first work product: the wizard should refine this plan before it fleshes out ${profile.unitLabel}s.`,
+    "",
+    "| Required planning artifact | Status | Review question |",
+    "| --- | --- | --- |",
+    ...profile.planningArtifacts.map((artifact) =>
+      `| ${escapeTableCell(artifact)} | needs-review | Has this been specific enough to guide every ${profile.unitLabel}? |`,
+    ),
+    "",
+    `- [ ] Approve ${profile.planningLabel.toLowerCase()} before drafting ${firstDraftUnit ? firstDraftUnit.title : `the first ${profile.unitLabel}`}.`,
+    `- [ ] Freeze the ${profile.unitLabel} order or record why it changed before prose is expanded.`,
+    "- [ ] Capture open questions as review comments instead of hiding them in polished prose.",
+  ].join("\n");
+}
+
+function sequentialDraftQueueMarkdown(blueprint: DocsLiveBlueprint, sections: DocsLiveSectionDraft[]) {
+  if (!blueprint.workflow) return "";
+  const profile = workflowProfileFor(blueprint);
+  const draftableSections = sections.filter((section) => section.title.toLowerCase() !== profile.qualityLabel.toLowerCase());
+  return [
+    `## Sequential ${titleCase(profile.unitLabel)} Draft Queue`,
+    "",
+    `${profile.sequencingInstruction} Each ${profile.unitLabel} is accepted before the next one is fleshed out.`,
+    "",
+    "| Order | Unit | Expansion rule | Acceptance criteria |",
+    "| --- | --- | --- | --- |",
+    ...draftableSections.map((section, index) =>
+      `| ${index + 1} | ${escapeTableCell(section.title)} | ${escapeTableCell(section.draftingBrief)} | ${escapeTableCell(profile.sequenceAcceptance[index % profile.sequenceAcceptance.length])} |`,
+    ),
+    "",
+    `## Final ${titleCase(profile.qualityLabel)}`,
+    "",
+    `${profile.qualityInstruction} Run this after the last ${profile.unitLabel} is drafted, not as a substitute for per-${profile.unitLabel} checks.`,
+    "",
+    ...profile.qualityChecks.map((check) => `- [ ] ${check}`),
   ].join("\n");
 }
 
@@ -1205,10 +1296,13 @@ function workflowProfileFor(blueprint: DocsLiveBlueprint): DocsLiveWorkflowProfi
   return blueprint.workflow || {
     planningLabel: "Outline",
     planningInstruction: "Lock the outline before prose is drafted.",
+    planningArtifacts: ["Audience", "purpose", "outline order", "source needs", "review owner"],
     sequencingLabel: "Section-by-section draft",
     sequencingInstruction: "Draft each section in outline order with local evidence prompts and a review handoff.",
+    sequenceAcceptance: ["Section purpose, evidence needs, unresolved assumptions, and review owner are clear before moving on."],
     qualityLabel: "Quality assurance",
     qualityInstruction: "Check every section for factual support, reader fit, unresolved assumptions, and review readiness.",
+    qualityChecks: ["Reader purpose is clear.", "Evidence and assumptions are visible.", "Review handoff is complete."],
     unitLabel: "section",
   };
 }

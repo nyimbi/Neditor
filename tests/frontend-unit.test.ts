@@ -78,6 +78,12 @@ import {
   formatExportMetadataChecklistSummary,
 } from "../src/lib/exportMetadataChecklist.js";
 import {
+  appendFrontMatterDataSource,
+  parseFrontMatterDataSources,
+  parseFrontMatterVariables,
+  parseMergedMetadataVariables,
+} from "../src/lib/frontMatterManagers.js";
+import {
   frontMatterAnyList,
   frontMatterAnyScalar,
   frontMatterListValues,
@@ -400,6 +406,53 @@ test("front matter helpers read update remove and preserve exact keys", () => {
   ok(inserted.startsWith("---\ntitle: New Title\n---\n\n# No front matter"));
 });
 
+test("front matter managers inventory data sources and document variables", () => {
+  const source = [
+    "---",
+    "title: Demo",
+    "dataSources:",
+    "  - name: Revenue",
+    "    path: data/revenue.csv",
+    "    type: csv",
+    "  - path: ../outside.json",
+    "    type: json",
+    "csvFiles: [data/customers.csv]",
+    "jsonFiles:",
+    "  - data/profile.json",
+    "owner: Strategy",
+    "brand:",
+    "  color: blue",
+    "client:",
+    "  name: Acme",
+    "emptyValue:",
+    "---",
+    "",
+    "# Demo",
+  ].join("\n");
+
+  const sources = parseFrontMatterDataSources(source);
+  deepEqual(sources.map((row) => [row.name, row.path, row.kind, row.status, row.source]), [
+    ["Revenue", "data/revenue.csv", "csv", "ready", "dataSources"],
+    ["Outside", "../outside.json", "json", "blocked-path", "dataSources"],
+    ["Customers", "data/customers.csv", "csv", "ready", "csvFiles"],
+    ["Profile", "data/profile.json", "json", "ready", "jsonFiles"],
+  ]);
+
+  const variables = parseFrontMatterVariables(source);
+  ok(variables.some((row) => row.key === "title" && row.value === "Demo" && row.status === "ready"));
+  ok(variables.some((row) => row.key === "owner" && row.value === "Strategy" && row.status === "ready"));
+  ok(variables.some((row) => row.key === "client.name" && row.value === "Acme" && row.status === "ready"));
+  ok(variables.some((row) => row.key === "emptyValue" && row.status === "empty"));
+  ok(!variables.some((row) => row.key === "brand.color"));
+
+  const merged = parseMergedMetadataVariables({ owner: "Compiled Owner", client: { tier: "Enterprise" }, output_path: "ignored" }, variables);
+  deepEqual(merged.map((row) => [row.key, row.value, row.status]), [["client.tier", "Enterprise", "ready"]]);
+
+  const appended = appendFrontMatterDataSource("# Draft\n", { name: "Revenue", path: "data/revenue.csv", kind: "csv" });
+  ok(appended.startsWith("---\ndataSources:"));
+  equal(parseFrontMatterDataSources(appended)[0]?.status, "ready");
+});
+
 test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   const text = "word alpha beta";
   equal(nextVimWordStart(text, 0), 5);
@@ -613,8 +666,14 @@ test("Docs Live textbook and novel wizards plan structure before sequential chap
   ok(textbookDraft.outlineText.includes("Instructional Quality Review"));
   ok(textbookDraft.questionnaire.includes("locked before prose is drafted"));
   ok(textbookDraft.markdown.includes("locks the textbook architecture before prose is drafted"));
+  ok(textbookDraft.markdown.includes("## Textbook Architecture Approval Gate"));
+  ok(textbookDraft.markdown.includes("Approve textbook architecture before drafting Chapter 1 - Conceptual Foundation"));
+  ok(textbookDraft.markdown.includes("## Sequential Chapter Draft Queue"));
+  ok(textbookDraft.markdown.includes("Each chapter is accepted before the next one is fleshed out"));
+  ok(textbookDraft.markdown.includes("## Final Instructional Quality Review"));
   ok(textbookDraft.markdown.includes("drafts chapters in order"));
   ok(textbookDraft.markdown.includes("Instructional quality review"));
+  equal(textbookDraft.workflow.find((step) => step.id === "draft")?.status, "ready");
   ok(textbookDraft.reviewPacket.sectionRunbook.some((item) => item.includes("draft this chapter in sequence")));
   ok(textbookDraft.reviewPacket.qaRegister.some((item) => item.includes("technical accuracy")));
 
@@ -632,8 +691,14 @@ test("Docs Live textbook and novel wizards plan structure before sequential chap
   ok(novelDraft.outlineText.includes("Narrative Quality Review"));
   ok(novelDraft.questionnaire.includes("plot outline"));
   ok(novelDraft.markdown.includes("locks the plot architecture before prose is drafted"));
+  ok(novelDraft.markdown.includes("## Plot Architecture Approval Gate"));
+  ok(novelDraft.markdown.includes("Approve plot architecture before drafting Chapter 1 - Opening Image"));
+  ok(novelDraft.markdown.includes("## Sequential Chapter Draft Queue"));
+  ok(novelDraft.markdown.includes("Chapter goal, conflict, turn, emotional consequence, and open question"));
+  ok(novelDraft.markdown.includes("## Final Narrative Quality Review"));
   ok(novelDraft.markdown.includes("drafts chapters in order"));
   ok(novelDraft.markdown.includes("Narrative quality review"));
+  equal(novelDraft.workflow.find((step) => step.id === "draft")?.status, "ready");
   ok(novelDraft.reviewPacket.sectionRunbook.some((item) => item.includes("draft this chapter in sequence")));
   ok(novelDraft.reviewPacket.qaRegister.some((item) => item.includes("story logic")));
 
@@ -642,9 +707,11 @@ test("Docs Live textbook and novel wizards plan structure before sequential chap
   ok(textbookTemplate.summary.includes("outline first"));
   ok(textbookTemplate.aiPrompt.includes("After the outline is approved"));
   ok(textbookTemplate.outline.includes("Chapter Outline"));
+  ok(businessTemplateMarkdown(textbookTemplate).includes("Textbook Architecture Approval Gate"));
   ok(novelTemplate.summary.includes("plot first"));
   ok(novelTemplate.aiPrompt.includes("After the plot is approved"));
   ok(novelTemplate.outline.includes("Narrative Quality Review"));
+  ok(businessTemplateMarkdown(novelTemplate).includes("Plot Architecture Approval Gate"));
 
   const textbookPlan = buildAgenticWorkflowPlan({
     instruction: "Create a technical textbook on distributed systems with sequential chapters",
@@ -2468,6 +2535,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
   const businessDocs = readFileSync("src/lib/businessDocuments.ts", "utf8");
+  const frontMatterManagers = readFileSync("src/lib/frontMatterManagers.ts", "utf8");
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
   const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
   const vimKeybindings = readFileSync("src/lib/vimKeybindings.ts", "utf8");
@@ -2989,15 +3057,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("insertDataSourceTemplate"));
   ok(app.includes("addFrontMatterDataSource"));
   ok(app.includes("Data source type"));
-  ok(app.includes("blocked-path"));
+  ok(frontMatterManagers.includes("blocked-path"));
   ok(app.includes('aria-label="Document variable manager"'));
   ok(app.includes("frontMatterVariableRows"));
   ok(app.includes("mergedMetadataVariableRows"));
   ok(app.includes("documentVariableManagerSummary"));
   ok(app.includes("parseFrontMatterVariables"));
-  ok(app.includes("hasIndentedYamlChildren"));
-  ok(app.includes("yamlIndentWidth"));
-  ok(app.includes("`${parent.path}.${key}`"));
+  ok(frontMatterManagers.includes("hasIndentedYamlChildren"));
+  ok(frontMatterManagers.includes("yamlIndentWidth"));
+  ok(frontMatterManagers.includes("`${parent.path}.${key}`"));
   ok(app.includes("parseMergedMetadataVariables"));
   ok(app.includes("project/merged metadata"));
   ok(app.includes("insertDocumentVariable"));
