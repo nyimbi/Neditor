@@ -67,6 +67,8 @@ const CLI_COMMANDS: &[&str] = &[
     "validate",
     "check",
     "templates",
+    "snippets",
+    "parts",
     "targets",
     "handlers",
     "transform-handlers",
@@ -137,6 +139,16 @@ struct DocumentTemplateInfo {
     best_for: &'static [&'static str],
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentSnippetInfo {
+    id: &'static str,
+    label: &'static str,
+    kind: &'static str,
+    summary: &'static str,
+    body: &'static str,
+}
+
 pub fn run_cli() -> i32 {
     let args = env::args().collect::<Vec<_>>();
     match run_cli_with_args(&args) {
@@ -181,6 +193,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "inspect" => run_inspect_command(&args[2..], stdin_text),
         "validate" | "check" => run_validate_command(&args[2..], stdin_text),
         "templates" => run_templates_command(&args[2..]),
+        "snippets" | "parts" => run_snippets_command(&args[2..]),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
@@ -986,6 +999,134 @@ fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
     }
     Ok(CliOutcome {
         message: templates_text_report(&templates),
+        exit_code: 0,
+    })
+}
+
+fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut ids_only = false;
+    let mut markdown_id: Option<String> = None;
+    let mut kind: Option<String> = None;
+    let mut query: Option<String> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--ids-only" => ids_only = true,
+            "--markdown" | "--body" => {
+                index += 1;
+                markdown_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--markdown requires a snippet id".to_string())?
+                        .to_string(),
+                );
+            }
+            "--kind" => {
+                index += 1;
+                kind = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--kind requires a snippet kind".to_string())?
+                        .to_string(),
+                );
+            }
+            "--query" | "--search" => {
+                index += 1;
+                query = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--query requires search text".to_string())?
+                        .to_string(),
+                );
+            }
+            value => return Err(format!("Unsupported snippets option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let snippets = document_snippet_catalog();
+    if let Some(id) = markdown_id {
+        let normalized = id.trim().to_ascii_lowercase();
+        let snippet = snippets
+            .iter()
+            .find(|snippet| snippet.id == normalized)
+            .ok_or_else(|| {
+                format!(
+                    "Unknown snippet '{}'. Available snippets: {}",
+                    id,
+                    snippets
+                        .iter()
+                        .map(|snippet| snippet.id)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })?;
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-snippet.v1",
+                    "snippet": snippet,
+                    "markdown": snippet.body,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: snippet.body.to_string(),
+            exit_code: 0,
+        });
+    }
+
+    let kind_filter = kind
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let query_filter = query
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let filtered = snippets
+        .into_iter()
+        .filter(|snippet| {
+            kind_filter
+                .as_deref()
+                .map_or(true, |kind| snippet.kind.to_ascii_lowercase() == kind)
+        })
+        .filter(|snippet| {
+            query_filter
+                .as_deref()
+                .map_or(true, |query| snippet_matches_query(snippet, query))
+        })
+        .collect::<Vec<_>>();
+    let ids = filtered
+        .iter()
+        .map(|snippet| snippet.id)
+        .collect::<Vec<_>>();
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-snippets.v1",
+                "count": filtered.len(),
+                "filters": {
+                    "kind": kind_filter,
+                    "query": query_filter,
+                },
+                "snippets": ids,
+                "snippetDetails": filtered,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    if ids_only {
+        return Ok(CliOutcome {
+            message: ids.join("\n"),
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: snippets_text_report(&filtered),
         exit_code: 0,
     })
 }
@@ -2528,6 +2669,104 @@ fn templates_text_report(templates: &[DocumentTemplateInfo]) -> String {
     lines.join("\n")
 }
 
+fn document_snippet_catalog() -> Vec<DocumentSnippetInfo> {
+    vec![
+        DocumentSnippetInfo {
+            id: "company-contact-block",
+            label: "Company contact block",
+            kind: "identity",
+            summary: "Reusable sender and organization block for cover pages, letters, and submissions.",
+            body: "**Prepared by:** {{fullName}}, {{roleTitle}}\n\n**Company:** {{companyName}}\n\n**Address:** {{companyAddress}}\n\n**Email:** {{email}}  \n**Phone:** {{phone}}  \n**Website:** {{website}}\n",
+        },
+        DocumentSnippetInfo {
+            id: "company-overview",
+            label: "Company overview",
+            kind: "identity",
+            summary: "Short boilerplate overview for proposals, tenders, and capability statements.",
+            body: "{{companyName}} is a {{industry}} organization. We help {{defaultClientName}} make practical decisions with clear evidence, disciplined delivery, and {{brandVoice}} communication.\n",
+        },
+        DocumentSnippetInfo {
+            id: "executive-summary",
+            label: "Executive summary starter",
+            kind: "proposal",
+            summary: "A compact executive summary scaffold with reader outcome and recommendation placeholders.",
+            body: "## Executive Summary\n\n{{defaultClientName}} needs {{outcome}}. {{companyName}} recommends {{recommendation}} because {{evidence}}.\n\nThe proposed approach focuses on {{scope}}, with delivery led by {{fullName}} and reviewed against {{success_criteria}}.\n",
+        },
+        DocumentSnippetInfo {
+            id: "scope-of-work",
+            label: "Scope of work",
+            kind: "delivery",
+            summary: "Reusable scope, deliverables, out-of-scope, and acceptance block.",
+            body: "## Scope of Work\n\n### In Scope\n\n- {{scope_item_1}}\n- {{scope_item_2}}\n- {{scope_item_3}}\n\n### Deliverables\n\n| Deliverable | Acceptance criteria | Owner |\n| --- | --- | --- |\n| {{deliverable}} | {{acceptance_criteria}} | {{owner}} |\n\n### Out of Scope\n\n- {{out_of_scope_item}}\n",
+        },
+        DocumentSnippetInfo {
+            id: "pricing-assumptions",
+            label: "Pricing assumptions",
+            kind: "proposal",
+            summary: "Commercial assumptions that make quotes and proposals easier to review.",
+            body: "## Pricing Assumptions\n\n- Pricing is based on {{pricing_basis}}.\n- Fees exclude {{exclusions}} unless stated otherwise.\n- The estimate assumes timely access to {{client_inputs}}.\n- Pricing remains valid until {{valid_until}}.\n",
+        },
+        DocumentSnippetInfo {
+            id: "rfp-compliance-matrix",
+            label: "RFP compliance matrix",
+            kind: "procurement",
+            summary: "Response matrix for buyer requirements, compliance status, and evidence references.",
+            body: "## Compliance Matrix\n\n| Requirement | Response | Evidence | Owner |\n| --- | --- | --- | --- |\n| {{requirement_id}} - {{requirement_text}} | {{compliant_partial_or_exception}} | {{evidence_reference}} | {{owner}} |\n",
+        },
+        DocumentSnippetInfo {
+            id: "tender-submission-checklist",
+            label: "Tender submission checklist",
+            kind: "procurement",
+            summary: "Checklist for mandatory tender attachments, sign-offs, and submission readiness.",
+            body: "## Mandatory Submission Checklist\n\n- [ ] Signed submission form\n- [ ] Pricing schedule\n- [ ] Technical response\n- [ ] Compliance declarations\n- [ ] Insurance, tax, or registration evidence\n- [ ] Authorized sign-off by {{approver}}\n",
+        },
+        DocumentSnippetInfo {
+            id: "tutorial-step",
+            label: "Tutorial step",
+            kind: "delivery",
+            summary: "Repeatable instruction block for tutorials and training guides.",
+            body: "### Step {{step_number}}: {{step_title}}\n\n**Goal:** {{step_goal}}\n\n1. {{instruction_1}}\n2. {{instruction_2}}\n3. {{instruction_3}}\n\n**Check:** {{completion_check}}\n\n**If this fails:** {{troubleshooting_tip}}\n",
+        },
+        DocumentSnippetInfo {
+            id: "risk-register",
+            label: "Risk register",
+            kind: "governance",
+            summary: "Standard business risk table for proposals, RFPs, tenders, and plans.",
+            body: "## Risk Register\n\n| Risk | Impact | Likelihood | Mitigation | Owner |\n| --- | --- | --- | --- | --- |\n| {{risk}} | {{impact}} | {{likelihood}} | {{mitigation}} | {{owner}} |\n",
+        },
+        DocumentSnippetInfo {
+            id: "review-handoff",
+            label: "Review handoff",
+            kind: "review",
+            summary: "Review instructions that keep unresolved assumptions visible before export.",
+            body: "## Review Handoff\n\n- Confirm all client names, figures, dates, and claims.\n- Resolve placeholders before sending: {{open_placeholders}}.\n- Confirm legal, finance, and delivery owner approvals where required.\n- Final reviewer: {{reviewer}}.\n",
+        },
+    ]
+}
+
+fn snippet_matches_query(snippet: &DocumentSnippetInfo, query: &str) -> bool {
+    snippet.id.to_ascii_lowercase().contains(query)
+        || snippet.label.to_ascii_lowercase().contains(query)
+        || snippet.kind.to_ascii_lowercase().contains(query)
+        || snippet.summary.to_ascii_lowercase().contains(query)
+        || snippet.body.to_ascii_lowercase().contains(query)
+}
+
+fn snippets_text_report(snippets: &[DocumentSnippetInfo]) -> String {
+    if snippets.is_empty() {
+        return "No NEditor document snippets match those filters.".to_string();
+    }
+    let mut lines = vec![format!("NEditor document snippets ({}):", snippets.len())];
+    for snippet in snippets {
+        lines.push(format!(
+            "  - {} [{}] {}: {}",
+            snippet.id, snippet.kind, snippet.label, snippet.summary
+        ));
+    }
+    lines.push("Use `ned snippets --markdown <id>` to print a reusable document part.".to_string());
+    lines.join("\n")
+}
+
 fn new_document_markdown(template: &str, title: &str) -> Result<String, String> {
     let template = template.trim().to_ascii_lowercase();
     if !NEW_DOCUMENT_TEMPLATES.contains(&template.as_str()) {
@@ -2789,6 +3028,9 @@ _ned() {{
       templates)
         COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search" -- "$cur") )
         ;;
+      snippets|parts)
+        COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body" -- "$cur") )
+        ;;
       handlers|transform-handlers)
         COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
         ;;
@@ -2865,6 +3107,9 @@ _ned() {{
       ;;
     templates)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:'
+      ;;
+    snippets|parts)
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:'
       ;;
     targets)
       _arguments '--json[print machine-readable JSON]'
@@ -2956,6 +3201,13 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l query -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l search -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l json".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l ids-only".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l kind -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l query -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l search -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l markdown -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l body -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l commands-only"
@@ -3355,6 +3607,7 @@ fn help_text() -> String {
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
+        "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json]"

@@ -3966,6 +3966,24 @@ Rich `ned templates` discovery:
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local template discovery without claiming external release proof completion. |
 | Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
 
+Packaged `ned snippets` reusable document parts:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after adding `ned snippets` / `ned parts`, kind/query filters, `--ids-only`, `--markdown`, JSON `snippetDetails`, completion/help updates, and body-output assertions for reusable document parts. |
+| `src-tauri/target/debug/ned snippets --kind procurement --json` | Pass | Direct smoke returned schema `neditor.ned-snippets.v1`, `count: 2`, procurement snippet metadata, and copyable bodies for RFP compliance matrix and tender submission checklist. |
+| `src-tauri/target/debug/ned snippets --query risk --ids-only` | Pass | Direct smoke returned only `risk-register` for script-friendly snippet lookup. |
+| `src-tauri/target/debug/ned snippets --markdown review-handoff` | Pass | Direct smoke printed the reusable review handoff Markdown with placeholders preserved. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for packaged snippet discovery and Markdown output. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after updating Settings CLI guidance for snippet output. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 74 tests, including static assertions that Settings and CLI source expose snippet discovery and metadata. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting packaged snippet discovery and Markdown output in README and specification. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while reusable document parts are now available from the packaged CLI. |
+| `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration remains valid after extending the packaged `ned snippets` surface. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after extending the packaged `ned snippets` surface. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local document-part reuse without claiming external release proof completion. |
+| Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

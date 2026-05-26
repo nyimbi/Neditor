@@ -94,6 +94,8 @@ ned inspect board-paper.md --json
 ned validate board-paper.md --to pdf --json
 ned export proposal.md --to docx --output proposal.docx
 ned templates --category Procurement --json
+ned snippets --kind procurement --json
+ned snippets --markdown review-handoff
 ned targets --json
 ned handlers --platform windows --commands-only
 ned readiness --json
@@ -130,7 +132,11 @@ diagnostics, and available export targets without writing any artifacts. `ned
 templates` explains the installed starter documents with categories, summaries,
 and best-fit uses; use `ned templates --category Procurement --json` or
 `ned templates --query podcast --ids-only` when help desk scripts need filtered
-template discovery. `ned targets` lists export
+template discovery. `ned snippets` explains reusable standard document parts
+such as contact blocks, company overview, scope, pricing assumptions, compliance
+matrix, risk register, tender checklist, tutorial step, and review handoff; use
+`ned snippets --markdown review-handoff` to print a copyable Markdown part or
+`ned snippets --kind procurement --json` for filtered automation. `ned targets` lists export
 formats, with `--json` output for help desk scripts and deployment checks. `ned
 handlers` lists copyable setup plans for optional transform handlers such as
 Graphviz, D2, PlantUML, Pikchr, and SQLite; use `--commands-only` when a support

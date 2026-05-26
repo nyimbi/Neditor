@@ -209,6 +209,9 @@ Template discovery must be useful to non-technical users and support automation:
 the CLI should expose stable IDs, human labels, categories, summaries, best-fit
 uses, JSON metadata, category filters, and search filters before a user creates a
 document.
+Reusable document parts must also be available outside the GUI: the packaged CLI
+should list, filter, search, and print standard snippet Markdown for identity,
+proposal, delivery, procurement, governance, and review sections.
 
 ### 6.2 Primary Layout
 

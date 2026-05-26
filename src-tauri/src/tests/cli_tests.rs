@@ -359,6 +359,48 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     .expect("template ids only");
     assert_eq!(ids_only.message, "podcast-script\nmovie-script");
 
+    let snippets = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "snippets".to_string(),
+        "--kind".to_string(),
+        "procurement".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("snippets json");
+    let snippet_report: serde_json::Value =
+        serde_json::from_str(&snippets.message).expect("snippets json");
+    assert_eq!(snippet_report["schema"], "neditor.ned-snippets.v1");
+    assert_eq!(snippet_report["count"], 2);
+    assert!(snippet_report["snippetDetails"]
+        .as_array()
+        .expect("snippet details")
+        .iter()
+        .any(|snippet| snippet["id"] == "rfp-compliance-matrix"
+            && snippet["kind"] == "procurement"
+            && snippet["body"]
+                .as_str()
+                .is_some_and(|body| body.contains("Compliance Matrix"))));
+
+    let snippet_ids = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "parts".to_string(),
+        "--query".to_string(),
+        "risk".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("snippet ids only");
+    assert_eq!(snippet_ids.message, "risk-register");
+
+    let snippet_body = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "snippets".to_string(),
+        "--markdown".to_string(),
+        "review-handoff".to_string(),
+    ])
+    .expect("snippet markdown");
+    assert!(snippet_body.message.contains("## Review Handoff"));
+    assert!(snippet_body.message.contains("{{reviewer}}"));
+
     let targets = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "targets".to_string(),
@@ -955,6 +997,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("handlers"));
     assert!(bash.message.contains("readiness"));
     assert!(bash.message.contains("evidence"));
+    assert!(bash.message.contains("snippets"));
+    assert!(bash.message.contains("--markdown"));
     assert!(bash.message.contains("support-bundle"));
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
@@ -976,6 +1020,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--spec-report"));
     assert!(zsh.message.contains("--engine-report"));
     assert!(zsh.message.contains("--evidence-root"));
+    assert!(zsh.message.contains("--ids-only"));
+    assert!(zsh.message.contains("--markdown"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -989,6 +1035,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("handlers"));
     assert!(fish.message.contains("readiness"));
     assert!(fish.message.contains("evidence"));
+    assert!(fish.message.contains("snippets"));
+    assert!(fish.message.contains("ids-only"));
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("epub"));
@@ -1234,6 +1282,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned inspect"));
     assert!(outcome.message.contains("ned validate"));
     assert!(outcome.message.contains("ned templates"));
+    assert!(outcome.message.contains("ned snippets"));
     assert!(outcome.message.contains("ned targets"));
     assert!(outcome.message.contains("ned handlers"));
     assert!(outcome.message.contains("ned readiness"));
