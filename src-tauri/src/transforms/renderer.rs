@@ -7,7 +7,7 @@ use super::{
     diagram,
     external::{graphviz_command, run_external_transform, ExternalTransformRequest},
     options::TransformExecutionOptions,
-    qr, structured, transform_cache_key,
+    qr, sql, structured, transform_cache_key,
     visual_data::{render_geojson_svg, render_stl_svg, render_topojson_svg, render_vega_lite_svg},
     TransformArtifact,
 };
@@ -39,6 +39,7 @@ pub(crate) fn render_transform(
         "calc" => "<aside class=\"transform transform-calc\">Calculations resolved into document variables.</aside>".to_string(),
         "csv" => render_delimited_table(body, ',', &mut artifact_diags, diagnostics),
         "tsv" => render_delimited_table(body, '\t', &mut artifact_diags, diagnostics),
+        "sql" => sql::render_sql_table(body, fence_options, options, &mut artifact_diags, diagnostics),
         "json" => structured::render_structured_data_html("json", body, &mut artifact_diags, diagnostics),
         "yaml" => structured::render_structured_data_html("yaml", body, &mut artifact_diags, diagnostics),
         "glossary" => render_glossary_html(body),
@@ -95,6 +96,7 @@ pub(crate) fn supported_transform(name: &str) -> bool {
         "calc"
             | "csv"
             | "tsv"
+            | "sql"
             | "json"
             | "yaml"
             | "glossary"

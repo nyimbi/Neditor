@@ -125,6 +125,90 @@ fn csv_formula_diagnostics_report_absolute_fence_source_lines() {
 }
 
 #[test]
+fn spreadsheet_table_import_export_round_trips_csv_and_xlsx() {
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-spreadsheet-table-{unique}"));
+    fs::create_dir_all(&root).expect("test root");
+    let csv_path = root.join("input.csv");
+    fs::write(&csv_path, "Region,Revenue\nEast,120\nWest,95\n").expect("csv input");
+
+    let imported = crate::data_exchange::import_spreadsheet_table(
+        crate::data_exchange::ImportSpreadsheetTableRequest {
+            path: path_to_string(&csv_path),
+        },
+    )
+    .expect("import csv");
+    assert_eq!(imported.columns, 2);
+    assert_eq!(imported.rows, 2);
+    assert!(imported.markdown.contains("| Region | Revenue |"));
+
+    let xlsx_path = root.join("table.xlsx");
+    let exported = crate::data_exchange::export_markdown_tables(
+        crate::data_exchange::ExportMarkdownTablesRequest {
+            markdown: imported.markdown.clone(),
+            output_path: path_to_string(&xlsx_path),
+            format: "xlsx".to_string(),
+            table_index: None,
+        },
+    )
+    .expect("export xlsx");
+    assert_eq!(exported.exported_tables, 1);
+    assert!(xlsx_path.is_file());
+
+    let xlsx_import = crate::data_exchange::import_spreadsheet_table(
+        crate::data_exchange::ImportSpreadsheetTableRequest {
+            path: path_to_string(&xlsx_path),
+        },
+    )
+    .expect("import xlsx");
+    assert!(xlsx_import.markdown.contains("| East | 120 |"));
+
+    let csv_output = root.join("table.csv");
+    let csv_export = crate::data_exchange::export_markdown_tables(
+        crate::data_exchange::ExportMarkdownTablesRequest {
+            markdown: xlsx_import.markdown,
+            output_path: path_to_string(&csv_output),
+            format: "csv".to_string(),
+            table_index: Some(0),
+        },
+    )
+    .expect("export csv");
+    assert_eq!(csv_export.rows, 2);
+    assert!(fs::read_to_string(csv_output)
+        .expect("csv output")
+        .contains("Region,Revenue"));
+}
+
+#[test]
+fn sql_transform_requires_read_only_trusted_queries() {
+    let mutation = run_transform("sql".to_string(), "DELETE FROM accounts".to_string())
+        .expect("sql transform artifact");
+    assert!(mutation.html.contains("read-only SELECT"));
+    assert!(mutation
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+
+    let missing_trust = compile_with_options(
+        CompileRequest {
+            text: "# SQL\n```sql database=\"/tmp/neditor-test.sqlite\"\nSELECT 1;\n```\n"
+                .to_string(),
+            file_path: None,
+        },
+        &json!({
+            "transformEnginePaths": {"sql": "/usr/bin/sqlite3"},
+            "trustedTransformEngines": {"sql": false}
+        }),
+    );
+    assert!(missing_trust
+        .html
+        .contains("requires explicit trust before NEditor runs sqlite3"));
+}
+
+#[test]
 fn table_formulas_resolve_forward_refs_and_report_cycles() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Formula Cycles\nstatus: approved\napprovedBy: QA\n---\n# Formula Cycles\n| Metric | Value |\n| --- | ---: |\n| Forward | =B2 |\n| Source | 42 |\n| Cycle A | =B4 |\n| Cycle B | =B3 |\n".to_string(),

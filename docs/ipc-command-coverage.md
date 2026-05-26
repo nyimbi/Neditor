@@ -28,6 +28,8 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `compile_document_with_options` | `src-tauri/src/compiler.rs` | `export_option_tests::compile_options_supply_brand_profile_defaults`; `export_option_tests::compile_options_do_not_override_document_brand_profile` |
 | `export_document` | `src-tauri/src/export_commands.rs` | `export_command_tests::export_document_writes_optional_sidecar_manifest` |
 | `prepare_for_export` | `src-tauri/src/export_commands.rs` | `export_command_tests::prepare_for_export_carries_broad_readiness_audit_to_manifest`; `export_command_tests::prepare_for_export_validates_target_and_options` |
+| `import_spreadsheet_table` | `src-tauri/src/data_exchange.rs` | `table_tests::spreadsheet_table_import_export_round_trips_csv_and_xlsx` |
+| `export_markdown_tables` | `src-tauri/src/data_exchange.rs` | `table_tests::spreadsheet_table_import_export_round_trips_csv_and_xlsx` |
 | `import_rfp_source` | `src-tauri/src/rfp_import.rs` | `tests/frontend-unit.test.ts` static RFP import wiring; RFP wizard source import workflows are covered by focused browser/native smoke gates |
 | `prepare_local_agent_handoff` | `src-tauri/src/local_agents.rs` | `tests/frontend-unit.test.ts` static local-agent handoff wiring; Agent Workspace provider handoff workflows are covered by focused browser/native smoke gates |
 | `create_snapshot` | `src-tauri/src/snapshot.rs` | `snapshot_storage::tests::project_snapshot_gitignore_entry_is_idempotent`; `snapshot::tests::snapshot_restore_is_scoped_to_active_document_store` |

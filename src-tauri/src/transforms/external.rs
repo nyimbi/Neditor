@@ -42,6 +42,7 @@ pub(crate) fn list_transform_engines() -> Vec<Value> {
         transform_engine("calc", "rust-native", true, false),
         transform_engine("csv", "rust-native", true, false),
         transform_engine("tsv", "rust-native", true, false),
+        transform_engine("sql", "sqlite-sidecar", false, true),
         transform_engine("json", "rust-native", true, false),
         transform_engine("yaml", "rust-native", true, false),
         transform_engine("glossary", "rust-native", true, false),
@@ -166,7 +167,7 @@ pub(crate) fn run_external_transform(
 }
 
 fn external_transform_supported(name: &str) -> bool {
-    graphviz_command(name).is_some() || matches!(name, "pikchr" | "plantuml" | "d2")
+    graphviz_command(name).is_some() || matches!(name, "pikchr" | "plantuml" | "d2" | "sql")
 }
 
 #[derive(Debug)]
@@ -268,6 +269,11 @@ fn external_engine_adapter(
             vec!["-".to_string()],
         )),
         ("pikchr", "file") => Ok(ExternalEngineAdapter::stdout("pikchr", "file", vec![temp])),
+        ("sql", "stdin" | "file") => Ok(ExternalEngineAdapter::stdout(
+            "sqlite3",
+            "probe",
+            vec!["--version".to_string()],
+        )),
         (_, "stdin" | "file") => Err(format!("No external adapter is registered for {name}.")),
         _ => Err("External transform input_mode must be 'stdin' or 'file'.".to_string()),
     }
@@ -318,6 +324,7 @@ fn external_engine_temp_suffix(name: &str) -> &'static str {
         "d2" => "d2",
         "plantuml" => "puml",
         "pikchr" => "pikchr",
+        "sql" => "sql",
         _ => "input",
     }
 }
@@ -908,7 +915,7 @@ fn transform_aliases(name: &str) -> Vec<&'static str> {
 fn transform_output(name: &str) -> &'static str {
     match name {
         "calc" => "variables",
-        "csv" | "tsv" => "table",
+        "csv" | "tsv" | "sql" => "table",
         "json" | "yaml" | "glossary" | "layout" | "roadmap" | "adr" | "diff" | "openapi"
         | "json-schema" | "bibtex" => "html",
         "plantuml" => "svg-or-png",
@@ -971,6 +978,7 @@ fn transform_version_probe(name: &str) -> Option<&'static str> {
         "d2" => Some("d2 --version"),
         "plantuml" => Some("plantuml -version"),
         "pikchr" => Some("pikchr --version"),
+        "sql" => Some("sqlite3 --version"),
         _ => None,
     }
 }
@@ -991,6 +999,7 @@ fn transform_setup_hint(name: &str, requires_execution: bool) -> &'static str {
             "Choose a local PlantUML launcher or wrapper script. Java and PlantUML remain user-installed."
         }
         "d2" => "Choose a local D2 executable. Bundling is intentionally deferred to license/package review.",
+        "sql" => "Choose a local sqlite3 executable. SQL transforms run direct read-only SELECT/WITH queries without shell interpolation.",
         "stl" => "Choose a local STL renderer only if static SVG fallback is insufficient.",
         _ => "Choose an absolute path to a local executable for this optional transform engine.",
     }
@@ -1003,6 +1012,7 @@ fn transform_default_command(name: &str) -> String {
         "plantuml" => "plantuml".to_string(),
         "d2" => "d2".to_string(),
         "pikchr" => "pikchr".to_string(),
+        "sql" => "sqlite3".to_string(),
         _ => name.to_string(),
     }
 }
@@ -1018,6 +1028,7 @@ fn transform_adapter_profile(name: &str) -> &'static str {
         "d2" => "D2 adapter: invokes input-to-stdout mode with '-' as the output target.",
         "plantuml" => "PlantUML adapter: uses -tsvg/-tpng with -pipe for stdin, or reads PlantUML's SVG/PNG sidecar for file mode.",
         "pikchr" => "Pikchr adapter: passes stdin with '-', a temporary Pikchr source file, or a temporary source file path for pikchr-cli.",
+        "sql" => "SQLite adapter: probes sqlite3 with --version; document SQL transforms run read-only SELECT/WITH queries against the configured database path.",
         _ => "No external adapter; rendered by the embedded Rust engine.",
     }
 }
@@ -1039,6 +1050,7 @@ fn transform_failure_suggestion(name: &str) -> &'static str {
         "pikchr" => {
             "Check Pikchr syntax; NEditor passes stdin, a temporary .pikchr file, or a temporary source file path for pikchr-cli."
         }
+        "sql" => "Check that sqlite3 is executable, the database path exists, and the query is read-only SELECT/WITH SQL.",
         _ => "Review the transform source and renderer diagnostics.",
     }
 }

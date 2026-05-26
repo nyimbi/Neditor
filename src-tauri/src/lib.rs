@@ -10,6 +10,7 @@ mod compile_options;
 mod compiler;
 mod compiler_support;
 mod compiler_types;
+mod data_exchange;
 mod diagnostics;
 mod diagnostics_types;
 mod document_ast;
@@ -60,6 +61,7 @@ use compiler::{compile_document, compile_document_with_options, run_transform};
 pub(crate) use compiler_types::{
     CompileRequest, CompileResponse, ExportManifest, Heading, IncludeEdge, SourceMapEntry,
 };
+use data_exchange::{export_markdown_tables, import_spreadsheet_table};
 pub(crate) use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
@@ -154,6 +156,8 @@ pub fn run() {
             compile_document_with_options,
             export_document,
             prepare_for_export,
+            import_spreadsheet_table,
+            export_markdown_tables,
             import_rfp_source,
             prepare_local_agent_handoff,
             create_snapshot,

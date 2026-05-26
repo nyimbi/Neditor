@@ -3213,7 +3213,7 @@ test("transform template library covers reusable calculations and custom templat
   ok(businessTemplates.length >= 12);
   ok(scienceTemplates.length >= 8);
   ok(mathTemplates.length >= 8);
-  for (const transform of ["chart", "vega-lite", "timeline", "roadmap", "adr", "mermaid", "pikchr", "dot", "plantuml", "csv", "json-schema", "openapi", "qr"]) {
+  for (const transform of ["chart", "vega-lite", "timeline", "roadmap", "adr", "mermaid", "pikchr", "dot", "plantuml", "csv", "sql", "json-schema", "openapi", "qr"]) {
     ok(builtinTransformTemplates.some((template) => template.transform === transform), `missing ${transform} template`);
   }
   const doseTemplate = builtinTransformTemplates.find((template) => template.id === "calc-science-dose");
@@ -3791,6 +3791,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Download selected TTS model"));
   ok(app.includes("Copy TTS model download details"));
   ok(app.includes('aria-label="Text to speech runtime report"'));
+  ok(app.includes("Import CSV/XLSX"));
+  ok(app.includes("export_markdown_tables"));
+  ok(app.includes("import_spreadsheet_table"));
+  ok(app.includes("Insert SQL transform"));
+  ok(app.includes('database="data/example.sqlite"'));
   ok(app.includes("read_text_aloud"));
   ok(app.includes("stop_text_aloud"));
   ok(app.includes("supertonic-cli"));

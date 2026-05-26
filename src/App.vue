@@ -534,6 +534,14 @@
             </select>
           </label>
           <button type="button" @click="createTableDraft">New table</button>
+          <div class="table-actions">
+            <button type="button" :disabled="tableDataBusy" @click="importTableFromSpreadsheet">
+              {{ tableDataBusy ? "Working..." : "Import CSV/XLSX" }}
+            </button>
+            <button type="button" :disabled="tableDataBusy || !tableDraft" @click="exportSelectedTable('csv')">Export CSV</button>
+            <button type="button" :disabled="tableDataBusy || !tableDraft" @click="exportSelectedTable('xlsx')">Export XLSX</button>
+            <button type="button" @click="insertSqlTransformTemplate">Insert SQL transform</button>
+          </div>
           <template v-if="tableDraft">
             <div class="table-actions">
               <button type="button" :disabled="tableDraftHasErrors" @click="applyTableDraft">{{ isNewTableDraft ? "Insert table" : "Apply" }}</button>
@@ -4909,6 +4917,23 @@ type TtsModelDownloadPlan = {
   command: string;
   acknowledged: boolean;
 };
+type ImportSpreadsheetTableResponse = {
+  source_path: string;
+  source_format: string;
+  sheet_name: string;
+  rows: number;
+  columns: number;
+  markdown: string;
+  warnings: string[];
+};
+type ExportMarkdownTablesResponse = {
+  output_path: string;
+  format: string;
+  table_count: number;
+  exported_tables: number;
+  rows: number;
+  columns: number;
+};
 
 declare global {
   interface Window {
@@ -5115,6 +5140,7 @@ const documentSetRenameDraft = ref("");
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const isNewTableDraft = ref(false);
+const tableDataBusy = ref(false);
 const tableFormulaFunction = ref<TableFormulaFunction>("SUM");
 const tableFormulaTargetColumn = ref(1);
 const tableFormulaStartRow = ref(1);
@@ -9378,6 +9404,10 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   })),
   { name: "Insert code fence", group: "Snippet", run: () => insertBlock(codeFenceSnippet) },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
+  { name: "Import CSV or XLSX table", group: "Writing Tools", keywords: ["table", "spreadsheet", "csv", "xlsx", "excel"], run: () => importTableFromSpreadsheet() },
+  { name: "Export selected table to CSV", group: "Writing Tools", keywords: ["table", "spreadsheet", "csv", "export"], run: () => exportSelectedTable("csv") },
+  { name: "Export selected table to XLSX", group: "Writing Tools", keywords: ["table", "spreadsheet", "xlsx", "excel", "export"], run: () => exportSelectedTable("xlsx") },
+  { name: "Insert SQL transform", group: "Transforms", keywords: ["sql", "database", "sqlite", "query", "table"], run: () => insertSqlTransformTemplate() },
   { name: "Insert cover figure", group: "Snippet", run: () => insertFigureSnippet() },
   ...figureCropPositions
     .filter((position) => position !== "center")
@@ -15812,6 +15842,87 @@ function replaceTableFromPaste() {
     formats: headers.map((_, columnIndex) => inferTableFormat(bodyRows.map((row) => row[columnIndex] || ""))),
     rows: bodyRows.length ? bodyRows : [headers.map(() => "")],
   };
+}
+
+async function importTableFromSpreadsheet() {
+  const selected = await open({
+    multiple: false,
+    filters: [{ name: "Spreadsheet tables", extensions: ["csv", "tsv", "xlsx"] }],
+  });
+  if (typeof selected !== "string") return;
+  tableDataBusy.value = true;
+  try {
+    const response = await invoke<ImportSpreadsheetTableResponse>("import_spreadsheet_table", {
+      request: { path: selected },
+    });
+    const parsed = parseTablePaste(response.markdown);
+    const headers = (parsed.rows[0] || []).map((cell, index) => cell.trim() || `Column ${index + 1}`);
+    const rows = parsed.rows.slice(1).map((row) => padTableRow(row, headers.length));
+    tableDraft.value = {
+      id: "",
+      caption: response.sheet_name || response.source_format.toUpperCase(),
+      headers,
+      alignments: parsed.alignments ? padAlignments(parsed.alignments, headers.length) : headers.map(() => "left"),
+      formats: headers.map((_, columnIndex) => inferTableFormat(rows.map((row) => row[columnIndex] || ""))),
+      rows: rows.length ? rows : [headers.map(() => "")],
+    };
+    isNewTableDraft.value = true;
+    tablePasteText.value = response.markdown;
+    store.sidebar = "tables";
+    store.statusMessage = `Imported ${response.rows} rows and ${response.columns} columns from ${response.source_format.toUpperCase()}`;
+    if (response.warnings.length) store.lastError = response.warnings.join(" ");
+  } catch (error) {
+    store.lastError = error instanceof Error ? error.message : String(error);
+    store.statusMessage = "Table import failed";
+  } finally {
+    tableDataBusy.value = false;
+  }
+}
+
+async function exportSelectedTable(format: "csv" | "xlsx") {
+  const markdown = tableDraftMarkdownPreview.value || active.value.text;
+  if (!markdown.trim()) {
+    store.statusMessage = "No table is available to export";
+    return;
+  }
+  const extension = format;
+  const outputPath = await save({
+    filters: [{ name: format.toUpperCase(), extensions: [extension] }],
+    defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")}-table.${extension}`,
+  });
+  if (!outputPath) return;
+  tableDataBusy.value = true;
+  try {
+    const response = await invoke<ExportMarkdownTablesResponse>("export_markdown_tables", {
+      request: {
+        markdown,
+        output_path: outputPath,
+        format,
+        table_index: 0,
+      },
+    });
+    store.statusMessage = `Exported ${response.exported_tables} table${response.exported_tables === 1 ? "" : "s"} to ${format.toUpperCase()}`;
+  } catch (error) {
+    store.lastError = error instanceof Error ? error.message : String(error);
+    store.statusMessage = `${format.toUpperCase()} table export failed`;
+  } finally {
+    tableDataBusy.value = false;
+  }
+}
+
+function insertSqlTransformTemplate() {
+  insertBlock([
+    '```sql database="data/example.sqlite"',
+    "SELECT",
+    "  name,",
+    "  amount",
+    "FROM results",
+    "ORDER BY amount DESC",
+    "LIMIT 25;",
+    "```",
+  ].join("\n"));
+  store.sidebar = "settings";
+  store.statusMessage = "Inserted SQL transform; configure and trust sqlite3 in Settings > Transforms";
 }
 
 function sortTableRows(columnIndex: number, direction: TableSortDirection) {

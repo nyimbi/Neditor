@@ -929,6 +929,26 @@ Support,2000,2500,=2000+2500
     ["csv", "budget"],
   ),
   template(
+    "sql-database-query",
+    "Data",
+    "sql",
+    "SQL database query",
+    "Queries a trusted local SQLite database and renders the result as a document table.",
+    fenced(
+      "sql",
+      `
+SELECT
+  name,
+  amount
+FROM results
+ORDER BY amount DESC
+LIMIT 25;
+`,
+      `database="data/example.sqlite"`,
+    ),
+    ["sql", "database", "sqlite", "table"],
+  ),
+  template(
     "json-schema-object",
     "Data",
     "json-schema",

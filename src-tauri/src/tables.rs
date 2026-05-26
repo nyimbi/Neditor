@@ -78,7 +78,7 @@ fn evaluate_delimited_table_formula_rows(
     );
 }
 
-fn parse_delimited_rows(body: &str, delimiter: char) -> Vec<Vec<String>> {
+pub(crate) fn parse_delimited_rows(body: &str, delimiter: char) -> Vec<Vec<String>> {
     let mut rows = Vec::new();
     let mut row = Vec::new();
     let mut cell = String::new();

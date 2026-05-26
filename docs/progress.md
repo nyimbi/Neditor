@@ -3664,6 +3664,19 @@ Consent-gated TTS model downloads:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after refreshing Preferences evidence for model-backed TTS consent. |
 | `git diff --check` | Pass | No whitespace errors are present in the TTS model download consent diff. |
 
+Spreadsheet table exchange and SQL transform:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding table import/export controls, command-palette entries, SQL transform insertion, and spreadsheet exchange IPC wiring. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with guards for CSV/XLSX import/export actions, SQL transform insertion, and SQL template registration. |
+| `cargo test --locked table_tests::spreadsheet_table_import_export_round_trips_csv_and_xlsx --lib` | Pass | Rust table tests proved native CSV import, XLSX export, XLSX import, and CSV export through the new spreadsheet exchange commands. |
+| `cargo test --locked table_tests::sql_transform_requires_read_only_trusted_queries --lib` | Pass | Rust transform tests proved SQL mutation blocking and trust gating for sqlite-backed SQL transforms. |
+| `cargo test --locked ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | IPC registration and documentation coverage passed after adding `import_spreadsheet_table` and `export_markdown_tables` to the coverage ledger. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting spreadsheet exchange and SQL transform evidence. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after refreshing Tables/data and Later transforms evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the spreadsheet exchange and SQL transform diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
