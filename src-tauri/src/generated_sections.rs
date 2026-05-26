@@ -22,16 +22,7 @@ pub(crate) fn inject_generated_sections(
     bibliography: &[BibliographyEntry],
     glossary: &BTreeMap<String, String>,
 ) -> String {
-    let wants_toc = text.contains("[TOC]")
-        || metadata_bool(
-            metadata,
-            &[
-                "toc",
-                "toc.enabled",
-                "tableOfContents",
-                "tableOfContents.enabled",
-            ],
-        );
+    let wants_toc = text.contains("[TOC]") || generated_toc_requested(metadata);
     let mut output = text.to_string();
     if wants_toc {
         let toc = render_toc(
@@ -157,6 +148,18 @@ pub(crate) fn generated_table_list_requested(metadata: &Value) -> bool {
             "tables.list",
             "tables.list.enabled",
             "captionLists.tables",
+        ],
+    )
+}
+
+pub(crate) fn generated_toc_requested(metadata: &Value) -> bool {
+    metadata_bool(
+        metadata,
+        &[
+            "toc",
+            "toc.enabled",
+            "tableOfContents",
+            "tableOfContents.enabled",
         ],
     )
 }

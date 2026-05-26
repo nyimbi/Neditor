@@ -21,7 +21,7 @@ use crate::{
         generated_figure_list_requested as figure_list_requested_from_metadata,
         generated_glossary_section_requested, generated_index_section_requested,
         generated_table_list_requested as table_list_requested_from_metadata,
-        inject_generated_sections,
+        generated_toc_requested as toc_requested_from_metadata, inject_generated_sections,
     },
     html_preview::markdown_to_html,
     indexing::{collect_index_entries, strip_index_markers},
@@ -179,6 +179,8 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         || figure_list_requested_from_metadata(&metadata);
     let generated_table_list_requested = reference_markdown.contains("[LIST_OF_TABLES]")
         || table_list_requested_from_metadata(&metadata);
+    let generated_toc_requested =
+        reference_markdown.contains("[TOC]") || toc_requested_from_metadata(&metadata);
     let generated_index_requested =
         reference_markdown.contains("[INDEX]") || generated_index_section_requested(&metadata);
     let generated_glossary_requested = reference_markdown.contains("[GLOSSARY]")
@@ -275,6 +277,8 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
             citation_references: &citation_references,
             bibliography: &bibliography,
             duplicate_bibliography_keys: &duplicate_bibliography_keys,
+            generated_toc_requested,
+            heading_count: headings.len(),
             generated_index_requested,
             index_terms: &index_terms,
             generated_glossary_requested,

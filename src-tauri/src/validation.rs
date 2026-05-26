@@ -21,6 +21,8 @@ pub(crate) struct DocumentValidationInput<'a> {
     pub(crate) citation_references: &'a [CitationReference],
     pub(crate) bibliography: &'a [BibliographyEntry],
     pub(crate) duplicate_bibliography_keys: &'a [String],
+    pub(crate) generated_toc_requested: bool,
+    pub(crate) heading_count: usize,
     pub(crate) generated_index_requested: bool,
     pub(crate) index_terms: &'a [String],
     pub(crate) generated_glossary_requested: bool,
@@ -276,6 +278,17 @@ fn validate_generated_reference_sections(
     input: &DocumentValidationInput<'_>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
+    if input.generated_toc_requested && input.heading_count == 0 {
+        let mut diagnostic = diag(
+            "warning",
+            "Generated table of contents was requested but no headings were found.",
+            None,
+            None,
+            Some("Add document headings or disable the generated table of contents before final export."),
+        );
+        diagnostic.related.push("headings: 0".to_string());
+        diagnostics.push(diagnostic);
+    }
     if input.generated_index_requested && input.index_terms.is_empty() {
         let mut diagnostic = diag(
             "warning",
