@@ -3131,6 +3131,14 @@ Equation editor template depth:
 | `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including static guards for Equation Editor filters, template categories, and the expanded matrix-template surface. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "builds business documents from saved identity snippets and local-agent handoff"` | Pass | Focused Chromium workflow proves users can filter Equation Editor templates by category/search, load total-cost and molarity templates, see Markdown preview updates, switch to inline mode, and insert an inline equation into the document. |
 
+AI paste clipboard import:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the explicit AI Paste **Load clipboard** action and guarded busy/status state. |
+| `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including static guards for the Load clipboard control and handler. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "previews and inserts cleaned AI paste through the modal"` | Pass | Focused Chromium workflow proves rich HTML clipboard import, status feedback, cleanup preview, and insertion through the AI paste modal. |
+
 Toolbar space recovery and Vim operator parity:
 
 | Command | Result | Evidence |

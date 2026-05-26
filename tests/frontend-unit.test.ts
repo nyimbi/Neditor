@@ -2388,6 +2388,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="AI command route suggestions"'));
   ok(app.includes("Docs Live"));
   ok(app.includes("AI Paste cleanup"));
+  ok(app.includes("Load clipboard"));
+  ok(app.includes("loadAiPasteFromClipboard"));
+  ok(app.includes("aiClipboardBusy"));
   ok(app.includes("Review governance"));
   ok(app.includes("Export readiness"));
   ok(app.includes("Outline mode"));

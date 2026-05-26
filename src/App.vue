@@ -2282,10 +2282,27 @@
           <button type="button" aria-label="Close AI paste cleanup" @click="closeAiPaste">x</button>
         </header>
         <section class="compare-grid ai-paste-grid">
-          <label>
-            Original
-            <textarea v-model="aiPasteText" rows="12" placeholder="Paste AI chat output here" data-initial-focus></textarea>
-          </label>
+          <div class="field-with-action">
+            <div class="field-action-header">
+              <label for="ai-paste-original">Original</label>
+              <button
+                type="button"
+                :disabled="aiClipboardBusy"
+                title="Read the current clipboard into the AI cleanup input"
+                @click="loadAiPasteFromClipboard"
+              >
+                {{ aiClipboardBusy ? "Reading..." : "Load clipboard" }}
+              </button>
+            </div>
+            <textarea
+              id="ai-paste-original"
+              v-model="aiPasteText"
+              rows="12"
+              placeholder="Paste AI chat output here"
+              aria-label="Original"
+              data-initial-focus
+            ></textarea>
+          </div>
           <label>
             Cleaned preview
             <textarea :value="store.aiCleanupPreview?.cleaned_markdown || ''" rows="12" readonly placeholder="Preview cleaned Markdown"></textarea>
@@ -4437,6 +4454,7 @@ let restoringScroll = false;
 let modalReturnFocus: HTMLElement | null = null;
 const aiPasteOpen = ref(false);
 const aiPasteText = ref("");
+const aiClipboardBusy = ref(false);
 const aiInsertMode = ref<"insert" | "quote" | "replace" | "appendix" | "selection" | "section">("insert");
 const aiAddProvenance = ref(true);
 const aiMarkAsDraft = ref(true);
@@ -13771,6 +13789,25 @@ async function boundedClipboardRead<T>(read: Promise<T>) {
   return Promise.race<T | null>([read, new Promise((resolve) => window.setTimeout(() => resolve(null), 350))]);
 }
 
+async function loadAiPasteFromClipboard() {
+  aiClipboardBusy.value = true;
+  try {
+    const clipboardText = await readClipboardText();
+    if (!clipboardText) {
+      store.statusMessage = "Clipboard did not contain readable text. Paste AI chat text manually.";
+      return;
+    }
+    aiPasteText.value = clipboardText.text;
+    aiPreviewSignature.value = "";
+    store.aiCleanupPreview = null;
+    store.aiCleanupIssues = [];
+    store.statusMessage =
+      clipboardText.kind === "rich" ? "Loaded rich clipboard text for AI cleanup" : "Loaded clipboard text for AI cleanup";
+  } finally {
+    aiClipboardBusy.value = false;
+  }
+}
+
 async function openAiPaste() {
   applyAiPasteDefaults();
   aiPasteOpen.value = true;
@@ -13779,18 +13816,12 @@ async function openAiPaste() {
     return;
   }
   if (aiPasteText.value.trim()) return;
-  const clipboardText = await readClipboardText();
-  if (clipboardText) {
-    aiPasteText.value = clipboardText.text;
-    store.statusMessage =
-      clipboardText.kind === "rich" ? "Loaded rich clipboard text for AI cleanup" : "Loaded clipboard text for AI cleanup";
-  } else {
-    store.statusMessage = "Paste AI chat text to preview cleanup";
-  }
+  await loadAiPasteFromClipboard();
 }
 
 function closeAiPaste() {
   aiPasteText.value = "";
+  aiClipboardBusy.value = false;
   aiPreviewSignature.value = "";
   store.aiCleanupPreview = null;
   store.aiCleanupIssues = [];
@@ -20272,6 +20303,25 @@ select:hover {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   min-height: 0;
+}
+
+.field-with-action {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-action-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-action-header button {
+  min-height: 28px;
+  padding: 3px 8px;
+  font-size: 12px;
 }
 
 .compare-grid pre {

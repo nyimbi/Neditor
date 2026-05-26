@@ -4382,7 +4382,11 @@ test("edits table structure with formats and cancels draft changes", async ({ pa
 
 test("previews and inserts cleaned AI paste through the modal", async ({ page }) => {
   await page.getByRole("button", { name: "AI Paste" }).click();
-  await page.getByRole("textbox", { name: "Original" }).fill("Assistant: Revenue grew 24%.");
+  const dialog = page.getByRole("dialog", { name: "AI paste cleanup" });
+  await setMockClipboardText(page, "<p><strong>Assistant:</strong> Revenue grew 24%.</p>", "text/html");
+  await dialog.getByRole("button", { name: "Load clipboard" }).click();
+  await expect(dialog.getByRole("textbox", { name: "Original" })).toHaveValue(/<strong>Assistant/);
+  await expect(page.locator(".status-bar")).toContainText("Loaded rich clipboard text for AI cleanup");
   await page.getByRole("button", { name: "Preview cleanup" }).click();
 
   await expect(page.getByRole("textbox", { name: "Cleaned preview" })).toHaveValue(/Cleaned AI output/);
