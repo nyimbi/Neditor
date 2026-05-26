@@ -1427,6 +1427,37 @@ test("quality recommendations ignore fenced examples for deterministic risk scan
   deepEqual(recommendations.map((item) => item.id), ["qa-ready"]);
 });
 
+test("quality recommendations ignore fenced bibliography examples as evidence", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "# Report",
+      "",
+      "## Evidence",
+      "",
+      "The reviewed claim needs a real bibliography source. [@real2026]",
+      "",
+      "~~~markdown",
+      "```bibtex",
+      "@misc{real2026, title={Example only}}",
+      "```",
+      "~~~",
+      "",
+    ].join("\n"),
+    semantic: {
+      title: "Report",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  const ids = recommendations.map((item) => item.id);
+  ok(ids.includes("citation-evidence"));
+  ok(!ids.includes("placeholders"));
+  ok(!ids.includes("humanization"));
+});
+
 test("AI source review helper supports tilde fences aliases and inert examples", () => {
   const lines = [
     "~~~llm-source",

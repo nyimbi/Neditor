@@ -169,6 +169,10 @@ Recent pushed checkpoints visible in current git history:
 - Quality recommendations now strip backtick and tilde fenced examples before
   counting placeholders, citation markers, headings, long paragraphs, and
   generic AI phrasing, so documentation snippets do not create false QA risks.
+- Bibliography evidence detection in the same QA pass is now top-level
+  fence-aware: real `[BIBLIOGRAPHY]`, raw BibTeX entries, and supported
+  bibliography fences still satisfy citation evidence, while bibliography
+  examples nested inside fenced Markdown do not.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.

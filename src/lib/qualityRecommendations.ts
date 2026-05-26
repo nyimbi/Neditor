@@ -1,6 +1,6 @@
 import type { DocumentDiagnostic, SemanticDocument } from "../types.js";
 import { frontMatterScalarValue } from "./frontMatter.js";
-import { stripMarkdownFencedBlocks } from "./provenanceReview.js";
+import { markdownFenceOpener, stripMarkdownFencedBlocks } from "./provenanceReview.js";
 
 export type QualityRecommendationSeverity = "pass" | "improve" | "risk" | "blocker";
 
@@ -20,7 +20,8 @@ export interface QualityRecommendationInput {
 
 const PLACEHOLDER_RE = /\{\{[^}]+\}\}|\b(?:TODO|TBD|FIXME)\b/gi;
 const CITATION_RE = /\[@[A-Za-z0-9_:.#$%&+?~/-]+\]/g;
-const BIBLIOGRAPHY_RE = /\[BIBLIOGRAPHY\]|^(?:```|~~~)\s*(?:bibtex|hayagriva|bibliography)\b|^@(?:article|book|misc|techreport|inproceedings)\s*[{(]/im;
+const BIBLIOGRAPHY_LANGUAGES = new Set(["bibtex", "hayagriva", "bibliography"]);
+const RAW_BIBLIOGRAPHY_ENTRY_RE = /^@(?:article|book|misc|techreport|inproceedings)\s*[{(]/i;
 const HEADING_RE = /^#{1,4}\s+\S.+$/gm;
 const GENERIC_AI_PHRASE_RE = /\b(?:leverage|robust|seamless|cutting-edge|world-class|game-changing|holistic|synergy)\b/gi;
 
@@ -34,7 +35,7 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
   const aiPending = [...(semantic?.ai_sources || []), ...(semantic?.ai_assisted_sections || [])].filter((item) => item.status !== "human-reviewed").length;
   const placeholderCount = (analysisText.match(PLACEHOLDER_RE) || []).length;
   const citationCount = (analysisText.match(CITATION_RE) || []).length;
-  const bibliographyPresent = BIBLIOGRAPHY_RE.test(text);
+  const bibliographyPresent = hasBibliographyEvidence(text);
   const headings = (analysisText.match(HEADING_RE) || []).length;
   const longParagraphs = longParagraphCount(analysisText);
   const genericPhrases = analysisText.match(GENERIC_AI_PHRASE_RE) || [];
@@ -175,6 +176,25 @@ function longParagraphCount(text: string) {
 
 function firstHeading(text: string) {
   return text.match(/^#\s+(.+)$/m)?.[1] || "";
+}
+
+function hasBibliographyEvidence(text: string) {
+  let fenceMarker = "";
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trimStart();
+    if (fenceMarker) {
+      if (trimmed.startsWith(fenceMarker)) fenceMarker = "";
+      continue;
+    }
+    const opener = markdownFenceOpener(line);
+    if (opener) {
+      if (BIBLIOGRAPHY_LANGUAGES.has(opener.language)) return true;
+      fenceMarker = opener.marker;
+      continue;
+    }
+    if (line.includes("[BIBLIOGRAPHY]") || RAW_BIBLIOGRAPHY_ENTRY_RE.test(trimmed)) return true;
+  }
+  return false;
 }
 
 function uniqueLowercase(values: string[]) {
