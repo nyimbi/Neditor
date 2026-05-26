@@ -1913,26 +1913,27 @@ test("collapses and restores command toolbars to recover writing space", async (
   expect(initialWorkspaceBox).not.toBeNull();
 
   await commandBar.getByRole("button", { name: "Collapse File toolbar" }).click();
-  await expect(commandBar.getByRole("button", { name: "Expand File toolbar" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Expand File toolbar" })).toBeVisible();
+  await expect(commandBar.getByRole("button", { name: "Expand File toolbar" })).toBeHidden();
   await expect(commandBar.getByRole("button", { name: "New" })).toBeHidden();
 
-  await commandBar.getByRole("button", { name: "Expand File toolbar" }).click();
+  await page.getByRole("button", { name: "Expand File toolbar" }).click();
   await expect(commandBar.getByRole("button", { name: "New" })).toBeVisible();
 
   await commandBar.getByRole("button", { name: "Collapse all" }).click();
-  await expect(commandBar.getByRole("button", { name: "Expand File toolbar" })).toBeVisible();
-  await expect(commandBar.getByRole("button", { name: "Expand View toolbar" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Expand File toolbar" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Expand View toolbar" })).toBeVisible();
   await expect(page.getByLabel("View mode")).toBeHidden();
   const collapsedBox = await commandBar.boundingBox();
   const collapsedWorkspaceBox = await workspace.boundingBox();
   expect(collapsedBox).not.toBeNull();
   expect(collapsedWorkspaceBox).not.toBeNull();
   expect(collapsedBox!.height).toBeLessThan(initialBox!.height);
-  expect(collapsedBox!.height).toBeLessThan(initialBox!.height * 0.45);
-  expect(collapsedWorkspaceBox!.height).toBeGreaterThan(initialWorkspaceBox!.height + 40);
-  await expect(commandBar.getByLabel("Collapsed toolbars")).toBeVisible();
+  expect(collapsedBox!.height).toBeLessThanOrEqual(2);
+  expect(collapsedWorkspaceBox!.height).toBeGreaterThan(initialWorkspaceBox!.height + 80);
+  await expect(page.getByLabel("Collapsed toolbars")).toBeVisible();
 
-  await commandBar.getByRole("button", { name: "Expand View toolbar" }).click();
+  await page.getByRole("button", { name: "Expand View toolbar" }).click();
   await commandBar.getByRole("button", { name: "Expand all" }).click();
   await expect(commandBar.getByRole("button", { name: "Collapse File toolbar" })).toBeVisible();
   await expect(commandBar.getByRole("button", { name: "New" })).toBeVisible();

@@ -1,7 +1,10 @@
 <template>
   <div
     class="app-shell"
-    :class="{ 'has-trust-prompt': externalTransformTrustPrompts.length }"
+    :class="{
+      'has-trust-prompt': externalTransformTrustPrompts.length,
+      'toolbars-collapsed': !hasExpandedToolbarRows,
+    }"
     :data-theme="store.theme"
     :data-toolbar-display="store.toolbarDisplay"
     :data-high-contrast="store.highContrast ? 'true' : 'false'"
@@ -114,42 +117,42 @@
       </section>
 
       <section class="window-meta" aria-label="Document status">
+        <section v-if="collapsedToolbarRows.length" class="collapsed-toolbar-tray titlebar-toolbar-tray" aria-label="Collapsed toolbars">
+          <span class="collapsed-toolbar-tray-label">Collapsed</span>
+          <button
+            v-for="row in collapsedToolbarRows"
+            :key="`collapsed-${row.id}`"
+            class="collapsed-toolbar-pill"
+            type="button"
+            :aria-label="`Expand ${row.label} toolbar`"
+            :title="`Expand ${row.label} toolbar`"
+            @click="toggleToolbarRow(row.id)"
+          >
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
+            </svg>
+            <span>{{ row.label }}</span>
+          </button>
+          <button
+            v-if="isToolbarCollapsed('view')"
+            class="collapsed-toolbar-pill collapsed-toolbar-pill-primary"
+            type="button"
+            aria-label="Expand all toolbars"
+            title="Expand all toolbars"
+            @click="setAllCommandToolbarsCollapsed(false)"
+          >
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
+            </svg>
+            <span>Expand all</span>
+          </button>
+        </section>
         <span role="status" class="release-badge" :class="releaseStatusClass" :aria-label="`Release status ${releaseStatus}`">{{ releaseStatus }}</span>
         <span v-if="store.gitStatus?.inside_repo">{{ store.gitStatus.branch || "detached" }}{{ store.gitStatus.dirty ? " dirty" : " clean" }}</span>
       </section>
     </header>
 
     <nav id="main-commands" class="command-bar" aria-label="Main commands" tabindex="-1">
-      <section v-if="collapsedToolbarRows.length" class="collapsed-toolbar-tray" aria-label="Collapsed toolbars">
-        <span class="collapsed-toolbar-tray-label">Collapsed</span>
-        <button
-          v-for="row in collapsedToolbarRows"
-          :key="`collapsed-${row.id}`"
-          class="collapsed-toolbar-pill"
-          type="button"
-          :aria-label="`Expand ${row.label} toolbar`"
-          :title="`Expand ${row.label} toolbar`"
-          @click="toggleToolbarRow(row.id)"
-        >
-          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
-          </svg>
-          <span>{{ row.label }}</span>
-        </button>
-        <button
-          v-if="isToolbarCollapsed('view')"
-          class="collapsed-toolbar-pill collapsed-toolbar-pill-primary"
-          type="button"
-          aria-label="Expand all toolbars"
-          title="Expand all toolbars"
-          @click="setAllCommandToolbarsCollapsed(false)"
-        >
-          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
-          </svg>
-          <span>Expand all</span>
-        </button>
-      </section>
       <section
         v-for="row in commandToolbarRows"
         v-show="!isToolbarCollapsed(row.id)"
@@ -6506,6 +6509,7 @@ const toolbarCollapseRows = computed(() => [...commandToolbarRows.value.map((row
 const collapsedToolbarRows = computed(() => toolbarCollapseRows.value.filter((row) => store.toolbarCollapsedRows.includes(row.id)));
 const normalizedToolbarCollapsedRows = (ids: string[]) =>
   Array.from(new Set(ids.filter((id) => toolbarCollapseRowIds.includes(id))));
+const hasExpandedToolbarRows = computed(() => toolbarCollapseRowIds.some((id) => !store.toolbarCollapsedRows.includes(id)));
 const anyCommandToolbarsCollapsed = computed(() => toolbarCollapseRowIds.some((id) => store.toolbarCollapsedRows.includes(id)));
 function isToolbarCollapsed(id: string) {
   return store.toolbarCollapsedRows.includes(id);
@@ -14715,6 +14719,14 @@ select:hover {
   grid-template-rows: 38px auto auto minmax(0, 1fr) 28px;
 }
 
+.app-shell.toolbars-collapsed {
+  grid-template-rows: 38px 0 minmax(0, 1fr) 28px;
+}
+
+.app-shell.has-trust-prompt.toolbars-collapsed {
+  grid-template-rows: 38px 0 auto minmax(0, 1fr) 28px;
+}
+
 .app-shell[data-theme="dark"] {
   color: #e6edf5;
   background: #111821;
@@ -15390,6 +15402,11 @@ select:hover {
   white-space: nowrap;
 }
 
+.titlebar-toolbar-tray {
+  flex: 1 1 auto;
+  max-width: min(46vw, 520px);
+}
+
 .release-badge {
   display: inline-flex;
   align-items: center;
@@ -15443,6 +15460,14 @@ select:hover {
   padding: 6px 8px;
   border-bottom-color: #b9c6d4;
   background: #f7f9fc;
+}
+
+.app-shell.toolbars-collapsed .command-bar {
+  height: 0;
+  min-height: 0;
+  padding-block: 0;
+  border-bottom-width: 0;
+  overflow: hidden;
 }
 
 .command-toolbar-row {
@@ -20005,6 +20030,22 @@ select:hover {
 @media (max-width: 600px) {
   .app-shell {
     grid-template-rows: 38px auto minmax(0, 1fr) 34px;
+  }
+
+  .app-shell.toolbars-collapsed {
+    grid-template-rows: 38px 0 minmax(0, 1fr) 34px;
+  }
+
+  .app-shell.has-trust-prompt.toolbars-collapsed {
+    grid-template-rows: 38px 0 auto minmax(0, 1fr) 34px;
+  }
+
+  .titlebar-toolbar-tray {
+    max-width: 34vw;
+  }
+
+  .titlebar-toolbar-tray .collapsed-toolbar-tray-label {
+    display: none;
   }
 
   .command-group,
