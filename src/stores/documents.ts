@@ -5,6 +5,7 @@ import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/p
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessDocuments";
+import { isAiSourceFenceOpener, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "../lib/transformTemplates";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import {
@@ -146,27 +147,6 @@ function rewriteAiAssistedMarker(line: string, reviewed: boolean) {
   fields.set("reviewedBy", reviewed ? "local" : "");
   fields.set("reviewedAt", reviewed ? new Date().toISOString() : "");
   return serializeAiAssistedMarker(fields);
-}
-
-function rewriteYamlLikeField(lines: string[], key: string, value: string) {
-  const index = lines.findIndex((line) => line.trimStart().startsWith(`${key}:`));
-  const replacement = `${key}: ${value}`;
-  if (index >= 0) {
-    lines[index] = replacement;
-  } else {
-    lines.push(replacement);
-  }
-}
-
-function rewriteAiSourceBlock(lines: string[], startIndex: number, reviewed: boolean) {
-  const endIndex = lines.findIndex((line, index) => index > startIndex && line.trim() === "```");
-  if (endIndex < 0) return false;
-  const body = lines.slice(startIndex + 1, endIndex);
-  rewriteYamlLikeField(body, "status", reviewed ? "human-reviewed" : "needs-review");
-  rewriteYamlLikeField(body, "reviewedBy", reviewed ? "local" : "");
-  rewriteYamlLikeField(body, "reviewedAt", reviewed ? new Date().toISOString() : "");
-  lines.splice(startIndex + 1, endIndex - startIndex - 1, ...body);
-  return true;
 }
 
 interface BackendWatchEvent {
@@ -1668,8 +1648,8 @@ export const useDocumentsStore = defineStore("documents", {
     setAiSourceReviewed(line: number, reviewed: boolean) {
       const lines = this.activeDocument.text.split("\n");
       const index = Math.max(0, line - 1);
-      if (!lines[index]?.trimStart().startsWith("```ai-source")) return;
-      if (!rewriteAiSourceBlock(lines, index, reviewed)) return;
+      if (!isAiSourceFenceOpener(lines[index] || "")) return;
+      if (!rewriteAiSourceReviewBlock(lines, index, reviewed)) return;
       this.updateText(lines.join("\n"));
       this.statusMessage = reviewed ? "Marked AI source as human-reviewed" : "Marked AI source as needing review";
     },

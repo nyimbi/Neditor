@@ -99,6 +99,7 @@ import {
   formatQualityRecommendationSummary,
   qualityRecommendationMarkdown,
 } from "../src/lib/qualityRecommendations.js";
+import { isAiSourceFenceOpener, rewriteAiSourceReviewBlock } from "../src/lib/provenanceReview.js";
 import {
   buildReleaseReadinessChecklist,
   formatReleaseChecklistSummary,
@@ -1364,6 +1365,32 @@ test("quality recommendations pass when a reviewed document has baseline structu
 
   deepEqual(recommendations.map((item) => item.id), ["qa-ready"]);
   equal(formatQualityRecommendationSummary(recommendations), "0 blockers, 0 risks, 0 improvements");
+});
+
+test("AI source review helper supports tilde fences aliases and inert examples", () => {
+  const lines = [
+    "~~~llm-source",
+    "tool: Claude",
+    "deployment: approved-claude",
+    "status: needs-review",
+    "~~~",
+  ];
+  ok(isAiSourceFenceOpener(lines[0]));
+  equal(rewriteAiSourceReviewBlock(lines, 0, true, "2026-05-26T12:00:00.000Z"), true);
+  deepEqual(lines, [
+    "~~~llm-source",
+    "tool: Claude",
+    "deployment: approved-claude",
+    "status: human-reviewed",
+    "reviewedBy: local",
+    "reviewedAt: 2026-05-26T12:00:00.000Z",
+    "~~~",
+  ]);
+
+  const exampleLines = ["```markdown", "```ai-source", "provider: Example Only", "```", "```"];
+  equal(isAiSourceFenceOpener(exampleLines[0]), false);
+  equal(rewriteAiSourceReviewBlock(exampleLines, 0, true, "2026-05-26T12:00:00.000Z"), false);
+  deepEqual(exampleLines, ["```markdown", "```ai-source", "provider: Example Only", "```", "```"]);
 });
 
 test("release readiness checklist reports missing governance state", () => {
