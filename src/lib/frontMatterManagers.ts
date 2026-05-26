@@ -124,7 +124,9 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       if (parsedTopLevel.anchor && hasIndentedYamlChildren(lines, endIndex, index, 0)) {
         if (!mapAnchors.has(parsedTopLevel.anchor)) mapAnchors.set(parsedTopLevel.anchor, []);
         currentMapAnchor = { anchor: parsedTopLevel.anchor, indent: 0 };
-        currentSequenceAnchor = { anchor: parsedTopLevel.anchor, indent: 0, rows: [], current: null };
+        if (firstIndentedYamlChildIsSequence(lines, endIndex, index, 0)) {
+          currentSequenceAnchor = { anchor: parsedTopLevel.anchor, indent: 0, rows: [], current: null };
+        }
       }
       if (parsedTopLevel.anchor && parsedTopLevel.value && !parsedTopLevel.value.startsWith("[") && !parsedTopLevel.value.startsWith("{")) {
         anchors.set(parsedTopLevel.anchor, parsedTopLevel.value);
@@ -732,6 +734,16 @@ function hasIndentedYamlChildren(lines: string[], endIndex: number, index: numbe
   return false;
 }
 
+function firstIndentedYamlChildIsSequence(lines: string[], endIndex: number, index: number, indent: number) {
+  for (let nextIndex = index + 1; nextIndex < endIndex; nextIndex += 1) {
+    const next = lines[nextIndex];
+    if (!next.trim() || next.trimStart().startsWith("#")) continue;
+    const nextIndent = yamlIndentWidth(next.match(/^\s*/)?.[0] || "");
+    return nextIndent > indent && /^\s*-\s*/.test(next);
+  }
+  return false;
+}
+
 function cleanYamlScalar(value: string) {
   const withoutComment = stripYamlComment(value).trim();
   const decorated = stripLeadingYamlDecorators(withoutComment);
@@ -967,7 +979,7 @@ function findInlineYamlKeySeparator(value: string) {
 }
 
 function yamlAliasNames(value: string) {
-  const scalar = stripLeadingYamlDecorators(stripYamlComment(value).trim()).scalar;
+  const scalar = stripLeadingYamlDecorators(stripYamlComment(value).trim()).scalar.replace(/^<<:\s*/, "");
   const direct = scalar.match(/^\*([A-Za-z0-9_-]+)$/)?.[1];
   if (direct) return [direct];
   if (!scalar.startsWith("[") || !scalar.endsWith("]")) return [];
