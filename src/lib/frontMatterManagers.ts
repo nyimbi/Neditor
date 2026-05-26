@@ -260,6 +260,44 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
       }
       continue;
     }
+    if (value.startsWith("[")) {
+      const inlineEntries = parseInlineYamlSequence(value, anchors, mapAnchors, index + 1);
+      if (parsed.anchor) {
+        if (!mapAnchors.has(parsed.anchor)) mapAnchors.set(parsed.anchor, []);
+        for (const entry of inlineEntries) {
+          recordMapAnchorEntry(mapAnchors, { anchor: parsed.anchor }, entry.key, entry.value, entry.line, entry.keepExisting);
+        }
+      }
+      for (const owner of stack.filter((entry) => entry.anchor)) {
+        const relativeKey = path.startsWith(`${owner.path}.`) ? path.slice(owner.path.length + 1) : "";
+        if (!relativeKey) continue;
+        for (const entry of inlineEntries) {
+          recordMapAnchorEntry(
+            mapAnchors,
+            owner,
+            `${relativeKey}.${entry.key}`,
+            entry.value,
+            entry.line,
+            entry.keepExisting,
+          );
+        }
+      }
+      if (!excluded) {
+        for (const entry of inlineEntries) {
+          setVariableRow(
+            rows,
+            {
+              key: `${path}.${entry.key}`,
+              value: entry.value,
+              status: entry.value ? "ready" : "empty",
+              line: entry.line,
+            },
+            entry.keepExisting,
+          );
+        }
+      }
+      continue;
+    }
     if (parsed.anchor && value && !value.startsWith("[") && !value.startsWith("{")) anchors.set(parsed.anchor, value);
     if (hasChildren) stack.push({ indent, path, excluded, anchor: parsed.anchor });
     if (excluded) continue;
@@ -510,6 +548,39 @@ function parseInlineYamlMap(
     if (entryValue === "|" || entryValue === ">" || entryValue.startsWith("[") || entryValue.startsWith("{")) continue;
     entries.push({ key, value: entryValue, line, keepExisting: false });
   }
+  return entries;
+}
+
+function parseInlineYamlSequence(
+  value: string,
+  anchors: Map<string, string>,
+  mapAnchors: Map<string, Array<{ key: string; value: string; line: number }>>,
+  line: number,
+): InlineYamlMapEntry[] {
+  const trimmed = stripYamlComment(value).trim();
+  if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) return [];
+  const entries: InlineYamlMapEntry[] = [];
+  splitInlineYamlCollection(trimmed.slice(1, -1)).forEach((item, itemIndex) => {
+    const indexKey = String(itemIndex);
+    const parsed = parseYamlScalar(item);
+    let entryValue = parsed.alias ? anchors.get(parsed.alias) || parsed.value : parsed.value;
+    if (parsed.alias && mapAnchors.has(parsed.alias)) {
+      for (const entry of mapAnchors.get(parsed.alias) || []) {
+        entries.push({ ...entry, key: `${indexKey}.${entry.key}`, keepExisting: true });
+      }
+      return;
+    }
+    if (entryValue === "[]" || entryValue === "{}") entryValue = "";
+    if (entryValue.startsWith("{")) {
+      for (const entry of parseInlineYamlMap(entryValue, anchors, mapAnchors, line)) {
+        entries.push({ ...entry, key: `${indexKey}.${entry.key}` });
+      }
+      return;
+    }
+    if (entryValue === "|" || entryValue === ">" || entryValue.startsWith("[") || entryValue.startsWith("{")) return;
+    if (parsed.anchor && entryValue) anchors.set(parsed.anchor, entryValue);
+    entries.push({ key: indexKey, value: entryValue, line, keepExisting: false });
+  });
   return entries;
 }
 
