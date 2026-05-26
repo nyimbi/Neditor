@@ -893,6 +893,23 @@ paths:
           schema:
             type: integer
             maximum: 100
+        - name: filter
+          in: query
+          style: deepObject
+          explode: true
+          allowReserved: true
+          deprecated: true
+          examples:
+            active:
+              value:
+                status: active
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
       responses:
         "200":
           description: Account list
@@ -920,6 +937,15 @@ paths:
             post:
               summary: Payment status callback
               operationId: paymentStatusCallback
+              callbacks:
+                retryNotice:
+                  '{$request.body#/retryUrl}':
+                    post:
+                      summary: Retry notice
+                      operationId: retryNoticeCallback
+                      responses:
+                        "204":
+                          description: Retry accepted
               responses:
                 "204":
                   description: Accepted
@@ -938,9 +964,20 @@ paths:
           description: Created account
 webhooks:
   accountChanged:
+    parameters:
+      - name: X-Webhook-Signature
+        in: header
+        required: true
+        schema:
+          type: string
     post:
       summary: Account changed webhook
       operationId: accountChangedWebhook
+      parameters:
+        - name: attempt
+          in: query
+          schema:
+            type: integer
       requestBody:
         content:
           application/json:
@@ -1104,14 +1141,24 @@ components:
     assert!(response.html.contains("X-API-Key"));
     assert!(response.html.contains("tenant"));
     assert!(response.html.contains("limit"));
+    assert!(response.html.contains("filter"));
+    assert!(response.html.contains("style: deepObject"));
+    assert!(response.html.contains("explode: true"));
+    assert!(response.html.contains("allowReserved: true"));
+    assert!(response.html.contains("deprecated: true"));
+    assert!(response.html.contains("examples: active"));
+    assert!(response.html.contains("content:"));
     assert!(response.html.contains("application/json"));
     assert!(response.html.contains("examples: success"));
     assert!(response.html.contains("X-RateLimit-Remaining"));
     assert!(response.html.contains("getAccount"));
     assert!(response.html.contains("callbacks: paymentStatus"));
     assert!(response.html.contains("paymentStatusCallback"));
+    assert!(response.html.contains("retryNoticeCallback"));
     assert!(response.html.contains("WEBHOOK POST"));
     assert!(response.html.contains("accountChangedWebhook"));
+    assert!(response.html.contains("X-Webhook-Signature"));
+    assert!(response.html.contains("attempt"));
     assert!(response.html.contains("discriminator eventType"));
     assert!(response.html.contains("mapping account, closed"));
     assert!(response.html.contains("array&lt;ref Account&gt;"));

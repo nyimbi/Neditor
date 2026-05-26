@@ -308,9 +308,17 @@ fn operation_label(summary: &str, operation_id: &str, operation: &Value) -> Stri
 }
 
 fn render_openapi_callbacks(callbacks: Option<&Value>) -> String {
+    render_openapi_callbacks_with_depth(callbacks, 0)
+}
+
+fn render_openapi_callbacks_with_depth(callbacks: Option<&Value>, depth: usize) -> String {
+    const MAX_CALLBACK_DEPTH: usize = 3;
     let Some(callbacks) = callbacks.and_then(Value::as_object) else {
         return String::new();
     };
+    if depth >= MAX_CALLBACK_DEPTH {
+        return String::new();
+    }
     let items = callbacks
         .iter()
         .flat_map(|(name, callback)| {
@@ -329,7 +337,11 @@ fn render_openapi_callbacks(callbacks: Option<&Value>) -> String {
                                         .or_else(|| operation.get("summary"))
                                         .and_then(Value::as_str)
                                         .unwrap_or("");
-                                    [
+                                    let nested_callbacks = render_openapi_callbacks_with_depth(
+                                        operation.get("callbacks"),
+                                        depth + 1,
+                                    );
+                                    let mut parts = [
                                         escape_html(name),
                                         escape_html(&method.to_ascii_uppercase()),
                                         escape_html(expression),
@@ -337,8 +349,11 @@ fn render_openapi_callbacks(callbacks: Option<&Value>) -> String {
                                     ]
                                     .into_iter()
                                     .filter(|part| !part.is_empty())
-                                    .collect::<Vec<_>>()
-                                    .join(" ")
+                                    .collect::<Vec<_>>();
+                                    if !nested_callbacks.is_empty() {
+                                        parts.push(nested_callbacks);
+                                    }
+                                    parts.join(" ")
                                 })
                         })
                     })
@@ -361,6 +376,11 @@ fn render_openapi_webhook_rows(value: &Value) -> String {
     webhooks
         .iter()
         .flat_map(|(name, path_item)| {
+            let path_parameters = path_item
+                .get("parameters")
+                .and_then(Value::as_array)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
             path_item.as_object().into_iter().flat_map(move |methods| {
                 methods
                     .iter()
@@ -376,11 +396,13 @@ fn render_openapi_webhook_rows(value: &Value) -> String {
                             .and_then(Value::as_str)
                             .unwrap_or("");
                         let operation_label = operation_label(summary, operation_id, operation);
-                        let parameters = operation
+                        let mut parameters = path_parameters.iter().collect::<Vec<_>>();
+                        if let Some(operation_parameters) = operation
                             .get("parameters")
                             .and_then(Value::as_array)
-                            .map(|parameters| parameters.iter().collect::<Vec<_>>())
-                            .unwrap_or_default();
+                        {
+                            parameters.extend(operation_parameters.iter());
+                        }
                         format!(
                             "<tr><td><code>WEBHOOK {}</code></td><td><code>{}</code></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                             escape_html(&method.to_ascii_uppercase()),
@@ -475,6 +497,10 @@ fn render_openapi_parameters(parameters: &[&Value]) -> String {
             if !schema.is_empty() {
                 label.push_str(&format!(" {}", escape_html(&schema)));
             }
+            let details = openapi_parameter_details(parameter);
+            if !details.is_empty() {
+                label.push_str(&format!(" {}", escape_html(&details)));
+            }
             if !description.is_empty() {
                 label.push_str(&format!(" - {}", escape_html(description)));
             }
@@ -487,6 +513,24 @@ fn render_openapi_parameters(parameters: &[&Value]) -> String {
     } else {
         format!("<ul>{items}</ul>")
     }
+}
+
+fn openapi_parameter_details(parameter: &Value) -> String {
+    let mut details = Vec::new();
+    for key in ["style", "explode", "allowReserved", "deprecated"] {
+        if let Some(value) = parameter.get(key) {
+            details.push(format!("{key}: {}", structured_value_summary(value)));
+        }
+    }
+    let examples = render_openapi_media_examples(parameter);
+    if !examples.is_empty() {
+        details.push(examples);
+    }
+    let content = render_openapi_content(parameter.get("content"));
+    if !content.is_empty() {
+        details.push(format!("content: {content}"));
+    }
+    details.join("; ")
 }
 
 fn render_openapi_request_body(request_body: Option<&Value>) -> String {
