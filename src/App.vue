@@ -2310,6 +2310,21 @@
           </label>
           </section>
           <section v-show="selectedConfigurationSection === 'files'" class="configuration-center-panel" aria-label="Recent documents configuration">
+          <section aria-label="Command line and default reader setup">
+            <h3>Command line and default reader</h3>
+            <p class="sidebar-hint">Use <code>ned open file.md</code> to send Markdown files to NEditor, or <code>ned convert file.md --to pdf --output file.pdf</code> for headless exports.</p>
+            <label>
+              <input :checked="defaultMarkdownReaderEnabled" type="checkbox" :disabled="defaultMarkdownReaderBusy" @change="toggleDefaultMarkdownReader($event)" />
+              Make NEditor the default Markdown reader
+            </label>
+            <p class="engine-setup-status" :class="defaultMarkdownReaderPlan?.applied ? 'ok' : defaultMarkdownReaderPlan?.supported ? '' : 'failed'" role="status">
+              {{ defaultMarkdownReaderStatus || defaultMarkdownReaderPlan?.message || "Check default Markdown reader setup before changing OS file associations." }}
+            </p>
+            <pre v-if="defaultMarkdownReaderPlan?.commands.length" class="transform-installer-commands">{{ defaultMarkdownReaderPlan.commands.join("\n") }}</pre>
+            <ul v-if="defaultMarkdownReaderPlan?.manual_steps.length" class="transform-installer-handlers">
+              <li v-for="step in defaultMarkdownReaderPlan.manual_steps" :key="step">{{ step }}</li>
+            </ul>
+          </section>
           <section aria-label="Recent files">
             <h3>Recent files</h3>
             <button v-for="path in store.recentFiles" :key="path" class="outline-row" type="button" @click="store.openRecentPath(path)">
@@ -5025,6 +5040,15 @@ type TransformHandlerInstallResponse = {
   message: string;
   commands: string[];
 };
+type DefaultMarkdownReaderResponse = {
+  platform: string;
+  enabled: boolean;
+  applied: boolean;
+  supported: boolean;
+  message: string;
+  commands: string[];
+  manual_steps: string[];
+};
 
 declare global {
   interface Window {
@@ -5150,6 +5174,10 @@ const transformInstallerPlans = ref<TransformHandlerInstallerPlan[]>([]);
 const selectedTransformInstallerId = ref("");
 const transformInstallerBusy = ref(false);
 const transformInstallerStatus = ref("");
+const defaultMarkdownReaderBusy = ref(false);
+const defaultMarkdownReaderStatus = ref("");
+const defaultMarkdownReaderEnabled = ref(false);
+const defaultMarkdownReaderPlan = ref<DefaultMarkdownReaderResponse | null>(null);
 const guidedDemoStepIndex = ref(0);
 const ttsBusy = ref(false);
 const ttsInspectionBusy = ref(false);
@@ -9941,7 +9969,9 @@ async function installDesktopWorkflowTestHooks() {
 
 onMounted(async () => {
   await store.boot();
+  await openPendingCliPaths();
   await loadTransformHandlerInstallers();
+  await loadDefaultMarkdownReaderPlan();
   await hydrateTtsModelStorageLocation();
   await bindNativeMenuCommands();
   applyAiPasteDefaults();
@@ -13441,6 +13471,9 @@ function selectConfigurationSection(sectionId: string) {
   if (sectionId === "transforms" && !transformInstallerPlans.value.length) {
     void loadTransformHandlerInstallers();
   }
+  if (sectionId === "files" && !defaultMarkdownReaderPlan.value) {
+    void loadDefaultMarkdownReaderPlan();
+  }
 }
 
 function openConfigurationSetup(stepId: string = "llm-access") {
@@ -13453,6 +13486,19 @@ function openConfigurationSetup(stepId: string = "llm-access") {
 
 function closeConfigurationSetup() {
   configurationSetupOpen.value = false;
+}
+
+async function openPendingCliPaths() {
+  const paths = await invoke<string[]>("pending_cli_open_paths").catch(() => []);
+  if (!paths.length) return;
+  for (const path of paths) {
+    try {
+      await store.openPath(path);
+    } catch (error) {
+      store.lastError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  store.statusMessage = `Opened ${paths.length} command-line ${paths.length === 1 ? "document" : "documents"}`;
 }
 
 async function runConfigurationSetupStep(stepId: ConfigurationSetupStepId) {
@@ -14525,6 +14571,39 @@ async function loadTransformHandlerInstallers() {
     transformInstallerPlans.value = [];
     selectedTransformInstallerId.value = "";
     transformInstallerStatus.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function loadDefaultMarkdownReaderPlan() {
+  try {
+    const response = await invoke<DefaultMarkdownReaderResponse>("default_markdown_reader_plan");
+    defaultMarkdownReaderPlan.value = response;
+    defaultMarkdownReaderEnabled.value = response.applied;
+    defaultMarkdownReaderStatus.value = response.message;
+  } catch (error) {
+    defaultMarkdownReaderPlan.value = null;
+    defaultMarkdownReaderEnabled.value = false;
+    defaultMarkdownReaderStatus.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function toggleDefaultMarkdownReader(event: Event) {
+  const enabled = eventChecked(event);
+  defaultMarkdownReaderBusy.value = true;
+  try {
+    const response = await invoke<DefaultMarkdownReaderResponse>("configure_default_markdown_reader", {
+      request: { enabled },
+    });
+    defaultMarkdownReaderPlan.value = response;
+    defaultMarkdownReaderEnabled.value = response.applied;
+    defaultMarkdownReaderStatus.value = response.message;
+    if (event.target instanceof HTMLInputElement) event.target.checked = response.applied;
+  } catch (error) {
+    defaultMarkdownReaderEnabled.value = false;
+    defaultMarkdownReaderStatus.value = error instanceof Error ? error.message : String(error);
+    if (event.target instanceof HTMLInputElement) event.target.checked = false;
+  } finally {
+    defaultMarkdownReaderBusy.value = false;
   }
 }
 

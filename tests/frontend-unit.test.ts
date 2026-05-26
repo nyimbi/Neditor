@@ -3831,6 +3831,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("install_transform_handlers"));
   ok(app.includes("openTransformInstaller"));
   ok(app.includes("Install Transform Handlers"));
+  ok(app.includes("pending_cli_open_paths"));
+  ok(app.includes("default_markdown_reader_plan"));
+  ok(app.includes("configure_default_markdown_reader"));
+  ok(app.includes("ned open file.md"));
+  ok(app.includes("Make NEditor the default Markdown reader"));
   ok(app.includes("Help: Docs Live"));
   ok(app.includes("Help: Export and publishing"));
   ok(app.includes("Help: AI-first composition"));

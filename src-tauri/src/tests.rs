@@ -98,6 +98,7 @@ ARR: Annual recurring revenue.
 }
 
 mod citation_tests;
+mod cli_tests;
 mod compiler_core_tests;
 mod document_structure_tests;
 mod example_fixture_tests;

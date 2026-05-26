@@ -6,6 +6,7 @@ use std::{collections::BTreeSet, fs, path::Path, path::PathBuf};
 mod ai_cleanup;
 mod bibliography;
 mod calculations;
+pub mod cli;
 mod compile_options;
 mod compiler;
 mod compiler_support;
@@ -55,6 +56,9 @@ mod workspace_files;
 use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
 use ai_cleanup::AiCleanupRequest;
+use cli::{
+    configure_default_markdown_reader, default_markdown_reader_plan, pending_cli_open_paths,
+};
 #[cfg(test)]
 use compiler::compile;
 pub(crate) use compiler::compile_with_options;
@@ -153,6 +157,9 @@ pub fn run() {
             duplicate_file,
             reveal_path,
             file_metadata,
+            pending_cli_open_paths,
+            default_markdown_reader_plan,
+            configure_default_markdown_reader,
             list_workspace_files,
             compile_document,
             compile_document_with_options,
