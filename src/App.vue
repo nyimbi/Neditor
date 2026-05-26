@@ -3321,6 +3321,8 @@
               <strong>{{ step.label }}</strong>
               <small>{{ step.status }}</small>
               <span>{{ step.detail }}</span>
+              <p>{{ step.assistance }}</p>
+              <em>{{ step.contextSignals.join(" | ") }}</em>
             </li>
           </ol>
           <div class="docs-live-section-cards">
@@ -22230,6 +22232,22 @@ select:hover {
   color: #2d3746;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.docs-live-workflow li p,
+.docs-live-workflow li em {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.docs-live-workflow li p {
+  color: #18324f;
+}
+
+.docs-live-workflow li em {
+  color: #6b7280;
+  font-style: normal;
 }
 
 .docs-live-section-cards {

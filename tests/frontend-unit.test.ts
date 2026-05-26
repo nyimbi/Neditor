@@ -1000,6 +1000,9 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   equal(draft.workflow[2].id, "draft");
   equal(draft.workflow[4].id, "humanize");
   equal(draft.workflow[5].id, "review");
+  ok(draft.workflow.every((step) => step.assistance.length > 80));
+  ok(draft.workflow.every((step) => step.contextSignals.some((signal) => signal.includes("placeholder"))));
+  ok(draft.workflow.some((step) => step.assistance.includes("Commercial team") || step.assistance.includes("owner")));
   ok(draft.reviewPacket.contextSources.some((source) => source.includes("AI-created questionnaire answers captured")));
   ok(draft.reviewPacket.sectionRunbook[0].includes("draft body, run QA"));
   ok(draft.reviewPacket.qaRegister.some((item) => item.includes("Executive Summary must tie")));
@@ -1023,6 +1026,7 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.markdown.includes("<!-- ai-assisted: status=needs-review"));
   ok(draft.markdown.includes("## Draft Context"));
   ok(draft.markdown.includes("## Drafting Plan"));
+  ok(draft.markdown.includes("AI assistance"));
   ok(draft.markdown.includes("## Section-by-section Draft Runbook"));
   ok(draft.markdown.includes("### Context Package"));
   ok(draft.markdown.includes("### Section Work Queue"));
@@ -4085,6 +4089,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("AI-created questionnaire"));
   ok(app.includes('aria-label="AI suggested optimal answers"'));
   ok(app.includes("buildDocsLiveSuggestedAnswers"));
+  ok(app.includes("step.contextSignals.join"));
   ok(app.includes("appendAllDocsLiveSuggestedAnswers"));
   ok(app.includes("Context-aware starting points for every wizard step."));
   ok(app.includes("Questionnaire answers"));

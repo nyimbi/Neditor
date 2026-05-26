@@ -99,6 +99,8 @@ export interface DocsLiveWorkflowStep {
   label: string;
   status: "ready" | "needs-input" | "complete";
   detail: string;
+  assistance: string;
+  contextSignals: string[];
 }
 
 export interface DocsLiveSectionDraft {
@@ -932,7 +934,7 @@ function buildDocsLiveWorkflow(
     : blueprint.workflow
       ? `Docs Live generated ${sections.length} suggested ${workflow.unitLabel}${sections.length === 1 ? "" : "s"} from the document type. Review and approve the ${workflow.planningLabel.toLowerCase()} before prose is accepted.`
       : `Docs Live generated ${sections.length} suggested outline section${sections.length === 1 ? "" : "s"} from the document type. Review and approve the outline before accepting the draft.`;
-  return [
+  const steps: Array<Omit<DocsLiveWorkflowStep, "assistance" | "contextSignals">> = [
     {
       id: "outline",
       label: outlineWasProvided ? (blueprint.workflow ? `${workflow.planningLabel} locked` : "Outline locked") : "Suggested outline ready",
@@ -984,6 +986,96 @@ function buildDocsLiveWorkflow(
         : "Each section carries reviewer questions, unresolved assumptions, and sign-off prompts.",
     },
   ];
+  return steps.map((step) => ({
+    ...step,
+    assistance: docsLiveWorkflowStepAssistance(step.id, {
+      sections,
+      placeholders,
+      contextSentences,
+      issues,
+      blueprint,
+      outlineWasProvided,
+      planningOnly,
+    }),
+    contextSignals: docsLiveWorkflowStepSignals(step.id, {
+      sections,
+      placeholders,
+      contextSentences,
+      issues,
+      blueprint,
+      outlineWasProvided,
+      planningOnly,
+    }),
+  }));
+}
+
+function docsLiveWorkflowStepAssistance(
+  stepId: DocsLiveWorkflowStep["id"],
+  context: {
+    sections: DocsLiveSectionDraft[];
+    placeholders: Record<string, string>;
+    contextSentences: string[];
+    issues: string[];
+    blueprint: DocsLiveBlueprint;
+    outlineWasProvided: boolean;
+    planningOnly: boolean;
+  },
+) {
+  const workflow = workflowProfileFor(context.blueprint);
+  const placeholderKeys = Object.keys(context.placeholders);
+  const firstUnit = firstDraftableWorkflowUnit(workflow, context.sections);
+  switch (stepId) {
+    case "outline":
+      return context.outlineWasProvided
+        ? `Treat the current outline as the approved work queue; verify ${firstUnit?.title || `the first ${workflow.unitLabel}`} has a clear purpose, owner, evidence need, and acceptance check before drafting.`
+        : `Review the AI-generated ${workflow.planningLabel.toLowerCase()}, rename weak sections, add missing decision/evidence steps, and explicitly approve it before prose generation.`;
+    case "context":
+      return placeholderKeys.length
+        ? `Promote the strongest context into reusable placeholders for ${placeholderKeys.slice(0, 4).join(", ")} and add any missing audience, outcome, owner, deadline, evidence, and reviewer values.`
+        : "Start with audience, outcome, owner, deadline, tone, evidence, and reviewer; keep unknown facts bracketed so the draft does not invent them.";
+    case "draft":
+      return context.planningOnly
+        ? `Do not flesh out prose yet; approve the ${workflow.planningLabel.toLowerCase()}, choose the first ${workflow.unitLabel}, and write section-specific completion criteria first.`
+        : `Draft ${firstUnit?.title || `the next ${workflow.unitLabel}`} first, carry forward only verified context, and leave unresolved facts as visible review prompts.`;
+    case "qa":
+      return context.issues.length
+        ? `Resolve the ${context.issues.length} open QA blocker${context.issues.length === 1 ? "" : "s"} before export, then run ${workflow.qualityLabel.toLowerCase()} against claims, calculations, citations, and assumptions.`
+        : `Run ${workflow.qualityLabel.toLowerCase()} now: check claims, calculations, citations, continuity, section purpose, and reviewer acceptance criteria.`;
+    case "humanize":
+      return context.planningOnly
+        ? "Wait for drafted prose, then replace generic AI phrasing with concrete owner language, examples, dates, source references, and natural transitions."
+        : "Read each section as the intended owner, cut generic setup phrases, add concrete examples, and make unresolved assumptions sound like review notes rather than filler.";
+    case "review":
+      return "Assign an accountable reviewer, keep AI-assisted provenance visible, collect approvals and unresolved evidence, then package the document for the selected export or publishing path.";
+    default:
+      return "Use the current document context to choose the next smallest reviewable action before generating or applying more text.";
+  }
+}
+
+function docsLiveWorkflowStepSignals(
+  stepId: DocsLiveWorkflowStep["id"],
+  context: {
+    sections: DocsLiveSectionDraft[];
+    placeholders: Record<string, string>;
+    contextSentences: string[];
+    issues: string[];
+    blueprint: DocsLiveBlueprint;
+    outlineWasProvided: boolean;
+    planningOnly: boolean;
+  },
+) {
+  const workflow = workflowProfileFor(context.blueprint);
+  const signals = [
+    context.outlineWasProvided
+      ? `${context.sections.length} supplied outline section${context.sections.length === 1 ? "" : "s"}`
+      : `${context.sections.length} suggested ${workflow.unitLabel}${context.sections.length === 1 ? "" : "s"}`,
+    `${Object.keys(context.placeholders).length} placeholder value${Object.keys(context.placeholders).length === 1 ? "" : "s"}`,
+    `${context.contextSentences.length} extracted context point${context.contextSentences.length === 1 ? "" : "s"}`,
+    `${context.issues.length} QA issue${context.issues.length === 1 ? "" : "s"}`,
+  ];
+  if (context.planningOnly) signals.push(`${workflow.planningLabel} approval pending`);
+  signals.push(`Current stage: ${stepId}`);
+  return signals;
 }
 
 function buildDocsLiveReviewPacket(
@@ -1086,9 +1178,9 @@ function draftingPlanTable(
       ? `Docs Live first locks the ${profile.planningLabel.toLowerCase()} before prose is drafted, drafts ${profile.unitLabel}s in order at ${draftingDepth} depth, then runs ${profile.qualityLabel.toLowerCase()} before review handoff.`
       : `Docs Live will work through the outline section by section at ${draftingDepth} depth, then attach QA, humanization, and review handoff notes.`,
     "",
-    "| Stage | Status | Detail |",
-    "| --- | --- | --- |",
-    ...workflow.map((step) => `| ${escapeTableCell(step.label)} | ${escapeTableCell(step.status)} | ${escapeTableCell(step.detail)} |`),
+    "| Stage | Status | Detail | AI assistance |",
+    "| --- | --- | --- | --- |",
+    ...workflow.map((step) => `| ${escapeTableCell(step.label)} | ${escapeTableCell(step.status)} | ${escapeTableCell(step.detail)} | ${escapeTableCell(step.assistance)} |`),
     "",
     "| Section | Drafting brief | QA focus |",
     "| --- | --- | --- |",
