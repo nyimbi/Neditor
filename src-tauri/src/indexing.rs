@@ -1,4 +1,4 @@
-use crate::Heading;
+use crate::{metadata_lookup, Heading};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -66,6 +66,10 @@ pub(crate) fn collect_index_entries(
     for term in glossary.keys() {
         let anchor = first_term_anchor(text, headings, term).or_else(|| current_anchor.clone());
         insert_index_entry(&mut entries, &excluded, term.clone(), anchor);
+    }
+    for term in metadata_index_terms(metadata) {
+        let anchor = first_term_anchor(text, headings, &term);
+        insert_index_entry(&mut entries, &excluded, term, anchor);
     }
     for (term, (count, anchor)) in proper_nouns {
         if count >= 2 {
@@ -143,25 +147,44 @@ fn insert_index_entry(
 
 fn index_exclude_terms(metadata: &Value) -> BTreeSet<String> {
     let mut terms = BTreeSet::new();
-    if let Some(values) = metadata.get("indexExclude").and_then(Value::as_array) {
-        for value in values {
-            if let Some(term) = value.as_str() {
-                terms.insert(index_exclude_key(term));
-            }
-        }
-    }
-    if let Some(values) = metadata
-        .get("index")
-        .and_then(|index| index.get("exclude"))
-        .and_then(Value::as_array)
-    {
-        for value in values {
-            if let Some(term) = value.as_str() {
-                terms.insert(index_exclude_key(term));
-            }
-        }
+    for term in metadata_string_values(metadata, &["indexExclude", "index.exclude"]) {
+        terms.insert(index_exclude_key(&term));
     }
     terms
+}
+
+fn metadata_index_terms(metadata: &Value) -> Vec<String> {
+    metadata_string_values(
+        metadata,
+        &["indexTerms", "index_terms", "index.terms", "index.keywords"],
+    )
+}
+
+fn metadata_string_values(metadata: &Value, keys: &[&str]) -> Vec<String> {
+    let mut values = Vec::new();
+    for key in keys {
+        collect_metadata_string_values(metadata_lookup(metadata, key), &mut values);
+    }
+    values
+}
+
+fn collect_metadata_string_values(value: Option<&Value>, values: &mut Vec<String>) {
+    match value {
+        Some(Value::Array(items)) => {
+            for item in items {
+                collect_metadata_string_values(Some(item), values);
+            }
+        }
+        Some(Value::String(value)) => {
+            for term in value.split(',') {
+                let term = term.trim();
+                if !term.is_empty() {
+                    values.push(term.to_string());
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 fn index_exclude_key(term: &str) -> String {
