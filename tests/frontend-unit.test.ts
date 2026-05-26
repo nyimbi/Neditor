@@ -571,6 +571,8 @@ test("front matter managers expand simple inline object variables", () => {
     "reviewers: [*docOwner, Finance Team]",
     "contacts: &contactList [{name: Jane, role: Sponsor}, {name: Eli, address: {city: Kigali}}]",
     "copiedContacts: *contactList",
+    "taggedDefaults: !client &taggedClient {owner: Tagged Owner, reviewer: Tagged Reviewer}",
+    "taggedClient: *taggedClient",
     "milestones:",
     "  - name: Discovery",
     "    owner: *docOwner",
@@ -584,6 +586,9 @@ test("front matter managers expand simple inline object variables", () => {
     "  - &primaryStakeholder",
     "    name: Amina",
     "    role: Executive Sponsor",
+    "  - !stakeholder",
+    "    name: Ben",
+    "    role: Legal Reviewer",
     "primaryStakeholder: *primaryStakeholder",
     "clientRows:",
     "  - <<: *clientDefaults",
@@ -623,6 +628,8 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "contacts.1.address.city" && row.value === "Kigali"));
   ok(rows.some((row) => row.key === "copiedContacts.0.name" && row.value === "Jane"));
   ok(rows.some((row) => row.key === "copiedContacts.1.address.city" && row.value === "Kigali"));
+  ok(rows.some((row) => row.key === "taggedDefaults.owner" && row.value === "Tagged Owner"));
+  ok(rows.some((row) => row.key === "taggedClient.reviewer" && row.value === "Tagged Reviewer"));
   ok(rows.some((row) => row.key === "milestones.0.name" && row.value === "Discovery"));
   ok(rows.some((row) => row.key === "milestones.0.owner" && row.value === "Strategy Office"));
   ok(rows.some((row) => row.key === "milestones.0.due" && row.value === "2026-06-01"));
@@ -632,6 +639,8 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "blockReviewers.1" && row.value === "Finance"));
   ok(rows.some((row) => row.key === "stakeholders.0.name" && row.value === "Amina"));
   ok(rows.some((row) => row.key === "stakeholders.0.role" && row.value === "Executive Sponsor"));
+  ok(rows.some((row) => row.key === "stakeholders.1.name" && row.value === "Ben"));
+  ok(rows.some((row) => row.key === "stakeholders.1.role" && row.value === "Legal Reviewer"));
   ok(rows.some((row) => row.key === "primaryStakeholder.name" && row.value === "Amina"));
   ok(rows.some((row) => row.key === "primaryStakeholder.role" && row.value === "Executive Sponsor"));
   ok(rows.some((row) => row.key === "clientRows.0.name" && row.value === "MergeCo"));

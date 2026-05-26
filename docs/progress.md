@@ -103,7 +103,9 @@ Recent pushed checkpoints visible in current git history:
   `<<: *defaults` merge keys, so repeated client/contact rows inherit standard
   defaults while explicit list-item fields override them. Anchored block-list
   rows such as stakeholder records can also be reused elsewhere as direct map
-  aliases.
+  aliases. Custom tags on inline maps and block-list rows are ignored for
+  inventory purposes while their scalar fields remain available as document
+  variables.
 - Application navigation now exposes NEditor's capabilities through both menus
   and buttons. The workbench header has visible File, Edit, View, Writing
   Tools, Quality, Export, and Help menus that mirror the native desktop menu
@@ -3347,7 +3349,7 @@ Front matter manager inline maps:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm exec tsc -p tsconfig.test.json` | Pass | Test TypeScript compilation passed after adding conservative inline YAML map expansion. |
-| `node --test --test-name-pattern "inline object" .tmp-tests/tests/frontend-unit.test.js` | Pass | Focused frontend unit coverage proves simple inline maps expand into dotted variables, scalar aliases inside inline maps resolve, nested inline maps become dotted variables, inline sequences and block sequences produce indexed dotted variables for scalar and object entries, block-list items can start with `<<: *defaults` merge keys without surfacing literal merge text, direct `client: *clientDefaults` map aliases expand instead of rendering as literal alias text, aliased inline sequences can be reused, anchored block-list rows can be reused as direct map aliases, merge defaults populate compact client metadata, explicit nested values override merged values while preserving sibling defaults, quoted `#` text survives, and nested anchored-parent inline maps can be reused through later merges. |
+| `node --test --test-name-pattern "inline object" .tmp-tests/tests/frontend-unit.test.js` | Pass | Focused frontend unit coverage proves simple inline maps expand into dotted variables, scalar aliases inside inline maps resolve, nested inline maps become dotted variables, inline sequences and block sequences produce indexed dotted variables for scalar and object entries, block-list items can start with `<<: *defaults` merge keys without surfacing literal merge text, direct `client: *clientDefaults` map aliases expand instead of rendering as literal alias text, aliased inline sequences can be reused, anchored block-list rows can be reused as direct map aliases, custom tags on inline maps and block-list rows do not hide scalar fields, merge defaults populate compact client metadata, explicit nested values override merged values while preserving sibling defaults, quoted `#` text survives, and nested anchored-parent inline maps can be reused through later merges. |
 
 Export metadata checklist modularization:
 
