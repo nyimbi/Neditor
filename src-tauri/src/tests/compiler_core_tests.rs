@@ -302,6 +302,56 @@ fn compiler_handles_document_variable_filter_edge_cases() {
 }
 
 #[test]
+fn compiler_strips_yaml_tags_from_front_matter_metadata() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-tagged-front-matter-test-{unique}"));
+    fs::create_dir_all(root.join("data")).expect("create data dir");
+    fs::write(
+        root.join("data").join("tagged.csv"),
+        "Region,Revenue\nEast,100\nWest,80\n",
+    )
+    .expect("write tagged data source");
+    let doc = root.join("tagged.md");
+
+    let response = compile(CompileRequest {
+        text: "---\ntitle: !docs!title Tagged Metadata\nstatus: approved\napprovedBy: QA\nclient: !docs!client Acme Holdings\nbudget: !<tag:yaml.org,2002:int> 1250\naccount: !docs!account {owner: Strategy Office, tier: Enterprise}\ndataSources: !docs!sources\n  - !docs!source {name: Tagged Revenue, path: data/tagged.csv, type: csv}\n---\n# Tagged\nClient: {{client}}\nOwner: {{account.owner}}\nTier: {{account.tier}}\nBudget: {{budget | currency}}\n".to_string(),
+        file_path: Some(path_to_string(&doc)),
+    });
+
+    assert!(
+        response.compiled_markdown.contains("Client: Acme Holdings"),
+        "compiled markdown:\n{}\ndiagnostics: {:?}",
+        response.compiled_markdown,
+        response.diagnostics
+    );
+    assert!(response
+        .compiled_markdown
+        .contains("Owner: Strategy Office"));
+    assert!(response.compiled_markdown.contains("Tier: Enterprise"));
+    assert!(response.compiled_markdown.contains("Budget: $1250.00"));
+    assert!(response
+        .compiled_markdown
+        .contains("## Data Source: Tagged Revenue"));
+    assert!(response.html.contains("<td>East</td>"));
+    assert!(response.html.contains("<td>100</td>"));
+    assert!(response
+        .include_graph
+        .iter()
+        .any(|edge| edge.child.ends_with("data/tagged.csv")));
+    assert_eq!(response.metadata["title"], "Tagged Metadata");
+    assert_eq!(response.metadata["account"]["owner"], "Strategy Office");
+    assert!(response
+        .diagnostics
+        .iter()
+        .all(|diagnostic| !diagnostic.message.contains("front matter")));
+
+    fs::remove_dir_all(root).expect("clean tagged front matter test dir");
+}
+
+#[test]
 fn calc_blocks_resolve_forward_refs_and_report_cycles() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Calc Graph\nstatus: approved\napprovedBy: QA\n---\n# Calc Graph\n```calc\nprofit = revenue - cost\ncost = 40\nrevenue = 100\ncycle_a = cycle_b + 1\ncycle_b = cycle_a + 1\n```\n\nProfit: {{=profit | round}}\n".to_string(),

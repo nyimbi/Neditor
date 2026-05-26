@@ -3,6 +3,7 @@ use crate::{
     path_to_string, DocumentDiagnostic, IncludeEdge,
 };
 use serde_json::{json, Value};
+use serde_yaml::Value as YamlValue;
 use std::{
     fs,
     path::{Component, Path, PathBuf},
@@ -24,7 +25,9 @@ pub(crate) fn parse_front_matter(
         consumed_lines += 1;
         if line.trim() == "---" {
             let body = lines.collect::<Vec<_>>().join("\n");
-            let metadata = match serde_yaml::from_str::<Value>(&yaml) {
+            let metadata = match parse_yaml_front_matter_value(&yaml)
+                .and_then(|metadata| yaml_value_to_json(strip_yaml_value_tags(metadata)))
+            {
                 Ok(metadata) if metadata.is_object() => metadata,
                 Ok(_) => {
                     diagnostics.push(with_range(
@@ -85,6 +88,134 @@ fn front_matter_yaml_error(
 
 fn first_front_matter_line_width(yaml: &str) -> usize {
     yaml.lines().next().unwrap_or("").chars().count()
+}
+
+fn parse_yaml_front_matter_value(yaml: &str) -> Result<YamlValue, serde_yaml::Error> {
+    serde_yaml::from_str::<YamlValue>(yaml).or_else(|err| {
+        if yaml_error_is_tag_handle(&err) {
+            serde_yaml::from_str::<YamlValue>(&strip_yaml_tag_decorators(yaml))
+        } else {
+            Err(err)
+        }
+    })
+}
+
+fn yaml_error_is_tag_handle(err: &serde_yaml::Error) -> bool {
+    err.to_string().contains("tag")
+}
+
+fn strip_yaml_tag_decorators(yaml: &str) -> String {
+    yaml.lines()
+        .map(strip_yaml_line_tag_decorators)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn strip_yaml_line_tag_decorators(line: &str) -> String {
+    let chars = line.chars().collect::<Vec<_>>();
+    let mut output = String::new();
+    let mut index = 0usize;
+    let mut quote = None;
+    while index < chars.len() {
+        let ch = chars[index];
+        if let Some(active_quote) = quote {
+            output.push(ch);
+            if ch == active_quote {
+                quote = None;
+            }
+            index += 1;
+            continue;
+        }
+        if ch == '"' || ch == '\'' {
+            quote = Some(ch);
+            output.push(ch);
+            index += 1;
+            continue;
+        }
+        if ch == '!' && yaml_tag_prefix_allowed(&chars, index) {
+            if let Some(end) = yaml_tag_decorator_end(&chars, index) {
+                index = end;
+                while index < chars.len() && chars[index].is_whitespace() {
+                    index += 1;
+                }
+                continue;
+            }
+        }
+        output.push(ch);
+        index += 1;
+    }
+    output
+}
+
+fn yaml_tag_prefix_allowed(chars: &[char], index: usize) -> bool {
+    index == 0
+        || chars
+            .get(index.saturating_sub(1))
+            .is_some_and(|ch| ch.is_whitespace() || matches!(ch, '[' | '{' | ',' | ':' | '-'))
+}
+
+fn yaml_tag_decorator_end(chars: &[char], start: usize) -> Option<usize> {
+    if chars.get(start + 1) == Some(&'<') {
+        let mut index = start + 2;
+        while index < chars.len() {
+            if chars[index] == '>' {
+                return Some(index + 1);
+            }
+            index += 1;
+        }
+        return None;
+    }
+    let mut index = start
+        + if chars.get(start + 1) == Some(&'!') {
+            2
+        } else {
+            1
+        };
+    index = consume_yaml_tag_name(chars, index)?;
+    if chars.get(index) == Some(&'!') {
+        index = consume_yaml_tag_name(chars, index + 1)?;
+    }
+    if index >= chars.len() || chars[index].is_whitespace() {
+        Some(index)
+    } else {
+        None
+    }
+}
+
+fn consume_yaml_tag_name(chars: &[char], mut index: usize) -> Option<usize> {
+    let start = index;
+    while index < chars.len() && is_yaml_tag_name_char(chars[index]) {
+        index += 1;
+    }
+    (index > start).then_some(index)
+}
+
+fn is_yaml_tag_name_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | ':' | '/' | '@' | '-')
+}
+
+fn strip_yaml_value_tags(value: YamlValue) -> YamlValue {
+    match value {
+        YamlValue::Tagged(tagged) => strip_yaml_value_tags(tagged.value),
+        YamlValue::Sequence(items) => YamlValue::Sequence(
+            items
+                .into_iter()
+                .map(strip_yaml_value_tags)
+                .collect::<Vec<_>>(),
+        ),
+        YamlValue::Mapping(mapping) => {
+            let mut normalized = serde_yaml::Mapping::new();
+            for (key, value) in mapping {
+                normalized.insert(strip_yaml_value_tags(key), strip_yaml_value_tags(value));
+            }
+            YamlValue::Mapping(normalized)
+        }
+        other => other,
+    }
+}
+
+fn yaml_value_to_json(value: YamlValue) -> Result<Value, serde_yaml::Error> {
+    serde_yaml::from_value(value)
 }
 
 pub(crate) fn merge_project_variables(

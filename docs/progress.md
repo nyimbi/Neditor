@@ -120,6 +120,12 @@ Recent pushed checkpoints visible in current git history:
   including dotted or slash-namespaced anchors such as `&client.defaults` and
   `&business/client.defaults`, can inherit dotted-key defaults from other
   anchored maps before being reused by a client or partner block.
+- The Rust compiler front-matter path now treats custom YAML tags and
+  tag-handle wrappers as metadata decorators too. Tagged scalars, tagged inline
+  maps, and tagged `dataSources` lists such as `!docs!sources` are normalized
+  before JSON metadata conversion, so compiled document variables, currency
+  filters, rendered data-source tables, and include-graph/export-manifest
+  evidence still work when business templates use typed YAML annotations.
 - Simple inline YAML maps now expand into dotted document variables as well.
   Compact business front matter such as `client: {name: Acme, tier:
   Enterprise}` and anchored defaults such as `defaults: &clientDefaults
