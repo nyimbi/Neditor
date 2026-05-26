@@ -23,6 +23,26 @@ export function isAiSourceFenceOpener(line: string) {
   return Boolean(opener && AI_SOURCE_FENCE_LANGUAGES.has(opener.language));
 }
 
+export function stripMarkdownFencedBlocks(value: string) {
+  let fenceMarker = "";
+  return value
+    .split(/\r?\n/)
+    .map((line) => {
+      const trimmed = line.trimStart();
+      if (fenceMarker) {
+        if (trimmed.startsWith(fenceMarker)) fenceMarker = "";
+        return "";
+      }
+      const opener = markdownFenceOpener(line);
+      if (opener) {
+        fenceMarker = opener.marker;
+        return "";
+      }
+      return line;
+    })
+    .join("\n");
+}
+
 function rewriteYamlLikeField(lines: string[], key: string, value: string) {
   const index = lines.findIndex((line) => line.trimStart().startsWith(`${key}:`));
   const replacement = `${key}: ${value}`;

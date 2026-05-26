@@ -1,5 +1,6 @@
 import type { DocumentDiagnostic, SemanticDocument } from "../types.js";
 import { frontMatterScalarValue } from "./frontMatter.js";
+import { stripMarkdownFencedBlocks } from "./provenanceReview.js";
 
 export type QualityRecommendationSeverity = "pass" | "improve" | "risk" | "blocker";
 
@@ -25,20 +26,21 @@ const GENERIC_AI_PHRASE_RE = /\b(?:leverage|robust|seamless|cutting-edge|world-c
 
 export function buildQualityRecommendations(input: QualityRecommendationInput): QualityRecommendation[] {
   const text = input.text || "";
+  const analysisText = stripMarkdownFencedBlocks(text);
   const semantic = input.semantic;
   const diagnostics = input.diagnostics || [];
   const recommendations: QualityRecommendation[] = [];
   const unresolved = (semantic?.comments || []).filter((comment) => comment.state !== "resolved").length;
   const aiPending = [...(semantic?.ai_sources || []), ...(semantic?.ai_assisted_sections || [])].filter((item) => item.status !== "human-reviewed").length;
-  const placeholderCount = (text.match(PLACEHOLDER_RE) || []).length;
-  const citationCount = (text.match(CITATION_RE) || []).length;
+  const placeholderCount = (analysisText.match(PLACEHOLDER_RE) || []).length;
+  const citationCount = (analysisText.match(CITATION_RE) || []).length;
   const bibliographyPresent = BIBLIOGRAPHY_RE.test(text);
-  const headings = (text.match(HEADING_RE) || []).length;
-  const longParagraphs = longParagraphCount(text);
-  const genericPhrases = text.match(GENERIC_AI_PHRASE_RE) || [];
+  const headings = (analysisText.match(HEADING_RE) || []).length;
+  const longParagraphs = longParagraphCount(analysisText);
+  const genericPhrases = analysisText.match(GENERIC_AI_PHRASE_RE) || [];
   const diagnosticErrors = diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
   const diagnosticWarnings = diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length;
-  const hasDocumentTitle = Boolean((semantic?.title || frontMatterScalarValue(text, "title") || firstHeading(text)).trim());
+  const hasDocumentTitle = Boolean((semantic?.title || frontMatterScalarValue(text, "title") || firstHeading(analysisText)).trim());
 
   if (diagnosticErrors || diagnosticWarnings) {
     recommendations.push({

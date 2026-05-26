@@ -99,7 +99,7 @@ import {
   formatQualityRecommendationSummary,
   qualityRecommendationMarkdown,
 } from "../src/lib/qualityRecommendations.js";
-import { isAiSourceFenceOpener, markdownFenceOpener, rewriteAiSourceReviewBlock } from "../src/lib/provenanceReview.js";
+import { isAiSourceFenceOpener, markdownFenceOpener, rewriteAiSourceReviewBlock, stripMarkdownFencedBlocks } from "../src/lib/provenanceReview.js";
 import {
   buildReleaseReadinessChecklist,
   formatReleaseChecklistSummary,
@@ -1395,6 +1395,38 @@ test("quality recommendations recognize tilde fenced bibliography sources", () =
   ok(!recommendations.some((item) => item.id === "citation-evidence"));
 });
 
+test("quality recommendations ignore fenced examples for deterministic risk scans", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "# Report",
+      "",
+      "## Evidence",
+      "",
+      "The reviewed document body is concise and ready.",
+      "",
+      "~~~markdown",
+      "TODO [@example] robust synergy should stay example-only.",
+      "```ai-source",
+      "provider: Example Only",
+      "status: needs-review",
+      "```",
+      "~~~",
+      "",
+      "[BIBLIOGRAPHY]",
+      "",
+    ].join("\n"),
+    semantic: {
+      title: "Report",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  deepEqual(recommendations.map((item) => item.id), ["qa-ready"]);
+});
+
 test("AI source review helper supports tilde fences aliases and inert examples", () => {
   const lines = [
     "~~~llm-source",
@@ -1409,6 +1441,10 @@ test("AI source review helper supports tilde fences aliases and inert examples",
     info: 'chart title="Pipeline"',
     language: "chart",
   });
+  equal(
+    stripMarkdownFencedBlocks(["Intro", "~~~markdown", "TODO [@example] robust", "```ai-source", "status: needs-review", "```", "~~~", "Outro"].join("\n")),
+    "Intro\n\n\n\n\n\n\nOutro",
+  );
   equal(rewriteAiSourceReviewBlock(lines, 0, true, "2026-05-26T12:00:00.000Z"), true);
   deepEqual(lines, [
     "~~~llm-source",

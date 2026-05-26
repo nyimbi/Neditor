@@ -4395,7 +4395,7 @@ import {
   qualityRecommendationMarkdown as qualityRecommendationsToMarkdown,
   type QualityRecommendation,
 } from "./lib/qualityRecommendations";
-import { isAiSourceFenceOpener, markdownFenceOpener } from "./lib/provenanceReview";
+import { isAiSourceFenceOpener, markdownFenceOpener, stripMarkdownFencedBlocks } from "./lib/provenanceReview";
 import {
   buildReleaseReadinessChecklist,
   formatReleaseChecklistSummary,
@@ -5054,7 +5054,6 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const codeFenceSnippet = "```markdown\n\n```\n";
-const markdownFencedBlockPattern = /^(~~~|```)[^\n]*\n[\s\S]*?\n\1[ \t]*$/gm;
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
 const figureCropPositionGrid: Record<FigureCropPosition, { x: -1 | 0 | 1; y: -1 | 0 | 1 }> = {
   center: { x: 0, y: 0 },
@@ -7352,10 +7351,6 @@ function agentPacketPreview(markdown: string) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 260);
-}
-
-function stripMarkdownFencedBlocks(value: string) {
-  return value.replace(markdownFencedBlockPattern, " ");
 }
 
 function defaultAgentLifecycleTaskState(task: AgenticLifecycleTask): AgentLifecycleTaskState {
