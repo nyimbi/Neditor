@@ -96,6 +96,7 @@ ned export proposal.md --to docx --output proposal.docx
 ned templates
 ned targets --json
 ned handlers --platform windows --commands-only
+ned readiness --json
 ned completions zsh
 ned doctor --workspace . --json
 ned default-reader --status
@@ -124,14 +125,18 @@ formats, with `--json` output for help desk scripts and deployment checks. `ned
 handlers` lists copyable setup plans for optional transform handlers such as
 Graphviz, D2, PlantUML, Pikchr, and SQLite; use `--commands-only` when a support
 script needs just the package-manager commands without starting installers. `ned
-completions bash`, `ned completions zsh`, and `ned completions fish` print shell
-completion scripts so support teams can make the command easier to discover
-after installation. `ned doctor` prints a local installation and workspace setup
-report with the app binary, default-reader automation status, `.neditor`
-scaffold status, transform handler setup coverage, export targets, and starter
-templates; use `ned doctor --workspace . --json` when you want machine-readable
-support evidence. In strict mode, missing or incomplete workspace scaffolding is
-a warning and produces a non-zero exit code. In the app, open **Settings -> Files** to review the `ned` usage
+readiness` reads `.tmp/release-readiness/report.json` without rerunning the
+verification suite and summarizes accepted checks, failed checks, external
+evidence gaps, and next commands; use `--json` for packaging dashboards and
+`--strict` when any remaining release gap should produce a non-zero exit code.
+`ned completions bash`, `ned completions zsh`, and `ned completions fish` print
+shell completion scripts so support teams can make the command easier to
+discover after installation. `ned doctor` prints a local installation and
+workspace setup report with the app binary, default-reader automation status,
+`.neditor` scaffold status, transform handler setup coverage, export targets,
+and starter templates; use `ned doctor --workspace . --json` when you want
+machine-readable support evidence. In strict mode, missing or incomplete
+workspace scaffolding is a warning and produces a non-zero exit code. In the app, open **Settings -> Files** to review the `ned` usage
 summary and request NEditor as the default Markdown reader. Some operating
 systems require user confirmation or a helper such as `duti`; NEditor shows the
 exact commands and manual steps instead of silently changing protected OS
@@ -749,6 +754,9 @@ release signing/notarization, live approved-provider endpoint proof, real Docs
 Live runtime device proof, independent security review sign-off, Google Docs
 live import/readback, open specification matrix rows, optional missing engines,
 and human reviewer sign-off for accessibility or native-viewer export review.
+`ned readiness --json` reads that generated report for support, release, and
+packaging handoffs; `ned readiness --strict` exits non-zero until the report is
+publication-ready with no failed checks or evidence gaps.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,

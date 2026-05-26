@@ -3765,6 +3765,22 @@ Spreadsheet table exchange and SQL transform:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the strict doctor implementation. |
 | `git diff --check` | Pass | No whitespace errors are present in the strict doctor diff. |
 
+`ned readiness` release report inspection:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed for `ned readiness` and `ned release-readiness` JSON/text report reading, custom `--report` fixtures, strict non-zero behavior when evidence gaps remain, ready-report strict pass behavior, shell completions, and help text coverage. |
+| `src-tauri/target/debug/ned readiness --json` | Pass | Direct smoke returned `neditor.ned-readiness.v1` from `.tmp/release-readiness/report.json` with `releaseReady: false`, 26 accepted required checks, zero failed checks, 16 evidence gaps, and next commands for release-readiness refresh and evidence-kit collection. |
+| `src-tauri/target/debug/ned readiness --strict` | Expected non-zero | Direct strict smoke exited `1` because the current report remains `current-host-ready-with-external-gaps` and lists the 16 external evidence gaps that still block publication. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after adding Settings copy for release-readiness CLI report inspection. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the Settings command-line guidance refresh. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting `ned readiness` in the README and specification. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding CLI release-readiness evidence to the packaging contract. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after the CLI readiness report extension. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after the CLI readiness report extension. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`, preserving external signing, notarization, Google Docs, AI provider/runtime, cross-host, human sign-off, and optional engine evidence gaps. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the readiness CLI implementation. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

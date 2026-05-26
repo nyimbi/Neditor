@@ -189,6 +189,13 @@ Packaging targets:
 - Windows.
 - Linux.
 
+Packaged builds must also include the `ned` command-line helper for file open,
+workspace initialization, document inspection, export conversion, default
+Markdown reader setup guidance, setup diagnostics, transform handler discovery,
+and release-readiness report inspection. The CLI must support JSON output for
+automation and strict non-zero modes for release gates so non-technical support
+teams can verify an installation without learning the developer toolchain.
+
 ### 6.2 Primary Layout
 
 Default interface:

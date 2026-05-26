@@ -265,6 +265,122 @@ fn ned_cli_lists_transform_handler_setup_plans() {
 }
 
 #[test]
+fn ned_cli_reads_release_readiness_reports_without_rerunning_checks() {
+    let root = temp_workspace_path("readiness");
+    fs::create_dir_all(&root).expect("create readiness root");
+    let report_path = root.join("report.json");
+    let report = serde_json::json!({
+        "generatedAt": "2026-05-26T12:00:00.000Z",
+        "platform": "darwin",
+        "arch": "arm64",
+        "status": "current-host-ready-with-external-gaps",
+        "summary": {
+            "requiredChecks": 2,
+            "accepted": 2,
+            "failed": 0,
+            "evidenceGaps": 1
+        },
+        "checks": [
+            {
+                "id": "desktop-command-smoke",
+                "path": ".tmp/desktop-smoke/native-command-report.json",
+                "status": "passed",
+                "accepted": true
+            }
+        ],
+        "evidenceGaps": [
+            {
+                "id": "homebrew-final-cask",
+                "status": "pending-release-cask",
+                "evidence": ".tmp/homebrew/homebrew-packaging-report.json",
+                "detail": "Set NEDITOR_HOMEBREW_CASK before publishing a tap."
+            }
+        ],
+        "failures": []
+    });
+    fs::write(
+        &report_path,
+        serde_json::to_string_pretty(&report).expect("report json"),
+    )
+    .expect("write readiness report");
+
+    let text = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "readiness".to_string(),
+        "--report".to_string(),
+        report_path.to_string_lossy().to_string(),
+    ])
+    .expect("readiness text");
+    assert_eq!(text.exit_code, 0);
+    assert!(text
+        .message
+        .contains("Release readiness: current-host-ready-with-external-gaps"));
+    assert!(text.message.contains("Release-ready for publication: no"));
+    assert!(text.message.contains("homebrew-final-cask"));
+    assert!(text.message.contains("pnpm run collect:evidence-kit"));
+
+    let json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "release-readiness".to_string(),
+        "--report".to_string(),
+        report_path.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("readiness json");
+    assert_eq!(json.exit_code, 0);
+    let normalized: serde_json::Value =
+        serde_json::from_str(&json.message).expect("readiness normalized json");
+    assert_eq!(normalized["schema"], "neditor.ned-readiness.v1");
+    assert_eq!(normalized["releaseReady"], false);
+    assert_eq!(normalized["summary"]["evidenceGaps"], 1);
+    assert_eq!(normalized["evidenceGaps"][0]["id"], "homebrew-final-cask");
+
+    let strict = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "readiness".to_string(),
+        "--report".to_string(),
+        report_path.to_string_lossy().to_string(),
+        "--strict".to_string(),
+    ])
+    .expect("strict readiness");
+    assert_eq!(strict.exit_code, 1);
+
+    let ready_report = serde_json::json!({
+        "generatedAt": "2026-05-26T12:10:00.000Z",
+        "platform": "darwin",
+        "arch": "arm64",
+        "status": "release-ready",
+        "summary": {
+            "requiredChecks": 2,
+            "accepted": 2,
+            "failed": 0,
+            "evidenceGaps": 0
+        },
+        "checks": [],
+        "evidenceGaps": [],
+        "failures": []
+    });
+    fs::write(
+        &report_path,
+        serde_json::to_string_pretty(&ready_report).expect("ready json"),
+    )
+    .expect("write ready report");
+    let ready = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "readiness".to_string(),
+        "--report".to_string(),
+        report_path.to_string_lossy().to_string(),
+        "--strict".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("ready strict json");
+    assert_eq!(ready.exit_code, 0);
+    let ready_json: serde_json::Value =
+        serde_json::from_str(&ready.message).expect("ready normalized json");
+    assert_eq!(ready_json["releaseReady"], true);
+}
+
+#[test]
 fn ned_cli_inspects_documents_without_writing_artifacts() {
     let source = temp_markdown_path("inspect");
     fs::write(&source, super::sample_document()).expect("write source markdown");
@@ -317,6 +433,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("complete -F _ned ned"));
     assert!(bash.message.contains("init"));
     assert!(bash.message.contains("handlers"));
+    assert!(bash.message.contains("readiness"));
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
     assert!(bash.message.contains("markdown-bundle"));
@@ -332,6 +449,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--output-dir"));
     assert!(zsh.message.contains("--stdout"));
     assert!(zsh.message.contains("--workspace"));
+    assert!(zsh.message.contains("--report"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -343,6 +461,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("complete -c ned"));
     assert!(fish.message.contains("init"));
     assert!(fish.message.contains("handlers"));
+    assert!(fish.message.contains("readiness"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("epub"));
 
@@ -549,6 +668,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned templates"));
     assert!(outcome.message.contains("ned targets"));
     assert!(outcome.message.contains("ned handlers"));
+    assert!(outcome.message.contains("ned readiness"));
     assert!(outcome.message.contains("ned completions"));
     assert!(outcome.message.contains("ned doctor"));
     assert!(outcome.message.contains("--workspace"));
