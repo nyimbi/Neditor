@@ -8,6 +8,7 @@ import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessD
 import { isAiSourceFenceOpener, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
 import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "../lib/transformTemplates";
+import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../lib/watchPaths";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import {
   clampAutosaveDelay,
@@ -257,15 +258,6 @@ function folderFromPath(path: string | null) {
   if (!path) return null;
   const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
   return separator > 0 ? path.slice(0, separator) : null;
-}
-
-function normalizeWatchPath(path?: string | null) {
-  const normalized = (path || "").replace(/\\/g, "/").replace(/\/+$/, "");
-  return /^[a-z]:/i.test(normalized) ? normalized.toLowerCase() : normalized;
-}
-
-function sameWatchPath(left?: string | null, right?: string | null) {
-  return normalizeWatchPath(left) === normalizeWatchPath(right);
 }
 
 function watchEventIsAccessOnly(event: WatchEvent) {
@@ -997,15 +989,7 @@ export const useDocumentsStore = defineStore("documents", {
       });
       const watchedFiles = watchSnapshot.paths.filter((file) => file.exists);
       const watchPaths = watchedFiles.map((file) => file.path);
-      const pathRoles = watchedFiles.reduce(
-        (roles, file) => {
-          const role = file.role === "root" ? "root" : "include";
-          roles[file.path] = role;
-          roles[normalizeWatchPath(file.path)] = role;
-          return roles;
-        },
-        {} as Record<string, "root" | "include">,
-      );
+      const pathRoles = buildWatchedPathRoles(watchedFiles);
       const driver = watchSnapshot.native_watcher ? "native" : "plugin";
       const signature = `${doc.id}\n${driver}\n${watchedFiles.map((file) => `${file.role || "include"}:${file.path}`).join("\n")}`;
       if (signature === this.watchSignature) return;

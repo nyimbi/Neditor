@@ -3595,6 +3595,16 @@ Recent item store helper extraction:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the state-store evidence refresh. |
 | `git diff --check` | Pass | No whitespace errors are present in the recent-item helper extraction diff. |
 
+Watch path helper extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after extracting watcher path normalization, path equivalence, and watched-role map construction to `src/lib/watchPaths.ts`. |
+| `pnpm run test:unit` | Pass | 72 frontend unit/static tests passed, including direct Windows/POSIX watch-path normalization, equivalence, and role lookup key coverage. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting watch-path helper extraction; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the state-store evidence refresh. |
+| `git diff --check` | Pass | No whitespace errors are present in the watch-path helper extraction diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

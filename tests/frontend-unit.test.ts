@@ -115,6 +115,7 @@ import {
   transformTemplateFillFields,
   transformTemplateMarkdown,
 } from "../src/lib/transformTemplates.js";
+import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../src/lib/watchPaths.js";
 import {
   migratePersistedWorkspace,
   normalizeAgentRunHistory,
@@ -166,6 +167,17 @@ test("recent item helpers deduplicate limit and forget paths", () => {
   deepEqual(rememberRecentItem(["a.md"], "", 3), ["a.md"]);
   deepEqual(forgetRecentItem(["a.md", "b.md", "c.md"], "b.md"), ["a.md", "c.md"]);
   deepEqual(forgetRecentItem(["a.md"], null), ["a.md"]);
+});
+
+test("watch path helpers normalize platform paths and role lookup keys", () => {
+  equal(normalizeWatchPath("C:\\Docs\\Root.md\\"), "c:/docs/root.md");
+  equal(normalizeWatchPath("/tmp/docs/root.md/"), "/tmp/docs/root.md");
+  ok(sameWatchPath("C:\\Docs\\Root.md", "c:/Docs/Root.md"));
+  deepEqual(buildWatchedPathRoles([{ path: "C:\\Docs\\Root.md", role: "root" }, { path: "/tmp/include.md", role: "include" }]), {
+    "C:\\Docs\\Root.md": "root",
+    "c:/docs/root.md": "root",
+    "/tmp/include.md": "include",
+  });
 });
 
 test("table parsing preserves captions, alignment, and escaped pipes", () => {
