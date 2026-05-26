@@ -67,6 +67,14 @@ export interface AiDocumentWizardStep {
   prompt: string;
 }
 
+export interface AiDocumentWizardStepAssistance {
+  stepId: string;
+  stepLabel: string;
+  suggestedAnswer: string;
+  rationale: string;
+  contextSignals: string[];
+}
+
 export interface AgenticCliIntegration {
   id: "claude-code" | "codex" | "opencode";
   label: string;
@@ -655,6 +663,7 @@ export function businessSnippetMarkdown(snippet: BusinessDocumentSnippet, profil
 }
 
 export function businessWizardContext(template: BusinessDocumentTemplate, profile: Partial<BusinessProfile> = {}) {
+  const assistance = buildBusinessWizardStepAssistance(template, profile);
   return [
     `Document builder: ${template.label}`,
     `Builder goal: ${template.aiPrompt}`,
@@ -665,9 +674,137 @@ export function businessWizardContext(template: BusinessDocumentTemplate, profil
     "Wizard workflow:",
     ...aiDocumentWizardSteps.map((step, index) => `${index + 1}. ${step.label}: ${step.prompt}`),
     "",
+    "AI suggested optimal answers:",
+    ...assistance.flatMap((item, index) => [
+      `${index + 1}. ${item.stepLabel}`,
+      `Suggested answer: ${item.suggestedAnswer}`,
+      `Rationale: ${item.rationale}`,
+      `Context signals: ${item.contextSignals.join("; ")}`,
+    ]),
+    "",
     "Agent handoff options:",
     ...agenticCliIntegrations.map((integration) => `- ${integration.label} (${integration.command}): ${integration.handoff}`),
   ].join("\n");
+}
+
+export function buildBusinessWizardStepAssistance(
+  template: BusinessDocumentTemplate,
+  profile: Partial<BusinessProfile> = {},
+): AiDocumentWizardStepAssistance[] {
+  const normalized = normalizeBusinessProfile(profile);
+  const placeholders = businessProfilePlaceholderMap(normalized);
+  const completion = businessProfileCompletionSummary(normalized);
+  const longForm = isLongFormTemplate(template);
+  const procurement = isProcurementTemplate(template);
+  const primaryUse = template.bestFor[0] || "document creation";
+  const outlineSummary = template.outline.slice(0, 6).join(" -> ");
+  const client = placeholders.defaultClientName;
+  const company = placeholders.companyName;
+  const owner = placeholders.fullName;
+  const voice = placeholders.brandVoice;
+  const identitySignal = completion.missing.length
+    ? `Missing identity fields: ${completion.missing.join(", ")}`
+    : "Business identity is complete";
+  const baseSignals = [
+    `Document type: ${template.label}`,
+    `Best for: ${template.bestFor.join(", ") || primaryUse}`,
+    `Profile completeness: ${completion.completed}/${completion.total}`,
+    identitySignal,
+  ];
+
+  return aiDocumentWizardSteps.map((step): AiDocumentWizardStepAssistance => {
+    let suggestedAnswer = "";
+    let rationale = "";
+    const contextSignals = [...baseSignals];
+    switch (step.id) {
+      case "identity":
+        suggestedAnswer = [
+          `Use ${owner} as accountable author for ${company}.`,
+          `Prepare the document for ${client}.`,
+          `Apply the saved website, address, email, phone, industry, and brand voice wherever repeated identity appears.`,
+          completion.missing.length ? `Leave unresolved identity values as visible placeholders: ${completion.missing.join(", ")}.` : "No identity placeholders need to remain open.",
+        ].join(" ");
+        rationale = "Business documents repeat sender, company, client, and voice details; using saved identity prevents inconsistent handoff metadata.";
+        break;
+      case "intent":
+        suggestedAnswer = [
+          `${template.label} goal: ${template.aiPrompt}`,
+          `Primary reader/use: ${primaryUse}.`,
+          procurement ? "Mirror buyer requirements, compliance evidence, deadlines, attachments, pricing assumptions, and evaluator scoring." : "State audience, desired reader action, deadline, success criteria, evidence, and review owner before drafting.",
+          `Tone should be ${voice}.`,
+        ].join(" ");
+        rationale = "The best answer ties the business outcome to the template's specific document job instead of asking the user to start from a blank prompt.";
+        break;
+      case "outline":
+        suggestedAnswer = [
+          longForm ? "Approve the structure before prose is generated." : "Use the template outline as the first planning draft.",
+          `Starting sequence: ${outlineSummary}.`,
+          procurement ? "Keep compliance, mandatory attachments, buyer intent, pricing, and risks visible as first-class sections." : "Let the user edit headings before section drafting begins.",
+        ].join(" ");
+        rationale = longForm
+          ? "Long-form and creative documents need architecture or plot approval before section-by-section drafting starts."
+          : "Business users need a concrete outline they can approve or edit before NEditor fills in prose.";
+        contextSignals.push(`Outline sections: ${template.outline.length}`);
+        break;
+      case "draft":
+        suggestedAnswer = [
+          "Draft sequentially from the approved outline.",
+          `Ground every section in ${company}, ${client}, and the available source material.`,
+          "Keep unverified facts, figures, quotes, pricing, and approvals as explicit placeholders or review questions.",
+          procurement ? "For every requirement, include response, evidence owner, compliance status, and verification note." : "Do not collapse review notes into polished claims until the user confirms them.",
+        ].join(" ");
+        rationale = "Sequential drafting keeps continuity and makes it easier for non-technical users to review one section at a time.";
+        break;
+      case "qa":
+        suggestedAnswer = [
+          "Run QA before export or provider handoff.",
+          procurement
+            ? "Check requirement coverage, compliance matrix completeness, attachment list, scoring alignment, pricing assumptions, and exception handling."
+            : "Check placeholders, unsupported claims, stale assumptions, citations, reviewer comments, structure, and export readiness.",
+          longForm ? "Add instructional, narrative, audio, or screenplay quality checks appropriate to the document type." : "Create visible review tasks for every blocker.",
+        ].join(" ");
+        rationale = "A responsible AI-first workflow treats QA as a required stage, not an optional polish pass.";
+        contextSignals.push(procurement ? "Procurement/compliance workflow" : "General business QA workflow");
+        break;
+      case "humanize":
+        suggestedAnswer = [
+          `Humanize into ${voice} prose.`,
+          "Replace generic AI phrasing with concrete nouns, named owners, exact reviewer questions, and source-grounded caveats.",
+          "Preserve AI provenance and needs-review markers until a human approves the final draft.",
+        ].join(" ");
+        rationale = "Humanization should improve specificity and readability without hiding uncertainty, provenance, or review obligations.";
+        break;
+      default:
+        suggestedAnswer = `${step.label}: answer using ${template.label}, ${company}, ${client}, and the saved business profile as context.`;
+        rationale = "Fallback suggestion keeps the wizard step tied to the current business context.";
+    }
+    return {
+      stepId: step.id,
+      stepLabel: step.label,
+      suggestedAnswer,
+      rationale,
+      contextSignals: Array.from(new Set(contextSignals.filter(Boolean))),
+    };
+  });
+}
+
+function businessProfileCompletionSummary(profile: BusinessProfile) {
+  const missing = businessProfileFields
+    .filter((field) => !profile[field.key].trim())
+    .map((field) => field.label);
+  return {
+    total: businessProfileFields.length,
+    completed: businessProfileFields.length - missing.length,
+    missing,
+  };
+}
+
+function isLongFormTemplate(template: BusinessDocumentTemplate) {
+  return template.id === "technical-textbook" || template.id === "novel" || template.id === "podcast-script" || template.id === "movie-script";
+}
+
+function isProcurementTemplate(template: BusinessDocumentTemplate) {
+  return template.id === "rfp" || template.id === "rfq" || template.id === "tender";
 }
 
 export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<BusinessProfile> = {}): RfpAnalysis {

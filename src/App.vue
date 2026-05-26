@@ -828,6 +828,16 @@
                     <li v-for="heading in template.outline" :key="`${template.id}-${heading}`">{{ heading }}</li>
                   </ol>
                 </details>
+                <details class="business-wizard-assistance">
+                  <summary>AI step assistance</summary>
+                  <ol>
+                    <li v-for="item in businessWizardStepAssistance(template)" :key="`${template.id}-${item.stepId}`">
+                      <strong>{{ item.stepLabel }}</strong>
+                      <p>{{ item.suggestedAnswer }}</p>
+                      <small>{{ item.contextSignals.join(" | ") }}</small>
+                    </li>
+                  </ol>
+                </details>
                 <div class="template-actions">
                   <button type="button" :title="`Insert a fillable ${template.label} Markdown template`" @click="insertBusinessTemplate(template)">
                     <span class="button-icon" aria-hidden="true">
@@ -4914,6 +4924,7 @@ import {
   businessSnippetMarkdown,
   businessTemplateMarkdown,
   businessWizardContext,
+  buildBusinessWizardStepAssistance,
   normalizeBusinessProfile,
   rfpComplianceMatrixMarkdown,
   rfpResponseMarkdown,
@@ -13785,6 +13796,10 @@ function insertBusinessTemplate(template: BusinessDocumentTemplate) {
   store.statusMessage = `Inserted ${template.label} document template`;
 }
 
+function businessWizardStepAssistance(template: BusinessDocumentTemplate) {
+  return buildBusinessWizardStepAssistance(template, store.businessProfile);
+}
+
 function insertBusinessSnippet(snippet: BusinessDocumentSnippet) {
   insertBlock(businessSnippetMarkdown(snippet, store.businessProfile));
   store.statusMessage = `Inserted ${snippet.label} document part`;
@@ -18890,6 +18905,22 @@ select:hover {
 .business-document-card details ol {
   margin: 6px 0 0;
   padding-left: 18px;
+}
+
+.business-wizard-assistance li {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.business-wizard-assistance p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.business-wizard-assistance small {
+  color: #526171;
 }
 
 .rfp-source-grid {

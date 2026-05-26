@@ -47,6 +47,7 @@ import {
   businessDocumentSnippets,
   businessDocumentTemplates,
   businessProfilePlaceholderText,
+  buildBusinessWizardStepAssistance,
   businessSnippetMarkdown,
   businessTemplateMarkdown,
   businessWizardContext,
@@ -1347,8 +1348,18 @@ test("business document helpers fill identity templates snippets and wizard cont
   const context = businessWizardContext(tender, profile);
   ok(context.includes("Document builder: Tender response"));
   ok(context.includes("Creation Wizard") || context.includes("Wizard workflow"));
+  ok(context.includes("AI suggested optimal answers:"));
+  ok(context.includes("Suggested answer:"));
+  ok(context.includes("requirement coverage"));
   ok(context.includes("Claude Code"));
   ok(context.includes("OpenCode"));
+
+  const assistance = buildBusinessWizardStepAssistance(tender, profile);
+  equal(assistance.length, 6);
+  ok(assistance.every((item) => item.suggestedAnswer.length > 80));
+  ok(assistance.every((item) => item.contextSignals.some((signal) => signal.includes("Tender response"))));
+  ok(assistance.some((item) => item.stepId === "qa" && item.suggestedAnswer.includes("compliance matrix completeness")));
+  ok(assistance.some((item) => item.stepId === "humanize" && item.suggestedAnswer.includes("clear and practical")));
 });
 
 test("RFP response wizard analyzes requirements intent and compliance coverage", () => {
@@ -3436,6 +3447,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Help Center"));
   ok(app.includes('aria-label="Business document creation"'));
   ok(app.includes('aria-label="AI document creation wizard"'));
+  ok(app.includes("AI step assistance"));
+  ok(app.includes("businessWizardStepAssistance"));
+  ok(app.includes("buildBusinessWizardStepAssistance"));
   ok(app.includes("lesson-plan"));
   ok(app.includes("lesson-content"));
   ok(app.includes("technical-textbook"));

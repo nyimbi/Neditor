@@ -457,6 +457,13 @@ NEditor is built for drafts that need evidence before publication.
   work queue, assumptions to verify, cleanup checks, and reviewer ownership,
   and can be inserted or copied as a standalone audit handoff. Recent Docs Live
   drafts remain available locally for later append/copy and packet handoff.
+- Use the Templates panel document builders when you want wizard assistance for
+  proposals, RFPs, RFQs, tenders, tutorials, lesson content, textbooks, novels,
+  podcast scripts, movie scripts, business cases, and executive briefs. Each
+  builder now shows AI step assistance with suggested optimal answers, rationale,
+  and context signals for identity, intent, outline approval, sequential
+  drafting, QA, and humanization before the wizard opens Docs Live or prepares a
+  local-agent handoff.
 - Use Agent Workspace packets for multi-step document work that combines
   drafting, revision, review, and distribution. The packet records blockers,
   QA gates, and distribution gates before the output is accepted.

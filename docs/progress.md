@@ -119,6 +119,14 @@ Recent pushed checkpoints visible in current git history:
   step count. Focused frontend unit/static coverage proves the appended answer
   becomes the next plan context and that every replanned step still receives
   context-aware assistance.
+- Business document builders now surface AI assistance at each wizard step
+  before a user opens Docs Live or prepares a local-agent handoff. Proposal,
+  RFP, RFQ, tender, tutorial, lesson, textbook, novel, podcast, movie, business
+  case, and executive brief cards show context-aware suggested optimal answers
+  with rationale and context signals for identity, intent, outline approval,
+  sequential drafting, QA, and humanization; the same assistance is included in
+  the Docs Live wizard context so non-technical users can adapt the suggestions
+  instead of starting from blank prompts.
 - The References sidebar front-matter manager parser is now more tolerant of
   business-document YAML edge cases: CRLF front matter, quoted `#` characters,
   comma-containing inline data-source lists, `yml` aliases, URL/Windows/parent
@@ -2786,6 +2794,17 @@ Agentic step assistance accept-and-replan verification:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with the accept-and-replan proof recorded. |
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the Agent Workspace step-assistance update. |
 | `git diff --check` | Pass | No whitespace errors after the Agent Workspace step-assistance update. |
+
+Business wizard step-assistance verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding business wizard step assistance, including direct proof that a tender builder gets six context-aware suggested answers, procurement QA guidance, brand-voice humanization guidance, Docs Live context evidence, and Templates UI wiring. |
+| `pnpm run check` | Pass | Vue typecheck passed after wiring business wizard step assistance into the Templates panel. |
+| `pnpm run check:docs` | Pass | 15 Markdown files were checked after documenting business wizard step assistance; local links resolve. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with business wizard step-assistance evidence recorded. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the business wizard step-assistance update. |
+| `git diff --check` | Pass | No whitespace errors after the business wizard step-assistance update. |
 
 AI paste code fence cleanup verification:
 

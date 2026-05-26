@@ -460,6 +460,10 @@ web app.
   proposals, RFPs, RFQs, tenders, statements of work, capability statements,
   case studies, business cases, and executive briefs; reusable semi-template
   document parts; and handoff options for Claude Code, Codex, and OpenCode.
+  Each document builder shows context-aware AI step assistance for identity,
+  intent, outline, sequential drafting, QA, and humanization so non-technical
+  users can accept or adapt suggested optimal answers before opening Docs Live
+  or handing work to an agent.
   The Agent Workspace can prepare those local-agent handoffs as actual Markdown
   files in the current document workspace, return the exact launch command, and
   warn when the chosen CLI is not installed.
