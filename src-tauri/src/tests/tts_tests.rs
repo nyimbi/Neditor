@@ -42,6 +42,24 @@ fn tts_command_builders_use_argument_safe_native_engines() {
     assert!(empty.contains("No text"));
 }
 
+#[test]
+fn tts_inspection_reports_browser_and_configured_native_engines_without_launching() {
+    let report = crate::tts::inspect_native_tts(crate::tts::NativeTtsInspectionRequest {
+        supertonic_command: Some("supertonic-command-that-should-not-exist".to_string()),
+    })
+    .expect("tts inspection");
+
+    assert!(report.engines.iter().any(|engine| engine.id == "browser-speech" && engine.available));
+    assert!(report.engines.iter().any(|engine| engine.id == "macos-say"));
+    let supertonic = report
+        .engines
+        .iter()
+        .find(|engine| engine.id == "supertonic-cli")
+        .expect("supertonic status");
+    assert!(!supertonic.available);
+    assert!(supertonic.detail.contains("not found"));
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn macos_say_reads_text_via_stdin_instead_of_shell_interpolation() {

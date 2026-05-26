@@ -3747,8 +3747,16 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("buildAiProviderRequestPackage"));
   ok(app.includes('aria-label="NEditor configuration setup wizard"'));
   ok(app.includes('aria-label="NEditor configuration setup"'));
+  ok(app.includes('aria-label="NEditor configuration center"'));
+  ok(app.includes('aria-label="Configuration sections"'));
   ok(app.includes("configurationSetupSteps"));
   ok(app.includes("configurationSetupStatus"));
+  ok(app.includes("configurationCenterSections"));
+  ok(app.includes("selectedConfigurationSection"));
+  ok(app.includes("Appearance and editor"));
+  ok(app.includes("Files and history"));
+  ok(app.includes("Exports and brand"));
+  ok(app.includes("AI, agents, and voice"));
   ok(app.includes("LLM access defaults"));
   ok(app.includes("Open configuration setup wizard"));
   ok(app.includes("saveAgentProviderDefaults"));
@@ -3761,6 +3769,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ttsEngineOptions"));
   ok(app.includes("Read selected text aloud"));
   ok(app.includes("Read document aloud"));
+  ok(app.includes("Check text to speech runtime"));
+  ok(app.includes("checkTtsRuntime"));
+  ok(app.includes("inspect_native_tts"));
+  ok(app.includes('aria-label="Text to speech runtime report"'));
   ok(app.includes("read_text_aloud"));
   ok(app.includes("stop_text_aloud"));
   ok(app.includes("supertonic-cli"));
@@ -3927,6 +3939,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-stop-reading",'));
   ok(tauriLib.includes("read_text_aloud"));
   ok(tauriLib.includes("stop_text_aloud"));
+  ok(tauriLib.includes("inspect_native_tts"));
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
   ok(tauriLib.includes('"neditor-open-agent-workspace",'));
   ok(tauriLib.includes('"neditor-ai-create-document",'));

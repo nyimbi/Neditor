@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::{
+    env,
+    ffi::OsString,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::Mutex,
 };
@@ -23,6 +25,11 @@ pub(crate) struct NativeTtsRequest {
     pub(crate) speed: Option<f32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct NativeTtsInspectionRequest {
+    pub(crate) supertonic_command: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct NativeTtsResponse {
     pub(crate) engine: String,
@@ -30,11 +37,42 @@ pub(crate) struct NativeTtsResponse {
     pub(crate) message: String,
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct NativeTtsEngineStatus {
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) available: bool,
+    pub(crate) detail: String,
+    pub(crate) executable_path: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct NativeTtsInspectionResponse {
+    pub(crate) engines: Vec<NativeTtsEngineStatus>,
+    pub(crate) available_native_engines: usize,
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) struct NativeTtsCommand {
     pub(crate) program: String,
     pub(crate) args: Vec<String>,
     pub(crate) stdin_text: Option<String>,
+}
+
+#[tauri::command]
+pub(crate) fn inspect_native_tts(
+    request: NativeTtsInspectionRequest,
+) -> Result<NativeTtsInspectionResponse, String> {
+    let mut engines = vec![browser_speech_status(), macos_say_status()];
+    engines.push(supertonic_status(request.supertonic_command.as_deref()));
+    let available_native_engines = engines
+        .iter()
+        .filter(|engine| engine.id != "browser-speech" && engine.available)
+        .count();
+    Ok(NativeTtsInspectionResponse {
+        engines,
+        available_native_engines,
+    })
 }
 
 #[tauri::command]
@@ -176,6 +214,123 @@ fn safe_command_path(value: Option<&str>) -> Result<String, String> {
         }
     }
     Ok(path.to_string())
+}
+
+fn browser_speech_status() -> NativeTtsEngineStatus {
+    NativeTtsEngineStatus {
+        id: "browser-speech".to_string(),
+        label: "Browser or system speech".to_string(),
+        available: true,
+        detail: "Checked in the web runtime before playback; no native command is required.".to_string(),
+        executable_path: None,
+    }
+}
+
+fn macos_say_status() -> NativeTtsEngineStatus {
+    #[cfg(target_os = "macos")]
+    {
+        let executable_path = command_path("say");
+        NativeTtsEngineStatus {
+            id: "macos-say".to_string(),
+            label: "macOS Say".to_string(),
+            available: executable_path.is_some(),
+            detail: executable_path
+                .as_ref()
+                .map(|path| format!("Found native Say executable at {path}."))
+                .unwrap_or_else(|| "macOS Say was not found on PATH.".to_string()),
+            executable_path,
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        NativeTtsEngineStatus {
+            id: "macos-say".to_string(),
+            label: "macOS Say".to_string(),
+            available: false,
+            detail: "macOS Say is only available on macOS.".to_string(),
+            executable_path: None,
+        }
+    }
+}
+
+fn supertonic_status(command: Option<&str>) -> NativeTtsEngineStatus {
+    let configured = command.unwrap_or("supertonic").trim();
+    if configured.is_empty() || configured.contains('\0') || configured.contains('\n') || configured.contains('\r') {
+        return NativeTtsEngineStatus {
+            id: "supertonic-cli".to_string(),
+            label: "Supertonic CLI".to_string(),
+            available: false,
+            detail: "Configure a valid Supertonic command path before using Supertonic.".to_string(),
+            executable_path: None,
+        };
+    }
+    let executable_path = command_path(configured);
+    NativeTtsEngineStatus {
+        id: "supertonic-cli".to_string(),
+        label: "Supertonic CLI".to_string(),
+        available: executable_path.is_some(),
+        detail: executable_path
+            .as_ref()
+            .map(|path| format!("Found Supertonic command at {path}."))
+            .unwrap_or_else(|| "Supertonic command was not found. Install the CLI or configure its full path.".to_string()),
+        executable_path,
+    }
+}
+
+fn command_path(command: &str) -> Option<String> {
+    let trimmed = command.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let has_path_separator = trimmed.contains('/') || trimmed.contains('\\');
+    if has_path_separator {
+        let path = PathBuf::from(trimmed);
+        return executable_file(&path).then(|| path.to_string_lossy().to_string());
+    }
+    for dir in env::split_paths(&env::var_os("PATH").unwrap_or_else(OsString::new)) {
+        for candidate in executable_candidates(&dir, trimmed) {
+            if executable_file(&candidate) {
+                return Some(candidate.to_string_lossy().to_string());
+            }
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let fallback = PathBuf::from("/usr/bin").join(trimmed);
+        if executable_file(&fallback) {
+            return Some(fallback.to_string_lossy().to_string());
+        }
+    }
+    None
+}
+
+fn executable_candidates(dir: &Path, command: &str) -> Vec<PathBuf> {
+    #[cfg(windows)]
+    {
+        let pathext = env::var_os("PATHEXT")
+            .map(|value| {
+                value
+                    .to_string_lossy()
+                    .split(';')
+                    .filter(|ext| !ext.trim().is_empty())
+                    .map(|ext| ext.trim().to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_else(|| vec![".exe".to_string(), ".cmd".to_string(), ".bat".to_string()]);
+        let mut candidates = vec![dir.join(command)];
+        candidates.extend(pathext.into_iter().map(|ext| dir.join(format!("{command}{ext}"))));
+        candidates
+    }
+
+    #[cfg(not(windows))]
+    {
+        vec![dir.join(command)]
+    }
+}
+
+fn executable_file(path: &Path) -> bool {
+    path.is_file()
 }
 
 fn safe_cli_value(value: Option<&str>, max_len: usize) -> Option<String> {

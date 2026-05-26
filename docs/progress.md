@@ -3630,6 +3630,28 @@ Configuration setup, LLM defaults, and read-aloud:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the preferences and command-palette evidence refresh. |
 | `git diff --check` | Pass | No whitespace errors are present in the setup, TTS, tests, or docs diff. |
 
+Native TTS runtime inspection:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding native TTS runtime inspection status to Settings, the setup wizard, and command palette. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with guards for `inspect_native_tts`, Check TTS runtime commands, and the text-to-speech runtime report UI. |
+| `cargo test --locked tts --lib` | Pass | Rust TTS tests passed for browser/native inspection, Supertonic command availability reporting without process launch, macOS Say stdin handling, and Supertonic argument shaping. |
+| `cargo test --locked ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | IPC registration and documentation coverage passed after adding `inspect_native_tts` to the coverage ledger. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting the TTS runtime inspection proof. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after refreshing Preferences evidence for native TTS inspection. |
+| `git diff --check` | Pass | No whitespace errors are present in the native TTS inspection diff. |
+
+Configuration Center consolidation:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after consolidating Settings behind a single Configuration Center with overview, appearance/editor, files/history, exports/brand, AI/agents/voice, and transforms sections. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with guards for Configuration Center navigation, section labels, setup wiring, and the existing AI/TTS configuration controls. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after refreshing the Preferences completion evidence for the consolidated setup surface. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding Configuration Center evidence to Preferences. |
+| `git diff --check` | Pass | No whitespace errors are present in the Configuration Center diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

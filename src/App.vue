@@ -1946,7 +1946,25 @@
 
         <template v-else>
           <h2>Settings</h2>
-          <section class="configuration-setup-card" aria-label="NEditor configuration setup wizard">
+          <section class="configuration-center" aria-label="NEditor configuration center">
+            <nav class="configuration-center-nav" aria-label="Configuration sections">
+              <button
+                v-for="section in configurationCenterSections"
+                :key="section.id"
+                type="button"
+                :class="{ active: selectedConfigurationSection === section.id }"
+                @click="selectedConfigurationSection = section.id"
+              >
+                <strong>{{ section.label }}</strong>
+                <small>{{ section.summary }}</small>
+              </button>
+            </nav>
+            <p class="sidebar-hint">
+              One configuration center controls setup, appearance, files, export, AI, voice, transforms, and release readiness.
+            </p>
+          </section>
+          <section v-show="selectedConfigurationSection === 'overview'" class="configuration-center-panel" aria-label="Setup overview">
+            <section class="configuration-setup-card" aria-label="NEditor configuration setup wizard">
             <header>
               <div>
                 <strong>Setup wizard</strong>
@@ -1967,6 +1985,8 @@
               </button>
             </div>
           </section>
+          </section>
+          <section v-show="selectedConfigurationSection === 'appearance'" class="configuration-center-panel" aria-label="Appearance and editor configuration">
           <label>
             Theme
             <select v-model="store.theme">
@@ -2010,6 +2030,8 @@
           </label>
           <label><input v-model="store.highContrast" type="checkbox" /> High contrast</label>
           <label><input v-model="store.reducedMotion" type="checkbox" /> Reduced motion</label>
+          </section>
+          <section v-show="selectedConfigurationSection === 'files'" class="configuration-center-panel" aria-label="Files and history configuration">
           <label><input v-model="store.autosave" type="checkbox" /> Autosave existing files</label>
           <label>
             Autosave delay
@@ -2027,6 +2049,8 @@
               <option value="project-local">Project local</option>
             </select>
           </label>
+          </section>
+          <section v-show="selectedConfigurationSection === 'exports'" class="configuration-center-panel" aria-label="Export and brand configuration">
           <h3>Export defaults</h3>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Manifest next to export</label>
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Styles</label>
@@ -2109,9 +2133,13 @@
             Legal disclaimer
             <textarea v-model="store.brandProfileDefaults.legalDisclaimer" rows="3"></textarea>
           </label>
+          </section>
+          <section v-show="selectedConfigurationSection === 'files'" class="configuration-center-panel" aria-label="Versioning configuration">
           <h3>Git integration</h3>
           <label><input v-model="store.gitIntegration.enabled" type="checkbox" /> Enable Git status</label>
           <label><input v-model="store.gitIntegration.warnOnDirtyExport" type="checkbox" /> Warn on dirty export</label>
+          </section>
+          <section v-show="selectedConfigurationSection === 'ai'" class="configuration-center-panel" aria-label="AI agents and voice configuration">
           <h3>AI paste cleanup defaults</h3>
           <section class="agent-provider-panel" aria-label="LLM access defaults">
             <header>
@@ -2187,11 +2215,20 @@
               </label>
             </section>
             <div class="reference-actions">
+              <button type="button" :disabled="ttsInspectionBusy" @click="checkTtsRuntime">
+                {{ ttsInspectionBusy ? "Checking..." : "Check TTS" }}
+              </button>
               <button type="button" :disabled="ttsBusy" @click="readSelectionAloud">Read selection</button>
               <button type="button" :disabled="ttsBusy" @click="readDocumentAloud">Read document</button>
               <button type="button" @click="stopReadingAloud">Stop</button>
             </div>
-            <p class="sidebar-hint">{{ ttsStatus || ttsSetupSummary }}</p>
+            <p class="sidebar-hint">{{ ttsStatus || ttsRuntimeSummary || ttsSetupSummary }}</p>
+            <div v-if="ttsInspectionReport" class="agent-cli-list" aria-label="Text to speech runtime status">
+              <span v-for="engine in ttsInspectionReport.engines" :key="engine.id">
+                {{ engine.label }}
+                <code>{{ engine.available ? "available" : "needs setup" }}</code>
+              </span>
+            </div>
           </section>
           <label><input v-model="store.aiCleanupDefaults.markAsDraft" type="checkbox" /> Mark as draft</label>
           <label><input v-model="store.aiCleanupDefaults.addProvenance" type="checkbox" /> Add provenance block</label>
@@ -2199,6 +2236,8 @@
           <label><input v-model="store.aiCleanupDefaults.convertNumberedLists" type="checkbox" /> Convert numbered lists</label>
           <label><input v-model="store.aiCleanupDefaults.convertTables" type="checkbox" /> Convert tables</label>
           <label><input v-model="store.aiCleanupDefaults.insertCitationTodos" type="checkbox" /> Insert citation TODOs</label>
+          </section>
+          <section v-show="selectedConfigurationSection === 'appearance'" class="configuration-center-panel" aria-label="Typography configuration">
           <h3>Typography</h3>
           <label>
             Editor font
@@ -2224,6 +2263,8 @@
             Preview line height
             <input v-model.number="store.previewLineHeight" type="number" min="1" max="2.4" step="0.05" />
           </label>
+          </section>
+          <section v-show="selectedConfigurationSection === 'files'" class="configuration-center-panel" aria-label="Recent documents configuration">
           <section aria-label="Recent files">
             <h3>Recent files</h3>
             <button v-for="path in store.recentFiles" :key="path" class="outline-row" type="button" @click="store.openRecentPath(path)">
@@ -2242,6 +2283,8 @@
               {{ path }}
             </button>
           </section>
+          </section>
+          <section v-show="selectedConfigurationSection === 'transforms'" class="configuration-center-panel" aria-label="Transform engine configuration">
           <h3>Transform engines</h3>
           <label>
             Timeout
@@ -2301,6 +2344,7 @@
           <p v-for="engine in store.transformEngines.filter((candidate) => !candidate.requiresExecution)" :key="engine.name" class="engine-summary">
             {{ engine.name }}: {{ engine.execution }} | {{ engine.installationLabel }} | {{ engine.securitySummary }}
           </p>
+          </section>
         </template>
       </aside>
 
@@ -2629,6 +2673,18 @@
                 Supertonic voice
                 <input v-model="store.ttsPreferences.supertonicVoice" />
               </label>
+              <div class="reference-actions">
+                <button type="button" :disabled="ttsInspectionBusy" @click="checkTtsRuntime">
+                  {{ ttsInspectionBusy ? "Checking..." : "Check TTS runtime" }}
+                </button>
+                <button type="button" :disabled="ttsBusy" @click="readSelectionAloud">Read selection</button>
+                <button type="button" @click="stopReadingAloud">Stop</button>
+              </div>
+              <ul v-if="ttsInspectionReport" class="docs-live-runtime" aria-label="Text to speech runtime report">
+                <li v-for="engine in ttsInspectionReport.engines" :key="engine.id">
+                  {{ engine.label }}: {{ engine.available ? "available" : "needs setup" }} - {{ engine.detail }}
+                </li>
+              </ul>
               <p class="sidebar-hint">Selection reading uses the editor selection first. Full-document reading uses the active Markdown source and keeps the document text local for browser speech or native engines.</p>
             </section>
             <section v-else class="business-profile-preview">
@@ -4763,6 +4819,17 @@ type NativeTtsResponse = {
   characters: number;
   message: string;
 };
+type NativeTtsEngineStatus = {
+  id: string;
+  label: string;
+  available: boolean;
+  detail: string;
+  executable_path?: string | null;
+};
+type NativeTtsInspectionResponse = {
+  engines: NativeTtsEngineStatus[];
+  available_native_engines: number;
+};
 
 declare global {
   interface Window {
@@ -4883,9 +4950,12 @@ const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const configurationSetupOpen = ref(false);
 const configurationSetupStepId = ref<ConfigurationSetupStepId>("llm-access");
+const selectedConfigurationSection = ref("overview");
 const guidedDemoStepIndex = ref(0);
 const ttsBusy = ref(false);
+const ttsInspectionBusy = ref(false);
 const ttsStatus = ref("");
+const ttsInspectionReport = ref<NativeTtsInspectionResponse | null>(null);
 const docsLiveDocumentType = ref<DocsLiveDocumentType>("business-brief");
 const docsLiveTitle = ref("");
 const docsLiveOutlineText = ref("");
@@ -6364,6 +6434,14 @@ const ttsSetupSummary = computed(() => {
   const selected = ttsEngineOptions.find((option) => option.id === store.ttsPreferences.engine)?.label || "Browser or system speech";
   return `${selected} | ${store.ttsPreferences.language} | ${store.ttsPreferences.rate.toFixed(1)}x`;
 });
+const selectedTtsEngineStatus = computed(() =>
+  ttsInspectionReport.value?.engines.find((engine) => engine.id === store.ttsPreferences.engine) || null,
+);
+const ttsRuntimeSummary = computed(() => {
+  if (!ttsInspectionReport.value) return "TTS runtime has not been checked.";
+  if (store.ttsPreferences.engine === "browser-speech") return "Browser speech will be checked by the web runtime before playback.";
+  return selectedTtsEngineStatus.value?.detail || "Selected native TTS engine has no runtime status.";
+});
 const configurationSetupSteps = [
   {
     id: "identity",
@@ -6393,7 +6471,7 @@ const configurationSetupSteps = [
     id: "tts",
     title: "Read aloud",
     summary: "Configure browser speech, macOS Say, or Supertonic for selected text and full-document reading.",
-    actionLabel: "Read selection",
+    actionLabel: "Check TTS",
   },
   {
     id: "exports",
@@ -6432,7 +6510,12 @@ const configurationSetupStatus = computed(() => {
     { id: "llm-access", label: "LLM defaults", done: llmDone, detail: store.aiProviderDefaults.profileId },
     { id: "local-agents", label: "Local agents", done: localAgentCliProfiles.length >= 4, detail: `${localAgentCliProfiles.length} agent handoffs` },
     { id: "voice-runtime", label: "Voice runtime", done: runtimeDone, detail: runtimeDone ? `${docsLiveRuntimeReport.value?.issues.length || 0} issues` : "not checked" },
-    { id: "tts", label: "Read aloud", done: Boolean(store.ttsPreferences.engine), detail: ttsSetupSummary.value },
+    {
+      id: "tts",
+      label: "Read aloud",
+      done: store.ttsPreferences.engine === "browser-speech" || Boolean(selectedTtsEngineStatus.value?.available),
+      detail: ttsRuntimeSummary.value,
+    },
     { id: "exports", label: "Exports", done: exportDone, detail: store.exportTarget.toUpperCase() },
     { id: "transforms", label: "Transforms", done: transformsDone, detail: `${store.externalTransformEngines.length} external engines` },
     { id: "release", label: "Release gates", done: releaseDone, detail: "external evidence required" },
@@ -6444,6 +6527,44 @@ const configurationSetupStatus = computed(() => {
   };
 });
 const configurationSetupSummary = computed(() => `${configurationSetupStatus.value.complete}/${configurationSetupStatus.value.total} setup areas ready`);
+const configurationCenterSections = computed(() => [
+  {
+    id: "overview",
+    label: "Overview",
+    summary: configurationSetupSummary.value,
+    detail: "Start here for setup readiness and guided configuration.",
+  },
+  {
+    id: "appearance",
+    label: "Appearance and editor",
+    summary: `${store.toolbarDisplay}; ${store.editorKeymapMode}`,
+    detail: "Theme, toolbar density, editor ergonomics, typography, and accessibility.",
+  },
+  {
+    id: "files",
+    label: "Files and history",
+    summary: `${store.autosave ? "autosave on" : "autosave off"}; ${store.snapshotStorage}`,
+    detail: "Autosave, snapshots, Git behavior, recents, and workspace recovery.",
+  },
+  {
+    id: "exports",
+    label: "Exports and brand",
+    summary: `${store.exportTarget.toUpperCase()}; ${store.bibliographyDefaults.citationStyle}`,
+    detail: "Export defaults, publishing metadata, bibliography style, layout, and brand package.",
+  },
+  {
+    id: "ai",
+    label: "AI, agents, and voice",
+    summary: `${store.aiProviderDefaults.profileId}; ${store.ttsPreferences.engine}`,
+    detail: "LLM access, local agents, AI cleanup, Docs Live runtime, and read-aloud setup.",
+  },
+  {
+    id: "transforms",
+    label: "Transforms",
+    summary: `${store.externalTransformEngines.length} external engines`,
+    detail: "External engine paths, trust, probes, timeout, and execution modes.",
+  },
+] as const);
 const rfpAnalysisSummary = computed(() => {
   const analysis = rfpAnalysis.value;
   if (!analysis) return "No RFP analyzed yet";
@@ -7539,6 +7660,26 @@ async function readSelectionAloud() {
 
 async function readDocumentAloud() {
   await readTextAloud("document");
+}
+
+async function checkTtsRuntime() {
+  store.saveTtsPreferences(store.ttsPreferences);
+  ttsInspectionBusy.value = true;
+  try {
+    ttsInspectionReport.value = await invoke<NativeTtsInspectionResponse>("inspect_native_tts", {
+      request: {
+        supertonic_command: store.ttsPreferences.supertonicCommand,
+      },
+    });
+    ttsStatus.value = ttsRuntimeSummary.value;
+    store.statusMessage = "Checked text-to-speech runtime setup";
+  } catch (error) {
+    ttsStatus.value = error instanceof Error ? error.message : String(error);
+    store.lastError = ttsStatus.value;
+    store.statusMessage = "Text-to-speech runtime check failed";
+  } finally {
+    ttsInspectionBusy.value = false;
+  }
 }
 
 async function readTextAloud(scope: "selection" | "document") {
@@ -8957,6 +9098,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Open AI agent workspace", group: "AI", run: () => openAgentWorkspace() },
   { name: "Read selected text aloud", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "macos say", "voice"], run: () => readSelectionAloud() },
   { name: "Read document aloud", group: "Writing Tools", keywords: ["tts", "speech", "full document", "supertonic", "macos say"], run: () => readDocumentAloud() },
+  { name: "Check text to speech runtime", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "macos say", "setup"], run: () => checkTtsRuntime() },
   { name: "Stop reading aloud", group: "Writing Tools", keywords: ["tts", "speech", "stop"], run: () => stopReadingAloud() },
   {
     name: "Open configuration setup wizard",
@@ -12973,8 +13115,7 @@ async function runConfigurationSetupStep(stepId: ConfigurationSetupStepId) {
   } else if (stepId === "voice-runtime") {
     await checkDocsLiveRuntime();
   } else if (stepId === "tts") {
-    store.saveTtsPreferences(store.ttsPreferences);
-    await readSelectionAloud();
+    await checkTtsRuntime();
   } else if (stepId === "exports") {
     closeConfigurationSetup();
     store.sidebar = "exports";
@@ -19970,6 +20111,54 @@ select:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
+}
+
+.configuration-center,
+.configuration-center-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.configuration-center {
+  margin-bottom: 12px;
+}
+
+.configuration-center-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  gap: 8px;
+}
+
+.configuration-center-nav button {
+  display: grid;
+  min-height: 58px;
+  padding: 8px;
+  gap: 2px;
+  border-color: #c9d2dc;
+  background: #f8fafc;
+  text-align: left;
+}
+
+.configuration-center-nav button.active {
+  border-color: #2f6f9f;
+  background: #eaf3ff;
+  color: #143f70;
+}
+
+.configuration-center-nav strong {
+  font-size: 12px;
+}
+
+.configuration-center-nav small {
+  overflow: hidden;
+  color: #526171;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.configuration-center-panel {
+  margin-bottom: 12px;
 }
 
 .agent-provider-output {

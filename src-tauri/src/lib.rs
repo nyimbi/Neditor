@@ -101,7 +101,7 @@ use tauri::{
 #[cfg(test)]
 use transforms::external::ExternalTransformRequest;
 use transforms::external::{list_transform_engines, run_external_transform};
-use tts::{read_text_aloud, stop_text_aloud, NativeTtsState};
+use tts::{inspect_native_tts, read_text_aloud, stop_text_aloud, NativeTtsState};
 #[cfg(test)]
 use transforms::renderer::supported_transform;
 pub(crate) use utils::{
@@ -167,6 +167,7 @@ pub fn run() {
             run_transform,
             run_external_transform,
             cleanup_ai_paste,
+            inspect_native_tts,
             read_text_aloud,
             stop_text_aloud,
             write_desktop_ui_smoke_report,
