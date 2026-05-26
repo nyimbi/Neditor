@@ -3836,6 +3836,25 @@ Support bundle spec-completion summary:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle spec-completion implementation. |
 | `git diff --check` | Pass | No whitespace errors are present in the support-bundle spec-completion diff. |
 
+Support bundle transform-engine summary:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `NEDITOR_TEST_PIKCHR=/Users/nyimbiodero/src/pjs/tooling/neditor/.tmp/pikchr-build/pikchr-trunk/pikchr pnpm run check:engines` | Pass | External transform probe now reports Graphviz, D2, PlantUML, Pikchr, and SQLite installed on this Darwin arm64 host with smoke artifacts; the optional Pikchr gap is closed in the current release-readiness report. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`, but evidence gaps dropped from 17 to 15 after current-host Pikchr proof and the dependent Homebrew release-readiness gate were refreshed. |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after adding `--engine-report` and `engine_report` request support to `ned support-bundle` and `create_support_bundle`, including fixture coverage for transform-engine summary rows, text output, and shell completions. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --json` | Pass | Direct smoke returned `engineProbe` with `.tmp/external-engines/probe-report.json`, status `complete`, 10 installed engines, zero missing or incompatible engines, and bounded engine details while preserving the redaction-safe support-bundle contract. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --output /private/tmp/neditor-engine-support-bundle-smoke.json` | Pass | Direct text smoke reported 15 release evidence gaps plus `Transform engines: complete (10 installed, 0 missing, 0 incompatible)` and wrote the support bundle JSON. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | IPC coverage ledger remains synchronized after documenting the expanded `create_support_bundle` evidence contract. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "creates support bundle handoff from settings"` | Pass | Focused Chromium smoke verified Settings support-bundle preview and saved-output rendering now include transform-engine health next to release and spec-completion status. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after adding transform-engine support bundle UI and static wiring checks. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed for support-bundle transform-engine report typing and rendering. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 65 tests after refreshing the shared browser workflow report for release-readiness acceptance. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting transform-engine summaries in support bundles. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while this slice improves support and release evidence visibility. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle transform-engine implementation. |
+| `git diff --check` | Pass | No whitespace errors are present in the support-bundle transform-engine diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

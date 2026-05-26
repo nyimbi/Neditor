@@ -386,6 +386,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     fs::create_dir_all(&root).expect("create support root");
     let report_path = root.join("readiness.json");
     let spec_path = root.join("spec-completion.json");
+    let engine_path = root.join("engine-probe.json");
     let output_path = root.join("support").join("bundle.json");
     let readiness = serde_json::json!({
         "generatedAt": "2026-05-26T12:20:00.000Z",
@@ -436,6 +437,42 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         serde_json::to_string_pretty(&spec_completion).expect("spec json"),
     )
     .expect("write spec fixture");
+    let engine_probe = serde_json::json!({
+        "generatedAt": "2026-05-26T12:30:00.000Z",
+        "status": "complete",
+        "summary": {
+            "installed": 3,
+            "missingLocal": 0,
+            "incompatible": 0,
+            "acceptedExternalEvidence": 0,
+            "invalidExternalEvidence": 0,
+            "unresolvedMissingEvidence": 0
+        },
+        "engines": [
+            {
+                "key": "graphviz-dot",
+                "name": "Graphviz / DOT",
+                "status": "installed",
+                "command": "dot",
+                "path": "/usr/local/bin/dot",
+                "version": "dot - graphviz version 1.0",
+                "smoke": {
+                    "status": "passed",
+                    "artifact": ".tmp/external-engines/artifacts/dot.svg",
+                    "bytes": 1200
+                },
+                "externalEvidence": {
+                    "status": "missing",
+                    "path": ".tmp/external-engines/external/graphviz-dot.json"
+                }
+            }
+        ]
+    });
+    fs::write(
+        &engine_path,
+        serde_json::to_string_pretty(&engine_probe).expect("engine json"),
+    )
+    .expect("write engine fixture");
 
     let json = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -446,6 +483,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         report_path.to_string_lossy().to_string(),
         "--spec-report".to_string(),
         spec_path.to_string_lossy().to_string(),
+        "--engine-report".to_string(),
+        engine_path.to_string_lossy().to_string(),
         "--json".to_string(),
     ])
     .expect("support json");
@@ -467,6 +506,12 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         bundle["specCompletion"]["openRows"][0]["requirementArea"],
         "Native dialogs"
     );
+    assert_eq!(bundle["engineProbe"]["status"], "complete");
+    assert_eq!(bundle["engineProbe"]["summary"]["installed"], 3);
+    assert_eq!(
+        bundle["engineProbe"]["engines"][0]["smoke"]["status"],
+        "passed"
+    );
     assert!(bundle["recommendations"]
         .as_array()
         .expect("recommendations")
@@ -484,6 +529,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         report_path.to_string_lossy().to_string(),
         "--spec-report".to_string(),
         spec_path.to_string_lossy().to_string(),
+        "--engine-report".to_string(),
+        engine_path.to_string_lossy().to_string(),
         "--output".to_string(),
         output_path.to_string_lossy().to_string(),
     ])
@@ -493,6 +540,9 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert!(text
         .message
         .contains("Spec completion: partial-with-release-risks (2 open rows)"));
+    assert!(text
+        .message
+        .contains("Transform engines: complete (3 installed, 0 missing, 0 incompatible)"));
     assert!(text.message.contains("Wrote support bundle"));
     assert!(output_path.is_file());
     let written: serde_json::Value =
@@ -511,6 +561,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         workspace: Some(root.to_string_lossy().to_string()),
         readiness_report: Some(report_path.to_string_lossy().to_string()),
         spec_report: Some(spec_path.to_string_lossy().to_string()),
+        engine_report: Some(engine_path.to_string_lossy().to_string()),
         output: Some(ipc_output_path.to_string_lossy().to_string()),
     })
     .expect("ipc support bundle");
@@ -595,6 +646,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--report"));
     assert!(zsh.message.contains("--readiness-report"));
     assert!(zsh.message.contains("--spec-report"));
+    assert!(zsh.message.contains("--engine-report"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

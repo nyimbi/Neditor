@@ -1103,6 +1103,11 @@ async function installTauriMock(page: Page, stateKey: string) {
             summary: { totalRows: 115, completeRows: 9, openRows: 106 },
             openRows: [{ specSection: "Mock", requirementArea: "Mock gap", status: "Partial" }],
           },
+          engineProbe: {
+            status: "complete",
+            summary: { installed: 10, missingLocal: 0, incompatible: 0, invalidExternalEvidence: 0 },
+            engines: [{ key: "pikchr", name: "Pikchr", status: "installed" }],
+          },
           recommendations: ["Mock support recommendation"],
         };
       }
@@ -2639,10 +2644,11 @@ test("creates support bundle handoff from settings", async ({ page }) => {
   await expect(page.getByText("not document content or secrets")).toBeVisible();
 
   await page.getByRole("button", { name: "Preview" }).click();
-  await expect(page.getByText("Support bundle preview ready: current-host-ready-with-external-gaps, 1 evidence gaps, 106 open spec rows")).toBeVisible();
+  await expect(page.getByText("Support bundle preview ready: current-host-ready-with-external-gaps, 1 evidence gaps, 106 open spec rows, engines complete (0 missing)")).toBeVisible();
   await expect(page.getByText("Mock support recommendation")).toBeVisible();
   await expect(page.getByText("preview only")).toBeVisible();
   await expect(page.locator("dd").getByText("106 open", { exact: true })).toBeVisible();
+  await expect(page.locator("dd").getByText("10 installed, 0 missing", { exact: true })).toBeVisible();
 
   await queueDialogSelection(page, "/workspace/neditor-support-bundle.json");
   await page.getByRole("button", { name: "Save JSON" }).click();

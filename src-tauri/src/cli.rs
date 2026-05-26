@@ -89,6 +89,7 @@ pub(crate) struct SupportBundleRequest {
     pub(crate) workspace: Option<String>,
     pub(crate) readiness_report: Option<String>,
     pub(crate) spec_report: Option<String>,
+    pub(crate) engine_report: Option<String>,
     pub(crate) output: Option<String>,
 }
 
@@ -206,6 +207,11 @@ pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Val
         .filter(|value| !value.trim().is_empty())
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(".tmp/spec-completion/report.json"));
+    let engine_report_path = request
+        .engine_report
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(".tmp/external-engines/probe-report.json"));
     let output_path = request
         .output
         .filter(|value| !value.trim().is_empty())
@@ -214,6 +220,7 @@ pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Val
         &workspace,
         &readiness_report_path,
         &spec_report_path,
+        &engine_report_path,
         output_path.as_deref(),
     )?;
     Ok(report)
@@ -948,6 +955,7 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut readiness_report_path = PathBuf::from(".tmp/release-readiness/report.json");
     let mut spec_report_path = PathBuf::from(".tmp/spec-completion/report.json");
+    let mut engine_report_path = PathBuf::from(".tmp/external-engines/probe-report.json");
     let mut output_path: Option<PathBuf> = None;
     let mut index = 0;
     while index < args.len() {
@@ -974,6 +982,13 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
                         .ok_or_else(|| "--spec-report requires a JSON report path".to_string())?,
                 );
             }
+            "--engine-report" => {
+                index += 1;
+                engine_report_path =
+                    PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--engine-report requires a JSON report path".to_string()
+                    })?);
+            }
             "--output" | "-o" => {
                 index += 1;
                 output_path =
@@ -990,6 +1005,7 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
         &workspace,
         &readiness_report_path,
         &spec_report_path,
+        &engine_report_path,
         output_path.as_deref(),
     )?;
 
@@ -1392,6 +1408,7 @@ fn build_support_bundle_report(
     workspace: &Path,
     readiness_report_path: &Path,
     spec_report_path: &Path,
+    engine_report_path: &Path,
     output_path: Option<&Path>,
 ) -> Result<(Value, Option<String>), String> {
     let doctor_args = vec![
@@ -1434,7 +1451,23 @@ fn build_support_bundle_report(
             "openRows": []
         })
     });
-    let recommendations = support_bundle_recommendations(&doctor, &readiness, &spec_completion);
+    let engine_probe = read_json_report(engine_report_path).unwrap_or_else(|err| {
+        json!({
+            "status": "missing",
+            "error": err,
+            "summary": {
+                "installed": 0,
+                "missingLocal": 0,
+                "incompatible": 0,
+                "acceptedExternalEvidence": 0,
+                "invalidExternalEvidence": 0,
+                "unresolvedMissingEvidence": 0
+            },
+            "engines": []
+        })
+    });
+    let recommendations =
+        support_bundle_recommendations(&doctor, &readiness, &spec_completion, &engine_probe);
     let mut report = json!({
         "schema": "neditor.ned-support-bundle.v1",
         "generatedAtUnixSeconds": unix_timestamp_seconds(),
@@ -1445,7 +1478,7 @@ fn build_support_bundle_report(
         "privacy": {
             "documentContentIncluded": false,
             "secretsIncluded": false,
-            "note": "This bundle includes setup status, command paths, report paths, and release evidence summaries only."
+            "note": "This bundle includes setup status, command paths, report paths, transform engine health, and release evidence summaries only."
         },
         "doctor": doctor,
         "releaseReadiness": {
@@ -1464,6 +1497,13 @@ fn build_support_bundle_report(
             "generatedAt": readiness_string_field(&spec_completion, "generatedAt"),
             "summary": spec_completion.get("summary").cloned().unwrap_or_else(|| json!({})),
             "openRows": support_bundle_open_spec_rows(&spec_completion, 20),
+        },
+        "engineProbe": {
+            "reportPath": path_to_display(engine_report_path),
+            "status": readiness_string_field(&engine_probe, "status").unwrap_or("unknown"),
+            "generatedAt": readiness_string_field(&engine_probe, "generatedAt"),
+            "summary": engine_probe.get("summary").cloned().unwrap_or_else(|| json!({})),
+            "engines": support_bundle_engine_rows(&engine_probe, 20),
         },
         "recommendations": recommendations,
     });
@@ -1486,6 +1526,7 @@ fn support_bundle_recommendations(
     doctor: &Value,
     readiness: &Value,
     spec_completion: &Value,
+    engine_probe: &Value,
 ) -> Vec<String> {
     let mut recommendations = Vec::new();
     if readiness_string_field(doctor, "status").unwrap_or("unknown") != "ready" {
@@ -1514,6 +1555,19 @@ fn support_bundle_recommendations(
             "Review {open_spec_rows} open specification row(s) before claiming production readiness."
         ));
     }
+    if readiness_string_field(engine_probe, "status").unwrap_or("unknown") == "missing" {
+        recommendations.push(
+            "Run pnpm run check:engines to attach transform engine setup evidence.".to_string(),
+        );
+    }
+    let missing_engines = summary_count_u64(engine_probe, "missingLocal");
+    let incompatible_engines = summary_count_u64(engine_probe, "incompatible");
+    let invalid_engine_evidence = summary_count_u64(engine_probe, "invalidExternalEvidence");
+    if missing_engines > 0 || incompatible_engines > 0 || invalid_engine_evidence > 0 {
+        recommendations.push(format!(
+            "Review transform engine setup: {missing_engines} missing, {incompatible_engines} incompatible, {invalid_engine_evidence} invalid external evidence item(s)."
+        ));
+    }
     if recommendations.is_empty() {
         recommendations
             .push("Support bundle is ready for installation or release review.".to_string());
@@ -1535,6 +1589,11 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
         .and_then(|summary| summary.get("openRows"))
         .and_then(Value::as_u64)
         .unwrap_or(0);
+    let engine_probe = report.get("engineProbe").unwrap_or(&Value::Null);
+    let engine_status = readiness_string_field(engine_probe, "status").unwrap_or("unknown");
+    let installed_engines = summary_count_u64(engine_probe, "installed");
+    let missing_engines = summary_count_u64(engine_probe, "missingLocal");
+    let incompatible_engines = summary_count_u64(engine_probe, "incompatible");
     let evidence_gaps = readiness_array_field(readiness, "evidenceGaps").len();
     let failures = readiness_array_field(readiness, "failures").len();
     let recommendations = readiness_array_field(report, "recommendations")
@@ -1553,6 +1612,9 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
         format!("Evidence gaps: {evidence_gaps}"),
         format!("Failures: {failures}"),
         format!("Spec completion: {spec_status} ({open_spec_rows} open rows)"),
+        format!(
+            "Transform engines: {engine_status} ({installed_engines} installed, {missing_engines} missing, {incompatible_engines} incompatible)"
+        ),
         "Privacy: no document content or secrets included".to_string(),
     ];
     if let Some(path) = written_to {
@@ -1599,6 +1661,32 @@ fn support_bundle_open_spec_rows(report: &Value, limit: usize) -> Vec<Value> {
         .collect()
 }
 
+fn support_bundle_engine_rows(report: &Value, limit: usize) -> Vec<Value> {
+    readiness_array_field(report, "engines")
+        .into_iter()
+        .take(limit)
+        .map(|engine| {
+            json!({
+                "key": readiness_string_field(&engine, "key"),
+                "name": readiness_string_field(&engine, "name"),
+                "status": readiness_string_field(&engine, "status").unwrap_or("unknown"),
+                "command": readiness_string_field(&engine, "command"),
+                "path": readiness_string_field(&engine, "path"),
+                "version": readiness_string_field(&engine, "version"),
+                "smoke": engine.get("smoke").map(|smoke| json!({
+                    "status": readiness_string_field(smoke, "status").unwrap_or("unknown"),
+                    "artifact": readiness_string_field(smoke, "artifact"),
+                    "bytes": smoke.get("bytes").and_then(Value::as_u64),
+                })),
+                "externalEvidence": engine.get("externalEvidence").map(|evidence| json!({
+                    "status": readiness_string_field(evidence, "status").unwrap_or("unknown"),
+                    "path": readiness_string_field(evidence, "path"),
+                })),
+            })
+        })
+        .collect()
+}
+
 fn readiness_summary_count(report: &Value, field: &str) -> usize {
     report
         .get("summary")
@@ -1636,6 +1724,14 @@ fn unix_timestamp_seconds() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn summary_count_u64(report: &Value, field: &str) -> u64 {
+    report
+        .get("summary")
+        .and_then(|summary| summary.get(field))
+        .and_then(Value::as_u64)
         .unwrap_or(0)
 }
 
@@ -2022,7 +2118,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --strict --report" -- "$cur") )
         ;;
       support|support-bundle)
-        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --output" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --engine-report --output" -- "$cur") )
         ;;
       doctor)
         COMPREPLY=( $(compgen -W "--json --strict --workspace" -- "$cur") )
@@ -2096,7 +2192,7 @@ _ned() {{
       _arguments '--json[print machine-readable JSON]' '--strict[fail when release gaps remain]' '--report[read a specific release-readiness report]:file:_files'
       ;;
     support|support-bundle)
-      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--output[write support bundle JSON]:file:_files'
+      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--engine-report[attach a specific transform engine probe report]:file:_files' '--output[write support bundle JSON]:file:_files'
       ;;
     completions|completion)
       _arguments '1:shell:($shells)'
@@ -2185,6 +2281,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l readiness-report -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l spec-report -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l engine-report -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l output -s o -r"
             .to_string(),
@@ -2513,7 +2611,7 @@ fn help_text() -> String {
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json]"
             .to_string(),
-        "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--output support.json]"
+        "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--engine-report path] [--output support.json]"
             .to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),
         "  ned doctor [--json] [--strict] [--workspace path]".to_string(),

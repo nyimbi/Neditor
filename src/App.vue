@@ -2369,6 +2369,13 @@
                 <dd>{{ supportBundleReport.specCompletion?.summary?.openRows || 0 }} open</dd>
               </div>
               <div>
+                <dt>Engines</dt>
+                <dd>
+                  {{ supportBundleReport.engineProbe?.summary?.installed || 0 }} installed,
+                  {{ supportBundleReport.engineProbe?.summary?.missingLocal || 0 }} missing
+                </dd>
+              </div>
+              <div>
                 <dt>Output</dt>
                 <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
               </div>
@@ -5132,6 +5139,16 @@ type SupportBundleReport = {
       completeRows?: number;
     };
     openRows?: unknown[];
+  };
+  engineProbe?: {
+    status?: string;
+    summary?: {
+      installed?: number;
+      missingLocal?: number;
+      incompatible?: number;
+      invalidExternalEvidence?: number;
+    };
+    engines?: unknown[];
   };
   recommendations?: string[];
 };
@@ -14766,9 +14783,11 @@ async function createSupportBundleFromSettings(writeToFile: boolean) {
     const releaseStatus = report.releaseReadiness?.status || "unknown";
     const gaps = report.releaseReadiness?.evidenceGaps?.length || 0;
     const specOpenRows = report.specCompletion?.summary?.openRows || 0;
+    const engineStatus = report.engineProbe?.status || "unknown";
+    const missingEngines = report.engineProbe?.summary?.missingLocal || 0;
     supportBundleStatus.value = report.writtenTo
       ? `Wrote support bundle to ${report.writtenTo}`
-      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${specOpenRows} open spec rows`;
+      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${specOpenRows} open spec rows, engines ${engineStatus} (${missingEngines} missing)`;
   } catch (error) {
     supportBundleReport.value = null;
     supportBundleStatus.value = error instanceof Error ? error.message : String(error);
