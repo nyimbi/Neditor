@@ -463,6 +463,19 @@ function parseInlineYamlMap(
     let entryValue = parsed.alias ? anchors.get(parsed.alias) || parsed.value : parsed.value;
     if (parsed.anchor && entryValue && !entryValue.startsWith("[") && !entryValue.startsWith("{")) anchors.set(parsed.anchor, entryValue);
     if (entryValue === "[]" || entryValue === "{}") entryValue = "";
+    if (entryValue.startsWith("{")) {
+      const nestedEntries = parseInlineYamlMap(entryValue, anchors, mapAnchors, line);
+      if (parsed.anchor) {
+        if (!mapAnchors.has(parsed.anchor)) mapAnchors.set(parsed.anchor, []);
+        for (const nested of nestedEntries) {
+          recordMapAnchorEntry(mapAnchors, { anchor: parsed.anchor }, nested.key, nested.value, nested.line, nested.keepExisting);
+        }
+      }
+      for (const nested of nestedEntries) {
+        entries.push({ ...nested, key: `${key}.${nested.key}` });
+      }
+      continue;
+    }
     if (entryValue === "|" || entryValue === ">" || entryValue.startsWith("[") || entryValue.startsWith("{")) continue;
     entries.push({ key, value: entryValue, line, keepExisting: false });
   }
