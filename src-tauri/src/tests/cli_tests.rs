@@ -166,6 +166,62 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
 }
 
 #[test]
+fn ned_cli_lists_transform_handler_setup_plans() {
+    let args = vec![
+        "ned".to_string(),
+        "handlers".to_string(),
+        "--platform".to_string(),
+        "macos".to_string(),
+        "--json".to_string(),
+    ];
+    let outcome = crate::cli::run_cli_with_args(&args).expect("handlers json");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("handlers json");
+    assert_eq!(report["schema"], "neditor.ned-handlers.v1");
+    assert_eq!(report["platform"], "macos");
+    assert!(report["registeredEngines"]
+        .as_array()
+        .expect("registered engines")
+        .contains(&serde_json::json!("plantuml")));
+    assert!(report["missingRegisteredEngines"]
+        .as_array()
+        .expect("missing engines")
+        .is_empty());
+    assert!(report["plans"][0]["commands"]
+        .as_array()
+        .expect("commands")
+        .iter()
+        .any(|command| command
+            .as_str()
+            .is_some_and(|value| value.contains("brew install"))));
+
+    let commands = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "transform-handlers".to_string(),
+        "--platform".to_string(),
+        "windows".to_string(),
+        "--commands-only".to_string(),
+    ])
+    .expect("handler commands");
+    assert_eq!(commands.exit_code, 0);
+    assert!(commands.message.contains("winget install"));
+    assert!(commands
+        .message
+        .contains("cargo install pikchr-cli --locked"));
+
+    let text = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "handlers".to_string(),
+        "--platform".to_string(),
+        "linux".to_string(),
+    ])
+    .expect("handlers text");
+    assert_eq!(text.exit_code, 0);
+    assert!(text.message.contains("Transform handler setup for linux"));
+    assert!(text.message.contains("copy-only"));
+}
+
+#[test]
 fn ned_cli_inspects_documents_without_writing_artifacts() {
     let source = temp_markdown_path("inspect");
     fs::write(&source, super::sample_document()).expect("write source markdown");
@@ -217,6 +273,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert_eq!(bash.exit_code, 0);
     assert!(bash.message.contains("complete -F _ned ned"));
     assert!(bash.message.contains("init"));
+    assert!(bash.message.contains("handlers"));
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
     assert!(bash.message.contains("markdown-bundle"));
@@ -241,6 +298,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert_eq!(fish.exit_code, 0);
     assert!(fish.message.contains("complete -c ned"));
     assert!(fish.message.contains("init"));
+    assert!(fish.message.contains("handlers"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("epub"));
 
@@ -446,6 +504,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned validate"));
     assert!(outcome.message.contains("ned templates"));
     assert!(outcome.message.contains("ned targets"));
+    assert!(outcome.message.contains("ned handlers"));
     assert!(outcome.message.contains("ned completions"));
     assert!(outcome.message.contains("ned doctor"));
     assert!(outcome.message.contains("docx"));

@@ -4,7 +4,12 @@ use crate::{
         export_document, prepare_for_export, ExportReadinessReport, ExportRequest,
         PrepareExportRequest,
     },
-    metadata_string, CompileRequest, CompileResponse, DocumentDiagnostic,
+    metadata_string,
+    transform_install::{
+        installable_external_transform_engines, transform_handler_installer_plans_for_platform,
+        TransformHandlerInstallerPlan,
+    },
+    CompileRequest, CompileResponse, DocumentDiagnostic,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -53,6 +58,8 @@ const CLI_COMMANDS: &[&str] = &[
     "check",
     "templates",
     "targets",
+    "handlers",
+    "transform-handlers",
     "completions",
     "default-reader",
     "doctor",
@@ -128,6 +135,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "validate" | "check" => run_validate_command(&args[2..], stdin_text),
         "templates" => run_list_command("templates", NEW_DOCUMENT_TEMPLATES, &args[2..]),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
+        "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
         "doctor" => run_doctor_command(&args[2..]),
@@ -735,6 +743,67 @@ fn run_list_command(kind: &str, values: &[&str], args: &[String]) -> Result<CliO
     })
 }
 
+fn run_handlers_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut commands_only = false;
+    let mut platform = env::consts::OS.to_string();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--commands-only" => commands_only = true,
+            "--platform" => {
+                index += 1;
+                platform = args
+                    .get(index)
+                    .ok_or_else(|| {
+                        "--platform requires macos, windows, linux, or manual".to_string()
+                    })?
+                    .to_ascii_lowercase();
+            }
+            value => return Err(format!("Unsupported handlers option '{value}'")),
+        }
+        index += 1;
+    }
+    let plans = transform_handler_installer_plans_for_platform(&platform);
+    let registered_engines = installable_external_transform_engines();
+    let missing = missing_transform_handler_engines(&plans, &registered_engines);
+
+    if commands_only {
+        let commands = plans
+            .iter()
+            .flat_map(|plan| plan.commands.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        if commands.is_empty() {
+            return Err("No transform handler setup commands are available.".to_string());
+        }
+        return Ok(CliOutcome {
+            message: commands.join("\n"),
+            exit_code: 0,
+        });
+    }
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-handlers.v1",
+                "platform": platform,
+                "registeredEngines": registered_engines,
+                "missingRegisteredEngines": missing,
+                "plans": plans,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+
+    Ok(CliOutcome {
+        message: handlers_text_report(&platform, &registered_engines, &missing, &plans),
+        exit_code: if missing.is_empty() { 0 } else { 1 },
+    })
+}
+
 fn run_completions_command(args: &[String]) -> Result<CliOutcome, String> {
     let shell = args
         .first()
@@ -1275,6 +1344,7 @@ fn bash_completion_script() -> String {
     let templates = NEW_DOCUMENT_TEMPLATES.join(" ");
     let targets = format!("{} all", SUPPORTED_EXPORT_TARGETS.join(" "));
     let shells = COMPLETION_SHELLS.join(" ");
+    let handler_platforms = "macos windows linux manual";
     format!(
         r#"# bash completion for ned
 _ned() {{
@@ -1295,6 +1365,10 @@ _ned() {{
       ;;
     completions|completion)
       COMPREPLY=( $(compgen -W "{shells}" -- "$cur") )
+      return 0
+      ;;
+    --platform)
+      COMPREPLY=( $(compgen -W "{handler_platforms}" -- "$cur") )
       return 0
       ;;
   esac
@@ -1321,6 +1395,9 @@ _ned() {{
         ;;
       templates|targets)
         COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+        ;;
+      handlers|transform-handlers)
+        COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
         ;;
       default-reader)
         COMPREPLY=( $(compgen -W "--status --enable" -- "$cur") )
@@ -1353,15 +1430,17 @@ fn zsh_completion_script() -> String {
     let templates = NEW_DOCUMENT_TEMPLATES.join(" ");
     let targets = format!("{} all", SUPPORTED_EXPORT_TARGETS.join(" "));
     let shells = COMPLETION_SHELLS.join(" ");
+    let handler_platforms = "macos windows linux manual";
     format!(
         r#"#compdef ned
 # zsh completion for ned
 _ned() {{
-  local -a commands templates targets shells
+  local -a commands templates targets shells handler_platforms
   commands=({commands})
   templates=({templates})
   targets=({targets})
   shells=({shells})
+  handler_platforms=({handler_platforms})
 
   case $words[2] in
     init)
@@ -1384,6 +1463,9 @@ _ned() {{
       ;;
     templates|targets)
       _arguments '--json[print machine-readable JSON]'
+      ;;
+    handlers|transform-handlers)
+      _arguments '--json[print machine-readable JSON]' '--commands-only[print copyable commands only]' '--platform[show setup for another platform]:platform:($handler_platforms)'
       ;;
     completions|completion)
       _arguments '1:shell:($shells)'
@@ -1432,6 +1514,11 @@ fn fish_completion_script() -> String {
             "complete -c ned -n '__fish_seen_subcommand_from completions completion' -a '{shell}'"
         ));
     }
+    for platform in ["macos", "windows", "linux", "manual"] {
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l platform -a '{platform}'"
+        ));
+    }
     lines.extend([
         "complete -c ned -n '__fish_seen_subcommand_from init' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from init' -l force".to_string(),
@@ -1449,6 +1536,10 @@ fn fish_completion_script() -> String {
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l option -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates targets inspect doctor' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l commands-only"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from inspect' -l option -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from validate check' -l json".to_string(),
@@ -1663,6 +1754,76 @@ fn inspect_text_report(
     lines.join("\n")
 }
 
+fn handlers_text_report(
+    platform: &str,
+    registered_engines: &[&str],
+    missing: &[String],
+    plans: &[TransformHandlerInstallerPlan],
+) -> String {
+    let mut lines = vec![
+        format!("Transform handler setup for {platform}"),
+        format!(
+            "Registered external engines: {}",
+            registered_engines.join(", ")
+        ),
+    ];
+    if missing.is_empty() {
+        lines.push(
+            "Coverage: every registered external engine appears in the setup plan.".to_string(),
+        );
+    } else {
+        lines.push(format!(
+            "Coverage gap: missing setup coverage for {}",
+            missing.join(", ")
+        ));
+    }
+    for plan in plans {
+        lines.push(String::new());
+        lines.push(format!("Plan: {} ({})", plan.label, plan.id));
+        lines.push(format!("Manager: {}", plan.manager));
+        lines.push(format!(
+            "Mode: {}{}",
+            if plan.installable {
+                "installable"
+            } else {
+                "copy-only"
+            },
+            if plan.requires_admin {
+                ", may require administrator privileges"
+            } else {
+                ""
+            }
+        ));
+        lines.push(format!("Handlers: {}", plan.handlers.join("; ")));
+        if !plan.commands.is_empty() {
+            lines.push("Commands:".to_string());
+            lines.extend(plan.commands.iter().map(|command| format!("  {command}")));
+        }
+        if !plan.notes.is_empty() {
+            lines.push("Notes:".to_string());
+            lines.extend(plan.notes.iter().map(|note| format!("  - {note}")));
+        }
+    }
+    lines.join("\n")
+}
+
+fn missing_transform_handler_engines(
+    plans: &[TransformHandlerInstallerPlan],
+    registered_engines: &[&str],
+) -> Vec<String> {
+    registered_engines
+        .iter()
+        .filter(|engine| {
+            !plans.iter().any(|plan| {
+                plan.engine_names
+                    .iter()
+                    .any(|candidate| candidate == **engine)
+            })
+        })
+        .map(|engine| (*engine).to_string())
+        .collect()
+}
+
 fn diagnostic_counts(diagnostics: &[DocumentDiagnostic]) -> (usize, usize, usize) {
     (
         diagnostics
@@ -1701,6 +1862,7 @@ fn help_text() -> String {
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json]".to_string(),
         "  ned targets [--json]".to_string(),
+        "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),
         "  ned doctor [--json] [--strict]".to_string(),
         "  ned default-reader --status".to_string(),

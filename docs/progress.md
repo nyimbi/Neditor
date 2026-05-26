@@ -3711,6 +3711,24 @@ Spreadsheet table exchange and SQL transform:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the CLI bootstrap implementation. |
 | `git diff --check` | Pass | No whitespace errors are present in the `ned init` diff. |
 
+`ned` transform handler setup discovery:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed for `ned handlers` JSON setup reports, Windows copyable command output, Linux copy-only guidance, completions, and help text coverage. |
+| `src-tauri/target/debug/ned handlers --platform macos --json` | Pass | Direct smoke returned `neditor.ned-handlers.v1` with every registered external engine covered by the Homebrew setup plan. |
+| `src-tauri/target/debug/ned handlers --platform windows --commands-only` | Pass | Direct smoke returned copyable winget commands plus `cargo install pikchr-cli --locked` without starting installers. |
+| `src-tauri/target/debug/ned handlers --platform linux` | Pass | Direct smoke returned copy-only Linux package guidance and explicit notes about terminal execution, trust, and probe follow-up. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after adding Settings copy for transform handler CLI setup discovery. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the Settings command-line guidance refresh. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting `ned handlers` in the README. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding CLI handler discovery evidence to local file, Settings, and Windows setup rows. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after the CLI handler discovery extension. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after the CLI handler discovery extension. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`, preserving external signing, notarization, and cross-host proof blockers. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the CLI handler discovery implementation. |
+| `git diff --check` | Pass | No whitespace errors are present in the `ned handlers` diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
