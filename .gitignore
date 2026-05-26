@@ -16,6 +16,7 @@ node_modules
 dist
 dist-ssr
 .tmp-tests
+src-tauri/binaries/ned-*
 playwright-report
 test-results
 *.local

@@ -9,6 +9,7 @@ cask "neditor" do
   homepage "https://github.com/nyimbi/Neditor"
 
   app "NEditor.app"
+  binary "#{appdir}/NEditor.app/Contents/MacOS/ned", target: "ned"
 
   zap trash: [
     "~/Library/Application Support/com.neditor.desktop",

@@ -289,12 +289,14 @@ function collectEvidenceGaps(checks) {
 function macosAppBundleAccepted(report) {
   const issues = [];
   const executablePath = report.executable?.path;
+  const cliPath = report.cli?.path;
   const iconPath = report.icon?.path;
   const plist = report.plist || {};
 
   if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
   if (report.appBundle !== "src-tauri/target/release/bundle/macos/NEditor.app") issues.push("unexpected-app-bundle");
   if (!artifactMatchesReport(executablePath, report.executable?.size, true)) issues.push("invalid-executable-artifact");
+  if (!artifactMatchesReport(cliPath, report.cli?.size, true)) issues.push("invalid-cli-artifact");
   if (!artifactMatchesReport(iconPath, report.icon?.size, false)) issues.push("invalid-icon-artifact");
   if (plist.CFBundleDisplayName !== "NEditor") issues.push("invalid-display-name");
   if (plist.CFBundleExecutable !== "neditor") issues.push("invalid-executable-name");
@@ -309,7 +311,7 @@ function macosAppBundleAccepted(report) {
     status: issues.length === 0 ? "passed" : "incomplete",
     detail:
       issues.length === 0
-        ? `app=${report.appBundle} executableBytes=${report.executable?.size} iconBytes=${report.icon?.size}`
+        ? `app=${report.appBundle} executableBytes=${report.executable?.size} cliBytes=${report.cli?.size} iconBytes=${report.icon?.size}`
         : issues.join(","),
   };
 }

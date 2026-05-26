@@ -595,6 +595,7 @@ NEditor package metadata still declares MIT licensing.
 `pnpm run check:platform-packaging` verifies cross-platform package
 configuration without requiring a Windows or Linux host. It checks synchronized
 npm/Cargo/Tauri version and license metadata, all-platform Tauri bundle targets,
+the packaged `ned` sidecar contract, Markdown file associations,
 macOS/Windows/Linux icon coverage, production desktop window dimensions, CSP
 guardrails, root MIT license linkage, and writes
 `.tmp/desktop-bundle/platform-package-config-report.json` with the current
@@ -606,7 +607,8 @@ local verification.
 macOS distribution. It checks the cask template under
 `packaging/homebrew/Casks/neditor.rb.template`, the README and
 `docs/homebrew-distribution.md` runbook, Tauri app metadata, bundle target
-coverage, and optional release cask/artifact SHA evidence when
+coverage, the exposed `ned` command-line helper, and optional release
+cask/artifact SHA evidence when
 `NEDITOR_HOMEBREW_CASK` and `NEDITOR_HOMEBREW_ARTIFACT` are supplied. The check
 passes the repository configuration while still reporting release blockers until
 a real SHA-pinned, signed, and notarized macOS artifact is available.
@@ -810,12 +812,18 @@ and local toolchains.
 ## Packaging Notes
 
 ```sh
+pnpm run prepare:sidecars
 pnpm run build
 ./node_modules/.bin/tauri build --no-bundle
 ./node_modules/.bin/tauri build --bundles app
 pnpm run test:desktop-bundle
 pnpm run test:desktop-dmg
 ```
+
+`pnpm run prepare:sidecars` builds the release `ned` helper and copies it to the
+target-triple sidecar name that Tauri expects from `bundle.externalBin`.
+`tauri build` also runs that step through `beforeBuildCommand`, so release hosts
+cannot accidentally package NEditor without the CLI helper.
 
 On macOS, `.app` bundle creation is part of `pnpm run verify:local:full` and the
 bundle checker writes `.tmp/desktop-bundle/macos-app-report.json`. The DMG

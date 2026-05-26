@@ -1,10 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "NEditor",
+  "mainBinaryName": "neditor",
   "version": "0.1.0",
   "identifier": "com.neditor.desktop",
   "build": {
     "beforeDevCommand": "pnpm run dev",
+    "beforeBuildCommand": "pnpm run prepare:sidecars && pnpm run build",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
@@ -28,6 +30,26 @@
     "copyright": "Copyright (c) 2026 NEditor Contributors",
     "license": "MIT",
     "licenseFile": "../LICENSE",
+    "category": "Productivity",
+    "shortDescription": "Local-first AI-assisted Markdown workbench",
+    "longDescription": "NEditor is a local-first AI-assisted Markdown workbench for planning, drafting, reviewing, exporting, and publishing business documents.",
+    "externalBin": [
+      "binaries/ned"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown",
+          "mdown",
+          "mkd"
+        ],
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "role": "Editor",
+        "mimeType": "text/markdown"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

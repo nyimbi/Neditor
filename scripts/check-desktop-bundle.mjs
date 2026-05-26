@@ -16,13 +16,20 @@ const tauriConfig = readJson("src-tauri/tauri.conf.json");
 const appRoot = join(root, "src-tauri", "target", "release", "bundle", "macos", "NEditor.app");
 const plistPath = join(appRoot, "Contents", "Info.plist");
 const executablePath = join(appRoot, "Contents", "MacOS", "neditor");
+const nedPath = firstExistingPath([
+  join(appRoot, "Contents", "MacOS", "ned"),
+  join(appRoot, "Contents", "Resources", "ned"),
+  join(appRoot, "Contents", "Resources", "binaries", "ned"),
+]);
 const iconPath = join(appRoot, "Contents", "Resources", "icon.icns");
 
 requireDirectory(appRoot, "macOS app bundle is missing; run ./node_modules/.bin/tauri build --bundles app first");
 requireFile(plistPath, "macOS app bundle Info.plist is missing");
 requireExecutable(executablePath, "macOS app bundle executable is missing or not executable");
+requireExecutable(nedPath, "macOS app bundle ned CLI sidecar is missing or not executable");
 requireFile(iconPath, "macOS app bundle icon is missing");
 requireMinimumSize(executablePath, 1_000_000, "macOS app bundle executable is unexpectedly small");
+requireMinimumSize(nedPath, 100_000, "macOS app bundle ned CLI sidecar is unexpectedly small");
 requireMinimumSize(iconPath, 1_000, "macOS app bundle icon is unexpectedly small");
 
 let plist = {};
@@ -95,6 +102,10 @@ function requireMinimumSize(path, minimumBytes, message) {
   }
 }
 
+function firstExistingPath(paths) {
+  return paths.find((path) => existsSync(path)) || paths[0];
+}
+
 function requireEqual(actual, expected, message) {
   if (actual !== expected) {
     issues.push(`${message}: expected ${JSON.stringify(expected)}, found ${JSON.stringify(actual)}`);
@@ -114,6 +125,11 @@ function writeBundleReport(plist) {
           path: relative(executablePath),
           size: statSync(executablePath).size,
           mode: `0${(statSync(executablePath).mode & 0o777).toString(8)}`,
+        },
+        cli: {
+          path: relative(nedPath),
+          size: statSync(nedPath).size,
+          mode: `0${(statSync(nedPath).mode & 0o777).toString(8)}`,
         },
         icon: {
           path: relative(iconPath),

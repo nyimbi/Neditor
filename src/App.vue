@@ -11422,7 +11422,7 @@ async function collectNativeModeEvidence(record: (name: string, passed: boolean,
       const sidebar = store.sidebar;
       const sourceVisible = surfaceVisible("#markdown-source");
       const previewVisible = surfaceVisible("#live-preview");
-      const sidebarText = surfaceText("#document-sidebar").slice(0, 900);
+      const sidebarText = surfaceText("#document-sidebar").slice(0, 2400);
       const previewText = surfaceText("#live-preview").slice(0, 1400);
       const outlineText = surfaceText("#outline-mode").slice(0, 1400);
       const outlineVisible = surfaceVisible("#outline-mode");

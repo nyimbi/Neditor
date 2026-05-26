@@ -5,6 +5,7 @@ description = "A local-first business Markdown document workbench"
 authors = ["NEditor Contributors"]
 license = "MIT"
 edition = "2021"
+default-run = "neditor"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

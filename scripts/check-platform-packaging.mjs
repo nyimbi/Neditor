@@ -16,21 +16,28 @@ const cargoPackage = {
   version: tomlScalar(cargoToml, "package", "version"),
   license: tomlScalar(cargoToml, "package", "license"),
   description: tomlScalar(cargoToml, "package", "description"),
+  defaultRun: tomlScalar(cargoToml, "package", "default-run"),
 };
 const bundle = tauriConfig.bundle || {};
 const windowConfig = tauriConfig.app?.windows?.[0] || {};
 const iconEvidence = collectIconEvidence(bundle.icon || []);
 const targetEvidence = classifyBundleTargets(bundle.targets);
+const cliEvidence = collectCliEvidence(bundle);
+const fileAssociationEvidence = collectFileAssociationEvidence(bundle.fileAssociations || []);
 const signing = signingEvidence();
 
 requireEqual(packageJson.name, cargoPackage.name, "npm and Cargo package names must match");
 requireEqual(packageJson.version, cargoPackage.version, "npm and Cargo package versions must match");
 requireEqual(packageJson.license, "MIT", "npm package license must remain MIT");
 requireEqual(cargoPackage.license, "MIT", "Cargo package license must remain MIT");
+requireEqual(cargoPackage.defaultRun, "neditor", "Cargo default-run must keep Tauri on the desktop app binary");
 requireEqual(tauriConfig.productName, "NEditor", "Tauri product name must remain NEditor");
+requireEqual(tauriConfig.mainBinaryName, "neditor", "Tauri mainBinaryName must keep the desktop app executable distinct from ned");
 requireEqual(tauriConfig.version, packageJson.version, "Tauri version must match package.json");
 requireEqual(tauriConfig.identifier, "com.neditor.desktop", "Tauri bundle identifier must remain stable");
 requireEqual(bundle.active, true, "Tauri bundling must remain active");
+requireEqual(packageJson.scripts?.["prepare:sidecars"], "node scripts/prepare-ned-sidecar.mjs", "package.json must expose prepare:sidecars");
+requireEqual(tauriConfig.build?.beforeBuildCommand, "pnpm run prepare:sidecars && pnpm run build", "Tauri beforeBuildCommand must prepare ned sidecar before packaging");
 if (!targetEvidence.allTargets) {
   issues.push(`Tauri bundle targets must remain all-platform; found ${JSON.stringify(bundle.targets)}`);
 }
@@ -56,6 +63,26 @@ if (windowConfig.width < 1200 || windowConfig.height < 800 || windowConfig.minWi
 const csp = String(tauriConfig.app?.security?.csp || "");
 for (const token of ["default-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "connect-src 'self' ipc:"]) {
   if (!csp.includes(token)) issues.push(`Tauri CSP is missing ${token}`);
+}
+if (!cliEvidence.configured) {
+  issues.push("Tauri bundle externalBin must include binaries/ned so the ned CLI is packaged with NEditor");
+}
+if (!cliEvidence.sourceExists) {
+  issues.push("ned CLI source binary src-tauri/src/bin/ned.rs is missing");
+}
+if (!cliEvidence.prepareScriptExists) {
+  issues.push("ned sidecar preparation script is missing");
+}
+if (!cliEvidence.ignoredGeneratedSidecars) {
+  issues.push(".gitignore must exclude generated ned sidecar binaries");
+}
+for (const extension of ["md", "markdown", "mdown", "mkd"]) {
+  if (!fileAssociationEvidence.extensions.includes(extension)) {
+    issues.push(`Tauri file associations must include .${extension}`);
+  }
+}
+if (!fileAssociationEvidence.mimeTypes.includes("text/markdown")) {
+  issues.push("Tauri file associations must declare text/markdown");
 }
 
 writeReport();
@@ -108,6 +135,28 @@ function collectIconEvidence(iconEntries) {
   return {
     entries: allEntries,
     kinds: [...new Set(allEntries.filter((entry) => entry.exists).map((entry) => entry.kind))].sort(),
+  };
+}
+
+function collectCliEvidence(bundle) {
+  const configuredBins = Array.isArray(bundle.externalBin) ? bundle.externalBin : [];
+  return {
+    configured: configuredBins.includes("binaries/ned"),
+    configuredBins,
+    sourceExists: existsSync(join(root, "src-tauri", "src", "bin", "ned.rs")),
+    prepareScriptExists: existsSync(join(root, "scripts", "prepare-ned-sidecar.mjs")),
+    ignoredGeneratedSidecars: readText(".gitignore").includes("src-tauri/binaries/ned-*"),
+  };
+}
+
+function collectFileAssociationEvidence(associations) {
+  const markdown = associations.find((association) => Array.isArray(association.ext) && association.ext.includes("md")) || {};
+  return {
+    count: associations.length,
+    extensions: Array.isArray(markdown.ext) ? [...markdown.ext].sort() : [],
+    mimeTypes: associations.map((association) => association.mimeType).filter(Boolean),
+    role: markdown.role || "",
+    name: markdown.name || "",
   };
 }
 
@@ -186,16 +235,20 @@ function writeReport() {
           npmName: packageJson.name,
           cargoName: cargoPackage.name,
           tauriProductName: tauriConfig.productName,
+          mainBinaryName: tauriConfig.mainBinaryName,
           version: packageJson.version,
           identifier: tauriConfig.identifier,
           license: packageJson.license,
           cargoLicense: cargoPackage.license,
+          cargoDefaultRun: cargoPackage.defaultRun,
           bundleLicense: bundle.license,
           licenseFile: bundle.licenseFile,
         },
         bundle: {
           active: bundle.active,
           targets: targetEvidence,
+          externalBin: cliEvidence,
+          fileAssociations: fileAssociationEvidence,
           copyright: bundle.copyright,
         },
         mainWindow: {

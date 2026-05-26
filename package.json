@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "prepare:sidecars": "node scripts/prepare-ned-sidecar.mjs",
     "check": "vue-tsc --noEmit",
     "check:ai-roadmap": "node scripts/check-ai-first-roadmap.mjs",
     "check:ai-provider": "node scripts/check-ai-provider-evidence.mjs",

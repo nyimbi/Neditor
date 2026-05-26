@@ -30,6 +30,7 @@ requireIncludes(README, "pnpm run check:homebrew", "README must document the Hom
 requireIncludes(docs, "packaging/homebrew/Casks/neditor.rb.template", "Homebrew docs must point at the cask template");
 requireIncludes(docs, "signed and notarized", "Homebrew docs must require signed and notarized macOS artifacts");
 requireIncludes(docs, "brew audit --cask --new", "Homebrew docs must include the final cask audit command");
+requireIncludes(docs, "`ned`", "Homebrew docs must describe the ned CLI helper");
 
 validateCaskTemplate(template, { placeholdersRequired: true, label: templatePath });
 requireEqual(tauriConfig.productName, "NEditor", "Tauri productName must match the Homebrew app stanza");
@@ -110,6 +111,7 @@ function validateCaskTemplate(source, { placeholdersRequired, label }) {
   requireIncludes(source, 'desc "Local-first AI-assisted Markdown workbench for business documents"', `${label} must describe the product`);
   requireIncludes(source, 'homepage "https://github.com/nyimbi/Neditor"', `${label} must declare the project homepage`);
   requireIncludes(source, 'app "NEditor.app"', `${label} must install the app bundle`);
+  requireIncludes(source, 'binary "#{appdir}/NEditor.app/Contents/MacOS/ned", target: "ned"', `${label} must expose the ned command-line helper from inside the app bundle`);
   requireIncludes(source, "~/Library/Application Support/com.neditor.desktop", `${label} must include app-data zap cleanup`);
   if (!placeholdersRequired) {
     if (source.includes("__VERSION__") || source.includes("__SHA256__")) {

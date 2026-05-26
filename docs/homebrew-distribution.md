@@ -13,7 +13,8 @@ Do not publish or update a Homebrew tap until all of these are true:
 - `pnpm run check:release-readiness` has no local failures.
 - macOS release artifacts are signed and notarized.
 - The Homebrew cask uses the final release version and a real SHA-256 checksum.
-- The downloadable artifact contains `NEditor.app` and matches the cask URL.
+- The downloadable artifact contains `NEditor.app`, exposes the `ned` command
+  line helper, and matches the cask URL.
 - The release notes identify any remaining external evidence gaps explicitly.
 
 The expected tap layout is:
@@ -30,6 +31,10 @@ After producing a signed and notarized macOS zip or DMG, replace
 ```sh
 NEDITOR_HOMEBREW_CASK=/path/to/homebrew-neditor/Casks/neditor.rb pnpm run check:homebrew
 ```
+
+The cask installs `NEditor.app` and links `ned` so business users and automation
+can open Markdown files or convert documents from Terminal without hunting for
+the app bundle path.
 
 For release evidence kit returns, place the completed cask and signed artifact
 under a return directory as:
