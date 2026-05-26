@@ -19,6 +19,7 @@ const quickCommands = [
   command("AI provider evidence contract", "pnpm", ["run", "check:ai-provider"]),
   command("AI runtime evidence contract", "pnpm", ["run", "check:ai-runtime"]),
   command("Security review evidence contract", "pnpm", ["run", "check:security-review"]),
+  command("Homebrew cask packaging contract", "pnpm", ["run", "check:homebrew"]),
   command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"]),
   command("Markdown links", "pnpm", ["run", "check:docs"]),
   command("Spec completion matrix contract", "pnpm", ["run", "check:spec-completion"]),

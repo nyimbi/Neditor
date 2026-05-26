@@ -35,6 +35,7 @@ computer:
 | Your computer | Download this kind of file | Plain-language install step |
 | --- | --- | --- |
 | Mac | `.dmg`, `.zip`, or `NEditor.app` | Open the download, drag NEditor to Applications if prompted, then launch it like any other Mac app. |
+| Mac with Homebrew | `brew install --cask <tap>/neditor` | Use this only after your organization publishes a signed and notarized Homebrew cask. |
 | Windows | `.msi`, `.exe`, or a packaged `NEditor` app | Run the installer, then open NEditor from the Start menu or desktop shortcut. |
 | Linux | `.AppImage`, `.deb`, `.rpm`, or a packaged desktop app | Install the package or mark the AppImage executable, then launch NEditor from your app menu. |
 
@@ -563,6 +564,15 @@ guardrails, root MIT license linkage, and writes
 `unsigned-local-builds` signing stance. Release distribution signing,
 notarization, and installer attestation remain credentialed release steps outside
 local verification.
+
+`pnpm run check:homebrew` verifies the Homebrew cask packaging contract for
+macOS distribution. It checks the cask template under
+`packaging/homebrew/Casks/neditor.rb.template`, the README and
+`docs/homebrew-distribution.md` runbook, Tauri app metadata, bundle target
+coverage, and optional release cask/artifact SHA evidence when
+`NEDITOR_HOMEBREW_CASK` and `NEDITOR_HOMEBREW_ARTIFACT` are supplied. The check
+passes the repository configuration while still reporting release blockers until
+a real SHA-pinned, signed, and notarized macOS artifact is available.
 
 `pnpm run check:platform-evidence` writes
 `.tmp/platform-evidence/report.json` and creates JSON templates under

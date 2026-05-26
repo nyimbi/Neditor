@@ -1,0 +1,18 @@
+cask "neditor" do
+  version "__VERSION__"
+  sha256 "__SHA256__"
+
+  url "https://github.com/nyimbi/Neditor/releases/download/v#{version}/NEditor-#{version}-macos.zip",
+      verified: "github.com/nyimbi/Neditor/"
+  name "NEditor"
+  desc "Local-first AI-assisted Markdown workbench for business documents"
+  homepage "https://github.com/nyimbi/Neditor"
+
+  app "NEditor.app"
+
+  zap trash: [
+    "~/Library/Application Support/com.neditor.desktop",
+    "~/Library/Preferences/com.neditor.desktop.plist",
+    "~/Library/Saved Application State/com.neditor.desktop.savedState",
+  ]
+end

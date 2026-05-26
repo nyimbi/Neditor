@@ -21,6 +21,7 @@
     "check:external-transform-docs": "node scripts/check-external-transform-docs.mjs",
     "check:e2e-env": "node scripts/check-e2e-environment.mjs",
     "check:google-docs-import": "node scripts/check-google-docs-import-evidence.mjs",
+    "check:homebrew": "node scripts/check-homebrew-packaging.mjs",
     "check:platform-evidence": "node scripts/check-platform-evidence.mjs",
     "check:platform-packaging": "node scripts/check-platform-packaging.mjs",
     "check:performance-profile": "node scripts/check-performance-profile-evidence.mjs",

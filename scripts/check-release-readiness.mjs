@@ -29,6 +29,7 @@ const requiredReports = [
   requiredReport("rendered-export-audit", ".tmp/rendered-export-audit/rendered-export-audit-report.json", [], renderedExportAuditAccepted),
   requiredReport("rendered-export-visual-summary", ".tmp/rendered-export-audit/visual-review-summary.json", [], visualSummaryPassed),
   requiredReport("google-docs-import-evidence", ".tmp/google-docs-import/report.json", [], googleDocsImportAccepted),
+  requiredReport("homebrew-packaging", ".tmp/homebrew/homebrew-packaging-report.json", [], homebrewPackagingAccepted),
   requiredReport("external-engine-probe", ".tmp/external-engines/probe-report.json", [], externalEngineProbePassed),
   requiredReport("performance-audit", ".tmp/performance-audit/report.json", [], performanceAuditAccepted),
   requiredReport("performance-profile-evidence", ".tmp/performance-profile/report.json", [], performanceProfileEvidenceAccepted),
@@ -186,6 +187,18 @@ function collectEvidenceGaps(checks) {
       evidence: ".tmp/google-docs-import/report.json",
       detail: "Local Google Docs package proof is present, but live Google Docs import/readback evidence needs an authorized Drive session.",
     });
+  }
+
+  const homebrewPackaging = reports["homebrew-packaging"];
+  if (homebrewPackaging?.status === "passed-with-release-blockers") {
+    for (const blocker of homebrewPackaging.blockers || []) {
+      gaps.push({
+        id: blocker.id,
+        status: blocker.status || "pending",
+        evidence: ".tmp/homebrew/homebrew-packaging-report.json",
+        detail: blocker.detail || "Homebrew packaging blocker remains open.",
+      });
+    }
   }
 
   const aiProvider = reports["ai-provider-evidence"];
@@ -657,6 +670,16 @@ function googleDocsImportAccepted(report) {
     detail: invalid
       ? `googleDocsImportIssues=${report.issues.length}`
       : `googleDocsImport=${report.importEvidence?.status || report.status || "unknown"}`,
+  };
+}
+
+function homebrewPackagingAccepted(report) {
+  const invalid = Array.isArray(report.issues) && report.issues.length > 0;
+  const status = invalid ? "failed" : report.status || "unknown";
+  return {
+    accepted: !invalid && (status === "ready" || status === "passed-with-release-blockers"),
+    status,
+    detail: invalid ? `homebrewPackagingIssues=${report.issues.length}` : `homebrewBlockers=${report.blockers?.length || 0}`,
   };
 }
 

@@ -3605,6 +3605,19 @@ Watch path helper extraction:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the state-store evidence refresh. |
 | `git diff --check` | Pass | No whitespace errors are present in the watch-path helper extraction diff. |
 
+Homebrew distribution packaging gate:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:homebrew` | Pass | Homebrew cask contract passed with zero configuration issues and wrote `.tmp/homebrew/homebrew-packaging-report.json`; the report correctly keeps release blockers open for final cask replacement, signed/notarized macOS artifact proof, and cask/artifact SHA evidence. |
+| `pnpm run check:docs` | Pass | 15 Markdown files were checked after adding the Homebrew distribution runbook and README links; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the Homebrew packaging evidence refresh. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding the Homebrew packaging scripts and package metadata. |
+| `pnpm run test:unit` | Pass | 72 frontend unit/static tests passed after adding the Homebrew gate to local verification. |
+| `pnpm run check:release-ci` | Pass | Release CI workflow guard refreshed after `package.json` changed and wrote `.tmp/release-ci/workflow-report.json`. |
+| `pnpm run check:release-readiness` | Pass | Release readiness aggregation returned `current-host-ready-with-external-gaps`, now including Homebrew blockers as explicit release risks rather than accepting an unsigned placeholder cask. |
+| `git diff --check` | Pass | No whitespace errors are present in packaging, docs, or scripts. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
