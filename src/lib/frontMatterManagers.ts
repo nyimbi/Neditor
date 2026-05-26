@@ -185,6 +185,37 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
     const parsed = parseYamlScalar(match[3]);
     if (parsed.anchor && hasChildren && !mapAnchors.has(parsed.anchor)) mapAnchors.set(parsed.anchor, []);
     let value = parsed.alias ? anchors.get(parsed.alias) || parsed.value : parsed.value;
+    if (parsed.alias && mapAnchors.has(parsed.alias)) {
+      const aliasedEntries = mapAnchors.get(parsed.alias) || [];
+      if (parsed.anchor) {
+        if (!mapAnchors.has(parsed.anchor)) mapAnchors.set(parsed.anchor, []);
+        for (const entry of aliasedEntries) {
+          recordMapAnchorEntry(mapAnchors, { anchor: parsed.anchor }, entry.key, entry.value, entry.line, true);
+        }
+      }
+      for (const owner of stack.filter((entry) => entry.anchor)) {
+        const relativeKey = path.startsWith(`${owner.path}.`) ? path.slice(owner.path.length + 1) : "";
+        if (!relativeKey) continue;
+        for (const entry of aliasedEntries) {
+          recordMapAnchorEntry(mapAnchors, owner, `${relativeKey}.${entry.key}`, entry.value, entry.line, true);
+        }
+      }
+      if (!excluded) {
+        for (const entry of aliasedEntries) {
+          setVariableRow(
+            rows,
+            {
+              key: `${path}.${entry.key}`,
+              value: entry.value,
+              status: entry.value ? "ready" : "empty",
+              line: index + 1,
+            },
+            true,
+          );
+        }
+      }
+      continue;
+    }
     if (value === "|" || value === ">") {
       value = collectYamlBlockScalar(lines, endIndex, index, indent, value);
       if (parsed.anchor && value) anchors.set(parsed.anchor, value);
