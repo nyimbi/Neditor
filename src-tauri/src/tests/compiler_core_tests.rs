@@ -959,6 +959,38 @@ fn compiler_generates_glossary_sections_from_marker_and_metadata() {
 }
 
 #[test]
+fn compiler_collects_tilde_fenced_glossary_and_bibliography() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Tilde Fences\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\ncitationStyle: author-year\n---\n# Tilde Fences\nARR and source-backed claims matter [@doe2026].\n\n[GLOSSARY]\n\n~~~glossary\nARR: Annual recurring revenue.\n~~~\n\n[BIBLIOGRAPHY]\n\n~~~bibtex\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe},\n year={2026}\n}\n~~~\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert_eq!(
+        response.semantic.glossary.get("ARR").map(String::as_str),
+        Some("Annual recurring revenue.")
+    );
+    assert!(response
+        .bibliography
+        .iter()
+        .any(|entry| entry.key == "doe2026"
+            && entry.title == "Evidence Based Reports"
+            && entry.author.as_deref() == Some("Doe")
+            && entry.issued.as_deref() == Some("2026")));
+    assert!(response.html.contains("class=\"glossary-term\""));
+    assert!(response
+        .compiled_markdown
+        .contains("- **ARR**: Annual recurring revenue."));
+    assert!(response
+        .compiled_markdown
+        .contains("- **doe2026**. Doe 2026. Evidence Based Reports"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("Missing citation source")));
+}
+
+#[test]
 fn compiler_preserves_figure_float_semantics() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Floating Figure\nstatus: approved\napprovedBy: QA\n---\n# Floating Figure\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:float caption=\"Floating diagram\" float=\"right\"}\n".to_string(),

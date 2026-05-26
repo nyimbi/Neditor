@@ -133,6 +133,10 @@ Recent pushed checkpoints visible in current git history:
   `[TOC]`, `[INDEX]`, `[GLOSSARY]`, `[BIBLIOGRAPHY]`, `[LIST_OF_FIGURES]`, or
   `[LIST_OF_TABLES]` stay intact inside code fences while real outside markers
   still render.
+- Shared fenced-body collection now accepts both backtick and tilde fences for
+  extension blocks such as `glossary`, `bibtex`, `hayagriva`, `bibliography`,
+  and `layout`, keeping author Markdown syntax choices consistent across
+  generated sections and citation workflows.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
