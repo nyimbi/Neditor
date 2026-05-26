@@ -171,6 +171,17 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
           if (inlineRow) rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
         }
       }
+      if (
+        section === "dataSources" &&
+        !parsedTopLevel.alias &&
+        parsedTopLevel.value &&
+        !parsedTopLevel.value.startsWith("{") &&
+        !parsedTopLevel.value.startsWith("[") &&
+        parsedTopLevel.value !== "|" &&
+        parsedTopLevel.value !== ">"
+      ) {
+        rows.push(normalizeFrontMatterDataSource({ source: section, line: index + 1, path: parsedTopLevel.value }, rows.length));
+      }
       if (aliasKind && parsedTopLevel.value.startsWith("[")) {
         for (const item of splitInlineYamlList(parsedTopLevel.value)) {
           const path = resolveDataSourceScalar(item, anchors);
