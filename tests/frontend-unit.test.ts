@@ -517,6 +517,35 @@ test("front matter managers surface scalar anchors aliases and block scalars", (
   ok(rows.some((row) => row.key === "client.approver" && row.value === "Jane # Lead"));
 });
 
+test("front matter managers resolve tagged scalars and simple merge aliases", () => {
+  const source = [
+    "---",
+    "defaults: &contactDefaults",
+    "  owner: !role \"Strategy # Lead\"",
+    "  reviewer: !!str QA Team",
+    "  budget: !<tag:yaml.org,2002:int> 125000",
+    "client:",
+    "  <<: *contactDefaults",
+    "  owner: Delivery Team",
+    "  region: !<tag:yaml.org,2002:str> EMEA",
+    "partner:",
+    "  <<: [*contactDefaults]",
+    "---",
+    "",
+    "# Merge",
+  ].join("\n");
+
+  const rows = parseFrontMatterVariables(source);
+  ok(rows.some((row) => row.key === "defaults.owner" && row.value === "Strategy # Lead"));
+  ok(rows.some((row) => row.key === "defaults.reviewer" && row.value === "QA Team"));
+  ok(rows.some((row) => row.key === "defaults.budget" && row.value === "125000"));
+  ok(rows.some((row) => row.key === "client.owner" && row.value === "Delivery Team"));
+  ok(rows.some((row) => row.key === "client.reviewer" && row.value === "QA Team"));
+  ok(rows.some((row) => row.key === "client.budget" && row.value === "125000"));
+  ok(rows.some((row) => row.key === "client.region" && row.value === "EMEA"));
+  ok(rows.some((row) => row.key === "partner.owner" && row.value === "Strategy # Lead"));
+});
+
 test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   const text = "word alpha beta";
   equal(nextVimWordStart(text, 0), 5);

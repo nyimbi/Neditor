@@ -82,6 +82,10 @@ Recent pushed checkpoints visible in current git history:
   and surfaces folded/literal block scalars as usable document-variable values,
   so repeated owners/reviewers and short multiline summaries can be inserted
   through the References sidebar instead of disappearing from the variable list.
+- Simple front-matter merge defaults and tagged scalars are now handled in the
+  document-variable inventory. Common YAML such as `<<: *defaults`, `!!str`,
+  `!custom`, and `!<tag:yaml.org,2002:str>` can populate repeated client,
+  owner, reviewer, budget, or region variables while explicit values still win.
 - Application navigation now exposes NEditor's capabilities through both menus
   and buttons. The workbench header has visible File, Edit, View, Writing
   Tools, Quality, Export, and Help menus that mirror the native desktop menu
@@ -3312,6 +3316,13 @@ Front matter manager anchors and multiline variables:
 | --- | --- | --- |
 | `pnpm exec tsc -p tsconfig.test.json` | Pass | Test TypeScript compilation passed after adding simple scalar anchor/alias and block-scalar handling. |
 | `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Three focused frontend unit tests passed, including scalar anchors, aliases, nested aliases, quoted `#` in anchored values, literal block scalar summaries, and folded block scalar excerpts. |
+
+Front matter manager merge keys and tags:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm exec tsc -p tsconfig.test.json` | Pass | Test TypeScript compilation passed after adding conservative tagged-scalar and simple merge-key handling. |
+| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Four focused frontend unit tests passed, including `!!str`, `!custom`, `!<tag:yaml.org,2002:str>`, simple `<<: *defaults` merges, list-form merge aliases, and explicit value override of merged defaults. |
 
 Export metadata checklist modularization:
 

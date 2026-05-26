@@ -140,36 +140,69 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
   const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
   if (endIndex <= 0) return [];
   const rows: FrontMatterVariableRow[] = [];
-  const stack: Array<{ indent: number; path: string; excluded: boolean }> = [];
+  const stack: Array<{ indent: number; path: string; excluded: boolean; anchor: string }> = [];
   const anchors = new Map<string, string>();
+  const mapAnchors = new Map<string, Array<{ key: string; value: string; line: number }>>();
   for (let index = 1; index < endIndex; index += 1) {
     const raw = lines[index];
+    const indentMatch = raw.match(/^(\s*)/);
+    const rawIndent = yamlIndentWidth(indentMatch?.[1] || "");
+    while (stack.length && stack[stack.length - 1].indent >= rawIndent) stack.pop();
+    const parent = stack[stack.length - 1];
+    const mergeMatch = raw.match(/^\s*<<:\s*(.*)$/);
+    if (mergeMatch && parent && !parent.excluded) {
+      for (const alias of yamlAliasNames(mergeMatch[1])) {
+        for (const entry of mapAnchors.get(alias) || []) {
+          setVariableRow(
+            rows,
+            {
+              key: `${parent.path}.${entry.key}`,
+              value: entry.value,
+              status: entry.value ? "ready" : "empty",
+              line: index + 1,
+            },
+            true,
+          );
+        }
+      }
+      continue;
+    }
     const match = raw.match(/^(\s*)([A-Za-z][\w-]*):\s*(.*)$/);
     if (!match) continue;
     const indent = yamlIndentWidth(match[1]);
-    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
-    const parent = stack[stack.length - 1];
     const key = match[2];
     const path = parent ? `${parent.path}.${key}` : key;
     const excluded = Boolean(parent?.excluded || (!parent && frontMatterVariableExcludedKeys.has(key)));
     const hasChildren = hasIndentedYamlChildren(lines, endIndex, index, indent);
     const parsed = parseYamlScalar(match[3]);
+    if (parsed.anchor && hasChildren && !mapAnchors.has(parsed.anchor)) mapAnchors.set(parsed.anchor, []);
     let value = parsed.alias ? anchors.get(parsed.alias) || parsed.value : parsed.value;
     if (value === "|" || value === ">") {
       value = collectYamlBlockScalar(lines, endIndex, index, indent, value);
       if (parsed.anchor && value) anchors.set(parsed.anchor, value);
-      if (!excluded && value) rows.push({ key: path, value, status: "ready", line: index + 1 });
+      if (!excluded && value) setVariableRow(rows, { key: path, value, status: "ready", line: index + 1 });
       continue;
     }
     if (parsed.anchor && value && !value.startsWith("[") && !value.startsWith("{")) anchors.set(parsed.anchor, value);
-    if (hasChildren) stack.push({ indent, path, excluded });
+    if (hasChildren) stack.push({ indent, path, excluded, anchor: parsed.anchor });
     if (excluded) continue;
     if (!value || value === "[]" || value === "{}") {
-      if (!hasChildren) rows.push({ key: path, value: "", status: "empty", line: index + 1 });
+      if (!hasChildren) setVariableRow(rows, { key: path, value: "", status: "empty", line: index + 1 });
       continue;
     }
     if (value.startsWith("[") || value.startsWith("{")) continue;
-    rows.push({
+    for (const owner of stack.filter((entry) => entry.anchor)) {
+      const relativeKey = path.startsWith(`${owner.path}.`) ? path.slice(owner.path.length + 1) : "";
+      if (relativeKey) {
+        const entries = mapAnchors.get(owner.anchor) || [];
+        const existing = entries.findIndex((entry) => entry.key === relativeKey);
+        const anchoredEntry = { key: relativeKey, value, line: index + 1 };
+        if (existing >= 0) entries[existing] = anchoredEntry;
+        else entries.push(anchoredEntry);
+        mapAnchors.set(owner.anchor, entries);
+      }
+    }
+    setVariableRow(rows, {
       key: path,
       value,
       status: "ready",
@@ -295,32 +328,46 @@ function hasIndentedYamlChildren(lines: string[], endIndex: number, index: numbe
 
 function cleanYamlScalar(value: string) {
   const withoutComment = stripYamlComment(value).trim();
-  const withoutAnchor = stripLeadingYamlAnchor(withoutComment);
-  if (withoutAnchor.length >= 2) {
-    const quote = withoutAnchor[0];
-    if ((quote === "\"" || quote === "'") && withoutAnchor.endsWith(quote)) {
-      const body = withoutAnchor.slice(1, -1);
+  const decorated = stripLeadingYamlDecorators(withoutComment);
+  if (decorated.scalar.length >= 2) {
+    const quote = decorated.scalar[0];
+    if ((quote === "\"" || quote === "'") && decorated.scalar.endsWith(quote)) {
+      const body = decorated.scalar.slice(1, -1);
       return quote === "'" ? body.replace(/''/g, "'") : body.replace(/\\"/g, "\"");
     }
   }
-  return withoutAnchor;
+  return decorated.scalar;
 }
 
 function parseYamlScalar(value: string) {
   const withoutComment = stripYamlComment(value).trim();
-  const anchorMatch = withoutComment.match(/^&([A-Za-z0-9_-]+)\s+(.*)$/);
-  const anchor = anchorMatch?.[1] || "";
-  const scalar = anchorMatch ? anchorMatch[2].trim() : withoutComment;
-  const alias = scalar.match(/^\*([A-Za-z0-9_-]+)$/)?.[1] || "";
+  const decorated = stripLeadingYamlDecorators(withoutComment);
+  const alias = decorated.scalar.match(/^\*([A-Za-z0-9_-]+)$/)?.[1] || "";
   return {
-    anchor,
+    anchor: decorated.anchor,
     alias,
-    value: cleanYamlScalar(scalar),
+    value: cleanYamlScalar(decorated.scalar),
   };
 }
 
-function stripLeadingYamlAnchor(value: string) {
-  return value.replace(/^&[A-Za-z0-9_-]+\s+/, "").trim();
+function stripLeadingYamlDecorators(value: string) {
+  let scalar = value.trim();
+  let anchor = "";
+  let previous = "";
+  while (scalar && scalar !== previous) {
+    previous = scalar;
+    const anchorMatch = scalar.match(/^&([A-Za-z0-9_-]+)(?:\s+|$)(.*)$/);
+    if (anchorMatch) {
+      anchor = anchorMatch[1];
+      scalar = anchorMatch[2].trim();
+      continue;
+    }
+    const tagMatch = scalar.match(/^(?:!![A-Za-z0-9_.:/-]+|![A-Za-z0-9_.:/-]+|!<[^>]+>)(?:\s+|$)(.*)$/);
+    if (tagMatch) {
+      scalar = tagMatch[1].trim();
+    }
+  }
+  return { anchor, scalar };
 }
 
 function collectYamlBlockScalar(lines: string[], endIndex: number, index: number, indent: number, style: string) {
@@ -381,6 +428,25 @@ function splitInlineYamlList(value: string) {
   }
   if (current.trim()) items.push(current.trim());
   return items;
+}
+
+function yamlAliasNames(value: string) {
+  const scalar = stripLeadingYamlDecorators(stripYamlComment(value).trim()).scalar;
+  const direct = scalar.match(/^\*([A-Za-z0-9_-]+)$/)?.[1];
+  if (direct) return [direct];
+  if (!scalar.startsWith("[") || !scalar.endsWith("]")) return [];
+  return splitInlineYamlList(scalar)
+    .map((item) => cleanYamlScalar(item).match(/^\*([A-Za-z0-9_-]+)$/)?.[1] || "")
+    .filter(Boolean);
+}
+
+function setVariableRow(rows: FrontMatterVariableRow[], row: FrontMatterVariableRow, keepExisting = false) {
+  const index = rows.findIndex((candidate) => candidate.key === row.key);
+  if (index >= 0) {
+    if (!keepExisting) rows[index] = row;
+    return;
+  }
+  rows.push(row);
 }
 
 function stripYamlComment(value: string) {
