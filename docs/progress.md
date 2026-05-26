@@ -31,6 +31,14 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Quality recommendations now have a dedicated typed implementation module
+  instead of living only inside the workbench component. `src/lib/qualityRecommendations.ts`
+  builds deterministic QA/QI findings for diagnostics, placeholders, citation
+  evidence, unresolved comments, AI provenance, missing document identity, weak
+  structure, readability, and generic AI wording; formats the summary; and
+  generates the insertable QA report Markdown. Frontend unit coverage directly
+  verifies blocker/risk/improvement classification, pass-state behavior, and
+  report generation, reducing the QA feature's coupling to `src/App.vue`.
 - Application navigation now exposes NEditor's capabilities through both menus
   and buttons. The workbench header has visible File, Edit, View, Writing
   Tools, Quality, Export, and Help menus that mirror the native desktop menu
@@ -3211,6 +3219,19 @@ Menus, quality recommendations, and expanded document wizards:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the evidence refresh. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests, including visible File/Writing Tools/Quality menus, menu-routed QA review, expanded wizard access, save/snapshot restore, and extended export workflows. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing full-suite browser evidence. |
+
+Quality recommendation modularization:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after extracting deterministic QA/QI recommendation logic from `src/App.vue` into `src/lib/qualityRecommendations.ts`. |
+| `pnpm run test:unit` | Pass | 52 frontend unit tests passed, including direct coverage for quality recommendation classification, summary formatting, pass-state behavior, and insertable report Markdown. |
+| `git diff --check` | Pass | No whitespace errors are present in the QA extraction diff. |
+| `pnpm run build` | Pass | Production Vue/Vite build passed with the extracted QA recommendation module. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting the QA extraction; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the evidence refresh. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the QA extraction, preserving the visible menu and Review sidebar QA workflow proof. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing browser evidence. |
 
 ## Next Execution Order
 

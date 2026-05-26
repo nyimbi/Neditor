@@ -75,6 +75,11 @@ import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
 import { extractMarkdownSection, findMarkdownSectionRange, replaceOrAppendMarkdownSection } from "../src/lib/markdownSectionMerge.js";
 import {
+  buildQualityRecommendations,
+  formatQualityRecommendationSummary,
+  qualityRecommendationMarkdown,
+} from "../src/lib/qualityRecommendations.js";
+import {
   builtinTransformTemplates,
   normalizeCustomTransformTemplates,
   transformTemplateFillFields,
@@ -720,6 +725,68 @@ test("AI runtime readiness flags missing secure voice and clipboard capabilities
   ok(report.issues.some((issue) => issue.includes("clipboard-read permission is denied")));
   ok(report.issues.some((issue) => issue.includes("Clipboard write API is unavailable")));
   ok(report.markdown.includes("| Clipboard read | no | denied |"));
+});
+
+test("quality recommendations classify deterministic review risks", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "---",
+      "title: Launch Plan",
+      "---",
+      "",
+      "# Launch Plan",
+      "",
+      "This robust plan will leverage market synergy for {{client}}. [@source2026]",
+      "",
+    ].join("\n"),
+    semantic: {
+      title: "Launch Plan",
+      comments: [{ line: 8, author: "QA", state: "open", text: "Clarify evidence." }],
+      ai_sources: [
+        {
+          line: 9,
+          provider: "local",
+          model: "draft",
+          date: "2026-05-26",
+          prompt_summary: "Drafted launch plan",
+          reviewed_by: "",
+          reviewed_at: "",
+          status: "needs-review",
+        },
+      ],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [{ severity: "error", message: "Broken reference", related: [] }],
+  });
+
+  const ids = new Set(recommendations.map((item) => item.id));
+  ok(ids.has("compiler-diagnostics"));
+  ok(ids.has("placeholders"));
+  ok(ids.has("citation-evidence"));
+  ok(ids.has("review-comments"));
+  ok(ids.has("ai-provenance"));
+  ok(ids.has("humanization"));
+  equal(formatQualityRecommendationSummary(recommendations), "1 blockers, 4 risks, 2 improvements");
+  const markdown = qualityRecommendationMarkdown(recommendations, "2026-05-26T00:00:00.000Z");
+  ok(markdown.includes("## Quality Assurance and Improvement Report"));
+  ok(markdown.includes("Summary: 1 blockers, 4 risks, 2 improvements"));
+  ok(markdown.includes("| Compiler diagnostics | blocker |"));
+});
+
+test("quality recommendations pass when a reviewed document has baseline structure", () => {
+  const recommendations = buildQualityRecommendations({
+    text: "# Report\n\n## Evidence\n\nDocument is concise and source-backed.\n\n[BIBLIOGRAPHY]\n",
+    semantic: {
+      title: "Report",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  deepEqual(recommendations.map((item) => item.id), ["qa-ready"]);
+  equal(formatQualityRecommendationSummary(recommendations), "0 blockers, 0 risks, 0 improvements");
 });
 
 test("agentic workflow planner coordinates creation revision review and distribution", () => {

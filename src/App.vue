@@ -4363,6 +4363,12 @@ import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from
 import { markdownListContinuation } from "./lib/markdownEditing";
 import { replaceOrAppendMarkdownSection } from "./lib/markdownSectionMerge";
 import {
+  buildQualityRecommendations,
+  formatQualityRecommendationSummary,
+  qualityRecommendationMarkdown as qualityRecommendationsToMarkdown,
+  type QualityRecommendation,
+} from "./lib/qualityRecommendations";
+import {
   blankCustomTransformTemplate,
   builtinTransformTemplates,
   createCustomTransformTemplateId,
@@ -4440,14 +4446,6 @@ interface ReleaseChecklistItem {
   label: string;
   status: ReleaseChecklistStatus;
   detail: string;
-  action: string;
-}
-type QualityRecommendationSeverity = "pass" | "improve" | "risk" | "blocker";
-interface QualityRecommendation {
-  id: string;
-  label: string;
-  severity: QualityRecommendationSeverity;
-  recommendation: string;
   action: string;
 }
 interface AppMenuItem {
@@ -5921,116 +5919,13 @@ const reviewSummary = computed(() => {
   };
 });
 const qualityImprovementRecommendations = computed<QualityRecommendation[]>(() => {
-  const text = active.value.text;
-  const semantic = active.value.compile?.semantic;
-  const diagnostics = active.value.compile?.diagnostics || [];
-  const recommendations: QualityRecommendation[] = [];
-  const unresolved = (semantic?.comments || []).filter((comment) => comment.state !== "resolved").length;
-  const aiPending = [...(semantic?.ai_sources || []), ...(semantic?.ai_assisted_sections || [])].filter((item) => item.status !== "human-reviewed").length;
-  const placeholderCount = (text.match(/\{\{[^}]+\}\}|\b(?:TODO|TBD|FIXME)\b/gi) || []).length;
-  const citationCount = (text.match(/\[@[A-Za-z0-9_:.#$%&+?~\/-]+\]/g) || []).length;
-  const bibliographyPresent = /\[BIBLIOGRAPHY\]|```bibtex|^@(?:article|book|misc|techreport|inproceedings)\{/im.test(text);
-  const headings = (text.match(/^#{1,4}\s+\S.+$/gm) || []).length;
-  const longParagraphs = text
-    .split(/\n{2,}/)
-    .filter((paragraph) => !paragraph.trim().startsWith("#") && paragraph.trim().split(/\s+/).length > 95).length;
-  const genericPhrases = text.match(/\b(?:leverage|robust|seamless|cutting-edge|world-class|game-changing|holistic|synergy)\b/gi) || [];
-  const diagnosticErrors = diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
-  const diagnosticWarnings = diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length;
-
-  if (diagnosticErrors || diagnosticWarnings) {
-    recommendations.push({
-      id: "compiler-diagnostics",
-      label: "Compiler diagnostics",
-      severity: diagnosticErrors ? "blocker" : "risk",
-      recommendation: `${diagnosticErrors} errors and ${diagnosticWarnings} warnings need review before export.`,
-      action: "Open Diagnostics, fix blocking issues, then re-run QA and export readiness.",
-    });
-  }
-  if (placeholderCount) {
-    recommendations.push({
-      id: "placeholders",
-      label: "Unresolved placeholders",
-      severity: "risk",
-      recommendation: `${placeholderCount} placeholders or TODO markers remain in the document.`,
-      action: "Resolve values, mark unknowns as explicit assumptions, or keep them in a reviewer handoff section.",
-    });
-  }
-  if (citationCount && !bibliographyPresent) {
-    recommendations.push({
-      id: "citation-evidence",
-      label: "Citation evidence",
-      severity: "risk",
-      recommendation: `${citationCount} citation marker(s) are present but no bibliography block is visible.`,
-      action: "Insert bibliography entries or add citation TODOs for every unsupported source.",
-    });
-  }
-  if (unresolved) {
-    recommendations.push({
-      id: "review-comments",
-      label: "Review comments",
-      severity: "risk",
-      recommendation: `${unresolved} unresolved review comment(s) still need a decision.`,
-      action: "Resolve comments, defer them with owner/date, or document why they are acceptable for this release.",
-    });
-  }
-  if (aiPending) {
-    recommendations.push({
-      id: "ai-provenance",
-      label: "AI provenance",
-      severity: "risk",
-      recommendation: `${aiPending} AI-assisted source or section marker(s) are not human reviewed.`,
-      action: "Inspect the generated material, remove AI cruft, verify claims, and mark reviewed only after human sign-off.",
-    });
-  }
-  if (headings < 2) {
-    recommendations.push({
-      id: "structure",
-      label: "Document structure",
-      severity: "improve",
-      recommendation: "The document has fewer than two headings, making navigation, outline review, and export structure weaker.",
-      action: "Use Outline mode or Docs Live to add chapters, sections, subsections, and review checkpoints.",
-    });
-  }
-  if (longParagraphs) {
-    recommendations.push({
-      id: "readability",
-      label: "Readability",
-      severity: "improve",
-      recommendation: `${longParagraphs} long paragraph(s) may be hard for business reviewers to scan.`,
-      action: "Split long paragraphs into shorter points, lists, examples, or decision tables.",
-    });
-  }
-  if (genericPhrases.length) {
-    recommendations.push({
-      id: "humanization",
-      label: "Humanization",
-      severity: "improve",
-      recommendation: `${Array.from(new Set(genericPhrases.map((phrase) => phrase.toLowerCase()))).slice(0, 5).join(", ")} may read as generic AI wording.`,
-      action: "Replace broad adjectives with named facts, proof points, constraints, and concrete reader outcomes.",
-    });
-  }
-  if (!recommendations.length) {
-    recommendations.push({
-      id: "qa-ready",
-      label: "QA baseline",
-      severity: "pass",
-      recommendation: "No obvious deterministic QA blockers were found in structure, citations, placeholders, comments, or AI review state.",
-      action: "Run export readiness and a human review pass before external distribution.",
-    });
-  }
-  return recommendations;
+  return buildQualityRecommendations({
+    text: active.value.text,
+    semantic: active.value.compile?.semantic,
+    diagnostics: active.value.compile?.diagnostics,
+  });
 });
-const qualityRecommendationSummary = computed(() => {
-  const counts = qualityImprovementRecommendations.value.reduce<Record<QualityRecommendationSeverity, number>>(
-    (acc, item) => {
-      acc[item.severity] += 1;
-      return acc;
-    },
-    { pass: 0, improve: 0, risk: 0, blocker: 0 },
-  );
-  return `${counts.blocker} blockers, ${counts.risk} risks, ${counts.improve} improvements`;
-});
+const qualityRecommendationSummary = computed(() => formatQualityRecommendationSummary(qualityImprovementRecommendations.value));
 const releaseReadinessChecklist = computed<ReleaseChecklistItem[]>(() => {
   const text = active.value.text;
   const semantic = active.value.compile?.semantic;
@@ -13477,21 +13372,7 @@ function runQualityReview() {
 }
 
 function qualityRecommendationMarkdown() {
-  const generatedAt = new Date().toISOString();
-  const rows = qualityImprovementRecommendations.value
-    .map((item) => `| ${markdownTableCell(item.label)} | ${item.severity} | ${markdownTableCell(item.recommendation)} | ${markdownTableCell(item.action)} |`)
-    .join("\n");
-  return [
-    "## Quality Assurance and Improvement Report",
-    "",
-    `Generated: ${generatedAt}`,
-    `Summary: ${qualityRecommendationSummary.value}`,
-    "",
-    "| Area | Severity | Recommendation | Action |",
-    "| --- | --- | --- | --- |",
-    rows,
-    "",
-  ].join("\n");
+  return qualityRecommendationsToMarkdown(qualityImprovementRecommendations.value);
 }
 
 function insertQualityImprovementReport() {
