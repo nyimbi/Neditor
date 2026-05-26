@@ -88,6 +88,9 @@ fn render_glossary_entries(glossary: &BTreeMap<String, String>) -> String {
 }
 
 fn render_bibliography_entries(bibliography: &[BibliographyEntry], style: &str) -> String {
+    if bibliography.is_empty() {
+        return "_No bibliography entries found._".to_string();
+    }
     bibliography
         .iter()
         .enumerate()

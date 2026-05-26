@@ -142,6 +142,24 @@ fn compiler_resolves_metadata_variables_transforms_and_manifest() {
 }
 
 #[test]
+fn compiler_renders_empty_bibliography_placeholder() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Empty Bibliography\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Empty Bibliography\n\n[BIBLIOGRAPHY]\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert!(response
+        .compiled_markdown
+        .contains("## Bibliography\n\n_No bibliography entries found._"));
+    assert!(response.html.contains("No bibliography entries found."));
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.message
+            == "Generated bibliography was requested but no bibliography entries were found."
+    }));
+}
+
+#[test]
 fn compiler_supports_default_document_variables() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Defaults\nstatus: approved\napprovedBy: QA\nclient: Acme\n---\n# Defaults\nPrepared for {{client | default:Fallback}} in {{region | default:\"East Africa\"}}.\nStill missing {{owner}}.\n".to_string(),

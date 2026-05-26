@@ -135,6 +135,9 @@ Recent pushed checkpoints visible in current git history:
 - Export readiness now also warns when `[BIBLIOGRAPHY]` is present but no
   bibliography entries are available, preventing an empty bibliography section
   from quietly passing release checks.
+- Empty generated bibliography markers now render a visible
+  `_No bibliography entries found._` placeholder in compiled Markdown/HTML, so
+  the readiness warning is also visible at the marker location.
 - PPTX agenda generation now follows the same structured TOC metadata path:
   `toc.enabled` and `tableOfContents.enabled` can automatically add an agenda
   slide without requiring the explicit `includeAgenda` export option.
