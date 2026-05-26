@@ -524,8 +524,15 @@ test("front matter managers resolve tagged scalars and simple merge aliases", ()
     "  owner: !role \"Strategy # Lead\"",
     "  reviewer: !!str QA Team",
     "  budget: !<tag:yaml.org,2002:int> 125000",
+    "  address:",
+    "    city: Nairobi",
+    "    country: Kenya",
+    "fallbacks: &fallbackDefaults",
+    "  reviewer: Backup Team",
+    "  delivery:",
+    "    timezone: EAT",
     "client:",
-    "  <<: *contactDefaults",
+    "  <<: [*contactDefaults, *fallbackDefaults]",
     "  owner: Delivery Team",
     "  region: !<tag:yaml.org,2002:str> EMEA",
     "partner:",
@@ -542,6 +549,9 @@ test("front matter managers resolve tagged scalars and simple merge aliases", ()
   ok(rows.some((row) => row.key === "client.owner" && row.value === "Delivery Team"));
   ok(rows.some((row) => row.key === "client.reviewer" && row.value === "QA Team"));
   ok(rows.some((row) => row.key === "client.budget" && row.value === "125000"));
+  ok(rows.some((row) => row.key === "client.address.city" && row.value === "Nairobi"));
+  ok(rows.some((row) => row.key === "client.address.country" && row.value === "Kenya"));
+  ok(rows.some((row) => row.key === "client.delivery.timezone" && row.value === "EAT"));
   ok(rows.some((row) => row.key === "client.region" && row.value === "EMEA"));
   ok(rows.some((row) => row.key === "partner.owner" && row.value === "Strategy # Lead"));
 });
