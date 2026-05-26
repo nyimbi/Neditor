@@ -108,6 +108,9 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       if (parsedTopLevel.anchor && parsedTopLevel.value && !parsedTopLevel.value.startsWith("[") && !parsedTopLevel.value.startsWith("{")) {
         anchors.set(parsedTopLevel.anchor, parsedTopLevel.value);
       }
+      if (parsedTopLevel.anchor && parsedTopLevel.value.startsWith("[")) {
+        anchors.set(parsedTopLevel.anchor, parsedTopLevel.value);
+      }
       if (parsedTopLevel.anchor && parsedTopLevel.value.startsWith("{")) {
         for (const entry of parseInlineYamlMap(parsedTopLevel.value, anchors, mapAnchors, index + 1)) {
           recordMapAnchorEntry(mapAnchors, { anchor: parsedTopLevel.anchor }, entry.key, entry.value, entry.line, entry.keepExisting);
@@ -124,8 +127,17 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
         if (applyDataSourceMerge(aliasedRow, parsedTopLevel.value, mapAnchors)) {
           rows.push(normalizeFrontMatterDataSource(aliasedRow, rows.length));
         } else {
-          const path = anchors.get(parsedTopLevel.alias) || "";
-          if (path) rows.push(normalizeFrontMatterDataSource({ ...aliasedRow, path }, rows.length));
+          const aliasedValue = anchors.get(parsedTopLevel.alias) || "";
+          if (aliasedValue.startsWith("[")) {
+            for (const item of splitInlineYamlList(aliasedValue)) {
+              const itemRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
+              if (applyInlineDataSourceObject(itemRow, item, anchors, mapAnchors)) {
+                rows.push(normalizeFrontMatterDataSource(itemRow, rows.length));
+              }
+            }
+          } else if (aliasedValue) {
+            rows.push(normalizeFrontMatterDataSource({ ...aliasedRow, path: aliasedValue }, rows.length));
+          }
         }
       }
       if (section === "dataSources" && parsedTopLevel.value.startsWith("[")) {
