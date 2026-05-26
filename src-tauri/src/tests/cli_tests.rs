@@ -109,6 +109,47 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
 }
 
 #[test]
+fn ned_cli_inspects_documents_without_writing_artifacts() {
+    let source = temp_markdown_path("inspect");
+    fs::write(&source, super::sample_document()).expect("write source markdown");
+    let args = vec![
+        "ned".to_string(),
+        "inspect".to_string(),
+        source.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ];
+    let outcome = crate::cli::run_cli_with_args(&args).expect("inspect json");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("inspect json");
+    assert_eq!(report["schema"], "neditor.ned-inspect.v1");
+    assert_eq!(report["document"]["title"], "Test Report");
+    assert_eq!(report["counts"]["diagnostics"]["errors"], 0);
+    assert!(report["counts"]["words"].as_u64().expect("word count") > 0);
+    assert!(report["headings"]
+        .as_array()
+        .expect("headings")
+        .iter()
+        .any(|heading| heading["text"] == "Test Report"));
+    assert!(report["exportTargets"]
+        .as_array()
+        .expect("targets")
+        .contains(&serde_json::json!("docx")));
+    assert!(!source.with_extension("html").exists());
+    assert!(!source.with_extension("pdf").exists());
+
+    let stdin_args = vec!["ned".to_string(), "inspect".to_string(), "-".to_string()];
+    let stdin_report = crate::cli::run_cli_with_args_and_stdin(
+        &stdin_args,
+        Some("---\ntitle: Pipeline Memo\nstatus: draft\n---\n\n# Pipeline Memo\n\nDraft text.\n"),
+    )
+    .expect("stdin inspect");
+    assert_eq!(stdin_report.exit_code, 0);
+    assert!(stdin_report.message.contains("NEditor document inspection"));
+    assert!(stdin_report.message.contains("Source: stdin.md"));
+    assert!(stdin_report.message.contains("Title: Pipeline Memo"));
+}
+
+#[test]
 fn ned_cli_generates_shell_completions_without_external_dependencies() {
     let bash = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -118,6 +159,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     .expect("bash completions");
     assert_eq!(bash.exit_code, 0);
     assert!(bash.message.contains("complete -F _ned ned"));
+    assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
     assert!(bash.message.contains("markdown-bundle"));
 
@@ -140,6 +182,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     .expect("fish completions");
     assert_eq!(fish.exit_code, 0);
     assert!(fish.message.contains("complete -c ned"));
+    assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("epub"));
 
     let unsupported = crate::cli::run_cli_with_args(&[
@@ -339,6 +382,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("--output-dir"));
     assert!(outcome.message.contains("--stdout"));
     assert!(outcome.message.contains("ned new"));
+    assert!(outcome.message.contains("ned inspect"));
     assert!(outcome.message.contains("ned validate"));
     assert!(outcome.message.contains("ned templates"));
     assert!(outcome.message.contains("ned targets"));

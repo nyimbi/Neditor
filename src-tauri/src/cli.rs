@@ -1,5 +1,10 @@
-use crate::export_commands::{
-    export_document, prepare_for_export, ExportReadinessReport, ExportRequest, PrepareExportRequest,
+use crate::{
+    compile_with_options,
+    export_commands::{
+        export_document, prepare_for_export, ExportReadinessReport, ExportRequest,
+        PrepareExportRequest,
+    },
+    metadata_string, CompileRequest, CompileResponse, DocumentDiagnostic,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -42,6 +47,7 @@ const CLI_COMMANDS: &[&str] = &[
     "open",
     "convert",
     "export",
+    "inspect",
     "validate",
     "check",
     "templates",
@@ -116,6 +122,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "new" => run_new_command(&args[2..]),
         "open" => run_open_command(&args[2..]),
         "convert" | "export" => run_convert_command(&args[2..], stdin_text),
+        "inspect" => run_inspect_command(&args[2..], stdin_text),
         "validate" | "check" => run_validate_command(&args[2..], stdin_text),
         "templates" => run_list_command("templates", NEW_DOCUMENT_TEMPLATES, &args[2..]),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
@@ -479,6 +486,115 @@ fn run_validate_command(args: &[String], stdin_text: Option<&str>) -> Result<Cli
     }
     Ok(CliOutcome {
         message: validate_text_report(&targets[0], strict, &report),
+        exit_code,
+    })
+}
+
+fn run_inspect_command(args: &[String], stdin_text: Option<&str>) -> Result<CliOutcome, String> {
+    let mut input: Option<String> = None;
+    let mut json_output = false;
+    let mut options = json!({});
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--option" => {
+                index += 1;
+                let pair = args
+                    .get(index)
+                    .ok_or_else(|| "--option requires key=value".to_string())?;
+                apply_cli_option(&mut options, pair)?;
+            }
+            value => {
+                if value.starts_with('-') && value != "-" {
+                    return Err(format!("Unsupported inspect option '{value}'"));
+                }
+                if input.is_some() {
+                    return Err("Only one input document can be inspected at a time.".to_string());
+                }
+                input = Some(value.to_string());
+            }
+        }
+        index += 1;
+    }
+    let input_arg = input.ok_or_else(|| "Usage: ned inspect <file.md|-> [--json]".to_string())?;
+    let (text, file_path, input_path) = read_cli_input_document(&input_arg, stdin_text)?;
+    let source_line_count = text.lines().count();
+    let source_word_count = count_words(&text);
+    let response = compile_with_options(CompileRequest { text, file_path }, &options);
+    let (error_count, warning_count, info_count) = diagnostic_counts(&response.diagnostics);
+    let exit_code = if error_count > 0 { 1 } else { 0 };
+    let document_type = metadata_string(&response.metadata, "documentType")
+        .or_else(|| metadata_string(&response.metadata, "document_type"));
+    let source_path = if input_arg == "-" {
+        None
+    } else {
+        Some(input_path.clone())
+    };
+
+    if json_output {
+        let message = serde_json::to_string_pretty(&json!({
+            "schema": "neditor.ned-inspect.v1",
+            "source": input_path,
+            "sourcePath": source_path,
+            "exitCode": exit_code,
+            "document": {
+                "title": response.semantic.title,
+                "status": response.semantic.status,
+                "documentType": document_type,
+                "version": response.export_manifest.document_version,
+                "sourceHash": response.export_manifest.source_hash,
+                "appVersion": response.export_manifest.app_version,
+            },
+            "counts": {
+                "words": source_word_count,
+                "sourceLines": source_line_count,
+                "compiledLines": response.compiled_markdown.lines().count(),
+                "headings": response.semantic.headings.len(),
+                "outlineItems": response.semantic.outline.len(),
+                "tables": response.semantic.tables,
+                "figures": response.semantic.figures,
+                "equations": response.semantic.equations,
+                "citations": response.semantic.citations.len(),
+                "glossaryTerms": response.semantic.glossary.len(),
+                "comments": response.semantic.comments.len(),
+                "changeNotes": response.semantic.change_notes.len(),
+                "aiSources": response.semantic.ai_sources.len(),
+                "aiAssistedSections": response.semantic.ai_assisted_sections.len(),
+                "crossReferences": response.semantic.cross_references.len(),
+                "includes": response.include_graph.len(),
+                "sourceMapEntries": response.source_map.len(),
+                "formulas": response.formula_graph.len(),
+                "formulaDependencies": response.formula_dependency_edges.len(),
+                "transformArtifacts": response.transform_artifacts.len(),
+                "diagnostics": {
+                    "errors": error_count,
+                    "warnings": warning_count,
+                    "info": info_count,
+                },
+            },
+            "headings": response.semantic.headings,
+            "outline": response.semantic.outline,
+            "includeGraph": response.include_graph,
+            "diagnostics": response.diagnostics,
+            "transformArtifacts": response.transform_artifacts,
+            "exportTargets": SUPPORTED_EXPORT_TARGETS,
+        }))
+        .map_err(|err| err.to_string())?;
+        return Ok(CliOutcome { message, exit_code });
+    }
+
+    Ok(CliOutcome {
+        message: inspect_text_report(
+            &input_path,
+            document_type.as_deref(),
+            source_word_count,
+            source_line_count,
+            error_count,
+            warning_count,
+            info_count,
+            &response,
+        ),
         exit_code,
     })
 }
@@ -1030,6 +1146,9 @@ _ned() {{
       convert|export)
         COMPREPLY=( $(compgen -W "--to --output --output-dir --stdout --no-manifest --option" -- "$cur") )
         ;;
+      inspect)
+        COMPREPLY=( $(compgen -W "--json --option" -- "$cur") )
+        ;;
       validate|check)
         COMPREPLY=( $(compgen -W "--to --json --strict --option" -- "$cur") )
         ;;
@@ -1086,6 +1205,9 @@ _ned() {{
       ;;
     convert|export)
       _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--output[output file, or - for text stdout]:file:_files' '--output-dir[output directory]:directory:_files -/' '--stdout[write supported text export to stdout]' '--no-manifest[skip sidecar manifest]' '--option[set export option key=value]:option:'
+      ;;
+    inspect)
+      _arguments '*:markdown file:_files -g "*.md"' '--json[print machine-readable JSON]' '--option[set compile option key=value]:option:'
       ;;
     validate|check)
       _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--json[print machine-readable JSON]' '--strict[treat warnings as non-zero]' '--option[set export option key=value]:option:'
@@ -1153,8 +1275,9 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l no-manifest"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l option -r".to_string(),
-        "complete -c ned -n '__fish_seen_subcommand_from templates targets doctor' -l json"
+        "complete -c ned -n '__fish_seen_subcommand_from templates targets inspect doctor' -l json"
             .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from inspect' -l option -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from validate check' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from validate check' -l strict".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from validate check' -l option -r".to_string(),
@@ -1283,6 +1406,111 @@ fn validate_text_report(target: &str, strict: bool, report: &ExportReadinessRepo
     lines.join("\n")
 }
 
+fn inspect_text_report(
+    input_path: &str,
+    document_type: Option<&str>,
+    source_word_count: usize,
+    source_line_count: usize,
+    error_count: usize,
+    warning_count: usize,
+    info_count: usize,
+    response: &CompileResponse,
+) -> String {
+    let mut lines = vec![
+        "NEditor document inspection".to_string(),
+        format!("Source: {input_path}"),
+        format!("Title: {}", response.semantic.title),
+        format!("Status: {}", response.semantic.status),
+        format!(
+            "Document type: {}",
+            document_type.unwrap_or("not specified")
+        ),
+        format!("Words: {source_word_count}"),
+        format!(
+            "Lines: {source_line_count} source, {} compiled",
+            response.compiled_markdown.lines().count()
+        ),
+        format!(
+            "Structure: {} headings, {} tables, {} figures, {} equations",
+            response.semantic.headings.len(),
+            response.semantic.tables,
+            response.semantic.figures,
+            response.semantic.equations
+        ),
+        format!(
+            "References: {} citations, {} glossary terms, {} cross-references",
+            response.semantic.citations.len(),
+            response.semantic.glossary.len(),
+            response.semantic.cross_references.len()
+        ),
+        format!(
+            "Automation: {} includes, {} formulas, {} transform artifacts",
+            response.include_graph.len(),
+            response.formula_graph.len(),
+            response.transform_artifacts.len()
+        ),
+        format!("Diagnostics: {error_count} errors, {warning_count} warnings, {info_count} info"),
+    ];
+    if !response.semantic.headings.is_empty() {
+        lines.push("Outline:".to_string());
+        for heading in response.semantic.headings.iter().take(12) {
+            lines.push(format!(
+                "  - H{} line {}: {}",
+                heading.level, heading.line, heading.text
+            ));
+        }
+        if response.semantic.headings.len() > 12 {
+            lines.push(format!(
+                "  - ... {} more headings",
+                response.semantic.headings.len() - 12
+            ));
+        }
+    }
+    if !response.diagnostics.is_empty() {
+        lines.push("Diagnostic details:".to_string());
+        for diagnostic in response.diagnostics.iter().take(10) {
+            let location = match (&diagnostic.source_file, diagnostic.line) {
+                (Some(source), Some(line)) => format!(" [{source}:{line}]"),
+                (Some(source), None) => format!(" [{source}]"),
+                (None, Some(line)) => format!(" [line {line}]"),
+                (None, None) => String::new(),
+            };
+            lines.push(format!(
+                "  - {}{}: {}",
+                diagnostic.severity, location, diagnostic.message
+            ));
+        }
+        if response.diagnostics.len() > 10 {
+            lines.push(format!(
+                "  - ... {} more diagnostics",
+                response.diagnostics.len() - 10
+            ));
+        }
+    }
+    lines.join("\n")
+}
+
+fn diagnostic_counts(diagnostics: &[DocumentDiagnostic]) -> (usize, usize, usize) {
+    (
+        diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == "error")
+            .count(),
+        diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == "warning")
+            .count(),
+        diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == "info")
+            .count(),
+    )
+}
+
+fn count_words(text: &str) -> usize {
+    text.split_whitespace().count()
+}
+
 fn help_text() -> String {
     vec![
         "ned - NEditor command line".to_string(),
@@ -1294,6 +1522,7 @@ fn help_text() -> String {
         "  ned open <file.md> [more.md] [--dry-run]".to_string(),
         "  ned convert <file.md|-> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
         "  ned convert <file.md|-> --to html --stdout".to_string(),
+        "  ned inspect <file.md|-> [--json]".to_string(),
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json]".to_string(),

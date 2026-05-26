@@ -3677,6 +3677,23 @@ Spreadsheet table exchange and SQL transform:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after refreshing Tables/data and Later transforms evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the spreadsheet exchange and SQL transform diff. |
 
+`ned` document inspection:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed for `ned inspect` JSON document inventory, stdin inspection, shell completion discovery, and help text coverage while preserving open/new/convert/validate/doctor workflows. |
+| `src-tauri/target/debug/ned inspect README.md --json` | Pass | Direct smoke returned `neditor.ned-inspect.v1` with title/status, word and line counts, outline headings, diagnostics, export targets, and no artifact write. |
+| `printf '# Inspect Pipe\n\nHello from stdin.\n' \| src-tauri/target/debug/ned inspect - --json` | Pass | Direct pipe smoke returned stdin inspection with `sourcePath: null`, heading inventory, diagnostics, and export target discovery. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after adding Settings copy for the no-write document inventory command. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the Settings command-line guidance refresh. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting `ned inspect` in the README. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding CLI inspection evidence to local file and Settings rows. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after the CLI extension. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after the CLI extension. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`, preserving external signing, notarization, and cross-host proof blockers. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the CLI implementation. |
+| `git diff --check` | Pass | No whitespace errors are present in the `ned inspect` diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
