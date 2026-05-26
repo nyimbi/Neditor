@@ -20,6 +20,7 @@ export function buildReleaseReadinessChecklist(input: ReleaseReadinessInput): Re
   const text = input.text || "";
   const semantic = input.semantic;
   const status = frontMatterAnyScalar(text, ["status"]) || semantic?.status || "draft";
+  const statusKey = status.toLowerCase();
   const version = frontMatterAnyScalar(text, ["version"]);
   const owner = frontMatterAnyScalar(text, ["owner"]);
   const releaseTarget = frontMatterAnyScalar(text, ["releaseTarget"]);
@@ -30,7 +31,7 @@ export function buildReleaseReadinessChecklist(input: ReleaseReadinessInput): Re
   const changeNotes = semantic?.change_notes?.length || 0;
   const aiItems = [...(semantic?.ai_sources || []), ...(semantic?.ai_assisted_sections || [])];
   const aiPending = aiItems.filter((item) => item.status !== "human-reviewed").length;
-  const approved = status === "approved" || status === "published";
+  const approved = statusKey === "approved" || statusKey === "published";
 
   return [
     {

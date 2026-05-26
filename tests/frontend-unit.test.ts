@@ -1520,7 +1520,7 @@ test("release readiness checklist and audit pass for approved documents", () => 
   const checklist = buildReleaseReadinessChecklist({
     text: [
       "---",
-      "status: approved",
+      "status: Approved",
       "version: 2.0.0",
       "owner: Strategy Office",
       "releaseTarget: Client PDF",
@@ -1532,7 +1532,7 @@ test("release readiness checklist and audit pass for approved documents", () => 
       "",
     ].join("\n"),
     semantic: {
-      status: "approved",
+      status: "PUBLISHED",
       comments: [{ line: 12, author: "QA", state: "resolved", text: "Resolved." }],
       change_notes: [{ line: 13, author: "QA", text: "Approved release package." }],
       ai_sources: [{ line: 14, provider: "local", model: "draft", date: "2026-05-26", prompt_summary: "Draft", reviewed_by: "QA Lead", reviewed_at: "2026-05-26T00:00:00.000Z", status: "human-reviewed" }],

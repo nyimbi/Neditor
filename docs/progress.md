@@ -173,6 +173,9 @@ Recent pushed checkpoints visible in current git history:
   fence-aware: real `[BIBLIOGRAPHY]`, raw BibTeX entries, and supported
   bibliography fences still satisfy citation evidence, while bibliography
   examples nested inside fenced Markdown do not.
+- Release readiness now treats front matter and semantic release states
+  case-insensitively, so business-authored `Approved`, `approved`,
+  `PUBLISHED`, or `published` status values are classified consistently.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
