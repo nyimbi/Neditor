@@ -11,6 +11,27 @@ const APP_BUNDLE_NAME: &str = "NEditor";
 const APP_BINARY_NAME: &str = "neditor";
 const APP_BUNDLE_ID: &str = "com.neditor.desktop";
 const LINUX_DESKTOP_ID: &str = "com.neditor.desktop.desktop";
+const SUPPORTED_EXPORT_TARGETS: &[&str] = &[
+    "html",
+    "pdf",
+    "docx",
+    "pptx",
+    "markdown-bundle",
+    "blog",
+    "substack",
+    "latex",
+    "google-docs",
+    "epub",
+];
+const NEW_DOCUMENT_TEMPLATES: &[&str] = &[
+    "blank",
+    "proposal",
+    "rfp-response",
+    "report",
+    "lesson-plan",
+    "textbook",
+    "novel",
+];
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CliOutcome {
@@ -52,14 +73,23 @@ pub fn run_cli() -> i32 {
 
 pub fn run_cli_with_args(args: &[String]) -> Result<CliOutcome, String> {
     let command = args.get(1).map(String::as_str).unwrap_or("--help");
+    if command != "--help" && command != "-h" && is_direct_open_candidate(command) {
+        return run_open_command(&args[1..]);
+    }
     match command {
         "-h" | "--help" | "help" => Ok(CliOutcome {
             message: help_text(),
             exit_code: 0,
         }),
+        "-V" | "--version" | "version" => Ok(CliOutcome {
+            message: format!("ned {}", env!("CARGO_PKG_VERSION")),
+            exit_code: 0,
+        }),
+        "new" => run_new_command(&args[2..]),
         "open" => run_open_command(&args[2..]),
         "convert" | "export" => run_convert_command(&args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
+        "doctor" => run_doctor_command(&args[2..]),
         other => Err(format!("Unknown ned command '{other}'.\n\n{}", help_text())),
     }
 }
@@ -104,6 +134,97 @@ fn run_open_command(args: &[String]) -> Result<CliOutcome, String> {
     open_paths_in_neditor(&paths)?;
     Ok(CliOutcome {
         message: format!("Opening {} in NEditor", paths.join(", ")),
+        exit_code: 0,
+    })
+}
+
+fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut output: Option<String> = None;
+    let mut template = "blank".to_string();
+    let mut title: Option<String> = None;
+    let mut should_open = false;
+    let mut force = false;
+    let mut dry_run = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--template" | "-t" => {
+                index += 1;
+                template = args
+                    .get(index)
+                    .ok_or_else(|| "--template requires a template name".to_string())?
+                    .to_string();
+            }
+            "--title" => {
+                index += 1;
+                title = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--title requires a title".to_string())?
+                        .to_string(),
+                );
+            }
+            "--open" => should_open = true,
+            "--force" => force = true,
+            "--dry-run" => dry_run = true,
+            value if value.starts_with('-') => {
+                return Err(format!("Unsupported new option '{value}'"));
+            }
+            value => {
+                if output.is_some() {
+                    return Err("Only one output document can be created at a time.".to_string());
+                }
+                output = Some(value.to_string());
+            }
+        }
+        index += 1;
+    }
+    let output = output.map(PathBuf::from).ok_or_else(|| {
+        "Usage: ned new <file.md> --template proposal --title \"Client Proposal\"".to_string()
+    })?;
+    if !is_markdown_like_output_path(&output) {
+        return Err(
+            "New documents must use a Markdown extension: .md, .markdown, .mdown, or .mkd"
+                .to_string(),
+        );
+    }
+    let resolved_title = title.unwrap_or_else(|| title_from_path(&output));
+    let markdown = new_document_markdown(&template, &resolved_title)?;
+    if dry_run {
+        return Ok(CliOutcome {
+            message: format!(
+                "Would create {} from template '{}' with title '{}'",
+                output.display(),
+                template,
+                resolved_title
+            ),
+            exit_code: 0,
+        });
+    }
+    if output.exists() && !force {
+        return Err(format!(
+            "{} already exists. Use --force to replace it.",
+            output.display()
+        ));
+    }
+    if let Some(parent) = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("Could not create directory {}: {err}", parent.display()))?;
+    }
+    fs::write(&output, markdown)
+        .map_err(|err| format!("Could not write new document {}: {err}", output.display()))?;
+    let path = canonical_path_string(&output)?;
+    if should_open {
+        open_paths_in_neditor(std::slice::from_ref(&path))?;
+    }
+    Ok(CliOutcome {
+        message: if should_open {
+            format!("Created and opened {path}")
+        } else {
+            format!("Created {path}")
+        },
         exit_code: 0,
     })
 }
@@ -196,6 +317,78 @@ fn run_default_reader_command(args: &[String]) -> Result<CliOutcome, String> {
         } else {
             1
         },
+    })
+}
+
+fn run_doctor_command(args: &[String]) -> Result<CliOutcome, String> {
+    let json_output = args.iter().any(|arg| arg == "--json");
+    let strict = args.iter().any(|arg| arg == "--strict");
+    if let Some(unsupported) = args
+        .iter()
+        .find(|arg| !matches!(arg.as_str(), "--json" | "--strict"))
+    {
+        return Err(format!("Unsupported doctor option '{unsupported}'"));
+    }
+    let current_exe = env::current_exe().ok();
+    let app_binary = find_neditor_binary();
+    let default_reader = default_markdown_reader_response(false, false);
+    let warnings = doctor_warnings(app_binary.as_ref(), &default_reader);
+    let status = if warnings.is_empty() {
+        "ready"
+    } else {
+        "warning"
+    };
+    let exit_code = if strict && !warnings.is_empty() { 1 } else { 0 };
+    if json_output {
+        let report = json!({
+            "schema": "neditor.ned-doctor.v1",
+            "status": status,
+            "version": env!("CARGO_PKG_VERSION"),
+            "platform": env::consts::OS,
+            "arch": env::consts::ARCH,
+            "cliPath": current_exe.map(|path| path.to_string_lossy().to_string()),
+            "appBinary": app_binary.map(|path| path.to_string_lossy().to_string()),
+            "defaultReader": default_reader,
+            "exportTargets": SUPPORTED_EXPORT_TARGETS,
+            "templates": NEW_DOCUMENT_TEMPLATES,
+            "warnings": warnings,
+        });
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code,
+        });
+    }
+    let mut lines = vec![
+        format!("ned {}", env!("CARGO_PKG_VERSION")),
+        format!("Status: {status}"),
+        format!("Platform: {}-{}", env::consts::OS, env::consts::ARCH),
+        format!(
+            "CLI path: {}",
+            current_exe
+                .map(|path| path.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        ),
+        format!(
+            "NEditor app binary: {}",
+            app_binary
+                .as_ref()
+                .map(|path| path.to_string_lossy().to_string())
+                .unwrap_or_else(|| "not found next to ned".to_string())
+        ),
+        format!("Default reader automation: {}", default_reader.message),
+        format!("Export targets: {}", SUPPORTED_EXPORT_TARGETS.join(", ")),
+        format!(
+            "New document templates: {}",
+            NEW_DOCUMENT_TEMPLATES.join(", ")
+        ),
+    ];
+    if !warnings.is_empty() {
+        lines.push("Warnings:".to_string());
+        lines.extend(warnings.iter().map(|warning| format!("  - {warning}")));
+    }
+    Ok(CliOutcome {
+        message: lines.join("\n"),
+        exit_code,
     })
 }
 
@@ -369,10 +562,34 @@ fn command_available(command: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn doctor_warnings(
+    app_binary: Option<&PathBuf>,
+    default_reader: &DefaultMarkdownReaderResponse,
+) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if app_binary.is_none() {
+        warnings.push(
+            "NEditor app binary was not found next to ned; installed app open commands may use OS fallback routing."
+                .to_string(),
+        );
+    }
+    if !default_reader.supported {
+        warnings.push(format!(
+            "Automatic default-reader setup is not currently available on this host: {}",
+            default_reader.message
+        ));
+    }
+    warnings
+}
+
 fn canonical_path_string(path: &Path) -> Result<String, String> {
     fs::canonicalize(path)
         .map_err(|err| format!("Could not find {}: {err}", path.display()))
         .map(|path| path.to_string_lossy().to_string())
+}
+
+fn is_direct_open_candidate(value: &str) -> bool {
+    is_markdown_like_output_path(Path::new(value))
 }
 
 fn is_markdown_like_path_argument(value: &str) -> bool {
@@ -380,10 +597,84 @@ fn is_markdown_like_path_argument(value: &str) -> bool {
         return false;
     }
     let path = Path::new(value);
+    is_markdown_like_output_path(path) && path.is_file()
+}
+
+fn is_markdown_like_output_path(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|extension| extension.to_str()),
         Some("md" | "markdown" | "mdown" | "mkd")
-    ) && path.is_file()
+    )
+}
+
+fn title_from_path(path: &Path) -> String {
+    path.file_stem()
+        .and_then(|stem| stem.to_str())
+        .map(|stem| {
+            stem.replace(['-', '_'], " ")
+                .split_whitespace()
+                .map(capitalize_word)
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .filter(|title| !title.is_empty())
+        .unwrap_or_else(|| "Untitled".to_string())
+}
+
+fn capitalize_word(word: &str) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
+        None => String::new(),
+    }
+}
+
+fn new_document_markdown(template: &str, title: &str) -> Result<String, String> {
+    let template = template.trim().to_ascii_lowercase();
+    if !NEW_DOCUMENT_TEMPLATES.contains(&template.as_str()) {
+        return Err(format!(
+            "Unknown template '{}'. Available templates: {}",
+            template,
+            NEW_DOCUMENT_TEMPLATES.join(", ")
+        ));
+    }
+    let escaped_title = yaml_scalar(title);
+    let body = match template.as_str() {
+        "blank" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\n---\n\n# {title}\n\nStart writing here.\n"
+        ),
+        "proposal" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: proposal\ntoc: true\n---\n\n# {title}\n\n## Executive Summary\n\nState the client outcome, recommendation, and commercial value.\n\n## Client Context\n\nDescribe the buyer, problem, constraints, and decision process.\n\n## Proposed Approach\n\n| Phase | Work | Output | Owner |\n| --- | --- | --- | --- |\n| Discover | Confirm objectives and evidence | Findings memo | {{{{owner}}}} |\n| Deliver | Execute the agreed work plan | Review-ready deliverable | {{{{owner}}}} |\n\n## Timeline\n\n- Kickoff: {{{{kickoff_date}}}}\n- Draft review: {{{{draft_review_date}}}}\n- Final delivery: {{{{final_delivery_date}}}}\n\n## Commercials\n\nSummarize fees, assumptions, payment terms, and exclusions.\n\n## Review Handoff\n\n- Confirm scope, pricing, legal terms, and cited evidence.\n- Resolve all placeholders before sending.\n"
+        ),
+        "rfp-response" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: rfp-response\ntoc: true\n---\n\n# {title}\n\n## Response Strategy\n\nSummarize the buyer's stated and implied intent, win themes, and response posture.\n\n## Compliance Matrix\n\n| ID | Requirement | Response | Evidence | Owner | Status |\n| --- | --- | --- | --- | --- | --- |\n| R1 | {{{{requirement}}}} | {{{{response}}}} | {{{{evidence}}}} | {{{{owner}}}} | Draft |\n\n## Technical Response\n\nAddress every mandatory requirement with clear evidence and assumptions.\n\n## Delivery Plan\n\nOutline milestones, dependencies, risks, and governance.\n\n## Pricing And Assumptions\n\nState pricing, exclusions, validity period, and approval requirements.\n\n## Final Verification\n\n- Every stated requirement has a mapped response.\n- Implied intent and evaluation criteria have been addressed.\n- Attachments, forms, and signatures are tracked.\n"
+        ),
+        "report" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: business-report\ntoc: true\n---\n\n# {title}\n\n## Executive Summary\n\nSummarize the finding, implication, and recommended decision.\n\n## Situation\n\nDescribe the context, evidence base, constraints, and stakeholders.\n\n## Analysis\n\n```calc\nrevenue = 0\ncost = 0\nprofit = revenue - cost\nmargin = profit / revenue\n```\n\nExpected margin: {{{{=margin | percent}}}}\n\n## Recommendations\n\n1. Recommendation one.\n2. Recommendation two.\n3. Recommendation three.\n\n## Risks And Next Steps\n\n| Risk | Impact | Mitigation | Owner |\n| --- | --- | --- | --- |\n| {{{{risk}}}} | {{{{impact}}}} | {{{{mitigation}}}} | {{{{owner}}}} |\n"
+        ),
+        "lesson-plan" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: lesson-plan\ntoc: true\n---\n\n# {title}\n\n## Learning Objectives\n\n- Learners can explain {{{{concept}}}}.\n- Learners can apply {{{{skill}}}} in a realistic scenario.\n\n## Audience And Prerequisites\n\nDescribe learner profile, prior knowledge, materials, and accessibility needs.\n\n## Lesson Flow\n\n| Time | Activity | Instructor Action | Learner Evidence |\n| ---: | --- | --- | --- |\n| 10 min | Opening | Frame the problem | Questions captured |\n| 30 min | Practice | Guide the worked example | Exercise completed |\n| 10 min | Review | Check understanding | Exit ticket |\n\n## Assessment\n\nDefine rubric, success criteria, remediation, and extension activities.\n"
+        ),
+        "textbook" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: textbook\ntoc: true\n---\n\n# {title}\n\n## Book Outline\n\n### Chapter 1: Foundations\n\n- Learning goals\n- Key concepts\n- Worked examples\n- Exercises\n\n### Chapter 2: Applied Practice\n\n- Case study\n- Common errors\n- Review questions\n\n## Drafting Plan\n\nUse Docs Live to flesh out chapters sequentially only after the outline is reviewed.\n"
+        ),
+        "novel" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: novel\ntoc: true\n---\n\n# {title}\n\n## Premise\n\nWrite the central dramatic question, protagonist want, stakes, and setting.\n\n## Cast\n\n| Character | Desire | Conflict | Arc |\n| --- | --- | --- | --- |\n| {{{{name}}}} | {{{{desire}}}} | {{{{conflict}}}} | {{{{arc}}}} |\n\n## Plot Outline\n\n### Act I\n\nSet up the world, inciting incident, and first irreversible choice.\n\n### Act II\n\nEscalate pressure, reversals, midpoint, and cost.\n\n### Act III\n\nResolve the conflict, consequence, and final image.\n\n## Narrative Review\n\nCheck voice, pacing, continuity, scene purpose, and emotional progression before drafting chapters.\n"
+        ),
+        _ => unreachable!(),
+    };
+    Ok(body)
+}
+
+fn yaml_scalar(value: &str) -> String {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, ' ' | '-' | '_' | '/' | '.'))
+    {
+        value.to_string()
+    } else {
+        format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+    }
 }
 
 fn default_output_path(input_path: &str, target: &str) -> PathBuf {
@@ -454,17 +745,23 @@ fn default_reader_message(response: &DefaultMarkdownReaderResponse) -> String {
 }
 
 fn help_text() -> String {
-    [
-        "ned - NEditor command line",
-        "",
-        "Usage:",
-        "  ned open <file.md> [more.md] [--dry-run]",
-        "  ned convert <file.md> --to pdf --output out.pdf [--no-manifest]",
-        "  ned export <file.md> --to docx --output out.docx",
-        "  ned default-reader --status",
-        "  ned default-reader --enable",
-        "",
-        "Targets: html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, google-docs, epub",
+    vec![
+        "ned - NEditor command line".to_string(),
+        "".to_string(),
+        "Usage:".to_string(),
+        "  ned <file.md> [more.md]".to_string(),
+        "  ned new <file.md> [--template proposal] [--title \"Client Proposal\"] [--open]"
+            .to_string(),
+        "  ned open <file.md> [more.md] [--dry-run]".to_string(),
+        "  ned convert <file.md> --to pdf --output out.pdf [--no-manifest]".to_string(),
+        "  ned export <file.md> --to docx --output out.docx".to_string(),
+        "  ned doctor [--json] [--strict]".to_string(),
+        "  ned default-reader --status".to_string(),
+        "  ned default-reader --enable".to_string(),
+        "  ned --version".to_string(),
+        "".to_string(),
+        format!("Templates: {}", NEW_DOCUMENT_TEMPLATES.join(", ")),
+        format!("Targets: {}", SUPPORTED_EXPORT_TARGETS.join(", ")),
     ]
     .join("\n")
 }

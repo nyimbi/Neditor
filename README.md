@@ -82,16 +82,24 @@ Packaged developer and release builds include a command-line helper named
 `ned`:
 
 ```sh
+ned board-paper.md
+ned new proposal.md --template proposal --title "Client Expansion Proposal"
 ned open board-paper.md
 ned convert board-paper.md --to pdf --output board-paper.pdf
 ned export proposal.md --to docx --output proposal.docx
+ned doctor
 ned default-reader --status
 ```
 
-`ned open` launches NEditor with one or more Markdown files. `ned convert` and
-`ned export` run the same local export pipeline used by the app for HTML, PDF,
-DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, Google Docs package, and
-EPUB outputs. In the app, open **Settings -> Files** to review the `ned` usage
+`ned file.md` and `ned open` launch NEditor with one or more Markdown files.
+`ned new` creates a starter Markdown document from business templates such as
+proposal, RFP response, report, lesson plan, textbook, and novel. `ned convert`
+and `ned export` run the same local export pipeline used by the app for HTML,
+PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, Google Docs package,
+and EPUB outputs. `ned doctor` prints a quick local installation report with
+the app binary, default-reader automation status, export targets, and starter
+templates; use `ned doctor --json` when you want machine-readable support
+evidence. In the app, open **Settings -> Files** to review the `ned` usage
 summary and request NEditor as the default Markdown reader. Some operating
 systems require user confirmation or a helper such as `duti`; NEditor shows the
 exact commands and manual steps instead of silently changing protected OS
