@@ -3536,6 +3536,15 @@ RFP compliance verification hardening:
 | `pnpm run check:docs` | Pass | 14 Markdown files were checked after recording the RFP verification evidence; all local links resolved. |
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after strengthening native RFP response verification. |
 
+Long-form wizard planning gate hardening:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 68 frontend unit tests passed, including textbook and novel outline/plot-first behavior. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed for the Docs Live long-form planning gate changes. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after recording the long-form wizard evidence; all local links resolved. |
+| `git diff --check` | Pass | No whitespace errors are present in the Docs Live, tests, or progress diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

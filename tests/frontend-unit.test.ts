@@ -1067,8 +1067,11 @@ test("Docs Live textbook and novel wizards plan structure before sequential chap
   ok(textbookDraft.markdown.includes("## Final Instructional Quality Review"));
   ok(textbookDraft.markdown.includes("drafts chapters in order"));
   ok(textbookDraft.markdown.includes("Instructional quality review"));
-  equal(textbookDraft.workflow.find((step) => step.id === "draft")?.status, "ready");
-  ok(textbookDraft.reviewPacket.sectionRunbook.some((item) => item.includes("draft this chapter in sequence")));
+  ok(textbookDraft.markdown.includes("Prose intentionally blocked until the textbook architecture is approved"));
+  equal(textbookDraft.workflow.find((step) => step.id === "draft")?.status, "needs-input");
+  equal(textbookDraft.sections.find((section) => section.title.includes("Chapter 1"))?.planningOnly, true);
+  equal(textbookDraft.sections.find((section) => section.title.includes("Chapter 1"))?.stagePlan[0].status, "needs-input");
+  ok(textbookDraft.reviewPacket.sectionRunbook.some((item) => item.includes("hold prose drafting")));
   ok(textbookDraft.reviewPacket.qaRegister.some((item) => item.includes("technical accuracy")));
 
   const novelDraft = buildDocsLiveDraft({
@@ -1092,9 +1095,24 @@ test("Docs Live textbook and novel wizards plan structure before sequential chap
   ok(novelDraft.markdown.includes("## Final Narrative Quality Review"));
   ok(novelDraft.markdown.includes("drafts chapters in order"));
   ok(novelDraft.markdown.includes("Narrative quality review"));
-  equal(novelDraft.workflow.find((step) => step.id === "draft")?.status, "ready");
-  ok(novelDraft.reviewPacket.sectionRunbook.some((item) => item.includes("draft this chapter in sequence")));
+  ok(novelDraft.markdown.includes("Prose intentionally blocked until the plot architecture is approved"));
+  equal(novelDraft.workflow.find((step) => step.id === "draft")?.status, "needs-input");
+  equal(novelDraft.sections.find((section) => section.title.includes("Chapter 1"))?.planningOnly, true);
+  ok(novelDraft.reviewPacket.sectionRunbook.some((item) => item.includes("hold prose drafting")));
   ok(novelDraft.reviewPacket.qaRegister.some((item) => item.includes("story logic")));
+
+  const approvedNovelDraft = buildDocsLiveDraft({
+    documentType: "novel",
+    title: "The Atlas Signal",
+    outline: ["- Story Premise", "- Plot Outline", "- Chapter 1 - Opening Image", "- Chapter 2 - Inciting Incident"].join("\n"),
+    context: "audience: adult speculative fiction readers. owner: Lead author. evidence: story bible.",
+    placeholders: "audience: adult speculative fiction readers\nowner: Lead author\nevidence: story bible",
+    generatedAt: "2026-05-26T10:10:00.000Z",
+  });
+  equal(approvedNovelDraft.workflow.find((step) => step.id === "draft")?.status, "ready");
+  equal(approvedNovelDraft.sections.find((section) => section.title.includes("Chapter 1"))?.planningOnly, false);
+  ok(approvedNovelDraft.reviewPacket.sectionRunbook.some((item) => item.includes("draft this chapter in sequence")));
+  ok(!approvedNovelDraft.markdown.includes("Prose intentionally blocked until the plot architecture is approved"));
 
   const textbookTemplate = businessDocumentTemplates.find((template) => template.id === "technical-textbook")!;
   const novelTemplate = businessDocumentTemplates.find((template) => template.id === "novel")!;

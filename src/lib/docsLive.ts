@@ -96,6 +96,7 @@ export interface DocsLiveWorkflowStep {
 export interface DocsLiveSectionDraft {
   title: string;
   level: number;
+  planningOnly: boolean;
   qaFocus: string;
   draftingBrief: string;
   stagePlan: DocsLiveSectionStage[];
@@ -111,7 +112,7 @@ export interface DocsLiveSectionDraft {
 export interface DocsLiveSectionStage {
   id: "draft" | "qa" | "humanize" | "review";
   label: string;
-  status: "complete" | "needs-review";
+  status: "complete" | "needs-review" | "needs-input";
   detail: string;
 }
 
@@ -613,7 +614,8 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
   const contextSentences = extractContextSentences(contextInput);
   const issues = buildDraftIssues(request, placeholders, outlineWasProvided);
   const draftingDepth = normalizeDraftingDepth(request.draftingDepth);
-  const sectionDrafts = sections.map((section, index) => buildSectionDraft(section, index, blueprint, placeholders, contextSentences));
+  const planningOnly = Boolean(blueprint.workflow && !outlineWasProvided);
+  const sectionDrafts = sections.map((section, index) => buildSectionDraft(section, index, blueprint, placeholders, contextSentences, planningOnly));
   const workflow = buildDocsLiveWorkflow(sectionDrafts, placeholders, contextSentences, issues, blueprint, outlineWasProvided);
   const reviewPacket = buildDocsLiveReviewPacket(request, sectionDrafts, placeholders, contextSentences, issues, blueprint, outlineWasProvided);
   const markdown = humanizeDraftText(
@@ -803,6 +805,7 @@ function buildDocsLiveWorkflow(
   outlineWasProvided: boolean,
 ): DocsLiveWorkflowStep[] {
   const workflow = workflowProfileFor(blueprint);
+  const planningOnly = Boolean(blueprint.workflow && !outlineWasProvided);
   const outlineStatus = sections.length ? (outlineWasProvided ? "complete" : "ready") : "needs-input";
   const outlineDetail = outlineWasProvided
     ? blueprint.workflow
@@ -829,8 +832,10 @@ function buildDocsLiveWorkflow(
     {
       id: "draft",
       label: workflow.sequencingLabel,
-      status: blueprint.workflow || !outlineWasProvided ? "ready" : "complete",
-      detail: !outlineWasProvided
+      status: planningOnly ? "needs-input" : blueprint.workflow || !outlineWasProvided ? "ready" : "complete",
+      detail: planningOnly
+        ? `${workflow.planningLabel} is not approved yet; Docs Live is holding prose expansion until the outline or plot is locked.`
+        : !outlineWasProvided
         ? "Draft text is a scaffold until the suggested outline is reviewed and accepted."
         : blueprint.workflow
         ? `${workflow.sequencingInstruction} Start only after the ${workflow.planningLabel.toLowerCase()} approval gate is checked.`
@@ -847,14 +852,18 @@ function buildDocsLiveWorkflow(
     {
       id: "humanize",
       label: "Humanization pass",
-      status: "complete",
-      detail: "Draft text is stripped of common AI phrasing and marked for human review.",
+      status: planningOnly ? "needs-input" : "complete",
+      detail: planningOnly
+        ? "Humanization waits until chapter prose exists; the current artifact is an outline or plot plan."
+        : "Draft text is stripped of common AI phrasing and marked for human review.",
     },
     {
       id: "review",
       label: "Review handoff",
-      status: "complete",
-      detail: "Each section carries reviewer questions, unresolved assumptions, and sign-off prompts.",
+      status: planningOnly ? "needs-input" : "complete",
+      detail: planningOnly
+        ? "Review should approve the architecture before accepting any generated prose."
+        : "Each section carries reviewer questions, unresolved assumptions, and sign-off prompts.",
     },
   ];
 }
@@ -894,7 +903,9 @@ function buildDocsLiveReviewPacket(
   const sectionRunbook = sections.map(
     (section, index) =>
       blueprint.workflow
-        ? `${index + 1}. ${section.title}: draft this ${workflow.unitLabel} in sequence only after the ${workflow.planningLabel.toLowerCase()} is locked, run ${workflow.qualityLabel.toLowerCase()} against ${section.qaFocus}, humanize the prose, then hand to reviewer.`
+        ? section.planningOnly
+          ? `${index + 1}. ${section.title}: hold prose drafting; refine the ${workflow.planningLabel.toLowerCase()}, acceptance criteria, continuity handoff, and review evidence first.`
+          : `${index + 1}. ${section.title}: draft this ${workflow.unitLabel} in sequence only after the ${workflow.planningLabel.toLowerCase()} is locked, run ${workflow.qualityLabel.toLowerCase()} against ${section.qaFocus}, humanize the prose, then hand to reviewer.`
         : `${index + 1}. ${section.title}: draft body, run QA against ${section.qaFocus}, humanize the prose, then hand to reviewer.`,
   );
   const qaRegister = [
@@ -1122,6 +1133,7 @@ function buildSectionDraft(
   blueprint: DocsLiveBlueprint,
   placeholders: Record<string, string>,
   contextSentences: string[],
+  planningOnly: boolean,
 ): DocsLiveSectionDraft {
   const focus = blueprint.sectionFocus[index % blueprint.sectionFocus.length];
   const workflow = workflowProfileFor(blueprint);
@@ -1143,15 +1155,18 @@ function buildSectionDraft(
   return {
     title: section.title,
     level: section.level,
+    planningOnly,
     qaFocus: focus,
     draftingBrief,
     contextBridge,
     stagePlan: [
       {
         id: "draft",
-        label: "Draft body",
-        status: "complete",
-        detail: `${draftingBrief} Context used: ${contextBridge}`,
+        label: planningOnly ? "Plan before drafting" : "Draft body",
+        status: planningOnly ? "needs-input" : "complete",
+        detail: planningOnly
+          ? `Prose is intentionally blocked until the ${workflow.planningLabel.toLowerCase()} is approved. Context available: ${contextBridge}`
+          : `${draftingBrief} Context used: ${contextBridge}`,
       },
       {
         id: "qa",
@@ -1211,15 +1226,23 @@ function draftSection(
   const deadline = placeholders.deadline || placeholders.date || "[date]";
   const subject = placeholders.client || placeholders.company || placeholders.customer || placeholders.product || placeholders.goal || blueprint.label.toLowerCase();
   const context = contextSentences[index % Math.max(1, contextSentences.length)] || "Use the provided outline and replace placeholders with verified facts.";
-  const promptSummary = sanitizeMarkerValue(`Drafted ${section.title} section ${index + 1} of ${total}`);
+  const promptSummary = sanitizeMarkerValue(
+    section.planningOnly ? `Planned ${section.title} before prose drafting ${index + 1} of ${total}` : `Drafted ${section.title} section ${index + 1} of ${total}`,
+  );
   const body = sectionBodyParagraphs(section, index, subject, audience, context, placeholders, contextSentences, draftingDepth);
+  const bodyParagraphs = section.planningOnly
+    ? [
+        `Prose intentionally blocked until the ${workflowProfileFor(blueprint).planningLabel.toLowerCase()} is approved. Use this ${section.title.toLowerCase()} entry to refine goals, dependencies, acceptance criteria, continuity, evidence, and reviewer questions before drafting.`,
+        `Context available for planning: ${context}`,
+      ]
+    : body;
   return [
     docsLiveReviewMarker(promptSummary),
     `${"#".repeat(level)} ${section.title}`,
     "",
     `**Drafting brief.** ${section.draftingBrief}`,
     "",
-    ...body.flatMap((paragraph) => [paragraph, ""]),
+    ...bodyParagraphs.flatMap((paragraph) => [paragraph, ""]),
     `${"#".repeat(childLevel)} Section QA`,
     "",
     `${section.qaSummary}`,
