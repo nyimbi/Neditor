@@ -95,6 +95,12 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       flushCurrent();
       section = topLevel[1];
       const aliasKind = dataSourceAliasKind(section);
+      if (section === "dataSources" && topLevel[2].trim().startsWith("{")) {
+        const inlineRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
+        if (applyInlineDataSourceObject(inlineRow, topLevel[2])) {
+          rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
+        }
+      }
       if (section === "dataSources" && topLevel[2].trim().startsWith("[")) {
         for (const item of splitInlineYamlList(topLevel[2])) {
           const inlineRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
