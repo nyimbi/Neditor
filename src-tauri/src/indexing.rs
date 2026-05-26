@@ -1,4 +1,4 @@
-use crate::{metadata_lookup, Heading};
+use crate::{compiler_support::fenced_code_marker, metadata_lookup, Heading};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -24,7 +24,7 @@ pub(crate) fn collect_index_entries(
     let mut proper_nouns: BTreeMap<String, (usize, Option<String>)> = BTreeMap::new();
     let mut heading_index = 0usize;
     let mut current_anchor = headings.first().map(|heading| heading.anchor.clone());
-    let mut in_fence = false;
+    let mut fence_marker = None;
 
     for (zero_index, line) in text.lines().enumerate() {
         let line_number = zero_index + 1;
@@ -32,12 +32,14 @@ pub(crate) fn collect_index_entries(
             current_anchor = Some(headings[heading_index].anchor.clone());
             heading_index += 1;
         }
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("```") {
-            in_fence = !in_fence;
+        if let Some(marker) = fence_marker {
+            if line.trim_start().starts_with(marker) {
+                fence_marker = None;
+            }
             continue;
         }
-        if in_fence {
+        if let Some(marker) = fenced_code_marker(line) {
+            fence_marker = Some(marker);
             continue;
         }
         for term in explicit_index_terms(line) {

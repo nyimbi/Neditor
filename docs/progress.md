@@ -162,6 +162,9 @@ Recent pushed checkpoints visible in current git history:
   continue to suppress forbidden terms. The cross-target export proof now carries
   both prose-linked and explicitly anchored metadata-defined index terms through
   HTML, PDF, DOCX, PPTX, and Markdown bundle outputs.
+- Automatic index extraction now uses the shared Markdown fence detector, so
+  both backtick and tilde fenced examples are ignored for bold terms, repeated
+  proper nouns, and explicit `{#index:...}` markers.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
   flow through simple merges as dotted variable names, and anchored maps,
   including dotted or slash-namespaced anchors such as `&client.defaults` and

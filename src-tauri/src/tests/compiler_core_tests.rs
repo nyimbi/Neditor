@@ -1008,7 +1008,7 @@ fn compiler_preserves_figure_float_semantics() {
 #[test]
 fn compiler_generates_linked_index_with_exclusions_and_proper_terms() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: Index\nstatus: approved\napprovedBy: QA\nindexExclude:\n  - internal draft\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Internal Draft should stay out. Working capital{#index:Liquidity} marker.\n\n[INDEX]\n".to_string(),
+            text: "---\ntitle: Index\nstatus: approved\napprovedBy: QA\nindexExclude:\n  - internal draft\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n~~~markdown\nHidden Product appears here.\nHidden Product appears again.\n**Hidden Bold** should not be indexed.\n{#index:Hidden Marker}\n~~~\n\n## Follow Up\nAcme Strategy returns. Internal Draft should stay out. Working capital{#index:Liquidity} marker.\n\n[INDEX]\n".to_string(),
             file_path: None,
         });
 
@@ -1025,6 +1025,18 @@ fn compiler_generates_linked_index_with_exclusions_and_proper_terms() {
         .index_terms
         .iter()
         .any(|term| term == "Internal Draft"));
+    assert!(!response
+        .index_terms
+        .iter()
+        .any(|term| term == "Hidden Product"));
+    assert!(!response
+        .index_terms
+        .iter()
+        .any(|term| term == "Hidden Bold"));
+    assert!(!response
+        .index_terms
+        .iter()
+        .any(|term| term == "Hidden Marker"));
     assert!(response.html.contains("href=\"#market-analysis\""));
     assert!(response.html.contains("Acme Strategy"));
     assert!(response.html.contains("Liquidity"));
