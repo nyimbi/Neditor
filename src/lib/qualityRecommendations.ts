@@ -1,4 +1,5 @@
 import type { DocumentDiagnostic, SemanticDocument } from "../types.js";
+import { frontMatterScalarValue } from "./frontMatter.js";
 
 export type QualityRecommendationSeverity = "pass" | "improve" | "risk" | "blocker";
 
@@ -37,7 +38,7 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
   const genericPhrases = text.match(GENERIC_AI_PHRASE_RE) || [];
   const diagnosticErrors = diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
   const diagnosticWarnings = diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length;
-  const hasDocumentTitle = Boolean((semantic?.title || frontMatterScalar(text, "title") || firstHeading(text)).trim());
+  const hasDocumentTitle = Boolean((semantic?.title || frontMatterScalarValue(text, "title") || firstHeading(text)).trim());
 
   if (diagnosticErrors || diagnosticWarnings) {
     recommendations.push({
@@ -170,14 +171,6 @@ function longParagraphCount(text: string) {
     .filter((paragraph) => !paragraph.trim().startsWith("#") && paragraph.trim().split(/\s+/).length > 95).length;
 }
 
-function frontMatterScalar(text: string, key: string) {
-  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return "";
-  const keyRe = new RegExp(`^${escapeRegExp(key)}\\s*:\\s*(.+)$`, "im");
-  const value = match[1].match(keyRe)?.[1] || "";
-  return value.replace(/^['"]|['"]$/g, "").trim();
-}
-
 function firstHeading(text: string) {
   return text.match(/^#\s+(.+)$/m)?.[1] || "";
 }
@@ -188,8 +181,4 @@ function uniqueLowercase(values: string[]) {
 
 function markdownTableCell(value: string) {
   return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

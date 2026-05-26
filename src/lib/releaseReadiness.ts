@@ -1,4 +1,5 @@
 import type { SemanticDocument } from "../types.js";
+import { frontMatterAnyScalar } from "./frontMatter.js";
 
 export type ReleaseChecklistStatus = "complete" | "missing" | "needs-review";
 
@@ -109,26 +110,6 @@ function releaseChecklistCounts(items: ReleaseChecklistItem[]) {
   );
 }
 
-function frontMatterAnyScalar(text: string, keys: string[]) {
-  for (const key of keys) {
-    const value = frontMatterScalar(text, key);
-    if (value) return value;
-  }
-  return "";
-}
-
-function frontMatterScalar(text: string, key: string) {
-  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return "";
-  const keyRe = new RegExp(`^${escapeRegExp(key)}\\s*:\\s*(.+)$`, "im");
-  const value = match[1].match(keyRe)?.[1] || "";
-  return value.replace(/^['"]|['"]$/g, "").trim();
-}
-
 function markdownTableCell(value: string) {
   return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

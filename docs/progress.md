@@ -53,6 +53,13 @@ Recent pushed checkpoints visible in current git history:
   preflight items; formats checklist summaries; and supplies Help guidance for
   the Export sidebar. Frontend unit coverage directly verifies blog publishing
   metadata and EPUB handoff readiness decisions without mounting the UI.
+- Front matter reading and update helpers now have a shared typed
+  implementation module. `src/lib/frontMatter.ts` owns scalar/list reads,
+  multi-key lookup, exact-key matching, scalar upsert/removal, and list upsert
+  behavior used by the workbench, quality recommendations, release readiness,
+  and export metadata preflight. Frontend unit coverage verifies exact-key
+  safety so fields such as `statusNote` are not accidentally treated as
+  `status`.
 - Docs Live textbook and novel wizards now start with structure instead of
   prose. Technical textbooks lock textbook architecture, chapter order,
   prerequisites, learning outcomes, examples, exercises, and assessment logic
@@ -3280,6 +3287,19 @@ Export metadata checklist modularization:
 | `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting export metadata checklist modularization; all local links resolved. |
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the frontend architecture evidence refresh. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the Export sidebar checklist extraction. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` with refreshed browser workflow evidence. |
+
+Shared front matter helper modularization:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after moving shared front matter scalar/list read and upsert helpers into `src/lib/frontMatter.ts`. |
+| `pnpm run test:unit` | Pass | 57 frontend unit tests passed, including direct exact-key front matter helper coverage for scalar reads, list reads, scalar upsert/removal, and list upsert. |
+| `git diff --check` | Pass | No whitespace errors are present in the shared front matter extraction diff. |
+| `pnpm run build` | Pass | Production Vue/Vite build passed with the shared front matter helper module. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting shared front matter helper modularization; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the frontend architecture evidence refresh. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the shared front matter helper extraction. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` with refreshed browser workflow evidence. |
 
 ## Next Execution Order

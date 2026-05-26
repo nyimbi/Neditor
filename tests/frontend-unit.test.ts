@@ -77,6 +77,15 @@ import {
   exportMetadataChecklistHelp,
   formatExportMetadataChecklistSummary,
 } from "../src/lib/exportMetadataChecklist.js";
+import {
+  frontMatterAnyList,
+  frontMatterAnyScalar,
+  frontMatterListValues,
+  frontMatterScalarValue,
+  removeFrontMatterField,
+  upsertFrontMatterField,
+  upsertFrontMatterListField,
+} from "../src/lib/frontMatter.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
 import { extractMarkdownSection, findMarkdownSectionRange, replaceOrAppendMarkdownSection } from "../src/lib/markdownSectionMerge.js";
 import {
@@ -349,6 +358,46 @@ test("markdown list continuation handles tasks numbers and blockquotes", () => {
   deepEqual(markdownListContinuation("  - "), { kind: "exit", fromColumn: 0, replacement: "  " });
   deepEqual(markdownListContinuation("> - [ ] "), { kind: "exit", fromColumn: 2, replacement: "" });
   equal(markdownListContinuation("plain paragraph"), null);
+});
+
+test("front matter helpers read update remove and preserve exact keys", () => {
+  const source = [
+    "---",
+    "statusNote: keep separate",
+    "status: draft",
+    "owner: \"Editorial\"",
+    "tags: [alpha, beta]",
+    "indexExclude:",
+    "  - Draft",
+    "  - Archive",
+    "---",
+    "",
+    "# Draft",
+    "",
+  ].join("\n");
+
+  equal(frontMatterScalarValue(source, "status"), "draft");
+  equal(frontMatterScalarValue(source, "statusNote"), "keep separate");
+  equal(frontMatterAnyScalar(source, ["missing", "owner"]), "Editorial");
+  deepEqual(frontMatterListValues(source, "tags"), ["alpha", "beta"]);
+  deepEqual(frontMatterAnyList(source, ["missing", "indexExclude"]), ["Draft", "Archive"]);
+
+  const updated = upsertFrontMatterField(source, "status", "approved");
+  ok(updated.includes("statusNote: keep separate"));
+  ok(updated.includes("status: approved"));
+  ok(!updated.includes("status: draft"));
+
+  const withList = upsertFrontMatterListField(updated, "tags", ["launch", "review", "launch"]);
+  ok(withList.includes('  - "launch"'));
+  ok(withList.includes('  - "review"'));
+  deepEqual(frontMatterListValues(withList, "tags"), ["launch", "review"]);
+
+  const removed = removeFrontMatterField(withList, "status");
+  ok(removed.includes("statusNote: keep separate"));
+  ok(!removed.includes("status: approved"));
+
+  const inserted = upsertFrontMatterField("# No front matter\n", "title", "New Title");
+  ok(inserted.startsWith("---\ntitle: New Title\n---\n\n# No front matter"));
 });
 
 test("Vim keybinding word helpers follow modal editor cursor semantics", () => {

@@ -1,4 +1,5 @@
 import type { ExportDefaults, ExportTarget } from "./workspacePersistence.js";
+import { frontMatterListValues, frontMatterScalarValue } from "./frontMatter.js";
 
 export type ExportMetadataChecklistStatus = "complete" | "missing" | "invalid" | "optional";
 
@@ -191,41 +192,6 @@ function metadataValueAtPath(metadata: Record<string, unknown>, key: string): un
     if (!current || typeof current !== "object") return undefined;
     return (current as Record<string, unknown>)[part];
   }, metadata);
-}
-
-function frontMatterScalarValue(text: string, key: string) {
-  const lines = frontMatterLines(text);
-  if (!lines.length) return "";
-  const line = lines.find((candidate) => candidate.trimStart().startsWith(`${key}:`));
-  if (!line) return "";
-  return line.split(":").slice(1).join(":").trim().replace(/^["']|["']$/g, "");
-}
-
-function frontMatterListValues(text: string, key: string) {
-  const lines = frontMatterLines(text);
-  if (!lines.length) return [];
-  const startIndex = lines.findIndex((candidate) => candidate.trimStart().startsWith(`${key}:`));
-  if (startIndex < 0) return [];
-  const inlineValue = lines[startIndex].split(":").slice(1).join(":").trim();
-  if (inlineValue.startsWith("[") && inlineValue.endsWith("]")) {
-    return inlineValue
-      .slice(1, -1)
-      .split(",")
-      .map((value) => value.trim().replace(/^["']|["']$/g, ""))
-      .filter(Boolean);
-  }
-  const values: string[] = [];
-  for (let index = startIndex + 1; index < lines.length; index += 1) {
-    const match = lines[index].match(/^\s+-\s+(.+?)\s*$/);
-    if (!match) break;
-    values.push(match[1].trim().replace(/^["']|["']$/g, ""));
-  }
-  return Array.from(new Set(values));
-}
-
-function frontMatterLines(text: string) {
-  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  return match ? match[1].split(/\r?\n/) : [];
 }
 
 function isPublicHttpUrl(value: string) {

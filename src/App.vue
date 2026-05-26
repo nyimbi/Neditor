@@ -4368,6 +4368,15 @@ import {
   PUBLIC_METADATA_TARGETS as publicMetadataTargets,
   type ExportMetadataChecklistItem,
 } from "./lib/exportMetadataChecklist";
+import {
+  frontMatterAnyList,
+  frontMatterAnyScalar,
+  frontMatterListValues,
+  frontMatterScalarValue,
+  removeFrontMatterField,
+  upsertFrontMatterField,
+  upsertFrontMatterListField,
+} from "./lib/frontMatter";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
 import { markdownListContinuation } from "./lib/markdownEditing";
 import { replaceOrAppendMarkdownSection } from "./lib/markdownSectionMerge";
@@ -12866,7 +12875,7 @@ function documentSetTableCell(value: string) {
 
 function documentReleaseStatus(document: OpenDocument) {
   const metadata = document.compile?.metadata || {};
-  const textStatus = frontMatterScalarFromText(document.text, "status");
+  const textStatus = frontMatterAnyScalar(document.text, ["status"]);
   const status = textStatus || (typeof metadata.status === "string" ? metadata.status : "");
   return status.trim() || "draft";
 }
@@ -12927,22 +12936,7 @@ function documentSetName(document: OpenDocument) {
 }
 
 function documentSetNameFromText(text: string) {
-  return frontMatterScalarFromText(text, "documentSet", "document_set", "set");
-}
-
-function frontMatterScalarFromText(text: string, ...keys: string[]) {
-  if (!text.startsWith("---\n")) return "";
-  const lines = text.split("\n");
-  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
-  if (endIndex <= 0) return "";
-  const keyPattern = keys.map((key) => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
-  const pattern = new RegExp(`^\\s*(${keyPattern})\\s*:\\s*(.+?)\\s*$`);
-  for (let index = 1; index < endIndex; index += 1) {
-    const match = lines[index].match(pattern);
-    if (!match) continue;
-    return match[2].replace(/^['"]|['"]$/g, "").trim();
-  }
-  return "";
+  return frontMatterAnyScalar(text, ["documentSet", "document_set", "set"]);
 }
 
 function folderFromDocumentPath(path: string) {
@@ -13336,35 +13330,6 @@ function setApprovalTimestampNow() {
   setFrontMatterField("approvedAt", new Date().toISOString());
 }
 
-function upsertFrontMatterField(text: string, key: string, value: string) {
-  const line = `${key}: ${value}`;
-  if (!text.startsWith("---\n")) {
-    return `---\n${line}\n---\n\n${text}`;
-  }
-  const lines = text.split("\n");
-  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
-  if (endIndex <= 0) {
-    return `---\n${line}\n---\n\n${text}`;
-  }
-  const existingIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
-  if (existingIndex > 0) {
-    lines[existingIndex] = line;
-  } else {
-    lines.splice(endIndex, 0, line);
-  }
-  return lines.join("\n");
-}
-
-function removeFrontMatterField(text: string, key: string) {
-  if (!text.startsWith("---\n")) return text;
-  const lines = text.split("\n");
-  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
-  if (endIndex <= 0) return text;
-  const existingIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
-  if (existingIndex > 0) lines.splice(existingIndex, 1);
-  return lines.join("\n");
-}
-
 function appendFrontMatterDataSource(
   text: string,
   source: { name: string; path: string; kind: SupportedDataSourceKind },
@@ -13386,75 +13351,6 @@ function appendFrontMatterDataSource(
     lines.splice(endIndex, 0, "dataSources:", ...entry);
   }
   return lines.join("\n");
-}
-
-function frontMatterScalarValue(text: string, key: string) {
-  if (!text.startsWith("---\n")) return "";
-  const lines = text.split("\n");
-  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
-  if (endIndex <= 0) return "";
-  const line = lines.find((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
-  if (!line) return "";
-  return line.split(":").slice(1).join(":").trim().replace(/^["']|["']$/g, "");
-}
-
-function upsertFrontMatterListField(text: string, key: string, values: string[]) {
-  const uniqueValues = Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
-  const block = uniqueValues.length
-    ? [`${key}:`, ...uniqueValues.map((value) => `  - ${yamlInlineString(value)}`)]
-    : [`${key}: []`];
-  const lines = text.startsWith("---\n") ? text.split("\n") : ["---", "---", "", ...text.split("\n")];
-  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
-  if (endIndex <= 0) return `---\n${block.join("\n")}\n---\n\n${text}`;
-  const startIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
-  if (startIndex > 0) {
-    let deleteCount = 1;
-    while (startIndex + deleteCount < endIndex && /^\s+-\s+/.test(lines[startIndex + deleteCount])) deleteCount += 1;
-    lines.splice(startIndex, deleteCount, ...block);
-  } else {
-    lines.splice(endIndex, 0, ...block);
-  }
-  return lines.join("\n");
-}
-
-function frontMatterListValues(text: string, key: string) {
-  if (!text.startsWith("---\n")) return [];
-  const lines = text.split("\n");
-  const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
-  if (endIndex <= 0) return [];
-  const startIndex = lines.findIndex((candidate, index) => index > 0 && index < endIndex && candidate.trimStart().startsWith(`${key}:`));
-  if (startIndex <= 0) return [];
-  const inlineValue = lines[startIndex].split(":").slice(1).join(":").trim();
-  if (inlineValue.startsWith("[") && inlineValue.endsWith("]")) {
-    return inlineValue
-      .slice(1, -1)
-      .split(",")
-      .map((value) => value.trim().replace(/^["']|["']$/g, ""))
-      .filter(Boolean);
-  }
-  const values: string[] = [];
-  for (let index = startIndex + 1; index < endIndex; index += 1) {
-    const match = lines[index].match(/^\s+-\s+(.+?)\s*$/);
-    if (!match) break;
-    values.push(match[1].trim().replace(/^["']|["']$/g, ""));
-  }
-  return Array.from(new Set(values));
-}
-
-function frontMatterAnyScalar(text: string, keys: string[]) {
-  for (const key of keys) {
-    const value = frontMatterScalarValue(text, key);
-    if (value.trim()) return value.trim();
-  }
-  return "";
-}
-
-function frontMatterAnyList(text: string, keys: string[]) {
-  for (const key of keys) {
-    const values = frontMatterListValues(text, key);
-    if (values.length) return values;
-  }
-  return [];
 }
 
 function parseFrontMatterDataSources(text: string): FrontMatterDataSourceRow[] {
