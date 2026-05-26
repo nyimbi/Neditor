@@ -994,11 +994,11 @@ export function transformTemplateMarkdown(template: Pick<TransformTemplate, "bod
 export function transformTemplateFillFields(template: Pick<TransformTemplate, "body" | "transform">): TransformTemplateFillField[] {
   const fields: TransformTemplateFillField[] = [];
   const seen = new Set<string>();
-  const fencePattern = /```([A-Za-z0-9_-]+)[^\n]*\n([\s\S]*?)\n```/g;
+  const fencePattern = /^(~~~|```)\s*([A-Za-z0-9_-]+)[^\n]*\n([\s\S]*?)\n\1[ \t]*$/gm;
   let match: RegExpExecArray | null;
   while ((match = fencePattern.exec(template.body))) {
-    const transform = match[1] || template.transform;
-    const content = match[2] || "";
+    const transform = (match[2] || template.transform).toLowerCase();
+    const content = match[3] || "";
     if (transform === "calc") {
       collectCalcFillFields(content, fields, seen);
     } else {

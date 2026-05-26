@@ -2958,6 +2958,22 @@ test("transform template library covers reusable calculations and custom templat
   const chartTemplate = builtinTransformTemplates.find((template) => template.transform === "chart");
   if (!chartTemplate) throw new Error("missing chart template");
   ok(transformTemplateFillFields(chartTemplate).some((field) => field.name === "title"));
+  deepEqual(
+    transformTemplateFillFields({
+      transform: "calc",
+      body: "~~~calc\nrevenue = 100\ncost = 60\nprofit = revenue - cost\n~~~\n",
+    }),
+    [
+      { name: "revenue", value: "100", source: "calc-assignment" },
+      { name: "cost", value: "60", source: "calc-assignment" },
+    ],
+  );
+  ok(
+    transformTemplateFillFields({
+      transform: "chart",
+      body: "~~~chart\ntitle: Pipeline Coverage\nx: Stage\ny: Value\n~~~\n",
+    }).some((field) => field.name === "title"),
+  );
   ok(transformTemplateMarkdown(builtinTransformTemplates[0]).endsWith("\n"));
   deepEqual(normalizeCustomTransformTemplates([{ id: "x", name: "X", transform: "calc", body: "```calc\nx = 1\n```\n" }]), [
     {

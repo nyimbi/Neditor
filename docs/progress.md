@@ -143,6 +143,9 @@ Recent pushed checkpoints visible in current git history:
   such as `chart` render from either backtick or tilde fences, while unsupported
   or documentation/example fences are preserved inertly instead of allowing
   nested transform samples to execute.
+- Transform template fill-field detection now recognizes tilde-fenced `calc`
+  and structured transform templates, so custom templates expose editable values
+  consistently with compiler-supported fence syntax.
 - AI provenance collection now follows the same fence policy: `ai-source`,
   `ai-provenance`, and `llm-source` blocks can use backtick or tilde fences,
   while nested provenance examples remain inert and do not create semantic
