@@ -200,6 +200,11 @@ transform-engine probe summaries plus standard release evidence report statuses.
 The CLI must support JSON output for automation and strict non-zero modes for
 release gates so non-technical support teams can verify an installation without
 learning the developer toolchain.
+The packaged template catalog must cover common business development,
+procurement, education, long-form, and media documents including proposals,
+RFPs, RFP responses, RFQs, tenders, tutorials, lesson plans, lesson content,
+technical textbooks, novels, podcast scripts, movie scripts, business cases, and
+executive briefs.
 
 ### 6.2 Primary Layout
 

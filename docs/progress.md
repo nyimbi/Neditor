@@ -3928,6 +3928,26 @@ Scriptable `ned open` and `ned new` status:
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local CLI automation without claiming external release proof completion. |
 | Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
 
+Expanded `ned new` business and publishing starters:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after expanding `ned new --template` to 17 starters, including RFP, RFQ, tender, tutorial, lesson content, technical textbook, podcast script, movie script, business case, and executive brief coverage with JSON creation assertions and placeholder checks. |
+| `src-tauri/target/debug/ned templates --json` | Pass | Direct smoke returned schema `neditor.ned-templates.v1` with the expanded starter catalog: blank, proposal, RFP, RFP response, RFQ, tender, report, tutorial, lesson plan, lesson content, textbook, technical textbook, novel, podcast script, movie script, business case, and executive brief. |
+| `src-tauri/target/debug/ned new /private/tmp/neditor-tender-smoke.md --template tender --title "Tender Smoke" --force --json` | Pass | Direct smoke created a tender starter and returned schema `neditor.ned-new.v1`, selected template, resolved title, output path, `created: true`, and `opened: false`. |
+| `rg -n "documentType: tender\|Evaluation Method\|Instructions To Tenderers" /private/tmp/neditor-tender-smoke.md` | Pass | Generated tender Markdown contains the expected front matter and procurement sections. |
+| `src-tauri/target/debug/ned new /private/tmp/neditor-podcast-smoke.md --template podcast-script --title "Podcast Smoke" --force --json` | Pass | Direct smoke created a podcast script starter and returned schema `neditor.ned-new.v1`, selected template, resolved title, output path, `created: true`, and `opened: false`. |
+| `rg -n "documentType: podcast-script\|Segment Rundown\|Production Notes" /private/tmp/neditor-podcast-smoke.md` | Pass | Generated podcast Markdown contains the expected front matter and production sections. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the expanded template catalog. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after updating Settings CLI examples for tender and podcast starters. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 74 tests, including static assertions that Settings points users at the broader CLI starter catalog. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting the expanded starter catalog in README and specification. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while packaged CLI business-template creation now covers more requested document types. |
+| `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration remains valid after expanding the packaged `ned` template catalog. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after expanding the packaged `ned` template catalog. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local document-creation capability without claiming external release proof completion. |
+| Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

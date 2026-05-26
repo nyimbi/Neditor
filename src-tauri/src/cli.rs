@@ -41,11 +41,21 @@ const STDOUT_EXPORT_TARGETS: &[&str] = &["html", "latex"];
 const NEW_DOCUMENT_TEMPLATES: &[&str] = &[
     "blank",
     "proposal",
+    "rfp",
     "rfp-response",
+    "rfq",
+    "tender",
     "report",
+    "tutorial",
     "lesson-plan",
+    "lesson-content",
     "textbook",
+    "technical-textbook",
     "novel",
+    "podcast-script",
+    "movie-script",
+    "business-case",
+    "executive-brief",
 ];
 const CLI_COMMANDS: &[&str] = &[
     "init",
@@ -2290,20 +2300,47 @@ fn new_document_markdown(template: &str, title: &str) -> Result<String, String> 
         "proposal" => format!(
             "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: proposal\ntoc: true\n---\n\n# {title}\n\n## Executive Summary\n\nState the client outcome, recommendation, and commercial value.\n\n## Client Context\n\nDescribe the buyer, problem, constraints, and decision process.\n\n## Proposed Approach\n\n| Phase | Work | Output | Owner |\n| --- | --- | --- | --- |\n| Discover | Confirm objectives and evidence | Findings memo | {{{{owner}}}} |\n| Deliver | Execute the agreed work plan | Review-ready deliverable | {{{{owner}}}} |\n\n## Timeline\n\n- Kickoff: {{{{kickoff_date}}}}\n- Draft review: {{{{draft_review_date}}}}\n- Final delivery: {{{{final_delivery_date}}}}\n\n## Commercials\n\nSummarize fees, assumptions, payment terms, and exclusions.\n\n## Review Handoff\n\n- Confirm scope, pricing, legal terms, and cited evidence.\n- Resolve all placeholders before sending.\n"
         ),
+        "rfp" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: rfp\ntoc: true\n---\n\n# {title}\n\n## Opportunity Summary\n\nDescribe the procurement goal, business outcome, buyer context, and decision deadline.\n\n## Scope Of Work\n\n| Workstream | Required Outcome | Deliverable | Acceptance Criteria |\n| --- | --- | --- | --- |\n| {{{{workstream}}}} | {{{{outcome}}}} | {{{{deliverable}}}} | {{{{criteria}}}} |\n\n## Vendor Instructions\n\n- Submission deadline: {{{{submission_deadline}}}}\n- Question deadline: {{{{question_deadline}}}}\n- Required format: {{{{submission_format}}}}\n- Contact: {{{{procurement_contact}}}}\n\n## Evaluation Criteria\n\n| Criterion | Weight | Evidence Expected |\n| --- | ---: | --- |\n| Technical fit | 40% | Relevant approach and proof |\n| Delivery confidence | 30% | Timeline, staffing, risk plan |\n| Commercial value | 30% | Pricing, terms, assumptions |\n\n## Required Response Matrix\n\n| ID | Requirement | Mandatory | Vendor Response | Evidence |\n| --- | --- | --- | --- | --- |\n| R1 | {{{{requirement}}}} | Yes |  |  |\n"
+        ),
         "rfp-response" => format!(
             "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: rfp-response\ntoc: true\n---\n\n# {title}\n\n## Response Strategy\n\nSummarize the buyer's stated and implied intent, win themes, and response posture.\n\n## Compliance Matrix\n\n| ID | Requirement | Response | Evidence | Owner | Status |\n| --- | --- | --- | --- | --- | --- |\n| R1 | {{{{requirement}}}} | {{{{response}}}} | {{{{evidence}}}} | {{{{owner}}}} | Draft |\n\n## Technical Response\n\nAddress every mandatory requirement with clear evidence and assumptions.\n\n## Delivery Plan\n\nOutline milestones, dependencies, risks, and governance.\n\n## Pricing And Assumptions\n\nState pricing, exclusions, validity period, and approval requirements.\n\n## Final Verification\n\n- Every stated requirement has a mapped response.\n- Implied intent and evaluation criteria have been addressed.\n- Attachments, forms, and signatures are tracked.\n"
+        ),
+        "rfq" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: rfq\ntoc: true\n---\n\n# {title}\n\n## Buying Need\n\nSummarize the goods, services, quantities, service levels, and decision date.\n\n## Quote Instructions\n\n- Quote deadline: {{{{quote_deadline}}}}\n- Validity period: {{{{validity_period}}}}\n- Delivery location: {{{{delivery_location}}}}\n- Required currency: {{{{currency}}}}\n\n## Line Items\n\n| Item | Description | Quantity | Unit | Required Date | Vendor Price |\n| --- | --- | ---: | --- | --- | ---: |\n| 1 | {{{{item_description}}}} | {{{{quantity}}}} | {{{{unit}}}} | {{{{required_date}}}} |  |\n\n## Commercial Terms\n\nState taxes, shipping, warranties, payment terms, substitutions, and exclusions.\n\n## Award Criteria\n\nExplain price, availability, compliance, service, and risk considerations.\n"
+        ),
+        "tender" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: tender\ntoc: true\n---\n\n# {title}\n\n## Tender Notice\n\nState the contracting authority, opportunity, procurement method, eligibility, and closing date.\n\n## Instructions To Tenderers\n\n- Tender reference: {{{{tender_reference}}}}\n- Submission portal/location: {{{{submission_location}}}}\n- Closing date and time: {{{{closing_datetime}}}}\n- Clarification process: {{{{clarification_process}}}}\n\n## Scope And Specifications\n\nDescribe mandatory specifications, service levels, deliverables, milestones, and acceptance tests.\n\n## Eligibility And Mandatory Documents\n\n| Document | Required | Notes |\n| --- | --- | --- |\n| Company registration | Yes | {{{{notes}}}} |\n| Tax compliance | Yes | {{{{notes}}}} |\n\n## Evaluation Method\n\n| Stage | Criteria | Pass Mark / Weight |\n| --- | --- | --- |\n| Administrative compliance | Mandatory documents | Pass/fail |\n| Technical evaluation | Methodology and capability | {{{{technical_weight}}}} |\n| Financial evaluation | Price and value | {{{{financial_weight}}}} |\n"
         ),
         "report" => format!(
             "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: business-report\ntoc: true\n---\n\n# {title}\n\n## Executive Summary\n\nSummarize the finding, implication, and recommended decision.\n\n## Situation\n\nDescribe the context, evidence base, constraints, and stakeholders.\n\n## Analysis\n\n```calc\nrevenue = 0\ncost = 0\nprofit = revenue - cost\nmargin = profit / revenue\n```\n\nExpected margin: {{{{=margin | percent}}}}\n\n## Recommendations\n\n1. Recommendation one.\n2. Recommendation two.\n3. Recommendation three.\n\n## Risks And Next Steps\n\n| Risk | Impact | Mitigation | Owner |\n| --- | --- | --- | --- |\n| {{{{risk}}}} | {{{{impact}}}} | {{{{mitigation}}}} | {{{{owner}}}} |\n"
         ),
+        "tutorial" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: tutorial\ntoc: true\n---\n\n# {title}\n\n## Outcome\n\nState what the reader will be able to do by the end of the tutorial.\n\n## Prerequisites\n\n- Audience: {{{{audience}}}}\n- Tools/accounts needed: {{{{tools}}}}\n- Starting files or data: {{{{starting_point}}}}\n\n## Steps\n\n### Step 1: {{{{first_step}}}}\n\nExplain the action, expected result, and common mistakes.\n\n### Step 2: {{{{second_step}}}}\n\nContinue with concise instructions and verification screenshots or outputs.\n\n## Check Your Work\n\n| Check | Expected Result | Troubleshooting |\n| --- | --- | --- |\n| {{{{check}}}} | {{{{expected}}}} | {{{{fix}}}} |\n\n## Next Steps\n\nSuggest practice tasks, references, and escalation paths.\n"
+        ),
         "lesson-plan" => format!(
             "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: lesson-plan\ntoc: true\n---\n\n# {title}\n\n## Learning Objectives\n\n- Learners can explain {{{{concept}}}}.\n- Learners can apply {{{{skill}}}} in a realistic scenario.\n\n## Audience And Prerequisites\n\nDescribe learner profile, prior knowledge, materials, and accessibility needs.\n\n## Lesson Flow\n\n| Time | Activity | Instructor Action | Learner Evidence |\n| ---: | --- | --- | --- |\n| 10 min | Opening | Frame the problem | Questions captured |\n| 30 min | Practice | Guide the worked example | Exercise completed |\n| 10 min | Review | Check understanding | Exit ticket |\n\n## Assessment\n\nDefine rubric, success criteria, remediation, and extension activities.\n"
         ),
-        "textbook" => format!(
-            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: textbook\ntoc: true\n---\n\n# {title}\n\n## Book Outline\n\n### Chapter 1: Foundations\n\n- Learning goals\n- Key concepts\n- Worked examples\n- Exercises\n\n### Chapter 2: Applied Practice\n\n- Case study\n- Common errors\n- Review questions\n\n## Drafting Plan\n\nUse Docs Live to flesh out chapters sequentially only after the outline is reviewed.\n"
+        "lesson-content" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: lesson-content\ntoc: true\n---\n\n# {title}\n\n## Learner Context\n\nDescribe grade/level, prior knowledge, accommodations, and materials.\n\n## Content Sequence\n\n### Concept 1: {{{{concept}}}}\n\nExplain the concept with a concrete example, visual cue, and misconception check.\n\n### Guided Practice\n\nProvide worked examples, prompts, and expected learner responses.\n\n### Independent Practice\n\n| Activity | Instructions | Evidence Of Learning |\n| --- | --- | --- |\n| {{{{activity}}}} | {{{{instructions}}}} | {{{{evidence}}}} |\n\n## Assessment Items\n\nAdd questions, answer key, rubric, remediation, and extension activities.\n"
+        ),
+        "textbook" | "technical-textbook" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: textbook\ntoc: true\n---\n\n# {title}\n\n## Book Positioning\n\n- Audience: {{{{audience}}}}\n- Level: {{{{level}}}}\n- Prerequisites: {{{{prerequisites}}}}\n\n## Book Outline\n\n### Chapter 1: Foundations\n\n- Learning goals\n- Key concepts\n- Worked examples\n- Exercises\n\n### Chapter 2: Applied Practice\n\n- Case study\n- Common errors\n- Review questions\n\n## Drafting Plan\n\nUse Docs Live to flesh out chapters sequentially only after the outline is reviewed.\n"
         ),
         "novel" => format!(
             "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: novel\ntoc: true\n---\n\n# {title}\n\n## Premise\n\nWrite the central dramatic question, protagonist want, stakes, and setting.\n\n## Cast\n\n| Character | Desire | Conflict | Arc |\n| --- | --- | --- | --- |\n| {{{{name}}}} | {{{{desire}}}} | {{{{conflict}}}} | {{{{arc}}}} |\n\n## Plot Outline\n\n### Act I\n\nSet up the world, inciting incident, and first irreversible choice.\n\n### Act II\n\nEscalate pressure, reversals, midpoint, and cost.\n\n### Act III\n\nResolve the conflict, consequence, and final image.\n\n## Narrative Review\n\nCheck voice, pacing, continuity, scene purpose, and emotional progression before drafting chapters.\n"
+        ),
+        "podcast-script" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: podcast-script\ntoc: true\n---\n\n# {title}\n\n## Episode Brief\n\n- Show: {{{{show_name}}}}\n- Episode objective: {{{{objective}}}}\n- Guest(s): {{{{guests}}}}\n- Target length: {{{{duration}}}}\n\n## Cold Open\n\nWrite a concise hook that frames the listener problem and stakes.\n\n## Segment Rundown\n\n| Segment | Time | Purpose | Notes |\n| --- | ---: | --- | --- |\n| Intro | 00:00 | Set context | {{{{intro_notes}}}} |\n| Main discussion | 05:00 | Develop argument/story | {{{{main_notes}}}} |\n| Close | {{{{close_time}}}} | Summarize and call to action | {{{{cta}}}} |\n\n## Host Script\n\n**Host:** {{{{host_line}}}}\n\n## Production Notes\n\nList music, ads, legal review, links, transcript needs, and publishing checklist.\n"
+        ),
+        "movie-script" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: movie-script\ntoc: true\n---\n\n# {title}\n\n## Logline\n\nState protagonist, goal, obstacle, stakes, and hook in one sentence.\n\n## Characters\n\n| Character | Role | Want | Need | Conflict |\n| --- | --- | --- | --- | --- |\n| {{{{character}}}} | {{{{role}}}} | {{{{want}}}} | {{{{need}}}} | {{{{conflict}}}} |\n\n## Treatment\n\n### Act I\n\nSet up world, inciting incident, and first turning point.\n\n### Act II\n\nEscalate conflict, midpoint reversal, low point, and renewed choice.\n\n### Act III\n\nResolve climax, consequence, and final image.\n\n## Scene Starter\n\n**INT./EXT. LOCATION - DAY/NIGHT**\n\nAction paragraph.\n\n**CHARACTER**\n\nDialogue.\n\n## Script Review\n\nCheck motivation, stakes, scene purpose, continuity, pacing, tone, and production constraints.\n"
+        ),
+        "business-case" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: business-case\ntoc: true\n---\n\n# {title}\n\n## Decision Required\n\nState the decision, sponsor, required date, and recommendation.\n\n## Strategic Rationale\n\nExplain the business problem, opportunity, alignment, and consequences of inaction.\n\n## Options Considered\n\n| Option | Benefits | Costs | Risks | Recommendation |\n| --- | --- | ---: | --- | --- |\n| Do nothing | {{{{benefit}}}} | {{{{cost}}}} | {{{{risk}}}} | No |\n| Recommended option | {{{{benefit}}}} | {{{{cost}}}} | {{{{risk}}}} | Yes |\n\n## Financial Case\n\n```calc\nbenefit = 0\ncost = 0\nnet_value = benefit - cost\nroi = net_value / cost\n```\n\nEstimated ROI: {{{{=roi | percent}}}}\n\n## Implementation Plan\n\nList milestones, dependencies, owners, governance, and success measures.\n"
+        ),
+        "executive-brief" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: executive-brief\ntoc: true\n---\n\n# {title}\n\n## Bottom Line\n\nGive the decision, implication, and recommendation in three to five sentences.\n\n## What Changed\n\nSummarize the new information, trend, event, or risk that requires attention.\n\n## Evidence\n\n| Signal | Source | Confidence | Implication |\n| --- | --- | --- | --- |\n| {{{{signal}}}} | {{{{source}}}} | {{{{confidence}}}} | {{{{implication}}}} |\n\n## Options\n\n1. Recommended action.\n2. Alternative action.\n3. No action.\n\n## Ask\n\nState the approval, resources, timing, or executive decision required.\n"
         ),
         _ => unreachable!(),
     };

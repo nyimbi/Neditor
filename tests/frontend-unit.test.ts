@@ -3837,7 +3837,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("create_support_bundle"));
   ok(app.includes("ned file.md"));
   ok(app.includes("ned open file.md --dry-run --json"));
-  ok(app.includes("ned new proposal.md --template proposal --json"));
+  ok(app.includes("ned new tender.md --template tender --json"));
+  ok(app.includes("ned new podcast.md --template podcast-script --json"));
   ok(app.includes("ned evidence --json"));
   ok(app.includes("ned default-reader --status --json"));
   ok(app.includes("ned support-bundle --output support.json"));

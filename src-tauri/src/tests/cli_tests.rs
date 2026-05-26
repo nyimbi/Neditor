@@ -184,6 +184,45 @@ fn ned_cli_creates_new_business_document_from_template() {
     assert_eq!(dry_report["dryRun"], true);
     assert_eq!(dry_report["created"], false);
     assert!(!dry_path.exists());
+
+    for (template, expected) in [
+        ("rfp", "documentType: rfp"),
+        ("rfq", "documentType: rfq"),
+        ("tender", "documentType: tender"),
+        ("tutorial", "documentType: tutorial"),
+        ("lesson-content", "documentType: lesson-content"),
+        ("technical-textbook", "documentType: textbook"),
+        ("podcast-script", "documentType: podcast-script"),
+        ("movie-script", "documentType: movie-script"),
+        ("business-case", "documentType: business-case"),
+        ("executive-brief", "documentType: executive-brief"),
+    ] {
+        let template_path = temp_markdown_path(template);
+        let outcome = crate::cli::run_cli_with_args(&[
+            "ned".to_string(),
+            "new".to_string(),
+            template_path.to_string_lossy().to_string(),
+            "--template".to_string(),
+            template.to_string(),
+            "--title".to_string(),
+            format!("{template} starter"),
+            "--json".to_string(),
+        ])
+        .expect("new expanded template");
+        assert_eq!(outcome.exit_code, 0);
+        let report: serde_json::Value =
+            serde_json::from_str(&outcome.message).expect("expanded template json");
+        assert_eq!(report["template"], template);
+        let markdown = fs::read_to_string(&template_path).expect("expanded template markdown");
+        assert!(
+            markdown.contains(expected),
+            "missing {expected} for {template}"
+        );
+        assert!(
+            markdown.contains("{{"),
+            "missing fillable placeholders for {template}"
+        );
+    }
 }
 
 #[test]
@@ -257,7 +296,32 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         .expect("templates list");
     assert_eq!(templates.exit_code, 0);
     assert!(templates.message.contains("proposal"));
+    assert!(templates.message.contains("tender"));
     assert!(templates.message.contains("rfp-response"));
+    assert!(templates.message.contains("podcast-script"));
+
+    let templates_json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "templates".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("templates json");
+    let template_report: serde_json::Value =
+        serde_json::from_str(&templates_json.message).expect("templates json");
+    assert_eq!(template_report["schema"], "neditor.ned-templates.v1");
+    for template in [
+        "rfp",
+        "rfq",
+        "tender",
+        "tutorial",
+        "podcast-script",
+        "movie-script",
+    ] {
+        assert!(template_report["templates"]
+            .as_array()
+            .expect("templates")
+            .contains(&serde_json::json!(template)));
+    }
 
     let targets = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

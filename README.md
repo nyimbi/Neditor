@@ -110,11 +110,12 @@ paths that would be handed to the app without opening a window.
 `ned init` creates a reusable `.neditor` project scaffold with variables,
 standard business snippets, and a local-agent handoff folder; use `--dry-run`
 to preview the files and `--json` for help desk automation. `ned new` creates a
-starter Markdown document from business templates such as proposal, RFP
-response, report, lesson plan, textbook, and novel; add `--json` for
-script-friendly creation status, selected template, title, output path, and open
-status. `ned convert` and `ned export` run the same local export pipeline used
-by the app for HTML, PDF, DOCX,
+starter Markdown document from business templates such as proposal, RFP, RFP
+response, RFQ, tender, tutorial, lesson plan, lesson content, technical textbook,
+novel, podcast script, movie script, business case, and executive brief; add
+`--json` for script-friendly creation status, selected template, title, output
+path, and open status. `ned convert` and `ned export` run the same local export
+pipeline used by the app for HTML, PDF, DOCX,
 PPTX, Markdown bundle, blog, Substack, LaTeX, Google Docs package, and EPUB
 outputs. Use comma-separated targets, or `--to all`, with `--output-dir` when
 you need a complete delivery pack for review, legal, publishing, and archive
