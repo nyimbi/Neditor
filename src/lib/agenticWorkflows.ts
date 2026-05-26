@@ -5368,7 +5368,14 @@ function countUnreviewedAiSourceFences(documentText: string) {
   const lines = documentText.split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
     const opener = markdownFenceOpener(lines[index]);
-    if (!opener || !isAiSourceFenceOpener(lines[index])) continue;
+    if (!opener) continue;
+    if (!isAiSourceFenceOpener(lines[index])) {
+      const endIndex = lines.findIndex(
+        (line, candidateIndex) => candidateIndex > index && line.trimStart().startsWith(opener.marker),
+      );
+      index = endIndex > index ? endIndex : lines.length;
+      continue;
+    }
     const endIndex = lines.findIndex(
       (line, candidateIndex) => candidateIndex > index && line.trimStart().startsWith(opener.marker),
     );
@@ -5492,17 +5499,21 @@ function sourceLineForIndex(text: string, index: number) {
 function extractDocumentClaimInventory(documentText: string): AgenticDocumentClaim[] {
   const claims: AgenticDocumentClaim[] = [];
   const seen = new Set<string>();
-  let inFence = false;
+  let fenceMarker = "";
   const lines = documentText.split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
     const rawLine = lines[index];
     const trimmed = rawLine.trim();
-    if (markdownFenceOpener(trimmed)) {
-      inFence = !inFence;
+    if (fenceMarker) {
+      if (trimmed.startsWith(fenceMarker)) fenceMarker = "";
+      continue;
+    }
+    const opener = markdownFenceOpener(trimmed);
+    if (opener) {
+      fenceMarker = opener.marker;
       continue;
     }
     if (
-      inFence ||
       !trimmed ||
       /^---$/.test(trimmed) ||
       /^#{1,6}\s/.test(trimmed) ||
@@ -5553,15 +5564,20 @@ function extractHumanizationFindings(documentText: string): AgenticHumanizationF
   const findings: AgenticHumanizationFinding[] = [];
   const seen = new Set<string>();
   const sentenceStarts = new Map<string, { count: number; line: number; text: string }>();
-  let inFence = false;
+  let fenceMarker = "";
   const lines = documentText.split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
     const trimmed = lines[index].trim();
-    if (markdownFenceOpener(trimmed)) {
-      inFence = !inFence;
+    if (fenceMarker) {
+      if (trimmed.startsWith(fenceMarker)) fenceMarker = "";
       continue;
     }
-    if (inFence || !trimmed || /^#{1,6}\s/.test(trimmed) || /^---$/.test(trimmed) || /^<!--/.test(trimmed)) continue;
+    const opener = markdownFenceOpener(trimmed);
+    if (opener) {
+      fenceMarker = opener.marker;
+      continue;
+    }
+    if (!trimmed || /^#{1,6}\s/.test(trimmed) || /^---$/.test(trimmed) || /^<!--/.test(trimmed)) continue;
     const text = trimmed.replace(/^[-*+]\s+/, "").replace(/^\d+[.)]\s+/, "").replace(/\s+/g, " ").slice(0, 240);
     const start = text.match(/^([A-Z][A-Za-z'-]{2,})(?:\s+[A-Za-z'-]{2,}){0,2}/)?.[0].toLowerCase();
     if (start) {
