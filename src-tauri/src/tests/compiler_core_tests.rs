@@ -302,6 +302,28 @@ fn compiler_handles_document_variable_filter_edge_cases() {
 }
 
 #[test]
+fn compiler_resolves_literal_dotted_front_matter_keys() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Dotted Keys\nstatus: approved\napprovedBy: QA\nclient.name: Acme Holdings\nclient.owner: Strategy Office\nprofile:\n  name: Nested Profile\nprofile.name: Literal Profile\nlayout.header: Board Pack\n---\n# Dotted Keys\nClient: {{client.name}}\nOwner: {{client.owner}}\nProfile: {{profile.name}}\nHeader: {{layout.header}}\nMissing: {{layout.footer | default=No footer}}\n".to_string(),
+        file_path: None,
+    });
+
+    assert!(response.compiled_markdown.contains("Client: Acme Holdings"));
+    assert!(response
+        .compiled_markdown
+        .contains("Owner: Strategy Office"));
+    assert!(response
+        .compiled_markdown
+        .contains("Profile: Nested Profile"));
+    assert!(response.compiled_markdown.contains("Header: Board Pack"));
+    assert!(response.compiled_markdown.contains("Missing: No footer"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("Missing document variable")));
+}
+
+#[test]
 fn compiler_strips_yaml_tags_from_front_matter_metadata() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

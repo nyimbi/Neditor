@@ -5,8 +5,14 @@ use std::path::Path;
 
 pub(crate) fn metadata_lookup<'a>(metadata: &'a Value, path: &str) -> Option<&'a Value> {
     let mut current = metadata;
-    for part in path.split('.') {
-        current = current.get(part)?;
+    let parts = path.split('.').collect::<Vec<_>>();
+    for (index, part) in parts.iter().enumerate() {
+        if let Some(next) = current.get(part) {
+            current = next;
+            continue;
+        }
+        let remaining = parts[index..].join(".");
+        return current.get(&remaining);
     }
     Some(current)
 }

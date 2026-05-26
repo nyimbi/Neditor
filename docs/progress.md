@@ -110,6 +110,11 @@ Recent pushed checkpoints visible in current git history:
   `{proposal.dueDate: 2026-07-01}` now surface as the same dotted variables
   users insert in document templates, while excluded roots such as `brand.*`
   remain hidden from the document-variable manager.
+- The Rust compiler now resolves literal dotted front-matter keys through the
+  same `{{client.name}}` variable syntax and export metadata lookup path. True
+  nested maps still take precedence when both `profile.name` and
+  `profile: {name: ...}` forms exist, so document authors can use compact
+  dotted metadata without breaking explicit structured YAML.
 - Simple front-matter merge defaults and tagged scalars are now handled in the
   document-variable inventory. Common YAML such as `<<: *defaults`, `!!str`,
   `!custom`, `!docs!channel`, and `!<tag:yaml.org,2002:str>` can populate
