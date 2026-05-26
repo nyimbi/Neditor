@@ -498,7 +498,8 @@ web app.
 - Data transforms for CSV, TSV, JSON, YAML, SQLite SQL, OpenAPI, and JSON
   Schema produce preview/export-safe artifacts. SQL transforms are read-only
   SQLite table queries behind explicit engine trust, and relative database paths
-  resolve from the current Markdown document's folder.
+  resolve from the current Markdown document's folder without allowing relative
+  escapes outside that folder.
 
 ### Diagrams And Transform Blocks
 

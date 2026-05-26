@@ -381,8 +381,9 @@ For database-backed tables, insert a SQL transform template or write a fenced
 engine in Configuration Center before running it. NEditor accepts read-only
 `SELECT` or `WITH` queries, rejects mutation statements and multi-statement
 batches, resolves relative database paths such as `data/revenue.sqlite` from
-the Markdown document's folder, and renders the result as a Markdown table that
-can be reviewed, copied, and exported with the rest of the document.
+the Markdown document's folder, blocks relative paths that escape that folder,
+and renders the result as a Markdown table that can be reviewed, copied, and
+exported with the rest of the document.
 
 ## Citations, Glossary, Index, And References
 

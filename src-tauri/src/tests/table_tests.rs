@@ -270,6 +270,49 @@ fn sql_transform_runs_trusted_sqlite_query_against_document_relative_database() 
 }
 
 #[test]
+fn sql_transform_blocks_document_relative_database_escape() {
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-sql-escape-{unique}"));
+    let docs = root.join("docs");
+    fs::create_dir_all(&docs).expect("test docs root");
+    fs::write(root.join("secret.sqlite"), "outside").expect("outside database marker");
+    let engine_path = std::env::current_exe().expect("current test executable path");
+
+    let response = compile_with_options(
+        CompileRequest {
+            text: "# SQL Escape\n```sql database=\"../secret.sqlite\"\nSELECT 1;\n```\n"
+                .to_string(),
+            file_path: Some(path_to_string(&docs.join("report.md"))),
+        },
+        &json!({
+            "transformEnginePaths": {"sql": path_to_string(&engine_path)},
+            "trustedTransformEngines": {"sql": true}
+        }),
+    );
+
+    assert!(response
+        .html
+        .contains("SQL database path must stay inside the document folder"));
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.severity == "error"
+            && diagnostic
+                .message
+                .contains("SQL database path must stay inside the document folder")
+    }));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "sql"
+            && artifact.diagnostics.iter().any(|diagnostic| diagnostic
+                .suggestion
+                .as_deref()
+                .is_some_and(|suggestion| suggestion.contains("under the document folder")))));
+}
+
+#[test]
 fn table_formulas_resolve_forward_refs_and_report_cycles() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Formula Cycles\nstatus: approved\napprovedBy: QA\n---\n# Formula Cycles\n| Metric | Value |\n| --- | ---: |\n| Forward | =B2 |\n| Source | 42 |\n| Cycle A | =B4 |\n| Cycle B | =B3 |\n".to_string(),

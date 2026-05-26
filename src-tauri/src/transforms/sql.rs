@@ -84,6 +84,19 @@ pub(crate) fn render_sql_table(
         diagnostics.push(diag("error", message, None, None, None));
         return error_block(message);
     }
+    if options.document_relative_path_escapes(&database_path) {
+        let message =
+            format!("SQL database path must stay inside the document folder: {database_path}");
+        artifact_diags.push(diag(
+            "error",
+            message.clone(),
+            None,
+            None,
+            Some("Move the SQLite file under the document folder or select a trusted local database explicitly."),
+        ));
+        diagnostics.push(diag("error", message.clone(), None, None, None));
+        return error_block(&message);
+    }
     let database_path = options.resolve_document_path(&database_path);
     if !database_path.is_file() {
         let message = format!("SQL database was not found: {}", database_path.display());

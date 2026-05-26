@@ -101,6 +101,23 @@ impl TransformExecutionOptions {
             path
         }
     }
+
+    pub(crate) fn document_relative_path_escapes(&self, value: &str) -> bool {
+        let path = PathBuf::from(value);
+        let Some(document_dir) = &self.document_dir else {
+            return false;
+        };
+        if path.is_absolute() {
+            return false;
+        }
+        let resolved = document_dir.join(&path);
+        match (document_dir.canonicalize(), resolved.canonicalize()) {
+            (Ok(base), Ok(target)) => !target.starts_with(base),
+            _ => path
+                .components()
+                .any(|component| matches!(component, std::path::Component::ParentDir)),
+        }
+    }
 }
 
 fn string_map_option(options: &Value, key: &str) -> HashMap<String, String> {
