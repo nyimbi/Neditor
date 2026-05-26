@@ -62,6 +62,8 @@ const CLI_COMMANDS: &[&str] = &[
     "transform-handlers",
     "readiness",
     "release-readiness",
+    "support",
+    "support-bundle",
     "completions",
     "default-reader",
     "doctor",
@@ -149,6 +151,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
+        "support" | "support-bundle" => run_support_bundle_command(&args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
         "doctor" => run_doctor_command(&args[2..]),
@@ -864,18 +867,7 @@ fn run_readiness_command(args: &[String]) -> Result<CliOutcome, String> {
         index += 1;
     }
 
-    let report_text = fs::read_to_string(&report_path).map_err(|err| {
-        format!(
-            "Could not read release-readiness report at {}: {err}. Run pnpm run check:release-readiness or pass --report <path>.",
-            report_path.display()
-        )
-    })?;
-    let report: Value = serde_json::from_str(&report_text).map_err(|err| {
-        format!(
-            "Could not parse release-readiness report at {}: {err}",
-            report_path.display()
-        )
-    })?;
+    let report = read_readiness_report(&report_path)?;
     let status = readiness_string_field(&report, "status").unwrap_or("unknown");
     let summary = report.get("summary").cloned().unwrap_or_else(|| json!({}));
     let checks = readiness_array_field(&report, "checks");
@@ -909,6 +901,117 @@ fn run_readiness_command(args: &[String]) -> Result<CliOutcome, String> {
     Ok(CliOutcome {
         message: readiness_text_report(&report, &report_path_display, release_ready),
         exit_code,
+    })
+}
+
+fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut readiness_report_path = PathBuf::from(".tmp/release-readiness/report.json");
+    let mut output_path: Option<PathBuf> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--workspace" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
+            "--readiness-report" => {
+                index += 1;
+                readiness_report_path =
+                    PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--readiness-report requires a JSON report path".to_string()
+                    })?);
+            }
+            "--output" | "-o" => {
+                index += 1;
+                output_path =
+                    Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--output requires a JSON file path".to_string()
+                    })?));
+            }
+            value => return Err(format!("Unsupported support-bundle option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let workspace_display = path_to_display(&workspace);
+    let doctor_args = vec![
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ];
+    let doctor_outcome = run_doctor_command(&doctor_args)?;
+    let doctor: Value =
+        serde_json::from_str(&doctor_outcome.message).map_err(|err| err.to_string())?;
+    let readiness = read_readiness_report(&readiness_report_path).unwrap_or_else(|err| {
+        json!({
+            "status": "missing",
+            "error": err,
+            "summary": {
+                "requiredChecks": 0,
+                "accepted": 0,
+                "failed": 0,
+                "evidenceGaps": 0
+            },
+            "checks": [],
+            "evidenceGaps": [],
+            "failures": []
+        })
+    });
+    let release_ready = readiness_release_ready(&readiness);
+    let recommendations = support_bundle_recommendations(&doctor, &readiness);
+    let mut report = json!({
+        "schema": "neditor.ned-support-bundle.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "version": env!("CARGO_PKG_VERSION"),
+        "platform": env::consts::OS,
+        "arch": env::consts::ARCH,
+        "workspace": workspace_display,
+        "privacy": {
+            "documentContentIncluded": false,
+            "secretsIncluded": false,
+            "note": "This bundle includes setup status, command paths, report paths, and release evidence summaries only."
+        },
+        "doctor": doctor,
+        "releaseReadiness": {
+            "reportPath": path_to_display(&readiness_report_path),
+            "status": readiness_string_field(&readiness, "status").unwrap_or("unknown"),
+            "releaseReady": release_ready,
+            "generatedAt": readiness_string_field(&readiness, "generatedAt"),
+            "summary": readiness.get("summary").cloned().unwrap_or_else(|| json!({})),
+            "evidenceGaps": readiness_array_field(&readiness, "evidenceGaps"),
+            "failures": readiness_array_field(&readiness, "failures"),
+            "nextCommands": readiness_next_commands(&readiness),
+        },
+        "recommendations": recommendations,
+    });
+
+    let written_to = if let Some(path) = output_path.as_ref() {
+        write_json_report(path, &report)?;
+        let written = path_to_display(path);
+        if let Value::Object(fields) = &mut report {
+            fields.insert("writtenTo".to_string(), json!(written));
+        }
+        Some(path_to_display(path))
+    } else {
+        None
+    };
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+
+    Ok(CliOutcome {
+        message: support_bundle_text_report(&report, written_to.as_deref()),
+        exit_code: 0,
     })
 }
 
@@ -1294,6 +1397,71 @@ fn readiness_next_commands(report: &Value) -> Vec<String> {
     commands
 }
 
+fn support_bundle_recommendations(doctor: &Value, readiness: &Value) -> Vec<String> {
+    let mut recommendations = Vec::new();
+    if readiness_string_field(doctor, "status").unwrap_or("unknown") != "ready" {
+        recommendations
+            .push("Review ned doctor warnings before sending files to business users.".to_string());
+    }
+    if !readiness_release_ready(readiness) {
+        recommendations.push(
+            "Close release-readiness evidence gaps before publishing installers or Homebrew casks."
+                .to_string(),
+        );
+    }
+    if readiness_string_field(readiness, "status").unwrap_or("unknown") == "missing" {
+        recommendations.push(
+            "Run pnpm run check:release-readiness in a developer checkout before release review."
+                .to_string(),
+        );
+    }
+    if recommendations.is_empty() {
+        recommendations
+            .push("Support bundle is ready for installation or release review.".to_string());
+    }
+    recommendations
+}
+
+fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> String {
+    let doctor_status = report
+        .get("doctor")
+        .and_then(|doctor| readiness_string_field(doctor, "status"))
+        .unwrap_or("unknown");
+    let readiness = report.get("releaseReadiness").unwrap_or(&Value::Null);
+    let readiness_status = readiness_string_field(readiness, "status").unwrap_or("unknown");
+    let evidence_gaps = readiness_array_field(readiness, "evidenceGaps").len();
+    let failures = readiness_array_field(readiness, "failures").len();
+    let recommendations = readiness_array_field(report, "recommendations")
+        .iter()
+        .filter_map(Value::as_str)
+        .map(|value| format!("  - {value}"))
+        .collect::<Vec<_>>();
+    let mut lines = vec![
+        "NEditor support bundle".to_string(),
+        format!(
+            "Workspace: {}",
+            readiness_string_field(report, "workspace").unwrap_or("unknown")
+        ),
+        format!("Doctor: {doctor_status}"),
+        format!("Release readiness: {readiness_status}"),
+        format!("Evidence gaps: {evidence_gaps}"),
+        format!("Failures: {failures}"),
+        "Privacy: no document content or secrets included".to_string(),
+    ];
+    if let Some(path) = written_to {
+        lines.push(format!("Wrote support bundle: {path}"));
+    }
+    if !recommendations.is_empty() {
+        lines.push("Recommendations:".to_string());
+        lines.extend(recommendations);
+    }
+    lines.push(
+        "Use --json or --output support.json when a help desk needs machine-readable evidence."
+            .to_string(),
+    );
+    lines.join("\n")
+}
+
 fn readiness_item_summary(item: &Value) -> String {
     let id = readiness_string_field(item, "id").unwrap_or("unknown");
     let status = readiness_string_field(item, "status").unwrap_or("unknown");
@@ -1323,6 +1491,40 @@ fn readiness_summary_count(report: &Value, field: &str) -> usize {
         .and_then(|summary| summary.get(field))
         .and_then(Value::as_u64)
         .unwrap_or(0) as usize
+}
+
+fn read_readiness_report(report_path: &Path) -> Result<Value, String> {
+    let report_text = fs::read_to_string(report_path).map_err(|err| {
+        format!(
+            "Could not read release-readiness report at {}: {err}. Run pnpm run check:release-readiness or pass --report <path>.",
+            report_path.display()
+        )
+    })?;
+    serde_json::from_str(&report_text).map_err(|err| {
+        format!(
+            "Could not parse release-readiness report at {}: {err}",
+            report_path.display()
+        )
+    })
+}
+
+fn write_json_report(path: &Path, report: &Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)
+                .map_err(|err| format!("Could not create {}: {err}", parent.display()))?;
+        }
+    }
+    let report_text = serde_json::to_string_pretty(report).map_err(|err| err.to_string())?;
+    fs::write(path, format!("{report_text}\n"))
+        .map_err(|err| format!("Could not write {}: {err}", path.display()))
+}
+
+fn unix_timestamp_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
 }
 
 fn doctor_warnings(
@@ -1707,6 +1909,9 @@ _ned() {{
       readiness|release-readiness)
         COMPREPLY=( $(compgen -W "--json --strict --report" -- "$cur") )
         ;;
+      support|support-bundle)
+        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --output" -- "$cur") )
+        ;;
       doctor)
         COMPREPLY=( $(compgen -W "--json --strict --workspace" -- "$cur") )
         ;;
@@ -1777,6 +1982,9 @@ _ned() {{
       ;;
     readiness|release-readiness)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when release gaps remain]' '--report[read a specific release-readiness report]:file:_files'
+      ;;
+    support|support-bundle)
+      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--output[write support bundle JSON]:file:_files'
       ;;
     completions|completion)
       _arguments '1:shell:($shells)'
@@ -1857,6 +2065,14 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from readiness release-readiness' -l strict"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from readiness release-readiness' -l report -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l workspace -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l readiness-report -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l output -s o -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from inspect' -l option -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from validate check' -l json".to_string(),
@@ -2182,6 +2398,8 @@ fn help_text() -> String {
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json]"
+            .to_string(),
+        "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--output support.json]"
             .to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),
         "  ned doctor [--json] [--strict] [--workspace path]".to_string(),

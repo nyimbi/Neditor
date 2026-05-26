@@ -381,6 +381,87 @@ fn ned_cli_reads_release_readiness_reports_without_rerunning_checks() {
 }
 
 #[test]
+fn ned_cli_creates_redaction_safe_support_bundles() {
+    let root = temp_workspace_path("support-bundle");
+    fs::create_dir_all(&root).expect("create support root");
+    let report_path = root.join("readiness.json");
+    let output_path = root.join("support").join("bundle.json");
+    let readiness = serde_json::json!({
+        "generatedAt": "2026-05-26T12:20:00.000Z",
+        "platform": "darwin",
+        "arch": "arm64",
+        "status": "release-ready",
+        "summary": {
+            "requiredChecks": 1,
+            "accepted": 1,
+            "failed": 0,
+            "evidenceGaps": 0
+        },
+        "checks": [],
+        "evidenceGaps": [],
+        "failures": []
+    });
+    fs::write(
+        &report_path,
+        serde_json::to_string_pretty(&readiness).expect("readiness json"),
+    )
+    .expect("write readiness fixture");
+
+    let json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "support".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--readiness-report".to_string(),
+        report_path.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("support json");
+    assert_eq!(json.exit_code, 0);
+    let bundle: serde_json::Value =
+        serde_json::from_str(&json.message).expect("support bundle json");
+    assert_eq!(bundle["schema"], "neditor.ned-support-bundle.v1");
+    assert_eq!(bundle["privacy"]["documentContentIncluded"], false);
+    assert_eq!(bundle["privacy"]["secretsIncluded"], false);
+    assert_eq!(bundle["doctor"]["schema"], "neditor.ned-doctor.v1");
+    assert_eq!(bundle["releaseReadiness"]["status"], "release-ready");
+    assert_eq!(bundle["releaseReadiness"]["releaseReady"], true);
+    assert!(bundle["recommendations"]
+        .as_array()
+        .expect("recommendations")
+        .iter()
+        .any(|recommendation| recommendation
+            .as_str()
+            .is_some_and(|value| value.contains("doctor warnings"))));
+
+    let text = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "support-bundle".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--readiness-report".to_string(),
+        report_path.to_string_lossy().to_string(),
+        "--output".to_string(),
+        output_path.to_string_lossy().to_string(),
+    ])
+    .expect("support output");
+    assert_eq!(text.exit_code, 0);
+    assert!(text.message.contains("NEditor support bundle"));
+    assert!(text.message.contains("Wrote support bundle"));
+    assert!(output_path.is_file());
+    let written: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(output_path).expect("read support output"))
+            .expect("written support json");
+    assert_eq!(written["schema"], "neditor.ned-support-bundle.v1");
+    assert!(
+        written["doctor"]["workspaceScaffold"]["recommended_command"]
+            .as_str()
+            .expect("recommended command")
+            .contains("ned init")
+    );
+}
+
+#[test]
 fn ned_cli_inspects_documents_without_writing_artifacts() {
     let source = temp_markdown_path("inspect");
     fs::write(&source, super::sample_document()).expect("write source markdown");
@@ -434,6 +515,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("init"));
     assert!(bash.message.contains("handlers"));
     assert!(bash.message.contains("readiness"));
+    assert!(bash.message.contains("support-bundle"));
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
     assert!(bash.message.contains("markdown-bundle"));
@@ -450,6 +532,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--stdout"));
     assert!(zsh.message.contains("--workspace"));
     assert!(zsh.message.contains("--report"));
+    assert!(zsh.message.contains("--readiness-report"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -462,6 +545,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("init"));
     assert!(fish.message.contains("handlers"));
     assert!(fish.message.contains("readiness"));
+    assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("epub"));
 
@@ -669,6 +753,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned targets"));
     assert!(outcome.message.contains("ned handlers"));
     assert!(outcome.message.contains("ned readiness"));
+    assert!(outcome.message.contains("ned support-bundle"));
     assert!(outcome.message.contains("ned completions"));
     assert!(outcome.message.contains("ned doctor"));
     assert!(outcome.message.contains("--workspace"));

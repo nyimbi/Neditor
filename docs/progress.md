@@ -3781,6 +3781,23 @@ Spreadsheet table exchange and SQL transform:
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`, preserving external signing, notarization, Google Docs, AI provider/runtime, cross-host, human sign-off, and optional engine evidence gaps. |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the readiness CLI implementation. |
 
+`ned support-bundle` help desk handoff:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed for `ned support` and `ned support-bundle` JSON output, file-output mode, redaction-safe privacy fields, embedded doctor reports, embedded release-readiness summaries, shell completions, and help text coverage. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --json` | Pass | Direct smoke returned `neditor.ned-support-bundle.v1` with no document content or secrets, `ned doctor` setup diagnostics, the current release-readiness summary, 16 external evidence gaps, and actionable support recommendations. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --output /private/tmp/neditor-support-bundle-smoke.json` | Pass | Direct smoke wrote a machine-readable support bundle and printed a concise support handoff summary with doctor status, release-readiness status, evidence-gap count, and privacy statement. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after adding Settings copy for support-bundle help desk handoffs. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the Settings command-line guidance refresh. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting `ned support-bundle` in the README and specification. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding the CLI support-bundle packaging contract. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after the support-bundle CLI extension. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after the support-bundle CLI extension. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` with the external proof blockers preserved. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle CLI implementation. |
+| `git diff --check` | Pass | No whitespace errors are present in the support-bundle diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
