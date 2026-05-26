@@ -80,6 +80,12 @@ import {
   qualityRecommendationMarkdown,
 } from "../src/lib/qualityRecommendations.js";
 import {
+  buildReleaseReadinessChecklist,
+  formatReleaseChecklistSummary,
+  releaseChecklistHelp,
+  releaseReadinessAuditMarkdown,
+} from "../src/lib/releaseReadiness.js";
+import {
   builtinTransformTemplates,
   normalizeCustomTransformTemplates,
   transformTemplateFillFields,
@@ -538,6 +544,69 @@ test("Docs Live covers business technical legal marketing and customer document 
   ok(draft.reviewPacket.sectionRunbook.some((item) => item.includes("Commercial Terms")));
 });
 
+test("Docs Live textbook and novel wizards plan structure before sequential chapter drafting", () => {
+  const textbookDraft = buildDocsLiveDraft({
+    documentType: "technical-textbook",
+    title: "Distributed Systems Textbook",
+    context: "audience: senior engineering students. evidence: course notes. owner: Faculty.",
+    placeholders: "audience: senior engineering students\nowner: Faculty\nevidence: course notes",
+    generatedAt: "2026-05-26T10:00:00.000Z",
+  });
+
+  equal(textbookDraft.documentType, "technical-textbook");
+  ok(textbookDraft.outlineText.includes("Textbook Architecture"));
+  ok(textbookDraft.outlineText.includes("Chapter 1 - Conceptual Foundation"));
+  ok(textbookDraft.outlineText.includes("Instructional Quality Review"));
+  ok(textbookDraft.questionnaire.includes("locked before prose is drafted"));
+  ok(textbookDraft.markdown.includes("locks the textbook architecture before prose is drafted"));
+  ok(textbookDraft.markdown.includes("drafts chapters in order"));
+  ok(textbookDraft.markdown.includes("Instructional quality review"));
+  ok(textbookDraft.reviewPacket.sectionRunbook.some((item) => item.includes("draft this chapter in sequence")));
+  ok(textbookDraft.reviewPacket.qaRegister.some((item) => item.includes("technical accuracy")));
+
+  const novelDraft = buildDocsLiveDraft({
+    documentType: "novel",
+    title: "The Atlas Signal",
+    context: "audience: adult speculative fiction readers. owner: Lead author. evidence: story bible.",
+    placeholders: "audience: adult speculative fiction readers\nowner: Lead author\nevidence: story bible",
+    generatedAt: "2026-05-26T10:05:00.000Z",
+  });
+
+  equal(novelDraft.documentType, "novel");
+  ok(novelDraft.outlineText.includes("Plot Outline"));
+  ok(novelDraft.outlineText.includes("Chapter 1 - Opening Image"));
+  ok(novelDraft.outlineText.includes("Narrative Quality Review"));
+  ok(novelDraft.questionnaire.includes("plot outline"));
+  ok(novelDraft.markdown.includes("locks the plot architecture before prose is drafted"));
+  ok(novelDraft.markdown.includes("drafts chapters in order"));
+  ok(novelDraft.markdown.includes("Narrative quality review"));
+  ok(novelDraft.reviewPacket.sectionRunbook.some((item) => item.includes("draft this chapter in sequence")));
+  ok(novelDraft.reviewPacket.qaRegister.some((item) => item.includes("story logic")));
+
+  const textbookTemplate = businessDocumentTemplates.find((template) => template.id === "technical-textbook")!;
+  const novelTemplate = businessDocumentTemplates.find((template) => template.id === "novel")!;
+  ok(textbookTemplate.summary.includes("outline first"));
+  ok(textbookTemplate.aiPrompt.includes("After the outline is approved"));
+  ok(textbookTemplate.outline.includes("Chapter Outline"));
+  ok(novelTemplate.summary.includes("plot first"));
+  ok(novelTemplate.aiPrompt.includes("After the plot is approved"));
+  ok(novelTemplate.outline.includes("Narrative Quality Review"));
+
+  const textbookPlan = buildAgenticWorkflowPlan({
+    instruction: "Create a technical textbook on distributed systems with sequential chapters",
+    contextAnswers: "audience: senior engineering students. owner: Faculty.",
+  });
+  ok(textbookPlan.qualityGates.some((gate) => gate.label === "Outline Architecture"));
+  ok(textbookPlan.qualityGates.some((gate) => gate.label === "Sequential Chapter Development"));
+
+  const novelPlan = buildAgenticWorkflowPlan({
+    instruction: "Create a novel with a locked plot outline and chapter-by-chapter drafting",
+    contextAnswers: "audience: adult speculative fiction readers. owner: Lead author.",
+  });
+  ok(novelPlan.qualityGates.some((gate) => gate.label === "Plot Architecture"));
+  ok(novelPlan.qualityGates.some((gate) => gate.label === "Narrative Quality Review"));
+});
+
 test("business document helpers fill identity templates snippets and wizard context", () => {
   const profile = normalizeBusinessProfile({
     fullName: "Jane Doe",
@@ -787,6 +856,62 @@ test("quality recommendations pass when a reviewed document has baseline structu
 
   deepEqual(recommendations.map((item) => item.id), ["qa-ready"]);
   equal(formatQualityRecommendationSummary(recommendations), "0 blockers, 0 risks, 0 improvements");
+});
+
+test("release readiness checklist reports missing governance state", () => {
+  const checklist = buildReleaseReadinessChecklist({
+    text: "# Draft\n\nUnreleased notes.",
+    semantic: {
+      status: "draft",
+      comments: [{ line: 4, author: "Legal", state: "open", text: "Check warranty language." }],
+      change_notes: [],
+      ai_sources: [],
+      ai_assisted_sections: [{ line: 2, heading: "Draft", status: "needs-review", reviewed_by: "", reviewed_at: "", source: "docs-live", prompt_summary: "draft" }],
+    },
+  });
+
+  const statusById = new Map(checklist.map((item) => [item.id, item.status]));
+  equal(statusById.get("release-state"), "needs-review");
+  equal(statusById.get("release-metadata"), "missing");
+  equal(statusById.get("approval-audit"), "missing");
+  equal(statusById.get("review-comments"), "needs-review");
+  equal(statusById.get("change-notes"), "needs-review");
+  equal(statusById.get("ai-review"), "needs-review");
+  equal(formatReleaseChecklistSummary(checklist), "0 complete, 2 missing, 4 need review");
+  ok(releaseChecklistHelp(checklist).includes("Resolve release metadata"));
+});
+
+test("release readiness checklist and audit pass for approved documents", () => {
+  const checklist = buildReleaseReadinessChecklist({
+    text: [
+      "---",
+      "status: approved",
+      "version: 2.0.0",
+      "owner: Strategy Office",
+      "releaseTarget: Client PDF",
+      "reviewer: QA Lead",
+      "approvedAt: 2026-05-26T00:00:00.000Z",
+      "---",
+      "",
+      "# Final Report",
+      "",
+    ].join("\n"),
+    semantic: {
+      status: "approved",
+      comments: [{ line: 12, author: "QA", state: "resolved", text: "Resolved." }],
+      change_notes: [{ line: 13, author: "QA", text: "Approved release package." }],
+      ai_sources: [{ line: 14, provider: "local", model: "draft", date: "2026-05-26", prompt_summary: "Draft", reviewed_by: "QA Lead", reviewed_at: "2026-05-26T00:00:00.000Z", status: "human-reviewed" }],
+      ai_assisted_sections: [],
+    },
+  });
+
+  deepEqual(checklist.map((item) => item.status), ["complete", "complete", "complete", "complete", "complete", "complete"]);
+  equal(formatReleaseChecklistSummary(checklist), "6 complete, 0 missing, 0 need review");
+  ok(releaseChecklistHelp(checklist).includes("local release metadata"));
+  const markdown = releaseReadinessAuditMarkdown(checklist);
+  ok(markdown.includes("## Release Readiness Audit"));
+  ok(markdown.includes("| Ownership metadata | complete | version 2.0.0"));
+  ok(markdown.includes("QA Lead"));
 });
 
 test("agentic workflow planner coordinates creation revision review and distribution", () => {

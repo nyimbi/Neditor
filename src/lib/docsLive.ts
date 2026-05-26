@@ -128,6 +128,17 @@ interface DocsLiveBlueprint {
   defaultOutline: string[];
   questions: string[];
   sectionFocus: string[];
+  workflow?: DocsLiveWorkflowProfile;
+}
+
+interface DocsLiveWorkflowProfile {
+  planningLabel: string;
+  planningInstruction: string;
+  sequencingLabel: string;
+  sequencingInstruction: string;
+  qualityLabel: string;
+  qualityInstruction: string;
+  unitLabel: string;
 }
 
 const blueprints: Record<DocsLiveDocumentType, DocsLiveBlueprint> = {
@@ -232,25 +243,73 @@ const blueprints: Record<DocsLiveDocumentType, DocsLiveBlueprint> = {
   },
   "technical-textbook": {
     label: "Technical textbook",
-    defaultOutline: ["Chapter Overview", "Learning Outcomes", "Conceptual Foundation", "Technical Deep Dive", "Worked Examples", "Exercises", "Common Pitfalls", "Chapter Summary", "Further Reading"],
+    defaultOutline: [
+      "Textbook Architecture",
+      "Chapter Outline",
+      "Reader Prerequisites",
+      "Chapter 1 - Conceptual Foundation",
+      "Chapter 2 - Technical Model",
+      "Chapter 3 - Worked Examples",
+      "Chapter 4 - Practice Exercises",
+      "Chapter 5 - Pitfalls and Review",
+      "Instructional Quality Review",
+    ],
     questions: [
       "What subject, reader level, and prerequisite knowledge should the chapter assume?",
+      "What textbook outline, chapter order, learning outcomes, and prerequisite sequence should be locked before prose is drafted?",
       "Which definitions, equations, code, diagrams, or technical standards must be covered?",
-      "What worked examples and exercises should reinforce the material?",
-      "Which citations, glossary terms, and review questions are required?",
+      "Which worked examples, exercises, glossary terms, citations, and review questions should be assigned to each chapter?",
+      "What instructional quality criteria should be checked after the sequential chapter draft is complete?",
     ],
-    sectionFocus: ["overview", "outcomes", "concepts", "technical detail", "examples", "exercises", "pitfalls", "summary", "references"],
+    sectionFocus: ["textbook architecture", "chapter outline", "prerequisites", "conceptual foundation", "technical model", "worked examples", "practice exercises", "pitfalls and review", "instructional QA"],
+    workflow: {
+      planningLabel: "Textbook architecture",
+      planningInstruction:
+        "Lock the textbook outline before prose is drafted: chapter order, learning outcomes, prerequisites, examples, exercises, and assessment logic.",
+      sequencingLabel: "Sequential chapter drafting",
+      sequencingInstruction:
+        "Draft chapters in order, carrying definitions, notation, examples, exercises, and learner scaffolding forward only after the previous chapter contract is reviewed.",
+      qualityLabel: "Instructional quality review",
+      qualityInstruction:
+        "Review the completed chapter sequence for technical accuracy, learning progression, equation/code integrity, exercise coverage, glossary consistency, and citation readiness.",
+      unitLabel: "chapter",
+    },
   },
   novel: {
     label: "Novel",
-    defaultOutline: ["Premise", "Characters", "Setting", "Act I", "Act II", "Act III", "Chapter Beats", "Themes", "Revision Notes"],
+    defaultOutline: [
+      "Story Premise",
+      "Character Arcs",
+      "World and Continuity Rules",
+      "Plot Outline",
+      "Chapter 1 - Opening Image",
+      "Chapter 2 - Inciting Incident",
+      "Chapter 3 - Rising Complications",
+      "Chapter 4 - Midpoint Reversal",
+      "Chapter 5 - Crisis and Climax",
+      "Chapter 6 - Resolution",
+      "Narrative Quality Review",
+    ],
     questions: [
       "What genre, premise, point of view, tense, and target reader should guide the draft?",
+      "What plot outline, character arcs, world rules, and chapter sequence should be locked before prose is drafted?",
       "Who are the central characters and what do they want, fear, hide, or change?",
       "What conflict, stakes, setting rules, and thematic questions should shape the story?",
-      "Which chapter beats or scenes should be drafted first?",
+      "What narrative quality criteria should be checked after chapters are drafted sequentially?",
     ],
-    sectionFocus: ["premise", "characters", "setting", "opening", "complications", "climax", "beats", "themes", "revision"],
+    sectionFocus: ["premise", "character arcs", "continuity rules", "plot outline", "opening image", "inciting incident", "rising complications", "midpoint reversal", "crisis and climax", "resolution", "narrative QA"],
+    workflow: {
+      planningLabel: "Plot architecture",
+      planningInstruction:
+        "Lock the plot before prose is drafted: premise, character arcs, point of view, world rules, act turns, chapter order, and continuity promises.",
+      sequencingLabel: "Sequential chapter drafting",
+      sequencingInstruction:
+        "Draft chapters in order so causality, character motivation, tension, revelations, scene goals, and continuity evolve deliberately from one chapter to the next.",
+      qualityLabel: "Narrative quality review",
+      qualityInstruction:
+        "Review the completed chapter sequence for story logic, emotional causality, character arc movement, voice, pacing, scene necessity, continuity, and AI-sounding prose.",
+      unitLabel: "chapter",
+    },
   },
   "podcast-script": {
     label: "Podcast script",
@@ -511,8 +570,8 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
   const issues = buildDraftIssues(request, placeholders, sections);
   const draftingDepth = normalizeDraftingDepth(request.draftingDepth);
   const sectionDrafts = sections.map((section, index) => buildSectionDraft(section, index, blueprint, placeholders, contextSentences));
-  const workflow = buildDocsLiveWorkflow(sectionDrafts, placeholders, contextSentences, issues);
-  const reviewPacket = buildDocsLiveReviewPacket(request, sectionDrafts, placeholders, contextSentences, issues);
+  const workflow = buildDocsLiveWorkflow(sectionDrafts, placeholders, contextSentences, issues, blueprint);
+  const reviewPacket = buildDocsLiveReviewPacket(request, sectionDrafts, placeholders, contextSentences, issues, blueprint);
   const markdown = humanizeDraftText(
     [
       "---",
@@ -534,9 +593,9 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
       "",
       docsLiveReviewMarker("Docs Live systematic outline-to-draft workflow"),
       "",
-      draftingPlanTable(workflow, sectionDrafts, draftingDepth),
+      draftingPlanTable(workflow, sectionDrafts, draftingDepth, blueprint),
       "",
-      reviewPacketMarkdown(reviewPacket),
+      reviewPacketMarkdown(reviewPacket, blueprint),
       "",
       ...sectionDrafts.flatMap((section, index) =>
         draftSection(section, index, sectionDrafts.length, blueprint, placeholders, contextSentences, draftingDepth),
@@ -549,7 +608,7 @@ export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft
       "",
       "### Quality Assurance",
       "",
-      ...qualityChecklist(sections, placeholders).map((item) => `- [ ] ${item}`),
+      ...qualityChecklist(sections, placeholders, blueprint).map((item) => `- [ ] ${item}`),
       "",
       "### Humanization Pass",
       "",
@@ -692,13 +751,17 @@ function buildDocsLiveWorkflow(
   placeholders: Record<string, string>,
   contextSentences: string[],
   issues: string[],
+  blueprint: DocsLiveBlueprint,
 ): DocsLiveWorkflowStep[] {
+  const workflow = workflowProfileFor(blueprint);
   return [
     {
       id: "outline",
-      label: "Outline locked",
+      label: blueprint.workflow ? `${workflow.planningLabel} locked` : "Outline locked",
       status: sections.length ? "complete" : "needs-input",
-      detail: `${sections.length} planned section${sections.length === 1 ? "" : "s"} ready for systematic drafting.`,
+      detail: blueprint.workflow
+        ? `${workflow.planningInstruction} ${sections.length} planned ${workflow.unitLabel}${sections.length === 1 ? "" : "s"} ready for systematic drafting.`
+        : `${sections.length} planned section${sections.length === 1 ? "" : "s"} ready for systematic drafting.`,
     },
     {
       id: "context",
@@ -710,15 +773,17 @@ function buildDocsLiveWorkflow(
     },
     {
       id: "draft",
-      label: "Section-by-section draft",
+      label: workflow.sequencingLabel,
       status: "complete",
-      detail: "Each outline item receives a body draft, local evidence prompts, and a review handoff.",
+      detail: blueprint.workflow ? workflow.sequencingInstruction : "Each outline item receives a body draft, local evidence prompts, and a review handoff.",
     },
     {
       id: "qa",
-      label: "Quality assurance",
+      label: workflow.qualityLabel,
       status: issues.length ? "needs-input" : "complete",
-      detail: issues.length ? `${issues.length} item${issues.length === 1 ? "" : "s"} need attention before review.` : "Generated QA gates are ready.",
+      detail: issues.length
+        ? `${issues.length} item${issues.length === 1 ? "" : "s"} need attention before review. ${workflow.qualityInstruction}`
+        : workflow.qualityInstruction,
     },
     {
       id: "humanize",
@@ -741,10 +806,14 @@ function buildDocsLiveReviewPacket(
   placeholders: Record<string, string>,
   contextSentences: string[],
   issues: string[],
+  blueprint: DocsLiveBlueprint,
 ): DocsLiveReviewPacket {
   const placeholderCount = Object.keys(placeholders).length;
+  const workflow = workflowProfileFor(blueprint);
   const contextSources = [
-    `${sections.length} outline section${sections.length === 1 ? "" : "s"} locked before drafting.`,
+    blueprint.workflow
+      ? `${workflow.planningInstruction} ${sections.length} planned ${workflow.unitLabel}${sections.length === 1 ? "" : "s"} locked before drafting.`
+      : `${sections.length} outline section${sections.length === 1 ? "" : "s"} locked before drafting.`,
     request.transcript?.trim() ? "Voice or dictated direction captured as drafting intent." : "Voice direction not supplied; use written context during review.",
     request.context?.trim() ? "Freeform document context captured." : "Freeform document context missing or minimal.",
     request.questionnaireAnswers?.trim()
@@ -759,10 +828,13 @@ function buildDocsLiveReviewPacket(
   ];
   const sectionRunbook = sections.map(
     (section, index) =>
-      `${index + 1}. ${section.title}: draft body, run QA against ${section.qaFocus}, humanize the prose, then hand to reviewer.`,
+      blueprint.workflow
+        ? `${index + 1}. ${section.title}: draft this ${workflow.unitLabel} in sequence only after the ${workflow.planningLabel.toLowerCase()} is locked, run ${workflow.qualityLabel.toLowerCase()} against ${section.qaFocus}, humanize the prose, then hand to reviewer.`
+        : `${index + 1}. ${section.title}: draft body, run QA against ${section.qaFocus}, humanize the prose, then hand to reviewer.`,
   );
   const qaRegister = [
     ...issues,
+    ...(blueprint.workflow ? [workflow.qualityInstruction] : []),
     ...sections.map((section) => section.qaSummary),
     "Final export should remain blocked until unresolved facts, figures, citations, and assumptions are checked.",
   ];
@@ -806,11 +878,19 @@ function docsLiveSourceBlock(generatedAt: string, documentType: DocsLiveDocument
   ].join("\n");
 }
 
-function draftingPlanTable(workflow: DocsLiveWorkflowStep[], sections: DocsLiveSectionDraft[], draftingDepth: DocsLiveDraftDepth) {
+function draftingPlanTable(
+  workflow: DocsLiveWorkflowStep[],
+  sections: DocsLiveSectionDraft[],
+  draftingDepth: DocsLiveDraftDepth,
+  blueprint: DocsLiveBlueprint,
+) {
+  const profile = workflowProfileFor(blueprint);
   return [
     "## Drafting Plan",
     "",
-    `Docs Live will work through the outline section by section at ${draftingDepth} depth, then attach QA, humanization, and review handoff notes.`,
+    blueprint.workflow
+      ? `Docs Live first locks the ${profile.planningLabel.toLowerCase()} before prose is drafted, drafts ${profile.unitLabel}s in order at ${draftingDepth} depth, then runs ${profile.qualityLabel.toLowerCase()} before review handoff.`
+      : `Docs Live will work through the outline section by section at ${draftingDepth} depth, then attach QA, humanization, and review handoff notes.`,
     "",
     "| Stage | Status | Detail |",
     "| --- | --- | --- |",
@@ -822,11 +902,14 @@ function draftingPlanTable(workflow: DocsLiveWorkflowStep[], sections: DocsLiveS
   ].join("\n");
 }
 
-function reviewPacketMarkdown(packet: DocsLiveReviewPacket) {
+function reviewPacketMarkdown(packet: DocsLiveReviewPacket, blueprint: DocsLiveBlueprint) {
+  const profile = workflowProfileFor(blueprint);
   return [
     "## Section-by-section Draft Runbook",
     "",
-    "Docs Live uses the outline as the work queue. Each section is drafted, checked, humanized, and packaged for review before the next approval step.",
+    blueprint.workflow
+      ? `Docs Live uses the ${profile.planningLabel.toLowerCase()} as the work queue. The outline or plot is settled first; each ${profile.unitLabel} is then drafted sequentially, checked, humanized, and packaged for review before ${profile.qualityLabel.toLowerCase()}.`
+      : "Docs Live uses the outline as the work queue. Each section is drafted, checked, humanized, and packaged for review before the next approval step.",
     "",
     "### Context Package",
     "",
@@ -932,13 +1015,22 @@ function buildSectionDraft(
   contextSentences: string[],
 ): DocsLiveSectionDraft {
   const focus = blueprint.sectionFocus[index % blueprint.sectionFocus.length];
+  const workflow = workflowProfileFor(blueprint);
   const owner = placeholders.owner || placeholders.reviewer || "the named owner";
   const evidence = placeholders.evidence || placeholders.source || "the strongest available evidence";
-  const draftingBrief = `Frame the ${focus} for ${placeholders.audience || "the intended reader"} and connect it to the next decision.`;
+  const draftingBrief = blueprint.workflow
+    ? `Draft this ${workflow.unitLabel} only after the ${workflow.planningLabel.toLowerCase()} is locked; frame the ${focus} for ${placeholders.audience || "the intended reader"} and connect it to the next ${workflow.unitLabel}.`
+    : `Frame the ${focus} for ${placeholders.audience || "the intended reader"} and connect it to the next decision.`;
   const contextBridge = contextSentences[index % Math.max(1, contextSentences.length)] || "Use the outline intent and keep unresolved facts visibly marked.";
-  const qaSummary = `${section.title} must tie ${focus} claims to ${evidence}, name ownership, and avoid unsupported certainty.`;
-  const humanizedAngle = `Make ${section.title} sound like a responsible subject-matter owner wrote it: specific nouns, concrete verbs, and no generic AI filler.`;
-  const reviewHandoff = `${owner} should verify the ${focus}, fill missing facts, and decide whether this section can be marked human-reviewed.`;
+  const qaSummary = blueprint.workflow
+    ? `${section.title} must advance the locked ${workflow.planningLabel.toLowerCase()}, tie ${focus} claims to ${evidence}, and satisfy ${workflow.qualityLabel.toLowerCase()}.`
+    : `${section.title} must tie ${focus} claims to ${evidence}, name ownership, and avoid unsupported certainty.`;
+  const humanizedAngle = blueprint.workflow
+    ? `Make ${section.title} read like a deliberate ${workflow.unitLabel} written by a human author: concrete moments, specific terms, varied cadence, and no generic AI filler.`
+    : `Make ${section.title} sound like a responsible subject-matter owner wrote it: specific nouns, concrete verbs, and no generic AI filler.`;
+  const reviewHandoff = blueprint.workflow
+    ? `${owner} should verify the ${focus}, confirm this ${workflow.unitLabel} follows the planned sequence, and decide whether it can move into ${workflow.qualityLabel.toLowerCase()}.`
+    : `${owner} should verify the ${focus}, fill missing facts, and decide whether this section can be marked human-reviewed.`;
   return {
     title: section.title,
     level: section.level,
@@ -973,18 +1065,21 @@ function buildSectionDraft(
     ],
     qaChecks: [
       `${section.title} makes one clear point before adding detail.`,
+      ...(blueprint.workflow ? [`The ${workflow.planningLabel.toLowerCase()} remains stable before drafting continues to the next ${workflow.unitLabel}.`] : []),
       `Claims are tied to ${evidence}, a named owner, a date, or a citation.`,
       `The section explains what ${owner} should do next.`,
     ],
     qaSummary,
     humanizationNotes: [
       "Replace generic claims with named facts, numbers, teams, customers, dates, or examples.",
+      ...(blueprint.workflow ? [`Preserve chapter-to-chapter continuity so the next ${workflow.unitLabel} can build on this one without re-planning.`] : []),
       "Cut filler phrases, repeated framing, and any sentence that sounds like a prompt response.",
       "Keep the cadence natural: short setup, specific evidence, then a concrete implication.",
     ],
     humanizedAngle,
     reviewQuestions: [
       `Does ${section.title} answer the reader's likely first question?`,
+      ...(blueprint.workflow ? [`Does this ${workflow.unitLabel} follow the locked sequence and prepare the next ${workflow.unitLabel}?`] : []),
       "What is still unverified and should remain marked before approval?",
     ],
     reviewHandoff,
@@ -1088,14 +1183,34 @@ function factSentence(placeholders: Record<string, string>) {
     .join("; ");
 }
 
-function qualityChecklist(sections: OutlinePlanItem[], placeholders: Record<string, string>) {
+function qualityChecklist(sections: OutlinePlanItem[], placeholders: Record<string, string>, blueprint: DocsLiveBlueprint) {
+  const workflow = workflowProfileFor(blueprint);
   return [
     `Every planned section has a drafted body (${sections.length} section${sections.length === 1 ? "" : "s"}).`,
+    ...(blueprint.workflow
+      ? [
+          `${workflow.planningLabel} was locked before prose drafting began.`,
+          `${workflow.sequencingLabel} was followed without skipping ahead or changing continuity silently.`,
+          workflow.qualityInstruction,
+        ]
+      : []),
     "Each recommendation, risk, date, and amount is backed by source material.",
     "The opening section states the audience, decision, and desired next action.",
     Object.keys(placeholders).length ? "Placeholder values were inserted and checked for accuracy." : "Missing placeholder values were filled or explicitly marked.",
     "AI provenance and review markers remain until a human reviewer signs off.",
   ];
+}
+
+function workflowProfileFor(blueprint: DocsLiveBlueprint): DocsLiveWorkflowProfile {
+  return blueprint.workflow || {
+    planningLabel: "Outline",
+    planningInstruction: "Lock the outline before prose is drafted.",
+    sequencingLabel: "Section-by-section draft",
+    sequencingInstruction: "Draft each section in outline order with local evidence prompts and a review handoff.",
+    qualityLabel: "Quality assurance",
+    qualityInstruction: "Check every section for factual support, reader fit, unresolved assumptions, and review readiness.",
+    unitLabel: "section",
+  };
 }
 
 function extractContextSentences(input: string) {

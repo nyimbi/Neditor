@@ -2259,14 +2259,32 @@ function qualityGateProfiles(): Record<DocsLiveDocumentType, Array<Omit<AgenticQ
       qualityGate("Reusable Materials", "Teacher notes, learner handouts, discussion prompts, and practice materials are separated for reuse.", ["Teacher notes present", "Handout content present"]),
     ],
     "technical-textbook": [
-      qualityGate("Technical Rigor", "Definitions, assumptions, equations, code, diagrams, and standards are accurate and consistently named.", ["Definitions present", "Technical assumptions reviewed"]),
-      qualityGate("Learning Design", "Outcomes, worked examples, exercises, pitfalls, summaries, and further reading support mastery.", ["Exercises present", "Worked examples present"]),
-      qualityGate("Reference Integrity", "Claims, formulas, external standards, and glossary terms are citation-ready before publication.", ["References present", "Glossary terms reviewed"]),
+      qualityGate("Outline Architecture", "The textbook architecture, chapter order, prerequisites, outcomes, notation, examples, exercises, and assessment path are locked before prose drafting.", [
+        "Chapter outline locked",
+        "Learning progression reviewed",
+      ]),
+      qualityGate("Sequential Chapter Development", "Each chapter builds from the previous one without skipped prerequisites, silent notation changes, or unreviewed exercise dependencies.", [
+        "Chapter sequence followed",
+        "Examples and exercises aligned",
+      ]),
+      qualityGate("Instructional Quality Review", "The completed chapter sequence is checked for technical accuracy, learning progression, equation/code integrity, exercise coverage, glossary consistency, and citation readiness.", [
+        "Technical accuracy reviewed",
+        "Instructional QA complete",
+      ]),
     ],
     novel: [
-      qualityGate("Story Spine", "Premise, genre, protagonist goal, conflict, stakes, and act or chapter beats are coherent.", ["Premise present", "Stakes and conflict named"]),
-      qualityGate("Character Arc", "Character motivations, secrets, relationships, and change arcs are specific enough for drafting.", ["Character goals present", "Arc notes present"]),
-      qualityGate("Voice and Continuity", "Point of view, tense, setting rules, themes, and continuity notes are consistent.", ["POV and tense set", "Continuity notes present"]),
+      qualityGate("Plot Architecture", "Premise, genre, protagonist goal, conflict, stakes, point of view, world rules, act turns, and chapter order are locked before prose drafting.", [
+        "Plot outline locked",
+        "Chapter order reviewed",
+      ]),
+      qualityGate("Sequential Chapter Development", "Each chapter advances causality, tension, character motivation, revelations, and continuity from the previous chapter.", [
+        "Chapter sequence followed",
+        "Character movement reviewed",
+      ]),
+      qualityGate("Narrative Quality Review", "The completed chapter sequence is checked for story logic, emotional causality, character arc movement, voice, pacing, scene necessity, continuity, and AI-sounding prose.", [
+        "Narrative QA complete",
+        "Voice and continuity reviewed",
+      ]),
     ],
     "podcast-script": [
       qualityGate("Episode Shape", "Cold open, intro, segment goals, transitions, outro, and calls to action are timed and clear.", ["Segments present", "Timing notes present"]),

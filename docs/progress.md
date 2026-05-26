@@ -39,6 +39,22 @@ Recent pushed checkpoints visible in current git history:
   generates the insertable QA report Markdown. Frontend unit coverage directly
   verifies blocker/risk/improvement classification, pass-state behavior, and
   report generation, reducing the QA feature's coupling to `src/App.vue`.
+- Release readiness checks now have a dedicated typed implementation module
+  instead of living only inside the workbench component. `src/lib/releaseReadiness.ts`
+  builds local publish/release gate checks for status, ownership metadata,
+  approval audit fields, unresolved review comments, change notes, and
+  unreviewed AI provenance; formats the status summary and Help guidance; and
+  generates the insertable release audit Markdown. Frontend unit coverage
+  directly verifies both missing-governance and approved-document paths.
+- Docs Live textbook and novel wizards now start with structure instead of
+  prose. Technical textbooks lock textbook architecture, chapter order,
+  prerequisites, learning outcomes, examples, exercises, and assessment logic
+  before sequential chapter drafting and instructional quality review. Novels
+  lock plot architecture, character arcs, world rules, chapter order, and
+  continuity promises before sequential chapter drafting and narrative quality
+  review. The business-document templates and Agent Workspace quality gates use
+  the same outline/plot-first contract, and frontend unit coverage verifies the
+  generated drafts, template metadata, and quality gates.
 - Application navigation now exposes NEditor's capabilities through both menus
   and buttons. The workbench header has visible File, Edit, View, Writing
   Tools, Quality, Export, and Help menus that mirror the native desktop menu
@@ -3232,6 +3248,19 @@ Quality recommendation modularization:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the evidence refresh. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the QA extraction, preserving the visible menu and Review sidebar QA workflow proof. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing browser evidence. |
+
+Release readiness extraction and long-form wizard sequencing:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after extracting release-readiness checklist logic and making textbook/novel Docs Live workflows outline-or-plot-first. |
+| `pnpm run test:unit` | Pass | 55 frontend unit tests passed, including direct release-readiness missing/approved-state coverage and textbook/novel wizard sequencing coverage for generated drafts, business templates, and Agent Workspace quality gates. |
+| `git diff --check` | Pass | No whitespace errors are present in the release-readiness and long-form wizard sequencing diff. |
+| `pnpm run build` | Pass | Production Vue/Vite build passed with the extracted release-readiness module and updated long-form wizard behavior. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting release-readiness extraction and long-form wizard sequencing; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the evidence refresh. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the release-readiness extraction and textbook/novel wizard sequencing changes. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` with refreshed browser workflow evidence. |
 
 ## Next Execution Order
 
