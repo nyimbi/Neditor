@@ -1846,6 +1846,17 @@ test("agentic workflow planner coordinates creation revision review and distribu
   ok(appendedContext.includes("Rationale:"));
   ok(appendedContext.includes("Context signals:"));
   ok(appendedContext.includes("Context completeness"));
+
+  const replanned = buildAgenticWorkflowPlan({
+    instruction: plan.instruction,
+    contextAnswers: appendedContext,
+    documentTitle: "Board Memo",
+    documentText: "# Board Memo\n\nDraft notes.",
+  });
+  ok(replanned.contextAnswers.includes(intentAssistance!.suggestedAnswer));
+  ok(replanned.context.includes("Agent context answers:"));
+  ok(replanned.stepAssistance.length === replanned.steps.length);
+  ok(replanned.stepAssistance.every((assistance) => assistance.contextUsed.some((signal) => signal.includes("Context completeness"))));
 });
 
 test("agentic workflow planner uses context answers to close missing inputs", () => {
@@ -3599,6 +3610,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="AI step-by-step assistance"'));
   ok(app.includes("agentPlan.stepAssistance"));
   ok(app.includes("appendAgentStepAssistance"));
+  ok(app.includes("Add answer and replan"));
+  ok(app.includes("and replanned"));
   ok(app.includes("runAgentAssistedStep"));
   ok(app.includes("Suggested optimal answers for each creation, revision, review, and distribution step."));
   ok(app.includes("agentPlan.revisionModes"));

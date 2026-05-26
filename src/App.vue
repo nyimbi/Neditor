@@ -3725,7 +3725,7 @@
                 <li v-for="signal in assistance.contextUsed" :key="signal">{{ signal }}</li>
               </ul>
               <div class="agent-lifecycle-actions">
-                <button type="button" @click="appendAgentStepAssistance(assistance)">Add answer</button>
+                <button type="button" @click="appendAgentStepAssistance(assistance)">Add answer and replan</button>
                 <button type="button" @click="runAgentAssistedStep(assistance)">Run step</button>
               </div>
             </article>
@@ -9380,12 +9380,8 @@ function runAgentControlAction(action: AgenticNextAction | AgentRunHistoryNextAc
 }
 function appendAgentStepAssistance(assistance: AgenticStepAssistance) {
   agentContextAnswers.value = appendAgenticStepAssistanceContext(agentContextAnswers.value, assistance);
-  agentPlan.value = null;
-  agentRun.value = null;
-  agentProviderPackage.value = null;
-  agentProviderResult.value = null;
-  localAgentHandoffResult.value = null;
-  store.statusMessage = `Added AI step assistance for ${assistance.stepLabel}`;
+  buildAgentWorkspacePlan();
+  store.statusMessage = `Added AI step assistance for ${assistance.stepLabel} and replanned ${agentPlan.value?.steps.length || 0} steps`;
 }
 function runAgentAssistedStep(assistance: AgenticStepAssistance) {
   const step = agentPlan.value?.steps.find((item) => item.id === assistance.stepId);

@@ -112,6 +112,13 @@ Recent pushed checkpoints visible in current git history:
   humanization, and review handoff. The same stage assistance appears in the UI
   and generated Drafting Plan table so users can see the suggested next action
   and context signals while moving through the document creation process.
+- Agent Workspace step assistance now makes the accept/replan loop one action:
+  **Add answer and replan** appends the selected context-aware optimal answer
+  with rationale and context signals, immediately rebuilds the plan from the
+  updated answers, clears stale run/provider state, and reports the replanned
+  step count. Focused frontend unit/static coverage proves the appended answer
+  becomes the next plan context and that every replanned step still receives
+  context-aware assistance.
 - The References sidebar front-matter manager parser is now more tolerant of
   business-document YAML edge cases: CRLF front matter, quoted `#` characters,
   comma-containing inline data-source lists, `yml` aliases, URL/Windows/parent
@@ -2769,6 +2776,16 @@ Piecewise and styled LaTeX equation verification:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with the current equation evidence recorded. |
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the equation renderer update. |
 | `git diff --check` | Pass | No whitespace errors after the piecewise/styled LaTeX renderer update. |
+
+Agentic step assistance accept-and-replan verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after making Agent Workspace step assistance accept and immediately replan from the appended suggested answer, including proof that the accepted answer becomes next-plan context and that replanned steps retain context-aware assistance. |
+| `pnpm run check:docs` | Pass | 15 Markdown files were checked after updating the step-assistance evidence; local links resolve. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with the accept-and-replan proof recorded. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the Agent Workspace step-assistance update. |
+| `git diff --check` | Pass | No whitespace errors after the Agent Workspace step-assistance update. |
 
 AI paste code fence cleanup verification:
 
