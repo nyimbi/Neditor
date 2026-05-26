@@ -99,7 +99,7 @@ import {
   formatQualityRecommendationSummary,
   qualityRecommendationMarkdown,
 } from "../src/lib/qualityRecommendations.js";
-import { isAiSourceFenceOpener, rewriteAiSourceReviewBlock } from "../src/lib/provenanceReview.js";
+import { isAiSourceFenceOpener, markdownFenceOpener, rewriteAiSourceReviewBlock } from "../src/lib/provenanceReview.js";
 import {
   buildReleaseReadinessChecklist,
   formatReleaseChecklistSummary,
@@ -1404,6 +1404,11 @@ test("AI source review helper supports tilde fences aliases and inert examples",
     "~~~",
   ];
   ok(isAiSourceFenceOpener(lines[0]));
+  deepEqual(markdownFenceOpener("  ~~~chart title=\"Pipeline\""), {
+    marker: "~~~",
+    info: 'chart title="Pipeline"',
+    language: "chart",
+  });
   equal(rewriteAiSourceReviewBlock(lines, 0, true, "2026-05-26T12:00:00.000Z"), true);
   deepEqual(lines, [
     "~~~llm-source",
@@ -3015,6 +3020,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Collapse all toolbars"));
   ok(app.includes("Expand all toolbars"));
   ok(app.includes("toggleToolbarRow"));
+  ok(app.includes("markdownFenceOpener(text)"));
+  ok(app.includes("isAiSourceFenceOpener(text)"));
+  ok(app.includes("stripMarkdownFencedBlocks"));
   ok(app.includes("interface CommandPaletteCommand"));
   ok(app.includes("commandSearchText(command).includes(query)"));
   ok(app.includes("Place another cursor on the line above for parallel edits."));

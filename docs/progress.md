@@ -146,6 +146,10 @@ Recent pushed checkpoints visible in current git history:
 - Transform template fill-field detection now recognizes tilde-fenced `calc`
   and structured transform templates, so custom templates expose editable values
   consistently with compiler-supported fence syntax.
+- The editor UI now uses the shared frontend fence opener for source
+  decorations, transform-engine detection, and compact AI/Docs Live previews,
+  so tilde-fenced transform and provenance blocks receive the same ergonomic
+  treatment as backtick-fenced blocks.
 - AI provenance collection now follows the same fence policy: `ai-source`,
   `ai-provenance`, and `llm-source` blocks can use backtick or tilde fences,
   while nested provenance examples remain inert and do not create semantic

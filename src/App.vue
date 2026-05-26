@@ -4395,6 +4395,7 @@ import {
   qualityRecommendationMarkdown as qualityRecommendationsToMarkdown,
   type QualityRecommendation,
 } from "./lib/qualityRecommendations";
+import { isAiSourceFenceOpener, markdownFenceOpener } from "./lib/provenanceReview";
 import {
   buildReleaseReadinessChecklist,
   formatReleaseChecklistSummary,
@@ -5053,6 +5054,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
 const codeFenceSnippet = "```markdown\n\n```\n";
+const markdownFencedBlockPattern = /^(~~~|```)[^\n]*\n[\s\S]*?\n\1[ \t]*$/gm;
 const figureCropPositions: FigureCropPosition[] = ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"];
 const figureCropPositionGrid: Record<FigureCropPosition, { x: -1 | 0 | 1; y: -1 | 0 | 1 }> = {
   center: { x: 0, y: 0 },
@@ -7345,13 +7347,17 @@ function agentRunHistoryItem(
   };
 }
 function agentPacketPreview(markdown: string) {
-  return markdown
-    .replace(/```[\s\S]*?```/g, " ")
+  return stripMarkdownFencedBlocks(markdown)
     .replace(/[#>*_`[\]-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 260);
 }
+
+function stripMarkdownFencedBlocks(value: string) {
+  return value.replace(markdownFencedBlockPattern, " ");
+}
+
 function defaultAgentLifecycleTaskState(task: AgenticLifecycleTask): AgentLifecycleTaskState {
   return {
     taskId: task.id,
@@ -11601,7 +11607,8 @@ function buildSemanticEditorDecorations(view: EditorView) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-front-matter" }));
       continue;
     }
-    if (/^\s*\{\{(?:page-break|section-break|slide)\b/.test(text) || /^\s*```layout\b/.test(text)) {
+    const fence = markdownFenceOpener(text);
+    if (/^\s*\{\{(?:page-break|section-break|slide)\b/.test(text) || fence?.language === "layout") {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-layout-token" }));
       continue;
     }
@@ -11613,11 +11620,11 @@ function buildSemanticEditorDecorations(view: EditorView) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-ai-assisted" }));
       continue;
     }
-    if (/^\s*```ai-source\b/.test(text)) {
+    if (isAiSourceFenceOpener(text)) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-ai-source" }));
       continue;
     }
-    if (/^\s*```[A-Za-z0-9_-]+\b/.test(text)) {
+    if (fence?.language) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-transform-fence" }));
       continue;
     }
@@ -13382,12 +13389,8 @@ async function chooseTransformEngine(name: string) {
 }
 
 function documentUsesTransformFence(text: string, name: string) {
-  const fencePrefix = new RegExp(`^\\s*\`\`\`${escapeRegExp(name)}(?:\\s|$)`, "i");
-  return text.split("\n").some((line) => fencePrefix.test(line));
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const target = name.toLowerCase();
+  return text.split("\n").some((line) => markdownFenceOpener(line)?.language === target);
 }
 
 async function confirmTransformEngineTrust(name: string) {
@@ -14009,8 +14012,7 @@ function docsLiveDraftHistoryItem(draft: DocsLiveDraft): DocsLiveDraftHistoryIte
 
 function docsLiveHistoryPreview(value: string) {
   return (
-    value
-      .replace(/```[\s\S]*?```/g, " ")
+    stripMarkdownFencedBlocks(value)
       .replace(/[#>*_`[\]-]/g, " ")
       .replace(/\s+/g, " ")
       .trim()
