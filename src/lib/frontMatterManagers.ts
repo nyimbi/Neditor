@@ -205,11 +205,11 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
           !applyDataSourceMerge(currentSequenceAnchor.current, sequenceItem[1], mapAnchors) &&
           !applyInlineDataSourceObject(currentSequenceAnchor.current, sequenceItem[1], anchors, mapAnchors)
         ) {
-          applyDataSourcePair(currentSequenceAnchor.current, sequenceItem[1]);
+          applyDataSourcePair(currentSequenceAnchor.current, sequenceItem[1], anchors);
         }
       } else if (currentSequenceAnchor.current) {
         const pair = raw.match(/^\s+([\w-]+):\s*(.*)$/);
-        if (pair) applyDataSourcePair(currentSequenceAnchor.current, `${pair[1]}: ${pair[2]}`);
+        if (pair) applyDataSourcePair(currentSequenceAnchor.current, `${pair[1]}: ${pair[2]}`, anchors);
       }
     } else {
       stopSequenceAnchor();
@@ -220,7 +220,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
         flushCurrent();
         current = { source: section, line: index + 1 };
         if (!applyDataSourceMerge(current, item[1], mapAnchors) && !applyInlineDataSourceObject(current, item[1], anchors, mapAnchors)) {
-          applyDataSourcePair(current, item[1]);
+          applyDataSourcePair(current, item[1], anchors);
         }
         continue;
       }
@@ -231,7 +231,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       }
       const pair = raw.match(/^\s+([\w-]+):\s*(.*)$/);
       if (pair && current) {
-        applyDataSourcePair(current, `${pair[1]}: ${pair[2]}`);
+        applyDataSourcePair(current, `${pair[1]}: ${pair[2]}`, anchors);
       }
       continue;
     }
@@ -555,17 +555,27 @@ export function dataSourceNameFromPath(path: string) {
   return file.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function applyDataSourcePair(row: Partial<FrontMatterDataSourceRow>, pairText: string) {
+function applyDataSourcePair(row: Partial<FrontMatterDataSourceRow>, pairText: string, anchors?: Map<string, string>) {
   const pair = pairText.match(/^([\w-]+):\s*(.*)$/);
   if (!pair) {
-    if (pairText.trim()) row.path = cleanYamlScalar(pairText);
+    const value = resolveDataSourceScalar(pairText, anchors);
+    if (value) row.path = value;
     return;
   }
   const key = pair[1];
-  const value = cleanYamlScalar(pair[2]);
+  const value = resolveDataSourceScalar(pair[2], anchors);
   if (key === "name" || key === "title") row.name = value;
   if (key === "path" || key === "file") row.path = value;
   if (key === "type" || key === "kind") row.kind = normalizeDataSourceKind(value);
+}
+
+function resolveDataSourceScalar(value: string, anchors?: Map<string, string>) {
+  const parsed = parseYamlScalar(value);
+  const resolved = parsed.alias && anchors ? anchors.get(parsed.alias) || parsed.value : parsed.value;
+  if (parsed.anchor && anchors && resolved && !resolved.startsWith("[") && !resolved.startsWith("{")) {
+    anchors.set(parsed.anchor, resolved);
+  }
+  return resolved;
 }
 
 function applyDataSourceMerge(
