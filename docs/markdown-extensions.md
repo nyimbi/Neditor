@@ -194,8 +194,11 @@ and `..` parent-directory escapes are blocked before any file is read, and
 resolved symlinks are checked before import. Missing paths, unsupported source
 types, and unreadable files are reported as diagnostics.
 
-The table editor can write clean Markdown after paste import, sorting, row and
-column edits, alignment, totals, formula rows, and merged-cell metadata edits.
+The table editor can write clean Markdown after paste import, CSV/TSV/XLSX
+import, sorting, row and column edits, alignment, totals, formula rows, and
+merged-cell metadata edits. Tables can also be exported as CSV or XLSX so a
+business user can round-trip spreadsheet data without leaving Markdown as the
+source of truth.
 
 ## Figures, Captions, And Cross References
 
@@ -354,6 +357,7 @@ Common transform names:
 | `chart` | Bar, line, pie, area, and KPI charts. |
 | `mermaid`, `pikchr`, `dot`, `graphviz`, `circo`, `neato`, `fdp`, `osage`, `twopi`, `d2`, `plantuml` | Diagrams with native fallback or trusted external engine support. |
 | `csv`, `tsv`, `json`, `yaml` | Structured data rendering. |
+| `sql` | Read-only SQLite query results rendered as Markdown tables. |
 | `openapi`, `json-schema` | API operations, security requirements, request/response contracts, response headers/links/examples, callbacks, webhooks, discriminators, component schemas, nested fields, composition, object/conditional/content keywords, definitions, and schema constraints. |
 | `bibtex`, `glossary`, `timeline`, `roadmap`, `adr`, `diff`, `qr` | Business-document artifacts and generated sections. |
 | `vega-lite`, `geojson`, `topojson`, `stl` | Visual data previews with static export fallbacks. |
@@ -377,10 +381,27 @@ First-release native business transforms:
 | `diff` | Unified-diff-style text. Additions, deletions, and hunk headers are classified and summarized. |
 | `qr` | UTF-8 payload text rendered as a static SVG QR code for short URLs, artifact paths, or release-pack references. |
 
-Execution-heavy second-wave transforms such as `python`, `r`, `sql`,
-`wavedrom`, `nomnoml`, `latex`, and raw `html` are not first-release native
-transforms. They stay deferred until NEditor has a safe sandbox or static
-renderer for each one; raw HTML should be avoided for release documents.
+Execution-heavy second-wave transforms such as `python`, `r`, `wavedrom`,
+`nomnoml`, `latex`, and raw `html` are not first-release native transforms.
+They stay deferred until NEditor has a safe sandbox or static renderer for each
+one; raw HTML should be avoided for release documents.
+
+SQL transforms are intentionally narrower than a general database console. They
+run trusted SQLite queries only, require a configured `sqlite3` executable, and
+accept read-only `SELECT` or `WITH` statements:
+
+````md
+```sql database="data/revenue.sqlite" caption="Revenue by region"
+SELECT region, SUM(revenue) AS revenue
+FROM revenue
+GROUP BY region
+ORDER BY revenue DESC;
+```
+````
+
+Database paths should stay in the document workspace. Mutation statements,
+multiple-statement batches, shell commands, and untrusted engines are rejected
+before execution. Results render as Markdown tables for preview and export.
 
 Native visual-data transform subsets:
 
@@ -409,7 +430,7 @@ y: revenue
 
 External engines are disabled until trusted. See
 [External transform setup](external-transforms.md) for Graphviz, D2, PlantUML,
-and Pikchr setup.
+Pikchr, and SQLite setup.
 
 The same Templates panel also includes starter blocks for chart, Vega-Lite,
 timeline, roadmap, ADR, Mermaid, Pikchr, DOT, PlantUML, CSV, JSON Schema,

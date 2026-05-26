@@ -14,16 +14,19 @@ const requirements = [
   ["D2 winget command", () => windowsSection.includes("winget install Terrastruct.D2")],
   ["Java runtime winget command", () => windowsSection.includes("winget install EclipseAdoptium.Temurin.21.JRE")],
   ["PlantUML winget command", () => windowsSection.includes("winget install PlantUML.PlantUML")],
+  ["SQLite winget command", () => windowsSection.includes("winget install SQLite.SQLite")],
   ["Rustup command for Pikchr CLI", () => windowsSection.includes("winget install Rustlang.Rustup")],
   ["Pikchr CLI install command", () => windowsSection.includes("cargo install pikchr-cli --locked")],
   ["Graphviz DOT path", () => windowsSection.includes("C:\\Program Files\\Graphviz\\bin\\dot.exe")],
   ["Graphviz layout paths", () => ["circo", "neato", "fdp", "osage", "twopi"].every((name) => windowsSection.includes(`C:\\Program Files\\Graphviz\\bin\\${name}.exe`))],
   ["D2 executable path", () => windowsSection.includes("d2.exe")],
   ["PlantUML executable path", () => windowsSection.includes("plantuml.exe")],
+  ["SQLite executable path", () => windowsSection.includes("sqlite3.exe")],
   ["Pikchr CLI executable path", () => windowsSection.includes("C:\\Users\\<you>\\.cargo\\bin\\pikchr-cli.exe")],
   ["PowerShell Pikchr probe", () => windowsSection.includes("$env:NEDITOR_TEST_PIKCHR") && windowsSection.includes("pnpm run check:engines")],
   ["Shim guidance", () => /package manager shim/i.test(windowsSection) && /normal terminal/i.test(windowsSection)],
   ["Explicit path preference", () => /Prefer explicit executable paths/i.test(windowsSection)],
+  ["SQL safety guidance", () => /read-only/i.test(markdown) && /SELECT/i.test(markdown) && /WITH/i.test(markdown) && /multi-statement/i.test(markdown)],
 ];
 
 const checks = requirements.map(([name, predicate]) => {

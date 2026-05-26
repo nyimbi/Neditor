@@ -6,6 +6,7 @@ NEditor can render several fenced-code transforms with native Rust fallbacks. Fo
 - D2
 - PlantUML
 - Pikchr
+- SQLite (`sqlite3`) for read-only SQL table transforms
 
 External engines are never trusted by default. Configure the executable path in Settings, enable trust for the specific engine, and keep the timeout/input-mode defaults unless the document requires otherwise.
 You can also disable a configured external engine per transform. Disabled
@@ -31,7 +32,7 @@ Current platform evidence is tracked in
 Recommended package installs:
 
 ```sh
-brew install graphviz d2 pikchr
+brew install graphviz d2 pikchr sqlite
 brew install --cask temurin
 brew install plantuml
 ```
@@ -48,6 +49,7 @@ Typical paths:
 /opt/homebrew/bin/d2
 /opt/homebrew/bin/pikchr
 /opt/homebrew/bin/plantuml
+/opt/homebrew/bin/sqlite3
 ```
 
 PlantUML requires a working Java runtime. Keep PlantUML in file mode unless stdin mode has been tested for the installed version.
@@ -58,7 +60,7 @@ Debian/Ubuntu packages:
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y graphviz default-jre plantuml
+sudo apt-get install -y graphviz default-jre plantuml sqlite3
 ```
 
 D2 and Pikchr may need vendor packages or release binaries:
@@ -87,6 +89,7 @@ winget install Graphviz.Graphviz
 winget install Terrastruct.D2
 winget install EclipseAdoptium.Temurin.21.JRE
 winget install PlantUML.PlantUML
+winget install SQLite.SQLite
 winget install Rustlang.Rustup
 cargo install pikchr-cli --locked
 ```
@@ -102,6 +105,7 @@ C:\Program Files\Graphviz\bin\osage.exe
 C:\Program Files\Graphviz\bin\twopi.exe
 C:\Users\<you>\AppData\Local\Microsoft\WinGet\Packages\...\d2.exe
 C:\Program Files\PlantUML\plantuml.exe
+C:\Users\<you>\AppData\Local\Microsoft\WinGet\Packages\...\sqlite3.exe
 C:\Users\<you>\.cargo\bin\pikchr-cli.exe
 ```
 
@@ -120,6 +124,7 @@ pnpm run check:engines
 | D2 | stdin | SVG stdout | Uses SVG export profile. |
 | Pikchr | stdin | SVG stdout | Native fallback covers simple semicolon- or line-separated `box`, `circle`/`ellipse`, `diamond`, `cylinder`, `file`, and `arrow` statements with connector labels. `pikchr-cli` executables receive a temporary `.pikchr` source file path as their positional argument. |
 | PlantUML | file | SVG or PNG sidecar | File mode avoids version-specific stdin behavior. Use `format=png`, `output=png`, or the `png` flag on a `plantuml` fence when a PNG artifact is required; otherwise NEditor requests SVG. |
+| SQLite SQL | file | CSV stdout converted to Markdown table | `sql` fences run through trusted `sqlite3` only. NEditor passes the database path and query without a shell, accepts read-only `SELECT` or `WITH` statements, rejects multi-statement or mutating SQL, and renders the result as a Markdown table. |
 
 ## Troubleshooting
 
@@ -136,3 +141,8 @@ pnpm run check:engines
 - If PlantUML behaves differently from other engines, keep it in file mode;
   Graphviz and D2 normally use stdin, while Pikchr can use native fallback for
   simple business diagrams.
+- If a SQL transform does not run, confirm the `sqlite3` executable path, the
+  database file path, and whether the query starts with `SELECT` or `WITH`.
+  NEditor is a document table workflow, not a database administration console,
+  so inserts, updates, deletes, schema changes, and multi-statement batches are
+  rejected by design.

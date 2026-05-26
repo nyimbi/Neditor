@@ -379,11 +379,13 @@ web app.
 
 - Visual Markdown table editor with paste import, row and column editing,
   alignment, numeric sorting, column formats, totals, formula rows, merged-cell
-  metadata, cancel/apply workflows, and readable Markdown output.
+  metadata, CSV/TSV/XLSX import, CSV/XLSX export, cancel/apply workflows, and
+  readable Markdown output.
 - Markdown tables, CSV fences, and TSV fences can carry formulas such as
   `=10+15`, `=SUM(2,3)`, and named table references.
-- Data transforms for CSV, TSV, JSON, YAML, OpenAPI, and JSON Schema produce
-  preview/export-safe artifacts.
+- Data transforms for CSV, TSV, JSON, YAML, SQLite SQL, OpenAPI, and JSON
+  Schema produce preview/export-safe artifacts. SQL transforms are read-only
+  SQLite table queries behind explicit engine trust.
 
 ### Diagrams And Transform Blocks
 
@@ -394,7 +396,7 @@ artifacts:
 - `chart` for bar, line, pie, area, and KPI charts.
 - `mermaid`, `pikchr`, DOT/Graphviz, D2, and PlantUML for diagrams.
 - `vega-lite`, GeoJSON, TopoJSON, STL, `timeline`, `glossary`, `bibtex`,
-  OpenAPI, JSON Schema, JSON, YAML, CSV, and TSV.
+  OpenAPI, JSON Schema, JSON, YAML, CSV, TSV, and read-only SQLite SQL.
 - Native Rust renderers or fallbacks are used where practical.
 - External executable engines require explicit trust, bounded execution, and
   clear setup/probe diagnostics.
