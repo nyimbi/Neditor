@@ -81,6 +81,8 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
   const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
   if (endIndex <= 0) return [];
   const rows: FrontMatterDataSourceRow[] = [];
+  const anchors = new Map<string, string>();
+  const mapAnchors = new Map<string, Array<{ key: string; value: string; line: number }>>();
   let section = "";
   let current: Partial<FrontMatterDataSourceRow> | null = null;
   const flushCurrent = () => {
@@ -95,16 +97,25 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       flushCurrent();
       section = topLevel[1];
       const aliasKind = dataSourceAliasKind(section);
+      const parsedTopLevel = parseYamlScalar(topLevel[2]);
+      if (parsedTopLevel.anchor && parsedTopLevel.value && !parsedTopLevel.value.startsWith("[") && !parsedTopLevel.value.startsWith("{")) {
+        anchors.set(parsedTopLevel.anchor, parsedTopLevel.value);
+      }
+      if (parsedTopLevel.anchor && parsedTopLevel.value.startsWith("{")) {
+        for (const entry of parseInlineYamlMap(parsedTopLevel.value, anchors, mapAnchors, index + 1)) {
+          recordMapAnchorEntry(mapAnchors, { anchor: parsedTopLevel.anchor }, entry.key, entry.value, entry.line, entry.keepExisting);
+        }
+      }
       if (section === "dataSources" && topLevel[2].trim().startsWith("{")) {
         const inlineRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
-        if (applyInlineDataSourceObject(inlineRow, topLevel[2])) {
+        if (applyInlineDataSourceObject(inlineRow, topLevel[2], anchors, mapAnchors)) {
           rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
         }
       }
       if (section === "dataSources" && topLevel[2].trim().startsWith("[")) {
         for (const item of splitInlineYamlList(topLevel[2])) {
           const inlineRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
-          if (applyInlineDataSourceObject(inlineRow, item)) {
+          if (applyInlineDataSourceObject(inlineRow, item, anchors, mapAnchors)) {
             rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
           }
         }
@@ -124,7 +135,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       if (item) {
         flushCurrent();
         current = { source: section, line: index + 1 };
-        if (!applyInlineDataSourceObject(current, item[1])) applyDataSourcePair(current, item[1]);
+        if (!applyInlineDataSourceObject(current, item[1], anchors, mapAnchors)) applyDataSourcePair(current, item[1]);
         continue;
       }
       const pair = raw.match(/^\s+([\w-]+):\s*(.*)$/);
@@ -465,10 +476,15 @@ function applyDataSourcePair(row: Partial<FrontMatterDataSourceRow>, pairText: s
   if (key === "type" || key === "kind") row.kind = normalizeDataSourceKind(value);
 }
 
-function applyInlineDataSourceObject(row: Partial<FrontMatterDataSourceRow>, value: string) {
+function applyInlineDataSourceObject(
+  row: Partial<FrontMatterDataSourceRow>,
+  value: string,
+  anchors: Map<string, string>,
+  mapAnchors: Map<string, Array<{ key: string; value: string; line: number }>>,
+) {
   const trimmed = stripYamlComment(value).trim();
   if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return false;
-  const entries = parseInlineYamlMap(trimmed, new Map(), new Map(), row.line || 0);
+  const entries = parseInlineYamlMap(trimmed, anchors, mapAnchors, row.line || 0);
   if (!entries.length) return false;
   for (const entry of entries) {
     applyDataSourcePair(row, `${entry.key}: ${entry.value}`);
