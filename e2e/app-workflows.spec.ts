@@ -1906,8 +1906,11 @@ test("keeps primary workbench regions accessible across desktop and narrow viewp
 
 test("collapses and restores command toolbars to recover writing space", async ({ page }) => {
   const commandBar = page.locator("#main-commands");
+  const workspace = page.locator("#document-workspace");
   const initialBox = await commandBar.boundingBox();
+  const initialWorkspaceBox = await workspace.boundingBox();
   expect(initialBox).not.toBeNull();
+  expect(initialWorkspaceBox).not.toBeNull();
 
   await commandBar.getByRole("button", { name: "Collapse File toolbar" }).click();
   await expect(commandBar.getByRole("button", { name: "Expand File toolbar" })).toBeVisible();
@@ -1921,8 +1924,13 @@ test("collapses and restores command toolbars to recover writing space", async (
   await expect(commandBar.getByRole("button", { name: "Expand View toolbar" })).toBeVisible();
   await expect(page.getByLabel("View mode")).toBeHidden();
   const collapsedBox = await commandBar.boundingBox();
+  const collapsedWorkspaceBox = await workspace.boundingBox();
   expect(collapsedBox).not.toBeNull();
+  expect(collapsedWorkspaceBox).not.toBeNull();
   expect(collapsedBox!.height).toBeLessThan(initialBox!.height);
+  expect(collapsedBox!.height).toBeLessThan(initialBox!.height * 0.45);
+  expect(collapsedWorkspaceBox!.height).toBeGreaterThan(initialWorkspaceBox!.height + 40);
+  await expect(commandBar.getByLabel("Collapsed toolbars")).toBeVisible();
 
   await commandBar.getByRole("button", { name: "Expand View toolbar" }).click();
   await commandBar.getByRole("button", { name: "Expand all" }).click();
@@ -2607,6 +2615,34 @@ test("runs configurable Emacs and Vim-style editor keybinding modes", async ({ p
   await page.keyboard.press("i");
   await page.keyboard.insertText("WORD-");
   await expect.poll(() => editorText(page)).toContain("word WORD-alpha beta");
+
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("G");
+  await page.keyboard.press("A");
+  await page.keyboard.insertText("\ntrim this line");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("d");
+  await page.keyboard.press("b");
+  await expect.poll(() => editorText(page)).not.toContain("trim this line");
+  await page.keyboard.press("0");
+  await page.keyboard.press("C");
+  await page.keyboard.insertText("replaced tail");
+  await expect.poll(() => editorText(page)).toContain("replaced tail");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("O");
+  await page.keyboard.insertText("join left");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("J");
+  await expect.poll(() => editorText(page)).toContain("join left replaced tail");
+  await page.keyboard.press("o");
+  await page.keyboard.insertText("changeable word");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("0");
+  await page.keyboard.press("c");
+  await page.keyboard.press("w");
+  await page.keyboard.insertText("changed");
+  await expect.poll(() => editorText(page)).toContain("changed word");
+  await expect.poll(() => editorText(page)).not.toContain("changeable word");
 
   await page.getByRole("button", { name: "Save Workspace" }).click();
   await page.reload();

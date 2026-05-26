@@ -120,11 +120,41 @@
     </header>
 
     <nav id="main-commands" class="command-bar" aria-label="Main commands" tabindex="-1">
+      <section v-if="collapsedToolbarRows.length" class="collapsed-toolbar-tray" aria-label="Collapsed toolbars">
+        <span class="collapsed-toolbar-tray-label">Collapsed</span>
+        <button
+          v-for="row in collapsedToolbarRows"
+          :key="`collapsed-${row.id}`"
+          class="collapsed-toolbar-pill"
+          type="button"
+          :aria-label="`Expand ${row.label} toolbar`"
+          :title="`Expand ${row.label} toolbar`"
+          @click="toggleToolbarRow(row.id)"
+        >
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
+          </svg>
+          <span>{{ row.label }}</span>
+        </button>
+        <button
+          v-if="isToolbarCollapsed('view')"
+          class="collapsed-toolbar-pill collapsed-toolbar-pill-primary"
+          type="button"
+          aria-label="Expand all toolbars"
+          title="Expand all toolbars"
+          @click="setAllCommandToolbarsCollapsed(false)"
+        >
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
+          </svg>
+          <span>Expand all</span>
+        </button>
+      </section>
       <section
         v-for="row in commandToolbarRows"
+        v-show="!isToolbarCollapsed(row.id)"
         :key="row.id"
         class="command-toolbar-row"
-        :class="{ collapsed: isToolbarCollapsed(row.id) }"
         :aria-label="`${row.label} toolbar`"
       >
         <button
@@ -163,7 +193,7 @@
           </div>
         </section>
       </section>
-      <section class="command-toolbar-row command-toolbar-row-view" :class="{ collapsed: isToolbarCollapsed('view') }" aria-label="View toolbar">
+      <section v-show="!isToolbarCollapsed('view')" class="command-toolbar-row command-toolbar-row-view" aria-label="View toolbar">
         <button
           class="command-toolbar-heading"
           type="button"
@@ -6158,7 +6188,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
     tips: [
       "The command palette is the fastest way to find actions while learning the app.",
       "AI drafting, outline planning, review readiness, and distribution preparation all have direct shortcuts so collapsed toolbars remain practical.",
-      "Vim-style mode starts in insert mode; press Escape for normal mode, then use h/j/k/l, 0, $, x, D, i, a, o, O, u, Ctrl+R, g, and G.",
+      "Vim-style mode starts in insert mode; press Escape for normal mode, then use h/j/k/l, 0, ^, $, w, e, b, x, D, C, J, i, a, o, O, u, Ctrl+R, g, G, dd, dw, de, db, d0, d$, cw, and cc.",
       "Emacs-style mode adds familiar Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Ctrl+P, Ctrl+N, Ctrl+D, and Ctrl+K navigation/editing keys.",
       "Toolbar text can be resized or hidden if you prefer icons only.",
     ],
@@ -6472,6 +6502,8 @@ const commandToolbarRows = computed<CommandToolbarRow[]>(() => {
     }),
   }));
 });
+const toolbarCollapseRows = computed(() => [...commandToolbarRows.value.map((row) => ({ id: row.id, label: row.label })), { id: "view", label: "View" }]);
+const collapsedToolbarRows = computed(() => toolbarCollapseRows.value.filter((row) => store.toolbarCollapsedRows.includes(row.id)));
 const normalizedToolbarCollapsedRows = (ids: string[]) =>
   Array.from(new Set(ids.filter((id) => toolbarCollapseRowIds.includes(id))));
 const anyCommandToolbarsCollapsed = computed(() => toolbarCollapseRowIds.some((id) => store.toolbarCollapsedRows.includes(id)));
@@ -10193,6 +10225,48 @@ async function collectNativeEditorKeybindingEvidence(record: (name: string, pass
       "native workflow edited with Vim normal insert and append",
       Boolean((evidence.vimEdit as { edited: boolean }).edited && (evidence.vimEdit as { status: string }).status === "Vim insert mode"),
       JSON.stringify(evidence.vimEdit),
+    );
+
+    await setNativeWorkflowText("trim this line");
+    await nextTick();
+    if (editorView) {
+      editorView.dispatch({ selection: { anchor: editorView.state.doc.length } });
+      vimInputMode.value = "normal";
+      await nextTick();
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "d", bubbles: true }), editorView, vimKeybindingController);
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "b", bubbles: true }), editorView, vimKeybindingController);
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "0", bubbles: true }), editorView, vimKeybindingController);
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "C", bubbles: true }), editorView, vimKeybindingController);
+      await nextTick();
+      insertAtSelection(editorView, "replaced tail");
+      vimInputMode.value = "normal";
+      await nextTick();
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "O", bubbles: true }), editorView, vimKeybindingController);
+      await nextTick();
+      insertAtSelection(editorView, "join left");
+      vimInputMode.value = "normal";
+      await nextTick();
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "J", bubbles: true }), editorView, vimKeybindingController);
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "o", bubbles: true }), editorView, vimKeybindingController);
+      await nextTick();
+      insertAtSelection(editorView, "changeable word");
+      vimInputMode.value = "normal";
+      await nextTick();
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "0", bubbles: true }), editorView, vimKeybindingController);
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "c", bubbles: true }), editorView, vimKeybindingController);
+      handleVimNormalKey(new KeyboardEvent("keydown", { key: "w", bubbles: true }), editorView, vimKeybindingController);
+      await nextTick();
+      insertAtSelection(editorView, "changed");
+    }
+    evidence.vimOperatorMotions = {
+      text: active.value.text,
+      edited: active.value.text === "join left replaced tail\nchanged word",
+      status: editorKeymapStatus.value,
+    };
+    record(
+      "native workflow edited with Vim operator motions",
+      Boolean((evidence.vimOperatorMotions as { edited: boolean }).edited && (evidence.vimOperatorMotions as { status: string }).status === "Vim insert mode"),
+      JSON.stringify(evidence.vimOperatorMotions),
     );
 
     store.editorKeymapMode = "vim";
@@ -15379,16 +15453,6 @@ select:hover {
   padding: 2px 0;
 }
 
-.command-toolbar-row.collapsed {
-  min-height: 30px;
-}
-
-.command-toolbar-row.collapsed .command-group,
-.command-toolbar-row.collapsed .compact-field,
-.command-toolbar-row.collapsed .compact-toolbar-toggle {
-  display: none;
-}
-
 .command-toolbar-heading {
   display: inline-flex;
   align-items: center;
@@ -15434,6 +15498,65 @@ select:hover {
 
 .command-toolbar-row-view {
   align-items: center;
+}
+
+.collapsed-toolbar-tray {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 26px;
+  padding: 1px 0 3px;
+  overflow-x: auto;
+}
+
+.collapsed-toolbar-tray-label {
+  flex: 0 0 auto;
+  color: #697789;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.collapsed-toolbar-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 0 7px;
+  border: 1px solid #cbd7e5;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #445367;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.collapsed-toolbar-pill:hover,
+.collapsed-toolbar-pill:focus-visible {
+  border-color: #9db2ca;
+  background: #eef5ff;
+}
+
+.collapsed-toolbar-pill-primary {
+  border-color: #9ab6d6;
+  color: #17456f;
+}
+
+.collapsed-toolbar-pill svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .command-group {

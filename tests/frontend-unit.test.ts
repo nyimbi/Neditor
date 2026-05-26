@@ -87,7 +87,7 @@ import {
   normalizeDocsLiveDraftHistory,
   WORKSPACE_SCHEMA_VERSION,
 } from "../src/lib/workspacePersistence.js";
-import { nextVimWordStart, previousVimWordStart, vimWordEnd } from "../src/lib/vimKeybindings.js";
+import { nextVimWordStart, previousVimWordStart, vimMotionRange, vimWordEnd } from "../src/lib/vimKeybindings.js";
 import {
   appendConflictMergeLine,
   appendConflictMergePart,
@@ -345,6 +345,10 @@ test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   equal(previousVimWordStart(text, text.length), 11);
   equal(previousVimWordStart(text, 10), 5);
   equal(previousVimWordStart(text, 5), 0);
+  deepEqual(vimMotionRange(text, 0, "w", "d"), { from: 0, to: 5 });
+  deepEqual(vimMotionRange(text, 0, "w", "c"), { from: 0, to: 4 });
+  deepEqual(vimMotionRange(text, 10, "b", "d"), { from: 5, to: 10 });
+  deepEqual(vimMotionRange(text, 5, "e", "d"), { from: 5, to: 10 });
 });
 
 test("editable outline planner creates document skeletons before drafting content", () => {
@@ -2159,6 +2163,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Toolbar text size"'));
   ok(app.includes("toolbarCollapsedRows"));
   ok(app.includes("command-toolbar-heading"));
+  ok(app.includes("collapsed-toolbar-tray"));
+  ok(app.includes("collapsedToolbarRows"));
   ok(app.includes("Collapse all toolbars"));
   ok(app.includes("Expand all toolbars"));
   ok(app.includes("toggleToolbarRow"));
@@ -2801,6 +2807,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(vimKeybindings.includes("vimMoveWordForward"));
   ok(vimKeybindings.includes("vimMoveWordBackward"));
   ok(vimKeybindings.includes("vimMoveWordEnd"));
+  ok(vimKeybindings.includes("vimApplyOperatorMotion"));
+  ok(vimKeybindings.includes("vimJoinLineWithNext"));
+  ok(vimKeybindings.includes('event.key === "d" || event.key === "c"'));
   ok(app.includes("Vim-style mode starts in insert mode"));
   ok(types.includes("savedText?: string"));
   ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
@@ -3524,8 +3533,10 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow edited with Emacs-style line commands"));
   ok(app.includes("native workflow applied Vim keybinding mode"));
   ok(app.includes("native workflow edited with Vim normal insert and append"));
+  ok(app.includes("native workflow edited with Vim operator motions"));
   ok(app.includes("vimPendingOperator"));
   ok(vimKeybindings.includes("vimDeleteCurrentLine"));
+  ok(vimKeybindings.includes("vimChangeCurrentLine"));
   ok(app.includes("collectNativeOutlineNavigationEvidence"));
   ok(app.includes("native workflow navigated outline heading to source"));
   ok(app.includes("collectNativeDiagnosticNavigationEvidence"));

@@ -18,7 +18,8 @@ import {
 import type { EditorView } from "@codemirror/view";
 
 export type VimInputMode = "insert" | "normal";
-export type VimPendingOperator = "" | "d";
+export type VimPendingOperator = "" | "d" | "c";
+export type VimMotionKey = "w" | "e" | "b";
 
 export interface VimKeybindingController {
   pendingOperator(): VimPendingOperator;
@@ -39,10 +40,19 @@ export function handleVimNormalKey(event: KeyboardEvent, view: EditorView, contr
     }
     return false;
   }
-  if (controller.pendingOperator()) {
-    if (controller.pendingOperator() === "d" && event.key === "d") {
+  const pendingOperator = controller.pendingOperator();
+  if (pendingOperator) {
+    if (event.key === pendingOperator) {
       event.preventDefault();
-      return vimDeleteCurrentLine(view, controller);
+      return pendingOperator === "d" ? vimDeleteCurrentLine(view, controller) : vimChangeCurrentLine(view, controller);
+    }
+    if (isVimOperatorMotionKey(event.key)) {
+      event.preventDefault();
+      return vimApplyOperatorMotion(view, controller, pendingOperator, event.key);
+    }
+    if (event.key === "0" || event.key === "$") {
+      event.preventDefault();
+      return vimApplyLineOperatorMotion(view, controller, pendingOperator, event.key);
     }
     controller.setPendingOperator("");
   }
@@ -55,9 +65,11 @@ export function handleVimNormalKey(event: KeyboardEvent, view: EditorView, contr
     e: () => vimMoveWordEnd(view),
     b: () => vimMoveWordBackward(view),
     "0": () => cursorLineStart(view),
+    "^": () => vimMoveFirstNonWhitespace(view),
     $: () => cursorLineEnd(view),
     x: () => deleteCharForward(view),
     D: () => deleteToLineEnd(view),
+    C: () => vimChangeToLineEnd(view, controller),
     I: () => vimInsertAtLineStart(view, controller),
     A: () => vimAppendAtLineEnd(view, controller),
     i: () => vimEnterInsertMode(view, controller),
@@ -67,14 +79,15 @@ export function handleVimNormalKey(event: KeyboardEvent, view: EditorView, contr
     u: () => undo(view),
     G: () => cursorDocEnd(view),
     g: () => cursorDocStart(view),
+    J: () => vimJoinLineWithNext(view),
   }[event.key];
   if (run) {
     event.preventDefault();
     return run();
   }
-  if (event.key === "d") {
+  if (event.key === "d" || event.key === "c") {
     event.preventDefault();
-    controller.setPendingOperator("d");
+    controller.setPendingOperator(event.key);
     return true;
   }
   if (event.key.length === 1) {
@@ -109,6 +122,17 @@ export function previousVimWordStart(text: string, cursor: number) {
   while (position > 0 && isVimWhitespace(text[position])) position -= 1;
   while (position > 0 && !isVimWhitespace(text[position - 1])) position -= 1;
   return position;
+}
+
+export function vimMotionRange(text: string, cursor: number, motion: VimMotionKey, operator: "d" | "c" = "d") {
+  const start = Math.max(0, Math.min(text.length, cursor));
+  if (motion === "b") {
+    return normalizedRange(previousVimWordStart(text, start), start);
+  }
+  if (motion === "e" || (motion === "w" && operator === "c" && !isVimWhitespace(text[start]))) {
+    return normalizedRange(start, Math.min(text.length, vimWordEnd(text, start) + 1));
+  }
+  return normalizedRange(start, nextVimWordStart(text, start));
 }
 
 function vimEnterInsertMode(view: EditorView, controller: VimKeybindingController) {
@@ -158,6 +182,12 @@ function vimMoveWordBackward(view: EditorView) {
   return vimMoveCursor(view, previousVimWordStart(view.state.doc.toString(), view.state.selection.main.head));
 }
 
+function vimMoveFirstNonWhitespace(view: EditorView) {
+  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  const firstNonWhitespace = line.text.search(/\S/);
+  return vimMoveCursor(view, line.from + Math.max(0, firstNonWhitespace));
+}
+
 function vimMoveCursor(view: EditorView, position: number) {
   const docLength = view.state.doc.length;
   view.dispatch({
@@ -171,6 +201,75 @@ function vimMoveCursor(view: EditorView, position: number) {
 function vimDeleteCurrentLine(view: EditorView, controller: VimKeybindingController) {
   controller.setPendingOperator("");
   return deleteLine(view);
+}
+
+function vimChangeCurrentLine(view: EditorView, controller: VimKeybindingController) {
+  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: "" },
+    selection: EditorSelection.cursor(line.from),
+    scrollIntoView: true,
+  });
+  return vimEnterInsertMode(view, controller);
+}
+
+function vimChangeToLineEnd(view: EditorView, controller: VimKeybindingController) {
+  deleteToLineEnd(view);
+  return vimEnterInsertMode(view, controller);
+}
+
+function vimApplyOperatorMotion(view: EditorView, controller: VimKeybindingController, operator: "d" | "c", motion: VimMotionKey) {
+  const range = vimMotionRange(view.state.doc.toString(), view.state.selection.main.head, motion, operator);
+  return vimApplyOperatorRange(view, controller, operator, range.from, range.to);
+}
+
+function vimApplyLineOperatorMotion(view: EditorView, controller: VimKeybindingController, operator: "d" | "c", motion: "0" | "$") {
+  const cursor = view.state.selection.main.head;
+  const line = view.state.doc.lineAt(cursor);
+  const range = motion === "0" ? normalizedRange(line.from, cursor) : normalizedRange(cursor, line.to);
+  return vimApplyOperatorRange(view, controller, operator, range.from, range.to);
+}
+
+function vimApplyOperatorRange(view: EditorView, controller: VimKeybindingController, operator: "d" | "c", from: number, to: number) {
+  controller.setPendingOperator("");
+  const docLength = view.state.doc.length;
+  const start = Math.max(0, Math.min(docLength, from));
+  const end = Math.max(0, Math.min(docLength, to));
+  if (start !== end) {
+    view.dispatch({
+      changes: { from: start, to: end, insert: "" },
+      selection: EditorSelection.cursor(start),
+      scrollIntoView: true,
+    });
+  }
+  if (operator === "c") return vimEnterInsertMode(view, controller);
+  view.focus();
+  return true;
+}
+
+function vimJoinLineWithNext(view: EditorView) {
+  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  if (line.number >= view.state.doc.lines) return true;
+  const nextLine = view.state.doc.line(line.number + 1);
+  view.dispatch({
+    changes: {
+      from: line.to,
+      to: nextLine.to,
+      insert: ` ${nextLine.text.trimStart()}`,
+    },
+    selection: EditorSelection.cursor(line.to + 1),
+    scrollIntoView: true,
+  });
+  view.focus();
+  return true;
+}
+
+function isVimOperatorMotionKey(key: string): key is VimMotionKey {
+  return key === "w" || key === "e" || key === "b";
+}
+
+function normalizedRange(from: number, to: number) {
+  return from <= to ? { from, to } : { from: to, to: from };
 }
 
 function isVimWhitespace(char: string | undefined) {

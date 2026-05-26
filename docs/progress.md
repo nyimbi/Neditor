@@ -3104,6 +3104,20 @@ Direct EPUB export affordances:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the EPUB affordance evidence update. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing the full-suite browser workflow evidence. |
 
+Toolbar space recovery and Vim operator parity:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after replacing stacked collapsed toolbar rows with a single collapsed-toolbar tray and expanding Vim normal mode with change/delete operator motions. |
+| `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including static guards for the collapsed toolbar tray and direct unit coverage for Vim operator-motion ranges. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "collapses and restores command toolbars"` | Pass | Focused Chromium workflow proves collapsed toolbars move into one tray, the command bar height drops below 45% of its expanded height, and the document workspace gains more than 40px of vertical writing space. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs configurable Emacs and Vim-style editor keybinding modes"` | Pass | Focused Chromium workflow proves the expanded Vim operator set, including `db`, `C`, `J`, and `cw`, while preserving Emacs mode and persisted Vim settings. |
+| `pnpm run build` | Pass | Production Vue/Vite build passed after the toolbar tray and Vim operator changes. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after the toolbar and Vim updates, preserving the full-suite browser evidence needed by release readiness. |
+| `pnpm run check:docs` | Pass | 14 Markdown files were checked after updating progress and spec evidence for the toolbar and Vim improvements; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the updated evidence. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` with all current-host checks accepted. |
+
 Local agent CLI workspace preparation:
 
 | Command | Result | Evidence |
