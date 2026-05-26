@@ -333,13 +333,14 @@ web app.
   client proposals, SOPs, strategy memos, policies, release notes, grant
   applications, technical/LaTeX papers, blog/Substack publishing, and executive
   revision passes, then identifies lanes, missing inputs, placeholder values,
-  suggested outline, revision intent, export targets, and runnable next steps
-  that route into Docs Live, AI Paste cleanup, Review, Export readiness,
-  Outline mode, or provider handoff. It
+  suggested outline, revision intent, export targets, runnable next steps, and
+  context-aware optimal answers for each step that route into Docs Live,
+  AI Paste cleanup, Review, Export readiness, Outline mode, or provider handoff. It
   gives users a dedicated **Context answers and constraints** field plus
-  **Replan with answers** action so missing-input answers become part of the
-  context pack, placeholders, packet, Docs Live handoff, provider package, and
-  saved run history. It also includes a **Source Pack Builder** for managing
+  **Replan with answers** action so missing-input answers and per-step AI
+  assistance become part of the context pack, placeholders, packet, Docs Live
+  handoff, provider package, and saved run history. It also includes a
+  **Source Pack Builder** for managing
   pasted notes, claims, URLs, file paths, references, and reviewer comments as
   structured grounding that flows into the agent plan, packet, Docs Live handoff,
   provider source pack, and saved history. Generated packets can be copied or

@@ -1165,6 +1165,23 @@ Requirements:
 - Export AI usage appendix optionally.
 - Warn before publishing if AI-assisted sections are unreviewed.
 
+### 11.4 Agentic Step Assistance
+
+The AI workflow should assist users at every major document step, not only after
+text has already been generated.
+
+Requirements:
+
+- Creation, composition, editing, revision, review, and distribution plans must
+  expose context-aware suggested optimal answers for each step.
+- Suggestions should use the current document intent, supplied context answers,
+  source pack, reusable document memory, outline, selected text, quality gates,
+  and distribution targets where available.
+- Users must be able to add a suggested answer into the editable context before
+  replanning, instead of having the system silently fill business facts.
+- Each suggestion must show the context signals and rationale that shaped it so
+  non-technical users can review, accept, revise, or reject the AI advice.
+
 ## 12. Versioning And Release Management
 
 ### 12.1 Local Snapshots

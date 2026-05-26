@@ -33,6 +33,18 @@ export interface AgenticWorkflowStep {
   status: "ready" | "needs-input";
 }
 
+export interface AgenticStepAssistance {
+  id: string;
+  stepId: string;
+  lane: AgenticWorkflowLane;
+  stepLabel: string;
+  action: AgenticWorkflowAction;
+  status: "ready" | "needs-input" | "needs-review";
+  suggestedAnswer: string;
+  rationale: string;
+  contextUsed: string[];
+}
+
 export interface AgenticLifecycleTask {
   id: string;
   lane: AgenticWorkflowLane;
@@ -69,6 +81,25 @@ export interface AgenticWorkflowPlan {
   distributionTargets: ExportTarget[];
   missingInputs: string[];
   steps: AgenticWorkflowStep[];
+  stepAssistance: AgenticStepAssistance[];
+}
+
+interface AgenticStepAssistanceInput {
+  steps: AgenticWorkflowStep[];
+  title: string;
+  documentType: DocsLiveDocumentType;
+  contextCompleteness: AgenticContextCompleteness;
+  documentIntent: AgenticDocumentIntentSheet;
+  sourcePack: AgenticSourcePack;
+  documentMemory: AgenticDocumentMemory;
+  suggestedOutline: string;
+  outlineVariants: AgenticOutlineVariant[];
+  revisionModes: AgenticRevisionMode[];
+  qualityGates: AgenticQualityGate[];
+  distributionTargets: ExportTarget[];
+  missingInputs: string[];
+  hasDocument: boolean;
+  hasSelection: boolean;
 }
 
 export type AgenticDocumentIntentFieldStatus = "provided" | "needs-review" | "missing";
@@ -699,6 +730,23 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
   const revisionModes = detectRevisionModes(corpus, lanes, documentType);
   const qualityGates = buildQualityGates(documentType, distributionTargets);
   const steps = buildPlanSteps(lanes, missingInputs, distributionTargets, Boolean(request.documentText?.trim()), Boolean(request.selectedText?.trim()));
+  const stepAssistance = buildAgenticStepAssistance({
+    steps,
+    title,
+    documentType,
+    contextCompleteness,
+    documentIntent,
+    sourcePack,
+    documentMemory,
+    suggestedOutline,
+    outlineVariants,
+    revisionModes,
+    qualityGates,
+    distributionTargets,
+    missingInputs,
+    hasDocument: Boolean(request.documentText?.trim()),
+    hasSelection: Boolean(request.selectedText?.trim()),
+  });
 
   return {
     instruction,
@@ -723,6 +771,7 @@ export function buildAgenticWorkflowPlan(request: AgenticWorkflowRequest): Agent
     distributionTargets,
     missingInputs,
     steps,
+    stepAssistance,
   };
 }
 
@@ -2160,6 +2209,128 @@ function buildPlanSteps(
     });
   }
   return steps.length ? steps : buildPlanSteps(["create", "review"], missingInputs, targets, hasDocument, hasSelection);
+}
+
+function buildAgenticStepAssistance(input: AgenticStepAssistanceInput): AgenticStepAssistance[] {
+  return input.steps.map((step) => {
+    const suggestedAnswer = suggestedAnswerForAgenticStep(step, input);
+    const contextUsed = contextSignalsForAgenticStep(step, input);
+    return {
+      id: `assist-${step.id}-${stableFingerprint([step.id, suggestedAnswer, contextUsed.join("|")].join("\n")).slice(0, 10)}`,
+      stepId: step.id,
+      lane: step.lane,
+      stepLabel: step.title,
+      action: step.action,
+      status: step.status === "needs-input" ? "needs-input" : step.lane === "review" || step.lane === "distribute" ? "needs-review" : "ready",
+      suggestedAnswer,
+      rationale: rationaleForAgenticStep(step, input),
+      contextUsed,
+    };
+  });
+}
+
+function suggestedAnswerForAgenticStep(
+  step: AgenticWorkflowStep,
+  input: AgenticStepAssistanceInput,
+) {
+  const audience = agenticIntentValue(input.documentIntent, "audience", "the intended reader");
+  const owner = agenticIntentValue(input.documentIntent, "owner", "the accountable owner");
+  const outcome = agenticIntentValue(input.documentIntent, "outcome", `move ${input.title} toward review`);
+  const evidence = agenticIntentValue(input.documentIntent, "evidence", "verified source material");
+  const reviewer = agenticIntentValue(input.documentIntent, "reviewer", owner);
+  const approvalStatus = agenticIntentValue(input.documentIntent, "approval-status", "needs human review");
+  const targets = input.distributionTargets.length ? input.distributionTargets.join(", ") : "PDF, DOCX, HTML, or Google Docs after review";
+  const outlineVariant = input.outlineVariants[0];
+  const outlineSummary = parseOutlineSections(input.suggestedOutline)
+    .slice(0, 5)
+    .map((section) => section.heading)
+    .join(" -> ") || `${titleCase(input.documentType)} outline`;
+  const revisionPasses = input.revisionModes.length ? input.revisionModes.map((mode) => revisionPassProfile(mode).label).join(", ") : "clarity, evidence, and humanization";
+  const qualityGates = input.qualityGates.slice(0, 4).map((gate) => gate.label).join(", ") || "source, structure, AI provenance, and export readiness";
+
+  switch (step.action) {
+    case "open-docs-live":
+      return [
+        `Audience: ${audience}.`,
+        `Outcome: ${outcome}.`,
+        `Owner/reviewer: ${owner}${reviewer && reviewer !== owner ? ` with ${reviewer}` : ""}.`,
+        `Evidence to ground the draft: ${evidence}.`,
+        input.missingInputs.length ? `Explicitly answer or keep visible: ${input.missingInputs.join(", ")}.` : "Context is sufficient for a first draft; preserve unresolved assumptions as review prompts.",
+      ].join(" ");
+    case "generate-docs-live-draft":
+    case "open-outline":
+      return [
+        outlineVariant
+          ? `Use the ${outlineVariant.label.toLowerCase()} structure because ${outlineVariant.summary}`
+          : `Use the current outline sequence: ${outlineSummary}.`,
+        `Draft in order for ${audience}; do not skip ahead or change section continuity silently.`,
+        `Each section should cite ${evidence}, name ${owner} as accountable, and leave unresolved facts visible.`,
+      ].join(" ");
+    case "open-ai-paste":
+      return [
+        `Revision goal: ${outcome}.`,
+        `Apply passes: ${revisionPasses}.`,
+        input.hasSelection ? "Constrain the rewrite to the selected text and preserve numbers, dates, commitments, and caveats." : "Prepare a tracked rewrite proposal instead of replacing the whole document silently.",
+        `Reviewer check: ${reviewer} verifies meaning drift, tone, and evidence before acceptance.`,
+      ].join(" ");
+    case "open-review":
+      return [
+        `Review answer: ${qualityGates}.`,
+        `Verify every material claim against ${evidence}, resolve placeholders and comments, and keep AI provenance in needs-review status until ${reviewer} signs off.`,
+        `If a gate fails, add a visible review task instead of polishing around the problem.`,
+      ].join(" ");
+    case "prepare-export":
+    case "open-exports":
+      return [
+        `Distribution answer: targets are ${targets}; approval status is ${approvalStatus}.`,
+        `Before export, confirm owner ${owner}, reviewer ${reviewer}, canonical metadata, source confidence, and target-specific evidence.`,
+        "Block distribution until export readiness and human review both pass.",
+      ].join(" ");
+    default:
+      return `${step.title}: use ${audience}, ${outcome}, ${evidence}, and ${owner} as the working context before running this step.`;
+  }
+}
+
+function contextSignalsForAgenticStep(
+  step: AgenticWorkflowStep,
+  input: AgenticStepAssistanceInput,
+) {
+  const signals = [
+    `Document type: ${titleCase(input.documentType)}`,
+    `Context completeness: ${input.contextCompleteness.score}/100 ${input.contextCompleteness.status}`,
+    `Intent status: ${input.documentIntent.status}`,
+    input.sourcePack.items.length ? `Source pack: ${input.sourcePack.items.length} item(s), ${input.sourcePack.claims.length} claim(s)` : "Source pack: none supplied",
+    input.documentMemory.entries.length ? `Document memory: ${input.documentMemory.entries.length} reusable item(s)` : "Document memory: none supplied",
+    input.distributionTargets.length ? `Targets: ${input.distributionTargets.join(", ")}` : "",
+    input.missingInputs.length ? `Missing inputs: ${input.missingInputs.join(", ")}` : "",
+    step.status === "needs-input" ? "Step needs input before final acceptance" : "Step can be run and reviewed",
+  ].filter(Boolean);
+  return Array.from(new Set(signals));
+}
+
+function rationaleForAgenticStep(
+  step: AgenticWorkflowStep,
+  input: AgenticStepAssistanceInput,
+) {
+  if (step.status === "needs-input") {
+    return "The suggestion fills the highest-risk missing context first so the agent does not invent business facts.";
+  }
+  if (step.lane === "distribute") {
+    return "Distribution is high-consequence, so the answer emphasizes approval metadata, source confidence, and target evidence before export.";
+  }
+  if (step.lane === "review") {
+    return "Review assistance keeps quality gates, provenance, comments, and evidence visible before a human accepts the document.";
+  }
+  if (input.contextCompleteness.status === "strong") {
+    return "The suggestion uses the supplied intent, context answers, sources, and memory instead of generic defaults.";
+  }
+  return "The suggestion combines available context with explicit review placeholders so weak inputs remain visible.";
+}
+
+function agenticIntentValue(intent: AgenticDocumentIntentSheet, key: string, fallback: string) {
+  const value = extractIntentField(intent, key).trim();
+  if (!value || /^TBD\b/i.test(value) || value === "(missing)") return fallback;
+  return value;
 }
 
 function buildReviewChecklist(
@@ -5802,6 +5973,7 @@ function buildRunMarkdown(input: {
   ];
 
   lines.push(...outlineVariantsMarkdown(plan.outlineVariants));
+  lines.push(...stepAssistanceMarkdown(plan.stepAssistance));
 
   if (plan.revisionModes.length) {
     lines.push("### Planned Revision Modes", "", ...plan.revisionModes.map((mode) => `- ${revisionPassProfile(mode).label}`), "");
@@ -5871,6 +6043,29 @@ function buildRunMarkdown(input: {
     "",
   );
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+function stepAssistanceMarkdown(items: AgenticStepAssistance[]) {
+  if (!items.length) return [];
+  return [
+    "## AI Step Assistance",
+    "",
+    "| Step | Lane | Status | Suggested optimal answer | Rationale |",
+    "| --- | --- | --- | --- | --- |",
+    ...items.map(
+      (item) =>
+        `| ${escapeTableCell(item.stepLabel)} | ${item.lane} | ${item.status} | ${escapeTableCell(item.suggestedAnswer)} | ${escapeTableCell(item.rationale)} |`,
+    ),
+    "",
+    "### Context Signals",
+    "",
+    ...items.flatMap((item) => [
+      `#### ${item.stepLabel}`,
+      "",
+      ...item.contextUsed.map((signal) => `- ${signal}`),
+      "",
+    ]),
+  ];
 }
 
 function editAcceptanceQueueMarkdown(editAcceptanceQueue: AgenticEditAcceptanceItem[]) {

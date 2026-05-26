@@ -3704,6 +3704,30 @@
             </ul>
             <button type="button" @click="buildAgentWorkspacePlan">Replan with answers</button>
           </section>
+          <section class="agent-step-assistance" aria-label="AI step-by-step assistance">
+            <header>
+              <div>
+                <strong>AI Step Assistance</strong>
+                <span>Suggested optimal answers for each creation, revision, review, and distribution step.</span>
+              </div>
+              <small>{{ agentPlan.stepAssistance.length }} suggestions</small>
+            </header>
+            <article v-for="assistance in agentPlan.stepAssistance" :key="assistance.id" :data-status="assistance.status">
+              <div>
+                <small>{{ assistance.lane }} | {{ assistance.status }}</small>
+                <strong>{{ assistance.stepLabel }}</strong>
+                <p>{{ assistance.suggestedAnswer }}</p>
+                <p class="sidebar-hint">{{ assistance.rationale }}</p>
+              </div>
+              <ul>
+                <li v-for="signal in assistance.contextUsed" :key="signal">{{ signal }}</li>
+              </ul>
+              <div class="agent-lifecycle-actions">
+                <button type="button" @click="appendAgentStepAssistance(assistance)">Add answer</button>
+                <button type="button" @click="runAgentAssistedStep(assistance)">Run step</button>
+              </div>
+            </article>
+          </section>
           <ol class="agent-step-list" aria-label="Agent workflow steps">
             <li v-for="step in agentPlan.steps" :key="step.id" :data-lane="step.lane">
               <div>
@@ -4864,6 +4888,7 @@ import {
   type AgenticWorkflowStep,
   type AgenticNextAction,
   type AgenticOutlineVariant,
+  type AgenticStepAssistance,
 } from "./lib/agenticWorkflows";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import {
@@ -9349,6 +9374,29 @@ function runAgentControlAction(action: AgenticNextAction | AgentRunHistoryNextAc
     action: workflowAction,
     status: action.status === "ready" ? "ready" : "needs-input",
   });
+}
+function appendAgentStepAssistance(assistance: AgenticStepAssistance) {
+  const block = [`[${assistance.lane}] ${assistance.stepLabel}`, assistance.suggestedAnswer].join("\n");
+  agentContextAnswers.value = appendTextBlock(agentContextAnswers.value, block);
+  agentPlan.value = null;
+  agentRun.value = null;
+  agentProviderPackage.value = null;
+  agentProviderResult.value = null;
+  localAgentHandoffResult.value = null;
+  store.statusMessage = `Added AI step assistance for ${assistance.stepLabel}`;
+}
+function runAgentAssistedStep(assistance: AgenticStepAssistance) {
+  const step = agentPlan.value?.steps.find((item) => item.id === assistance.stepId);
+  runAgenticStep(
+    step || {
+      id: assistance.stepId,
+      lane: assistance.lane,
+      title: assistance.stepLabel,
+      detail: assistance.rationale,
+      action: assistance.action,
+      status: assistance.status === "needs-input" ? "needs-input" : "ready",
+    },
+  );
 }
 function setAgentAutomationTaskState(task: AgenticAutomationTask, status: AgentAutomationExecutionStatus, result?: string) {
   const now = new Date().toISOString();
@@ -16833,6 +16881,8 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-plan > header,
 .app-shell[data-theme="dark"] .agent-plan-grid article,
 .app-shell[data-theme="dark"] .agent-missing-inputs,
+.app-shell[data-theme="dark"] .agent-step-assistance,
+.app-shell[data-theme="dark"] .agent-step-assistance article,
 .app-shell[data-theme="dark"] .agent-step-list li,
 .app-shell[data-theme="dark"] .agent-missing-inputs li,
 .app-shell[data-theme="dark"] .agent-run-output,
@@ -17035,6 +17085,8 @@ select:hover {
   .app-shell[data-theme="system"] .agent-plan > header,
   .app-shell[data-theme="system"] .agent-plan-grid article,
   .app-shell[data-theme="system"] .agent-missing-inputs,
+  .app-shell[data-theme="system"] .agent-step-assistance,
+  .app-shell[data-theme="system"] .agent-step-assistance article,
   .app-shell[data-theme="system"] .agent-step-list li,
   .app-shell[data-theme="system"] .agent-missing-inputs li,
   .app-shell[data-theme="system"] .agent-run-output,
@@ -17206,6 +17258,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-plan > header,
 .app-shell[data-high-contrast="true"] .agent-plan-grid article,
 .app-shell[data-high-contrast="true"] .agent-missing-inputs,
+.app-shell[data-high-contrast="true"] .agent-step-assistance,
+.app-shell[data-high-contrast="true"] .agent-step-assistance article,
 .app-shell[data-high-contrast="true"] .agent-step-list li,
 .app-shell[data-high-contrast="true"] .agent-missing-inputs li,
 .app-shell[data-high-contrast="true"] .agent-run-output,
@@ -19685,6 +19739,8 @@ select:hover {
 
 .agent-plan-grid article,
 .agent-missing-inputs,
+.agent-step-assistance,
+.agent-step-assistance article,
 .agent-step-list li,
 .agent-run-output,
 .agent-control-center,
@@ -19806,6 +19862,47 @@ select:hover {
   border: 1px solid #e2c582;
   background: #fff9e8;
   font-size: 11px;
+}
+
+.agent-step-assistance {
+  display: grid;
+  gap: 8px;
+  border-left: 3px solid #5d6aa3;
+  background: #f8f9ff;
+}
+
+.agent-step-assistance > header,
+.agent-step-assistance article {
+  display: grid;
+  gap: 8px;
+}
+
+.agent-step-assistance > header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.agent-step-assistance article {
+  border-left: 3px solid #8a93c8;
+}
+
+.agent-step-assistance article[data-status="needs-input"] {
+  border-left-color: #c68a1a;
+}
+
+.agent-step-assistance article[data-status="needs-review"] {
+  border-left-color: #2f6f9f;
+}
+
+.agent-step-assistance p,
+.agent-step-assistance ul {
+  margin: 0;
+}
+
+.agent-step-assistance small {
+  color: #526171;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .agent-step-list {

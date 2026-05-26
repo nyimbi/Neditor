@@ -1828,6 +1828,11 @@ test("agentic workflow planner coordinates creation revision review and distribu
   ok(plan.steps.some((step) => step.action === "open-ai-paste"));
   ok(plan.steps.some((step) => step.action === "open-review"));
   ok(plan.steps.some((step) => step.action === "prepare-export"));
+  equal(plan.stepAssistance.length, plan.steps.length);
+  ok(plan.stepAssistance.every((assistance) => plan.steps.some((step) => step.id === assistance.stepId)));
+  ok(plan.stepAssistance.some((assistance) => assistance.stepId === "intent" && assistance.suggestedAnswer.includes("executive team")));
+  ok(plan.stepAssistance.some((assistance) => assistance.suggestedAnswer.includes("Strategy")));
+  ok(plan.stepAssistance.every((assistance) => assistance.contextUsed.some((signal) => signal.includes("Context completeness"))));
 });
 
 test("agentic workflow planner uses context answers to close missing inputs", () => {
@@ -2015,6 +2020,8 @@ test("agentic workflow run generates auditable creation and distribution packets
   ok(run.markdown.includes("### Document-Type Quality Gates"));
   ok(run.markdown.includes("Client Need"));
   ok(run.markdown.includes("### Outline Variants"));
+  ok(run.markdown.includes("## AI Step Assistance"));
+  ok(run.markdown.includes("Suggested optimal answer"));
   ok(run.markdown.includes("#### Executive-first"));
   ok(run.markdown.includes("Strategy: executive-first"));
   ok(run.markdown.includes("## Review Comment Resolution Queue"));
@@ -3576,6 +3583,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentPlan.documentIntent"));
   ok(app.includes("Document intent sheet"));
   ok(app.includes("agent-intent-sheet"));
+  ok(app.includes('aria-label="AI step-by-step assistance"'));
+  ok(app.includes("agentPlan.stepAssistance"));
+  ok(app.includes("appendAgentStepAssistance"));
+  ok(app.includes("runAgentAssistedStep"));
+  ok(app.includes("Suggested optimal answers for each creation, revision, review, and distribution step."));
   ok(app.includes("agentPlan.revisionModes"));
   ok(app.includes("Revision passes"));
   ok(app.includes("agent-revision-modes"));
