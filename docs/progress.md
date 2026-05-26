@@ -123,11 +123,12 @@ Recent pushed checkpoints visible in current git history:
   defaults while explicit list-item fields override them. Anchored block-list
   rows such as stakeholder records can also be reused elsewhere as direct map
   aliases. Nested inline sequences inside compact maps now expand through
-  original declarations, merge defaults, and copied aliases, and compact
-  objects anchored inside inline sequence items can be reused later as direct
-  map aliases. Custom tags on inline maps and block-list rows are ignored for
-  inventory purposes while their scalar fields remain available as document
-  variables.
+  original declarations, merge defaults, and copied aliases, compact territory
+  or approval matrices such as `[[North, South], [East, West]]` are inventoried
+  as indexed dotted variables, and compact objects anchored inside inline
+  sequence items can be reused later as direct map aliases. Custom tags on
+  inline maps and block-list rows are ignored for inventory purposes while
+  their scalar fields remain available as document variables.
 - Application navigation now exposes NEditor's capabilities through both menus
   and buttons. The workbench header has visible File, Edit, View, Writing
   Tools, Quality, Export, and Help menus that mirror the native desktop menu

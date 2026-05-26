@@ -928,6 +928,14 @@ function parseInlineYamlSequence(
       }
       return;
     }
+    if (entryValue.startsWith("[")) {
+      const nestedEntries = parseInlineYamlSequence(entryValue, anchors, mapAnchors, line);
+      recordMapAnchorEntries(mapAnchors, parsed.anchor, nestedEntries);
+      for (const entry of nestedEntries) {
+        entries.push({ ...entry, key: `${indexKey}.${entry.key}` });
+      }
+      return;
+    }
     if (entryValue === "|" || entryValue === ">" || entryValue.startsWith("[") || entryValue.startsWith("{")) return;
     if (parsed.anchor && entryValue) anchors.set(parsed.anchor, entryValue);
     entries.push({ key: indexKey, value: entryValue, line, keepExisting: false });

@@ -655,10 +655,12 @@ test("front matter managers expand simple inline object variables", () => {
   const source = [
     "---",
     "owner: &docOwner Strategy Office",
-    "defaults: &clientDefaults {owner: *docOwner, reviewer: QA Team, tier: \"Enterprise # priority\", approvers: [CFO, Legal], address: {city: Nairobi, country: Kenya}}",
+    "defaults: &clientDefaults {owner: *docOwner, reviewer: QA Team, tier: \"Enterprise # priority\", approvers: [CFO, Legal], coverage: [[North, South], [East, West]], address: {city: Nairobi, country: Kenya}}",
     "client: {<<: *clientDefaults, name: Acme Corp, owner: Delivery Team, region: EMEA, address: {city: Lagos}}",
     "aliasClient: *clientDefaults",
     "reviewers: [*docOwner, Finance Team]",
+    "territoryMatrix: &territoryMatrix [[North, South], [East, West]]",
+    "copiedTerritoryMatrix: *territoryMatrix",
     "contacts: &contactList [&primaryContact {name: Jane, role: Sponsor, reviewers: [Legal, Finance]}, {name: Eli, address: {city: Kigali}}]",
     "copiedContacts: *contactList",
     "primaryContact: *primaryContact",
@@ -701,6 +703,8 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "defaults.tier" && row.value === "Enterprise # priority"));
   ok(rows.some((row) => row.key === "defaults.approvers.0" && row.value === "CFO"));
   ok(rows.some((row) => row.key === "defaults.approvers.1" && row.value === "Legal"));
+  ok(rows.some((row) => row.key === "defaults.coverage.0.0" && row.value === "North"));
+  ok(rows.some((row) => row.key === "defaults.coverage.1.1" && row.value === "West"));
   ok(rows.some((row) => row.key === "defaults.address.city" && row.value === "Nairobi"));
   ok(rows.some((row) => row.key === "defaults.address.country" && row.value === "Kenya"));
   ok(rows.some((row) => row.key === "client.name" && row.value === "Acme Corp"));
@@ -709,6 +713,8 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "client.tier" && row.value === "Enterprise # priority"));
   ok(rows.some((row) => row.key === "client.approvers.0" && row.value === "CFO"));
   ok(rows.some((row) => row.key === "client.approvers.1" && row.value === "Legal"));
+  ok(rows.some((row) => row.key === "client.coverage.0.1" && row.value === "South"));
+  ok(rows.some((row) => row.key === "client.coverage.1.0" && row.value === "East"));
   ok(rows.some((row) => row.key === "client.region" && row.value === "EMEA"));
   ok(rows.some((row) => row.key === "client.address.city" && row.value === "Lagos"));
   ok(rows.some((row) => row.key === "client.address.country" && row.value === "Kenya"));
@@ -717,6 +723,10 @@ test("front matter managers expand simple inline object variables", () => {
   ok(!rows.some((row) => row.key === "aliasClient" && row.value === "*clientDefaults"));
   ok(rows.some((row) => row.key === "reviewers.0" && row.value === "Strategy Office"));
   ok(rows.some((row) => row.key === "reviewers.1" && row.value === "Finance Team"));
+  ok(rows.some((row) => row.key === "territoryMatrix.0.0" && row.value === "North"));
+  ok(rows.some((row) => row.key === "territoryMatrix.1.1" && row.value === "West"));
+  ok(rows.some((row) => row.key === "copiedTerritoryMatrix.0.1" && row.value === "South"));
+  ok(rows.some((row) => row.key === "copiedTerritoryMatrix.1.0" && row.value === "East"));
   ok(rows.some((row) => row.key === "contacts.0.name" && row.value === "Jane"));
   ok(rows.some((row) => row.key === "contacts.0.role" && row.value === "Sponsor"));
   ok(rows.some((row) => row.key === "contacts.0.reviewers.0" && row.value === "Legal"));
@@ -748,6 +758,7 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "clientRows.0.reviewer" && row.value === "QA Team"));
   ok(rows.some((row) => row.key === "clientRows.0.tier" && row.value === "Enterprise # priority"));
   ok(rows.some((row) => row.key === "clientRows.0.approvers.0" && row.value === "CFO"));
+  ok(rows.some((row) => row.key === "clientRows.0.coverage.1.1" && row.value === "West"));
   ok(rows.some((row) => row.key === "clientRows.0.address.city" && row.value === "Accra"));
   ok(rows.some((row) => row.key === "clientRows.0.address.country" && row.value === "Kenya"));
   ok(!rows.some((row) => row.key === "clientRows.0" && row.value.includes("<<")));
