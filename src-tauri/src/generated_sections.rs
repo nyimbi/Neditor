@@ -3,7 +3,7 @@ use crate::{
     compiler_support::{citation_style, fenced_code_marker},
     document_ast::{extract_label, extract_quoted_attribute},
     indexing::{render_index_entries, IndexEntry},
-    Heading,
+    metadata_lookup, Heading,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -23,14 +23,15 @@ pub(crate) fn inject_generated_sections(
     glossary: &BTreeMap<String, String>,
 ) -> String {
     let wants_toc = text.contains("[TOC]")
-        || metadata
-            .get("toc")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-        || metadata
-            .get("tableOfContents")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
+        || metadata_bool(
+            metadata,
+            &[
+                "toc",
+                "toc.enabled",
+                "tableOfContents",
+                "tableOfContents.enabled",
+            ],
+        );
     let mut output = text.to_string();
     if wants_toc {
         let toc = render_toc(
@@ -124,25 +125,21 @@ fn render_bibliography_entries(bibliography: &[BibliographyEntry], style: &str) 
 }
 
 fn metadata_bool(metadata: &Value, keys: &[&str]) -> bool {
+    keys.iter().any(|key| {
+        metadata_lookup(metadata, key)
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    })
+}
+
+fn metadata_u64(metadata: &Value, keys: &[&str]) -> Option<u64> {
     keys.iter()
-        .any(|key| metadata.get(*key).and_then(Value::as_bool).unwrap_or(false))
+        .find_map(|key| metadata_lookup(metadata, key).and_then(Value::as_u64))
 }
 
 pub(crate) fn generated_index_section_requested(metadata: &Value) -> bool {
     metadata_bool(metadata, &["indexSection", "index_section"])
-        || metadata
-            .get("index")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-        || metadata
-            .get("index")
-            .and_then(|index| {
-                index
-                    .get("enabled")
-                    .or_else(|| index.get("section"))
-                    .and_then(Value::as_bool)
-            })
-            .unwrap_or(false)
+        || metadata_bool(metadata, &["index", "index.enabled", "index.section"])
 }
 
 pub(crate) fn generated_glossary_section_requested(metadata: &Value) -> bool {
@@ -329,18 +326,28 @@ fn toc_number_for_heading(level: usize, counters: &mut [usize; 6]) -> String {
 }
 
 pub(crate) fn toc_depth(metadata: &Value) -> usize {
-    metadata
-        .get("tocDepth")
-        .or_else(|| metadata.get("toc_depth"))
-        .and_then(Value::as_u64)
-        .map(|depth| depth.clamp(1, 6) as usize)
-        .unwrap_or(6)
+    metadata_u64(
+        metadata,
+        &[
+            "tocDepth",
+            "toc_depth",
+            "toc.depth",
+            "tableOfContents.depth",
+        ],
+    )
+    .map(|depth| depth.clamp(1, 6) as usize)
+    .unwrap_or(6)
 }
 
 fn toc_numbering_enabled(metadata: &Value) -> bool {
-    metadata
-        .get("tocNumbered")
-        .or_else(|| metadata.get("numberedHeadings"))
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
+    metadata_bool(
+        metadata,
+        &[
+            "tocNumbered",
+            "numberedHeadings",
+            "toc.numbered",
+            "toc.numberedHeadings",
+            "tableOfContents.numbered",
+        ],
+    )
 }

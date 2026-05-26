@@ -794,7 +794,7 @@ fn compiler_blocks_symlinked_data_sources_outside_document_folder() {
 #[test]
 fn compiler_honors_toc_depth_and_numbering() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: TOC\nstatus: approved\napprovedBy: QA\ntoc: true\ntocDepth: 2\ntocNumbered: true\n---\n# Alpha\n## Beta\n### Gamma\n## Delta\n".to_string(),
+            text: "---\ntitle: TOC\nstatus: approved\napprovedBy: QA\ntoc:\n  enabled: true\n  depth: 2\n  numbered: true\n---\n# Alpha\n## Beta\n### Gamma\n## Delta\n".to_string(),
             file_path: None,
         });
 

@@ -125,6 +125,10 @@ Recent pushed checkpoints visible in current git history:
   `!custom`, `!docs!channel`, and `!<tag:yaml.org,2002:str>` can populate
   repeated client, owner, reviewer, budget, or region variables while explicit
   values still win.
+- Generated table-of-contents controls now accept structured metadata such as
+  `toc: {enabled: true, depth: 2, numbered: true}` in addition to the legacy
+  flat `tocDepth` and `tocNumbered` keys, and the DOCX TOC field uses the same
+  shared depth lookup.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
   flow through simple merges as dotted variable names, and anchored maps,
   including dotted or slash-namespaced anchors such as `&client.defaults` and
