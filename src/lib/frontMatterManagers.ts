@@ -175,10 +175,21 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       }
       if (aliasKind && parsedTopLevel.value.startsWith("[")) {
         for (const item of splitInlineYamlList(parsedTopLevel.value)) {
-          const path = cleanYamlScalar(item);
+          const path = resolveDataSourceScalar(item, anchors);
           if (path) {
             rows.push(normalizeFrontMatterDataSource({ path, kind: aliasKind, source: section, line: index + 1 }, rows.length));
           }
+        }
+      }
+      if (aliasKind && parsedTopLevel.alias) {
+        const aliasedValue = anchors.get(parsedTopLevel.alias) || "";
+        if (aliasedValue.startsWith("[")) {
+          for (const item of splitInlineYamlList(aliasedValue)) {
+            const path = resolveDataSourceScalar(item, anchors);
+            if (path) rows.push(normalizeFrontMatterDataSource({ path, kind: aliasKind, source: section, line: index + 1 }, rows.length));
+          }
+        } else if (aliasedValue) {
+          rows.push(normalizeFrontMatterDataSource({ path: aliasedValue, kind: aliasKind, source: section, line: index + 1 }, rows.length));
         }
       }
       continue;
@@ -242,7 +253,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
         rows.push(
           normalizeFrontMatterDataSource(
             {
-              path: cleanYamlScalar(item[1]),
+              path: resolveDataSourceScalar(item[1], anchors),
               kind: aliasKind,
               source: section,
               line: index + 1,
