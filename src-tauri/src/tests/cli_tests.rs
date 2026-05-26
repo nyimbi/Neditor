@@ -109,6 +109,48 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
 }
 
 #[test]
+fn ned_cli_generates_shell_completions_without_external_dependencies() {
+    let bash = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "completions".to_string(),
+        "bash".to_string(),
+    ])
+    .expect("bash completions");
+    assert_eq!(bash.exit_code, 0);
+    assert!(bash.message.contains("complete -F _ned ned"));
+    assert!(bash.message.contains("rfp-response"));
+    assert!(bash.message.contains("markdown-bundle"));
+
+    let zsh = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "completion".to_string(),
+        "zsh".to_string(),
+    ])
+    .expect("zsh completions");
+    assert_eq!(zsh.exit_code, 0);
+    assert!(zsh.message.contains("#compdef ned"));
+    assert!(zsh.message.contains("--output-dir"));
+
+    let fish = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "completions".to_string(),
+        "fish".to_string(),
+    ])
+    .expect("fish completions");
+    assert_eq!(fish.exit_code, 0);
+    assert!(fish.message.contains("complete -c ned"));
+    assert!(fish.message.contains("epub"));
+
+    let unsupported = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "completions".to_string(),
+        "powershell".to_string(),
+    ])
+    .expect_err("unsupported shell");
+    assert!(unsupported.contains("Supported shells: bash, zsh, fish"));
+}
+
+#[test]
 fn ned_cli_converts_markdown_to_html_export() {
     let source = temp_markdown_path("convert");
     let output = source.with_extension("html");
@@ -203,6 +245,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned new"));
     assert!(outcome.message.contains("ned templates"));
     assert!(outcome.message.contains("ned targets"));
+    assert!(outcome.message.contains("ned completions"));
     assert!(outcome.message.contains("ned doctor"));
     assert!(outcome.message.contains("docx"));
     assert!(outcome.message.contains("epub"));

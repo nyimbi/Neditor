@@ -36,6 +36,17 @@ The cask installs `NEditor.app` and links `ned` so business users and automation
 can open Markdown files or convert documents from Terminal without hunting for
 the app bundle path.
 
+`ned` can also print shell completion scripts without installing another
+package. After installing the cask, users can run the command that matches their
+shell, review the output, and place it in the appropriate shell completion
+directory:
+
+```sh
+ned completions bash
+ned completions zsh
+ned completions fish
+```
+
 For release evidence kit returns, place the completed cask and signed artifact
 under a return directory as:
 

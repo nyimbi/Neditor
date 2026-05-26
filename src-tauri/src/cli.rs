@@ -32,6 +32,20 @@ const NEW_DOCUMENT_TEMPLATES: &[&str] = &[
     "textbook",
     "novel",
 ];
+const CLI_COMMANDS: &[&str] = &[
+    "new",
+    "open",
+    "convert",
+    "export",
+    "templates",
+    "targets",
+    "completions",
+    "default-reader",
+    "doctor",
+    "help",
+    "version",
+];
+const COMPLETION_SHELLS: &[&str] = &["bash", "zsh", "fish"];
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CliOutcome {
@@ -90,6 +104,7 @@ pub fn run_cli_with_args(args: &[String]) -> Result<CliOutcome, String> {
         "convert" | "export" => run_convert_command(&args[2..]),
         "templates" => run_list_command("templates", NEW_DOCUMENT_TEMPLATES, &args[2..]),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
+        "completions" | "completion" => run_completions_command(&args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
         "doctor" => run_doctor_command(&args[2..]),
         other => Err(format!("Unknown ned command '{other}'.\n\n{}", help_text())),
@@ -372,6 +387,32 @@ fn run_list_command(kind: &str, values: &[&str], args: &[String]) -> Result<CliO
     }
     Ok(CliOutcome {
         message: values.join("\n"),
+        exit_code: 0,
+    })
+}
+
+fn run_completions_command(args: &[String]) -> Result<CliOutcome, String> {
+    let shell = args
+        .first()
+        .ok_or_else(|| "Usage: ned completions <bash|zsh|fish>".to_string())?
+        .as_str();
+    if args.len() > 1 {
+        return Err("Only one shell can be generated at a time.".to_string());
+    }
+    let script = match shell {
+        "bash" => bash_completion_script(),
+        "zsh" => zsh_completion_script(),
+        "fish" => fish_completion_script(),
+        other => {
+            return Err(format!(
+                "Unsupported completion shell '{}'. Supported shells: {}",
+                other,
+                COMPLETION_SHELLS.join(", ")
+            ))
+        }
+    };
+    Ok(CliOutcome {
+        message: script,
         exit_code: 0,
     })
 }
@@ -784,6 +825,168 @@ fn target_extension(target: &str) -> &'static str {
     }
 }
 
+fn bash_completion_script() -> String {
+    let commands = CLI_COMMANDS.join(" ");
+    let templates = NEW_DOCUMENT_TEMPLATES.join(" ");
+    let targets = format!("{} all", SUPPORTED_EXPORT_TARGETS.join(" "));
+    let shells = COMPLETION_SHELLS.join(" ");
+    format!(
+        r#"# bash completion for ned
+_ned() {{
+  local cur prev command
+  COMPREPLY=()
+  cur="${{COMP_WORDS[COMP_CWORD]}}"
+  prev="${{COMP_WORDS[COMP_CWORD-1]}}"
+  command="${{COMP_WORDS[1]}}"
+
+  case "$prev" in
+    --template|-t)
+      COMPREPLY=( $(compgen -W "{templates}" -- "$cur") )
+      return 0
+      ;;
+    --to)
+      COMPREPLY=( $(compgen -W "{targets}" -- "$cur") )
+      return 0
+      ;;
+    completions|completion)
+      COMPREPLY=( $(compgen -W "{shells}" -- "$cur") )
+      return 0
+      ;;
+  esac
+
+  if [[ "$cur" == -* ]]; then
+    case "$command" in
+      new)
+        COMPREPLY=( $(compgen -W "--template --title --open --force --dry-run" -- "$cur") )
+        ;;
+      open)
+        COMPREPLY=( $(compgen -W "--dry-run" -- "$cur") )
+        ;;
+      convert|export)
+        COMPREPLY=( $(compgen -W "--to --output --output-dir --no-manifest --option" -- "$cur") )
+        ;;
+      templates|targets)
+        COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+        ;;
+      default-reader)
+        COMPREPLY=( $(compgen -W "--status --enable" -- "$cur") )
+        ;;
+      doctor)
+        COMPREPLY=( $(compgen -W "--json --strict" -- "$cur") )
+        ;;
+      *)
+        COMPREPLY=( $(compgen -W "--help --version" -- "$cur") )
+        ;;
+    esac
+    return 0
+  fi
+
+  if [[ $COMP_CWORD -eq 1 ]]; then
+    COMPREPLY=( $(compgen -W "{commands}" -- "$cur") )
+  fi
+}}
+complete -F _ned ned
+"#
+    )
+}
+
+fn zsh_completion_script() -> String {
+    let commands = CLI_COMMANDS
+        .iter()
+        .map(|command| format!("{command}\\:{command}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let templates = NEW_DOCUMENT_TEMPLATES.join(" ");
+    let targets = format!("{} all", SUPPORTED_EXPORT_TARGETS.join(" "));
+    let shells = COMPLETION_SHELLS.join(" ");
+    format!(
+        r#"#compdef ned
+# zsh completion for ned
+_ned() {{
+  local -a commands templates targets shells
+  commands=({commands})
+  templates=({templates})
+  targets=({targets})
+  shells=({shells})
+
+  case $words[2] in
+    new)
+      _arguments '*:markdown file:_files -g "*.md"' '--template[choose starter template]:template:($templates)' '--title[set document title]:title:' '--open[open after creating]' '--force[replace existing file]' '--dry-run[preview action]'
+      ;;
+    open)
+      _arguments '*:markdown file:_files -g "*.md"' '--dry-run[preview action]'
+      ;;
+    convert|export)
+      _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--output[output file]:file:_files' '--output-dir[output directory]:directory:_files -/' '--no-manifest[skip sidecar manifest]' '--option[set export option key=value]:option:'
+      ;;
+    templates|targets)
+      _arguments '--json[print machine-readable JSON]'
+      ;;
+    completions|completion)
+      _arguments '1:shell:($shells)'
+      ;;
+    default-reader)
+      _arguments '--status[show setup status]' '--enable[request default Markdown reader setup]'
+      ;;
+    doctor)
+      _arguments '--json[print machine-readable JSON]' '--strict[fail when warnings exist]'
+      ;;
+    *)
+      _arguments '1:command:($commands)'
+      ;;
+  esac
+}}
+_ned "$@"
+"#
+    )
+}
+
+fn fish_completion_script() -> String {
+    let mut lines = vec![
+        "# fish completion for ned".to_string(),
+        "complete -c ned -f".to_string(),
+    ];
+    for command in CLI_COMMANDS {
+        lines.push(format!(
+            "complete -c ned -n '__fish_use_subcommand' -a '{command}'"
+        ));
+    }
+    for template in NEW_DOCUMENT_TEMPLATES {
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from new' -l template -s t -a '{template}'"
+        ));
+    }
+    for target in SUPPORTED_EXPORT_TARGETS.iter().chain(["all"].iter()) {
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from convert export' -l to -s t -a '{target}'"
+        ));
+    }
+    for shell in COMPLETION_SHELLS {
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from completions completion' -a '{shell}'"
+        ));
+    }
+    lines.extend([
+        "complete -c ned -n '__fish_seen_subcommand_from new' -l title".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from new' -l open".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from new' -l force".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from new open' -l dry-run".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from convert export' -l output -s o -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from convert export' -l output-dir -s d -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from convert export' -l no-manifest"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from convert export' -l option -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates targets doctor' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from doctor' -l strict".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l status".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l enable".to_string(),
+    ]);
+    lines.join("\n")
+}
+
 fn parse_export_targets(value: &str) -> Result<Vec<String>, String> {
     let requested = value
         .split(',')
@@ -883,6 +1086,7 @@ fn help_text() -> String {
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json]".to_string(),
         "  ned targets [--json]".to_string(),
+        "  ned completions <bash|zsh|fish>".to_string(),
         "  ned doctor [--json] [--strict]".to_string(),
         "  ned default-reader --status".to_string(),
         "  ned default-reader --enable".to_string(),
