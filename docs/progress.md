@@ -3892,6 +3892,24 @@ Support bundle release-evidence report summary:
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves evidence inspection without claiming external proof completion. |
 | Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
 
+`ned default-reader` scriptable setup reporting:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after adding `ned default-reader --status --json`, schema `neditor.ned-default-reader.v1`, unsupported-option validation, status text coverage, completion/help updates, and rebuilt the `ned` binary. |
+| `src-tauri/target/debug/ned default-reader --status --json` | Pass | Direct smoke returned platform, automation support, copyable commands, manual setup steps, next commands, and status `manual-setup-required` on this macOS host where `duti` is not installed. |
+| `src-tauri/target/debug/ned default-reader --status` | Pass | Direct text smoke now starts with `Default Markdown reader: manual-setup-required` and lists the same safe commands/manual steps for non-technical setup. |
+| `src-tauri/target/debug/ned default-reader --mystery` | Pass with expected CLI error | Direct smoke returned an unsupported-option error instead of silently ignoring an invalid default-reader flag. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the scriptable default-reader reporting implementation. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding Settings guidance for `ned default-reader --status --json`. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 74 tests, including static assertions that Settings and CLI source expose the default-reader JSON contract. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting scriptable default-reader setup status in the business-friendly README. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while packaged CLI default-reader setup reporting is now machine-readable. |
+| `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration remains valid after extending the packaged `ned` default-reader surface. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after extending the packaged `ned` default-reader surface. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local setup reporting without claiming external release proof completion. |
+| Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

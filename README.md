@@ -101,7 +101,7 @@ ned evidence --json
 ned support-bundle --workspace . --output support.json
 ned completions zsh
 ned doctor --workspace . --json
-ned default-reader --status
+ned default-reader --status --json
 ```
 
 `ned file.md` and `ned open` launch NEditor with one or more Markdown files.
@@ -151,7 +151,11 @@ report with the app binary, default-reader automation status, `.neditor`
 scaffold status, transform handler setup coverage, export targets, and starter
 templates; use `ned doctor --workspace . --json` when you want machine-readable
 support evidence. In strict mode, missing or incomplete workspace scaffolding is
-a warning and produces a non-zero exit code. In the app, open **Settings -> Files** to review the `ned` usage
+a warning and produces a non-zero exit code. `ned default-reader --status --json`
+prints a machine-readable default Markdown reader setup plan with OS-specific
+automation availability, copyable commands, manual steps, and next commands;
+`ned default-reader --enable --json` returns non-zero if the platform requires
+manual confirmation or if the helper command fails. In the app, open **Settings -> Files** to review the `ned` usage
 summary and request NEditor as the default Markdown reader. Some operating
 systems require user confirmation or a helper such as `duti`; NEditor shows the
 exact commands and manual steps instead of silently changing protected OS

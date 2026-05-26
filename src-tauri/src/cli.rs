@@ -781,16 +781,36 @@ fn run_inspect_command(args: &[String], stdin_text: Option<&str>) -> Result<CliO
 }
 
 fn run_default_reader_command(args: &[String]) -> Result<CliOutcome, String> {
-    let enable = args.iter().any(|arg| arg == "--enable");
-    let status_only = args.is_empty() || args.iter().any(|arg| arg == "--status");
+    let mut enable = false;
+    let mut status_only = args.is_empty();
+    let mut json_output = false;
+    for arg in args {
+        match arg.as_str() {
+            "--enable" => enable = true,
+            "--status" => status_only = true,
+            "--json" => json_output = true,
+            other => return Err(format!("Unsupported default-reader option '{other}'")),
+        }
+    }
+    if enable {
+        status_only = false;
+    }
     let response = default_markdown_reader_response(enable, enable);
+    let exit_code = if enable && !response.applied { 1 } else { 0 };
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&default_reader_json_report(
+                &response,
+                enable,
+                status_only,
+            ))
+            .map_err(|err| err.to_string())?,
+            exit_code,
+        });
+    }
     Ok(CliOutcome {
         message: default_reader_message(&response),
-        exit_code: if status_only || response.supported {
-            0
-        } else {
-            1
-        },
+        exit_code,
     })
 }
 
@@ -2429,7 +2449,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --strict --workspace" -- "$cur") )
         ;;
       default-reader)
-        COMPREPLY=( $(compgen -W "--status --enable" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--status --enable --json" -- "$cur") )
         ;;
       *)
         COMPREPLY=( $(compgen -W "--help --version" -- "$cur") )
@@ -2506,7 +2526,7 @@ _ned() {{
       _arguments '1:shell:($shells)'
       ;;
     default-reader)
-      _arguments '--status[show setup status]' '--enable[request default Markdown reader setup]'
+      _arguments '--status[show setup status]' '--enable[request default Markdown reader setup]' '--json[print machine-readable JSON]'
       ;;
     doctor)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when warnings exist]' '--workspace[inspect NEditor project scaffold]:directory:_files -/'
@@ -2610,6 +2630,7 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from doctor' -l workspace -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l status".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l enable".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l json".to_string(),
     ]);
     lines.join("\n")
 }
@@ -2678,7 +2699,13 @@ fn executable_name(name: &str) -> String {
 }
 
 fn default_reader_message(response: &DefaultMarkdownReaderResponse) -> String {
-    let mut lines = vec![response.message.clone()];
+    let mut lines = vec![
+        format!(
+            "Default Markdown reader: {}",
+            default_reader_status(response)
+        ),
+        response.message.clone(),
+    ];
     if !response.commands.is_empty() {
         lines.push("Commands:".to_string());
         lines.extend(
@@ -2698,6 +2725,47 @@ fn default_reader_message(response: &DefaultMarkdownReaderResponse) -> String {
         );
     }
     lines.join("\n")
+}
+
+fn default_reader_json_report(
+    response: &DefaultMarkdownReaderResponse,
+    requested_enable: bool,
+    status_only: bool,
+) -> Value {
+    json!({
+        "schema": "neditor.ned-default-reader.v1",
+        "platform": &response.platform,
+        "status": default_reader_status(response),
+        "requestedEnable": requested_enable,
+        "statusOnly": status_only,
+        "enabled": response.enabled,
+        "applied": response.applied,
+        "supported": response.supported,
+        "message": &response.message,
+        "commands": &response.commands,
+        "manualSteps": &response.manual_steps,
+        "nextCommands": default_reader_next_commands(response),
+    })
+}
+
+fn default_reader_status(response: &DefaultMarkdownReaderResponse) -> &'static str {
+    if response.applied {
+        "applied"
+    } else if response.supported {
+        "automation-available"
+    } else {
+        "manual-setup-required"
+    }
+}
+
+fn default_reader_next_commands(response: &DefaultMarkdownReaderResponse) -> Vec<String> {
+    if response.applied {
+        Vec::new()
+    } else if response.supported {
+        vec!["ned default-reader --enable".to_string()]
+    } else {
+        vec!["ned default-reader --status".to_string()]
+    }
 }
 
 fn validate_text_report(target: &str, strict: bool, report: &ExportReadinessReport) -> String {
@@ -2932,8 +3000,8 @@ fn help_text() -> String {
             .to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),
         "  ned doctor [--json] [--strict] [--workspace path]".to_string(),
-        "  ned default-reader --status".to_string(),
-        "  ned default-reader --enable".to_string(),
+        "  ned default-reader --status [--json]".to_string(),
+        "  ned default-reader --enable [--json]".to_string(),
         "  ned --version".to_string(),
         "".to_string(),
         format!("Templates: {}", NEW_DOCUMENT_TEMPLATES.join(", ")),

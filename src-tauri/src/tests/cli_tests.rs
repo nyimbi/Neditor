@@ -1012,6 +1012,46 @@ fn ned_cli_gives_batch_exports_distinct_default_names() {
 }
 
 #[test]
+fn ned_cli_reports_default_reader_setup_as_json() {
+    let outcome = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "default-reader".to_string(),
+        "--status".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("default reader json");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value =
+        serde_json::from_str(&outcome.message).expect("default reader json");
+    assert_eq!(report["schema"], "neditor.ned-default-reader.v1");
+    assert!(report["platform"].as_str().is_some());
+    assert!(report["status"].as_str().is_some());
+    assert_eq!(report["requestedEnable"], false);
+    assert_eq!(report["statusOnly"], true);
+    assert!(report["supported"].as_bool().is_some());
+    assert!(report["commands"].as_array().is_some());
+    assert!(report["manualSteps"].as_array().is_some());
+    assert!(report["nextCommands"].as_array().is_some());
+
+    let text = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "default-reader".to_string(),
+        "--status".to_string(),
+    ])
+    .expect("default reader text");
+    assert_eq!(text.exit_code, 0);
+    assert!(text.message.contains("Default Markdown reader:"));
+
+    let error = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "default-reader".to_string(),
+        "--mystery".to_string(),
+    ])
+    .expect_err("unsupported default reader option");
+    assert!(error.contains("Unsupported default-reader option"));
+}
+
+#[test]
 fn ned_cli_help_names_supported_conversion_targets() {
     let args = vec!["ned".to_string(), "--help".to_string()];
     let outcome = crate::cli::run_cli_with_args(&args).expect("help");
@@ -1029,6 +1069,9 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned readiness"));
     assert!(outcome.message.contains("ned evidence"));
     assert!(outcome.message.contains("ned support-bundle"));
+    assert!(outcome
+        .message
+        .contains("ned default-reader --status [--json]"));
     assert!(outcome.message.contains("ned completions"));
     assert!(outcome.message.contains("ned doctor"));
     assert!(outcome.message.contains("--workspace"));
