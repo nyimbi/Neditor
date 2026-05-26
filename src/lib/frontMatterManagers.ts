@@ -83,13 +83,32 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
   const rows: FrontMatterDataSourceRow[] = [];
   const anchors = new Map<string, string>();
   const mapAnchors = new Map<string, Array<{ key: string; value: string; line: number }>>();
+  const sequenceAnchors = new Map<string, Array<Partial<FrontMatterDataSourceRow>>>();
   let section = "";
   let current: Partial<FrontMatterDataSourceRow> | null = null;
   let currentMapAnchor: { anchor: string; indent: number } | null = null;
+  let currentSequenceAnchor: {
+    anchor: string;
+    indent: number;
+    rows: Array<Partial<FrontMatterDataSourceRow>>;
+    current: Partial<FrontMatterDataSourceRow> | null;
+  } | null = null;
   const flushCurrent = () => {
     if (!current) return;
     rows.push(normalizeFrontMatterDataSource(current, rows.length));
     current = null;
+  };
+  const flushSequenceAnchorItem = () => {
+    if (!currentSequenceAnchor?.current) return;
+    currentSequenceAnchor.rows.push(currentSequenceAnchor.current);
+    currentSequenceAnchor.current = null;
+  };
+  const stopSequenceAnchor = () => {
+    if (!currentSequenceAnchor) return;
+    flushSequenceAnchorItem();
+    if (currentSequenceAnchor.rows.length) sequenceAnchors.set(currentSequenceAnchor.anchor, currentSequenceAnchor.rows);
+    if (currentSequenceAnchor.rows.length) mapAnchors.delete(currentSequenceAnchor.anchor);
+    currentSequenceAnchor = null;
   };
   for (let index = 1; index < endIndex; index += 1) {
     const raw = lines[index];
@@ -97,6 +116,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
     const topLevel = raw.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
     if (topLevel) {
       flushCurrent();
+      stopSequenceAnchor();
       currentMapAnchor = null;
       section = topLevel[1];
       const aliasKind = dataSourceAliasKind(section);
@@ -104,6 +124,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       if (parsedTopLevel.anchor && hasIndentedYamlChildren(lines, endIndex, index, 0)) {
         if (!mapAnchors.has(parsedTopLevel.anchor)) mapAnchors.set(parsedTopLevel.anchor, []);
         currentMapAnchor = { anchor: parsedTopLevel.anchor, indent: 0 };
+        currentSequenceAnchor = { anchor: parsedTopLevel.anchor, indent: 0, rows: [], current: null };
       }
       if (parsedTopLevel.anchor && parsedTopLevel.value && !parsedTopLevel.value.startsWith("[") && !parsedTopLevel.value.startsWith("{")) {
         anchors.set(parsedTopLevel.anchor, parsedTopLevel.value);
@@ -124,7 +145,11 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       }
       if (section === "dataSources" && parsedTopLevel.alias) {
         const aliasedRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
-        if (applyDataSourceMerge(aliasedRow, parsedTopLevel.value, mapAnchors)) {
+        if (sequenceAnchors.has(parsedTopLevel.alias)) {
+          for (const itemRow of sequenceAnchors.get(parsedTopLevel.alias) || []) {
+            rows.push(normalizeFrontMatterDataSource({ ...itemRow, source: section }, rows.length));
+          }
+        } else if (applyDataSourceMerge(aliasedRow, parsedTopLevel.value, mapAnchors)) {
           rows.push(normalizeFrontMatterDataSource(aliasedRow, rows.length));
         } else {
           const aliasedValue = anchors.get(parsedTopLevel.alias) || "";
@@ -171,6 +196,24 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
     } else {
       currentMapAnchor = null;
     }
+    if (currentSequenceAnchor && rawIndent > currentSequenceAnchor.indent) {
+      const sequenceItem = raw.match(/^\s*-\s*(.*)$/);
+      if (sequenceItem) {
+        flushSequenceAnchorItem();
+        currentSequenceAnchor.current = { line: index + 1 };
+        if (
+          !applyDataSourceMerge(currentSequenceAnchor.current, sequenceItem[1], mapAnchors) &&
+          !applyInlineDataSourceObject(currentSequenceAnchor.current, sequenceItem[1], anchors, mapAnchors)
+        ) {
+          applyDataSourcePair(currentSequenceAnchor.current, sequenceItem[1]);
+        }
+      } else if (currentSequenceAnchor.current) {
+        const pair = raw.match(/^\s+([\w-]+):\s*(.*)$/);
+        if (pair) applyDataSourcePair(currentSequenceAnchor.current, `${pair[1]}: ${pair[2]}`);
+      }
+    } else {
+      stopSequenceAnchor();
+    }
     if (section === "dataSources") {
       const item = raw.match(/^\s*-\s*(.*)$/);
       if (item) {
@@ -211,6 +254,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
     }
   }
   flushCurrent();
+  stopSequenceAnchor();
   return rows;
 }
 
