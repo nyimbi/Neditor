@@ -78,6 +78,10 @@ Recent pushed checkpoints visible in current git history:
   business-document YAML edge cases: CRLF front matter, quoted `#` characters,
   comma-containing inline data-source lists, `yml` aliases, URL/Windows/parent
   traversal path blocking, and filenames that legitimately contain `..`.
+- The same front-matter manager now resolves simple scalar anchors and aliases
+  and surfaces folded/literal block scalars as usable document-variable values,
+  so repeated owners/reviewers and short multiline summaries can be inserted
+  through the References sidebar instead of disappearing from the variable list.
 - Application navigation now exposes NEditor's capabilities through both menus
   and buttons. The workbench header has visible File, Edit, View, Writing
   Tools, Quality, Export, and Help menus that mirror the native desktop menu
@@ -3296,11 +3300,18 @@ Front matter manager YAML edge cases:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm exec tsc -p tsconfig.test.json` | Pass | Test TypeScript compilation passed after hardening `src/lib/frontMatterManagers.ts`. |
-| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Focused frontend unit coverage passed for CRLF front matter, quote-aware YAML comments, comma-containing inline lists, `yml` alias normalization, URL/Windows/parent traversal path blocking, and safe filenames containing `..`. |
+| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Focused frontend unit coverage passed for CRLF front matter, quote-aware YAML comments, comma-containing inline lists, `yml` alias normalization, URL/Windows/parent traversal path blocking, safe filenames containing `..`, scalar anchors/aliases, and folded/literal block scalar variables. |
 | `pnpm run check` | Pass | Vue typecheck passed after the front-matter parser hardening. |
 | `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting front-matter manager edge-case coverage; all local links resolved. |
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the front-matter addendum evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the parser, tests, or docs diff. |
+
+Front matter manager anchors and multiline variables:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm exec tsc -p tsconfig.test.json` | Pass | Test TypeScript compilation passed after adding simple scalar anchor/alias and block-scalar handling. |
+| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Three focused frontend unit tests passed, including scalar anchors, aliases, nested aliases, quoted `#` in anchored values, literal block scalar summaries, and folded block scalar excerpts. |
 
 Export metadata checklist modularization:
 

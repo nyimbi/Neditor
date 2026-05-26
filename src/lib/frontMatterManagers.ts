@@ -141,6 +141,7 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
   if (endIndex <= 0) return [];
   const rows: FrontMatterVariableRow[] = [];
   const stack: Array<{ indent: number; path: string; excluded: boolean }> = [];
+  const anchors = new Map<string, string>();
   for (let index = 1; index < endIndex; index += 1) {
     const raw = lines[index];
     const match = raw.match(/^(\s*)([A-Za-z][\w-]*):\s*(.*)$/);
@@ -152,14 +153,22 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
     const path = parent ? `${parent.path}.${key}` : key;
     const excluded = Boolean(parent?.excluded || (!parent && frontMatterVariableExcludedKeys.has(key)));
     const hasChildren = hasIndentedYamlChildren(lines, endIndex, index, indent);
+    const parsed = parseYamlScalar(match[3]);
+    let value = parsed.alias ? anchors.get(parsed.alias) || parsed.value : parsed.value;
+    if (value === "|" || value === ">") {
+      value = collectYamlBlockScalar(lines, endIndex, index, indent, value);
+      if (parsed.anchor && value) anchors.set(parsed.anchor, value);
+      if (!excluded && value) rows.push({ key: path, value, status: "ready", line: index + 1 });
+      continue;
+    }
+    if (parsed.anchor && value && !value.startsWith("[") && !value.startsWith("{")) anchors.set(parsed.anchor, value);
     if (hasChildren) stack.push({ indent, path, excluded });
     if (excluded) continue;
-    const value = cleanYamlScalar(match[3]);
     if (!value || value === "[]" || value === "{}") {
       if (!hasChildren) rows.push({ key: path, value: "", status: "empty", line: index + 1 });
       continue;
     }
-    if (/^[>|]$/.test(value) || value.startsWith("[") || value.startsWith("{")) continue;
+    if (value.startsWith("[") || value.startsWith("{")) continue;
     rows.push({
       key: path,
       value,
@@ -286,14 +295,48 @@ function hasIndentedYamlChildren(lines: string[], endIndex: number, index: numbe
 
 function cleanYamlScalar(value: string) {
   const withoutComment = stripYamlComment(value).trim();
-  if (withoutComment.length >= 2) {
-    const quote = withoutComment[0];
-    if ((quote === "\"" || quote === "'") && withoutComment.endsWith(quote)) {
-      const body = withoutComment.slice(1, -1);
+  const withoutAnchor = stripLeadingYamlAnchor(withoutComment);
+  if (withoutAnchor.length >= 2) {
+    const quote = withoutAnchor[0];
+    if ((quote === "\"" || quote === "'") && withoutAnchor.endsWith(quote)) {
+      const body = withoutAnchor.slice(1, -1);
       return quote === "'" ? body.replace(/''/g, "'") : body.replace(/\\"/g, "\"");
     }
   }
-  return withoutComment;
+  return withoutAnchor;
+}
+
+function parseYamlScalar(value: string) {
+  const withoutComment = stripYamlComment(value).trim();
+  const anchorMatch = withoutComment.match(/^&([A-Za-z0-9_-]+)\s+(.*)$/);
+  const anchor = anchorMatch?.[1] || "";
+  const scalar = anchorMatch ? anchorMatch[2].trim() : withoutComment;
+  const alias = scalar.match(/^\*([A-Za-z0-9_-]+)$/)?.[1] || "";
+  return {
+    anchor,
+    alias,
+    value: cleanYamlScalar(scalar),
+  };
+}
+
+function stripLeadingYamlAnchor(value: string) {
+  return value.replace(/^&[A-Za-z0-9_-]+\s+/, "").trim();
+}
+
+function collectYamlBlockScalar(lines: string[], endIndex: number, index: number, indent: number, style: string) {
+  const collected: string[] = [];
+  for (let nextIndex = index + 1; nextIndex < endIndex; nextIndex += 1) {
+    const next = lines[nextIndex];
+    if (!next.trim()) {
+      collected.push("");
+      continue;
+    }
+    const nextIndent = yamlIndentWidth(next.match(/^\s*/)?.[0] || "");
+    if (nextIndent <= indent) break;
+    collected.push(next.slice(Math.min(next.length, indent + 2)));
+  }
+  const text = style === ">" ? collected.map((line) => line.trim()).filter(Boolean).join(" ") : collected.join("\n").trim();
+  return text.replace(/\s+/g, " ").trim();
 }
 
 function startsWithFrontMatter(text: string) {

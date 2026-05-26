@@ -488,6 +488,35 @@ test("front matter managers handle CRLF quoted YAML and safer path checks", () =
   ok(sources.some((row) => row.name === "Parent" && row.status === "blocked-path"));
 });
 
+test("front matter managers surface scalar anchors aliases and block scalars", () => {
+  const source = [
+    "---",
+    "owner: &docOwner Strategy Office",
+    "reviewer: *docOwner",
+    "summary: |",
+    "  First line with # visible marker.",
+    "  Second line for reviewers.",
+    "excerpt: >",
+    "  Fold this",
+    "  into one paragraph.",
+    "client:",
+    "  lead: &leadName \"Jane # Lead\"",
+    "  approver: *leadName",
+    "---",
+    "",
+    "# Anchors",
+  ].join("\n");
+
+  const rows = parseFrontMatterVariables(source);
+  ok(rows.some((row) => row.key === "owner" && row.value === "Strategy Office"));
+  ok(rows.some((row) => row.key === "reviewer" && row.value === "Strategy Office"));
+  ok(rows.some((row) => row.key === "summary" && row.value.includes("First line with # visible marker.")));
+  ok(rows.some((row) => row.key === "summary" && row.value.includes("Second line for reviewers.")));
+  ok(rows.some((row) => row.key === "excerpt" && row.value === "Fold this into one paragraph."));
+  ok(rows.some((row) => row.key === "client.lead" && row.value === "Jane # Lead"));
+  ok(rows.some((row) => row.key === "client.approver" && row.value === "Jane # Lead"));
+});
+
 test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   const text = "word alpha beta";
   equal(nextVimWordStart(text, 0), 5);
