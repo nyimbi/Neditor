@@ -212,8 +212,17 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
       const itemAnchor = itemDecorated.anchor;
       if (itemAnchor && !mapAnchors.has(itemAnchor)) mapAnchors.set(itemAnchor, []);
       if (itemHasChildren || itemAnchor) stack.push({ indent: itemIndent, path: itemPath, excluded: itemExcluded, anchor: itemAnchor });
+      const itemMerge = itemDecorated.scalar.match(/^<<:\s*(.*)$/);
       const itemPair = itemDecorated.scalar.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
-      if (itemPair) {
+      if (itemMerge) {
+        recordEntriesForPath(
+          itemPath,
+          itemExcluded,
+          yamlAliasNames(itemMerge[1]).flatMap((alias) =>
+            (mapAnchors.get(alias) || []).map((entry) => ({ ...entry, keepExisting: true })),
+          ),
+        );
+      } else if (itemPair) {
         const itemKey = itemPair[1];
         const itemValue = parseYamlScalar(itemPair[2]);
         let value = itemValue.alias ? anchors.get(itemValue.alias) || itemValue.value : itemValue.value;

@@ -580,6 +580,11 @@ test("front matter managers expand simple inline object variables", () => {
     "blockReviewers:",
     "  - Legal",
     "  - Finance",
+    "clientRows:",
+    "  - <<: *clientDefaults",
+    "    name: MergeCo",
+    "    owner: Sales Team",
+    "    address: {city: Accra}",
     "portfolio: &portfolioDefaults",
     "  billing: {currency: USD, amount: 125000}",
     "deal:",
@@ -620,6 +625,13 @@ test("front matter managers expand simple inline object variables", () => {
   ok(rows.some((row) => row.key === "milestones.1.owner" && row.value === "Finance Team"));
   ok(rows.some((row) => row.key === "blockReviewers.0" && row.value === "Legal"));
   ok(rows.some((row) => row.key === "blockReviewers.1" && row.value === "Finance"));
+  ok(rows.some((row) => row.key === "clientRows.0.name" && row.value === "MergeCo"));
+  ok(rows.some((row) => row.key === "clientRows.0.owner" && row.value === "Sales Team"));
+  ok(rows.some((row) => row.key === "clientRows.0.reviewer" && row.value === "QA Team"));
+  ok(rows.some((row) => row.key === "clientRows.0.tier" && row.value === "Enterprise # priority"));
+  ok(rows.some((row) => row.key === "clientRows.0.address.city" && row.value === "Accra"));
+  ok(rows.some((row) => row.key === "clientRows.0.address.country" && row.value === "Kenya"));
+  ok(!rows.some((row) => row.key === "clientRows.0" && row.value.includes("<<")));
   ok(rows.some((row) => row.key === "portfolio.billing.currency" && row.value === "USD"));
   ok(rows.some((row) => row.key === "portfolio.billing.amount" && row.value === "125000"));
   ok(rows.some((row) => row.key === "deal.billing.currency" && row.value === "USD"));
