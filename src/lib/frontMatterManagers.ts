@@ -95,6 +95,14 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       flushCurrent();
       section = topLevel[1];
       const aliasKind = dataSourceAliasKind(section);
+      if (section === "dataSources" && topLevel[2].trim().startsWith("[")) {
+        for (const item of splitInlineYamlList(topLevel[2])) {
+          const inlineRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
+          if (applyInlineDataSourceObject(inlineRow, item)) {
+            rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
+          }
+        }
+      }
       if (aliasKind && topLevel[2].trim().startsWith("[")) {
         for (const item of splitInlineYamlList(topLevel[2])) {
           const path = cleanYamlScalar(item);
@@ -110,7 +118,7 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
       if (item) {
         flushCurrent();
         current = { source: section, line: index + 1 };
-        applyDataSourcePair(current, item[1]);
+        if (!applyInlineDataSourceObject(current, item[1])) applyDataSourcePair(current, item[1]);
         continue;
       }
       const pair = raw.match(/^\s+([\w-]+):\s*(.*)$/);
@@ -449,6 +457,17 @@ function applyDataSourcePair(row: Partial<FrontMatterDataSourceRow>, pairText: s
   if (key === "name" || key === "title") row.name = value;
   if (key === "path" || key === "file") row.path = value;
   if (key === "type" || key === "kind") row.kind = normalizeDataSourceKind(value);
+}
+
+function applyInlineDataSourceObject(row: Partial<FrontMatterDataSourceRow>, value: string) {
+  const trimmed = stripYamlComment(value).trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return false;
+  const entries = parseInlineYamlMap(trimmed, new Map(), new Map(), row.line || 0);
+  if (!entries.length) return false;
+  for (const entry of entries) {
+    applyDataSourcePair(row, `${entry.key}: ${entry.value}`);
+  }
+  return true;
 }
 
 function normalizeFrontMatterDataSource(row: Partial<FrontMatterDataSourceRow>, index: number): FrontMatterDataSourceRow {

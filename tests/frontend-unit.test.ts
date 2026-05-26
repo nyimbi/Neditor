@@ -414,8 +414,10 @@ test("front matter managers inventory data sources and document variables", () =
     "  - name: Revenue",
     "    path: data/revenue.csv",
     "    type: csv",
+    "  - {name: Pipeline, path: \"data/pipeline,2026.tsv\", type: tsv}",
     "  - path: ../outside.json",
     "    type: json",
+    "dataSources: [{name: Compact YAML, path: data/compact.yml, type: yml}, {title: Profile JSON, file: data/profile-compact.json, kind: json}]",
     "csvFiles: [data/customers.csv]",
     "jsonFiles:",
     "  - data/profile.json",
@@ -433,7 +435,10 @@ test("front matter managers inventory data sources and document variables", () =
   const sources = parseFrontMatterDataSources(source);
   deepEqual(sources.map((row) => [row.name, row.path, row.kind, row.status, row.source]), [
     ["Revenue", "data/revenue.csv", "csv", "ready", "dataSources"],
+    ["Pipeline", "data/pipeline,2026.tsv", "tsv", "ready", "dataSources"],
     ["Outside", "../outside.json", "json", "blocked-path", "dataSources"],
+    ["Compact YAML", "data/compact.yml", "yaml", "ready", "dataSources"],
+    ["Profile JSON", "data/profile-compact.json", "json", "ready", "dataSources"],
     ["Customers", "data/customers.csv", "csv", "ready", "csvFiles"],
     ["Profile", "data/profile.json", "json", "ready", "jsonFiles"],
   ]);
