@@ -995,7 +995,7 @@ fn compiler_generates_linked_index_with_exclusions_and_proper_terms() {
 #[test]
 fn compiler_generates_index_from_front_matter_without_marker() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: Front Matter Index\nstatus: approved\napprovedBy: QA\nindex:\n  enabled: true\n  terms:\n    - Buyer Intent\n    - Strategy Office\n  exclude:\n    - secret plan\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Buyer Intent is a single-use metadata term. Secret Plan should stay out. Working capital{#index:Liquidity} marker.\n".to_string(),
+            text: "---\ntitle: Front Matter Index\nstatus: approved\napprovedBy: QA\nindex:\n  enabled: true\n  terms:\n    - Buyer Intent\n    - Strategy Office\n    - term: Executive Sponsor\n      anchor: market-analysis\n  exclude:\n    - secret plan\n---\n# Market Analysis\nAcme Strategy appears here. **Working Capital** matters.\n\n## Follow Up\nAcme Strategy returns. Buyer Intent is a single-use metadata term. Secret Plan should stay out. Working capital{#index:Liquidity} marker.\n".to_string(),
             file_path: None,
         });
 
@@ -1012,6 +1012,9 @@ fn compiler_generates_index_from_front_matter_without_marker() {
     assert!(response
         .compiled_markdown
         .contains("- [Buyer Intent](#follow-up)"));
+    assert!(response
+        .compiled_markdown
+        .contains("- [Executive Sponsor](#market-analysis)"));
     assert!(response.compiled_markdown.contains("- Strategy Office"));
     assert!(!response
         .index_terms

@@ -8,6 +8,11 @@ pub(crate) struct IndexEntry {
     pub(crate) anchor: Option<String>,
 }
 
+struct MetadataIndexTerm {
+    term: String,
+    anchor: Option<String>,
+}
+
 pub(crate) fn collect_index_entries(
     text: &str,
     metadata: &Value,
@@ -68,8 +73,10 @@ pub(crate) fn collect_index_entries(
         insert_index_entry(&mut entries, &excluded, term.clone(), anchor);
     }
     for term in metadata_index_terms(metadata) {
-        let anchor = first_term_anchor(text, headings, &term);
-        insert_index_entry(&mut entries, &excluded, term, anchor);
+        let anchor = term
+            .anchor
+            .or_else(|| first_term_anchor(text, headings, &term.term));
+        insert_index_entry(&mut entries, &excluded, term.term, anchor);
     }
     for (term, (count, anchor)) in proper_nouns {
         if count >= 2 {
@@ -153,11 +160,12 @@ fn index_exclude_terms(metadata: &Value) -> BTreeSet<String> {
     terms
 }
 
-fn metadata_index_terms(metadata: &Value) -> Vec<String> {
-    metadata_string_values(
-        metadata,
-        &["indexTerms", "index_terms", "index.terms", "index.keywords"],
-    )
+fn metadata_index_terms(metadata: &Value) -> Vec<MetadataIndexTerm> {
+    let mut values = Vec::new();
+    for key in ["indexTerms", "index_terms", "index.terms", "index.keywords"] {
+        collect_metadata_index_terms(metadata_lookup(metadata, key), &mut values);
+    }
+    values
 }
 
 fn metadata_string_values(metadata: &Value, keys: &[&str]) -> Vec<String> {
@@ -181,6 +189,46 @@ fn collect_metadata_string_values(value: Option<&Value>, values: &mut Vec<String
                 if !term.is_empty() {
                     values.push(term.to_string());
                 }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_metadata_index_terms(value: Option<&Value>, values: &mut Vec<MetadataIndexTerm>) {
+    match value {
+        Some(Value::Array(items)) => {
+            for item in items {
+                collect_metadata_index_terms(Some(item), values);
+            }
+        }
+        Some(Value::String(value)) => {
+            for term in value.split(',') {
+                let term = term.trim();
+                if !term.is_empty() {
+                    values.push(MetadataIndexTerm {
+                        term: term.to_string(),
+                        anchor: None,
+                    });
+                }
+            }
+        }
+        Some(Value::Object(object)) => {
+            let term = ["term", "name", "title", "label", "value"]
+                .iter()
+                .find_map(|key| object.get(*key).and_then(Value::as_str))
+                .map(str::trim)
+                .filter(|term| !term.is_empty());
+            if let Some(term) = term {
+                let anchor = ["anchor", "target", "ref", "section"]
+                    .iter()
+                    .find_map(|key| object.get(*key).and_then(Value::as_str))
+                    .map(|anchor| anchor.trim().trim_start_matches('#').to_string())
+                    .filter(|anchor| !anchor.is_empty());
+                values.push(MetadataIndexTerm {
+                    term: term.to_string(),
+                    anchor,
+                });
             }
         }
         _ => {}

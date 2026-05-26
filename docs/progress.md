@@ -137,8 +137,9 @@ Recent pushed checkpoints visible in current git history:
   `glossarySection` aliases.
 - Automatic indexes now honor metadata-defined terms from `index.terms`,
   `indexTerms`, `index_terms`, and `index.keywords`, including comma-separated
-  strings, while `index.exclude` and `indexExclude` use the same shared metadata
-  lookup and continue to suppress forbidden terms.
+  strings and structured entries such as `{term, anchor}`, while
+  `index.exclude` and `indexExclude` use the same shared metadata lookup and
+  continue to suppress forbidden terms.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
   flow through simple merges as dotted variable names, and anchored maps,
   including dotted or slash-namespaced anchors such as `&client.defaults` and
