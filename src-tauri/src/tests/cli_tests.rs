@@ -17,6 +17,37 @@ fn ned_cli_opens_markdown_paths_in_dry_run() {
     assert_eq!(outcome.exit_code, 0);
     assert!(outcome.message.contains("Would open"));
     assert!(outcome.message.contains("NEditor"));
+
+    let json_args = vec![
+        "ned".to_string(),
+        "open".to_string(),
+        path.to_string_lossy().to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ];
+    let json = crate::cli::run_cli_with_args(&json_args).expect("dry-run open json");
+    assert_eq!(json.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&json.message).expect("open json");
+    assert_eq!(report["schema"], "neditor.ned-open.v1");
+    assert_eq!(report["dryRun"], true);
+    assert_eq!(report["opened"], false);
+    assert_eq!(report["count"], 1);
+    assert_eq!(
+        report["paths"][0],
+        fs::canonicalize(&path)
+            .expect("canonical open path")
+            .to_string_lossy()
+            .as_ref()
+    );
+
+    let error = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "open".to_string(),
+        path.to_string_lossy().to_string(),
+        "--mystery".to_string(),
+    ])
+    .expect_err("unsupported open option");
+    assert!(error.contains("Unsupported open option"));
 }
 
 #[test]
@@ -114,6 +145,45 @@ fn ned_cli_creates_new_business_document_from_template() {
 
     let duplicate = crate::cli::run_cli_with_args(&args).expect_err("refuse overwrite");
     assert!(duplicate.contains("already exists"));
+
+    let json_path = temp_markdown_path("new-proposal-json");
+    let json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "new".to_string(),
+        json_path.to_string_lossy().to_string(),
+        "--template".to_string(),
+        "proposal".to_string(),
+        "--title".to_string(),
+        "JSON Proposal".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("new proposal json");
+    assert_eq!(json.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&json.message).expect("new json");
+    assert_eq!(report["schema"], "neditor.ned-new.v1");
+    assert_eq!(report["created"], true);
+    assert_eq!(report["opened"], false);
+    assert_eq!(report["template"], "proposal");
+    assert_eq!(report["title"], "JSON Proposal");
+    assert!(json_path.is_file());
+
+    let dry_path = temp_markdown_path("new-proposal-dry-json");
+    let dry_json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "new".to_string(),
+        dry_path.to_string_lossy().to_string(),
+        "--template".to_string(),
+        "proposal".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("new dry-run json");
+    let dry_report: serde_json::Value =
+        serde_json::from_str(&dry_json.message).expect("new dry json");
+    assert_eq!(dry_report["schema"], "neditor.ned-new.v1");
+    assert_eq!(dry_report["dryRun"], true);
+    assert_eq!(dry_report["created"], false);
+    assert!(!dry_path.exists());
 }
 
 #[test]

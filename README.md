@@ -84,8 +84,8 @@ Packaged developer and release builds include a command-line helper named
 ```sh
 ned board-paper.md
 ned init ~/Documents/client-pack --json
-ned new proposal.md --template proposal --title "Client Expansion Proposal"
-ned open board-paper.md
+ned new proposal.md --template proposal --title "Client Expansion Proposal" --json
+ned open board-paper.md --dry-run --json
 ned convert board-paper.md --to pdf --output board-paper.pdf
 ned convert board-paper.md --to pdf,docx,html --output-dir exports
 ned convert board-paper.md --to html --stdout
@@ -104,13 +104,17 @@ ned doctor --workspace . --json
 ned default-reader --status --json
 ```
 
-`ned file.md` and `ned open` launch NEditor with one or more Markdown files.
+`ned file.md` and `ned open` launch NEditor with one or more Markdown files;
+use `ned open file.md --dry-run --json` when a setup script needs to verify the
+paths that would be handed to the app without opening a window.
 `ned init` creates a reusable `.neditor` project scaffold with variables,
 standard business snippets, and a local-agent handoff folder; use `--dry-run`
 to preview the files and `--json` for help desk automation. `ned new` creates a
 starter Markdown document from business templates such as proposal, RFP
-response, report, lesson plan, textbook, and novel. `ned convert` and `ned
-export` run the same local export pipeline used by the app for HTML, PDF, DOCX,
+response, report, lesson plan, textbook, and novel; add `--json` for
+script-friendly creation status, selected template, title, output path, and open
+status. `ned convert` and `ned export` run the same local export pipeline used
+by the app for HTML, PDF, DOCX,
 PPTX, Markdown bundle, blog, Substack, LaTeX, Google Docs package, and EPUB
 outputs. Use comma-separated targets, or `--to all`, with `--output-dir` when
 you need a complete delivery pack for review, legal, publishing, and archive

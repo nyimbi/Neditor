@@ -3910,6 +3910,24 @@ Support bundle release-evidence report summary:
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local setup reporting without claiming external release proof completion. |
 | Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
 
+Scriptable `ned open` and `ned new` status:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after adding `--json` to `ned open` and `ned new`, schema checks for `neditor.ned-open.v1` and `neditor.ned-new.v1`, dry-run file handoff coverage, creation status coverage, unsupported open-option validation, completion/help updates, and rebuilt the `ned` binary. |
+| `src-tauri/target/debug/ned open README.md --dry-run --json` | Pass | Direct smoke returned schema `neditor.ned-open.v1`, one canonical Markdown path, `dryRun: true`, and `opened: false` without launching the app. |
+| `src-tauri/target/debug/ned new /private/tmp/neditor-ned-json-smoke.md --template proposal --title "CLI JSON Smoke" --force --json` | Pass | Direct smoke created a proposal document in `/private/tmp` and returned schema `neditor.ned-new.v1`, selected template, resolved title, output path, `created: true`, and `opened: false`. |
+| `src-tauri/target/debug/ned open README.md --mystery` | Pass with expected CLI error | Direct smoke returned an unsupported-option error instead of treating an invalid flag as a path. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the scriptable open/new CLI implementation. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding Settings guidance for scriptable `ned open` and `ned new` usage. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 74 tests, including static assertions that Settings and CLI source expose open/new JSON schemas. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting scriptable file handoff and document creation in the README. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while packaged CLI file open and business-template creation are now machine-readable. |
+| `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration remains valid after extending the packaged `ned` open/new surface. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after extending the packaged `ned` open/new surface. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local CLI automation without claiming external release proof completion. |
+| Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

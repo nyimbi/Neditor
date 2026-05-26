@@ -237,22 +237,59 @@ pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Val
 }
 
 fn run_open_command(args: &[String]) -> Result<CliOutcome, String> {
-    let dry_run = args.iter().any(|arg| arg == "--dry-run");
-    let paths = args
+    let mut dry_run = false;
+    let mut json_output = false;
+    let mut raw_paths = Vec::new();
+    for arg in args {
+        match arg.as_str() {
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            value if value.starts_with('-') => {
+                return Err(format!("Unsupported open option '{value}'"));
+            }
+            value => raw_paths.push(value.to_string()),
+        }
+    }
+    let paths = raw_paths
         .iter()
-        .filter(|arg| arg.as_str() != "--dry-run")
         .map(|arg| canonical_path_string(&PathBuf::from(arg)))
         .collect::<Result<Vec<_>, _>>()?;
     if paths.is_empty() {
-        return Err("Usage: ned open <file.md> [more.md] [--dry-run]".to_string());
+        return Err("Usage: ned open <file.md> [more.md] [--dry-run] [--json]".to_string());
     }
     if dry_run {
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-open.v1",
+                    "dryRun": true,
+                    "opened": false,
+                    "count": paths.len(),
+                    "paths": paths,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
         return Ok(CliOutcome {
             message: format!("Would open {} in NEditor", paths.join(", ")),
             exit_code: 0,
         });
     }
     open_paths_in_neditor(&paths)?;
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-open.v1",
+                "dryRun": false,
+                "opened": true,
+                "count": paths.len(),
+                "paths": paths,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
     Ok(CliOutcome {
         message: format!("Opening {} in NEditor", paths.join(", ")),
         exit_code: 0,
@@ -365,6 +402,7 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut should_open = false;
     let mut force = false;
     let mut dry_run = false;
+    let mut json_output = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -386,6 +424,7 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
             "--open" => should_open = true,
             "--force" => force = true,
             "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
             value if value.starts_with('-') => {
                 return Err(format!("Unsupported new option '{value}'"));
             }
@@ -410,6 +449,22 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
     let resolved_title = title.unwrap_or_else(|| title_from_path(&output));
     let markdown = new_document_markdown(&template, &resolved_title)?;
     if dry_run {
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-new.v1",
+                    "dryRun": true,
+                    "created": false,
+                    "opened": false,
+                    "output": path_to_display(&output),
+                    "template": template,
+                    "title": resolved_title,
+                    "force": force,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
         return Ok(CliOutcome {
             message: format!(
                 "Would create {} from template '{}' with title '{}'",
@@ -438,6 +493,22 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
     let path = canonical_path_string(&output)?;
     if should_open {
         open_paths_in_neditor(std::slice::from_ref(&path))?;
+    }
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-new.v1",
+                "dryRun": false,
+                "created": true,
+                "opened": should_open,
+                "output": path,
+                "template": template,
+                "title": resolved_title,
+                "force": force,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
     }
     Ok(CliOutcome {
         message: if should_open {
@@ -2416,10 +2487,10 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--dry-run --force --json" -- "$cur") )
         ;;
       new)
-        COMPREPLY=( $(compgen -W "--template --title --open --force --dry-run" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--template --title --open --force --dry-run --json" -- "$cur") )
         ;;
       open)
-        COMPREPLY=( $(compgen -W "--dry-run" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--dry-run --json" -- "$cur") )
         ;;
       convert|export)
         COMPREPLY=( $(compgen -W "--to --output --output-dir --stdout --no-manifest --option" -- "$cur") )
@@ -2493,10 +2564,10 @@ _ned() {{
       _arguments '1:workspace directory:_files -/' '--dry-run[preview action]' '--force[replace scaffold files]' '--json[print machine-readable JSON]'
       ;;
     new)
-      _arguments '*:markdown file:_files -g "*.md"' '--template[choose starter template]:template:($templates)' '--title[set document title]:title:' '--open[open after creating]' '--force[replace existing file]' '--dry-run[preview action]'
+      _arguments '*:markdown file:_files -g "*.md"' '--template[choose starter template]:template:($templates)' '--title[set document title]:title:' '--open[open after creating]' '--force[replace existing file]' '--dry-run[preview action]' '--json[print machine-readable JSON]'
       ;;
     open)
-      _arguments '*:markdown file:_files -g "*.md"' '--dry-run[preview action]'
+      _arguments '*:markdown file:_files -g "*.md"' '--dry-run[preview action]' '--json[print machine-readable JSON]'
       ;;
     convert|export)
       _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--output[output file, or - for text stdout]:file:_files' '--output-dir[output directory]:directory:_files -/' '--stdout[write supported text export to stdout]' '--no-manifest[skip sidecar manifest]' '--option[set export option key=value]:option:'
@@ -2582,6 +2653,7 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from new' -l open".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from new' -l force".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from new open' -l dry-run".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from new open' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l output -s o -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l output-dir -s d -r"
@@ -2982,9 +3054,9 @@ fn help_text() -> String {
         "Usage:".to_string(),
         "  ned <file.md> [more.md]".to_string(),
         "  ned init [workspace] [--dry-run] [--force] [--json]".to_string(),
-        "  ned new <file.md> [--template proposal] [--title \"Client Proposal\"] [--open]"
+        "  ned new <file.md> [--template proposal] [--title \"Client Proposal\"] [--open] [--json]"
             .to_string(),
-        "  ned open <file.md> [more.md] [--dry-run]".to_string(),
+        "  ned open <file.md> [more.md] [--dry-run] [--json]".to_string(),
         "  ned convert <file.md|-> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
         "  ned convert <file.md|-> --to html --stdout".to_string(),
         "  ned inspect <file.md|-> [--json]".to_string(),
