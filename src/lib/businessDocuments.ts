@@ -232,20 +232,22 @@ export const businessDocumentTemplates: BusinessDocumentTemplate[] = [
   {
     id: "podcast-script",
     label: "Podcast script",
-    summary: "Creates episode scripts with cold open, host segments, guest questions, sponsor copy, and production notes.",
+    summary: "Locks episode architecture first, then drafts segments sequentially with audio production review.",
     docsLiveType: "podcast-script",
     bestFor: ["Podcast episodes", "Interview shows", "Narrative audio"],
-    aiPrompt: "Create a podcast episode script with show brief, cold open, intro, segmented host copy, guest questions, sponsor or promo reads, outro, timing, transitions, and production notes.",
-    outline: ["Show Brief", "Cold Open", "Intro", "Segment 1", "Segment 2", "Guest Questions", "Sponsor or Promo Read", "Outro", "Production Notes"],
+    aiPrompt:
+      "First create and lock the episode architecture: audience promise, segment order, timing, host and guest roles, sound cues, sponsor obligations, facts, claims, transcript needs, and listener takeaway. After the rundown is approved, draft segments sequentially and finish with audio production quality review for listener flow, timing, host voice, interview logic, sponsor compliance, fact/source readiness, transcript readiness, and production handoff clarity.",
+    outline: ["Episode Architecture", "Segment Rundown", "Cold Open", "Intro", "Segment 1", "Segment 2", "Guest Questions", "Sponsor or Promo Read", "Outro", "Production Notes", "Audio Production Review"],
   },
   {
     id: "movie-script",
     label: "Movie script",
-    summary: "Develops screenplay structure with logline, characters, acts, key scenes, dialogue notes, and production constraints.",
+    summary: "Locks screen story architecture first, then drafts beats sequentially with screenplay quality review.",
     docsLiveType: "movie-script",
     bestFor: ["Screenplays", "Film treatments", "Scene planning"],
-    aiPrompt: "Create a movie script planning packet with logline, character arcs, world and tone, three-act structure, key scenes, dialogue notes, visual motifs, and production constraints.",
-    outline: ["Logline", "Characters", "World and Tone", "Act I", "Act II", "Act III", "Key Scenes", "Dialogue Notes", "Production Constraints"],
+    aiPrompt:
+      "First create and lock the screen story architecture: logline, protagonist want and need, central conflict, act turns, beat sheet, scene order, visual rules, dialogue promises, tone, rating considerations, and production constraints. After the beat sheet is approved, draft beats sequentially and finish with screenplay quality review for screen story logic, visual playability, character motivation, act-turn causality, dialogue texture, pacing, continuity, tone, and production feasibility.",
+    outline: ["Screen Story Architecture", "Logline", "Characters", "World and Tone", "Beat Sheet", "Act I", "Act II", "Act III", "Key Scenes", "Dialogue Notes", "Production Constraints", "Screenplay Quality Review"],
   },
   {
     id: "proposal",
@@ -625,6 +627,24 @@ function longFormTemplateGate(template: BusinessDocumentTemplate) {
       "- [ ] Define the genre, premise, point of view, protagonist goal, conflict, stakes, world rules, act turns, chapter order, and continuity promises before drafting prose.",
       "- [ ] Approve the plot outline before Chapter 1 is fleshed out.",
       "- [ ] Draft chapters sequentially and run narrative quality review after the chapter sequence is complete.",
+    ].join("\n");
+  }
+  if (template.id === "podcast-script") {
+    return [
+      "## Episode Architecture Approval Gate",
+      "",
+      "- [ ] Define the audience promise, segment order, timing, host and guest roles, sound cues, sponsor obligations, claims, and listener takeaway before drafting script copy.",
+      "- [ ] Approve the segment rundown before the cold open or Segment 1 is fleshed out.",
+      "- [ ] Draft segments sequentially and run audio production quality review after the episode sequence is complete.",
+    ].join("\n");
+  }
+  if (template.id === "movie-script") {
+    return [
+      "## Screen Story Architecture Approval Gate",
+      "",
+      "- [ ] Define the logline, protagonist want and need, central conflict, act turns, scene order, visual rules, dialogue promises, and production constraints before drafting screenplay pages.",
+      "- [ ] Approve the beat sheet before Act I or the first key scene is fleshed out.",
+      "- [ ] Draft beats sequentially and run screenplay quality review after the beat sequence is complete.",
     ].join("\n");
   }
   return "";

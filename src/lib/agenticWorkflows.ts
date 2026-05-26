@@ -2288,14 +2288,32 @@ function qualityGateProfiles(): Record<DocsLiveDocumentType, Array<Omit<AgenticQ
       ]),
     ],
     "podcast-script": [
-      qualityGate("Episode Shape", "Cold open, intro, segment goals, transitions, outro, and calls to action are timed and clear.", ["Segments present", "Timing notes present"]),
-      qualityGate("Audio Production", "Host copy, guest questions, sound cues, sponsor reads, and production notes are separated.", ["Production notes present", "Sponsor or CTA reviewed"]),
-      qualityGate("Audience Fit", "Tone, episode promise, claims, and listener takeaway match the show format.", ["Audience named", "Takeaway present"]),
+      qualityGate("Episode Architecture", "Audience promise, segment order, timing, host and guest roles, sound cues, sponsor obligations, claims, and listener takeaway are locked before script copy is drafted.", [
+        "Segment rundown locked",
+        "Listener promise reviewed",
+      ]),
+      qualityGate("Sequential Segment Development", "Cold open, intro, segments, guest questions, sponsor reads, and outro build listener attention in order without repeated context or dropped takeaways.", [
+        "Segment sequence followed",
+        "Transitions and timing reviewed",
+      ]),
+      qualityGate("Audio Production Quality Review", "The completed episode sequence is checked for listener flow, timing, host voice, interview logic, sponsor compliance, fact/source readiness, transcript readiness, and production handoff clarity.", [
+        "Audio QA complete",
+        "Production handoff ready",
+      ]),
     ],
     "movie-script": [
-      qualityGate("Screen Story", "Logline, protagonist, conflict, stakes, act turns, and key scenes are visually playable.", ["Logline present", "Act turns present"]),
-      qualityGate("Scene Craft", "Dialogue notes, visual motifs, locations, production constraints, and pacing are explicit.", ["Scene beats present", "Production constraints listed"]),
-      qualityGate("Continuity and Tone", "Character arcs, world rules, rating constraints, and tonal promises remain consistent.", ["Character arcs present", "Tone reviewed"]),
+      qualityGate("Screen Story Architecture", "Logline, protagonist want and need, central conflict, act turns, beat sheet, scene order, visual rules, dialogue promises, tone, rating, and production constraints are locked before screenplay pages are drafted.", [
+        "Beat sheet locked",
+        "Act turns reviewed",
+      ]),
+      qualityGate("Sequential Beat Development", "Each beat advances action, dialogue, character choice, visual motif, revelation, and production reality from the previous beat.", [
+        "Beat sequence followed",
+        "Scene handoffs reviewed",
+      ]),
+      qualityGate("Screenplay Quality Review", "The completed beat sequence is checked for screen story logic, visual playability, character motivation, act-turn causality, dialogue texture, pacing, continuity, tone, and production feasibility.", [
+        "Screenplay QA complete",
+        "Production feasibility reviewed",
+      ]),
     ],
     "strategy-plan": [
       qualityGate("Strategic Choice", "The plan names the strategic bet, alternatives rejected, and tradeoffs.", ["Choice stated", "Rejected alternatives captured"]),

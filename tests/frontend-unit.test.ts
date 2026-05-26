@@ -65,6 +65,7 @@ import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debou
 import {
   buildDocsLiveDraft,
   buildDocsLiveQuestionnaire,
+  buildDocsLiveSuggestedAnswers,
   docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
   extractDocsLivePlaceholders,
@@ -967,6 +968,18 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(questionnaire.includes("Outcome"));
   ok(questionnaire.includes("Distribution Target"));
 
+  const suggestions = buildDocsLiveSuggestedAnswers("proposal", {
+    title: "Acme Renewal Proposal",
+    outline: "- Executive Summary\n- Proposed Approach\n- Investment",
+    context: "The renewal must preserve expansion pricing and explain delivery risk clearly.",
+    placeholders: "client: Acme\nowner: Commercial team\ndistribution target: Google Docs",
+  });
+  ok(suggestions.length >= questionnaire.split("\n").length);
+  ok(suggestions.some((suggestion) => suggestion.stepLabel === "Intent and outcome" && suggestion.answer.includes("Acme")));
+  ok(suggestions.some((suggestion) => suggestion.stepLabel === "Section-by-section draft" && suggestion.answer.includes("Executive Summary")));
+  ok(suggestions.some((suggestion) => suggestion.stepLabel === "Placeholder values" && suggestion.answer.includes("distribution target: Google Docs")));
+  ok(suggestions.every((suggestion) => suggestion.answer.length > 40 && suggestion.source.includes("Suggested")));
+
   const draft = buildDocsLiveDraft({
     documentType: "proposal",
     title: "Acme Renewal Proposal",
@@ -1187,6 +1200,95 @@ test("Docs Live textbook and novel wizards plan structure before sequential chap
   });
   ok(novelPlan.qualityGates.some((gate) => gate.label === "Plot Architecture"));
   ok(novelPlan.qualityGates.some((gate) => gate.label === "Narrative Quality Review"));
+});
+
+test("Docs Live podcast and movie wizards lock production structure before sequential drafting", () => {
+  const podcastDraft = buildDocsLiveDraft({
+    documentType: "podcast-script",
+    title: "Future of Support",
+    context: "audience: support leaders. owner: Producer. evidence: interview notes.",
+    placeholders: "audience: support leaders\nowner: Producer\nevidence: interview notes",
+    generatedAt: "2026-05-26T11:00:00.000Z",
+  });
+
+  equal(podcastDraft.documentType, "podcast-script");
+  ok(podcastDraft.outlineText.includes("Episode Architecture"));
+  ok(podcastDraft.outlineText.includes("Segment Rundown"));
+  ok(podcastDraft.outlineText.includes("Audio Production Review"));
+  ok(podcastDraft.questionnaire.includes("segment rundown"));
+  ok(podcastDraft.markdown.includes("locks the episode architecture before prose is drafted"));
+  ok(podcastDraft.markdown.includes("## Episode Architecture Approval Gate"));
+  ok(podcastDraft.markdown.includes("Approve episode architecture before drafting Cold Open"));
+  ok(podcastDraft.markdown.includes("## Sequential Segment Draft Queue"));
+  ok(podcastDraft.markdown.includes("Each segment is accepted before the next one is fleshed out"));
+  ok(podcastDraft.markdown.includes("## Final Audio Production Quality Review"));
+  ok(podcastDraft.markdown.includes("Prose intentionally blocked until the episode architecture is approved"));
+  equal(podcastDraft.workflow.find((step) => step.id === "draft")?.status, "needs-input");
+  equal(podcastDraft.sections.find((section) => section.title.includes("Segment 1"))?.planningOnly, true);
+  ok(podcastDraft.reviewPacket.sectionRunbook.some((item) => item.includes("hold prose drafting")));
+  ok(podcastDraft.reviewPacket.qaRegister.some((item) => item.includes("listener flow")));
+
+  const approvedPodcastDraft = buildDocsLiveDraft({
+    documentType: "podcast-script",
+    title: "Future of Support",
+    outline: ["- Episode Architecture", "- Segment Rundown", "- Cold Open", "- Segment 1", "- Segment 2", "- Audio Production Review"].join("\n"),
+    context: "audience: support leaders. owner: Producer. evidence: interview notes.",
+    placeholders: "audience: support leaders\nowner: Producer\nevidence: interview notes",
+    generatedAt: "2026-05-26T11:05:00.000Z",
+  });
+  equal(approvedPodcastDraft.workflow.find((step) => step.id === "draft")?.status, "ready");
+  equal(approvedPodcastDraft.sections.find((section) => section.title.includes("Segment 1"))?.planningOnly, false);
+  ok(approvedPodcastDraft.reviewPacket.sectionRunbook.some((item) => item.includes("draft this segment in sequence")));
+
+  const movieDraft = buildDocsLiveDraft({
+    documentType: "movie-script",
+    title: "The Signal Room",
+    context: "audience: streaming thriller viewers. owner: Screenwriter. evidence: treatment notes.",
+    placeholders: "audience: streaming thriller viewers\nowner: Screenwriter\nevidence: treatment notes",
+    generatedAt: "2026-05-26T11:10:00.000Z",
+  });
+
+  equal(movieDraft.documentType, "movie-script");
+  ok(movieDraft.outlineText.includes("Screen Story Architecture"));
+  ok(movieDraft.outlineText.includes("Beat Sheet"));
+  ok(movieDraft.outlineText.includes("Screenplay Quality Review"));
+  ok(movieDraft.questionnaire.includes("story architecture"));
+  ok(movieDraft.markdown.includes("locks the screen story architecture before prose is drafted"));
+  ok(movieDraft.markdown.includes("## Screen Story Architecture Approval Gate"));
+  ok(movieDraft.markdown.includes("Approve screen story architecture before drafting Act I"));
+  ok(movieDraft.markdown.includes("## Sequential Beat Draft Queue"));
+  ok(movieDraft.markdown.includes("Each beat is accepted before the next one is fleshed out"));
+  ok(movieDraft.markdown.includes("## Final Screenplay Quality Review"));
+  ok(movieDraft.markdown.includes("Prose intentionally blocked until the screen story architecture is approved"));
+  equal(movieDraft.workflow.find((step) => step.id === "draft")?.status, "needs-input");
+  equal(movieDraft.sections.find((section) => section.title.includes("Act I"))?.planningOnly, true);
+  ok(movieDraft.reviewPacket.sectionRunbook.some((item) => item.includes("hold prose drafting")));
+  ok(movieDraft.reviewPacket.qaRegister.some((item) => item.includes("visual playability")));
+
+  const podcastTemplate = businessDocumentTemplates.find((template) => template.id === "podcast-script")!;
+  const movieTemplate = businessDocumentTemplates.find((template) => template.id === "movie-script")!;
+  ok(podcastTemplate.summary.includes("architecture first"));
+  ok(podcastTemplate.aiPrompt.includes("After the rundown is approved"));
+  ok(podcastTemplate.outline.includes("Audio Production Review"));
+  ok(businessTemplateMarkdown(podcastTemplate).includes("Episode Architecture Approval Gate"));
+  ok(movieTemplate.summary.includes("architecture first"));
+  ok(movieTemplate.aiPrompt.includes("After the beat sheet is approved"));
+  ok(movieTemplate.outline.includes("Screenplay Quality Review"));
+  ok(businessTemplateMarkdown(movieTemplate).includes("Screen Story Architecture Approval Gate"));
+
+  const podcastPlan = buildAgenticWorkflowPlan({
+    instruction: "Create a podcast script with a locked segment rundown and sequential segment drafting",
+    contextAnswers: "audience: support leaders. owner: Producer.",
+  });
+  ok(podcastPlan.qualityGates.some((gate) => gate.label === "Episode Architecture"));
+  ok(podcastPlan.qualityGates.some((gate) => gate.label === "Sequential Segment Development"));
+
+  const moviePlan = buildAgenticWorkflowPlan({
+    instruction: "Create a movie script with a locked beat sheet and sequential screenplay drafting",
+    contextAnswers: "audience: streaming thriller viewers. owner: Screenwriter.",
+  });
+  ok(moviePlan.qualityGates.some((gate) => gate.label === "Screen Story Architecture"));
+  ok(moviePlan.qualityGates.some((gate) => gate.label === "Screenplay Quality Review"));
 });
 
 test("business document helpers fill identity templates snippets and wizard context", () => {
@@ -3956,6 +4058,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("buildDocsLiveDraft"));
   ok(app.includes("docsLiveQuestionnaireAnswerText"));
   ok(app.includes("AI-created questionnaire"));
+  ok(app.includes('aria-label="AI suggested optimal answers"'));
+  ok(app.includes("buildDocsLiveSuggestedAnswers"));
+  ok(app.includes("appendAllDocsLiveSuggestedAnswers"));
+  ok(app.includes("Context-aware starting points for every wizard step."));
   ok(app.includes("Questionnaire answers"));
   ok(app.includes("Generate draft"));
   ok(app.includes("native workflow opened Docs Live from native writing tools menu"));

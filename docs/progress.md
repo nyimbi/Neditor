@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-26
+Updated: 2026-05-27
 
 ## Active Goal
 
@@ -74,6 +74,19 @@ Recent pushed checkpoints visible in current git history:
   chapter draft queues, per-chapter acceptance criteria, and final instructional
   or narrative quality review checklists so users can plan first, approve the
   structure, then flesh out chapters in order.
+- Podcast and movie script wizards now use the same staged creation contract:
+  podcast scripts lock episode architecture and a segment rundown before
+  sequential segment drafting and audio production quality review, while movie
+  scripts lock screen story architecture and a beat sheet before sequential beat
+  drafting and screenplay quality review. Agent Workspace quality gates,
+  business templates, Docs Live generated drafts, and focused frontend unit
+  coverage now prove those creative wizards are no longer simple outline-only
+  starters.
+- Docs Live now adds AI assistance to every questionnaire step by generating
+  context-aware suggested answers from the selected document type, title,
+  outline, placeholders, dictated direction, and existing context. Users can add
+  one suggested answer or append the full set before generating, keeping the AI
+  guidance editable and reviewable instead of silently filling the document.
 - The References sidebar front-matter manager parser is now more tolerant of
   business-document YAML edge cases: CRLF front matter, quoted `#` characters,
   comma-containing inline data-source lists, `yml` aliases, URL/Windows/parent
@@ -3983,6 +3996,13 @@ Packaged `ned snippets` reusable document parts:
 | `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after extending the packaged `ned snippets` surface. |
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local document-part reuse without claiming external release proof completion. |
 | Browser e2e suite | Not rerun | Skipped to conserve battery because this slice adds terminal behavior, completion/help text, README/spec copy, and static Settings guidance; no interactive workflow behavior changed. |
+
+Creative content wizard staging:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 75 tests after making podcast and movie script wizards lock episode/screen-story architecture before prose, generate sequential segment/beat draft queues, add final audio-production/screenplay quality review gates, update business-template approval gates, expose matching Agent Workspace quality gates, and add context-aware suggested answers for every Docs Live questionnaire step. |
+| Browser e2e suite | Not rerun | Skipped to conserve battery because this slice changes shared Docs Live draft generation, business-template metadata, agentic workflow planning logic, and static Docs Live UI wiring covered by the focused frontend unit suite. |
 
 ## Next Execution Order
 

@@ -86,6 +86,14 @@ export interface DocsLiveDraft {
   issues: string[];
 }
 
+export interface DocsLiveSuggestedAnswer {
+  id: string;
+  stepLabel: string;
+  question: string;
+  answer: string;
+  source: string;
+}
+
 export interface DocsLiveWorkflowStep {
   id: string;
   label: string;
@@ -355,25 +363,114 @@ const blueprints: Record<DocsLiveDocumentType, DocsLiveBlueprint> = {
   },
   "podcast-script": {
     label: "Podcast script",
-    defaultOutline: ["Show Brief", "Cold Open", "Intro", "Segment 1", "Segment 2", "Guest Questions", "Sponsor or Promo Read", "Outro", "Production Notes"],
+    defaultOutline: [
+      "Episode Architecture",
+      "Segment Rundown",
+      "Cold Open",
+      "Intro",
+      "Segment 1",
+      "Segment 2",
+      "Guest Questions",
+      "Sponsor or Promo Read",
+      "Outro",
+      "Production Notes",
+      "Audio Production Review",
+    ],
     questions: [
       "What show format, audience, tone, and episode objective should the script follow?",
+      "What segment rundown, timing, host promise, guest arc, and listener takeaway should be locked before script copy is drafted?",
       "Who are the hosts or guests and what should each segment accomplish?",
       "What stories, facts, sound cues, sponsor copy, or calls to action are required?",
-      "What timing, transitions, and production notes should be included?",
+      "What audio production criteria should be checked after the segment sequence is drafted?",
     ],
-    sectionFocus: ["brief", "hook", "intro", "segments", "questions", "sponsor", "outro", "production"],
+    sectionFocus: ["episode architecture", "rundown", "hook", "intro", "segment argument", "segment story", "guest arc", "sponsor read", "outro", "production", "audio QA"],
+    workflow: {
+      planningLabel: "Episode architecture",
+      planningInstruction:
+        "Lock the episode architecture before script copy is drafted: audience promise, segment order, timing, host and guest roles, sound cues, sponsor obligations, facts, claims, and listener takeaway.",
+      planningArtifacts: [
+        "Audience, show format, tone, and episode promise",
+        "Segment rundown with timing, purpose, transitions, and host ownership",
+        "Guest arc, required questions, story beats, and follow-up prompts",
+        "Sponsor or promo obligations, calls to action, legal constraints, and production notes",
+        "Fact/source list, sound cues, transcript needs, and publishing checklist",
+      ],
+      sequencingLabel: "Sequential segment drafting",
+      sequencingInstruction:
+        "Draft segments in order so the cold open, intro, interview or narrative blocks, sponsor reads, and outro build listener attention without repeating context or dropping promised takeaways.",
+      sequenceAcceptance: [
+        "The segment has a clear listener promise, purpose, time budget, and transition into the next segment.",
+        "Host copy, guest prompts, claims, sound cues, and calls to action are separated for production.",
+        "Facts, names, links, sponsor terms, and sensitive claims are marked for verification.",
+        "The segment ending gives the next segment a specific audio handoff rather than a generic transition.",
+      ],
+      qualityLabel: "Audio production quality review",
+      qualityInstruction:
+        "Review the completed episode sequence for listener flow, timing, host voice, interview logic, sponsor compliance, fact/source readiness, transcript readiness, and production handoff clarity.",
+      qualityChecks: [
+        "The episode promise, segment order, timing, and listener takeaway remain coherent from cold open to outro.",
+        "Host voice, guest questions, transitions, and sound cues are specific enough for recording.",
+        "Sponsor reads, legal notes, claims, links, credits, and calls to action are marked for approval.",
+        "Transcript, show notes, publishing checklist, and unresolved production assumptions are ready for review.",
+      ],
+      unitLabel: "segment",
+    },
   },
   "movie-script": {
     label: "Movie script",
-    defaultOutline: ["Logline", "Characters", "World and Tone", "Act I", "Act II", "Act III", "Key Scenes", "Dialogue Notes", "Production Constraints"],
+    defaultOutline: [
+      "Screen Story Architecture",
+      "Logline",
+      "Characters",
+      "World and Tone",
+      "Beat Sheet",
+      "Act I",
+      "Act II",
+      "Act III",
+      "Key Scenes",
+      "Dialogue Notes",
+      "Production Constraints",
+      "Screenplay Quality Review",
+    ],
     questions: [
       "What genre, logline, audience, tone, and format constraints should guide the screenplay?",
+      "What story architecture, act turns, scene order, character arcs, and continuity promises should be locked before screenplay pages are drafted?",
       "Who are the primary characters and what are their arcs?",
       "What major turning points, set pieces, dialogue style, and visual motifs matter?",
-      "Which production constraints, locations, or ratings considerations should be reflected?",
+      "What screenplay quality criteria should be checked after beats and scenes are drafted sequentially?",
     ],
-    sectionFocus: ["logline", "characters", "world", "setup", "confrontation", "resolution", "scenes", "dialogue", "production"],
+    sectionFocus: ["story architecture", "logline", "characters", "world", "beat sheet", "setup", "confrontation", "resolution", "scenes", "dialogue", "production", "screenplay QA"],
+    workflow: {
+      planningLabel: "Screen story architecture",
+      planningInstruction:
+        "Lock the screen story architecture before screenplay pages are drafted: logline, protagonist want and need, central conflict, act turns, scene order, visual rules, dialogue promises, and production constraints.",
+      planningArtifacts: [
+        "Logline, genre, audience, tone, format, and rating constraints",
+        "Character arcs, wants, needs, conflicts, relationships, and reversals",
+        "World rules, visual motifs, locations, production limits, and continuity promises",
+        "Beat sheet with act turns, midpoint, low point, climax, and final image",
+        "Scene order, set pieces, dialogue approach, and review constraints",
+      ],
+      sequencingLabel: "Sequential beat drafting",
+      sequencingInstruction:
+        "Draft beats in order so action, dialogue, character choice, visual motif, revelation, and production reality progress deliberately from one beat to the next.",
+      sequenceAcceptance: [
+        "The beat has a visual objective, conflict, turn, consequence, and handoff into the next beat.",
+        "Character motivation follows from the previous beat rather than resetting.",
+        "Dialogue, action, location, and production constraints are playable on screen.",
+        "Continuity, tone, rating constraints, visual motifs, and unresolved questions are marked before moving on.",
+      ],
+      qualityLabel: "Screenplay quality review",
+      qualityInstruction:
+        "Review the completed beat sequence for screen story logic, visual playability, character motivation, act-turn causality, dialogue texture, pacing, continuity, tone, and production feasibility.",
+      qualityChecks: [
+        "The logline, act turns, stakes, reversals, climax, and final image form a coherent screen story.",
+        "Every scene or beat has visible action, conflict, turn, consequence, and production-aware staging.",
+        "Character choices, dialogue, tone, continuity, and visual motifs remain consistent.",
+        "Locations, rating issues, effects, legal risks, budget assumptions, and unresolved notes are ready for review.",
+      ],
+      unitLabel: "beat",
+    },
   },
   "strategy-plan": {
     label: "Strategy plan",
@@ -579,6 +676,27 @@ export function normalizeDocsLiveDocumentType(input = ""): DocsLiveDocumentType 
 }
 
 export function buildDocsLiveQuestionnaire(documentType: string, request: DocsLiveQuestionnaireRequest = {}) {
+  return docsLiveQuestionnaireQuestions(documentType, request).map((question, index) => `${index + 1}. ${question}`).join("\n");
+}
+
+export function buildDocsLiveSuggestedAnswers(documentType: string, request: DocsLiveQuestionnaireRequest = {}): DocsLiveSuggestedAnswer[] {
+  const type = normalizeDocsLiveDocumentType(documentType);
+  const blueprint = blueprints[type];
+  const outlineItems = parseOutlinePlan(request.outline || "");
+  const contextInput = [request.context, request.transcript].filter(Boolean).join("\n");
+  const placeholders = extractDocsLivePlaceholders([request.placeholders, contextInput].filter(Boolean).join("\n"));
+  const contextSentences = extractContextSentences(contextInput);
+  const questions = docsLiveQuestionnaireQuestions(type, request);
+  return questions.map((question, index) => ({
+    id: `${type}-${index + 1}`,
+    stepLabel: suggestedAnswerStepLabel(index, question, blueprint),
+    question,
+    answer: suggestedQuestionnaireAnswer(question, index, blueprint, outlineItems, placeholders, contextSentences, request),
+    source: suggestedAnswerSource(placeholders, contextSentences, outlineItems),
+  }));
+}
+
+function docsLiveQuestionnaireQuestions(documentType: string, request: DocsLiveQuestionnaireRequest = {}) {
   const type = normalizeDocsLiveDocumentType(documentType);
   const outlineItems = parseOutlinePlan(request.outline || "");
   const placeholders = extractDocsLivePlaceholders([request.placeholders, request.context, request.transcript].filter(Boolean).join("\n"));
@@ -593,7 +711,7 @@ export function buildDocsLiveQuestionnaire(documentType: string, request: DocsLi
     questions.push(`Which ${missing.map(titleCase).join(", ")} values should Docs Live use as placeholders or review prompts?`);
   }
   questions.push("What must remain visibly marked for human review before export or publication?");
-  return Array.from(new Set(questions)).map((question, index) => `${index + 1}. ${question}`).join("\n");
+  return Array.from(new Set(questions));
 }
 
 export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft {
@@ -981,7 +1099,7 @@ function draftingPlanTable(
 function longFormPlanningGateMarkdown(blueprint: DocsLiveBlueprint, sections: DocsLiveSectionDraft[]) {
   if (!blueprint.workflow) return "";
   const profile = workflowProfileFor(blueprint);
-  const firstDraftUnit = sections.find((section) => /^chapter\s+\d+/i.test(section.title)) || sections[0];
+  const firstDraftUnit = firstDraftableWorkflowUnit(profile, sections);
   return [
     `## ${titleCase(profile.planningLabel)} Approval Gate`,
     "",
@@ -1002,7 +1120,7 @@ function longFormPlanningGateMarkdown(blueprint: DocsLiveBlueprint, sections: Do
 function sequentialDraftQueueMarkdown(blueprint: DocsLiveBlueprint, sections: DocsLiveSectionDraft[]) {
   if (!blueprint.workflow) return "";
   const profile = workflowProfileFor(blueprint);
-  const draftableSections = sections.filter((section) => section.title.toLowerCase() !== profile.qualityLabel.toLowerCase());
+  const draftableSections = draftableWorkflowSections(profile, sections);
   return [
     `## Sequential ${titleCase(profile.unitLabel)} Draft Queue`,
     "",
@@ -1020,6 +1138,28 @@ function sequentialDraftQueueMarkdown(blueprint: DocsLiveBlueprint, sections: Do
     "",
     ...profile.qualityChecks.map((check) => `- [ ] ${check}`),
   ].join("\n");
+}
+
+function firstDraftableWorkflowUnit(profile: DocsLiveWorkflowProfile, sections: DocsLiveSectionDraft[]) {
+  const draftable = draftableWorkflowSections(profile, sections);
+  return draftable.find((section) => /^chapter\s+\d+/i.test(section.title))
+    || draftable.find((section) => /\b(cold open|intro|segment|act|scene|beat)\b/i.test(section.title))
+    || draftable[0]
+    || sections[0];
+}
+
+function draftableWorkflowSections(profile: DocsLiveWorkflowProfile, sections: DocsLiveSectionDraft[]) {
+  const planningLabel = profile.planningLabel.toLowerCase();
+  const qualityLabel = profile.qualityLabel.toLowerCase();
+  return sections.filter((section) => {
+    const title = section.title.toLowerCase();
+    return title !== planningLabel
+      && title !== qualityLabel
+      && title !== "segment rundown"
+      && title !== "beat sheet"
+      && !title.endsWith("quality review")
+      && !title.endsWith("production review");
+  });
 }
 
 function reviewPacketMarkdown(packet: DocsLiveReviewPacket, blueprint: DocsLiveBlueprint) {
@@ -1051,6 +1191,100 @@ function reviewPacketMarkdown(packet: DocsLiveReviewPacket, blueprint: DocsLiveB
     "",
     ...packet.reviewerHandoff.map((item) => `- [ ] ${item}`),
   ].join("\n");
+}
+
+function suggestedAnswerStepLabel(index: number, question: string, blueprint: DocsLiveBlueprint) {
+  const lower = question.toLowerCase();
+  const workflow = workflowProfileFor(blueprint);
+  if (lower.includes("placeholder")) return "Placeholder values";
+  if (lower.includes("human review") || lower.includes("export") || lower.includes("publication")) return "Review and distribution";
+  if (lower.includes("outline") || lower.includes("architecture") || lower.includes("plot") || lower.includes("rundown") || lower.includes("beat sheet")) {
+    return workflow.planningLabel;
+  }
+  if (lower.startsWith("for \"") || lower.includes("section") || lower.includes("chapter") || lower.includes("segment") || lower.includes("beat")) return workflow.sequencingLabel;
+  if (lower.includes("quality") || lower.includes("checked")) return workflow.qualityLabel;
+  return index === 0 ? "Intent and outcome" : "Context capture";
+}
+
+function suggestedAnswerSource(placeholders: Record<string, string>, contextSentences: string[], outlineItems: OutlinePlanItem[]) {
+  const sources = [];
+  if (Object.keys(placeholders).length) sources.push(`${Object.keys(placeholders).length} placeholder value${Object.keys(placeholders).length === 1 ? "" : "s"}`);
+  if (contextSentences.length) sources.push(`${contextSentences.length} context note${contextSentences.length === 1 ? "" : "s"}`);
+  if (outlineItems.length) sources.push(`${outlineItems.length} outline item${outlineItems.length === 1 ? "" : "s"}`);
+  return sources.length ? `Suggested from ${sources.join(", ")}.` : "Suggested from the selected document type; replace bracketed values before drafting.";
+}
+
+function suggestedQuestionnaireAnswer(
+  question: string,
+  index: number,
+  blueprint: DocsLiveBlueprint,
+  outlineItems: OutlinePlanItem[],
+  placeholders: Record<string, string>,
+  contextSentences: string[],
+  request: DocsLiveQuestionnaireRequest,
+) {
+  const lower = question.toLowerCase();
+  const workflow = workflowProfileFor(blueprint);
+  const title = (request.title || placeholders.title || blueprint.label).trim();
+  const audience = placeholders.audience || placeholders.reader || placeholders.customer || placeholders.client || `[primary ${blueprint.label.toLowerCase()} audience]`;
+  const outcome = placeholders.outcome || placeholders.goal || placeholders.decision || suggestedOutcomeFor(blueprint);
+  const owner = placeholders.owner || placeholders.reviewer || placeholders.author || "[named owner]";
+  const deadline = placeholders.deadline || placeholders.date || "[review date]";
+  const distribution = placeholders["distribution target"] || placeholders.channel || placeholders.target || "[delivery channel]";
+  const evidence = placeholders.evidence || placeholders.source || contextSentences[0] || "[source evidence]";
+  const tone = placeholders.tone || placeholders.voice || "[desired tone]";
+  const outlineSummary = outlineItems.length ? outlineItems.slice(0, 6).map((item) => item.title).join(" -> ") : blueprint.defaultOutline.slice(0, 5).join(" -> ");
+  const context = contextSentences[index % Math.max(1, contextSentences.length)] || `${blueprint.label} should be specific, reviewable, and ready for human approval.`;
+
+  if (lower.includes("what should") && lower.includes("help the reader")) {
+    return `${title} should help ${audience} ${outcome}. Success means the reader can see the recommendation, the evidence, the owner, the deadline, and the open review items without guessing.`;
+  }
+  if (lower.includes("placeholder")) {
+    return [
+      `audience: ${audience}`,
+      `outcome: ${outcome}`,
+      `owner: ${owner}`,
+      `deadline: ${deadline}`,
+      `distribution target: ${distribution}`,
+      `evidence: ${evidence}`,
+      `tone: ${tone}`,
+      `reviewer: ${placeholders.reviewer || owner}`,
+    ].join("\n");
+  }
+  if (lower.includes("human review") || lower.includes("export") || lower.includes("publication")) {
+    return `Keep these visibly marked until review: unverified facts and claims, missing citations or source files, unresolved placeholders, legal/commercial approvals, export metadata for ${distribution}, and any section where ${owner} has not signed off.`;
+  }
+  if (lower.includes("outline") || lower.includes("architecture") || lower.includes("plot") || lower.includes("rundown") || lower.includes("beat sheet")) {
+    return `${workflow.planningLabel} should lock: ${workflow.planningArtifacts.join("; ")}. Proposed order: ${outlineSummary}. Do not draft prose until ${owner} approves this structure.`;
+  }
+  if (lower.includes("quality") || lower.includes("checked")) {
+    return `${workflow.qualityLabel} should check ${workflow.qualityChecks.join("; ")}. Any failure stays as a review task instead of being hidden in polished prose.`;
+  }
+  if (lower.includes("facts") || lower.includes("examples") || lower.includes("calculations") || lower.includes("caveats")) {
+    const section = question.match(/For "(.+?)"/)?.[1] || outlineItems[index % Math.max(1, outlineItems.length)]?.title || "this section";
+    return `${section} should use ${evidence}, name ${owner} as the accountable reviewer, preserve caveats explicitly, and connect to the next ${workflow.unitLabel}. Context to reflect: ${context}`;
+  }
+  if (lower.includes("client") || lower.includes("sponsor")) {
+    return `Client or sponsor: ${placeholders.client || placeholders.sponsor || audience}. Their primary need is ${outcome}, and the draft should make ownership, timing, and evidence easy to verify.`;
+  }
+  if (lower.includes("audience") || lower.includes("reader") || lower.includes("learner") || lower.includes("listener")) {
+    return `Audience: ${audience}. Assume they need ${outcome}, prefer ${tone}, and will trust the draft only when claims are tied to ${evidence}.`;
+  }
+  if (lower.includes("owner") || lower.includes("responsible")) {
+    return `Owner: ${owner}. They should approve the ${workflow.planningLabel.toLowerCase()}, review every ${workflow.unitLabel} before the next one is drafted, and sign off before ${distribution}.`;
+  }
+  return `${blueprint.label} context: ${context} Use ${workflow.planningLabel.toLowerCase()} first, draft each ${workflow.unitLabel} in sequence, run ${workflow.qualityLabel.toLowerCase()}, humanize the result, and leave unresolved items visible for ${owner}.`;
+}
+
+function suggestedOutcomeFor(blueprint: DocsLiveBlueprint) {
+  const label = blueprint.label.toLowerCase();
+  if (label.includes("proposal")) return "approve the recommended approach";
+  if (label.includes("rfp") || label.includes("tender") || label.includes("rfq")) return "evaluate a compliant response";
+  if (label.includes("textbook") || label.includes("lesson") || label.includes("tutorial")) return "learn the material and know what to do next";
+  if (label.includes("novel")) return "understand the story promise, plot, characters, and next drafting step";
+  if (label.includes("podcast")) return "record a coherent episode with clear listener value";
+  if (label.includes("movie")) return "evaluate and draft a playable screen story";
+  return "make the intended decision or take the next action";
 }
 
 function parsePlaceholderValueMetadata(raw: string): Pick<DocsLivePlaceholderEntry, "value" | "kind" | "source" | "reviewStatus"> {

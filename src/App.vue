@@ -3263,13 +3263,31 @@
               </div>
             </div>
           </section>
-          <label>
-            AI-created questionnaire
-            <textarea v-model="docsLiveQuestionnaireText" rows="7" readonly></textarea>
-          </label>
-          <label>
-            Questionnaire answers
-            <textarea
+	          <label>
+	            AI-created questionnaire
+	            <textarea v-model="docsLiveQuestionnaireText" rows="7" readonly></textarea>
+	          </label>
+	          <section class="docs-live-suggestions docs-live-wide" aria-label="AI suggested optimal answers">
+	            <header>
+	              <div>
+	                <strong>Suggested Answers</strong>
+	                <span>Context-aware starting points for every wizard step.</span>
+	              </div>
+	              <button type="button" :disabled="!docsLiveSuggestedAnswers.length" @click="appendAllDocsLiveSuggestedAnswers">Use all</button>
+	            </header>
+	            <article v-for="suggestion in docsLiveSuggestedAnswers" :key="suggestion.id">
+	              <div>
+	                <small>{{ suggestion.stepLabel }}</small>
+	                <strong>{{ suggestion.question }}</strong>
+	                <p>{{ suggestion.answer }}</p>
+	                <span>{{ suggestion.source }}</span>
+	              </div>
+	              <button type="button" @click="appendDocsLiveSuggestedAnswer(suggestion)">Use</button>
+	            </article>
+	          </section>
+	          <label>
+	            Questionnaire answers
+	            <textarea
               v-model="docsLiveQuestionnaireAnswerText"
               rows="7"
               placeholder="1. The reader should approve renewal.&#10;2. Include usage growth, budget, risks, and named owner.&#10;3. Leave financial assumptions marked for review."
@@ -4878,20 +4896,22 @@ import {
   type RfpSourceKind,
 } from "./lib/businessDocuments";
 import {
-  buildDocsLiveDraft,
-  buildDocsLiveQuestionnaire,
-  docsLivePlaceholderEntries,
-  docsLiveDocumentTypes,
+	  buildDocsLiveDraft,
+	  buildDocsLiveQuestionnaire,
+	  buildDocsLiveSuggestedAnswers,
+	  docsLivePlaceholderEntries,
+	  docsLiveDocumentTypes,
   normalizeDocsLiveDocumentType,
   removeDocsLivePlaceholder,
   upsertDocsLivePlaceholder,
-  type DocsLiveDocumentType,
-  type DocsLiveDraft,
-  type DocsLiveDraftDepth,
-  type DocsLivePlaceholderEntry,
-  type DocsLivePlaceholderKind,
-  type DocsLivePlaceholderReviewStatus,
-} from "./lib/docsLive";
+	  type DocsLiveDocumentType,
+	  type DocsLiveDraft,
+	  type DocsLiveDraftDepth,
+	  type DocsLivePlaceholderEntry,
+	  type DocsLivePlaceholderKind,
+	  type DocsLivePlaceholderReviewStatus,
+	  type DocsLiveSuggestedAnswer,
+	} from "./lib/docsLive";
 import {
   buildExportMetadataChecklist,
   DISTRIBUTION_APPROVAL_TARGETS as distributionApprovalTargets,
@@ -6013,6 +6033,15 @@ const docsLiveIntentCompletion = computed(() => {
   const present = docsLiveIntentFields.filter((field) => Boolean(docsLivePlaceholderValue(field.key))).length;
   return `${present}/${docsLiveIntentFields.length} intent fields`;
 });
+const docsLiveSuggestedAnswers = computed(() =>
+  buildDocsLiveSuggestedAnswers(docsLiveDocumentType.value, {
+    title: docsLiveTitle.value,
+    outline: docsLiveOutlineText.value,
+    context: docsLiveContext.value,
+    transcript: docsLiveTranscript.value,
+    placeholders: docsLivePlaceholderText.value,
+  }),
+);
 const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
@@ -15311,6 +15340,27 @@ function refreshDocsLiveQuestionnaire() {
   });
 }
 
+function appendDocsLiveSuggestedAnswer(suggestion: DocsLiveSuggestedAnswer) {
+  const answer = [`${suggestion.stepLabel}: ${suggestion.question}`, suggestion.answer].join("\n");
+  docsLiveQuestionnaireAnswerText.value = appendTextBlock(docsLiveQuestionnaireAnswerText.value, answer);
+  store.statusMessage = `Added suggested ${suggestion.stepLabel.toLowerCase()} answer`;
+}
+
+function appendAllDocsLiveSuggestedAnswers() {
+  const answerBlock = docsLiveSuggestedAnswers.value
+    .map((suggestion, index) => [`${index + 1}. ${suggestion.stepLabel}: ${suggestion.question}`, suggestion.answer].join("\n"))
+    .join("\n\n");
+  docsLiveQuestionnaireAnswerText.value = appendTextBlock(docsLiveQuestionnaireAnswerText.value, answerBlock);
+  store.statusMessage = "Added all suggested Docs Live answers";
+}
+
+function appendTextBlock(existing: string, block: string) {
+  const normalizedBlock = block.trim();
+  if (!normalizedBlock) return existing.trim();
+  const current = existing.trim();
+  return current ? `${current}\n\n${normalizedBlock}` : normalizedBlock;
+}
+
 function addDocsLivePlaceholder() {
   docsLivePlaceholderText.value = upsertDocsLivePlaceholder(
     docsLivePlaceholderText.value,
@@ -17018,10 +17068,12 @@ select:hover {
   .app-shell[data-theme="system"] .agent-distribution-runbooks article,
   .app-shell[data-theme="system"] .agent-provider-panel,
   .app-shell[data-theme="system"] .agent-provider-output,
-  .app-shell[data-theme="system"] .docs-live-runtime,
-  .app-shell[data-theme="system"] .docs-live-intent-brief,
-  .app-shell[data-theme="system"] .docs-live-placeholder-manager,
-  .app-shell[data-theme="system"] .docs-live-workflow,
+	  .app-shell[data-theme="system"] .docs-live-runtime,
+	  .app-shell[data-theme="system"] .docs-live-intent-brief,
+	  .app-shell[data-theme="system"] .docs-live-placeholder-manager,
+	  .app-shell[data-theme="system"] .docs-live-suggestions,
+	  .app-shell[data-theme="system"] .docs-live-suggestions article,
+	  .app-shell[data-theme="system"] .docs-live-workflow,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
   .app-shell[data-theme="system"] .preview-timing,
@@ -21929,7 +21981,8 @@ select:hover {
 }
 
 .docs-live-intent-brief,
-.docs-live-placeholder-manager {
+.docs-live-placeholder-manager,
+.docs-live-suggestions {
   display: grid;
   gap: 8px;
   padding: 10px;
@@ -21938,7 +21991,8 @@ select:hover {
   background: #ffffff;
 }
 
-.docs-live-intent-brief header {
+.docs-live-intent-brief header,
+.docs-live-suggestions header {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -21946,7 +22000,10 @@ select:hover {
 }
 
 .docs-live-intent-brief header span,
-.docs-live-intent-brief header small {
+.docs-live-intent-brief header small,
+.docs-live-suggestions header span,
+.docs-live-suggestions article span,
+.docs-live-suggestions article small {
   color: #526171;
   font-size: 12px;
 }
@@ -21992,6 +22049,29 @@ select:hover {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.docs-live-suggestions article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid #e3e8ef;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.docs-live-suggestions article div {
+  display: grid;
+  gap: 4px;
+}
+
+.docs-live-suggestions article p {
+  margin: 0;
+  color: #17212d;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .docs-live-workflow {

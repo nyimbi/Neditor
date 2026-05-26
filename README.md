@@ -183,7 +183,7 @@ settings.
 | Draft a board paper, proposal, report, or briefing note | Start in **Outline** mode, create the structure, then fill in each section. |
 | Start from an AI-first document brief | Use **AI Create** to open Docs Live with an intent-first workflow for document type, outline, context, placeholders, QA, humanization, and review handoff. |
 | Start a proposal, RFP, RFQ, tender, or tutorial | Open **Templates**, set up **Business info**, then use the **Document creation wizard** to insert a fillable template, open Docs Live, or prepare a Claude Code, Codex, or OpenCode handoff package. The Agent Workspace can also write a governed local-agent handoff file under `.neditor/agent-handoffs` and verify whether the selected CLI is available on `PATH`. |
-| Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, run **Check AI runtime** when you want proof that voice and clipboard capabilities are available, dictate the intent, add placeholder values, generate an outline-aware questionnaire if helpful, answer it in the dialog, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
+| Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, run **Check AI runtime** when you want proof that voice and clipboard capabilities are available, dictate the intent, add placeholder values, review the AI-created questionnaire, use or edit the context-aware suggested answers for each wizard step, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
 | Listen to a draft or selected passage | Use **Read Sel.** or **Read Doc** in the Writing toolbar, or configure **Read aloud** in Settings for browser speech, macOS Say, or Supertonic CLI. |
 | Reuse a company format | Save your name, email, company, address, website, industry, client, and brand voice in **Business info**, then insert reusable document parts such as contact blocks, company overview, scope, pricing assumptions, compliance matrix, risk register, and review handoff. |
 | Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
@@ -423,7 +423,11 @@ web app.
   and reusable variables. Each placeholder can also carry a type, source or
   evidence note, and review status, then flow into the generated draft inputs
   table before section-by-section drafting, QA gates, humanization cleanup, and
-  review handoff notes. Its review packet shows the context sources, section
+  review handoff notes. Docs Live also proposes context-aware suggested answers
+  for each wizard step from the selected document type, title, outline,
+  placeholders, dictated direction, and existing context; users can accept one
+  answer at a time or append all suggestions before generating. Its review
+  packet shows the context sources, section
   work queue, assumption register, humanization checklist, and reviewer handoff
   before the draft is applied. The packet itself can be inserted or copied as a
   standalone audit handoff, and generated drafts can be copied or appended as
