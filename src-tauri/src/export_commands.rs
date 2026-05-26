@@ -733,6 +733,7 @@ fn validate_target_specific_export_readiness(
     }
 
     let status = metadata_string(metadata, "status").unwrap_or_else(|| "draft".to_string());
+    let normalized_status = status.trim().to_ascii_lowercase();
     let approval_reviewer_missing = metadata_string(metadata, "approvedBy")
         .or_else(|| metadata_string(metadata, "reviewer"))
         .map(|value| value.trim().is_empty())
@@ -746,7 +747,7 @@ fn validate_target_specific_export_readiness(
     let release_target_missing = metadata_string(metadata, "releaseTarget")
         .map(|value| value.trim().is_empty())
         .unwrap_or(true);
-    if !matches!(status.as_str(), "approved" | "published")
+    if !matches!(normalized_status.as_str(), "approved" | "published")
         || approval_reviewer_missing
         || approved_at_missing
         || owner_missing

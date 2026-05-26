@@ -74,12 +74,12 @@ pub(crate) fn validate_document(
             Some("Add version to YAML front matter for export traceability."),
         ));
     }
-    if metadata
+    let document_status = metadata
         .get("status")
         .and_then(Value::as_str)
-        .unwrap_or("draft")
-        == "draft"
-    {
+        .unwrap_or("draft");
+    let normalized_status = document_status.trim().to_ascii_lowercase();
+    if normalized_status == "draft" {
         diagnostics.push(diag(
             "warning",
             "Document status is draft.",
@@ -90,7 +90,7 @@ pub(crate) fn validate_document(
     }
     if let Some(status) = metadata.get("status").and_then(Value::as_str) {
         if !matches!(
-            status,
+            normalized_status.as_str(),
             "draft" | "in-review" | "approved" | "published" | "archived"
         ) {
             diagnostics.push(diag(
@@ -102,10 +102,7 @@ pub(crate) fn validate_document(
             ));
         }
     }
-    let release_status = matches!(
-        metadata.get("status").and_then(Value::as_str),
-        Some("approved" | "published")
-    );
+    let release_status = matches!(normalized_status.as_str(), "approved" | "published");
     if release_status {
         let approved_by_missing = metadata
             .get("approvedBy")

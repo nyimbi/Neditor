@@ -41,6 +41,23 @@ fn validation_rejects_unknown_release_status() {
 }
 
 #[test]
+fn validation_accepts_case_insensitive_release_statuses() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Published\nversion: 1.0.0\nstatus: PUBLISHED\napprovedBy: QA\napprovedAt: 2026-05-26\n---\n# Published\n".to_string(),
+        file_path: None,
+    });
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message == "Invalid document status: PUBLISHED"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("missing approval metadata")));
+}
+
+#[test]
 fn approved_documents_require_approval_timestamp() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Approved\nversion: 1.0.0\nstatus: published\napprovedBy: QA\n---\n# Approved\n".to_string(),

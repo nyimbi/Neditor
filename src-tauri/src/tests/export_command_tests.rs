@@ -1395,6 +1395,24 @@ fn prepare_for_export_reports_target_specific_release_metadata_blockers() {
 }
 
 #[test]
+fn prepare_for_export_accepts_case_insensitive_release_statuses() {
+    let source = "---\ntitle: Published Deck\nversion: 1.0.0\nstatus: PUBLISHED\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: board distribution\n---\n# Published Deck\n".to_string();
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source,
+        file_path: None,
+        target: "pptx".to_string(),
+        options: json!({ "warnOnDirtyGit": false }),
+    });
+
+    assert!(report.ready, "{:#?}", report.diagnostics);
+    assert_eq!(report.error_count, 0, "{:#?}", report.diagnostics);
+    assert!(!report.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("requires release approval metadata")));
+    assert!(report.manifest.readiness.ready);
+}
+
+#[test]
 fn prepare_for_export_validates_public_distribution_metadata() {
     let source = "---\ntitle: Public Metadata\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: public site\nsummary: Ready for public distribution.\ntags: strategy, operations\ncanonicalUrl: draft/public-metadata\nlanguage: en_US\n---\n# Public Metadata\n".to_string();
     let report = prepare_for_export(PrepareExportRequest {
