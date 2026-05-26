@@ -96,6 +96,8 @@ ned export proposal.md --to docx --output proposal.docx
 ned templates --category Procurement --json
 ned snippets --kind procurement --json
 ned snippets --markdown review-handoff
+ned profile --workspace . --set fullName="Jane Doe" --set companyName="Acme Advisory" --json
+ned profile --workspace . --placeholders
 ned targets --json
 ned handlers --platform windows --commands-only
 ned readiness --json
@@ -109,8 +111,9 @@ ned default-reader --status --json
 `ned file.md` and `ned open` launch NEditor with one or more Markdown files;
 use `ned open file.md --dry-run --json` when a setup script needs to verify the
 paths that would be handed to the app without opening a window.
-`ned init` creates a reusable `.neditor` project scaffold with variables,
-standard business snippets, and a local-agent handoff folder; use `--dry-run`
+`ned init` creates a reusable `.neditor` project scaffold with a business
+profile, variables, standard business snippets, and a local-agent handoff folder;
+use `--dry-run`
 to preview the files and `--json` for help desk automation. `ned new` creates a
 starter Markdown document from business templates such as proposal, RFP, RFP
 response, RFQ, tender, tutorial, lesson plan, lesson content, technical textbook,
@@ -136,7 +139,12 @@ template discovery. `ned snippets` explains reusable standard document parts
 such as contact blocks, company overview, scope, pricing assumptions, compliance
 matrix, risk register, tender checklist, tutorial step, and review handoff; use
 `ned snippets --markdown review-handoff` to print a copyable Markdown part or
-`ned snippets --kind procurement --json` for filtered automation. `ned targets` lists export
+`ned snippets --kind procurement --json` for filtered automation. `ned profile`
+creates, updates, and prints the reusable name, email, phone, role, company,
+address, website, industry, default client, and brand voice values that appear in
+templates, snippets, Docs Live, and agent handoffs; use `--json` for help desks,
+`--markdown` for a reusable identity block, and `--placeholders` for Docs Live
+answers. `ned targets` lists export
 formats, with `--json` output for help desk scripts and deployment checks. `ned
 handlers` lists copyable setup plans for optional transform handlers such as
 Graphviz, D2, PlantUML, Pikchr, and SQLite; use `--commands-only` when a support

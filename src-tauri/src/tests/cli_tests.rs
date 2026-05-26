@@ -84,6 +84,10 @@ fn ned_cli_initializes_project_workspace_scaffold() {
     assert!(root.join(".neditor").join("variables.yaml").is_file());
     assert!(root
         .join(".neditor")
+        .join("business-profile.json")
+        .is_file());
+    assert!(root
+        .join(".neditor")
         .join("snippets")
         .join("business.md")
         .is_file());
@@ -96,6 +100,10 @@ fn ned_cli_initializes_project_workspace_scaffold() {
         fs::read_to_string(root.join(".neditor").join("variables.yaml")).expect("variables");
     assert!(variables.contains("company:"));
     assert!(variables.contains("review_date"));
+    let profile =
+        fs::read_to_string(root.join(".neditor").join("business-profile.json")).expect("profile");
+    assert!(profile.contains("\"companyName\""));
+    assert!(profile.contains("\"brandVoice\""));
     let snippet = fs::read_to_string(root.join(".neditor").join("snippets").join("business.md"))
         .expect("snippet");
     assert!(snippet.contains("Compliance Matrix Starter"));
@@ -120,6 +128,95 @@ fn ned_cli_initializes_project_workspace_scaffold() {
     assert_eq!(dry_run.exit_code, 0);
     assert!(dry_run.message.contains("Would initialize"));
     assert!(!dry_root.exists());
+}
+
+#[test]
+fn ned_cli_manages_reusable_business_profile() {
+    let root = temp_workspace_path("profile");
+    fs::create_dir_all(&root).expect("create profile workspace");
+    let outcome = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "profile".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--init".to_string(),
+        "--set".to_string(),
+        "fullName=Jane Doe".to_string(),
+        "--set".to_string(),
+        "email=jane@example.com".to_string(),
+        "--set".to_string(),
+        "companyName=Acme Advisory".to_string(),
+        "--set".to_string(),
+        "brandVoice=clear and practical".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("profile json");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("profile json");
+    assert_eq!(report["schema"], "neditor.ned-profile.v1");
+    assert_eq!(report["written"], true);
+    assert_eq!(report["profile"]["fullName"], "Jane Doe");
+    assert_eq!(report["profile"]["companyName"], "Acme Advisory");
+    assert!(report["placeholderText"]
+        .as_str()
+        .expect("placeholder text")
+        .contains("brandVoice: clear and practical"));
+    assert!(root
+        .join(".neditor")
+        .join("business-profile.json")
+        .is_file());
+
+    let markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "profile".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--markdown".to_string(),
+    ])
+    .expect("profile markdown");
+    assert!(markdown.message.contains("## Business Identity"));
+    assert!(markdown.message.contains("Jane Doe"));
+    assert!(markdown.message.contains("Acme Advisory"));
+
+    let placeholders = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "business-profile".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--placeholders".to_string(),
+    ])
+    .expect("profile placeholders");
+    assert!(placeholders.message.contains("fullName: Jane Doe"));
+    assert!(placeholders.message.contains("companyName: Acme Advisory"));
+
+    let dry = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "profile".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--set".to_string(),
+        "companyName=Dry Run Company".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("profile dry-run");
+    let dry_report: serde_json::Value = serde_json::from_str(&dry.message).expect("dry json");
+    assert_eq!(dry_report["dryRun"], true);
+    assert_eq!(dry_report["written"], false);
+    let still_acme =
+        fs::read_to_string(root.join(".neditor").join("business-profile.json")).expect("profile");
+    assert!(still_acme.contains("Acme Advisory"));
+
+    let unknown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "profile".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--set".to_string(),
+        "secretKey=value".to_string(),
+    ])
+    .expect_err("unknown profile field");
+    assert!(unknown.contains("Unknown profile field"));
 }
 
 #[test]

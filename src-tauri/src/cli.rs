@@ -69,6 +69,8 @@ const CLI_COMMANDS: &[&str] = &[
     "templates",
     "snippets",
     "parts",
+    "profile",
+    "business-profile",
     "targets",
     "handlers",
     "transform-handlers",
@@ -149,6 +151,21 @@ struct DocumentSnippetInfo {
     body: &'static str,
 }
 
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct BusinessProfile {
+    full_name: String,
+    email: String,
+    phone: String,
+    role_title: String,
+    company_name: String,
+    company_address: String,
+    website: String,
+    industry: String,
+    default_client_name: String,
+    brand_voice: String,
+}
+
 pub fn run_cli() -> i32 {
     let args = env::args().collect::<Vec<_>>();
     match run_cli_with_args(&args) {
@@ -194,6 +211,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "validate" | "check" => run_validate_command(&args[2..], stdin_text),
         "templates" => run_templates_command(&args[2..]),
         "snippets" | "parts" => run_snippets_command(&args[2..]),
+        "profile" | "business-profile" => run_profile_command(&args[2..]),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
@@ -1127,6 +1145,113 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
     }
     Ok(CliOutcome {
         message: snippets_text_report(&filtered),
+        exit_code: 0,
+    })
+}
+
+fn run_profile_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut workspace = PathBuf::from(".");
+    let mut json_output = false;
+    let mut markdown_output = false;
+    let mut placeholders_output = false;
+    let mut init = false;
+    let mut force = false;
+    let mut dry_run = false;
+    let mut updates: Vec<(String, String)> = Vec::new();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--workspace" | "-w" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
+            "--set" => {
+                index += 1;
+                let raw = args
+                    .get(index)
+                    .ok_or_else(|| "--set requires key=value".to_string())?;
+                updates.push(parse_profile_assignment(raw)?);
+            }
+            "--json" => json_output = true,
+            "--markdown" => markdown_output = true,
+            "--placeholders" | "--placeholder-text" => placeholders_output = true,
+            "--init" => init = true,
+            "--force" => force = true,
+            "--dry-run" => dry_run = true,
+            value if value.starts_with('-') => {
+                return Err(format!("Unsupported profile option '{value}'"));
+            }
+            value => updates.push(parse_profile_assignment(value)?),
+        }
+        index += 1;
+    }
+
+    let neditor_dir = workspace.join(".neditor");
+    let profile_path = neditor_dir.join("business-profile.json");
+    let existed = profile_path.exists();
+    let mut profile = if existed && !force {
+        read_business_profile(&profile_path)?
+    } else {
+        BusinessProfile::default()
+    };
+    for (key, value) in &updates {
+        set_business_profile_field(&mut profile, key, value)?;
+    }
+    let should_write = (!existed && init) || force || !updates.is_empty();
+    if should_write && !dry_run {
+        fs::create_dir_all(&neditor_dir).map_err(|err| {
+            format!(
+                "Could not create NEditor workspace directory {}: {err}",
+                neditor_dir.display()
+            )
+        })?;
+        write_business_profile(&profile_path, &profile)?;
+    }
+
+    if markdown_output && !json_output {
+        return Ok(CliOutcome {
+            message: business_profile_markdown(&profile),
+            exit_code: 0,
+        });
+    }
+    if placeholders_output && !json_output {
+        return Ok(CliOutcome {
+            message: business_profile_placeholder_text(&profile),
+            exit_code: 0,
+        });
+    }
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-profile.v1",
+                "workspace": path_to_display(&workspace),
+                "profilePath": path_to_display(&profile_path),
+                "exists": existed,
+                "initialized": init && !existed,
+                "updated": !updates.is_empty(),
+                "dryRun": dry_run,
+                "written": should_write && !dry_run,
+                "profile": profile,
+                "placeholderText": business_profile_placeholder_text(&profile),
+                "markdown": business_profile_markdown(&profile),
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+
+    Ok(CliOutcome {
+        message: business_profile_text_report(
+            &profile_path,
+            existed,
+            should_write,
+            dry_run,
+            &profile,
+        ),
         exit_code: 0,
     })
 }
@@ -2767,6 +2892,197 @@ fn snippets_text_report(snippets: &[DocumentSnippetInfo]) -> String {
     lines.join("\n")
 }
 
+fn parse_profile_assignment(raw: &str) -> Result<(String, String), String> {
+    let (key, value) = raw
+        .split_once('=')
+        .or_else(|| raw.split_once(':'))
+        .ok_or_else(|| format!("Profile values must be key=value, got '{raw}'"))?;
+    let key = normalize_profile_key(key);
+    if key.is_empty() {
+        return Err("Profile value key cannot be empty".to_string());
+    }
+    Ok((key, value.trim().to_string()))
+}
+
+fn normalize_profile_key(key: &str) -> String {
+    let mut spaced = String::new();
+    let mut previous_was_lower_or_digit = false;
+    for character in key.trim().chars() {
+        if character == '_' || character == '-' {
+            spaced.push(' ');
+            previous_was_lower_or_digit = false;
+            continue;
+        }
+        if character.is_ascii_uppercase() && previous_was_lower_or_digit {
+            spaced.push(' ');
+        }
+        previous_was_lower_or_digit = character.is_ascii_lowercase() || character.is_ascii_digit();
+        spaced.push(character);
+    }
+    spaced
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+}
+
+fn set_business_profile_field(
+    profile: &mut BusinessProfile,
+    key: &str,
+    value: &str,
+) -> Result<(), String> {
+    match normalize_profile_key(key).as_str() {
+        "full name" | "name" | "owner" | "prepared by" => profile.full_name = value.to_string(),
+        "email" | "email address" => profile.email = value.to_string(),
+        "phone" | "phone number" | "telephone" => profile.phone = value.to_string(),
+        "role title" | "role" | "title" | "job title" => profile.role_title = value.to_string(),
+        "company name" | "company" | "organization" | "organisation" => {
+            profile.company_name = value.to_string()
+        }
+        "company address" | "address" | "mailing address" => {
+            profile.company_address = value.to_string()
+        }
+        "website" | "web site" | "url" => profile.website = value.to_string(),
+        "industry" | "sector" => profile.industry = value.to_string(),
+        "default client name" | "default client" | "client" | "client name" => {
+            profile.default_client_name = value.to_string()
+        }
+        "brand voice" | "voice" | "tone" => profile.brand_voice = value.to_string(),
+        other => {
+            return Err(format!(
+                "Unknown profile field '{other}'. Supported fields: {}",
+                business_profile_fields().join(", ")
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn business_profile_fields() -> Vec<&'static str> {
+    vec![
+        "fullName",
+        "email",
+        "phone",
+        "roleTitle",
+        "companyName",
+        "companyAddress",
+        "website",
+        "industry",
+        "defaultClientName",
+        "brandVoice",
+    ]
+}
+
+fn read_business_profile(path: &Path) -> Result<BusinessProfile, String> {
+    let text = fs::read_to_string(path)
+        .map_err(|err| format!("Could not read business profile {}: {err}", path.display()))?;
+    serde_json::from_str(&text)
+        .map_err(|err| format!("Could not parse business profile {}: {err}", path.display()))
+}
+
+fn write_business_profile(path: &Path, profile: &BusinessProfile) -> Result<(), String> {
+    let text = serde_json::to_string_pretty(profile).map_err(|err| err.to_string())?;
+    fs::write(path, format!("{text}\n"))
+        .map_err(|err| format!("Could not write business profile {}: {err}", path.display()))
+}
+
+fn profile_value(value: &str, placeholder: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        format!("{{{{{placeholder}}}}}")
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn business_profile_placeholder_text(profile: &BusinessProfile) -> String {
+    [
+        ("fullName", &profile.full_name),
+        ("email", &profile.email),
+        ("phone", &profile.phone),
+        ("roleTitle", &profile.role_title),
+        ("companyName", &profile.company_name),
+        ("companyAddress", &profile.company_address),
+        ("website", &profile.website),
+        ("industry", &profile.industry),
+        ("defaultClientName", &profile.default_client_name),
+        ("brandVoice", &profile.brand_voice),
+    ]
+    .iter()
+    .map(|(key, value)| format!("{key}: {}", profile_value(value, key)))
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+fn business_profile_markdown(profile: &BusinessProfile) -> String {
+    vec![
+        "## Business Identity".to_string(),
+        "".to_string(),
+        format!(
+            "**Prepared by:** {}, {}",
+            profile_value(&profile.full_name, "fullName"),
+            profile_value(&profile.role_title, "roleTitle")
+        ),
+        "".to_string(),
+        format!(
+            "**Company:** {}",
+            profile_value(&profile.company_name, "companyName")
+        ),
+        format!(
+            "**Address:** {}",
+            profile_value(&profile.company_address, "companyAddress")
+        ),
+        "".to_string(),
+        format!("**Email:** {}", profile_value(&profile.email, "email")),
+        format!("**Phone:** {}", profile_value(&profile.phone, "phone")),
+        format!(
+            "**Website:** {}",
+            profile_value(&profile.website, "website")
+        ),
+        "".to_string(),
+        format!(
+            "**Industry:** {}",
+            profile_value(&profile.industry, "industry")
+        ),
+        format!(
+            "**Default client:** {}",
+            profile_value(&profile.default_client_name, "defaultClientName")
+        ),
+        format!(
+            "**Brand voice:** {}",
+            profile_value(&profile.brand_voice, "brandVoice")
+        ),
+    ]
+    .join("\n")
+}
+
+fn business_profile_text_report(
+    path: &Path,
+    existed: bool,
+    should_write: bool,
+    dry_run: bool,
+    profile: &BusinessProfile,
+) -> String {
+    let status = if should_write && dry_run {
+        "would write"
+    } else if should_write {
+        "written"
+    } else if existed {
+        "loaded"
+    } else {
+        "not initialized"
+    };
+    [
+        format!("NEditor business profile: {status}"),
+        format!("Profile path: {}", path.display()),
+        "Use `ned profile --init --set companyName=... --set fullName=...` to create or update it.".to_string(),
+        "Use `ned profile --markdown` to print a reusable contact block or `--placeholders` for Docs Live.".to_string(),
+        "".to_string(),
+        business_profile_placeholder_text(profile),
+    ]
+    .join("\n")
+}
+
 fn new_document_markdown(template: &str, title: &str) -> Result<String, String> {
     let template = template.trim().to_ascii_lowercase();
     if !NEW_DOCUMENT_TEMPLATES.contains(&template.as_str()) {
@@ -2836,11 +3152,15 @@ fn workspace_init_entries(root: &Path) -> Vec<(PathBuf, &'static str)> {
     vec![
         (
             base.join("README.md"),
-            "# NEditor Workspace\n\nThis folder stores reusable local project material for NEditor.\n\n- `variables.yaml` supplies project variables that documents can reference with `{{variable}}` placeholders.\n- `snippets/` stores reusable document parts for proposals, RFPs, reports, tutorials, and review handoffs.\n- `agent-handoffs/` stores generated local-agent packets for Claude Code, Codex, OpenCode, or private workflows.\n\nDo not store API keys, passwords, or client secrets in this folder.\n",
+            "# NEditor Workspace\n\nThis folder stores reusable local project material for NEditor.\n\n- `business-profile.json` stores reusable sender, company, client, website, and brand voice values for templates, Docs Live, and handoff packages.\n- `variables.yaml` supplies project variables that documents can reference with `{{variable}}` placeholders.\n- `snippets/` stores reusable document parts for proposals, RFPs, reports, tutorials, and review handoffs.\n- `agent-handoffs/` stores generated local-agent packets for Claude Code, Codex, OpenCode, or private workflows.\n\nDo not store API keys, passwords, or client secrets in this folder.\n",
         ),
         (
             base.join("variables.yaml"),
             "# Project variables available to NEditor documents.\n# Replace these examples with values your documents reuse often.\nprofile:\n  owner: \"Your Name\"\n  email: \"you@example.com\"\ncompany:\n  name: \"Your Company\"\n  website: \"https://example.com\"\nclient:\n  name: \"Client Name\"\nproject:\n  name: \"Project Name\"\n  review_date: \"YYYY-MM-DD\"\n",
+        ),
+        (
+            base.join("business-profile.json"),
+            "{\n  \"fullName\": \"Your Name\",\n  \"email\": \"you@example.com\",\n  \"phone\": \"\",\n  \"roleTitle\": \"Your Role\",\n  \"companyName\": \"Your Company\",\n  \"companyAddress\": \"\",\n  \"website\": \"https://example.com\",\n  \"industry\": \"\",\n  \"defaultClientName\": \"Client Name\",\n  \"brandVoice\": \"clear and practical\"\n}\n",
         ),
         (
             base.join("snippets").join("business.md"),
@@ -2874,7 +3194,8 @@ fn init_text_report(
     append_init_paths(&mut lines, "Updated", updated);
     append_init_paths(&mut lines, "Kept existing", kept);
     lines.push("Next steps:".to_string());
-    lines.push("  - Edit .neditor/variables.yaml with reusable names, company details, and project values.".to_string());
+    lines.push("  - Run `ned profile --workspace . --set fullName=... --set companyName=...` to set reusable business identity values.".to_string());
+    lines.push("  - Edit .neditor/variables.yaml with project values that are not part of the reusable business profile.".to_string());
     lines.push("  - Add reusable proposal, RFP, tutorial, and review handoff parts under .neditor/snippets/.".to_string());
     lines.push(
         "  - Use the Agent Workspace when you want governed local-agent handoff files.".to_string(),
@@ -3031,6 +3352,9 @@ _ned() {{
       snippets|parts)
         COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body" -- "$cur") )
         ;;
+      profile|business-profile)
+        COMPREPLY=( $(compgen -W "--workspace --set --init --force --dry-run --json --markdown --placeholders --placeholder-text" -- "$cur") )
+        ;;
       handlers|transform-handlers)
         COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
         ;;
@@ -3110,6 +3434,9 @@ _ned() {{
       ;;
     snippets|parts)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:'
+      ;;
+    profile|business-profile)
+      _arguments '--workspace[workspace containing .neditor]:directory:_files -/' '--set[set profile field key=value]:assignment:' '--init[create profile file]' '--force[replace existing profile when initializing]' '--dry-run[preview write]' '--json[print machine-readable JSON]' '--markdown[print reusable identity block]' '--placeholders[print Docs Live placeholder values]' '--placeholder-text[alias for --placeholders]'
       ;;
     targets)
       _arguments '--json[print machine-readable JSON]'
@@ -3208,6 +3535,15 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l search -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l markdown -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l body -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l workspace -s w -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l set -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l init".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l force".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l dry-run".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l json".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l markdown".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l placeholders".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l placeholder-text".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l commands-only"
@@ -3608,6 +3944,7 @@ fn help_text() -> String {
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id]".to_string(),
+        "  ned profile [--workspace path] [--init] [--set fullName=...] [--json|--markdown|--placeholders]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json]"

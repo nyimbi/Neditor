@@ -191,12 +191,13 @@ Packaging targets:
 
 Packaged builds must also include the `ned` command-line helper for scriptable
 file-open handoff previews, business-template document creation, workspace
-initialization, document inspection, export conversion, default Markdown reader
-setup guidance and machine-readable status reporting, setup diagnostics,
-transform handler discovery, release-readiness report inspection, release
-evidence report status inspection, and a redaction-safe support bundle that
-combines setup diagnostics with release evidence, spec-completion summaries, and
-transform-engine probe summaries plus standard release evidence report statuses.
+initialization, reusable business-profile setup, document inspection, export
+conversion, default Markdown reader setup guidance and machine-readable status
+reporting, setup diagnostics, transform handler discovery, release-readiness
+report inspection, release evidence report status inspection, and a
+redaction-safe support bundle that combines setup diagnostics with release
+evidence, spec-completion summaries, and transform-engine probe summaries plus
+standard release evidence report statuses.
 The CLI must support JSON output for automation and strict non-zero modes for
 release gates so non-technical support teams can verify an installation without
 learning the developer toolchain.
@@ -212,6 +213,10 @@ document.
 Reusable document parts must also be available outside the GUI: the packaged CLI
 should list, filter, search, and print standard snippet Markdown for identity,
 proposal, delivery, procurement, governance, and review sections.
+Reusable business identity values must be scriptable as well: the CLI should
+initialize, update, inspect, and print the repeated name, email, phone, role,
+company, address, website, industry, default-client, and brand-voice values used
+by templates, snippets, Docs Live, and agent handoff packages.
 
 ### 6.2 Primary Layout
 

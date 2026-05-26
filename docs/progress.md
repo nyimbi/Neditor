@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `a2820d5 Add document
-  set handoff manifests`
+- Latest inspected committed baseline before this update: `790cebf Make creative
+  wizards guide structure first`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`
 
@@ -87,6 +87,14 @@ Recent pushed checkpoints visible in current git history:
   outline, placeholders, dictated direction, and existing context. Users can add
   one suggested answer or append the full set before generating, keeping the AI
   guidance editable and reviewable instead of silently filling the document.
+- The packaged `ned` CLI now has a first-class reusable business profile setup
+  surface. `ned init` scaffolds `.neditor/business-profile.json`, and
+  `ned profile` / `ned business-profile` can initialize, update, dry-run, and
+  print repeated sender, company, client, website, industry, and brand-voice
+  values as JSON, Markdown, or Docs Live placeholder text. The field parser
+  accepts documented camelCase keys plus spaced, dashed, underscored, and common
+  business aliases so non-technical setup scripts can reuse the same profile in
+  templates, snippets, Docs Live, and local-agent handoffs.
 - The References sidebar front-matter manager parser is now more tolerant of
   business-document YAML edge cases: CRLF front matter, quoted `#` characters,
   comma-containing inline data-source lists, `yml` aliases, URL/Windows/parent
@@ -1393,10 +1401,16 @@ P2/P3 gaps:
 
 ## Verification Status
 
-Current verification recorded on 2026-05-21 through 2026-05-26:
+Current verification recorded on 2026-05-21 through 2026-05-27:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting stayed clean after adding the `ned profile` command surface and profile-field normalizer. |
+| `pnpm run check:cli` | Pass | 21 focused CLI tests passed and the `ned` binary rebuilt. Coverage includes `.neditor/business-profile.json` scaffold creation, repeated `--set` updates, camelCase business profile fields, schema `neditor.ned-profile.v1`, Markdown identity output, Docs Live placeholder output, dry-run protection, alias command support, shell-completion generation, and unknown-field validation. |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding Settings CLI copy and guards that the CLI source exposes the profile command, profile schema, and scaffold file. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting scriptable business profile setup in the README and specification. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks`: 115 matrix rows, 9 complete, and 106 still partial/open. |
+| `pnpm run check:release-readiness` | Pass with external gaps | Wrote `.tmp/release-readiness/report.json` with status `current-host-ready-with-external-gaps`; current host checks remain accepted, but release evidence still needs signing/notarization, Windows/Linux package and WebDriver proof, live Google Docs import/readback, final Homebrew cask/artifact proof, live AI provider proof, real-device AI runtime proof, release-device performance profiling, independent security review, native-viewer/export human sign-off, and assistive-technology sign-off. |
 | `cargo test --locked file_command_tests --lib` in `src-tauri` | Pass | 8 file command tests passed, including `reveal_command_for_existing_path_is_platform_specific_and_argument_safe`. |
 | `cargo test --locked desktop_native_command_workflow_smoke --lib` in `src-tauri` | Pass | Native command workflow smoke passed against real local files and direct export outputs. |
 | `cargo test --locked representative_rendered_export_artifacts_are_package_inspectable --lib` in `src-tauri` | Pass | Representative rendered/package export audit passed across HTML, PDF, DOCX, PPTX, Markdown bundle, blog, Substack, LaTeX, and Google Docs package evidence. |
