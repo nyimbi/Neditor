@@ -42,6 +42,24 @@ fn pptx_export_can_include_an_agenda_from_options() {
 }
 
 #[test]
+fn pptx_export_can_include_an_agenda_from_structured_toc_metadata() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Structured Agenda\nstatus: approved\napprovedBy: QA\ntoc:\n  enabled: true\n  depth: 2\n---\n# Structured Agenda\nIntro.\n\n## Operations\nBody.\n\n## Finance\nBody.\n".to_string(),
+            file_path: None,
+        });
+
+    let pptx = render_pptx_bytes(&response, &json!({})).expect("pptx bytes");
+    let agenda_slide = zip_entry_text(&pptx, "ppt/slides/slide2.xml");
+    let body_slide = zip_entry_text(&pptx, "ppt/slides/slide3.xml");
+
+    assert!(agenda_slide.contains("Agenda"));
+    assert!(agenda_slide.contains("Structured Agenda"));
+    assert!(agenda_slide.contains("Operations"));
+    assert!(agenda_slide.contains("Finance"));
+    assert!(body_slide.contains("Structured Agenda"));
+}
+
+#[test]
 fn pptx_export_splits_large_tables_across_slides() {
     let rows = (1..=20)
         .map(|index| format!("| Row {index} | {index} |"))

@@ -536,7 +536,16 @@ fn include_pptx_agenda(response: &CompileResponse, options: &Value) -> bool {
     options
         .get("includeAgenda")
         .and_then(Value::as_bool)
-        .or_else(|| response.metadata.get("toc").and_then(Value::as_bool))
+        .or_else(|| {
+            [
+                "toc",
+                "toc.enabled",
+                "tableOfContents",
+                "tableOfContents.enabled",
+            ]
+            .iter()
+            .find_map(|path| metadata_lookup(&response.metadata, path).and_then(Value::as_bool))
+        })
         .unwrap_or(false)
 }
 

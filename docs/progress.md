@@ -129,6 +129,9 @@ Recent pushed checkpoints visible in current git history:
   `toc: {enabled: true, depth: 2, numbered: true}` in addition to the legacy
   flat `tocDepth` and `tocNumbered` keys, and the DOCX TOC field uses the same
   shared depth lookup.
+- PPTX agenda generation now follows the same structured TOC metadata path:
+  `toc.enabled` and `tableOfContents.enabled` can automatically add an agenda
+  slide without requiring the explicit `includeAgenda` export option.
 - Generated glossary sections now accept structured `glossary.enabled: true`
   metadata in addition to `[GLOSSARY]`, `glossary: true`, and the legacy
   `glossarySection` aliases.
