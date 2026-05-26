@@ -524,10 +524,17 @@ function applyInlineDataSourceObject(
   anchors: Map<string, string>,
   mapAnchors: Map<string, Array<{ key: string; value: string; line: number }>>,
 ) {
-  const trimmed = stripLeadingYamlDecorators(stripYamlComment(value).trim()).scalar;
+  const decorated = stripLeadingYamlDecorators(stripYamlComment(value).trim());
+  const trimmed = decorated.scalar;
   if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return false;
   const entries = parseInlineYamlMap(trimmed, anchors, mapAnchors, row.line || 0);
   if (!entries.length) return false;
+  if (decorated.anchor) {
+    if (!mapAnchors.has(decorated.anchor)) mapAnchors.set(decorated.anchor, []);
+    for (const entry of entries) {
+      recordMapAnchorEntry(mapAnchors, { anchor: decorated.anchor }, entry.key, entry.value, entry.line, entry.keepExisting);
+    }
+  }
   for (const entry of entries) {
     applyDataSourcePair(row, `${entry.key}: ${entry.value}`);
   }
