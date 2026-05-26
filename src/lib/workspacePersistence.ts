@@ -125,6 +125,8 @@ export interface TtsPreferences {
   supertonicVoice: string;
   supertonicLanguage: string;
   supertonicSpeed: number;
+  supertonicModelDownloadAcknowledged: boolean;
+  supertonicModelStoragePath: string;
 }
 
 const AI_PROVIDER_PROFILE_IDS = [
@@ -643,6 +645,8 @@ export function normalizeTtsPreferences(defaults: unknown): TtsPreferences {
     supertonicVoice: normalizedString(record.supertonicVoice, 80) || "M1",
     supertonicLanguage: normalizedString(record.supertonicLanguage, 24) || "en",
     supertonicSpeed: supertonicSpeed === undefined ? 1 : clampNumber(supertonicSpeed, 0.7, 2),
+    supertonicModelDownloadAcknowledged: record.supertonicModelDownloadAcknowledged === true,
+    supertonicModelStoragePath: normalizedString(record.supertonicModelStoragePath, 400),
   };
 }
 

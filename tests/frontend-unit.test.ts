@@ -2445,6 +2445,8 @@ test("text-to-speech preferences normalize selected local engines", () => {
       supertonicVoice: " F1 ",
       supertonicLanguage: " en ",
       supertonicSpeed: 0.1,
+      supertonicModelDownloadAcknowledged: true,
+      supertonicModelStoragePath: " ~/.cache/supertonic/models ",
     }),
     {
       engine: "supertonic-cli",
@@ -2455,6 +2457,8 @@ test("text-to-speech preferences normalize selected local engines", () => {
       supertonicVoice: "F1",
       supertonicLanguage: "en",
       supertonicSpeed: 0.7,
+      supertonicModelDownloadAcknowledged: true,
+      supertonicModelStoragePath: "~/.cache/supertonic/models",
     },
   );
   deepEqual(normalizeTtsPreferences({ engine: "unknown", rate: 0.1, supertonicSpeed: 9 }), {
@@ -2466,6 +2470,8 @@ test("text-to-speech preferences normalize selected local engines", () => {
     supertonicVoice: "M1",
     supertonicLanguage: "en",
     supertonicSpeed: 2,
+    supertonicModelDownloadAcknowledged: false,
+    supertonicModelStoragePath: "",
   });
 });
 
@@ -2632,6 +2638,8 @@ test("workspace persistence migration versions and normalizes saved settings", (
       supertonicVoice: " F1 ",
       supertonicLanguage: " en ",
       supertonicSpeed: 1.1,
+      supertonicModelDownloadAcknowledged: true,
+      supertonicModelStoragePath: " ~/.cache/supertonic/models ",
     },
     aiCleanupDefaults: { preserveHeadings: true, convertTables: false },
     agentRunHistory: [
@@ -2966,6 +2974,8 @@ test("workspace persistence migration versions and normalizes saved settings", (
     supertonicVoice: "F1",
     supertonicLanguage: "en",
     supertonicSpeed: 1.1,
+    supertonicModelDownloadAcknowledged: true,
+    supertonicModelStoragePath: "~/.cache/supertonic/models",
   });
   deepEqual(migrated.aiCleanupDefaults, {
     addProvenance: true,
@@ -3772,6 +3782,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Check text to speech runtime"));
   ok(app.includes("checkTtsRuntime"));
   ok(app.includes("inspect_native_tts"));
+  ok(app.includes("download_tts_model"));
+  ok(app.includes("ttsModelDownloadPlan"));
+  ok(app.includes('aria-label="TTS model download notice"'));
+  ok(app.includes('aria-label="TTS model download setup"'));
+  ok(app.includes("supertonicModelDownloadAcknowledged"));
+  ok(app.includes("supertonicModelStoragePath"));
+  ok(app.includes("Download selected TTS model"));
+  ok(app.includes("Copy TTS model download details"));
   ok(app.includes('aria-label="Text to speech runtime report"'));
   ok(app.includes("read_text_aloud"));
   ok(app.includes("stop_text_aloud"));
@@ -3940,6 +3958,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes("read_text_aloud"));
   ok(tauriLib.includes("stop_text_aloud"));
   ok(tauriLib.includes("inspect_native_tts"));
+  ok(tauriLib.includes("download_tts_model"));
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
   ok(tauriLib.includes('"neditor-open-agent-workspace",'));
   ok(tauriLib.includes('"neditor-ai-create-document",'));

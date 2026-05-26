@@ -3652,6 +3652,18 @@ Configuration Center consolidation:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding Configuration Center evidence to Preferences. |
 | `git diff --check` | Pass | No whitespace errors are present in the Configuration Center diff. |
 
+Consent-gated TTS model downloads:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding the Supertonic-only model download panel, explicit acknowledgement state, model size/location disclosure, and command-palette entries. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with guards for TTS model download UI, persisted acknowledgement/storage fields, download command wiring, and existing read-aloud setup controls. |
+| `cargo test --locked tts --lib` | Pass | Rust TTS tests passed for argument-safe native engines, Supertonic playback refusal before model-download acknowledgement, explicit model download command shaping, native inspection, and macOS Say stdin handling. |
+| `cargo test --locked ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | IPC registration and documentation coverage passed after adding `download_tts_model` to the coverage ledger. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting TTS model download consent gating. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after refreshing Preferences evidence for model-backed TTS consent. |
+| `git diff --check` | Pass | No whitespace errors are present in the TTS model download consent diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

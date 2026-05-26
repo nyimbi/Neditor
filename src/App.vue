@@ -2214,12 +2214,49 @@
                 <input v-model="store.ttsPreferences.supertonicVoice" placeholder="F1, M1, or approved voice" />
               </label>
             </section>
+            <section v-if="ttsModelDownloadPlan" class="tts-model-download-notice" aria-label="TTS model download notice">
+              <header>
+                <div>
+                  <strong>Model download required before Supertonic speech</strong>
+                  <span>NEditor will not start a model-backed Supertonic run until you acknowledge this download.</span>
+                </div>
+              </header>
+              <dl>
+                <div>
+                  <dt>Model</dt>
+                  <dd>{{ ttsModelDownloadPlan.model }}</dd>
+                </div>
+                <div>
+                  <dt>Size</dt>
+                  <dd>{{ ttsModelDownloadPlan.approximateSize }}</dd>
+                </div>
+                <div>
+                  <dt>Storage location</dt>
+                  <dd>{{ ttsModelDownloadPlan.storagePath }}</dd>
+                </div>
+                <div>
+                  <dt>Download source</dt>
+                  <dd>{{ ttsModelDownloadPlan.source }}</dd>
+                </div>
+              </dl>
+              <label class="tts-model-consent">
+                <input v-model="store.ttsPreferences.supertonicModelDownloadAcknowledged" type="checkbox" @change="saveTtsModelDownloadAcknowledgement" />
+                I understand Supertonic may download {{ ttsModelDownloadPlan.model }} ({{ ttsModelDownloadPlan.approximateSize }}) to {{ ttsModelDownloadPlan.storagePath }} before first use.
+              </label>
+              <div class="reference-actions">
+                <button type="button" :disabled="!ttsModelDownloadPlan.acknowledged || ttsModelDownloadBusy" @click="downloadSelectedTtsModel">
+                  {{ ttsModelDownloadBusy ? "Starting..." : "Download model" }}
+                </button>
+                <button type="button" @click="copyTtsModelDownloadCommand">Copy command</button>
+              </div>
+              <p class="sidebar-hint">Download command: <code>{{ ttsModelDownloadPlan.command }}</code></p>
+            </section>
             <div class="reference-actions">
               <button type="button" :disabled="ttsInspectionBusy" @click="checkTtsRuntime">
                 {{ ttsInspectionBusy ? "Checking..." : "Check TTS" }}
               </button>
-              <button type="button" :disabled="ttsBusy" @click="readSelectionAloud">Read selection</button>
-              <button type="button" :disabled="ttsBusy" @click="readDocumentAloud">Read document</button>
+              <button type="button" :disabled="ttsReadDisabled" @click="readSelectionAloud">Read selection</button>
+              <button type="button" :disabled="ttsReadDisabled" @click="readDocumentAloud">Read document</button>
               <button type="button" @click="stopReadingAloud">Stop</button>
             </div>
             <p class="sidebar-hint">{{ ttsStatus || ttsRuntimeSummary || ttsSetupSummary }}</p>
@@ -2673,11 +2710,43 @@
                 Supertonic voice
                 <input v-model="store.ttsPreferences.supertonicVoice" />
               </label>
+              <section v-if="ttsModelDownloadPlan" class="tts-model-download-notice" aria-label="TTS model download setup">
+                <header>
+                  <div>
+                    <strong>Confirm model download</strong>
+                    <span>Supertonic uses a local model; NEditor will not trigger that download until you approve it.</span>
+                  </div>
+                </header>
+                <dl>
+                  <div>
+                    <dt>Model</dt>
+                    <dd>{{ ttsModelDownloadPlan.model }}</dd>
+                  </div>
+                  <div>
+                    <dt>Size</dt>
+                    <dd>{{ ttsModelDownloadPlan.approximateSize }}</dd>
+                  </div>
+                  <div>
+                    <dt>Storage location</dt>
+                    <dd>{{ ttsModelDownloadPlan.storagePath }}</dd>
+                  </div>
+                </dl>
+                <label class="tts-model-consent">
+                  <input v-model="store.ttsPreferences.supertonicModelDownloadAcknowledged" type="checkbox" @change="saveTtsModelDownloadAcknowledgement" />
+                  Allow Supertonic model download for {{ ttsModelDownloadPlan.model }}.
+                </label>
+                <div class="reference-actions">
+                  <button type="button" :disabled="!ttsModelDownloadPlan.acknowledged || ttsModelDownloadBusy" @click="downloadSelectedTtsModel">
+                    {{ ttsModelDownloadBusy ? "Starting..." : "Download model" }}
+                  </button>
+                  <button type="button" @click="copyTtsModelDownloadCommand">Copy command</button>
+                </div>
+              </section>
               <div class="reference-actions">
                 <button type="button" :disabled="ttsInspectionBusy" @click="checkTtsRuntime">
                   {{ ttsInspectionBusy ? "Checking..." : "Check TTS runtime" }}
                 </button>
-                <button type="button" :disabled="ttsBusy" @click="readSelectionAloud">Read selection</button>
+                <button type="button" :disabled="ttsReadDisabled" @click="readSelectionAloud">Read selection</button>
                 <button type="button" @click="stopReadingAloud">Stop</button>
               </div>
               <ul v-if="ttsInspectionReport" class="docs-live-runtime" aria-label="Text to speech runtime report">
@@ -4540,6 +4609,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { homeDir } from "@tauri-apps/api/path";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorSelection, EditorState, RangeSetBuilder } from "@codemirror/state";
@@ -4830,6 +4900,15 @@ type NativeTtsInspectionResponse = {
   engines: NativeTtsEngineStatus[];
   available_native_engines: number;
 };
+type TtsModelDownloadPlan = {
+  engine: "supertonic-cli";
+  model: string;
+  approximateSize: string;
+  storagePath: string;
+  source: string;
+  command: string;
+  acknowledged: boolean;
+};
 
 declare global {
   interface Window {
@@ -4954,8 +5033,10 @@ const selectedConfigurationSection = ref("overview");
 const guidedDemoStepIndex = ref(0);
 const ttsBusy = ref(false);
 const ttsInspectionBusy = ref(false);
+const ttsModelDownloadBusy = ref(false);
 const ttsStatus = ref("");
 const ttsInspectionReport = ref<NativeTtsInspectionResponse | null>(null);
+const ttsModelStorageDefault = ref("~/.cache/supertonic/models");
 const docsLiveDocumentType = ref<DocsLiveDocumentType>("business-brief");
 const docsLiveTitle = ref("");
 const docsLiveOutlineText = ref("");
@@ -6442,6 +6523,23 @@ const ttsRuntimeSummary = computed(() => {
   if (store.ttsPreferences.engine === "browser-speech") return "Browser speech will be checked by the web runtime before playback.";
   return selectedTtsEngineStatus.value?.detail || "Selected native TTS engine has no runtime status.";
 });
+const ttsModelDownloadPlan = computed<TtsModelDownloadPlan | null>(() => {
+  if (store.ttsPreferences.engine !== "supertonic-cli") return null;
+  const storagePath = store.ttsPreferences.supertonicModelStoragePath.trim() || ttsModelStorageDefault.value;
+  const command = `${store.ttsPreferences.supertonicCommand.trim() || "supertonic"} download`;
+  return {
+    engine: "supertonic-cli",
+    model: "supertonic-3",
+    approximateSize: "~305 MB",
+    storagePath,
+    source: "Hugging Face model download managed by the Supertonic CLI",
+    command,
+    acknowledged: store.ttsPreferences.supertonicModelDownloadAcknowledged,
+  };
+});
+const ttsReadDisabled = computed(
+  () => ttsBusy.value || Boolean(ttsModelDownloadPlan.value && !ttsModelDownloadPlan.value.acknowledged),
+);
 const configurationSetupSteps = [
   {
     id: "identity",
@@ -7654,6 +7752,23 @@ function textToReadAloud(scope: "selection" | "document") {
   return active.value.text.trim();
 }
 
+async function hydrateTtsModelStorageLocation() {
+  try {
+    const home = await homeDir();
+    const normalizedHome = home.replace(/[\\/]$/, "");
+    if (normalizedHome) {
+      ttsModelStorageDefault.value = `${normalizedHome}/.cache/supertonic/models`;
+    }
+    if (!store.ttsPreferences.supertonicModelStoragePath.trim()) {
+      store.ttsPreferences.supertonicModelStoragePath = ttsModelStorageDefault.value;
+    }
+  } catch {
+    if (!store.ttsPreferences.supertonicModelStoragePath.trim()) {
+      store.ttsPreferences.supertonicModelStoragePath = ttsModelStorageDefault.value;
+    }
+  }
+}
+
 async function readSelectionAloud() {
   await readTextAloud("selection");
 }
@@ -7682,6 +7797,67 @@ async function checkTtsRuntime() {
   }
 }
 
+function saveTtsModelDownloadAcknowledgement() {
+  const plan = ttsModelDownloadPlan.value;
+  if (plan) {
+    store.ttsPreferences.supertonicModelStoragePath = plan.storagePath;
+  }
+  store.saveTtsPreferences(store.ttsPreferences);
+  store.statusMessage = store.ttsPreferences.supertonicModelDownloadAcknowledged
+    ? "Supertonic model download acknowledgement saved"
+    : "Supertonic model download acknowledgement cleared";
+}
+
+async function downloadSelectedTtsModel() {
+  const plan = ttsModelDownloadPlan.value;
+  if (!plan) return;
+  if (!plan.acknowledged) {
+    ttsStatus.value = "Review the Supertonic model name, size, and storage location before starting the download.";
+    store.statusMessage = ttsStatus.value;
+    return;
+  }
+  store.ttsPreferences.supertonicModelStoragePath = plan.storagePath;
+  store.saveTtsPreferences(store.ttsPreferences);
+  ttsModelDownloadBusy.value = true;
+  try {
+    const response = await invoke<NativeTtsResponse>("download_tts_model", {
+      request: {
+        engine: plan.engine,
+        command_path: store.ttsPreferences.supertonicCommand,
+        model: plan.model,
+        approximate_size: plan.approximateSize,
+        storage_path: plan.storagePath,
+        acknowledged: plan.acknowledged,
+      },
+    });
+    ttsStatus.value = response.message;
+    store.statusMessage = response.message;
+  } catch (error) {
+    ttsStatus.value = error instanceof Error ? error.message : String(error);
+    store.lastError = ttsStatus.value;
+    store.statusMessage = "TTS model download could not be started";
+  } finally {
+    ttsModelDownloadBusy.value = false;
+  }
+}
+
+async function copyTtsModelDownloadCommand() {
+  const plan = ttsModelDownloadPlan.value;
+  if (!plan) return;
+  const text = [
+    `Model: ${plan.model}`,
+    `Approximate size: ${plan.approximateSize}`,
+    `Storage location: ${plan.storagePath}`,
+    `Download command: ${plan.command}`,
+  ].join("\n");
+  try {
+    await navigator.clipboard?.writeText(text);
+  } catch {
+    // Clipboard access is optional in desktop smoke and restricted browser contexts.
+  }
+  store.statusMessage = "TTS model download details are ready to copy";
+}
+
 async function readTextAloud(scope: "selection" | "document") {
   const sourceText = textToReadAloud(scope);
   if (!sourceText) {
@@ -7691,6 +7867,12 @@ async function readTextAloud(scope: "selection" | "document") {
   }
   const text = readableSpeechText(sourceText);
   store.saveTtsPreferences(store.ttsPreferences);
+  const plan = ttsModelDownloadPlan.value;
+  if (plan && !plan.acknowledged) {
+    ttsStatus.value = `Review and acknowledge the ${plan.model} download (${plan.approximateSize}) to ${plan.storagePath} before using Supertonic.`;
+    store.statusMessage = ttsStatus.value;
+    return;
+  }
   ttsBusy.value = true;
   try {
     if (store.ttsPreferences.engine === "browser-speech") {
@@ -7706,6 +7888,8 @@ async function readTextAloud(scope: "selection" | "document") {
           rate: Math.round(store.ttsPreferences.rate * 175),
           command_path: store.ttsPreferences.engine === "supertonic-cli" ? store.ttsPreferences.supertonicCommand : undefined,
           speed: store.ttsPreferences.engine === "supertonic-cli" ? store.ttsPreferences.supertonicSpeed : undefined,
+          model_download_acknowledged: plan?.acknowledged,
+          model_storage_path: plan?.storagePath,
         },
       });
       ttsStatus.value = `${response.message} with ${ttsEngineOptions.find((option) => option.id === store.ttsPreferences.engine)?.label || response.engine}`;
@@ -9099,6 +9283,8 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Read selected text aloud", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "macos say", "voice"], run: () => readSelectionAloud() },
   { name: "Read document aloud", group: "Writing Tools", keywords: ["tts", "speech", "full document", "supertonic", "macos say"], run: () => readDocumentAloud() },
   { name: "Check text to speech runtime", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "macos say", "setup"], run: () => checkTtsRuntime() },
+  { name: "Download selected TTS model", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "model", "download"], run: () => downloadSelectedTtsModel() },
+  { name: "Copy TTS model download details", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "model", "storage"], run: () => copyTtsModelDownloadCommand() },
   { name: "Stop reading aloud", group: "Writing Tools", keywords: ["tts", "speech", "stop"], run: () => stopReadingAloud() },
   {
     name: "Open configuration setup wizard",
@@ -9600,6 +9786,7 @@ async function installDesktopWorkflowTestHooks() {
 
 onMounted(async () => {
   await store.boot();
+  await hydrateTtsModelStorageLocation();
   await bindNativeMenuCommands();
   applyAiPasteDefaults();
   buildEditor();
@@ -20111,6 +20298,52 @@ select:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
+}
+
+.tts-model-download-notice {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d6bf8a;
+  border-left: 3px solid #b7791f;
+  background: #fffaf0;
+}
+
+.tts-model-download-notice > header,
+.tts-model-download-notice > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.tts-model-download-notice header span,
+.tts-model-download-notice dd {
+  color: #526171;
+  font-size: 12px;
+}
+
+.tts-model-download-notice dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.tts-model-download-notice dt {
+  color: #6b4b12;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.tts-model-download-notice dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.tts-model-consent {
+  align-items: flex-start;
+  margin: 0;
 }
 
 .configuration-center,

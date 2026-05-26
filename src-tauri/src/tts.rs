@@ -23,6 +23,18 @@ pub(crate) struct NativeTtsRequest {
     pub(crate) rate: Option<u16>,
     pub(crate) command_path: Option<String>,
     pub(crate) speed: Option<f32>,
+    pub(crate) model_download_acknowledged: Option<bool>,
+    pub(crate) model_storage_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct NativeTtsModelDownloadRequest {
+    pub(crate) engine: String,
+    pub(crate) command_path: Option<String>,
+    pub(crate) model: Option<String>,
+    pub(crate) approximate_size: Option<String>,
+    pub(crate) storage_path: Option<String>,
+    pub(crate) acknowledged: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -115,7 +127,41 @@ pub(crate) fn read_text_aloud(
 }
 
 #[tauri::command]
-pub(crate) fn stop_text_aloud(state: State<'_, NativeTtsState>) -> Result<NativeTtsResponse, String> {
+pub(crate) fn download_tts_model(
+    request: NativeTtsModelDownloadRequest,
+    state: State<'_, NativeTtsState>,
+) -> Result<NativeTtsResponse, String> {
+    let command = native_tts_model_download_command_for_request(&request)?;
+    let mut child = Command::new(&command.program)
+        .args(&command.args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|err| format!("Could not start TTS model download: {err}"))?;
+    let _ = child.try_wait();
+    state
+        .children
+        .lock()
+        .map_err(|_| "Could not track text-to-speech model download.".to_string())?
+        .push(child);
+    let model =
+        safe_cli_value(request.model.as_deref(), 80).unwrap_or_else(|| "supertonic-3".to_string());
+    let size = safe_cli_value(request.approximate_size.as_deref(), 40)
+        .unwrap_or_else(|| "~305 MB".to_string());
+    let location = safe_storage_path(request.storage_path.as_deref())
+        .unwrap_or_else(|| "the Supertonic model cache".to_string());
+    Ok(NativeTtsResponse {
+        engine: request.engine,
+        characters: 0,
+        message: format!("Started downloading {model} ({size}) to {location}"),
+    })
+}
+
+#[tauri::command]
+pub(crate) fn stop_text_aloud(
+    state: State<'_, NativeTtsState>,
+) -> Result<NativeTtsResponse, String> {
     let mut children = state
         .children
         .lock()
@@ -128,7 +174,29 @@ pub(crate) fn stop_text_aloud(state: State<'_, NativeTtsState>) -> Result<Native
     Ok(NativeTtsResponse {
         engine: "native".to_string(),
         characters: 0,
-        message: format!("Stopped {count} native text-to-speech process{}", if count == 1 { "" } else { "es" }),
+        message: format!(
+            "Stopped {count} native text-to-speech process{}",
+            if count == 1 { "" } else { "es" }
+        ),
+    })
+}
+
+pub(crate) fn native_tts_model_download_command_for_request(
+    request: &NativeTtsModelDownloadRequest,
+) -> Result<NativeTtsCommand, String> {
+    if request.engine.trim() != "supertonic-cli" {
+        return Err(
+            "Only Supertonic currently has a downloadable TTS model in NEditor.".to_string(),
+        );
+    }
+    if request.acknowledged != Some(true) {
+        return Err("Review the Supertonic model name, download size, and storage location before starting the download.".to_string());
+    }
+    let command_path = safe_command_path(request.command_path.as_deref())?;
+    Ok(NativeTtsCommand {
+        program: command_path,
+        args: vec!["download".to_string()],
+        stdin_text: None,
     })
 }
 
@@ -170,16 +238,28 @@ fn macos_say_command(request: &NativeTtsRequest, text: &str) -> Result<NativeTts
     {
         let _ = request;
         let _ = text;
-        Err("macOS Say is only available on macOS. Use browser speech or Supertonic on this host.".to_string())
+        Err(
+            "macOS Say is only available on macOS. Use browser speech or Supertonic on this host."
+                .to_string(),
+        )
     }
 }
 
-fn supertonic_command(
-    request: &NativeTtsRequest,
-    text: &str,
-) -> Result<NativeTtsCommand, String> {
+fn supertonic_command(request: &NativeTtsRequest, text: &str) -> Result<NativeTtsCommand, String> {
+    if request.model_download_acknowledged != Some(true) {
+        let location = safe_storage_path(request.model_storage_path.as_deref())
+            .unwrap_or_else(|| "the Supertonic model cache".to_string());
+        return Err(format!(
+            "Supertonic may download the supertonic-3 model on first use. Review and acknowledge the ~305 MB model download and storage location ({location}) before reading aloud."
+        ));
+    }
     let command_path = safe_command_path(request.command_path.as_deref())?;
-    let mut args = vec!["say".to_string(), text.to_string(), "--model".to_string(), "supertonic-3".to_string()];
+    let mut args = vec![
+        "say".to_string(),
+        text.to_string(),
+        "--model".to_string(),
+        "supertonic-3".to_string(),
+    ];
     if let Some(voice) = safe_cli_value(request.voice.as_deref(), 80) {
         args.push("--voice".to_string());
         args.push(voice);
@@ -188,7 +268,10 @@ fn supertonic_command(
         args.push("--lang".to_string());
         args.push(language);
     }
-    if let Some(speed) = request.speed.filter(|value| value.is_finite() && (0.7..=2.0).contains(value)) {
+    if let Some(speed) = request
+        .speed
+        .filter(|value| value.is_finite() && (0.7..=2.0).contains(value))
+    {
         args.push("--speed".to_string());
         args.push(format!("{speed:.2}"));
     }
@@ -197,6 +280,20 @@ fn supertonic_command(
         args,
         stdin_text: None,
     })
+}
+
+fn safe_storage_path(value: Option<&str>) -> Option<String> {
+    let text = value?.trim();
+    if text.is_empty() || text.len() > 400 {
+        return None;
+    }
+    if text
+        .chars()
+        .any(|character| character == '\0' || character == '\n' || character == '\r')
+    {
+        return None;
+    }
+    Some(text.to_string())
 }
 
 fn safe_command_path(value: Option<&str>) -> Result<String, String> {
@@ -210,7 +307,9 @@ fn safe_command_path(value: Option<&str>) -> Result<String, String> {
     if path.contains(std::path::MAIN_SEPARATOR) {
         let candidate = PathBuf::from(path);
         if !candidate.exists() || !candidate.is_file() {
-            return Err(format!("Configured text-to-speech command is not an executable file: {path}"));
+            return Err(format!(
+                "Configured text-to-speech command is not an executable file: {path}"
+            ));
         }
     }
     Ok(path.to_string())
@@ -221,7 +320,8 @@ fn browser_speech_status() -> NativeTtsEngineStatus {
         id: "browser-speech".to_string(),
         label: "Browser or system speech".to_string(),
         available: true,
-        detail: "Checked in the web runtime before playback; no native command is required.".to_string(),
+        detail: "Checked in the web runtime before playback; no native command is required."
+            .to_string(),
         executable_path: None,
     }
 }
@@ -256,12 +356,17 @@ fn macos_say_status() -> NativeTtsEngineStatus {
 
 fn supertonic_status(command: Option<&str>) -> NativeTtsEngineStatus {
     let configured = command.unwrap_or("supertonic").trim();
-    if configured.is_empty() || configured.contains('\0') || configured.contains('\n') || configured.contains('\r') {
+    if configured.is_empty()
+        || configured.contains('\0')
+        || configured.contains('\n')
+        || configured.contains('\r')
+    {
         return NativeTtsEngineStatus {
             id: "supertonic-cli".to_string(),
             label: "Supertonic CLI".to_string(),
             available: false,
-            detail: "Configure a valid Supertonic command path before using Supertonic.".to_string(),
+            detail: "Configure a valid Supertonic command path before using Supertonic."
+                .to_string(),
             executable_path: None,
         };
     }
@@ -273,7 +378,10 @@ fn supertonic_status(command: Option<&str>) -> NativeTtsEngineStatus {
         detail: executable_path
             .as_ref()
             .map(|path| format!("Found Supertonic command at {path}."))
-            .unwrap_or_else(|| "Supertonic command was not found. Install the CLI or configure its full path.".to_string()),
+            .unwrap_or_else(|| {
+                "Supertonic command was not found. Install the CLI or configure its full path."
+                    .to_string()
+            }),
         executable_path,
     }
 }
@@ -319,7 +427,11 @@ fn executable_candidates(dir: &Path, command: &str) -> Vec<PathBuf> {
             })
             .unwrap_or_else(|| vec![".exe".to_string(), ".cmd".to_string(), ".bat".to_string()]);
         let mut candidates = vec![dir.join(command)];
-        candidates.extend(pathext.into_iter().map(|ext| dir.join(format!("{command}{ext}"))));
+        candidates.extend(
+            pathext
+                .into_iter()
+                .map(|ext| dir.join(format!("{command}{ext}"))),
+        );
         candidates
     }
 

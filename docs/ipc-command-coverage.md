@@ -44,6 +44,7 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `run_external_transform` | `src-tauri/src/transforms/external.rs` | `external_transform_tests::external_transform_adapters_shape_engine_specific_invocations`; `external_transform_tests::external_transform_cache_invalidates_when_trusted_executable_changes` |
 | `cleanup_ai_paste` | `src-tauri/src/ai_cleanup.rs` | `ai_cleanup_tests::ai_cleanup_normalizes_chat_artifacts`; `ai_cleanup_tests::ai_cleanup_converts_rich_html_clipboard_content`; `ai_cleanup_tests::ai_cleanup_normalizes_ai_code_fence_variants` |
 | `inspect_native_tts` | `src-tauri/src/tts.rs` | `tts_tests::tts_inspection_reports_browser_and_configured_native_engines_without_launching` |
+| `download_tts_model` | `src-tauri/src/tts.rs` | `tts_tests::tts_model_download_command_requires_explicit_acknowledgement` |
 | `read_text_aloud` | `src-tauri/src/tts.rs` | `tts_tests::tts_command_builders_use_argument_safe_native_engines`; `tts_tests::macos_say_reads_text_via_stdin_instead_of_shell_interpolation` on macOS |
 | `stop_text_aloud` | `src-tauri/src/tts.rs` | `tts_tests::tts_command_builders_use_argument_safe_native_engines`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `write_desktop_ui_smoke_report` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates the guarded native UI smoke report when `NEDITOR_DESKTOP_UI_SMOKE_REPORT` is set |

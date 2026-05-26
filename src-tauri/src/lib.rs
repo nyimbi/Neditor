@@ -101,9 +101,11 @@ use tauri::{
 #[cfg(test)]
 use transforms::external::ExternalTransformRequest;
 use transforms::external::{list_transform_engines, run_external_transform};
-use tts::{inspect_native_tts, read_text_aloud, stop_text_aloud, NativeTtsState};
 #[cfg(test)]
 use transforms::renderer::supported_transform;
+use tts::{
+    download_tts_model, inspect_native_tts, read_text_aloud, stop_text_aloud, NativeTtsState,
+};
 pub(crate) use utils::{
     escape_css, escape_html, escape_pdf, escape_xml, format_value, metadata_lookup,
     metadata_string, metadata_string_list, path_to_string, render_export_template, sha256_hex,
@@ -168,6 +170,7 @@ pub fn run() {
             run_external_transform,
             cleanup_ai_paste,
             inspect_native_tts,
+            download_tts_model,
             read_text_aloud,
             stop_text_aloud,
             write_desktop_ui_smoke_report,
