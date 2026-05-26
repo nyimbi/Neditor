@@ -2376,6 +2376,14 @@
                 </dd>
               </div>
               <div>
+                <dt>Evidence reports</dt>
+                <dd>
+                  {{ supportBundleReport.evidenceReportSummary?.ready || 0 }} ready,
+                  {{ supportBundleReport.evidenceReportSummary?.attention || 0 }} attention,
+                  {{ supportBundleReport.evidenceReportSummary?.missing || 0 }} missing
+                </dd>
+              </div>
+              <div>
                 <dt>Output</dt>
                 <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
               </div>
@@ -5149,6 +5157,14 @@ type SupportBundleReport = {
       invalidExternalEvidence?: number;
     };
     engines?: unknown[];
+  };
+  evidenceReports?: unknown[];
+  evidenceReportSummary?: {
+    ready?: number;
+    attention?: number;
+    missing?: number;
+    failed?: number;
+    total?: number;
   };
   recommendations?: string[];
 };
@@ -14785,9 +14801,10 @@ async function createSupportBundleFromSettings(writeToFile: boolean) {
     const specOpenRows = report.specCompletion?.summary?.openRows || 0;
     const engineStatus = report.engineProbe?.status || "unknown";
     const missingEngines = report.engineProbe?.summary?.missingLocal || 0;
+    const evidenceAttention = (report.evidenceReportSummary?.attention || 0) + (report.evidenceReportSummary?.missing || 0);
     supportBundleStatus.value = report.writtenTo
       ? `Wrote support bundle to ${report.writtenTo}`
-      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${specOpenRows} open spec rows, engines ${engineStatus} (${missingEngines} missing)`;
+      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${specOpenRows} open spec rows, engines ${engineStatus} (${missingEngines} missing), ${evidenceAttention} evidence reports need attention`;
   } catch (error) {
     supportBundleReport.value = null;
     supportBundleStatus.value = error instanceof Error ? error.message : String(error);

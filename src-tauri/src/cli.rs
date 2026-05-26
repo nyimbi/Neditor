@@ -90,6 +90,7 @@ pub(crate) struct SupportBundleRequest {
     pub(crate) readiness_report: Option<String>,
     pub(crate) spec_report: Option<String>,
     pub(crate) engine_report: Option<String>,
+    pub(crate) evidence_root: Option<String>,
     pub(crate) output: Option<String>,
 }
 
@@ -212,6 +213,11 @@ pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Val
         .filter(|value| !value.trim().is_empty())
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(".tmp/external-engines/probe-report.json"));
+    let evidence_root_path = request
+        .evidence_root
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(".tmp"));
     let output_path = request
         .output
         .filter(|value| !value.trim().is_empty())
@@ -221,6 +227,7 @@ pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Val
         &readiness_report_path,
         &spec_report_path,
         &engine_report_path,
+        &evidence_root_path,
         output_path.as_deref(),
     )?;
     Ok(report)
@@ -956,6 +963,7 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut readiness_report_path = PathBuf::from(".tmp/release-readiness/report.json");
     let mut spec_report_path = PathBuf::from(".tmp/spec-completion/report.json");
     let mut engine_report_path = PathBuf::from(".tmp/external-engines/probe-report.json");
+    let mut evidence_root_path = PathBuf::from(".tmp");
     let mut output_path: Option<PathBuf> = None;
     let mut index = 0;
     while index < args.len() {
@@ -989,6 +997,13 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
                         "--engine-report requires a JSON report path".to_string()
                     })?);
             }
+            "--evidence-root" => {
+                index += 1;
+                evidence_root_path = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--evidence-root requires a directory path".to_string())?,
+                );
+            }
             "--output" | "-o" => {
                 index += 1;
                 output_path =
@@ -1006,6 +1021,7 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
         &readiness_report_path,
         &spec_report_path,
         &engine_report_path,
+        &evidence_root_path,
         output_path.as_deref(),
     )?;
 
@@ -1409,6 +1425,7 @@ fn build_support_bundle_report(
     readiness_report_path: &Path,
     spec_report_path: &Path,
     engine_report_path: &Path,
+    evidence_root_path: &Path,
     output_path: Option<&Path>,
 ) -> Result<(Value, Option<String>), String> {
     let doctor_args = vec![
@@ -1466,8 +1483,15 @@ fn build_support_bundle_report(
             "engines": []
         })
     });
-    let recommendations =
-        support_bundle_recommendations(&doctor, &readiness, &spec_completion, &engine_probe);
+    let evidence_reports = support_bundle_evidence_reports(evidence_root_path);
+    let evidence_report_summary = support_bundle_evidence_report_summary(&evidence_reports);
+    let recommendations = support_bundle_recommendations(
+        &doctor,
+        &readiness,
+        &spec_completion,
+        &engine_probe,
+        &evidence_report_summary,
+    );
     let mut report = json!({
         "schema": "neditor.ned-support-bundle.v1",
         "generatedAtUnixSeconds": unix_timestamp_seconds(),
@@ -1505,6 +1529,8 @@ fn build_support_bundle_report(
             "summary": engine_probe.get("summary").cloned().unwrap_or_else(|| json!({})),
             "engines": support_bundle_engine_rows(&engine_probe, 20),
         },
+        "evidenceReports": evidence_reports,
+        "evidenceReportSummary": evidence_report_summary,
         "recommendations": recommendations,
     });
 
@@ -1527,6 +1553,7 @@ fn support_bundle_recommendations(
     readiness: &Value,
     spec_completion: &Value,
     engine_probe: &Value,
+    evidence_report_summary: &Value,
 ) -> Vec<String> {
     let mut recommendations = Vec::new();
     if readiness_string_field(doctor, "status").unwrap_or("unknown") != "ready" {
@@ -1568,6 +1595,13 @@ fn support_bundle_recommendations(
             "Review transform engine setup: {missing_engines} missing, {incompatible_engines} incompatible, {invalid_engine_evidence} invalid external evidence item(s)."
         ));
     }
+    let evidence_attention = number_field_u64(evidence_report_summary, "attention")
+        + number_field_u64(evidence_report_summary, "missing");
+    if evidence_attention > 0 {
+        recommendations.push(format!(
+            "Collect or refresh {evidence_attention} release evidence report(s) before production publishing."
+        ));
+    }
     if recommendations.is_empty() {
         recommendations
             .push("Support bundle is ready for installation or release review.".to_string());
@@ -1594,6 +1628,10 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
     let installed_engines = summary_count_u64(engine_probe, "installed");
     let missing_engines = summary_count_u64(engine_probe, "missingLocal");
     let incompatible_engines = summary_count_u64(engine_probe, "incompatible");
+    let evidence_report_summary = report.get("evidenceReportSummary").unwrap_or(&Value::Null);
+    let evidence_ready = number_field_u64(evidence_report_summary, "ready");
+    let evidence_attention = number_field_u64(evidence_report_summary, "attention");
+    let evidence_missing = number_field_u64(evidence_report_summary, "missing");
     let evidence_gaps = readiness_array_field(readiness, "evidenceGaps").len();
     let failures = readiness_array_field(readiness, "failures").len();
     let recommendations = readiness_array_field(report, "recommendations")
@@ -1614,6 +1652,9 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
         format!("Spec completion: {spec_status} ({open_spec_rows} open rows)"),
         format!(
             "Transform engines: {engine_status} ({installed_engines} installed, {missing_engines} missing, {incompatible_engines} incompatible)"
+        ),
+        format!(
+            "Evidence reports: {evidence_ready} ready, {evidence_attention} need attention, {evidence_missing} missing"
         ),
         "Privacy: no document content or secrets included".to_string(),
     ];
@@ -1687,6 +1728,138 @@ fn support_bundle_engine_rows(report: &Value, limit: usize) -> Vec<Value> {
         .collect()
 }
 
+fn support_bundle_evidence_reports(evidence_root: &Path) -> Vec<Value> {
+    [
+        (
+            "platform-evidence",
+            "Windows/Linux platform evidence",
+            "platform-evidence/report.json",
+        ),
+        (
+            "release-signing",
+            "Release signing and notarization",
+            "release-signing/report.json",
+        ),
+        (
+            "google-docs-import",
+            "Google Docs import/readback",
+            "google-docs-import/report.json",
+        ),
+        (
+            "homebrew-packaging",
+            "Homebrew packaging",
+            "homebrew/homebrew-packaging-report.json",
+        ),
+        (
+            "ai-provider-endpoint",
+            "AI provider endpoint",
+            "ai-provider-evidence/report.json",
+        ),
+        (
+            "ai-runtime-device",
+            "AI runtime device",
+            "ai-runtime-evidence/report.json",
+        ),
+        (
+            "performance-profile",
+            "Release-device performance profile",
+            "performance-profile/report.json",
+        ),
+        (
+            "security-review",
+            "Independent security review",
+            "security-review/report.json",
+        ),
+        (
+            "rendered-export-visual-signoff",
+            "Rendered export native-viewer signoff",
+            "rendered-export-audit/visual-review-summary.json",
+        ),
+        (
+            "accessibility-manual-signoff",
+            "Accessibility assistive-technology signoff",
+            "accessibility/manual-review-summary.json",
+        ),
+    ]
+    .into_iter()
+    .map(|(id, label, relative_path)| {
+        let path = evidence_root.join(relative_path);
+        match read_json_report(&path) {
+            Ok(report) => {
+                let summary = report.get("summary").cloned().unwrap_or_else(|| json!({}));
+                let status = readiness_string_field(&report, "status")
+                    .or_else(|| readiness_string_field(&report, "result"))
+                    .or_else(|| readiness_string_field(&summary, "status"))
+                    .unwrap_or("present");
+                json!({
+                    "id": id,
+                    "label": label,
+                    "reportPath": path_to_display(&path),
+                    "status": status,
+                    "bucket": support_bundle_evidence_bucket(status),
+                    "generatedAt": readiness_string_field(&report, "generatedAt"),
+                    "summary": summary,
+                })
+            }
+            Err(error) => json!({
+                "id": id,
+                "label": label,
+                "reportPath": path_to_display(&path),
+                "status": "missing",
+                "bucket": "missing",
+                "error": error,
+                "summary": {},
+            }),
+        }
+    })
+    .collect()
+}
+
+fn support_bundle_evidence_report_summary(reports: &[Value]) -> Value {
+    let mut ready = 0_u64;
+    let mut attention = 0_u64;
+    let mut missing = 0_u64;
+    let mut failed = 0_u64;
+    for report in reports {
+        match readiness_string_field(report, "bucket").unwrap_or("attention") {
+            "ready" => ready += 1,
+            "missing" => missing += 1,
+            "failed" => failed += 1,
+            _ => attention += 1,
+        }
+    }
+    json!({
+        "total": reports.len(),
+        "ready": ready,
+        "attention": attention,
+        "missing": missing,
+        "failed": failed,
+    })
+}
+
+fn support_bundle_evidence_bucket(status: &str) -> &'static str {
+    let normalized = status.to_ascii_lowercase();
+    if normalized.contains("failed")
+        || normalized.contains("invalid")
+        || normalized.contains("incomplete")
+    {
+        return "failed";
+    }
+    if normalized == "missing" {
+        return "missing";
+    }
+    if normalized.starts_with("pending") || normalized.contains("blocker") {
+        return "attention";
+    }
+    if matches!(
+        normalized.as_str(),
+        "accepted" | "complete" | "passed" | "human-reviewed" | "automated-reviewed"
+    ) {
+        return "ready";
+    }
+    "attention"
+}
+
 fn readiness_summary_count(report: &Value, field: &str) -> usize {
     report
         .get("summary")
@@ -1733,6 +1906,10 @@ fn summary_count_u64(report: &Value, field: &str) -> u64 {
         .and_then(|summary| summary.get(field))
         .and_then(Value::as_u64)
         .unwrap_or(0)
+}
+
+fn number_field_u64(value: &Value, field: &str) -> u64 {
+    value.get(field).and_then(Value::as_u64).unwrap_or(0)
 }
 
 fn doctor_warnings(
@@ -2118,7 +2295,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --strict --report" -- "$cur") )
         ;;
       support|support-bundle)
-        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --engine-report --output" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --engine-report --evidence-root --output" -- "$cur") )
         ;;
       doctor)
         COMPREPLY=( $(compgen -W "--json --strict --workspace" -- "$cur") )
@@ -2192,7 +2369,7 @@ _ned() {{
       _arguments '--json[print machine-readable JSON]' '--strict[fail when release gaps remain]' '--report[read a specific release-readiness report]:file:_files'
       ;;
     support|support-bundle)
-      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--engine-report[attach a specific transform engine probe report]:file:_files' '--output[write support bundle JSON]:file:_files'
+      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--engine-report[attach a specific transform engine probe report]:file:_files' '--evidence-root[attach standard release evidence reports from a .tmp-style root]:directory:_files -/' '--output[write support bundle JSON]:file:_files'
       ;;
     completions|completion)
       _arguments '1:shell:($shells)'
@@ -2283,6 +2460,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l spec-report -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l engine-report -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l evidence-root -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l output -s o -r"
             .to_string(),
@@ -2611,7 +2790,7 @@ fn help_text() -> String {
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json]"
             .to_string(),
-        "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--engine-report path] [--output support.json]"
+        "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--engine-report path] [--evidence-root .tmp] [--output support.json]"
             .to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),
         "  ned doctor [--json] [--strict] [--workspace path]".to_string(),

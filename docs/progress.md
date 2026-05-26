@@ -3855,6 +3855,26 @@ Support bundle transform-engine summary:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle transform-engine implementation. |
 | `git diff --check` | Pass | No whitespace errors are present in the support-bundle transform-engine diff. |
 
+Support bundle release-evidence report summary:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed after adding `--evidence-root` and `evidence_root` request support to `ned support-bundle` and `create_support_bundle`, including fixture coverage for ready, attention, and missing evidence-report buckets plus text output and shell completions. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --json` | Pass | Direct smoke returned `evidenceReports` and `evidenceReportSummary` for platform, signing, Google Docs, Homebrew, AI provider, AI runtime, performance profile, security review, rendered-export sign-off, and accessibility sign-off reports without including document bodies or secrets. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --output /private/tmp/neditor-evidence-support-bundle-smoke.json` | Pass | Direct text smoke reported 15 release evidence gaps, `Evidence reports: 0 ready, 10 need attention, 0 missing`, and the recommendation to collect or refresh 10 release evidence reports. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | IPC coverage ledger remains synchronized after documenting the release evidence report summary in the `create_support_bundle` contract. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "creates support bundle handoff from settings"` | Pass | Focused Chromium smoke verified Settings support-bundle preview now displays release evidence report readiness next to release, spec, and transform-engine health. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after adding release evidence report summary UI and static wiring checks. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed for support-bundle release evidence report typing and rendering. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 65 tests after refreshing the shared browser workflow report for release-readiness acceptance. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting release evidence report summaries in support bundles. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while this slice improves support and release evidence visibility. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after extending support bundles with release evidence report summaries. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after extending support bundles with release evidence report summaries. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` with 15 evidence gaps and zero failed checks. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the support-bundle release evidence report implementation. |
+| `git diff --check` | Pass | No whitespace errors are present in the support-bundle release evidence report diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

@@ -387,6 +387,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     let report_path = root.join("readiness.json");
     let spec_path = root.join("spec-completion.json");
     let engine_path = root.join("engine-probe.json");
+    let evidence_root = root.join("evidence");
     let output_path = root.join("support").join("bundle.json");
     let readiness = serde_json::json!({
         "generatedAt": "2026-05-26T12:20:00.000Z",
@@ -473,6 +474,38 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         serde_json::to_string_pretty(&engine_probe).expect("engine json"),
     )
     .expect("write engine fixture");
+    fs::create_dir_all(evidence_root.join("platform-evidence")).expect("create platform evidence");
+    fs::create_dir_all(evidence_root.join("release-signing")).expect("create signing evidence");
+    fs::write(
+        evidence_root.join("platform-evidence").join("report.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "generatedAt": "2026-05-26T12:35:00.000Z",
+            "status": "accepted",
+            "summary": {
+                "requiredPlatforms": 2,
+                "completePlatforms": 2,
+                "missingEvidence": 0,
+                "invalidEvidence": 0
+            }
+        }))
+        .expect("platform evidence json"),
+    )
+    .expect("write platform evidence fixture");
+    fs::write(
+        evidence_root.join("release-signing").join("report.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "generatedAt": "2026-05-26T12:36:00.000Z",
+            "status": "pending-release-credentials",
+            "summary": {
+                "requiredPlatforms": 3,
+                "completePlatforms": 0,
+                "missingEvidence": 3,
+                "invalidEvidence": 0
+            }
+        }))
+        .expect("signing evidence json"),
+    )
+    .expect("write signing evidence fixture");
 
     let json = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -485,6 +518,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         spec_path.to_string_lossy().to_string(),
         "--engine-report".to_string(),
         engine_path.to_string_lossy().to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
         "--json".to_string(),
     ])
     .expect("support json");
@@ -512,6 +547,11 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         bundle["engineProbe"]["engines"][0]["smoke"]["status"],
         "passed"
     );
+    assert_eq!(bundle["evidenceReportSummary"]["ready"], 1);
+    assert_eq!(bundle["evidenceReportSummary"]["attention"], 1);
+    assert_eq!(bundle["evidenceReportSummary"]["missing"], 8);
+    assert_eq!(bundle["evidenceReports"][0]["id"], "platform-evidence");
+    assert_eq!(bundle["evidenceReports"][0]["bucket"], "ready");
     assert!(bundle["recommendations"]
         .as_array()
         .expect("recommendations")
@@ -531,6 +571,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         spec_path.to_string_lossy().to_string(),
         "--engine-report".to_string(),
         engine_path.to_string_lossy().to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
         "--output".to_string(),
         output_path.to_string_lossy().to_string(),
     ])
@@ -543,6 +585,9 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert!(text
         .message
         .contains("Transform engines: complete (3 installed, 0 missing, 0 incompatible)"));
+    assert!(text
+        .message
+        .contains("Evidence reports: 1 ready, 1 need attention, 8 missing"));
     assert!(text.message.contains("Wrote support bundle"));
     assert!(output_path.is_file());
     let written: serde_json::Value =
@@ -562,6 +607,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         readiness_report: Some(report_path.to_string_lossy().to_string()),
         spec_report: Some(spec_path.to_string_lossy().to_string()),
         engine_report: Some(engine_path.to_string_lossy().to_string()),
+        evidence_root: Some(evidence_root.to_string_lossy().to_string()),
         output: Some(ipc_output_path.to_string_lossy().to_string()),
     })
     .expect("ipc support bundle");
@@ -647,6 +693,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--readiness-report"));
     assert!(zsh.message.contains("--spec-report"));
     assert!(zsh.message.contains("--engine-report"));
+    assert!(zsh.message.contains("--evidence-root"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

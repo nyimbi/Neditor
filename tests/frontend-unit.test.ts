@@ -3844,6 +3844,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Spec rows"));
   ok(app.includes("engineProbe"));
   ok(app.includes("Engines"));
+  ok(app.includes("evidenceReportSummary"));
+  ok(app.includes("Evidence reports"));
   ok(app.includes("ned doctor"));
   ok(app.includes("Make NEditor the default Markdown reader"));
   ok(app.includes("Help: Docs Live"));

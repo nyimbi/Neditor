@@ -131,11 +131,12 @@ verification suite and summarizes accepted checks, failed checks, external
 evidence gaps, and next commands; use `--json` for packaging dashboards and
 `--strict` when any remaining release gap should produce a non-zero exit code.
 `ned support-bundle` combines `ned doctor`, release-readiness,
-spec-completion, and transform-engine probe summaries into a redaction-safe JSON
-handoff for help desks and release managers. It includes setup status, command
-paths, report paths, evidence-gap summaries, open specification rows, installed
-or missing transform-engine status, and recommendations, but not document
-content or secrets. `ned completions bash`,
+spec-completion, transform-engine probe summaries, and standard release evidence
+report statuses into a redaction-safe JSON handoff for help desks and release
+managers. It includes setup status, command paths, report paths, evidence-gap
+summaries, open specification rows, installed or missing transform-engine
+status, AI/runtime/security/performance/sign-off evidence report status, and
+recommendations, but not document content or secrets. `ned completions bash`,
 `ned completions zsh`, and `ned completions fish` print shell completion
 scripts so support teams can make the command easier to discover after
 installation. `ned doctor` prints a local installation and workspace setup
@@ -767,7 +768,8 @@ publication-ready with no failed checks or evidence gaps.
 `ned support-bundle --output support.json` packages the local setup diagnostics,
 release-readiness summary, spec-completion summary, and transform-engine probe
 summary into one supportable JSON file without including document content or
-secrets.
+secrets. Pass `--evidence-root .tmp` explicitly when the standard release
+evidence reports have been copied into a non-default evidence directory.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
