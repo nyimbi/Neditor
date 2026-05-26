@@ -84,7 +84,8 @@ Recent pushed checkpoints visible in current git history:
   `<<: *defaults` merge maps for repeated `name`, `type`, or `kind` values,
   and expanded data-source rows can start with `- <<: *defaults` before
   overriding fields such as `path` or `name`. Custom tags on compact
-  data-source objects are ignored for inventory purposes.
+  data-source objects, inline lists, and alias lists are ignored for inventory
+  purposes.
 - The same front-matter manager now resolves simple scalar anchors and aliases
   and surfaces folded/literal block scalars as usable document-variable values,
   so repeated owners/reviewers and short multiline summaries can be inserted
@@ -3331,7 +3332,7 @@ Front matter manager YAML edge cases:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm exec tsc -p tsconfig.test.json` | Pass | Test TypeScript compilation passed after hardening `src/lib/frontMatterManagers.ts`. |
-| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Focused frontend unit coverage passed for CRLF front matter, quote-aware YAML comments, comma-containing inline lists, compact inline `dataSources` block objects plus top-level object/list declarations, scalar aliases and inline/block-map `<<: *defaults` inside compact data-source objects, expanded `dataSources` rows beginning with `- <<: *defaults`, custom tags on compact data-source objects, `yml` alias normalization, URL/Windows/parent traversal path blocking, safe filenames containing `..`, scalar anchors/aliases, and folded/literal block scalar variables. |
+| `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Focused frontend unit coverage passed for CRLF front matter, quote-aware YAML comments, comma-containing inline lists, compact inline `dataSources` block objects plus top-level object/list declarations, scalar aliases and inline/block-map `<<: *defaults` inside compact data-source objects, expanded `dataSources` rows beginning with `- <<: *defaults`, custom tags on compact data-source objects, inline lists, and alias lists, `yml` alias normalization, URL/Windows/parent traversal path blocking, safe filenames containing `..`, scalar anchors/aliases, and folded/literal block scalar variables. |
 | `pnpm run check` | Pass | Vue typecheck passed after the front-matter parser hardening. |
 | `pnpm run check:docs` | Pass | 14 Markdown files were checked after documenting front-matter manager edge-case coverage; all local links resolved. |
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the front-matter addendum evidence. |

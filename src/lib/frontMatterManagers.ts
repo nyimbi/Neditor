@@ -119,16 +119,16 @@ export function parseFrontMatterDataSources(text: string): FrontMatterDataSource
           rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
         }
       }
-      if (section === "dataSources" && topLevel[2].trim().startsWith("[")) {
-        for (const item of splitInlineYamlList(topLevel[2])) {
+      if (section === "dataSources" && parsedTopLevel.value.startsWith("[")) {
+        for (const item of splitInlineYamlList(parsedTopLevel.value)) {
           const inlineRow: Partial<FrontMatterDataSourceRow> = { source: section, line: index + 1 };
           if (applyInlineDataSourceObject(inlineRow, item, anchors, mapAnchors)) {
             rows.push(normalizeFrontMatterDataSource(inlineRow, rows.length));
           }
         }
       }
-      if (aliasKind && topLevel[2].trim().startsWith("[")) {
-        for (const item of splitInlineYamlList(topLevel[2])) {
+      if (aliasKind && parsedTopLevel.value.startsWith("[")) {
+        for (const item of splitInlineYamlList(parsedTopLevel.value)) {
           const path = cleanYamlScalar(item);
           if (path) {
             rows.push(normalizeFrontMatterDataSource({ path, kind: aliasKind, source: section, line: index + 1 }, rows.length));

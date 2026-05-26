@@ -429,8 +429,10 @@ test("front matter managers inventory data sources and document variables", () =
     "  - path: ../outside.json",
     "    type: json",
     "dataSources: [{name: Compact YAML, path: data/compact.yml, type: yml}, {<<: *sourceDefaults, title: Profile JSON, file: data/profile-compact.json, kind: json}]",
+    "dataSources: !sources [{name: Tagged List, path: data/tagged-list.json, type: json}]",
     "dataSources: !source {name: Single Compact, path: data/single.csv, type: csv}",
     "csvFiles: [data/customers.csv]",
+    "csvFiles: !files [data/tagged-customers.csv]",
     "jsonFiles:",
     "  - data/profile.json",
     "owner: Strategy",
@@ -455,8 +457,10 @@ test("front matter managers inventory data sources and document variables", () =
     ["Outside", "../outside.json", "json", "blocked-path", "dataSources"],
     ["Compact YAML", "data/compact.yml", "yaml", "ready", "dataSources"],
     ["Profile JSON", "data/profile-compact.json", "json", "ready", "dataSources"],
+    ["Tagged List", "data/tagged-list.json", "json", "ready", "dataSources"],
     ["Single Compact", "data/single.csv", "csv", "ready", "dataSources"],
     ["Customers", "data/customers.csv", "csv", "ready", "csvFiles"],
+    ["Tagged Customers", "data/tagged-customers.csv", "csv", "ready", "csvFiles"],
     ["Profile", "data/profile.json", "json", "ready", "jsonFiles"],
   ]);
 
