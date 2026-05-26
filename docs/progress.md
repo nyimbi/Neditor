@@ -96,9 +96,10 @@ Recent pushed checkpoints visible in current git history:
   aliases plus direct single-file scalar declarations. Anchored source maps with
   nested lists remain map defaults instead of being misclassified as
   source-list aliases, and aliased block-list source rows can start with
-  `<<: *defaults` merge defaults. Dotted/namespaced anchor names such as
-  `&source.defaults` and `*source.path.default` now resolve in data-source
-  defaults and scalar source paths.
+  `<<: *defaults` merge defaults. Dotted, slash, and URI-style namespaced
+  anchor names such as `&source.defaults`, `&business/client.defaults`, and
+  `*urn:source/path.default` now resolve in data-source defaults and scalar
+  source paths.
 - The same front-matter manager now resolves simple and namespaced scalar
   anchors and aliases and surfaces folded/literal block scalars as usable
   document-variable values, so repeated owners/reviewers and short multiline
@@ -110,8 +111,9 @@ Recent pushed checkpoints visible in current git history:
   owner, reviewer, budget, or region variables while explicit values still win.
   Nested scalar defaults such as `address.city` and `delivery.timezone` also
   flow through simple merges as dotted variable names, and anchored maps,
-  including dotted/namespaced anchors such as `&client.defaults`, can inherit
-  other anchored maps before being reused by a client or partner block.
+  including dotted or slash-namespaced anchors such as `&client.defaults` and
+  `&business/client.defaults`, can inherit other anchored maps before being
+  reused by a client or partner block.
 - Simple inline YAML maps now expand into dotted document variables as well.
   Compact business front matter such as `client: {name: Acme, tier:
   Enterprise}` and anchored defaults such as `defaults: &clientDefaults

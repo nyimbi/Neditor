@@ -52,7 +52,7 @@ const metadataVariableExcludedKeys = new Set([
   "app_version",
 ]);
 
-const yamlAnchorNamePattern = "[A-Za-z0-9_.-]+";
+const yamlAnchorNamePattern = "[A-Za-z0-9_.:/@-]+";
 const yamlAliasScalarRegex = new RegExp(`^\\*(${yamlAnchorNamePattern})$`);
 const yamlAnchorPrefixRegex = new RegExp(`^&(${yamlAnchorNamePattern})(?:\\s+|$)(.*)$`);
 
