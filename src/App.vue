@@ -2738,10 +2738,18 @@
                     <dt>Storage location</dt>
                     <dd>{{ ttsModelDownloadPlan.storagePath }}</dd>
                   </div>
+                  <div>
+                    <dt>Download source</dt>
+                    <dd>{{ ttsModelDownloadPlan.source }}</dd>
+                  </div>
+                  <div>
+                    <dt>Command</dt>
+                    <dd>{{ ttsModelDownloadPlan.command }}</dd>
+                  </div>
                 </dl>
                 <label class="tts-model-consent">
                   <input v-model="store.ttsPreferences.supertonicModelDownloadAcknowledged" type="checkbox" @change="saveTtsModelDownloadAcknowledgement" />
-                  Allow Supertonic model download for {{ ttsModelDownloadPlan.model }}.
+                  I understand Supertonic may download {{ ttsModelDownloadPlan.model }} ({{ ttsModelDownloadPlan.approximateSize }}) to {{ ttsModelDownloadPlan.storagePath }} before first use.
                 </label>
                 <div class="reference-actions">
                   <button type="button" :disabled="!ttsModelDownloadPlan.acknowledged || ttsModelDownloadBusy" @click="downloadSelectedTtsModel">
@@ -9309,8 +9317,12 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Read selected text aloud", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "macos say", "voice"], run: () => readSelectionAloud() },
   { name: "Read document aloud", group: "Writing Tools", keywords: ["tts", "speech", "full document", "supertonic", "macos say"], run: () => readDocumentAloud() },
   { name: "Check text to speech runtime", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "macos say", "setup"], run: () => checkTtsRuntime() },
-  { name: "Download selected TTS model", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "model", "download"], run: () => downloadSelectedTtsModel() },
-  { name: "Copy TTS model download details", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "model", "storage"], run: () => copyTtsModelDownloadCommand() },
+  ...(ttsModelDownloadPlan.value
+    ? [
+        { name: "Download selected TTS model", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "model", "download"], run: () => downloadSelectedTtsModel() },
+        { name: "Copy TTS model download details", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "model", "storage"], run: () => copyTtsModelDownloadCommand() },
+      ]
+    : []),
   { name: "Stop reading aloud", group: "Writing Tools", keywords: ["tts", "speech", "stop"], run: () => stopReadingAloud() },
   {
     name: "Open configuration setup wizard",

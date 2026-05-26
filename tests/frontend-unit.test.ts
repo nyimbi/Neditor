@@ -3786,8 +3786,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ttsModelDownloadPlan"));
   ok(app.includes('aria-label="TTS model download notice"'));
   ok(app.includes('aria-label="TTS model download setup"'));
+  ok(app.includes("Download source"));
+  ok(app.includes("ttsModelDownloadPlan.command"));
   ok(app.includes("supertonicModelDownloadAcknowledged"));
   ok(app.includes("supertonicModelStoragePath"));
+  ok(app.includes("...(ttsModelDownloadPlan.value"));
   ok(app.includes("Download selected TTS model"));
   ok(app.includes("Copy TTS model download details"));
   ok(app.includes('aria-label="Text to speech runtime report"'));
