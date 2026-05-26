@@ -21,6 +21,7 @@ import {
   migratePersistedWorkspace,
   normalizeAgentRunHistory,
   normalizeAiCleanupDefaults,
+  normalizeAiProviderDefaults,
   normalizeBibliographyDefaults,
   normalizeBrandProfileDefaults,
   normalizeCitationStyle,
@@ -29,17 +30,20 @@ import {
   normalizeExportProfiles,
   normalizeGitIntegrationPreferences,
   normalizePersistedWorkspaceForSave,
+  normalizeTtsPreferences,
   type DocsLiveDraftHistoryItem,
   type EditorKeymapMode,
   type ExportDefaults,
   type ExportProfile,
   type ExportTarget,
   type AgentRunHistoryItem,
+  type AiProviderDefaults,
   type PersistedScrollPosition,
   type PersistedWorkspace,
   type PreviewTheme,
   type SnapshotStorage,
   type ToolbarDisplay,
+  type TtsPreferences,
 } from "../lib/workspacePersistence";
 import type {
   AiCleanupResponse,
@@ -360,6 +364,8 @@ export const useDocumentsStore = defineStore("documents", {
     bibliographyDefaults: normalizeBibliographyDefaults({}),
     brandProfileDefaults: normalizeBrandProfileDefaults({}),
     businessProfile: normalizeBusinessProfile({}) as BusinessProfile,
+    aiProviderDefaults: normalizeAiProviderDefaults({}) as AiProviderDefaults,
+    ttsPreferences: normalizeTtsPreferences({}) as TtsPreferences,
     exportProfiles: [] as ExportProfile[],
     activeExportProfileId: "",
     gitIntegration: normalizeGitIntegrationPreferences({}),
@@ -496,6 +502,8 @@ export const useDocumentsStore = defineStore("documents", {
             : "";
         if (persisted.gitIntegration) this.gitIntegration = normalizeGitIntegrationPreferences(persisted.gitIntegration);
         if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
+        this.aiProviderDefaults = normalizeAiProviderDefaults(persisted.aiProviderDefaults);
+        this.ttsPreferences = normalizeTtsPreferences(persisted.ttsPreferences);
         this.agentRunHistory = normalizeAgentRunHistory(persisted.agentRunHistory);
         this.docsLiveDraftHistory = normalizeDocsLiveDraftHistory(persisted.docsLiveDraftHistory);
         this.guidedDemoCompletedStepIds = persisted.guidedDemoCompletedStepIds || [];
@@ -561,6 +569,8 @@ export const useDocumentsStore = defineStore("documents", {
         bibliographyDefaults: this.bibliographyDefaults,
         brandProfileDefaults: this.brandProfileDefaults,
         businessProfile: this.businessProfile,
+        aiProviderDefaults: this.aiProviderDefaults,
+        ttsPreferences: this.ttsPreferences,
         exportProfiles: this.exportProfiles,
         activeExportProfileId: this.activeExportProfileId,
         gitIntegration: this.gitIntegration,
@@ -632,6 +642,14 @@ export const useDocumentsStore = defineStore("documents", {
     },
     saveBusinessProfile(profile: Partial<BusinessProfile>) {
       this.businessProfile = normalizeBusinessProfile(profile);
+      void this.persistWorkspace();
+    },
+    saveAiProviderDefaults(defaults: Partial<AiProviderDefaults>) {
+      this.aiProviderDefaults = normalizeAiProviderDefaults(defaults);
+      void this.persistWorkspace();
+    },
+    saveTtsPreferences(defaults: Partial<TtsPreferences>) {
+      this.ttsPreferences = normalizeTtsPreferences(defaults);
       void this.persistWorkspace();
     },
     recordGuidedDemoStepComplete(stepId: string) {

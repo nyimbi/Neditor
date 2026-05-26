@@ -85,6 +85,7 @@ uses it.
 | Start from an AI-first document brief | Use **AI Create** to open Docs Live with an intent-first workflow for document type, outline, context, placeholders, QA, humanization, and review handoff. |
 | Start a proposal, RFP, RFQ, tender, or tutorial | Open **Templates**, set up **Business info**, then use the **Document creation wizard** to insert a fillable template, open Docs Live, or prepare a Claude Code, Codex, or OpenCode handoff package. The Agent Workspace can also write a governed local-agent handoff file under `.neditor/agent-handoffs` and verify whether the selected CLI is available on `PATH`. |
 | Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, run **Check AI runtime** when you want proof that voice and clipboard capabilities are available, dictate the intent, add placeholder values, generate an outline-aware questionnaire if helpful, answer it in the dialog, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
+| Listen to a draft or selected passage | Use **Read Sel.** or **Read Doc** in the Writing toolbar, or configure **Read aloud** in Settings for browser speech, macOS Say, or Supertonic CLI. |
 | Reuse a company format | Save your name, email, company, address, website, industry, client, and brand voice in **Business info**, then insert reusable document parts such as contact blocks, company overview, scope, pricing assumptions, compliance matrix, risk register, and review handoff. |
 | Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
 | Send a client-facing document | Export to PDF or DOCX, depending on what the recipient expects. |
@@ -336,6 +337,11 @@ web app.
   permission, and clipboard read/write support so business users can confirm
   that dictation and clipboard-assisted AI workflows are usable on the current
   machine without storing clipboard text.
+- **Read aloud** can speak the current editor selection or the full Markdown
+  document. Browser speech works inside the app runtime; native desktop builds
+  can use macOS Say; and teams that install Supertonic can point NEditor at the
+  `supertonic` CLI for local on-device TTS. These settings store provider
+  choices and command names, not audio recordings or document copies.
 - The Templates panel now includes a business identity setup dialog for your
   name, email, phone, role, company, address, website, industry, default client,
   and brand voice; common business-development document builders for tutorials,

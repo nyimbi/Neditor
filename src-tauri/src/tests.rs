@@ -164,3 +164,4 @@ mod export_command_tests;
 mod ai_cleanup_tests;
 mod file_command_tests;
 mod ipc_command_tests;
+mod tts_tests;

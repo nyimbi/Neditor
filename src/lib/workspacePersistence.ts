@@ -1,4 +1,5 @@
 import type { AiCleanupOptions } from "../types.js";
+import type { AiProviderProfileId } from "./aiProviderPackages.js";
 import { normalizeBusinessProfile, type BusinessProfile } from "./businessDocuments.js";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "./transformTemplates.js";
 
@@ -105,6 +106,42 @@ export interface GitIntegrationPreferences {
   enabled: boolean;
   warnOnDirtyExport: boolean;
 }
+
+export interface AiProviderDefaults {
+  profileId: AiProviderProfileId;
+  endpoint: string;
+  model: string;
+  keyEnv: string;
+}
+
+export type TtsEngineId = "browser-speech" | "macos-say" | "supertonic-cli";
+
+export interface TtsPreferences {
+  engine: TtsEngineId;
+  voice: string;
+  language: string;
+  rate: number;
+  supertonicCommand: string;
+  supertonicVoice: string;
+  supertonicLanguage: string;
+  supertonicSpeed: number;
+}
+
+const AI_PROVIDER_PROFILE_IDS = [
+  "manual-review",
+  "openai-compatible",
+  "anthropic-compatible",
+  "gemini-compatible",
+  "local-http",
+  "local-openai",
+  "private-openai",
+  "claude-code-cli",
+  "codex-cli",
+  "opencode-cli",
+  "google-antigravity-cli",
+] as const satisfies readonly AiProviderProfileId[];
+
+const TTS_ENGINE_IDS = ["browser-speech", "macos-say", "supertonic-cli"] as const;
 
 export type AgentLifecycleExecutionStatus = "queued" | "in-progress" | "needs-review" | "complete" | "blocked";
 
@@ -358,6 +395,8 @@ export interface PersistedWorkspace {
   bibliographyDefaults?: Partial<BibliographyDefaults>;
   brandProfileDefaults?: Partial<BrandProfileDefaults>;
   businessProfile?: Partial<BusinessProfile>;
+  aiProviderDefaults?: Partial<AiProviderDefaults>;
+  ttsPreferences?: Partial<TtsPreferences>;
   exportProfiles?: Partial<ExportProfile>[];
   activeExportProfileId?: string;
   gitIntegration?: Partial<GitIntegrationPreferences>;
@@ -397,6 +436,10 @@ function booleanValue(value: unknown) {
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function stringArray(value: unknown, limit: number) {
@@ -575,6 +618,34 @@ export function normalizeGitIntegrationPreferences(defaults: Partial<GitIntegrat
   };
 }
 
+export function normalizeAiProviderDefaults(defaults: unknown): AiProviderDefaults {
+  const record = isRecord(defaults) ? defaults : {};
+  const profileId = enumValue(record.profileId, AI_PROVIDER_PROFILE_IDS) || "manual-review";
+  return {
+    profileId,
+    endpoint: normalizedString(record.endpoint, 300),
+    model: normalizedString(record.model, 160) || "human-approved-provider",
+    keyEnv: normalizeEnvName(record.keyEnv) || "NEDITOR_AI_API_KEY",
+  };
+}
+
+export function normalizeTtsPreferences(defaults: unknown): TtsPreferences {
+  const record = isRecord(defaults) ? defaults : {};
+  const engine = enumValue(record.engine, TTS_ENGINE_IDS) || "browser-speech";
+  const rate = numberValue(record.rate);
+  const supertonicSpeed = numberValue(record.supertonicSpeed);
+  return {
+    engine,
+    voice: normalizedString(record.voice, 120),
+    language: normalizedString(record.language, 24) || "en-US",
+    rate: rate === undefined ? 1 : clampNumber(rate, 0.5, 2),
+    supertonicCommand: normalizedString(record.supertonicCommand, 300) || "supertonic",
+    supertonicVoice: normalizedString(record.supertonicVoice, 80) || "M1",
+    supertonicLanguage: normalizedString(record.supertonicLanguage, 24) || "en",
+    supertonicSpeed: supertonicSpeed === undefined ? 1 : clampNumber(supertonicSpeed, 0.7, 2),
+  };
+}
+
 export function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>): AiCleanupOptions {
   return {
     addProvenance: typeof defaults.addProvenance === "boolean" ? defaults.addProvenance : true,
@@ -584,6 +655,11 @@ export function normalizeAiCleanupDefaults(defaults: Partial<AiCleanupOptions>):
     convertNumberedLists: typeof defaults.convertNumberedLists === "boolean" ? defaults.convertNumberedLists : true,
     convertTables: typeof defaults.convertTables === "boolean" ? defaults.convertTables : true,
   };
+}
+
+function normalizeEnvName(value: unknown) {
+  const name = normalizedString(value, 80).replace(/[^A-Z0-9_]/gi, "_").toUpperCase();
+  return /^[A-Z_][A-Z0-9_]*$/.test(name) ? name : "";
 }
 
 function normalizeAgentLifecycleTaskStates(value: unknown): AgentLifecycleTaskState[] {
@@ -1097,6 +1173,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (isRecord(raw.bibliographyDefaults)) migrated.bibliographyDefaults = normalizeBibliographyDefaults(raw.bibliographyDefaults);
   if (isRecord(raw.brandProfileDefaults)) migrated.brandProfileDefaults = normalizeBrandProfileDefaults(raw.brandProfileDefaults);
   migrated.businessProfile = normalizeBusinessProfile(raw.businessProfile);
+  migrated.aiProviderDefaults = normalizeAiProviderDefaults(raw.aiProviderDefaults);
+  migrated.ttsPreferences = normalizeTtsPreferences(raw.ttsPreferences);
   const exportProfiles = normalizeExportProfiles(raw.exportProfiles);
   if (exportProfiles.length) {
     migrated.exportProfiles = exportProfiles;

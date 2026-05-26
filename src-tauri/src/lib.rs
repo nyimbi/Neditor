@@ -44,6 +44,7 @@ mod source_mapping;
 mod table_cells;
 mod tables;
 mod transforms;
+mod tts;
 mod utils;
 mod validation;
 mod variables;
@@ -100,6 +101,7 @@ use tauri::{
 #[cfg(test)]
 use transforms::external::ExternalTransformRequest;
 use transforms::external::{list_transform_engines, run_external_transform};
+use tts::{read_text_aloud, stop_text_aloud, NativeTtsState};
 #[cfg(test)]
 use transforms::renderer::supported_transform;
 pub(crate) use utils::{
@@ -122,6 +124,7 @@ pub fn run() {
             }
         })
         .manage(FileWatcherState::default())
+        .manage(NativeTtsState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -164,6 +167,8 @@ pub fn run() {
             run_transform,
             run_external_transform,
             cleanup_ai_paste,
+            read_text_aloud,
+            stop_text_aloud,
             write_desktop_ui_smoke_report,
             desktop_workflow_smoke_enabled,
             desktop_workflow_smoke_autorun_enabled,
@@ -353,6 +358,18 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             "Transform Templates",
         )?)
         .item(&document_wizards_menu)
+        .separator()
+        .item(&menu_item(
+            app,
+            "neditor-read-selection-aloud",
+            "Read Selection Aloud",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-read-document-aloud",
+            "Read Document Aloud",
+        )?)
+        .item(&menu_item(app, "neditor-stop-reading", "Stop Reading")?)
         .separator()
         .item(&menu_item(app, "neditor-open-docs-live", "Docs Live")?)
         .item(&menu_item(

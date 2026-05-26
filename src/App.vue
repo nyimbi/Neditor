@@ -1946,6 +1946,27 @@
 
         <template v-else>
           <h2>Settings</h2>
+          <section class="configuration-setup-card" aria-label="NEditor configuration setup wizard">
+            <header>
+              <div>
+                <strong>Setup wizard</strong>
+                <span>{{ configurationSetupSummary }}</span>
+              </div>
+              <button type="button" @click="openConfigurationSetup()">Open setup</button>
+            </header>
+            <div class="configuration-status-grid">
+              <button
+                v-for="item in configurationSetupStatus.items"
+                :key="item.id"
+                type="button"
+                :class="['configuration-status-chip', item.done ? 'ready' : 'needs-work']"
+                @click="openConfigurationSetup(item.id)"
+              >
+                <strong>{{ item.label }}</strong>
+                <small>{{ item.detail }}</small>
+              </button>
+            </div>
+          </section>
           <label>
             Theme
             <select v-model="store.theme">
@@ -2092,6 +2113,86 @@
           <label><input v-model="store.gitIntegration.enabled" type="checkbox" /> Enable Git status</label>
           <label><input v-model="store.gitIntegration.warnOnDirtyExport" type="checkbox" /> Warn on dirty export</label>
           <h3>AI paste cleanup defaults</h3>
+          <section class="agent-provider-panel" aria-label="LLM access defaults">
+            <header>
+              <div>
+                <strong>LLM access defaults</strong>
+                <span>Saved defaults do not store API keys; use environment variables or session-only keys.</span>
+              </div>
+              <button type="button" @click="saveAgentProviderDefaults">Save defaults</button>
+            </header>
+            <section class="agent-provider-grid">
+              <label>
+                Provider profile
+                <select v-model="agentProviderId" @change="syncAgentProviderProfile">
+                  <option v-for="profile in aiProviderProfiles" :key="profile.id" :value="profile.id">
+                    {{ profile.label }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                Model
+                <input v-model="agentProviderModel" placeholder="Approved model or deployment name" />
+              </label>
+              <label>
+                Endpoint
+                <input v-model="agentProviderEndpoint" placeholder="https://provider.example/v1/messages" />
+              </label>
+              <label>
+                API key environment variable
+                <input v-model="agentProviderKeyEnv" placeholder="OPENAI_API_KEY or NEDITOR_AI_API_KEY" />
+              </label>
+            </section>
+            <div class="agent-cli-list" aria-label="Configured local agent options">
+              <span v-for="profile in localAgentCliProfiles" :key="profile.id">
+                {{ profile.label }}
+                <code>{{ profile.command }}</code>
+              </span>
+            </div>
+          </section>
+          <section class="agent-provider-panel" aria-label="Text to speech setup">
+            <header>
+              <div>
+                <strong>Read aloud</strong>
+                <span>Read selected text or the full Markdown document with browser speech, macOS Say, or Supertonic.</span>
+              </div>
+              <button type="button" @click="store.saveTtsPreferences(store.ttsPreferences)">Save TTS</button>
+            </header>
+            <section class="agent-provider-grid">
+              <label>
+                TTS engine
+                <select v-model="store.ttsPreferences.engine">
+                  <option v-for="option in ttsEngineOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
+                </select>
+              </label>
+              <label>
+                Voice
+                <input v-model="store.ttsPreferences.voice" placeholder="Browser voice, macOS voice, or Supertonic voice" />
+              </label>
+              <label>
+                Language
+                <input v-model="store.ttsPreferences.language" placeholder="en-US" />
+              </label>
+              <label>
+                Rate
+                <input v-model.number="store.ttsPreferences.rate" type="number" min="0.5" max="2" step="0.1" />
+              </label>
+              <label>
+                Supertonic command
+                <input v-model="store.ttsPreferences.supertonicCommand" placeholder="supertonic or /path/to/supertonic" />
+              </label>
+              <label>
+                Supertonic voice
+                <input v-model="store.ttsPreferences.supertonicVoice" placeholder="F1, M1, or approved voice" />
+              </label>
+            </section>
+            <div class="reference-actions">
+              <button type="button" :disabled="ttsBusy" @click="readSelectionAloud">Read selection</button>
+              <button type="button" :disabled="ttsBusy" @click="readDocumentAloud">Read document</button>
+              <button type="button" @click="stopReadingAloud">Stop</button>
+            </div>
+            <p class="sidebar-hint">{{ ttsStatus || ttsSetupSummary }}</p>
+          </section>
           <label><input v-model="store.aiCleanupDefaults.markAsDraft" type="checkbox" /> Mark as draft</label>
           <label><input v-model="store.aiCleanupDefaults.addProvenance" type="checkbox" /> Add provenance block</label>
           <label><input v-model="store.aiCleanupDefaults.preserveHeadings" type="checkbox" /> Preserve original headings</label>
@@ -2412,6 +2513,137 @@
             {{ aiPreviewBusy ? "Cleaning" : "Preview cleanup" }}
           </button>
           <button type="submit" :disabled="aiPreviewBusy || !aiPasteText.trim()">Insert cleaned</button>
+        </footer>
+      </form>
+    </section>
+
+    <section
+      v-if="configurationSetupOpen"
+      ref="configurationSetupDialog"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="NEditor configuration setup"
+      tabindex="-1"
+      @keydown="handleModalKeydown('configuration-setup', $event)"
+    >
+      <form class="modal configuration-setup-modal" @submit.prevent="runConfigurationSetupStep(currentConfigurationSetupStep.id)">
+        <header>
+          <h2>Configuration Setup</h2>
+          <button type="button" aria-label="Close configuration setup" @click="closeConfigurationSetup">x</button>
+        </header>
+        <section class="configuration-setup-layout">
+          <nav class="configuration-setup-nav" aria-label="Setup areas">
+            <button
+              v-for="step in configurationSetupSteps"
+              :key="step.id"
+              type="button"
+              :class="{ active: currentConfigurationSetupStep.id === step.id }"
+              @click="configurationSetupStepId = step.id"
+            >
+              <strong>{{ step.title }}</strong>
+              <small>{{ step.summary }}</small>
+            </button>
+          </nav>
+          <section class="configuration-setup-detail" aria-label="Selected setup area">
+            <header>
+              <div>
+                <strong>{{ currentConfigurationSetupStep.title }}</strong>
+                <span>{{ currentConfigurationSetupStep.summary }}</span>
+              </div>
+              <small>{{ configurationSetupSummary }}</small>
+            </header>
+            <section class="configuration-status-grid" aria-label="Setup readiness checklist">
+              <article
+                v-for="item in configurationSetupStatus.items"
+                :key="item.id"
+                :class="['configuration-status-chip', item.done ? 'ready' : 'needs-work']"
+              >
+                <strong>{{ item.label }}</strong>
+                <small>{{ item.detail }}</small>
+              </article>
+            </section>
+            <section v-if="currentConfigurationSetupStep.id === 'llm-access'" class="agent-provider-grid">
+              <label>
+                Provider profile
+                <select v-model="agentProviderId" data-initial-focus @change="syncAgentProviderProfile">
+                  <option v-for="profile in aiProviderProfiles" :key="profile.id" :value="profile.id">{{ profile.label }}</option>
+                </select>
+              </label>
+              <label>
+                Model
+                <input v-model="agentProviderModel" />
+              </label>
+              <label>
+                Endpoint
+                <input v-model="agentProviderEndpoint" />
+              </label>
+              <label>
+                Key environment variable
+                <input v-model="agentProviderKeyEnv" />
+              </label>
+              <p class="sidebar-hint">Session API keys are entered only when running a provider request and are never saved in workspace settings.</p>
+            </section>
+            <section v-else-if="currentConfigurationSetupStep.id === 'local-agents'" class="business-profile-preview">
+              <ul>
+                <li v-for="profile in localAgentCliProfiles" :key="profile.id">
+                  <strong>{{ profile.label }}</strong>
+                  <code>{{ profile.command }}</code>
+                  <span>{{ profile.workspaceHint }}</span>
+                </li>
+              </ul>
+            </section>
+            <section v-else-if="currentConfigurationSetupStep.id === 'voice-runtime'" class="docs-live-runtime">
+              <p v-if="!docsLiveRuntimeReport" class="sidebar-hint">Run the runtime check to verify speech recognition, microphone, and clipboard capabilities before voice drafting.</p>
+              <ul v-else>
+                <li>Speech: {{ docsLiveRuntimeReport.speechRecognition.state }} - {{ docsLiveRuntimeReport.speechRecognition.detail }}</li>
+                <li>Microphone: {{ docsLiveRuntimeReport.microphonePermission.state }} - {{ docsLiveRuntimeReport.microphonePermission.detail }}</li>
+                <li>Clipboard read: {{ docsLiveRuntimeReport.clipboardRead.state }} - {{ docsLiveRuntimeReport.clipboardRead.detail }}</li>
+                <li>Clipboard write: {{ docsLiveRuntimeReport.clipboardWrite.state }} - {{ docsLiveRuntimeReport.clipboardWrite.detail }}</li>
+              </ul>
+            </section>
+            <section v-else-if="currentConfigurationSetupStep.id === 'tts'" class="agent-provider-grid">
+              <label>
+                TTS engine
+                <select v-model="store.ttsPreferences.engine" data-initial-focus>
+                  <option v-for="option in ttsEngineOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
+                </select>
+              </label>
+              <label>
+                Voice
+                <input v-model="store.ttsPreferences.voice" />
+              </label>
+              <label>
+                Language
+                <input v-model="store.ttsPreferences.language" />
+              </label>
+              <label>
+                Rate
+                <input v-model.number="store.ttsPreferences.rate" type="number" min="0.5" max="2" step="0.1" />
+              </label>
+              <label>
+                Supertonic command
+                <input v-model="store.ttsPreferences.supertonicCommand" />
+              </label>
+              <label>
+                Supertonic voice
+                <input v-model="store.ttsPreferences.supertonicVoice" />
+              </label>
+              <p class="sidebar-hint">Selection reading uses the editor selection first. Full-document reading uses the active Markdown source and keeps the document text local for browser speech or native engines.</p>
+            </section>
+            <section v-else class="business-profile-preview">
+              <p>{{ currentConfigurationSetupStep.summary }}</p>
+              <ul>
+                <li v-for="item in configurationSetupStatus.items.filter((candidate) => candidate.id === currentConfigurationSetupStep.id)" :key="item.id">
+                  {{ item.label }}: {{ item.detail }}
+                </li>
+              </ul>
+            </section>
+          </section>
+        </section>
+        <footer>
+          <button type="button" @click="closeConfigurationSetup">Close</button>
+          <button type="submit">{{ currentConfigurationSetupStep.actionLabel }}</button>
         </footer>
       </form>
     </section>
@@ -4279,6 +4511,8 @@ import {
   formatAiProviderSourcePack,
   isLocalAgentCliProfile,
   localAgentCliProfileById,
+  localAgentCliProfiles,
+  providerProfileById,
   type AiProviderExecutionResult,
   type AiProviderProfileId,
   type AiProviderRequestPackage,
@@ -4524,6 +4758,11 @@ type LocalAgentHandoffResponse = {
   instructions: string[];
   warnings: string[];
 };
+type NativeTtsResponse = {
+  engine: string;
+  characters: number;
+  message: string;
+};
 
 declare global {
   interface Window {
@@ -4560,6 +4799,7 @@ const businessProfileDialog = ref<HTMLElement | null>(null);
 const equationEditorDialog = ref<HTMLElement | null>(null);
 const agentWorkspaceDialog = ref<HTMLElement | null>(null);
 const guidedDemoDialog = ref<HTMLElement | null>(null);
+const configurationSetupDialog = ref<HTMLElement | null>(null);
 const commandPaletteDialog = ref<HTMLElement | null>(null);
 const conflictDialog = ref<HTMLElement | null>(null);
 let editorView: EditorView | null = null;
@@ -4616,11 +4856,11 @@ const agentRun = ref<AgenticWorkflowRun | null>(null);
 const agentLifecycleTaskStates = ref<Record<string, AgentLifecycleTaskState>>({});
 const agentEditAcceptanceStates = ref<Record<string, AgentEditAcceptanceState>>({});
 const agentAutomationTaskStates = ref<Record<string, AgentAutomationTaskState>>({});
-const defaultAgentProviderProfile = aiProviderProfiles[0];
-const agentProviderId = ref<AiProviderProfileId>("manual-review");
-const agentProviderEndpoint = ref(defaultAgentProviderProfile.endpoint);
-const agentProviderModel = ref(defaultAgentProviderProfile.model);
-const agentProviderKeyEnv = ref("NEDITOR_AI_API_KEY");
+const defaultAgentProviderProfile = providerProfileById(store.aiProviderDefaults.profileId);
+const agentProviderId = ref<AiProviderProfileId>(store.aiProviderDefaults.profileId);
+const agentProviderEndpoint = ref(store.aiProviderDefaults.endpoint || defaultAgentProviderProfile.endpoint);
+const agentProviderModel = ref(store.aiProviderDefaults.model || defaultAgentProviderProfile.model);
+const agentProviderKeyEnv = ref(store.aiProviderDefaults.keyEnv || "NEDITOR_AI_API_KEY");
 const agentProviderPackage = ref<AiProviderRequestPackage | null>(null);
 const agentProviderApiKey = ref("");
 const agentProviderBusy = ref(false);
@@ -4641,7 +4881,11 @@ const agentHistoryLaneFilter = ref<"all" | AgenticWorkflowLane>("all");
 const agentHistoryTargetFilter = ref<"all" | ExportTarget>("all");
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
+const configurationSetupOpen = ref(false);
+const configurationSetupStepId = ref<ConfigurationSetupStepId>("llm-access");
 const guidedDemoStepIndex = ref(0);
+const ttsBusy = ref(false);
+const ttsStatus = ref("");
 const docsLiveDocumentType = ref<DocsLiveDocumentType>("business-brief");
 const docsLiveTitle = ref("");
 const docsLiveOutlineText = ref("");
@@ -4942,6 +5186,7 @@ type ToolbarIconName =
   | "ai"
   | "agent"
   | "mic"
+  | "speak"
   | "settings"
   | "commands"
   | "bold"
@@ -5030,6 +5275,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   ai: ["M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z", "M5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8z"],
   agent: ["M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z", "M9 12h6", "M12 9v6"],
   mic: ["M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z", "M5 11a7 7 0 0 0 14 0", "M12 18v3", "M8 21h8"],
+  speak: ["M4 9h4l5-4v14l-5-4H4z", "M16 9a4 4 0 0 1 0 6", "M18.5 6.5a8 8 0 0 1 0 11"],
   settings: ["M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z", "M4 12h2", "M18 12h2", "M12 4v2", "M12 18v2", "M6.6 6.6l1.4 1.4", "M16 16l1.4 1.4", "M17.4 6.6 16 8", "M8 16l-1.4 1.4"],
   commands: ["M4 7h16", "M4 12h16", "M4 17h10", "M17 15l3 2-3 2"],
   bold: ["M8 5h5a3 3 0 0 1 0 6H8z", "M8 11h6a3 3 0 0 1 0 6H8z", "M8 5v12"],
@@ -6109,6 +6355,95 @@ const businessProfileCompletion = computed(() => {
   const completed = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
   return `${completed}/${businessProfileFields.length} fields`;
 });
+const ttsEngineOptions = [
+  { id: "browser-speech", label: "Browser or system speech" },
+  { id: "macos-say", label: "macOS Say" },
+  { id: "supertonic-cli", label: "Supertonic CLI" },
+] as const;
+const ttsSetupSummary = computed(() => {
+  const selected = ttsEngineOptions.find((option) => option.id === store.ttsPreferences.engine)?.label || "Browser or system speech";
+  return `${selected} | ${store.ttsPreferences.language} | ${store.ttsPreferences.rate.toFixed(1)}x`;
+});
+const configurationSetupSteps = [
+  {
+    id: "identity",
+    title: "Business identity",
+    summary: "Reusable name, company, address, website, tone, and client defaults for templates and generated drafts.",
+    actionLabel: "Set up identity",
+  },
+  {
+    id: "llm-access",
+    title: "LLM access",
+    summary: "Choose the approved provider profile, model, endpoint, and environment variable used for API requests.",
+    actionLabel: "Save LLM defaults",
+  },
+  {
+    id: "local-agents",
+    title: "Local agent tools",
+    summary: "Prepare governed handoffs for Claude Code, Codex, OpenCode, and Google Antigravity without storing secrets.",
+    actionLabel: "Open provider handoff",
+  },
+  {
+    id: "voice-runtime",
+    title: "Docs Live voice",
+    summary: "Check microphone, speech recognition, and clipboard readiness before voice-driven document creation.",
+    actionLabel: "Check runtime",
+  },
+  {
+    id: "tts",
+    title: "Read aloud",
+    summary: "Configure browser speech, macOS Say, or Supertonic for selected text and full-document reading.",
+    actionLabel: "Read selection",
+  },
+  {
+    id: "exports",
+    title: "Export defaults",
+    summary: "Set brand, bibliography, HTML, PDF, Office, publishing, Google Docs, LaTeX, EPUB, and evidence defaults.",
+    actionLabel: "Review exports",
+  },
+  {
+    id: "transforms",
+    title: "Transforms and templates",
+    summary: "Configure external engines, trusted paths, timeout, input modes, and reusable calculation templates.",
+    actionLabel: "Review engines",
+  },
+  {
+    id: "release",
+    title: "Distribution readiness",
+    summary: "Track Homebrew, platform packaging, signing, accessibility, performance, security, and release evidence gates.",
+    actionLabel: "Open release checks",
+  },
+] as const;
+type ConfigurationSetupStepId = (typeof configurationSetupSteps)[number]["id"];
+const currentConfigurationSetupStep = computed(
+  () => configurationSetupSteps.find((step) => step.id === configurationSetupStepId.value) || configurationSetupSteps[0],
+);
+const configurationSetupStatus = computed(() => {
+  const businessDone = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
+  const llmDone = Boolean(store.aiProviderDefaults.profileId && store.aiProviderDefaults.model && store.aiProviderDefaults.keyEnv);
+  const runtimeDone = Boolean(docsLiveRuntimeReport.value);
+  const exportDone = Boolean(store.exportDefaults.includeManifest && store.exportDefaults.layoutPreset && store.bibliographyDefaults.citationStyle);
+  const transformsDone = store.externalTransformEngines.length
+    ? store.externalTransformEngines.some((engine) => externalEngineSetupStatus(engine).status === "ready" || store.disabledTransformEngines[engine.name])
+    : true;
+  const releaseDone = false;
+  const items = [
+    { id: "identity", label: "Identity", done: businessDone >= Math.min(6, businessProfileFields.length), detail: businessProfileCompletion.value },
+    { id: "llm-access", label: "LLM defaults", done: llmDone, detail: store.aiProviderDefaults.profileId },
+    { id: "local-agents", label: "Local agents", done: localAgentCliProfiles.length >= 4, detail: `${localAgentCliProfiles.length} agent handoffs` },
+    { id: "voice-runtime", label: "Voice runtime", done: runtimeDone, detail: runtimeDone ? `${docsLiveRuntimeReport.value?.issues.length || 0} issues` : "not checked" },
+    { id: "tts", label: "Read aloud", done: Boolean(store.ttsPreferences.engine), detail: ttsSetupSummary.value },
+    { id: "exports", label: "Exports", done: exportDone, detail: store.exportTarget.toUpperCase() },
+    { id: "transforms", label: "Transforms", done: transformsDone, detail: `${store.externalTransformEngines.length} external engines` },
+    { id: "release", label: "Release gates", done: releaseDone, detail: "external evidence required" },
+  ];
+  return {
+    items,
+    complete: items.filter((item) => item.done).length,
+    total: items.length,
+  };
+});
+const configurationSetupSummary = computed(() => `${configurationSetupStatus.value.complete}/${configurationSetupStatus.value.total} setup areas ready`);
 const rfpAnalysisSummary = computed(() => {
   const analysis = rfpAnalysis.value;
   if (!analysis) return "No RFP analyzed yet";
@@ -6813,7 +7148,10 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     label: "Write",
     actions: [
       { id: "docs-live", label: "Docs Live", title: "Open voice-guided document drafting", icon: "mic", primary: true, run: () => openDocsLive() },
+      { id: "read-selection", label: "Read Sel.", title: "Read selected text aloud", icon: "speak", run: () => readSelectionAloud() },
+      { id: "read-document", label: "Read Doc", title: "Read the full document aloud", icon: "speak", run: () => readDocumentAloud() },
       { id: "biz-wizard", label: "Wizards", title: "Open the AI document creation wizard for common business, education, technical, and creative documents", icon: "ai", primary: true, run: () => openDocumentWizardHub() },
+      { id: "setup", label: "Setup", title: "Configure LLM access, local agents, voice, exports, transforms, and release gates", icon: "settings", run: () => openConfigurationSetup() },
       { id: "biz-identity", label: "Identity", title: "Set up reusable business identity values", icon: "settings", run: () => openBusinessProfile() },
       { id: "bold", label: "Bold", title: "Bold selection", icon: "bold", run: () => wrapSelection("**") },
       { id: "italic", label: "Italic", title: "Italic selection", icon: "italic", run: () => wrapSelection("*") },
@@ -7003,6 +7341,9 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "docs-live", label: "Docs Live", help: "Dictate and structure a draft with context and placeholders.", run: () => openDocsLive() },
           { id: "agent", label: "AI Agent Workspace", help: "Plan, revise, review, and distribute with governed agent workflows.", run: () => openAgentWorkspace() },
           { id: "ai-paste", label: "Clean AI Paste", help: "Clean pasted AI output and add provenance.", run: () => openAiPaste() },
+          { id: "read-selection", label: "Read Selection Aloud", help: "Read the selected editor text using the configured TTS engine.", run: () => readSelectionAloud() },
+          { id: "read-document", label: "Read Document Aloud", help: "Read the full active Markdown document using the configured TTS engine.", run: () => readDocumentAloud() },
+          { id: "stop-reading", label: "Stop Reading", help: "Stop browser speech and native TTS processes started by NEditor.", run: () => stopReadingAloud() },
           { id: "commands", label: "Command Palette", help: "Search every command or route a natural-language AI instruction.", run: () => (commandPaletteOpen.value = true) },
         ],
       },
@@ -7184,6 +7525,142 @@ function currentEditorSelectionText() {
   if (!selection || selection.empty) return "";
   return editorView?.state.sliceDoc(selection.from, selection.to) || "";
 }
+
+function textToReadAloud(scope: "selection" | "document") {
+  flushEditorTextToStore();
+  const selected = currentEditorSelectionText().trim();
+  if (scope === "selection") return selected;
+  return active.value.text.trim();
+}
+
+async function readSelectionAloud() {
+  await readTextAloud("selection");
+}
+
+async function readDocumentAloud() {
+  await readTextAloud("document");
+}
+
+async function readTextAloud(scope: "selection" | "document") {
+  const sourceText = textToReadAloud(scope);
+  if (!sourceText) {
+    ttsStatus.value = scope === "selection" ? "Select text in the editor before using Read selection." : "The active document is empty.";
+    store.statusMessage = ttsStatus.value;
+    return;
+  }
+  const text = readableSpeechText(sourceText);
+  store.saveTtsPreferences(store.ttsPreferences);
+  ttsBusy.value = true;
+  try {
+    if (store.ttsPreferences.engine === "browser-speech") {
+      speakWithBrowserSpeech(text);
+      ttsStatus.value = `Reading ${scope === "selection" ? "selection" : "document"} with browser speech (${text.length} characters)`;
+    } else {
+      const response = await invoke<NativeTtsResponse>("read_text_aloud", {
+        request: {
+          engine: store.ttsPreferences.engine,
+          text,
+          voice: nativeTtsVoice(),
+          language: nativeTtsLanguage(),
+          rate: Math.round(store.ttsPreferences.rate * 175),
+          command_path: store.ttsPreferences.engine === "supertonic-cli" ? store.ttsPreferences.supertonicCommand : undefined,
+          speed: store.ttsPreferences.engine === "supertonic-cli" ? store.ttsPreferences.supertonicSpeed : undefined,
+        },
+      });
+      ttsStatus.value = `${response.message} with ${ttsEngineOptions.find((option) => option.id === store.ttsPreferences.engine)?.label || response.engine}`;
+      ttsBusy.value = false;
+    }
+    store.statusMessage = ttsStatus.value;
+  } catch (error) {
+    ttsStatus.value = error instanceof Error ? error.message : String(error);
+    store.lastError = ttsStatus.value;
+    store.statusMessage = "Read aloud failed";
+    ttsBusy.value = false;
+  }
+}
+
+function nativeTtsVoice() {
+  if (store.ttsPreferences.engine === "supertonic-cli") return store.ttsPreferences.supertonicVoice || store.ttsPreferences.voice;
+  return store.ttsPreferences.voice;
+}
+
+function nativeTtsLanguage() {
+  if (store.ttsPreferences.engine === "supertonic-cli") return store.ttsPreferences.supertonicLanguage || store.ttsPreferences.language;
+  return store.ttsPreferences.language;
+}
+
+function readableSpeechText(text: string) {
+  return text
+    .replace(/^---[\s\S]*?---\s*/m, "")
+    .replace(/```[\s\S]*?```/g, " code block omitted. ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/[*_~>#-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function speakWithBrowserSpeech(text: string) {
+  const speech = typeof window !== "undefined" ? window.speechSynthesis : null;
+  if (!speech || typeof SpeechSynthesisUtterance === "undefined") {
+    throw new Error("Browser speech synthesis is unavailable in this runtime. Use macOS Say or Supertonic in Settings.");
+  }
+  speech.cancel();
+  const chunks = speechTextChunks(text);
+  let index = 0;
+  const speakNext = () => {
+    const chunk = chunks[index];
+    if (!chunk) {
+      ttsBusy.value = false;
+      ttsStatus.value = "Finished reading aloud";
+      store.statusMessage = ttsStatus.value;
+      return;
+    }
+    index += 1;
+    const utterance = new SpeechSynthesisUtterance(chunk);
+    utterance.lang = store.ttsPreferences.language;
+    utterance.rate = store.ttsPreferences.rate;
+    const voiceName = store.ttsPreferences.voice.trim().toLowerCase();
+    const voice = voiceName ? speech.getVoices().find((candidate) => candidate.name.toLowerCase() === voiceName) : null;
+    if (voice) utterance.voice = voice;
+    utterance.onend = speakNext;
+    utterance.onerror = () => {
+      ttsBusy.value = false;
+      ttsStatus.value = "Browser speech synthesis stopped before completion";
+      store.statusMessage = ttsStatus.value;
+    };
+    speech.speak(utterance);
+  };
+  speakNext();
+}
+
+function speechTextChunks(text: string, maxChars = 3200) {
+  const sentences = text.match(/[^.!?]+[.!?]+|\S[\s\S]*$/g) || [text];
+  const chunks: string[] = [];
+  let current = "";
+  for (const sentence of sentences) {
+    const next = [current, sentence.trim()].filter(Boolean).join(" ");
+    if (next.length > maxChars && current) {
+      chunks.push(current);
+      current = sentence.trim();
+    } else {
+      current = next;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [text];
+}
+
+async function stopReadingAloud() {
+  if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+  await invoke<NativeTtsResponse>("stop_text_aloud").catch(() => null);
+  ttsBusy.value = false;
+  ttsStatus.value = "Stopped reading aloud";
+  store.statusMessage = ttsStatus.value;
+}
+
 function openAgentWorkspace(seedInstruction = "") {
   if (seedInstruction.trim()) {
     agentInstruction.value = seedInstruction.trim();
@@ -7244,10 +7721,39 @@ function syncAgentProviderProfile() {
   const profile = aiProviderProfiles.find((item) => item.id === agentProviderId.value) || aiProviderProfiles[0];
   agentProviderEndpoint.value = profile.endpoint;
   agentProviderModel.value = profile.model;
+  agentProviderKeyEnv.value = aiProviderDefaultKeyEnv(profile.id);
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   localAgentHandoffResult.value = null;
   localAgentHandoffError.value = "";
+}
+
+function applyStoredAiProviderDefaults() {
+  const defaults = store.aiProviderDefaults;
+  const profile = providerProfileById(defaults.profileId);
+  agentProviderId.value = defaults.profileId;
+  agentProviderEndpoint.value = defaults.endpoint || profile.endpoint;
+  agentProviderModel.value = defaults.model || profile.model;
+  agentProviderKeyEnv.value = defaults.keyEnv || aiProviderDefaultKeyEnv(defaults.profileId);
+}
+
+function saveAgentProviderDefaults() {
+  store.saveAiProviderDefaults({
+    profileId: agentProviderId.value,
+    endpoint: agentProviderEndpoint.value,
+    model: agentProviderModel.value,
+    keyEnv: agentProviderKeyEnv.value,
+  });
+  agentProviderPackage.value = null;
+  agentProviderResult.value = null;
+  store.statusMessage = `Saved ${providerProfileById(agentProviderId.value).label} setup defaults without storing an API key`;
+}
+
+function aiProviderDefaultKeyEnv(profileId: AiProviderProfileId) {
+  if (profileId === "openai-compatible" || profileId === "codex-cli") return "OPENAI_API_KEY";
+  if (profileId === "anthropic-compatible" || profileId === "claude-code-cli") return "ANTHROPIC_API_KEY";
+  if (profileId === "gemini-compatible" || profileId === "google-antigravity-cli") return "GOOGLE_API_KEY";
+  return "NEDITOR_AI_API_KEY";
 }
 function buildAgentWorkspacePlan() {
   flushEditorTextToStore();
@@ -8449,6 +8955,16 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
   { name: "Open AI agent workspace", group: "AI", run: () => openAgentWorkspace() },
+  { name: "Read selected text aloud", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "macos say", "voice"], run: () => readSelectionAloud() },
+  { name: "Read document aloud", group: "Writing Tools", keywords: ["tts", "speech", "full document", "supertonic", "macos say"], run: () => readDocumentAloud() },
+  { name: "Stop reading aloud", group: "Writing Tools", keywords: ["tts", "speech", "stop"], run: () => stopReadingAloud() },
+  {
+    name: "Open configuration setup wizard",
+    group: "Settings",
+    description: "Configure business identity, LLM access, local agents, voice runtime, exports, transforms, and release gates.",
+    keywords: ["setup", "configuration", "llm", "openai", "claude code", "codex", "google antigravity", "opencode", "api key"],
+    run: () => openConfigurationSetup(),
+  },
   { name: "AI: Create document", group: "AI", run: () => startAiDocumentCreation() },
   { name: "AI: Document creation wizard", group: "AI", run: () => openDocumentWizardHub() },
   { name: "AI: Compose from outline", group: "AI", run: () => openDocsLiveFromOutline() },
@@ -8734,7 +9250,7 @@ const commandAgentRouteSuggestions = computed<CommandAgentRouteSuggestion[]>(() 
       id: "provider",
       label: "Provider handoff",
       detail: "Open the Agent Workspace, generate a governed packet, and build a redacted provider request.",
-      rank: /\b(provider|model|openai|anthropic|gemini|local gateway|handoff|run ai)\b/.test(instruction) ? 0 : 4,
+      rank: /\b(provider|model|openai|anthropic|gemini|antigravity|local gateway|handoff|run ai)\b/.test(instruction) ? 0 : 4,
     },
   ];
   return candidates
@@ -8876,6 +9392,15 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-open-docs-live":
       openDocsLive();
       break;
+    case "neditor-read-selection-aloud":
+      await readSelectionAloud();
+      break;
+    case "neditor-read-document-aloud":
+      await readDocumentAloud();
+      break;
+    case "neditor-stop-reading":
+      await stopReadingAloud();
+      break;
     case "neditor-open-agent-workspace":
       openAgentWorkspace();
       break;
@@ -8979,10 +9504,12 @@ watch(aiPasteOpen, (open) => handleModalStateChange(open, aiPasteDialog));
 watch(agentWorkspaceOpen, (open) => handleModalStateChange(open, agentWorkspaceDialog));
 watch(docsLiveOpen, (open) => handleModalStateChange(open, docsLiveDialog));
 watch(businessProfileOpen, (open) => handleModalStateChange(open, businessProfileDialog));
+watch(configurationSetupOpen, (open) => handleModalStateChange(open, configurationSetupDialog));
 watch(equationEditorOpen, (open) => handleModalStateChange(open, equationEditorDialog));
 watch(guidedDemoOpen, (open) => handleModalStateChange(open, guidedDemoDialog));
 watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteDialog));
 watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
+watch(() => store.aiProviderDefaults, applyStoredAiProviderDefaults, { deep: true });
 
 watch(
   () => active.value.id,
@@ -12199,7 +12726,7 @@ function restoreModalFocus() {
   }
 }
 
-function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "equation-editor" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
+function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "configuration-setup" | "equation-editor" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.preventDefault();
     closeModal(kind);
@@ -12225,7 +12752,7 @@ function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" |
   }
 }
 
-function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "equation-editor" | "guided-demo" | "command-palette" | "conflict") {
+function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "configuration-setup" | "equation-editor" | "guided-demo" | "command-palette" | "conflict") {
   if (kind === "ai-paste") {
     closeAiPaste();
   } else if (kind === "agent-workspace") {
@@ -12234,6 +12761,8 @@ function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "busine
     closeDocsLive();
   } else if (kind === "business-profile") {
     closeBusinessProfile();
+  } else if (kind === "configuration-setup") {
+    closeConfigurationSetup();
   } else if (kind === "equation-editor") {
     closeEquationEditor();
   } else if (kind === "guided-demo") {
@@ -12413,6 +12942,52 @@ function insertTransformTemplate(template: TransformTemplate) {
 function openBusinessProfile() {
   businessProfileDraft.value = normalizeBusinessProfile(store.businessProfile);
   businessProfileOpen.value = true;
+}
+
+function openConfigurationSetup(stepId: string = "llm-access") {
+  if (configurationSetupSteps.some((step) => step.id === stepId)) {
+    configurationSetupStepId.value = stepId as ConfigurationSetupStepId;
+  }
+  configurationSetupOpen.value = true;
+  store.sidebar = "settings";
+}
+
+function closeConfigurationSetup() {
+  configurationSetupOpen.value = false;
+}
+
+async function runConfigurationSetupStep(stepId: ConfigurationSetupStepId) {
+  if (stepId === "identity") {
+    closeConfigurationSetup();
+    openBusinessProfile();
+  } else if (stepId === "llm-access") {
+    saveAgentProviderDefaults();
+  } else if (stepId === "local-agents") {
+    if (!isLocalAgentCliProfile(agentProviderId.value)) {
+      agentProviderId.value = "claude-code-cli";
+      syncAgentProviderProfile();
+    }
+    closeConfigurationSetup();
+    openAgentWorkspace("Prepare this document for governed local-agent handoff.");
+    buildAgentProviderPackage();
+  } else if (stepId === "voice-runtime") {
+    await checkDocsLiveRuntime();
+  } else if (stepId === "tts") {
+    store.saveTtsPreferences(store.ttsPreferences);
+    await readSelectionAloud();
+  } else if (stepId === "exports") {
+    closeConfigurationSetup();
+    store.sidebar = "exports";
+    await prepareForExport();
+  } else if (stepId === "transforms") {
+    closeConfigurationSetup();
+    store.sidebar = "settings";
+    await store.compileActive();
+  } else {
+    closeConfigurationSetup();
+    store.sidebar = "review";
+    store.statusMessage = "Review release readiness, Homebrew blockers, signing, accessibility, and evidence gates before distribution";
+  }
 }
 
 function closeBusinessProfile() {
@@ -14388,6 +14963,7 @@ function selectAgentProviderProfileForInstruction(instruction: string) {
   if (/\b(claude code)\b/.test(text)) providerId = "claude-code-cli";
   else if (/\b(codex cli|openai codex|codex)\b/.test(text)) providerId = "codex-cli";
   else if (/\b(opencode|open code)\b/.test(text)) providerId = "opencode-cli";
+  else if (/\b(google antigravity|antigravity)\b/.test(text)) providerId = "google-antigravity-cli";
   else if (/\b(gemini|google ai)\b/.test(text)) providerId = "gemini-compatible";
   else if (/\b(anthropic|claude)\b/.test(text)) providerId = "anthropic-compatible";
   else if (/\b(localhost|ollama|lm studio|local gateway|local model)\b/.test(text)) providerId = "local-openai";
@@ -17182,6 +17758,69 @@ select:hover {
   background: #fbfcf8;
 }
 
+.configuration-setup-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px;
+  border: 1px solid #c9d2dc;
+  border-left: 3px solid #2f6f78;
+  border-radius: 7px;
+  background: #f7fcfc;
+}
+
+.configuration-setup-card header,
+.configuration-setup-detail header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.configuration-setup-card header div,
+.configuration-setup-detail header div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.configuration-setup-card header span,
+.configuration-setup-detail header span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.configuration-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 6px;
+}
+
+.configuration-status-chip {
+  display: grid;
+  gap: 2px;
+  min-height: 52px;
+  padding: 7px 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+  text-align: left;
+}
+
+.configuration-status-chip.ready {
+  border-color: #9bbd9c;
+  background: #f4fbf4;
+}
+
+.configuration-status-chip.needs-work {
+  border-color: #d8c28a;
+  background: #fffaf0;
+}
+
+.configuration-status-chip small {
+  color: #526171;
+  font-size: 11px;
+}
+
 .business-template-hub header,
 .business-profile-preview header {
   display: grid;
@@ -17299,6 +17938,42 @@ select:hover {
 
 .business-profile-modal {
   max-width: 900px;
+}
+
+.configuration-setup-modal {
+  width: min(1080px, 100%);
+}
+
+.configuration-setup-layout {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.7fr) minmax(0, 1.6fr);
+  gap: 12px;
+}
+
+.configuration-setup-nav,
+.configuration-setup-detail {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.configuration-setup-nav button {
+  display: grid;
+  gap: 3px;
+  min-height: 58px;
+  padding: 8px;
+  text-align: left;
+}
+
+.configuration-setup-nav button.active {
+  border-color: #2f6f78;
+  background: #eefafa;
+}
+
+.configuration-setup-nav small {
+  color: #526171;
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .equation-editor-modal {

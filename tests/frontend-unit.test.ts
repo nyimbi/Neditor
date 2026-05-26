@@ -119,8 +119,10 @@ import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../src
 import {
   migratePersistedWorkspace,
   normalizeAgentRunHistory,
+  normalizeAiProviderDefaults,
   normalizeCitationStyle,
   normalizeDocsLiveDraftHistory,
+  normalizeTtsPreferences,
   WORKSPACE_SCHEMA_VERSION,
 } from "../src/lib/workspacePersistence.js";
 import { nextVimWordStart, previousVimWordStart, vimMotionRange, vimWordEnd } from "../src/lib/vimKeybindings.js";
@@ -2394,7 +2396,7 @@ test("AI provider packages redact secrets and preserve agent governance context"
     ok(JSON.stringify(localPackage.requestBody).includes(localPackage.profile.model));
   }
 
-  for (const profileId of ["claude-code-cli", "codex-cli", "opencode-cli"] as const) {
+  for (const profileId of ["claude-code-cli", "codex-cli", "opencode-cli", "google-antigravity-cli"] as const) {
     const cliPackage = buildAiProviderRequestPackage(run, { profileId });
     equal(cliPackage.profile.endpoint, "");
     equal(cliPackage.profile.authHeader, "");
@@ -2403,8 +2405,68 @@ test("AI provider packages redact secrets and preserve agent governance context"
     ok(cliPackage.checklist.some((item) => item.includes("approved provider workspace")));
     ok(isLocalAgentCliProfile(profileId));
   }
-  equal(localAgentCliProfiles.length, 3);
+  equal(localAgentCliProfiles.length, 4);
+  ok(localAgentCliProfiles.some((profile) => profile.id === "google-antigravity-cli" && profile.command === "antigravity"));
+  ok(aiProviderProfiles.some((profile) => profile.id === "google-antigravity-cli" && profile.label.includes("Google Antigravity")));
   equal(isLocalAgentCliProfile("openai-compatible"), false);
+});
+
+test("AI provider defaults normalize non-secret setup preferences", () => {
+  deepEqual(
+    normalizeAiProviderDefaults({
+      profileId: "openai-compatible",
+      endpoint: " https://api.openai.com/v1/chat/completions ",
+      model: " gpt-4.1 ",
+      keyEnv: "openai api key",
+    }),
+    {
+      profileId: "openai-compatible",
+      endpoint: "https://api.openai.com/v1/chat/completions",
+      model: "gpt-4.1",
+      keyEnv: "OPENAI_API_KEY",
+    },
+  );
+  deepEqual(normalizeAiProviderDefaults({ profileId: "unknown", keyEnv: "1bad" }), {
+    profileId: "manual-review",
+    endpoint: "",
+    model: "human-approved-provider",
+    keyEnv: "NEDITOR_AI_API_KEY",
+  });
+});
+
+test("text-to-speech preferences normalize selected local engines", () => {
+  deepEqual(
+    normalizeTtsPreferences({
+      engine: "supertonic-cli",
+      voice: " Samantha ",
+      language: " en-US ",
+      rate: 9,
+      supertonicCommand: " /opt/homebrew/bin/supertonic ",
+      supertonicVoice: " F1 ",
+      supertonicLanguage: " en ",
+      supertonicSpeed: 0.1,
+    }),
+    {
+      engine: "supertonic-cli",
+      voice: "Samantha",
+      language: "en-US",
+      rate: 2,
+      supertonicCommand: "/opt/homebrew/bin/supertonic",
+      supertonicVoice: "F1",
+      supertonicLanguage: "en",
+      supertonicSpeed: 0.7,
+    },
+  );
+  deepEqual(normalizeTtsPreferences({ engine: "unknown", rate: 0.1, supertonicSpeed: 9 }), {
+    engine: "browser-speech",
+    voice: "",
+    language: "en-US",
+    rate: 0.5,
+    supertonicCommand: "supertonic",
+    supertonicVoice: "M1",
+    supertonicLanguage: "en",
+    supertonicSpeed: 2,
+  });
 });
 
 test("AI provider execution extracts Markdown without persisting secrets", async () => {
@@ -2555,6 +2617,22 @@ test("workspace persistence migration versions and normalizes saved settings", (
       },
     ],
     gitIntegration: { enabled: false },
+    aiProviderDefaults: {
+      profileId: "openai-compatible",
+      endpoint: " https://api.openai.com/v1/chat/completions ",
+      model: " gpt-4.1 ",
+      keyEnv: "openai api key",
+    },
+    ttsPreferences: {
+      engine: "supertonic-cli",
+      voice: " Samantha ",
+      language: " en-US ",
+      rate: 1.25,
+      supertonicCommand: " supertonic ",
+      supertonicVoice: " F1 ",
+      supertonicLanguage: " en ",
+      supertonicSpeed: 1.1,
+    },
     aiCleanupDefaults: { preserveHeadings: true, convertTables: false },
     agentRunHistory: [
       {
@@ -2873,6 +2951,22 @@ test("workspace persistence migration versions and normalizes saved settings", (
   });
   equal(migrated.exportProfiles?.[1]?.name, "Export profile 2");
   deepEqual(migrated.gitIntegration, { enabled: false, warnOnDirtyExport: true });
+  deepEqual(migrated.aiProviderDefaults, {
+    profileId: "openai-compatible",
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    model: "gpt-4.1",
+    keyEnv: "OPENAI_API_KEY",
+  });
+  deepEqual(migrated.ttsPreferences, {
+    engine: "supertonic-cli",
+    voice: "Samantha",
+    language: "en-US",
+    rate: 1.25,
+    supertonicCommand: "supertonic",
+    supertonicVoice: "F1",
+    supertonicLanguage: "en",
+    supertonicSpeed: 1.1,
+  });
   deepEqual(migrated.aiCleanupDefaults, {
     addProvenance: true,
     markAsDraft: true,
@@ -3651,6 +3745,26 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="AI provider response"'));
   ok(app.includes('aria-label="AI provider handoff"'));
   ok(app.includes("buildAiProviderRequestPackage"));
+  ok(app.includes('aria-label="NEditor configuration setup wizard"'));
+  ok(app.includes('aria-label="NEditor configuration setup"'));
+  ok(app.includes("configurationSetupSteps"));
+  ok(app.includes("configurationSetupStatus"));
+  ok(app.includes("LLM access defaults"));
+  ok(app.includes("Open configuration setup wizard"));
+  ok(app.includes("saveAgentProviderDefaults"));
+  ok(app.includes("aiProviderDefaultKeyEnv"));
+  ok(app.includes("OPENAI_API_KEY"));
+  ok(app.includes("NEDITOR_AI_API_KEY"));
+  ok(app.includes("Google Antigravity"));
+  ok(app.includes("google-antigravity-cli"));
+  ok(app.includes('aria-label="Text to speech setup"'));
+  ok(app.includes("ttsEngineOptions"));
+  ok(app.includes("Read selected text aloud"));
+  ok(app.includes("Read document aloud"));
+  ok(app.includes("read_text_aloud"));
+  ok(app.includes("stop_text_aloud"));
+  ok(app.includes("supertonic-cli"));
+  ok(app.includes("macos-say"));
   ok(app.includes("inspectAiRuntimeReadiness"));
   ok(app.includes("Check AI runtime"));
   ok(app.includes('aria-label="AI runtime readiness"'));
@@ -3808,6 +3922,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
   ok(tauriLib.includes('"neditor-export-epub", "EPUB Export"'));
   ok(tauriLib.includes('"neditor-open-docs-live", "Docs Live"'));
+  ok(tauriLib.includes('"neditor-read-selection-aloud",'));
+  ok(tauriLib.includes('"neditor-read-document-aloud",'));
+  ok(tauriLib.includes('"neditor-stop-reading",'));
+  ok(tauriLib.includes("read_text_aloud"));
+  ok(tauriLib.includes("stop_text_aloud"));
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
   ok(tauriLib.includes('"neditor-open-agent-workspace",'));
   ok(tauriLib.includes('"neditor-ai-create-document",'));

@@ -3618,6 +3618,18 @@ Homebrew distribution packaging gate:
 | `pnpm run check:release-readiness` | Pass | Release readiness aggregation returned `current-host-ready-with-external-gaps`, now including Homebrew blockers as explicit release risks rather than accepting an unsigned placeholder cask. |
 | `git diff --check` | Pass | No whitespace errors are present in packaging, docs, or scripts. |
 
+Configuration setup, LLM defaults, and read-aloud:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding the configuration setup wizard, persisted non-secret LLM defaults, Google Antigravity handoff routing, and TTS settings/actions. |
+| `pnpm run test:unit` | Pass | 74 frontend unit/static tests passed, including AI provider defaults, TTS preference normalization, setup wizard wiring, read-aloud controls, native menu wiring, and persisted migration coverage. |
+| `cargo test --locked tts --lib` | Pass | Rust TTS command-builder tests passed for Supertonic CLI argument shaping and macOS Say stdin-based speech input. |
+| `cargo test --locked ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | IPC registration and documentation coverage passed after adding `read_text_aloud` and `stop_text_aloud` plus the previously registered RFP/local-agent/native-smoke commands to the coverage ledger. |
+| `pnpm run check:docs` | Pass | 15 Markdown files were checked after documenting setup/read-aloud behavior and IPC coverage; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the preferences and command-palette evidence refresh. |
+| `git diff --check` | Pass | No whitespace errors are present in the setup, TTS, tests, or docs diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

@@ -10,7 +10,8 @@ export type AiProviderProfileId =
   | "private-openai"
   | "claude-code-cli"
   | "codex-cli"
-  | "opencode-cli";
+  | "opencode-cli"
+  | "google-antigravity-cli";
 export type AiProviderBodyStyle = "messages" | "system-and-messages" | "contents" | "prompt";
 
 export interface AiProviderProfile {
@@ -61,7 +62,7 @@ export interface AiProviderExecutionResult {
 }
 
 export interface LocalAgentCliProfile {
-  id: Extract<AiProviderProfileId, "claude-code-cli" | "codex-cli" | "opencode-cli">;
+  id: Extract<AiProviderProfileId, "claude-code-cli" | "codex-cli" | "opencode-cli" | "google-antigravity-cli">;
   command: string;
   label: string;
   workspaceHint: string;
@@ -172,6 +173,15 @@ export const aiProviderProfiles: AiProviderProfile[] = [
     authHeader: "",
     summary: "Creates a governed prompt package for OpenCode document-agent workflows in the project folder.",
   },
+  {
+    id: "google-antigravity-cli",
+    label: "Google Antigravity handoff",
+    endpoint: "",
+    model: "antigravity",
+    bodyStyle: "prompt",
+    authHeader: "",
+    summary: "Creates a governed prompt package for Google Antigravity agent-first local workflows.",
+  },
 ];
 
 export const localAgentCliProfiles: LocalAgentCliProfile[] = [
@@ -192,6 +202,12 @@ export const localAgentCliProfiles: LocalAgentCliProfile[] = [
     command: "opencode",
     label: "OpenCode",
     workspaceHint: "Open OpenCode from the document folder and ask it to work from the prepared handoff file.",
+  },
+  {
+    id: "google-antigravity-cli",
+    command: "antigravity",
+    label: "Google Antigravity",
+    workspaceHint: "Open Google Antigravity from the document folder and ask it to work from the prepared handoff file.",
   },
 ];
 
