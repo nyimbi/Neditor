@@ -2183,6 +2183,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("import_rfp_source"));
   ok(app.includes('aria-label="Equation editor"'));
   ok(app.includes('aria-label="Equation templates"'));
+  ok(app.includes('aria-label="Equation template filters"'));
+  ok(app.includes('aria-label="Search equation templates"'));
+  ok(app.includes('aria-label="Equation template category"'));
+  ok(app.includes("filteredEquationEditorTemplates"));
+  ok(app.includes("Matrix system"));
   ok(app.includes("equationEditorTemplates"));
   ok(app.includes("Open equation editor"));
   ok(app.includes('aria-label="Reusable document parts"'));
@@ -2725,8 +2730,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Export EPUB"));
   ok(app.includes('id: "export-html", label: "HTML Export", title: "Export standalone HTML"'));
   ok(app.includes('id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package"'));
-  ok(app.includes('aria-label="HTML export options"'));
-  ok(app.includes("HTML delivery"));
+  ok(app.includes('aria-label="Public export metadata options"'));
+  ok(app.includes('aria-label="Distribution metadata checklist"'));
+  ok(app.includes("publicMetadataOptionsTitle"));
+  ok(app.includes("exportDistributionChecklist"));
   ok(app.includes("store.exportDefaults.htmlLanguage"));
   ok(app.includes("store.exportDefaults.canonicalUrl"));
   ok(app.includes("exportDocumentAs(\"html\")"));

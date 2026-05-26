@@ -3123,6 +3123,14 @@ Target-specific public metadata readiness:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after the validation evidence update. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing browser workflow evidence. |
 
+Equation editor template depth:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding categorized/searchable Equation Editor templates and a larger business/science/mathematics template library. |
+| `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including static guards for Equation Editor filters, template categories, and the expanded matrix-template surface. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "builds business documents from saved identity snippets and local-agent handoff"` | Pass | Focused Chromium workflow proves users can filter Equation Editor templates by category/search, load total-cost and molarity templates, see Markdown preview updates, switch to inline mode, and insert an inline equation into the document. |
+
 Toolbar space recovery and Vim operator parity:
 
 | Command | Result | Evidence |

@@ -3455,12 +3455,23 @@ test("builds business documents from saved identity snippets and local-agent han
   await page.getByRole("button", { name: "Equation" }).click();
   const equationEditor = page.getByRole("dialog", { name: "Equation editor" });
   await expect(equationEditor).toBeVisible();
-  await equationEditor.getByRole("button", { name: "Total cost" }).click();
+  await equationEditor.getByLabel("Equation template category").selectOption("Business");
+  await equationEditor.getByLabel("Search equation templates").fill("total cost");
+  await expect(equationEditor.getByText("1 templates")).toBeVisible();
+  await equationEditor.getByRole("button", { name: "Load Total cost equation template" }).click();
   await expect(equationEditor.getByLabel("Equation LaTeX")).toHaveValue(/C_\{implementation\}/);
   await expect(equationEditor.getByLabel("Equation Markdown preview")).toHaveValue(/#eq:total-cost/);
+  await equationEditor.getByLabel("Equation template category").selectOption("Science");
+  await equationEditor.getByLabel("Search equation templates").fill("molarity");
+  await equationEditor.getByRole("button", { name: "Load Molarity equation template" }).click();
+  await expect(equationEditor.getByLabel("Equation LaTeX")).toHaveValue("M=\\frac{n}{V}");
+  await expect(equationEditor.getByLabel("Equation Markdown preview")).toHaveValue(/#eq:molarity/);
+  await equationEditor.getByLabel("Equation mode").selectOption("inline");
+  await equationEditor.getByLabel("Equation LaTeX").fill("a^2+b^2=c^2");
+  await expect(equationEditor.getByLabel("Equation Markdown preview")).toHaveValue("$a^2+b^2=c^2$");
   await equationEditor.getByRole("button", { name: "Insert equation" }).click();
   await expect(equationEditor).toBeHidden();
-  await expect.poll(() => editorText(page)).toContain("\\mathrm{TCO}");
+  await expect.poll(() => editorText(page)).toContain("$a^2+b^2=c^2$");
 });
 
 test("runs command palette insertion and table editor workflows", async ({ page }) => {

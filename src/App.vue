@@ -2395,16 +2395,33 @@
           <h2>Equation editor</h2>
           <button type="button" aria-label="Close equation editor" @click="closeEquationEditor">x</button>
         </header>
+        <section class="equation-template-controls" aria-label="Equation template filters">
+          <label>
+            Search
+            <input v-model="equationTemplateQuery" type="search" placeholder="roi, dose, matrix" aria-label="Search equation templates" />
+          </label>
+          <label>
+            Category
+            <select v-model="equationTemplateCategory" aria-label="Equation template category">
+              <option value="all">All categories</option>
+              <option v-for="category in equationTemplateCategories" :key="category" :value="category">{{ category }}</option>
+            </select>
+          </label>
+          <span>{{ filteredEquationEditorTemplates.length }} templates</span>
+        </section>
         <section class="equation-template-picker" aria-label="Equation templates">
           <button
-            v-for="template in equationEditorTemplates"
-            :key="template.label"
+            v-for="template in filteredEquationEditorTemplates"
+            :key="`${template.category}-${template.label}`"
             type="button"
             :title="`Load ${template.label} equation template`"
+            :aria-label="`Load ${template.label} equation template`"
             @click="useEquationTemplate(template)"
           >
-            {{ template.label }}
+            <strong>{{ template.label }}</strong>
+            <small>{{ template.category }} | {{ template.summary }}</small>
           </button>
+          <p v-if="!filteredEquationEditorTemplates.length" class="sidebar-hint">No equation templates match the current filters.</p>
         </section>
         <section class="equation-editor-grid">
           <label>
@@ -4571,6 +4588,8 @@ const equationDraftMode = ref<"display" | "inline">("display");
 const equationDraftLatex = ref("E = mc^2");
 const equationDraftLabel = ref("eq:energy");
 const equationDraftCaption = ref("Energy mass equivalence");
+const equationTemplateQuery = ref("");
+const equationTemplateCategory = ref("all");
 const rfpSourceKind = ref<RfpSourceKind>("markdown");
 const rfpSourcePath = ref("");
 const rfpSourceUrl = ref("");
@@ -4951,12 +4970,166 @@ const dataSourceNameDraft = ref("");
 const dataSourcePathDraft = ref("");
 const dataSourceTypeDraft = ref<SupportedDataSourceKind>("csv");
 const equationEditorTemplates = [
-  { label: "Weighted score", latex: "\\mathrm{Score}=\\sum_{i=1}^{n} w_i x_i", caption: "Weighted evaluation score", labelId: "eq:weighted-score" },
-  { label: "Total cost", latex: "\\mathrm{TCO}=C_{implementation}+C_{license}+C_{support}+C_{risk}", caption: "Total cost of ownership", labelId: "eq:total-cost" },
-  { label: "Service level", latex: "\\mathrm{SLA}=\\frac{\\mathrm{successful\\ requests}}{\\mathrm{total\\ requests}}\\times 100\\%", caption: "Service level calculation", labelId: "eq:sla" },
-  { label: "ROI", latex: "\\mathrm{ROI}=\\frac{\\mathrm{benefit}-\\mathrm{cost}}{\\mathrm{cost}}\\times 100\\%", caption: "Return on investment", labelId: "eq:roi" },
-  { label: "Risk score", latex: "\\mathrm{Risk}=\\mathrm{Impact}\\times\\mathrm{Likelihood}", caption: "Risk scoring model", labelId: "eq:risk-score" },
-  { label: "Capacity", latex: "\\mathrm{Capacity}=\\frac{\\mathrm{available\\ hours}}{\\mathrm{hours\\ per\\ deliverable}}", caption: "Delivery capacity estimate", labelId: "eq:capacity" },
+  {
+    category: "Business",
+    label: "Weighted score",
+    summary: "Score proposals, vendors, or initiatives with weighted criteria.",
+    latex: "\\mathrm{Score}=\\sum_{i=1}^{n} w_i x_i",
+    caption: "Weighted evaluation score",
+    labelId: "eq:weighted-score",
+  },
+  {
+    category: "Business",
+    label: "Total cost",
+    summary: "Show implementation, license, support, and risk cost drivers.",
+    latex: "\\mathrm{TCO}=C_{implementation}+C_{license}+C_{support}+C_{risk}",
+    caption: "Total cost of ownership",
+    labelId: "eq:total-cost",
+  },
+  {
+    category: "Business",
+    label: "Service level",
+    summary: "Express successful service events as a percentage.",
+    latex: "\\mathrm{SLA}=\\frac{\\mathrm{successful\\ requests}}{\\mathrm{total\\ requests}}\\times 100\\%",
+    caption: "Service level calculation",
+    labelId: "eq:sla",
+  },
+  {
+    category: "Business",
+    label: "ROI",
+    summary: "Summarize benefit relative to cost.",
+    latex: "\\mathrm{ROI}=\\frac{\\mathrm{benefit}-\\mathrm{cost}}{\\mathrm{cost}}\\times 100\\%",
+    caption: "Return on investment",
+    labelId: "eq:roi",
+  },
+  {
+    category: "Business",
+    label: "Risk score",
+    summary: "Combine impact and likelihood for risk registers.",
+    latex: "\\mathrm{Risk}=\\mathrm{Impact}\\times\\mathrm{Likelihood}",
+    caption: "Risk scoring model",
+    labelId: "eq:risk-score",
+  },
+  {
+    category: "Business",
+    label: "Capacity",
+    summary: "Estimate delivery throughput from available effort.",
+    latex: "\\mathrm{Capacity}=\\frac{\\mathrm{available\\ hours}}{\\mathrm{hours\\ per\\ deliverable}}",
+    caption: "Delivery capacity estimate",
+    labelId: "eq:capacity",
+  },
+  {
+    category: "Business",
+    label: "Gross margin",
+    summary: "Calculate margin from revenue and direct cost.",
+    latex: "\\mathrm{Margin}=\\frac{\\mathrm{Revenue}-\\mathrm{COGS}}{\\mathrm{Revenue}}\\times 100\\%",
+    caption: "Gross margin",
+    labelId: "eq:gross-margin",
+  },
+  {
+    category: "Business",
+    label: "Runway",
+    summary: "Estimate months of cash runway.",
+    latex: "\\mathrm{Runway}=\\frac{\\mathrm{Cash\\ balance}}{\\mathrm{monthly\\ burn}}",
+    caption: "Cash runway",
+    labelId: "eq:runway",
+  },
+  {
+    category: "Science",
+    label: "Dose by weight",
+    summary: "Calculate medication or reagent dose by body mass.",
+    latex: "\\mathrm{Dose}=\\mathrm{weight}_{kg}\\times\\mathrm{dose}_{mg/kg}",
+    caption: "Dose by weight",
+    labelId: "eq:dose-by-weight",
+  },
+  {
+    category: "Science",
+    label: "Molarity",
+    summary: "Compute concentration from moles and liters.",
+    latex: "M=\\frac{n}{V}",
+    caption: "Molar concentration",
+    labelId: "eq:molarity",
+  },
+  {
+    category: "Science",
+    label: "Density",
+    summary: "Relate mass and volume.",
+    latex: "\\rho=\\frac{m}{V}",
+    caption: "Density",
+    labelId: "eq:density",
+  },
+  {
+    category: "Science",
+    label: "Half life",
+    summary: "Model exponential decay over half-life periods.",
+    latex: "N(t)=N_0\\left(\\frac{1}{2}\\right)^{t/t_{1/2}}",
+    caption: "Half-life decay",
+    labelId: "eq:half-life",
+  },
+  {
+    category: "Science",
+    label: "Ohm law",
+    summary: "Relate voltage, current, and resistance.",
+    latex: "V=IR",
+    caption: "Ohm law",
+    labelId: "eq:ohm-law",
+  },
+  {
+    category: "Science",
+    label: "Kinetic energy",
+    summary: "Calculate translational kinetic energy.",
+    latex: "E_k=\\frac{1}{2}mv^2",
+    caption: "Kinetic energy",
+    labelId: "eq:kinetic-energy",
+  },
+  {
+    category: "Mathematics",
+    label: "Linear model",
+    summary: "Fit a straight-line relationship.",
+    latex: "y=mx+b",
+    caption: "Linear model",
+    labelId: "eq:linear-model",
+  },
+  {
+    category: "Mathematics",
+    label: "Quadratic formula",
+    summary: "Solve second-order polynomial equations.",
+    latex: "x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}",
+    caption: "Quadratic formula",
+    labelId: "eq:quadratic-formula",
+  },
+  {
+    category: "Mathematics",
+    label: "Bayes theorem",
+    summary: "Update probability with new evidence.",
+    latex: "P(A|B)=\\frac{P(B|A)P(A)}{P(B)}",
+    caption: "Bayes theorem",
+    labelId: "eq:bayes-theorem",
+  },
+  {
+    category: "Mathematics",
+    label: "Expected value",
+    summary: "Compute the weighted average of possible outcomes.",
+    latex: "E[X]=\\sum_i x_i p_i",
+    caption: "Expected value",
+    labelId: "eq:expected-value",
+  },
+  {
+    category: "Mathematics",
+    label: "Standard deviation",
+    summary: "Measure spread around the mean.",
+    latex: "\\sigma=\\sqrt{\\frac{1}{N}\\sum_{i=1}^{N}(x_i-\\mu)^2}",
+    caption: "Standard deviation",
+    labelId: "eq:standard-deviation",
+  },
+  {
+    category: "Mathematics",
+    label: "Matrix system",
+    summary: "Represent coupled linear equations.",
+    latex: "\\begin{bmatrix}a&b\\\\c&d\\end{bmatrix}\\begin{bmatrix}x\\\\y\\end{bmatrix}=\\begin{bmatrix}p\\\\q\\end{bmatrix}",
+    caption: "Matrix system",
+    labelId: "eq:matrix-system",
+  },
 ];
 const documentVariableNameDraft = ref("");
 const documentVariableValueDraft = ref("");
@@ -5904,6 +6077,15 @@ const rfpAnalysisSummary = computed(() => {
   const analysis = rfpAnalysis.value;
   if (!analysis) return "No RFP analyzed yet";
   return `${analysis.requirements.length} requirements | ${analysis.statedIntent.length} stated intent | ${analysis.impliedIntent.length} implied intent | ${analysis.completenessScore}/100 ready`;
+});
+const equationTemplateCategories = computed(() => [...new Set(equationEditorTemplates.map((template) => template.category))].sort());
+const filteredEquationEditorTemplates = computed(() => {
+  const query = equationTemplateQuery.value.trim().toLowerCase();
+  return equationEditorTemplates.filter((template) => {
+    if (equationTemplateCategory.value !== "all" && template.category !== equationTemplateCategory.value) return false;
+    if (!query) return true;
+    return [template.label, template.category, template.summary, template.caption, template.latex].join(" ").toLowerCase().includes(query);
+  });
 });
 const equationDraftMarkdown = computed(() => {
   const latex = equationDraftLatex.value.trim() || "E = mc^2";
@@ -16860,13 +17042,45 @@ select:hover {
 }
 
 .equation-editor-modal {
-  max-width: 820px;
+  max-width: 900px;
+}
+
+.equation-template-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 220px) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.equation-template-controls span {
+  color: #526171;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .equation-template-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.equation-template-picker button {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  min-height: 62px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.equation-template-picker small {
+  color: #526171;
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .equation-editor-grid {
