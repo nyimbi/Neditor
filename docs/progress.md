@@ -128,7 +128,10 @@ Recent pushed checkpoints visible in current git history:
   evidence still work when business templates use typed YAML annotations.
   Project-level `.neditor/variables.yaml` files now use the same normalization
   path, so tagged `variables:` wrappers and tagged project values merge into
-  document metadata without overriding explicit front matter.
+  document metadata without overriding explicit front matter. Project variables
+  now merge recursively too: a document can override `profile.name` and
+  `profile.address.city` while still inheriting `profile.address.country` and
+  `profile.owner` from reusable project defaults.
 - Simple inline YAML maps now expand into dotted document variables as well.
   Compact business front matter such as `client: {name: Acme, tier:
   Enterprise}` and anchored defaults such as `defaults: &clientDefaults

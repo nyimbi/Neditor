@@ -432,7 +432,7 @@ fn compiler_loads_project_level_variables_without_overriding_front_matter() {
     fs::create_dir_all(root.join(".neditor")).expect("create project vars dir");
     fs::write(
         root.join(".neditor").join("variables.yaml"),
-        "variables: !docs!vars\n  client: !docs!client Project Client\n  region: !docs!region West\n  owner: !docs!owner Strategy Office\n  review:\n    lead: !docs!person QA Lead\n",
+        "variables: !docs!vars\n  client: !docs!client Project Client\n  region: !docs!region West\n  owner: !docs!owner Strategy Office\n  review:\n    lead: !docs!person QA Lead\n  profile:\n    name: Project Profile\n    owner: Project Owner\n    address:\n      city: Nairobi\n      country: Kenya\n",
     )
     .expect("write project variables");
     let doc = root.join("docs").join("report.md");
@@ -440,16 +440,23 @@ fn compiler_loads_project_level_variables_without_overriding_front_matter() {
     fs::write(&doc, "# Report").expect("write doc");
 
     let response = compile(CompileRequest {
-            text: "---\ntitle: Project Vars\nstatus: approved\napprovedBy: QA\nclient: Front Matter Client\n---\n# Project Vars\nPrepared for {{client}} in {{region}} by {{owner}} with {{review.lead}}.\n".to_string(),
+            text: "---\ntitle: Project Vars\nstatus: approved\napprovedBy: QA\nclient: Front Matter Client\nprofile:\n  name: Front Profile\n  address:\n    city: Lagos\n---\n# Project Vars\nPrepared for {{client}} in {{region}} by {{owner}} with {{review.lead}}.\nProfile {{profile.name}} in {{profile.address.city}}, {{profile.address.country}} by {{profile.owner}}.\n".to_string(),
             file_path: Some(path_to_string(&doc)),
         });
 
     assert!(response
         .compiled_markdown
         .contains("Prepared for Front Matter Client in West by Strategy Office with QA Lead."));
+    assert!(response
+        .compiled_markdown
+        .contains("Profile Front Profile in Lagos, Kenya by Project Owner."));
     assert_eq!(response.metadata["client"], "Front Matter Client");
     assert_eq!(response.metadata["region"], "West");
     assert_eq!(response.metadata["review"]["lead"], "QA Lead");
+    assert_eq!(response.metadata["profile"]["name"], "Front Profile");
+    assert_eq!(response.metadata["profile"]["address"]["city"], "Lagos");
+    assert_eq!(response.metadata["profile"]["address"]["country"], "Kenya");
+    assert_eq!(response.metadata["profile"]["owner"], "Project Owner");
     fs::remove_dir_all(root).expect("clean project vars test dir");
 }
 

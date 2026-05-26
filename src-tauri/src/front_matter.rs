@@ -270,8 +270,23 @@ pub(crate) fn merge_project_variables(
         ));
         return;
     };
+    merge_project_variable_defaults(target, source);
+}
+
+fn merge_project_variable_defaults(
+    target: &mut serde_json::Map<String, Value>,
+    source: &serde_json::Map<String, Value>,
+) {
     for (key, value) in source {
-        target.entry(key.clone()).or_insert_with(|| value.clone());
+        match (target.get_mut(key), value) {
+            (Some(Value::Object(target_object)), Value::Object(source_object)) => {
+                merge_project_variable_defaults(target_object, source_object);
+            }
+            (Some(_), _) => {}
+            (None, value) => {
+                target.insert(key.clone(), value.clone());
+            }
+        }
     }
 }
 
