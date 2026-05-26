@@ -1,6 +1,7 @@
 import { buildDocsLiveDraft, docsLiveDocumentTypes, normalizeDocsLiveDocumentType, type DocsLiveDocumentType, type DocsLiveDraftDepth } from "./docsLive.js";
 import { extractCitationTodoItems } from "./citationTodoWorkflow.js";
 import { outlinePlanFromMarkdown } from "./documentOutline.js";
+import { isAiSourceFenceOpener, markdownFenceOpener } from "./provenanceReview.js";
 import type { ExportTarget } from "./workspacePersistence.js";
 
 export type AgenticWorkflowLane = "create" | "compose" | "edit" | "revise" | "review" | "distribute";
@@ -5293,7 +5294,7 @@ function analyzeAgenticDocumentEvidence(documentText: string, plan: AgenticWorkf
     ),
   ).slice(0, 12);
   const citationTodos = Array.from(new Set(extractCitationTodoItems(documentText).map((item) => item.excerpt))).slice(0, 12);
-  const unreviewedAiSources = [...documentText.matchAll(/```ai-source[\s\S]*?```/g)].filter((block) => !/\bstatus:\s*human-reviewed\b/i.test(block[0])).length;
+  const unreviewedAiSources = countUnreviewedAiSourceFences(documentText);
   const unreviewedAiAssisted = [...documentText.matchAll(/<!--\s*ai-assisted:[\s\S]*?-->/g)].filter((marker) => !/\bstatus\s*=\s*human-reviewed\b/i.test(marker[0])).length;
   const reviewCommentResolutions = extractReviewCommentResolutions(documentText);
   const unresolvedComments = reviewCommentResolutions.length;
@@ -5360,6 +5361,22 @@ function slugifyReferenceLabel(text: string) {
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
+}
+
+function countUnreviewedAiSourceFences(documentText: string) {
+  let count = 0;
+  const lines = documentText.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const opener = markdownFenceOpener(lines[index]);
+    if (!opener || !isAiSourceFenceOpener(lines[index])) continue;
+    const endIndex = lines.findIndex(
+      (line, candidateIndex) => candidateIndex > index && line.trimStart().startsWith(opener.marker),
+    );
+    const body = lines.slice(index + 1, endIndex > index ? endIndex : undefined).join("\n");
+    if (!/\bstatus:\s*human-reviewed\b/i.test(body)) count += 1;
+    if (endIndex > index) index = endIndex;
+  }
+  return count;
 }
 
 function releaseMetadataMissing(documentText: string) {
@@ -5480,7 +5497,7 @@ function extractDocumentClaimInventory(documentText: string): AgenticDocumentCla
   for (let index = 0; index < lines.length; index += 1) {
     const rawLine = lines[index];
     const trimmed = rawLine.trim();
-    if (/^```/.test(trimmed)) {
+    if (markdownFenceOpener(trimmed)) {
       inFence = !inFence;
       continue;
     }
@@ -5540,7 +5557,7 @@ function extractHumanizationFindings(documentText: string): AgenticHumanizationF
   const lines = documentText.split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
     const trimmed = lines[index].trim();
-    if (/^```/.test(trimmed)) {
+    if (markdownFenceOpener(trimmed)) {
       inFence = !inFence;
       continue;
     }

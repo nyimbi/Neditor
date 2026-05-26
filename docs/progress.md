@@ -150,6 +150,10 @@ Recent pushed checkpoints visible in current git history:
   decorations, transform-engine detection, and compact AI/Docs Live previews,
   so tilde-fenced transform and provenance blocks receive the same ergonomic
   treatment as backtick-fenced blocks.
+- Agentic workflow evidence now uses the shared frontend fence opener too:
+  tilde-fenced `llm-source` provenance blocks count toward human-review
+  governance, and tilde-fenced Markdown examples stay out of claim and
+  humanization scans.
 - AI provenance collection now follows the same fence policy: `ai-source`,
   `ai-provenance`, and `llm-source` blocks can use backtick or tilde fences,
   while nested provenance examples remain inert and do not create semantic

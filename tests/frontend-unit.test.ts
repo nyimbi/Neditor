@@ -2044,11 +2044,15 @@ test("agentic workflow reviewers inspect current document evidence", () => {
       "[placeholder link](https://example.com/review)",
       "See {@missing-ref} before export.",
       "",
-      "```ai-source",
+      "~~~llm-source",
       "provider: OpenAI",
       "model: ChatGPT",
       "status: needs-review",
-      "```",
+      "~~~",
+      "",
+      "~~~markdown",
+      "Example revenue grows by 99% and should not enter the claim inventory.",
+      "~~~",
       "",
       "<!-- ai-assisted: status=needs-review | source=NEditor Docs Live | promptSummary=Draft -->",
       "<!-- comment: unresolved | author: Reviewer | at: 2026-05-24 | Confirm finance source. -->",
@@ -2073,6 +2077,8 @@ test("agentic workflow reviewers inspect current document evidence", () => {
   ok(run.controlCenter.governance.some((item) => item.label === "Human review" && item.detail.includes("unresolved current-document review comment")));
   ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata" && item.detail.includes("Approved at")));
   ok(run.controlCenter.governance.some((item) => item.label === "Approval metadata gate" && item.status === "missing"));
+  equal(run.documentEvidence.unreviewedAiMarkers, 2);
+  ok(!run.documentEvidence.claimInventory.some((claim) => claim.text.includes("Example revenue grows by 99%")));
   equal(run.approvalGate.status, "blocked");
   ok(run.approvalGate.blockers.some((item) => item.includes("Status")));
   ok(run.approvalGate.blockers.some((item) => item.includes("Reviewer")));
