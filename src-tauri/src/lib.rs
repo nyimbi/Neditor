@@ -44,6 +44,7 @@ mod snapshot_storage;
 mod source_mapping;
 mod table_cells;
 mod tables;
+mod transform_install;
 mod transforms;
 mod tts;
 mod utils;
@@ -100,6 +101,7 @@ use tauri::{
     menu::{Menu, MenuItemBuilder, SubmenuBuilder},
     AppHandle, Emitter, Manager, Runtime,
 };
+use transform_install::{install_transform_handlers, list_transform_handler_installers};
 #[cfg(test)]
 use transforms::external::ExternalTransformRequest;
 use transforms::external::{list_transform_engines, run_external_transform};
@@ -170,6 +172,8 @@ pub fn run() {
             tag_release,
             restore_git_revision,
             list_transform_engines,
+            list_transform_handler_installers,
+            install_transform_handlers,
             run_transform,
             run_external_transform,
             cleanup_ai_paste,
@@ -364,6 +368,11 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             app,
             "neditor-open-templates",
             "Transform Templates",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-install-transform-handlers",
+            "Install Transform Handlers",
         )?)
         .item(&document_wizards_menu)
         .separator()

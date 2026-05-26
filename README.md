@@ -400,6 +400,10 @@ artifacts:
 - Native Rust renderers or fallbacks are used where practical.
 - External executable engines require explicit trust, bounded execution, and
   clear setup/probe diagnostics.
+- Settings -> Transforms includes a transform handler installer. It shows the
+  exact package-manager commands for Graphviz, D2, PlantUML, Pikchr, and SQLite,
+  can start the supported allowlisted installer on the current platform, and
+  falls back to copyable commands when the platform needs terminal/admin setup.
 
 ### Review, Release, And AI Governance
 
@@ -547,16 +551,18 @@ app assertions, while still failing immediately for real workflow assertion
 failures.
 
 `pnpm run check:engines` probes optional external transform engines and reports
-installed/missing Graphviz/DOT variants, D2, PlantUML, Java-backed PlantUML, and
-Pikchr paths without failing just because an optional engine is absent. For each
-installed engine it also renders a small SVG smoke artifact through the adapter
-shape NEditor uses, writes those files under `.tmp/external-engines/artifacts/`,
-and records paths, versions, byte counts, and compatibility status in
+installed/missing Graphviz/DOT variants, D2, PlantUML, Java-backed PlantUML,
+Pikchr, and SQLite `sqlite3` paths without failing just because an optional
+engine is absent. For each installed diagram engine it renders a small SVG smoke
+artifact through the adapter shape NEditor uses; for SQLite it runs a read-only
+in-memory CSV query. The probe writes those artifacts under
+`.tmp/external-engines/artifacts/` and records paths, versions, byte counts, and
+compatibility status in
 `.tmp/external-engines/probe-report.json` for local platform evidence. It also
 writes JSON templates under `.tmp/external-engines/templates/` and accepts
 validated copied proof from `NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR` or
 `.tmp/external-engines/external/`, so a missing local optional engine such as
-Pikchr can be closed by real evidence from a host where that engine is
+Pikchr or sqlite3 can be closed by real evidence from a host where that engine is
 installed.
 
 `pnpm run check:deps` verifies that every JavaScript and Rust dependency in the

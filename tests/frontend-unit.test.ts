@@ -3822,6 +3822,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("No external executable path is configured"));
   ok(app.includes("External executable path is trusted"));
   ok(app.includes("External execution is disabled"));
+  ok(app.includes('aria-label="Transform handler installer"'));
+  ok(app.includes("Download and install transform handlers"));
+  ok(app.includes("Install all handlers"));
+  ok(app.includes("list_transform_handler_installers"));
+  ok(app.includes("install_transform_handlers"));
+  ok(app.includes("openTransformInstaller"));
+  ok(app.includes("Install Transform Handlers"));
   ok(app.includes("Help: Docs Live"));
   ok(app.includes("Help: Export and publishing"));
   ok(app.includes("Help: AI-first composition"));
@@ -3963,6 +3970,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-read-selection-aloud",'));
   ok(tauriLib.includes('"neditor-read-document-aloud",'));
   ok(tauriLib.includes('"neditor-stop-reading",'));
+  ok(tauriLib.includes('"neditor-install-transform-handlers",'));
   ok(tauriLib.includes("read_text_aloud"));
   ok(tauriLib.includes("stop_text_aloud"));
   ok(tauriLib.includes("inspect_native_tts"));
@@ -3980,6 +3988,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-mode-outline", "Outline Mode"'));
   ok(app.includes('case "neditor-mode-export"'));
   ok(app.includes('case "neditor-mode-outline"'));
+  ok(app.includes('case "neditor-install-transform-handlers"'));
   ok(app.includes('case "neditor-open-help"'));
   ok(app.includes('case "neditor-open-agent-workspace"'));
   ok(app.includes('case "neditor-run-qa-review"'));
@@ -4297,6 +4306,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
   ok(evidenceKitCollector.includes("pikchr.template.json"));
+  ok(evidenceKitCollector.includes("sqlite.template.json"));
+  ok(evidenceKitCollector.includes("NEDITOR_TEST_SQLITE3"));
   ok(evidenceKitCollector.includes("spec-completion-open-items"));
   ok(evidenceKitCollector.includes("runbooks/spec-completion-closure.md"));
   ok(evidenceKitCollector.includes("gapWorkItems"));
@@ -4314,7 +4325,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("runbooks/release-device-performance-profile.md"));
   ok(evidenceKitChecker.includes("runbooks/optional-external-engines.md"));
   ok(evidenceKitChecker.includes("runbooks/spec-completion-closure.md"));
-  ok(evidenceKitChecker.includes("expectedTemplateCount = 15"));
+  ok(evidenceKitChecker.includes("expectedTemplateCount = 16"));
   ok(evidenceKitChecker.includes("report.json"));
   ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
   ok(evidenceKitChecker.includes("current source tree must be clean"));
@@ -4328,6 +4339,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("must list final readiness command"));
   ok(evidenceIngest.includes("neditor.release-evidence-ingest.v1"));
   ok(evidenceIngest.includes("NEDITOR_RELEASE_EVIDENCE_RETURN_DIR"));
+  ok(evidenceIngest.includes("external-engine-sqlite"));
   ok(evidenceIngest.includes("platform/win32-package-artifacts.json"));
   ok(evidenceIngest.includes("ai-provider/provider-evidence.json"));
   ok(evidenceIngest.includes("ai-runtime/runtime-evidence.json"));

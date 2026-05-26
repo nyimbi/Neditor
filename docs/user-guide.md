@@ -478,16 +478,24 @@ Git state, and other issues that affect deliverability.
 ## Transform Engines
 
 NEditor uses native Rust renderers or static fallbacks where practical.
-External diagram engines are optional and must be explicitly trusted.
+External diagram and database engines are optional and must be explicitly
+trusted.
 
-External engines include Graphviz/DOT, D2, PlantUML, and Pikchr. Configure
-exact executable paths in settings, probe the engine, and trust only the engine
-you intend to use. Execution is bounded by timeout and output-size limits, and
-no engine is invoked through interpolated shell strings.
+External engines include Graphviz/DOT, D2, PlantUML, Pikchr, and SQLite
+`sqlite3` for read-only SQL table transforms. Configure exact executable paths
+in settings, probe the engine, and trust only the engine you intend to use.
+Execution is bounded by timeout and output-size limits, and no engine is
+invoked through interpolated shell strings.
+
+Open **Settings -> Transforms -> Download and install transform handlers** to
+install or copy setup commands for the full handler set. The configurator shows
+the package manager, platform, exact commands, covered handlers, and privilege
+expectations before it starts an allowlisted installer.
 
 For release evidence, optional engines can be proven on another workstation.
 Run the release evidence kit, fill the returned engine template such as
-`external-engines/external/pikchr.json`, and import it with
+`external-engines/external/pikchr.json` or
+`external-engines/external/sqlite.json`, and import it with
 `pnpm run ingest:evidence`; NEditor validates the returned proof through the
 same external-engine checker before release readiness accepts it.
 

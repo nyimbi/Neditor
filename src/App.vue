@@ -2331,6 +2331,58 @@
           </section>
           <section v-show="selectedConfigurationSection === 'transforms'" class="configuration-center-panel" aria-label="Transform engine configuration">
           <h3>Transform engines</h3>
+          <section class="transform-handler-installer" aria-label="Transform handler installer">
+            <header>
+              <div>
+                <h4>Download and install transform handlers</h4>
+                <span>Use a managed setup plan for Graphviz, D2, PlantUML, Pikchr, and SQLite before choosing trusted executable paths.</span>
+              </div>
+              <button type="button" @click="loadTransformHandlerInstallers">Refresh installer options</button>
+            </header>
+            <label>
+              Installer profile
+              <select v-model="selectedTransformInstallerId">
+                <option v-for="plan in transformInstallerPlans" :key="plan.id" :value="plan.id">
+                  {{ plan.label }}
+                </option>
+              </select>
+            </label>
+            <dl v-if="selectedTransformInstallerPlan" class="transform-installer-summary">
+              <div>
+                <dt>Platform</dt>
+                <dd>{{ selectedTransformInstallerPlan.platform }}</dd>
+              </div>
+              <div>
+                <dt>Manager</dt>
+                <dd>{{ selectedTransformInstallerPlan.manager }}</dd>
+              </div>
+              <div>
+                <dt>Mode</dt>
+                <dd>{{ selectedTransformInstallerPlan.installable ? "Can start from NEditor" : "Copy commands and run in a terminal" }}</dd>
+              </div>
+              <div>
+                <dt>Privilege</dt>
+                <dd>{{ selectedTransformInstallerPlan.requires_admin ? "May ask for administrator access" : "No administrator prompt expected from NEditor" }}</dd>
+              </div>
+            </dl>
+            <ul v-if="selectedTransformInstallerPlan" class="transform-installer-handlers">
+              <li v-for="handler in selectedTransformInstallerPlan.handlers" :key="handler">{{ handler }}</li>
+            </ul>
+            <pre v-if="transformInstallerCommandText" class="transform-installer-commands">{{ transformInstallerCommandText }}</pre>
+            <div class="reference-actions">
+              <button
+                type="button"
+                :disabled="!selectedTransformInstallerPlan?.installable || transformInstallerBusy"
+                @click="startTransformHandlerInstall"
+              >
+                {{ transformInstallerBusy ? "Starting..." : "Install all handlers" }}
+              </button>
+              <button type="button" :disabled="!transformInstallerCommandText" @click="copyTransformInstallerCommands">Copy commands</button>
+            </div>
+            <p class="engine-setup-status" role="status">
+              {{ transformInstallerStatus || selectedTransformInstallerPlan?.notes.join(" ") || "Installer options will appear after setup loads." }}
+            </p>
+          </section>
           <label>
             Timeout
             <input
@@ -4942,6 +4994,23 @@ type ExportMarkdownTablesResponse = {
   rows: number;
   columns: number;
 };
+type TransformHandlerInstallerPlan = {
+  id: string;
+  label: string;
+  platform: string;
+  manager: string;
+  handlers: string[];
+  commands: string[];
+  installable: boolean;
+  requires_admin: boolean;
+  notes: string[];
+};
+type TransformHandlerInstallResponse = {
+  plan_id: string;
+  started: boolean;
+  message: string;
+  commands: string[];
+};
 
 declare global {
   interface Window {
@@ -5063,6 +5132,10 @@ const guidedDemoOpen = ref(false);
 const configurationSetupOpen = ref(false);
 const configurationSetupStepId = ref<ConfigurationSetupStepId>("llm-access");
 const selectedConfigurationSection = ref("overview");
+const transformInstallerPlans = ref<TransformHandlerInstallerPlan[]>([]);
+const selectedTransformInstallerId = ref("");
+const transformInstallerBusy = ref(false);
+const transformInstallerStatus = ref("");
 const guidedDemoStepIndex = ref(0);
 const ttsBusy = ref(false);
 const ttsInspectionBusy = ref(false);
@@ -6659,6 +6732,10 @@ const configurationSetupStatus = computed(() => {
   };
 });
 const configurationSetupSummary = computed(() => `${configurationSetupStatus.value.complete}/${configurationSetupStatus.value.total} setup areas ready`);
+const selectedTransformInstallerPlan = computed(() =>
+  transformInstallerPlans.value.find((plan) => plan.id === selectedTransformInstallerId.value) || transformInstallerPlans.value[0] || null,
+);
+const transformInstallerCommandText = computed(() => (selectedTransformInstallerPlan.value?.commands || []).join("\n"));
 const configurationCenterSections = computed(() => [
   {
     id: "overview",
@@ -6693,8 +6770,8 @@ const configurationCenterSections = computed(() => [
   {
     id: "transforms",
     label: "Transforms",
-    summary: `${store.externalTransformEngines.length} external engines`,
-    detail: "External engine paths, trust, probes, timeout, and execution modes.",
+    summary: `${store.externalTransformEngines.length} external engines; ${transformInstallerPlans.value.length} installer plan`,
+    detail: "Download handlers, set executable paths, trust engines, probe setup, timeout, and execution modes.",
   },
 ] as const);
 const rfpAnalysisSummary = computed(() => {
@@ -7446,6 +7523,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "figure", label: "Figure", title: "Insert figure", icon: "figure", run: () => insertFigureSnippet() },
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
+      { id: "install-handlers", label: "Handlers", title: "Download and install transform handlers", icon: "settings", run: () => openTransformInstaller() },
       { id: "biz-part", label: "Part", title: "Insert a reusable business document part", icon: "templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
       { id: "equation", label: "Equation", title: "Open equation editor", icon: "equation", run: () => openEquationEditor() },
       { id: "toc", label: "TOC", title: "Insert table of contents", icon: "toc", run: () => insertBlock(tocSnippet) },
@@ -7610,6 +7688,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "equation", label: "Equation Editor", help: "Open equation templates and LaTeX insertion.", run: () => openEquationEditor() },
           { id: "toc", label: "Table of Contents", help: "Insert a generated TOC marker.", run: () => insertBlock(tocSnippet) },
           { id: "templates", label: "Transform Templates", help: "Open reusable calc, chart, diagram, data, and API templates.", run: () => openTransformTemplates() },
+          { id: "install-transform-handlers", label: "Install Transform Handlers", help: "Open the configurator workflow that downloads and installs Graphviz, D2, PlantUML, Pikchr, and SQLite handlers.", run: () => openTransformInstaller() },
         ],
       },
       {
@@ -9350,6 +9429,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Help: Export and publishing", group: "Help", run: () => openHelp("export-publishing") },
   { name: "Help: Keyboard shortcuts", group: "Help", run: () => openHelp("keyboard-shortcuts") },
   { name: "Run transforms", group: "Transforms", run: () => void store.compileActive() },
+  {
+    name: "Install transform handlers",
+    group: "Transforms",
+    description: "Open the configurator installer for Graphviz, D2, PlantUML, Pikchr, and SQLite handlers.",
+    keywords: ["download", "install", "handlers", "graphviz", "d2", "plantuml", "pikchr", "sqlite"],
+    run: () => openTransformInstaller(),
+  },
   { name: "Find and replace", group: "Edit", run: () => runEditorCommand(openSearchPanel) },
   { name: "Find next", group: "Edit", run: () => runEditorCommand(findNext) },
   { name: "Find previous", group: "Edit", run: () => runEditorCommand(findPrevious) },
@@ -9729,6 +9815,9 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-open-templates":
       store.sidebar = "templates";
       break;
+    case "neditor-install-transform-handlers":
+      openTransformInstaller();
+      break;
     case "neditor-open-document-wizards":
       openDocumentWizardHub();
       break;
@@ -9828,6 +9917,7 @@ async function installDesktopWorkflowTestHooks() {
 
 onMounted(async () => {
   await store.boot();
+  await loadTransformHandlerInstallers();
   await hydrateTtsModelStorageLocation();
   await bindNativeMenuCommands();
   applyAiPasteDefaults();
@@ -13315,6 +13405,13 @@ function openBusinessProfile() {
   businessProfileOpen.value = true;
 }
 
+function openTransformInstaller() {
+  store.sidebar = "settings";
+  selectedConfigurationSection.value = "transforms";
+  void loadTransformHandlerInstallers();
+  store.statusMessage = "Opened transform handler installer";
+}
+
 function openConfigurationSetup(stepId: string = "llm-access") {
   if (configurationSetupSteps.some((step) => step.id === stepId)) {
     configurationSetupStepId.value = stepId as ConfigurationSetupStepId;
@@ -13352,6 +13449,8 @@ async function runConfigurationSetupStep(stepId: ConfigurationSetupStepId) {
   } else if (stepId === "transforms") {
     closeConfigurationSetup();
     store.sidebar = "settings";
+    selectedConfigurationSection.value = "transforms";
+    await loadTransformHandlerInstallers();
     await store.compileActive();
   } else {
     closeConfigurationSetup();
@@ -14382,6 +14481,65 @@ async function chooseTransformEngine(name: string) {
     multiple: false,
   });
   if (typeof selected === "string") await store.setTransformEnginePath(name, selected);
+}
+
+async function loadTransformHandlerInstallers() {
+  try {
+    transformInstallerPlans.value = await invoke<TransformHandlerInstallerPlan[]>("list_transform_handler_installers");
+    if (!transformInstallerPlans.value.some((plan) => plan.id === selectedTransformInstallerId.value)) {
+      selectedTransformInstallerId.value = transformInstallerPlans.value[0]?.id || "";
+    }
+    transformInstallerStatus.value = transformInstallerPlans.value.length ? "Transform handler installer options loaded" : "No installer plan is available for this platform";
+  } catch (error) {
+    transformInstallerPlans.value = [];
+    selectedTransformInstallerId.value = "";
+    transformInstallerStatus.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function copyTransformInstallerCommands() {
+  const commands = transformInstallerCommandText.value;
+  if (!commands) {
+    transformInstallerStatus.value = "No transform handler install commands are available to copy";
+    return;
+  }
+  try {
+    await navigator.clipboard?.writeText(commands);
+    transformInstallerStatus.value = "Copied transform handler install commands";
+  } catch {
+    transformInstallerStatus.value = "Transform handler install commands are ready to copy";
+  }
+}
+
+async function startTransformHandlerInstall() {
+  const plan = selectedTransformInstallerPlan.value;
+  if (!plan) {
+    transformInstallerStatus.value = "Choose an installer profile first";
+    return;
+  }
+  if (!plan.installable) {
+    transformInstallerStatus.value = "This platform uses copy-only commands; run them in a terminal and then return to Probe engines.";
+    return;
+  }
+  const allowed = await confirm(
+    `Install transform handlers with ${plan.manager}?\n\nNEditor will start only the commands shown in the configurator:\n\n${plan.commands.join("\n")}\n\nRun Probe for each engine after installation finishes.`,
+    { title: "Install transform handlers", kind: "warning" },
+  );
+  if (!allowed) {
+    transformInstallerStatus.value = "Transform handler installation cancelled";
+    return;
+  }
+  transformInstallerBusy.value = true;
+  try {
+    const response = await invoke<TransformHandlerInstallResponse>("install_transform_handlers", {
+      request: { plan_id: plan.id },
+    });
+    transformInstallerStatus.value = response.message;
+  } catch (error) {
+    transformInstallerStatus.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    transformInstallerBusy.value = false;
+  }
 }
 
 function documentUsesTransformFence(text: string, name: string) {
@@ -20515,6 +20673,84 @@ select:hover {
 
 .configuration-center-panel {
   margin-bottom: 12px;
+}
+
+.transform-handler-installer {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #c9d2dc;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.transform-handler-installer header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.transform-handler-installer header div {
+  display: grid;
+  gap: 3px;
+}
+
+.transform-handler-installer h4 {
+  margin: 0;
+  color: #182433;
+  font-size: 13px;
+}
+
+.transform-handler-installer header span,
+.transform-handler-installer dd,
+.transform-handler-installer li {
+  color: #526171;
+  font-size: 11px;
+}
+
+.transform-installer-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.transform-installer-summary div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.transform-installer-summary dt {
+  color: #36465a;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.transform-installer-summary dd {
+  margin: 0;
+}
+
+.transform-installer-handlers {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.transform-installer-commands {
+  max-height: 150px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid #d8e0e8;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 11px;
+  white-space: pre-wrap;
 }
 
 .agent-provider-output {

@@ -42,6 +42,8 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `tag_release` | `src-tauri/src/git.rs` | `file_command_tests::git_history_diff_commit_tag_and_restore_workflow`; `file_command_tests::git_restore_and_tag_reject_option_shaped_refs` |
 | `restore_git_revision` | `src-tauri/src/git.rs` | `file_command_tests::git_history_diff_commit_tag_and_restore_workflow`; `file_command_tests::git_restore_and_tag_reject_option_shaped_refs`; `file_command_tests::git_restore_refuses_symlink_targets` |
 | `list_transform_engines` | `src-tauri/src/transforms/external.rs` | `external_transform_tests::external_transform_adapters_shape_engine_specific_invocations` |
+| `list_transform_handler_installers` | `src-tauri/src/transform_install.rs` | `transform_install_tests::transform_handler_installer_plans_cover_supported_platforms` |
+| `install_transform_handlers` | `src-tauri/src/transform_install.rs` | `transform_install_tests::transform_handler_install_steps_are_allowlisted` |
 | `run_transform` | `src-tauri/src/compiler.rs` | `transform_tests::transform_registry_covers_required_first_release_transforms`; `transform_tests::transform_aliases_render_through_canonical_artifacts` |
 | `run_external_transform` | `src-tauri/src/transforms/external.rs` | `external_transform_tests::external_transform_adapters_shape_engine_specific_invocations`; `external_transform_tests::external_transform_cache_invalidates_when_trusted_executable_changes` |
 | `cleanup_ai_paste` | `src-tauri/src/ai_cleanup.rs` | `ai_cleanup_tests::ai_cleanup_normalizes_chat_artifacts`; `ai_cleanup_tests::ai_cleanup_converts_rich_html_clipboard_content`; `ai_cleanup_tests::ai_cleanup_normalizes_ai_code_fence_variants` |

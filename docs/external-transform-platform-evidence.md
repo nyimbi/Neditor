@@ -19,9 +19,10 @@ NEDITOR_TEST_PIKCHR=/Users/nyimbiodero/src/pjs/tooling/neditor/.tmp/pikchr-build
 ```
 
 The probe reports installed/missing optional engines without failing solely
-because an optional engine is absent. For installed engines, it also renders a
-small SVG smoke artifact through the same adapter shape NEditor uses and writes
-those artifacts under `.tmp/external-engines/artifacts/`.
+because an optional engine is absent. For installed diagram engines, it renders
+a small SVG smoke artifact through the same adapter shape NEditor uses. For
+SQLite, it runs a read-only in-memory CSV query through `sqlite3`. The probe
+writes those artifacts under `.tmp/external-engines/artifacts/`.
 
 The same command now writes external evidence templates under
 `.tmp/external-engines/templates/`. Copy a completed evidence file into
@@ -29,7 +30,7 @@ The same command now writes external evidence templates under
 `NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR` at another directory, when a supported
 host has an optional engine that is not installed locally. Supplied evidence is
 validated for schema, engine key, status, timestamp, platform, command, version,
-SVG smoke bytes, smoke hash, required text markers, and zero unresolved
+smoke bytes, smoke hash, required text markers, and zero unresolved
 blockers. Malformed supplied evidence fails the probe; absent optional engines
 without copied proof remain explicit release-readiness gaps.
 
@@ -115,6 +116,13 @@ Pikchr: installed
   smoke: passed
   artifact: .tmp/external-engines/artifacts/pikchr.svg
   bytes: 1420
+SQLite / sqlite3: installed
+  command: sqlite3
+  path: /usr/bin/sqlite3
+  version: 3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)
+  smoke: passed
+  artifact: .tmp/external-engines/artifacts/sqlite.csv
+  bytes: 731
 ```
 
 Rust conformance evidence:
@@ -127,12 +135,14 @@ external transform conformance verified: dot, circo, neato, fdp, osage, twopi, d
 Interpretation:
 
 - Graphviz/DOT, Graphviz layout engines (`circo`, `neato`, `fdp`, `osage`,
-  `twopi`), D2, PlantUML, and Pikchr are verified on this macOS host through
-  the standalone engine probe and through the same Rust external transform
-  execution path used by NEditor.
+  `twopi`), D2, PlantUML, Pikchr, and SQLite are verified on this macOS host
+  through the standalone engine probe. Diagram engines are also verified
+  through the same Rust external transform execution path used by NEditor, and
+  SQLite SQL transform trust/read-only behavior is covered by focused Rust
+  table transform tests.
 - The standalone probe now produces inspectable SVG smoke artifacts for every
-  installed engine and fails if an installed engine cannot render the expected
-  smoke output.
+  installed diagram engine plus a CSV query artifact for SQLite, and fails if
+  an installed engine cannot render the expected smoke output.
 - External evidence templates now make copied Linux, Windows, or alternate
   macOS optional-engine proof auditable instead of relying on prose notes.
 - PlantUML file-mode execution is verified locally and Java is available.
@@ -144,5 +154,5 @@ Interpretation:
 
 - Refresh Linux installed-engine evidence locally when those engines are
   available outside retired remote workflows.
-- Add Windows evidence for Graphviz, D2, PlantUML, Java, and Pikchr executable
-  paths, including package-manager shims.
+- Add Windows evidence for Graphviz, D2, PlantUML, Java, Pikchr, and SQLite
+  executable paths, including package-manager shims.

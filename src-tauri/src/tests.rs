@@ -108,6 +108,7 @@ mod validation_tests;
 
 mod table_tests;
 
+mod transform_install_tests;
 mod transform_tests;
 
 mod export_tests;

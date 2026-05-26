@@ -107,6 +107,12 @@ const evidenceItems = [
     "optional-engines/pikchr.json",
     "pikchr.json",
   ]),
+  item("external-engine-sqlite", ".tmp/external-engines/external/sqlite.json", "external-engine", [
+    "external-engines/external/sqlite.json",
+    "external-engines/sqlite.json",
+    "optional-engines/sqlite.json",
+    "sqlite.json",
+  ]),
 ];
 
 if (listOnly) {

@@ -138,6 +138,20 @@ const engines = [
       needles: ["<svg", "NEditor"],
     },
   },
+  {
+    key: "sqlite",
+    name: "SQLite / sqlite3",
+    command: "sqlite3",
+    env: "NEDITOR_TEST_SQLITE3",
+    versionArgs: ["--version"],
+    smoke: {
+      kind: "sqlite",
+      source:
+        "WITH RECURSIVE n(value) AS (VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 12) SELECT 'NEditor SQL smoke' AS marker, value, printf('row-%02d-read-only-sql-transform-proof', value) AS detail FROM n;",
+      artifact: "sqlite.csv",
+      needles: ["marker,value,detail", "NEditor SQL smoke", "read-only-sql-transform-proof"],
+    },
+  },
 ];
 
 rmSync(artifactDir, { recursive: true, force: true });
@@ -300,7 +314,8 @@ function evaluateExternalEvidence(engine) {
   requireValue(Boolean(String(evidence.path || "").trim()), problems, "path is required");
   requireValue(Boolean(String(evidence.version || "").trim()), problems, "version is required");
   requireValue(evidence.smoke?.status === "passed", problems, "smoke.status must be passed");
-  requireValue(Number(evidence.smoke?.bytes) > 200, problems, "smoke.bytes must be > 200");
+  const minimumSmokeBytes = engine.smoke?.minimumBytes || 200;
+  requireValue(Number(evidence.smoke?.bytes) > minimumSmokeBytes, problems, `smoke.bytes must be > ${minimumSmokeBytes}`);
   requireValue(isSha256(evidence.smoke?.sha256), problems, "smoke.sha256 must be a sha256");
   const needles = Array.isArray(evidence.smoke?.needles) ? evidence.smoke.needles : [];
   for (const needle of engine.smoke?.needles || []) {
@@ -392,6 +407,13 @@ function runSmoke(engine, commandPath) {
       const sourcePath = join(tempDir, `${safeName(engine.command)}.pikchr`);
       writeFileSync(sourcePath, engine.smoke.source);
       result = spawnSync(commandPath, [sourcePath], {
+        encoding: "utf8",
+        shell: false,
+        timeout: 20_000,
+      });
+      output = result.stdout || "";
+    } else if (engine.smoke.kind === "sqlite") {
+      result = spawnSync(commandPath, ["-header", "-csv", ":memory:", engine.smoke.source], {
         encoding: "utf8",
         shell: false,
         timeout: 20_000,

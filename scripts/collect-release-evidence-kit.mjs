@@ -29,6 +29,7 @@ const templateCopies = [
   [".tmp/rendered-export-audit/visual-review-signoff.template.json", "templates/rendered-export/visual-review-signoff.template.json"],
   [".tmp/accessibility/manual-review-template.json", "templates/accessibility/manual-review-template.json"],
   [".tmp/external-engines/templates/pikchr.template.json", "templates/external-engines/pikchr.template.json"],
+  [".tmp/external-engines/templates/sqlite.template.json", "templates/external-engines/sqlite.template.json"],
 ];
 
 const runbooks = [
@@ -202,12 +203,12 @@ const runbooks = [
       `git checkout ${sourceCommit || "<source-commit>"}`,
       "git status --porcelain",
       "pnpm install --frozen-lockfile",
-      "Install or build the missing optional engine, such as Pikchr, on the verifier host.",
-      "Run pnpm run check:engines with the engine path environment variable when needed, for example NEDITOR_TEST_PIKCHR=/absolute/path/to/pikchr pnpm run check:engines.",
-      "Copy the matching completed template from .tmp/external-engines/templates/ to .tmp/external-engines/external/, for example pikchr.json.",
+      "Install or build the missing optional engine, such as Pikchr or sqlite3, on the verifier host.",
+      "Run pnpm run check:engines with the engine path environment variable when needed, for example NEDITOR_TEST_PIKCHR=/absolute/path/to/pikchr NEDITOR_TEST_SQLITE3=/absolute/path/to/sqlite3 pnpm run check:engines.",
+      "Copy the matching completed template from .tmp/external-engines/templates/ to .tmp/external-engines/external/, for example pikchr.json or sqlite.json.",
       "NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR=.tmp/external-engines/external pnpm run check:engines",
     ],
-    returns: [".tmp/external-engines/external/pikchr.json"],
+    returns: [".tmp/external-engines/external/pikchr.json", ".tmp/external-engines/external/sqlite.json"],
   },
   {
     file: "runbooks/spec-completion-closure.md",

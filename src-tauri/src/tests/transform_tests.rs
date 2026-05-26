@@ -23,6 +23,10 @@ fn transform_registry_covers_required_first_release_transforms() {
         .iter()
         .find(|engine| engine.get("name").and_then(Value::as_str) == Some("plantuml"))
         .expect("plantuml engine metadata");
+    let sql = engines
+        .iter()
+        .find(|engine| engine.get("name").and_then(Value::as_str) == Some("sql"))
+        .expect("sql engine metadata");
     assert_eq!(
         pikchr.get("trustRequired").and_then(Value::as_bool),
         Some(true)
@@ -65,6 +69,23 @@ fn transform_registry_covers_required_first_release_transforms() {
         plantuml.get("output").and_then(Value::as_str),
         Some("svg-or-png")
     );
+    assert_eq!(sql.get("output").and_then(Value::as_str), Some("table"));
+    assert_eq!(
+        sql.get("trustRequired").and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        sql.get("defaultCommand").and_then(Value::as_str),
+        Some("sqlite3")
+    );
+    assert!(sql
+        .get("setupHint")
+        .and_then(Value::as_str)
+        .is_some_and(|hint| hint.contains("sqlite3") && hint.contains("read-only")));
+    assert!(sql
+        .pointer("/diagnosticProfile/versionProbe")
+        .and_then(Value::as_str)
+        .is_some_and(|probe| probe.contains("sqlite3 --version")));
     assert!(vega_lite
         .get("aliases")
         .and_then(Value::as_array)
@@ -96,6 +117,7 @@ fn transform_registry_covers_required_first_release_transforms() {
         "stl",
         "csv",
         "tsv",
+        "sql",
         "json",
         "yaml",
         "openapi",
