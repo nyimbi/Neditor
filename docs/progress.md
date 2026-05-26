@@ -139,6 +139,10 @@ Recent pushed checkpoints visible in current git history:
   generated sections and citation workflows. Non-target fenced examples are now
   consumed as examples, so nested `glossary` or `bibtex` samples cannot leak
   fake terms or references into the compiled document model.
+- Transform fences now use the same shared fence detector: supported transforms
+  such as `chart` render from either backtick or tilde fences, while unsupported
+  or documentation/example fences are preserved inertly instead of allowing
+  nested transform samples to execute.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.

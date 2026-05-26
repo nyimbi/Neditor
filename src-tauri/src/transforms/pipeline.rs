@@ -1,7 +1,7 @@
 use super::TransformArtifact;
 use crate::{
-    diagnostics::DocumentDiagnostic, source_mapping::ast_source_range_for_generated_lines,
-    SourceMapEntry,
+    compiler_support::fenced_code_marker, diagnostics::DocumentDiagnostic,
+    source_mapping::ast_source_range_for_generated_lines, SourceMapEntry,
 };
 use serde_json::Value;
 
@@ -20,7 +20,8 @@ where
     let mut artifacts = Vec::new();
     let mut lines = text.lines().enumerate().peekable();
     while let Some((line_index, line)) = lines.next() {
-        if let Some(info) = line.trim().strip_prefix("```") {
+        if let Some(marker) = fenced_code_marker(line) {
+            let info = line.trim_start().strip_prefix(marker).unwrap_or("").trim();
             let name = info.split_whitespace().next().unwrap_or("");
             if is_supported(name) {
                 let source_line = line_index + 1;
@@ -28,7 +29,7 @@ where
                 let fence_options = transform_fence_options(info);
                 let mut body = String::new();
                 for (body_line_index, body_line) in lines.by_ref() {
-                    if body_line.trim() == "```" {
+                    if body_line.trim_start().starts_with(marker) {
                         end_source_line = body_line_index + 1;
                         break;
                     }
@@ -50,6 +51,16 @@ where
                 artifacts.push(artifact);
                 continue;
             }
+            output.push_str(line);
+            output.push('\n');
+            for (_, body_line) in lines.by_ref() {
+                output.push_str(body_line);
+                output.push('\n');
+                if body_line.trim_start().starts_with(marker) {
+                    break;
+                }
+            }
+            continue;
         }
         output.push_str(line);
         output.push('\n');

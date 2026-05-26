@@ -1019,6 +1019,28 @@ fn compiler_ignores_extension_blocks_inside_fenced_examples() {
 }
 
 #[test]
+fn compiler_renders_tilde_transform_fences_and_ignores_examples() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Transform Fences\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Transform Fences\n\n```markdown\n```chart\ntype: bar\ntitle: Fake Chart\ndata:\n  - label: Placeholder\n    value: 999\nx: label\ny: value\n```\n```\n\n~~~chart\ntype: bar\ntitle: Real Chart\ndata:\n  - label: Q1\n    value: 10\n  - label: Q2\n    value: 14\nx: label\ny: value\n~~~\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    let chart_artifacts = response
+        .transform_artifacts
+        .iter()
+        .filter(|artifact| artifact.name == "chart")
+        .collect::<Vec<_>>();
+    assert_eq!(chart_artifacts.len(), 1);
+    assert!(chart_artifacts[0].source.contains("Real Chart"));
+    assert!(!chart_artifacts[0].source.contains("Fake Chart"));
+    assert!(response.compiled_markdown.contains("Real Chart"));
+    assert!(response
+        .compiled_markdown
+        .contains("```chart\ntype: bar\ntitle: Fake Chart"));
+}
+
+#[test]
 fn compiler_preserves_figure_float_semantics() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Floating Figure\nstatus: approved\napprovedBy: QA\n---\n# Floating Figure\n![Diagram](data:image/svg+xml;base64,PHN2Zy8+){#fig:float caption=\"Floating diagram\" float=\"right\"}\n".to_string(),
