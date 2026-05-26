@@ -118,9 +118,13 @@ fn ned_cli_creates_new_business_document_from_template() {
 
 #[test]
 fn ned_cli_doctor_reports_json_capabilities() {
+    let workspace = temp_workspace_path("doctor");
+    fs::create_dir_all(&workspace).expect("create doctor workspace");
     let args = vec![
         "ned".to_string(),
         "doctor".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
         "--json".to_string(),
     ];
     let outcome = crate::cli::run_cli_with_args(&args).expect("doctor json");
@@ -136,6 +140,31 @@ fn ned_cli_doctor_reports_json_capabilities() {
         .as_array()
         .expect("templates")
         .contains(&serde_json::json!("rfp-response")));
+    assert_eq!(report["workspaceScaffold"]["status"], "not-initialized");
+    assert!(report["workspaceScaffold"]["recommended_command"]
+        .as_str()
+        .expect("recommended command")
+        .contains("ned init"));
+    assert!(report["transformHandlers"]["registeredEngines"]
+        .as_array()
+        .expect("registered engines")
+        .contains(&serde_json::json!("plantuml")));
+    assert!(report["transformHandlers"]["missingRegisteredEngines"]
+        .as_array()
+        .expect("missing transform engines")
+        .is_empty());
+
+    crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "init".to_string(),
+        workspace.to_string_lossy().to_string(),
+    ])
+    .expect("init doctor workspace");
+    let ready = crate::cli::run_cli_with_args(&args).expect("doctor ready json");
+    let ready_report: serde_json::Value =
+        serde_json::from_str(&ready.message).expect("ready doctor json");
+    assert_eq!(ready_report["workspaceScaffold"]["status"], "ready");
+    assert!(ready_report["workspaceScaffold"]["recommended_command"].is_null());
 }
 
 #[test]
@@ -288,6 +317,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("#compdef ned"));
     assert!(zsh.message.contains("--output-dir"));
     assert!(zsh.message.contains("--stdout"));
+    assert!(zsh.message.contains("--workspace"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -507,6 +537,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned handlers"));
     assert!(outcome.message.contains("ned completions"));
     assert!(outcome.message.contains("ned doctor"));
+    assert!(outcome.message.contains("--workspace"));
     assert!(outcome.message.contains("docx"));
     assert!(outcome.message.contains("epub"));
     assert!(outcome.message.contains("or all"));

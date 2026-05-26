@@ -97,7 +97,7 @@ ned templates
 ned targets --json
 ned handlers --platform windows --commands-only
 ned completions zsh
-ned doctor
+ned doctor --workspace . --json
 ned default-reader --status
 ```
 
@@ -126,10 +126,11 @@ Graphviz, D2, PlantUML, Pikchr, and SQLite; use `--commands-only` when a support
 script needs just the package-manager commands without starting installers. `ned
 completions bash`, `ned completions zsh`, and `ned completions fish` print shell
 completion scripts so support teams can make the command easier to discover
-after installation. `ned doctor` prints a quick local installation report with
-the app binary, default-reader automation status, export targets, and starter
-templates; use `ned doctor --json` when you want machine-readable support
-evidence. In the app, open **Settings -> Files** to review the `ned` usage
+after installation. `ned doctor` prints a local installation and workspace setup
+report with the app binary, default-reader automation status, `.neditor`
+scaffold status, transform handler setup coverage, export targets, and starter
+templates; use `ned doctor --workspace . --json` when you want machine-readable
+support evidence. In the app, open **Settings -> Files** to review the `ned` usage
 summary and request NEditor as the default Markdown reader. Some operating
 systems require user confirmation or a helper such as `duti`; NEditor shows the
 exact commands and manual steps instead of silently changing protected OS

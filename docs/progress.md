@@ -3729,6 +3729,24 @@ Spreadsheet table exchange and SQL transform:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the CLI handler discovery implementation. |
 | `git diff --check` | Pass | No whitespace errors are present in the `ned handlers` diff. |
 
+`ned` workspace-aware setup doctor:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed for `ned doctor --workspace` JSON setup reporting, uninitialized scaffold recommendations, initialized scaffold readiness, transform-handler coverage, completions, and help text coverage. |
+| `src-tauri/target/debug/ned doctor --workspace /private/tmp/neditor-doctor-uninitialized --json` | Pass | Direct smoke returned `neditor.ned-doctor.v1` with app binary/default-reader details, transform handler coverage, workspace scaffold status `workspace-missing`, missing `.neditor` files, and the exact `ned init ... --json` recommendation. |
+| `src-tauri/target/debug/ned init /private/tmp/neditor-doctor-ready --force --json` | Pass | Direct setup smoke created the expected `.neditor` workspace scaffold for the ready-doctor proof. |
+| `src-tauri/target/debug/ned doctor --workspace /private/tmp/neditor-doctor-ready` | Pass | Direct text smoke reported the workspace scaffold as ready and transform handler setup coverage as complete while preserving host-specific default-reader warning details. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed after updating Settings copy for workspace-aware doctor diagnostics. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the Settings command-line guidance refresh. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting `ned doctor --workspace . --json` in the README. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding workspace-aware doctor evidence to local file and Settings rows. |
+| `pnpm run check:platform-packaging` | Pass | Platform package configuration remains valid after the CLI doctor extension. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after the CLI doctor extension. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`, preserving external signing, notarization, and cross-host proof blockers. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed for the CLI doctor implementation. |
+| `git diff --check` | Pass | No whitespace errors are present in the `ned doctor` diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

@@ -90,6 +90,16 @@ pub(crate) struct DefaultMarkdownReaderResponse {
     pub(crate) manual_steps: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+struct WorkspaceScaffoldStatus {
+    workspace: String,
+    neditor_directory: String,
+    status: String,
+    required_files: Vec<String>,
+    missing_files: Vec<String>,
+    recommended_command: Option<String>,
+}
+
 pub fn run_cli() -> i32 {
     let args = env::args().collect::<Vec<_>>();
     match run_cli_with_args(&args) {
@@ -831,18 +841,38 @@ fn run_completions_command(args: &[String]) -> Result<CliOutcome, String> {
 }
 
 fn run_doctor_command(args: &[String]) -> Result<CliOutcome, String> {
-    let json_output = args.iter().any(|arg| arg == "--json");
-    let strict = args.iter().any(|arg| arg == "--strict");
-    if let Some(unsupported) = args
-        .iter()
-        .find(|arg| !matches!(arg.as_str(), "--json" | "--strict"))
-    {
-        return Err(format!("Unsupported doctor option '{unsupported}'"));
+    let mut json_output = false;
+    let mut strict = false;
+    let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--strict" => strict = true,
+            "--workspace" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
+            value => return Err(format!("Unsupported doctor option '{value}'")),
+        }
+        index += 1;
     }
     let current_exe = env::current_exe().ok();
     let app_binary = find_neditor_binary();
     let default_reader = default_markdown_reader_response(false, false);
-    let warnings = doctor_warnings(app_binary.as_ref(), &default_reader);
+    let workspace_scaffold = workspace_scaffold_status(&workspace);
+    let handler_plans = transform_handler_installer_plans_for_platform(env::consts::OS);
+    let registered_engines = installable_external_transform_engines();
+    let missing_handler_engines =
+        missing_transform_handler_engines(&handler_plans, &registered_engines);
+    let warnings = doctor_warnings(
+        app_binary.as_ref(),
+        &default_reader,
+        &missing_handler_engines,
+    );
     let status = if warnings.is_empty() {
         "ready"
     } else {
@@ -859,6 +889,12 @@ fn run_doctor_command(args: &[String]) -> Result<CliOutcome, String> {
             "cliPath": current_exe.map(|path| path.to_string_lossy().to_string()),
             "appBinary": app_binary.map(|path| path.to_string_lossy().to_string()),
             "defaultReader": default_reader,
+            "workspaceScaffold": workspace_scaffold,
+            "transformHandlers": {
+                "registeredEngines": registered_engines,
+                "missingRegisteredEngines": missing_handler_engines,
+                "plans": handler_plans,
+            },
             "exportTargets": SUPPORTED_EXPORT_TARGETS,
             "templates": NEW_DOCUMENT_TEMPLATES,
             "warnings": warnings,
@@ -886,6 +922,18 @@ fn run_doctor_command(args: &[String]) -> Result<CliOutcome, String> {
                 .unwrap_or_else(|| "not found next to ned".to_string())
         ),
         format!("Default reader automation: {}", default_reader.message),
+        format!(
+            "Workspace scaffold: {} at {}",
+            workspace_scaffold.status, workspace_scaffold.neditor_directory
+        ),
+        format!(
+            "Transform handler setup coverage: {}",
+            if missing_handler_engines.is_empty() {
+                "all registered engines covered".to_string()
+            } else {
+                format!("missing {}", missing_handler_engines.join(", "))
+            }
+        ),
         format!("Export targets: {}", SUPPORTED_EXPORT_TARGETS.join(", ")),
         format!(
             "New document templates: {}",
@@ -895,6 +943,9 @@ fn run_doctor_command(args: &[String]) -> Result<CliOutcome, String> {
     if !warnings.is_empty() {
         lines.push("Warnings:".to_string());
         lines.extend(warnings.iter().map(|warning| format!("  - {warning}")));
+    }
+    if let Some(command) = workspace_scaffold.recommended_command.as_ref() {
+        lines.push(format!("Workspace setup command: {command}"));
     }
     Ok(CliOutcome {
         message: lines.join("\n"),
@@ -1075,6 +1126,7 @@ fn command_available(command: &str) -> bool {
 fn doctor_warnings(
     app_binary: Option<&PathBuf>,
     default_reader: &DefaultMarkdownReaderResponse,
+    missing_handler_engines: &[String],
 ) -> Vec<String> {
     let mut warnings = Vec::new();
     if app_binary.is_none() {
@@ -1089,7 +1141,47 @@ fn doctor_warnings(
             default_reader.message
         ));
     }
+    if !missing_handler_engines.is_empty() {
+        warnings.push(format!(
+            "Transform handler setup plan is missing coverage for: {}",
+            missing_handler_engines.join(", ")
+        ));
+    }
     warnings
+}
+
+fn workspace_scaffold_status(root: &Path) -> WorkspaceScaffoldStatus {
+    let entries = workspace_init_entries(root);
+    let required_files = entries
+        .iter()
+        .map(|(path, _)| path_to_display(path))
+        .collect::<Vec<_>>();
+    let missing_files = entries
+        .iter()
+        .filter(|(path, _)| !path.is_file())
+        .map(|(path, _)| path_to_display(path))
+        .collect::<Vec<_>>();
+    let status = if root.exists() && missing_files.is_empty() {
+        "ready"
+    } else if !root.exists() {
+        "workspace-missing"
+    } else if missing_files.len() == required_files.len() {
+        "not-initialized"
+    } else {
+        "incomplete"
+    };
+    WorkspaceScaffoldStatus {
+        workspace: path_to_display(root),
+        neditor_directory: path_to_display(&root.join(".neditor")),
+        status: status.to_string(),
+        required_files,
+        missing_files,
+        recommended_command: if status == "ready" {
+            None
+        } else {
+            Some(format!("ned init {} --json", root.display()))
+        },
+    }
 }
 
 fn canonical_path_string(path: &Path) -> Result<String, String> {
@@ -1399,11 +1491,11 @@ _ned() {{
       handlers|transform-handlers)
         COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
         ;;
+      doctor)
+        COMPREPLY=( $(compgen -W "--json --strict --workspace" -- "$cur") )
+        ;;
       default-reader)
         COMPREPLY=( $(compgen -W "--status --enable" -- "$cur") )
-        ;;
-      doctor)
-        COMPREPLY=( $(compgen -W "--json --strict" -- "$cur") )
         ;;
       *)
         COMPREPLY=( $(compgen -W "--help --version" -- "$cur") )
@@ -1474,7 +1566,7 @@ _ned() {{
       _arguments '--status[show setup status]' '--enable[request default Markdown reader setup]'
       ;;
     doctor)
-      _arguments '--json[print machine-readable JSON]' '--strict[fail when warnings exist]'
+      _arguments '--json[print machine-readable JSON]' '--strict[fail when warnings exist]' '--workspace[inspect NEditor project scaffold]:directory:_files -/'
       ;;
     *)
       _arguments '1:command:($commands)'
@@ -1546,6 +1638,7 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from validate check' -l strict".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from validate check' -l option -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from doctor' -l strict".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from doctor' -l workspace -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l status".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l enable".to_string(),
     ]);
@@ -1864,7 +1957,7 @@ fn help_text() -> String {
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),
-        "  ned doctor [--json] [--strict]".to_string(),
+        "  ned doctor [--json] [--strict] [--workspace path]".to_string(),
         "  ned default-reader --status".to_string(),
         "  ned default-reader --enable".to_string(),
         "  ned --version".to_string(),
