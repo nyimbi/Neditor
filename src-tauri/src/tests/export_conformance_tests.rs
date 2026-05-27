@@ -1114,9 +1114,22 @@ openapi: 3.1.0
 info:
   title: Ledger API
   version: 1.0.0
+  termsOfService: https://example.test/terms
+  contact:
+    name: API Support
+    email: api-support@example.test
+  license:
+    name: Commercial
+    identifier: LicenseRef-NEditor-Commercial
 servers:
   - url: https://api.example.test
     description: Production
+externalDocs:
+  description: API handbook
+  url: https://docs.example.test/api
+tags:
+  - name: Accounts
+    description: Account administration workflows
 security:
   - ApiKeyAuth: []
 paths:
@@ -1354,6 +1367,11 @@ components:
     let html = render_full_html(&response, &options);
     assert!(html.contains("transform-openapi"));
     assert!(html.contains("Ledger API"));
+    assert!(html.contains("API metadata"));
+    assert!(html.contains("API Support"));
+    assert!(html.contains("LicenseRef-NEditor-Commercial"));
+    assert!(html.contains("API handbook"));
+    assert!(html.contains("Account administration workflows"));
     assert!(html.contains("https://api.example.test"));
     assert!(html.contains("listAccounts"));
     assert!(html.contains("deprecated"));

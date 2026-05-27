@@ -982,6 +982,15 @@ openapi: 3.1.0
 info:
   title: Ledger API
   version: 1.0.0
+  termsOfService: https://example.test/terms
+  contact:
+    name: API Support
+    email: api-support@example.test
+    url: https://support.example.test
+  license:
+    name: Commercial
+    identifier: LicenseRef-NEditor-Commercial
+    url: https://example.test/license
 servers:
   - url: https://api.example.test/{region}
     description: Production
@@ -990,6 +999,15 @@ servers:
         default: us-east
         enum: [us-east, eu-west]
         description: Deployment region
+externalDocs:
+  description: API handbook
+  url: https://docs.example.test/api
+tags:
+  - name: Accounts
+    description: Account administration workflows
+    externalDocs:
+      description: Accounts playbook
+      url: https://docs.example.test/tags/accounts
 security:
   - ApiKeyAuth: []
 paths:
@@ -1273,6 +1291,20 @@ components:
     });
 
     assert!(response.html.contains("Ledger API"));
+    assert!(response.html.contains("API metadata"));
+    assert!(response.html.contains("https://example.test/terms"));
+    assert!(response.html.contains("API Support"));
+    assert!(response.html.contains("api-support@example.test"));
+    assert!(response.html.contains("https://support.example.test"));
+    assert!(response.html.contains("Commercial"));
+    assert!(response.html.contains("LicenseRef-NEditor-Commercial"));
+    assert!(response.html.contains("https://example.test/license"));
+    assert!(response.html.contains("API handbook"));
+    assert!(response.html.contains("https://docs.example.test/api"));
+    assert!(response
+        .html
+        .contains("Accounts - Account administration workflows"));
+    assert!(response.html.contains("Accounts playbook"));
     assert!(response.html.contains("https://api.example.test/{region}"));
     assert!(response
         .html

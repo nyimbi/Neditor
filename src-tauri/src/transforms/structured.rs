@@ -85,6 +85,7 @@ pub(crate) fn render_openapi_html(
             escape_html(version)
         ));
     }
+    html.push_str(&render_openapi_metadata(info, &value));
     html.push_str(&render_openapi_servers(&value));
     html.push_str(
         "<table class=\"transform-table openapi\"><thead><tr><th>Method</th><th>Path</th><th>Operation</th><th>Security</th><th>Parameters</th><th>Request body</th><th>Responses</th></tr></thead><tbody>",
@@ -214,6 +215,139 @@ fn render_openapi_servers(value: &Value) -> String {
         return String::new();
     };
     render_openapi_server_list(servers, "api-servers")
+}
+
+fn render_openapi_metadata(info: Option<&Map<String, Value>>, value: &Value) -> String {
+    let mut items = Vec::new();
+    if let Some(terms) = info
+        .and_then(|info| info.get("termsOfService"))
+        .and_then(Value::as_str)
+        .filter(|terms| !terms.trim().is_empty())
+    {
+        items.push(format!(
+            "<li><strong>Terms:</strong> <code>{}</code></li>",
+            escape_html(terms)
+        ));
+    }
+    if let Some(contact) = info
+        .and_then(|info| info.get("contact"))
+        .and_then(Value::as_object)
+        .map(openapi_contact_summary)
+        .filter(|summary| !summary.is_empty())
+    {
+        items.push(format!("<li><strong>Contact:</strong> {contact}</li>"));
+    }
+    if let Some(license) = info
+        .and_then(|info| info.get("license"))
+        .and_then(Value::as_object)
+        .map(openapi_license_summary)
+        .filter(|summary| !summary.is_empty())
+    {
+        items.push(format!("<li><strong>License:</strong> {license}</li>"));
+    }
+    if let Some(external_docs) = openapi_external_docs_summary(value.get("externalDocs")) {
+        items.push(format!(
+            "<li><strong>External docs:</strong> {external_docs}</li>"
+        ));
+    }
+    if let Some(tags) = openapi_tags_summary(value.get("tags")) {
+        items.push(format!("<li><strong>Tags:</strong> {tags}</li>"));
+    }
+    if items.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<section class=\"api-metadata\"><h4>API metadata</h4><ul>{}</ul></section>",
+            items.join("")
+        )
+    }
+}
+
+fn openapi_contact_summary(contact: &Map<String, Value>) -> String {
+    [
+        contact
+            .get("name")
+            .and_then(Value::as_str)
+            .map(escape_html)
+            .unwrap_or_default(),
+        contact
+            .get("email")
+            .and_then(Value::as_str)
+            .map(|email| format!("email: {}", escape_html(email)))
+            .unwrap_or_default(),
+        contact
+            .get("url")
+            .and_then(Value::as_str)
+            .map(|url| format!("url: <code>{}</code>", escape_html(url)))
+            .unwrap_or_default(),
+    ]
+    .into_iter()
+    .filter(|part| !part.is_empty())
+    .collect::<Vec<_>>()
+    .join(" ")
+}
+
+fn openapi_license_summary(license: &Map<String, Value>) -> String {
+    [
+        license
+            .get("name")
+            .and_then(Value::as_str)
+            .map(escape_html)
+            .unwrap_or_default(),
+        license
+            .get("identifier")
+            .and_then(Value::as_str)
+            .map(|identifier| format!("identifier: {}", escape_html(identifier)))
+            .unwrap_or_default(),
+        license
+            .get("url")
+            .and_then(Value::as_str)
+            .map(|url| format!("url: <code>{}</code>", escape_html(url)))
+            .unwrap_or_default(),
+    ]
+    .into_iter()
+    .filter(|part| !part.is_empty())
+    .collect::<Vec<_>>()
+    .join(" ")
+}
+
+fn openapi_external_docs_summary(value: Option<&Value>) -> Option<String> {
+    let docs = value?.as_object()?;
+    let url = docs.get("url").and_then(Value::as_str).unwrap_or("");
+    let description = docs
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("External docs");
+    if url.trim().is_empty() {
+        return None;
+    }
+    Some(format!(
+        "{} <code>{}</code>",
+        escape_html(description),
+        escape_html(url)
+    ))
+}
+
+fn openapi_tags_summary(value: Option<&Value>) -> Option<String> {
+    let tags = value?
+        .as_array()?
+        .iter()
+        .filter_map(|tag| {
+            let tag = tag.as_object()?;
+            let name = tag.get("name").and_then(Value::as_str)?;
+            let description = tag.get("description").and_then(Value::as_str).unwrap_or("");
+            let external_docs = openapi_external_docs_summary(tag.get("externalDocs"));
+            let mut parts = vec![escape_html(name)];
+            if !description.trim().is_empty() {
+                parts.push(format!("- {}", escape_html(description)));
+            }
+            if let Some(external_docs) = external_docs {
+                parts.push(format!("({external_docs})"));
+            }
+            Some(parts.join(" "))
+        })
+        .collect::<Vec<_>>();
+    (!tags.is_empty()).then(|| tags.join("; "))
 }
 
 fn render_openapi_server_list(servers: &[Value], class_name: &str) -> String {

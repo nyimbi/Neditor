@@ -4816,6 +4816,13 @@ Structured JSON/YAML map tables:
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked structured_data_tables_render_keyed_maps_and_scalar_settings --lib` | Pass | Focused structured-data proof shows keyed JSON object maps render as captioned tables with stable key columns, scalar YAML settings maps render as two-column field tables, scalar arrays remain readable, and mixed hierarchical documents continue using structured trees. |
 
+OpenAPI metadata completeness:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused OpenAPI proof shows native API references now preserve terms of service, contact, license, root external docs, tag descriptions, and tag external docs alongside existing operation, callback, webhook, schema, security, and parameter tables. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export proof remains clean after adding API metadata to the OpenAPI native HTML artifact fixture. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
