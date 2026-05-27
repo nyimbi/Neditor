@@ -4685,6 +4685,14 @@ RFP URL and DOCX source cleanup hardening:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after refreshing native RFP URL cleanup evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the RFP URL cleanup hardening diff. |
 
+XLSX front matter data sources:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked data_sources --lib` | Pass | Seven focused Rust data-source tests passed, including `compiler_loads_front_matter_xlsx_data_sources`, proving front matter `dataSources` and `xlsxFiles` can import a local XLSX first worksheet as Markdown table output while preserving include graph and export-manifest evidence. |
+| `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed after adding XLSX as a supported local data-source kind in the front matter manager. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after exposing XLSX in data-source UI type options. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

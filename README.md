@@ -545,8 +545,10 @@ web app.
   Tables sidebar lives.
 - Markdown tables, CSV fences, and TSV fences can carry formulas such as
   `=10+15`, `=SUM(2,3)`, and named table references.
-- Data transforms for CSV, TSV, JSON, YAML, SQLite SQL, OpenAPI, and JSON
-  Schema produce preview/export-safe artifacts. SQL transforms are read-only
+- Data transforms for CSV, TSV, XLSX data sources, JSON, YAML, SQLite SQL,
+  OpenAPI, and JSON Schema produce preview/export-safe artifacts. XLSX front
+  matter sources import the first worksheet as a Markdown table while preserving
+  document-folder path safety. SQL transforms are read-only
   SQLite table queries behind explicit engine trust, and relative database paths
   resolve from the current Markdown document's folder without allowing relative
   escapes outside that folder.

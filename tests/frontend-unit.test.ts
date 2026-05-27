@@ -906,6 +906,8 @@ test("front matter managers inventory data sources and document variables", () =
     "csvFiles: !files [data/tagged-customers.csv]",
     "csvFiles: *csvBlockList",
     "ymlFiles: *yamlAliasList",
+    "xlsxFiles:",
+    "  - data/forecast.xlsx",
     "jsonFiles:",
     "  - data/profile.json",
     "  - *jsonAliasPath",
@@ -958,6 +960,7 @@ test("front matter managers inventory data sources and document variables", () =
     ["Legacy Block B", "data/legacy-block-b.csv", "csv", "ready", "csvFiles"],
     ["Legacy A", "data/legacy-a.yml", "yaml", "ready", "ymlFiles"],
     ["Legacy B", "data/legacy-b.yml", "yaml", "ready", "ymlFiles"],
+    ["Forecast", "data/forecast.xlsx", "xlsx", "ready", "xlsxFiles"],
     ["Profile", "data/profile.json", "json", "ready", "jsonFiles"],
     ["Aliased Profile", "data/aliased-profile.json", "json", "ready", "jsonFiles"],
   ]);

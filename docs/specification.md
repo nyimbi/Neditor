@@ -1262,7 +1262,7 @@ Initial:
 - Inline tables.
 - `csv` fenced blocks.
 - `tsv` fenced blocks.
-- Local CSV files referenced from front matter.
+- Local CSV, TSV, JSON, YAML, and XLSX files referenced from front matter.
 
 Later:
 

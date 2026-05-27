@@ -1,4 +1,5 @@
 use crate::{
+    data_exchange::import_xlsx_data_source_markdown,
     diagnostics::{diag, with_range},
     path_to_string, DocumentDiagnostic, IncludeEdge,
 };
@@ -326,6 +327,8 @@ pub(crate) fn render_front_matter_data_sources(
     collect_data_source_specs(metadata.get("json_files"), Some("json"), &mut specs);
     collect_data_source_specs(metadata.get("yamlFiles"), Some("yaml"), &mut specs);
     collect_data_source_specs(metadata.get("yaml_files"), Some("yaml"), &mut specs);
+    collect_data_source_specs(metadata.get("xlsxFiles"), Some("xlsx"), &mut specs);
+    collect_data_source_specs(metadata.get("xlsx_files"), Some("xlsx"), &mut specs);
     if specs.is_empty() {
         return String::new();
     }
@@ -358,7 +361,7 @@ pub(crate) fn render_front_matter_data_sources(
             .or_else(|| data_source_kind_from_path(&spec.path))
             .unwrap_or("csv")
             .to_ascii_lowercase();
-        if !matches!(kind.as_str(), "csv" | "tsv" | "json" | "yaml") {
+        if !matches!(kind.as_str(), "csv" | "tsv" | "json" | "yaml" | "xlsx") {
             diagnostics.push(data_source_context_diagnostic(
                 &spec,
                 None,
@@ -366,7 +369,7 @@ pub(crate) fn render_front_matter_data_sources(
                 "warning",
                 format!("Unsupported data source type '{kind}' for {}", spec.path),
                 None,
-                Some("Use csv, tsv, json, or yaml for local data sources."),
+                Some("Use csv, tsv, json, yaml, or xlsx for local data sources."),
             ));
             continue;
         }
@@ -375,36 +378,77 @@ pub(crate) fn render_front_matter_data_sources(
             diagnostics.push(data_source_path_diagnostic(root_file, &spec, Some(&path)));
             continue;
         }
-        let contents = match fs::read_to_string(&path) {
-            Ok(contents) => contents,
-            Err(err) => {
-                diagnostics.push(data_source_context_diagnostic(
-                    &spec,
-                    Some(&path),
-                    Some(path_to_string(&path)),
-                    "error",
-                    format!("Unable to read data source {}: {err}", path.display()),
-                    None,
-                    Some("Create the data file or update front matter dataSources/csvFiles."),
-                ));
-                continue;
-            }
-        };
-        include_graph.push(IncludeEdge {
-            parent: root_file.to_string(),
-            child: path_to_string(&path),
-            depth: 0,
-        });
         let title = spec.name.unwrap_or_else(|| {
             path.file_stem()
                 .and_then(|name| name.to_str())
                 .unwrap_or("Data source")
                 .to_string()
         });
-        rendered.push(format!(
-            "## Data Source: {title}\n\n```{kind}\n{}\n```",
-            contents.trim_end()
-        ));
+        let data_source_markdown = if kind == "xlsx" {
+            match import_xlsx_data_source_markdown(&path, &title) {
+                Ok((markdown, warnings)) => {
+                    for warning in warnings {
+                        diagnostics.push(data_source_context_diagnostic(
+                            &DataSourceSpec {
+                                name: Some(title.clone()),
+                                path: spec.path.clone(),
+                                kind: Some(kind.clone()),
+                            },
+                            Some(&path),
+                            Some(path_to_string(&path)),
+                            "info",
+                            format!("XLSX data source {}: {warning}", path.display()),
+                            None,
+                            Some("Review imported worksheet values before relying on formula-derived cells."),
+                        ));
+                    }
+                    markdown
+                }
+                Err(err) => {
+                    diagnostics.push(data_source_context_diagnostic(
+                        &DataSourceSpec {
+                            name: Some(title.clone()),
+                            path: spec.path.clone(),
+                            kind: Some(kind.clone()),
+                        },
+                        Some(&path),
+                        Some(path_to_string(&path)),
+                        "error",
+                        format!("Unable to read data source {}: {err}", path.display()),
+                        None,
+                        Some("Create the data file or update front matter dataSources/csvFiles/xlsxFiles."),
+                    ));
+                    continue;
+                }
+            }
+        } else {
+            let contents = match fs::read_to_string(&path) {
+                Ok(contents) => contents,
+                Err(err) => {
+                    diagnostics.push(data_source_context_diagnostic(
+                        &DataSourceSpec {
+                            name: Some(title.clone()),
+                            path: spec.path.clone(),
+                            kind: Some(kind.clone()),
+                        },
+                        Some(&path),
+                        Some(path_to_string(&path)),
+                        "error",
+                        format!("Unable to read data source {}: {err}", path.display()),
+                        None,
+                        Some("Create the data file or update front matter dataSources/csvFiles."),
+                    ));
+                    continue;
+                }
+            };
+            format!("```{kind}\n{}\n```", contents.trim_end())
+        };
+        include_graph.push(IncludeEdge {
+            parent: root_file.to_string(),
+            child: path_to_string(&path),
+            depth: 0,
+        });
+        rendered.push(format!("## Data Source: {title}\n\n{data_source_markdown}"));
     }
     rendered.join("\n\n")
 }
@@ -475,6 +519,8 @@ fn data_source_kind_from_path(path: &str) -> Option<&'static str> {
         Some("json")
     } else if path.ends_with(".yaml") || path.ends_with(".yml") {
         Some("yaml")
+    } else if path.ends_with(".xlsx") {
+        Some("xlsx")
     } else {
         None
     }

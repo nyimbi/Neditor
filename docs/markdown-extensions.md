@@ -172,7 +172,7 @@ Q2,18000,4000,=18000+4000
 ```
 ````
 
-Front matter can also pull local CSV, TSV, JSON, and YAML files into the
+Front matter can also pull local CSV, TSV, JSON, YAML, and XLSX files into the
 document as generated data source sections:
 
 ```yaml
@@ -184,15 +184,19 @@ dataSources:
     path: data/settings.yaml
 csvFiles:
   - data/revenue.csv
+xlsxFiles:
+  - data/forecast.xlsx
 ---
 ```
 
-CSV/TSV sources render as tables, JSON arrays can render as structured tables,
-and nested JSON/YAML values render as structured trees. Data source paths must
-stay inside the document folder by using relative child paths; absolute paths
-and `..` parent-directory escapes are blocked before any file is read, and
-resolved symlinks are checked before import. Missing paths, unsupported source
-types, and unreadable files are reported as diagnostics.
+CSV/TSV/XLSX sources render as tables, JSON arrays can render as structured
+tables, and nested JSON/YAML values render as structured trees. XLSX data
+sources import the first worksheet and use cached formula values when the
+workbook provides them. Data source paths must stay inside the document folder
+by using relative child paths; absolute paths and `..` parent-directory escapes
+are blocked before any file is read, and resolved symlinks are checked before
+import. Missing paths, unsupported source types, and unreadable files are
+reported as diagnostics.
 
 The table editor can write clean Markdown after paste import, CSV/TSV/XLSX
 import, sorting, row and column edits, alignment, totals, formula rows, and

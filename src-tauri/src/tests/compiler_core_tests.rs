@@ -647,6 +647,59 @@ fn compiler_loads_front_matter_json_and_yaml_data_sources() {
 }
 
 #[test]
+fn compiler_loads_front_matter_xlsx_data_sources() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-xlsx-data-source-{unique}"));
+    fs::create_dir_all(root.join("data")).expect("create xlsx data dir");
+    let xlsx_path = root.join("data").join("forecast.xlsx");
+    crate::data_exchange::export_markdown_tables(crate::data_exchange::ExportMarkdownTablesRequest {
+        markdown: "Table: Forecast\n| Region | Revenue | Risk |\n| --- | ---: | --- |\n| East | 120 | Low |\n| West | 95 | Watch |\n".to_string(),
+        output_path: path_to_string(&xlsx_path),
+        format: "xlsx".to_string(),
+        table_index: None,
+    })
+    .expect("write xlsx data source");
+
+    let response = compile(CompileRequest {
+        text: "---\ntitle: XLSX Data Source\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Forecast Workbook\n    path: data/forecast.xlsx\n    type: xlsx\nxlsxFiles:\n  - data/forecast.xlsx\n---\n# XLSX Data Source\n".to_string(),
+        file_path: Some(path_to_string(&root.join("report.md"))),
+    });
+
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "error"));
+    assert!(response.html.contains("Data Source: Forecast Workbook"));
+    assert!(response.html.contains("<td>East</td>"));
+    assert!(response.html.contains("<td>120</td>"));
+    assert!(response.html.contains("Data Source: forecast"));
+    assert!(response
+        .compiled_markdown
+        .contains("Table: Forecast Workbook"));
+    assert!(response
+        .include_graph
+        .iter()
+        .any(|edge| edge.child.ends_with("data/forecast.xlsx")));
+    assert!(response
+        .export_manifest
+        .included_files
+        .iter()
+        .any(|file| file.path.ends_with("data/forecast.xlsx")));
+    assert!(response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == "info"
+            && diagnostic
+                .message
+                .contains("Imported formulas are read from cached worksheet values")));
+
+    fs::remove_dir_all(root).expect("clean xlsx data source test dir");
+}
+
+#[test]
 fn compiler_reports_malformed_front_matter_data_sources() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -656,7 +709,7 @@ fn compiler_reports_malformed_front_matter_data_sources() {
     fs::create_dir_all(root.join("data")).expect("create bad data source dir");
 
     let response = compile(CompileRequest {
-        text: "---\ntitle: Bad Data Sources\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Missing path\n    type: json\n  - path: data/report.xlsx\n    type: xlsx\n  - path: data/missing.json\n    type: json\n---\n# Bad Data Sources\n".to_string(),
+        text: "---\ntitle: Bad Data Sources\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Missing path\n    type: json\n  - path: data/report.parquet\n    type: parquet\n  - path: data/missing.json\n    type: json\n---\n# Bad Data Sources\n".to_string(),
         file_path: Some(path_to_string(&root.join("report.md"))),
     });
 
@@ -683,21 +736,21 @@ fn compiler_reports_malformed_front_matter_data_sources() {
             diagnostic.severity == "warning"
                 && diagnostic
                     .message
-                    .contains("Unsupported data source type 'xlsx'")
+                    .contains("Unsupported data source type 'parquet'")
         })
         .expect("unsupported data source diagnostic");
     assert!(unsupported
         .related
         .iter()
-        .any(|related| related == "data_source_path: data/report.xlsx"));
+        .any(|related| related == "data_source_path: data/report.parquet"));
     assert!(unsupported
         .related
         .iter()
-        .any(|related| related == "data_source_type: xlsx"));
+        .any(|related| related == "data_source_type: parquet"));
     assert!(unsupported
         .suggestion
         .as_deref()
-        .is_some_and(|suggestion| suggestion.contains("csv, tsv, json, or yaml")));
+        .is_some_and(|suggestion| suggestion.contains("csv, tsv, json, yaml, or xlsx")));
     let unreadable = response
         .diagnostics
         .iter()

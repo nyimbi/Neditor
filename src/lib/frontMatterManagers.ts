@@ -1,4 +1,4 @@
-export type SupportedDataSourceKind = "csv" | "tsv" | "json" | "yaml";
+export type SupportedDataSourceKind = "csv" | "tsv" | "json" | "yaml" | "xlsx";
 export type FrontMatterDataSourceKind = SupportedDataSourceKind | string;
 export type FrontMatterDataSourceStatus = "ready" | "missing-path" | "unsupported-type" | "blocked-path";
 
@@ -27,7 +27,7 @@ interface InlineYamlMapEntry {
   keepExisting: boolean;
 }
 
-export const DATA_SOURCE_TYPE_OPTIONS: SupportedDataSourceKind[] = ["csv", "tsv", "json", "yaml"];
+export const DATA_SOURCE_TYPE_OPTIONS: SupportedDataSourceKind[] = ["csv", "tsv", "json", "yaml", "xlsx"];
 
 const frontMatterVariableExcludedKeys = new Set([
   "brand",
@@ -38,6 +38,7 @@ const frontMatterVariableExcludedKeys = new Set([
   "jsonFiles",
   "yamlFiles",
   "ymlFiles",
+  "xlsxFiles",
   "bibliography",
   "indexExclude",
 ]);
@@ -713,6 +714,7 @@ function dataSourceAliasKind(section: string): FrontMatterDataSourceKind | null 
     jsonFiles: "json",
     yamlFiles: "yaml",
     ymlFiles: "yaml",
+    xlsxFiles: "xlsx",
   };
   return aliases[section] || null;
 }

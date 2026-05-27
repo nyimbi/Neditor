@@ -55,6 +55,15 @@ struct DataTable {
     rows: Vec<Vec<String>>,
 }
 
+pub(crate) fn import_xlsx_data_source_markdown(
+    path: &Path,
+    caption: &str,
+) -> Result<(String, Vec<String>), String> {
+    let (mut table, warnings) = read_xlsx_first_sheet(path)?;
+    table.caption = caption.trim().to_string();
+    Ok((table_to_markdown(&table), warnings))
+}
+
 #[tauri::command]
 pub(crate) fn import_spreadsheet_table(
     request: ImportSpreadsheetTableRequest,

@@ -1692,11 +1692,12 @@ Finish:
   coverage now proves named table/range formulas compile and survive HTML, PDF,
   DOCX, PPTX, Markdown bundle text, and Markdown bundle AST outputs.
 - Inline formulas and table-cell formulas in preview/export/readiness.
-- Data sources from front matter and external CSV/TSV/JSON/YAML paths. Backend
-  coverage now proves CSV, TSV, JSON, and YAML local file sources through
-  compile, transform artifacts, manifests, and cross-target export outputs, with
-  absolute paths, parent-directory escapes, and resolved symlink escapes blocked
-  before file reads.
+- Data sources from front matter and external CSV/TSV/JSON/YAML/XLSX paths.
+  Backend coverage now proves CSV, TSV, JSON, YAML, and XLSX local file sources
+  through compile, transform artifacts or generated table output, manifests,
+  and cross-target export outputs where applicable, with absolute paths,
+  parent-directory escapes, and resolved symlink escapes blocked before file
+  reads.
 - Document variable management for business metadata. The References panel now
   surfaces nested YAML front matter variables as dotted placeholder paths such as
   `account.ownerName`, preserves source-line navigation, and inserts filtered
