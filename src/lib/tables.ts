@@ -316,7 +316,11 @@ function parseTableCaption(line: string) {
 }
 
 function isMarkdownTableRow(line: string) {
-  return line.startsWith("|") && line.endsWith("|") && unescapedPipeCount(line) >= 2;
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  const pipeCount = unescapedPipeCount(trimmed);
+  const cells = splitMarkdownTableRow(trimmed);
+  return cells.length >= 2 || (trimmed.startsWith("|") && hasUnescapedTrailingPipe(trimmed) && pipeCount >= 2 && cells.length >= 1);
 }
 
 function isMarkdownTableSeparator(line: string) {
@@ -327,7 +331,7 @@ function splitMarkdownTableRow(line: string) {
   const cells: string[] = [];
   let cell = "";
   let escaped = false;
-  for (const char of line.trim().slice(1, -1)) {
+  for (const char of stripOptionalOuterPipes(line.trim())) {
     if (escaped) {
       cell += char === "|" ? "|" : `\\${char}`;
       escaped = false;
@@ -343,6 +347,21 @@ function splitMarkdownTableRow(line: string) {
   if (escaped) cell += "\\";
   cells.push(cell.trim());
   return cells;
+}
+
+function stripOptionalOuterPipes(line: string) {
+  let inner = line.startsWith("|") ? line.slice(1) : line;
+  if (hasUnescapedTrailingPipe(inner)) inner = inner.slice(0, -1);
+  return inner;
+}
+
+function hasUnescapedTrailingPipe(line: string) {
+  if (!line.endsWith("|")) return false;
+  let slashCount = 0;
+  for (let index = line.length - 2; index >= 0 && line[index] === "\\"; index -= 1) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 0;
 }
 
 function alignmentFromSeparator(cell: string): TableAlignment {

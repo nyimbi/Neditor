@@ -6,7 +6,7 @@ use crate::{
     escape_html, format_value,
     markdown_tables::{
         is_markdown_table_row, is_markdown_table_separator, markdown_table_row,
-        split_markdown_table_row,
+        markdown_table_separator_row, split_markdown_table_row,
     },
 };
 use serde::Serialize;
@@ -154,6 +154,11 @@ pub(crate) fn evaluate_markdown_table_formulas(
         let table_id = output.last().and_then(|line| table_id_from_caption(line));
         let header = lines[index].to_string();
         let separator = lines[index + 1].to_string();
+        let separator_cells = split_markdown_table_row(separator.trim());
+        let source_needs_canonical_table = !header.trim().starts_with('|')
+            || !header.trim().ends_with('|')
+            || !separator.trim().starts_with('|')
+            || !separator.trim().ends_with('|');
         index += 2;
         let mut row_lines = Vec::new();
         while index < lines.len() && is_markdown_table_row(lines[index].trim()) {
@@ -182,11 +187,13 @@ pub(crate) fn evaluate_markdown_table_formulas(
             },
         );
 
-        output.push(header);
-        output.push(separator);
-        if changed {
+        if changed || source_needs_canonical_table {
+            output.push(markdown_table_row(&rows[0]));
+            output.push(markdown_table_separator_row(&separator_cells));
             output.extend(rows.iter().skip(1).map(|row| markdown_table_row(row)));
         } else {
+            output.push(header);
+            output.push(separator);
             output.extend(row_lines.into_iter().map(|(_, row)| row));
         }
         register_named_table(&mut named_tables, table_id.as_deref(), &rows);

@@ -1,6 +1,14 @@
 pub(crate) fn is_markdown_table_row(line: &str) -> bool {
     let trimmed = line.trim();
-    trimmed.starts_with('|') && trimmed.ends_with('|') && unescaped_pipe_count(trimmed) >= 2
+    if trimmed.is_empty() {
+        return false;
+    }
+    let cells = split_markdown_table_row(trimmed);
+    cells.len() >= 2
+        || (trimmed.starts_with('|')
+            && has_unescaped_trailing_pipe(trimmed)
+            && unescaped_pipe_count(trimmed) >= 2
+            && !cells.is_empty())
 }
 
 pub(crate) fn is_markdown_table_separator(line: &str) -> bool {
@@ -12,8 +20,7 @@ pub(crate) fn is_markdown_table_separator(line: &str) -> bool {
 
 pub(crate) fn split_markdown_table_row(line: &str) -> Vec<String> {
     let trimmed = line.trim();
-    let inner = trimmed.strip_prefix('|').unwrap_or(trimmed);
-    let inner = inner.strip_suffix('|').unwrap_or(inner);
+    let inner = strip_optional_outer_pipes(trimmed);
     let mut cells = Vec::new();
     let mut cell = String::new();
     let mut escaped = false;
@@ -47,6 +54,30 @@ pub(crate) fn split_markdown_table_row(line: &str) -> Vec<String> {
     cells
 }
 
+fn strip_optional_outer_pipes(line: &str) -> &str {
+    let inner = line.strip_prefix('|').unwrap_or(line);
+    if has_unescaped_trailing_pipe(inner) {
+        &inner[..inner.len() - 1]
+    } else {
+        inner
+    }
+}
+
+fn has_unescaped_trailing_pipe(line: &str) -> bool {
+    if !line.ends_with('|') {
+        return false;
+    }
+    let mut slash_count = 0;
+    for ch in line[..line.len() - 1].chars().rev() {
+        if ch == '\\' {
+            slash_count += 1;
+        } else {
+            break;
+        }
+    }
+    slash_count % 2 == 0
+}
+
 pub(crate) fn markdown_table_row(cells: &[String]) -> String {
     format!(
         "| {} |",
@@ -55,6 +86,22 @@ pub(crate) fn markdown_table_row(cells: &[String]) -> String {
             .map(|cell| escape_markdown_table_cell(cell))
             .collect::<Vec<_>>()
             .join(" | ")
+    )
+}
+
+pub(crate) fn markdown_table_separator_row(cells: &[String]) -> String {
+    markdown_table_row(
+        &cells
+            .iter()
+            .map(|cell| {
+                let compact = cell.replace(char::is_whitespace, "");
+                match (compact.starts_with(':'), compact.ends_with(':')) {
+                    (true, true) => ":---:".to_string(),
+                    (false, true) => "---:".to_string(),
+                    _ => "---".to_string(),
+                }
+            })
+            .collect::<Vec<_>>(),
     )
 }
 

@@ -959,7 +959,9 @@ Required next coverage:
   through `pnpm run test:rendered-exports`, which generates the
   `review-cases/edited-tables` HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts
   and validates edited source text, formula totals, escaped pipes, and
-  alignment evidence. Manual table QA is now an executable contract through
+  alignment evidence. Direct text-edited Markdown tables are now accepted with
+  or without outer pipes in both the visual table editor parser and the backend
+  compiler/preview path. Manual table QA is now an executable contract through
   `pnpm run check:tables:manual`, which generates a current-commit reviewer
   template and validates completed source/grid/spreadsheet/export/supported-host
   sign-off. Remaining work is collecting completed human sign-off and broader

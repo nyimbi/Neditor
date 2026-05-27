@@ -260,6 +260,20 @@ test("table parsing preserves captions, alignment, and escaped pipes", () => {
   const [updatedTable] = parseMarkdownTables(replacement.text);
   equal(updatedTable.rows[0][1], "$2400");
   equal(updatedTable.rows[0][2], "margin|stable");
+
+  const [textEditedTable] = parseMarkdownTables(
+    "Table: Text edited {#tbl:text}\nRegion | Revenue | Note\n:--- | ---: | ---\nEast | $1,200 | margin\\|stable\n",
+  );
+  equal(textEditedTable.id, "tbl:text");
+  deepEqual(textEditedTable.headers, ["Region", "Revenue", "Note"]);
+  deepEqual(textEditedTable.alignments, ["left", "right", "left"]);
+  deepEqual(textEditedTable.rows[0], ["East", "$1,200", "margin|stable"]);
+  const textEditedDraft = tableDraftFromMarkdownSource(tableSourceText(
+    "Table: Text edited {#tbl:text}\nRegion | Revenue | Note\n:--- | ---: | ---\nEast | $1,200 | margin\\|stable\n",
+    textEditedTable,
+  ));
+  equal(textEditedDraft?.draft.caption, "Text edited");
+  ok(textEditedDraft?.sourceText.includes("| Region | Revenue | Note |"));
 });
 
 test("table source snapshots detect source and draft divergence", () => {

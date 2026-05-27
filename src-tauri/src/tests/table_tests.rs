@@ -34,6 +34,48 @@ fn compiler_summarizes_markdown_tables() {
 }
 
 #[test]
+fn compiler_accepts_text_edited_tables_without_outer_pipes() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Text Edited Tables\nstatus: approved\napprovedBy: QA\n---\n# Text Edited Tables\nTable: Direct source edit {#tbl:source-edit}\nRegion | Revenue | Note\n:--- | ---: | ---\nEast | $1,200 | margin\\|stable\nWest | =SUM(B1,300) | typed in text\n\nSee {@tbl:source-edit}.\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response
+        .compiled_markdown
+        .contains("| West | 1500 | typed in text |"));
+    assert!(response.html.contains("<td") && response.html.contains("1500"));
+    assert_eq!(response.semantic.tables, 1);
+    assert!(response
+        .semantic
+        .cross_references
+        .iter()
+        .any(|reference| reference.key == "tbl:source-edit" && reference.resolved));
+    assert!(response.document_ast.blocks.iter().any(|block| {
+        matches!(
+            block,
+            DocumentBlock::Table { id, caption, headers, rows, .. }
+                if id.as_deref() == Some("tbl:source-edit")
+                    && caption.as_deref() == Some("Direct source edit")
+                    && headers == &vec![
+                        "Region".to_string(),
+                        "Revenue".to_string(),
+                        "Note".to_string()
+                    ]
+                    && rows.iter().any(|row| row == &vec![
+                        "East".to_string(),
+                        "$1,200".to_string(),
+                        "margin|stable".to_string()
+                    ])
+                    && rows.iter().any(|row| row == &vec![
+                        "West".to_string(),
+                        "1500".to_string(),
+                        "typed in text".to_string()
+                    ])
+        )
+    }));
+}
+
+#[test]
 fn csv_and_tsv_transforms_evaluate_table_formula_cells() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Formula Tables\nstatus: approved\napprovedBy: QA\n---\n# Formula Tables\n```csv\nMetric,Value\nTotal,=10+15\nRounded,=ROUND(2.6)\nRange,=SUM(B1:B2)\n```\n\n```tsv\nMetric\tValue\nAbs\t=ABS(-5)\nSum\t=SUM(2,3)\nProfitable\t=IF(10>5,1,0)\nEqual\t=IF(ROUND(2.6)=3,1,0)\nRange\t=SUM(B1:B4)\n```\n".to_string(),

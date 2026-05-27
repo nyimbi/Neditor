@@ -94,6 +94,11 @@ Recent pushed checkpoints visible in current git history:
   control that selects the exact source table range, and the focused Chromium
   workflow proves replacing that text with a valid pipe table refreshes the
   visual grid cells.
+- Direct text-edited tables now accept common Markdown pipe-table syntax with
+  or without outer pipes. The frontend table editor parses `A | B` / `--- |
+  ---` source edits into the visual grid, and the backend compiler normalizes
+  those text-edited tables into canonical pipe tables before formula
+  evaluation, preview rendering, and export.
 - Docs Live production-script creation now has browser workflow proof for
   structure-first podcast and movie-script gates. Podcast drafts block prose
   until episode architecture is approved, movie scripts block prose until
@@ -1461,6 +1466,8 @@ Recent pushed checkpoints visible in current git history:
 
 | Command | Result | Notes |
 | --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_accepts_text_edited_tables_without_outer_pipes --lib` | Pass | Focused Rust compiler proof accepts a directly typed Markdown table without outer pipes, evaluates formulas, resolves table references, preserves escaped literal pipes, and renders the table into HTML/AST output. |
+| `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed, including table editor parsing for directly typed Markdown tables without outer pipes and canonical source regeneration for the visual grid. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new business-transform review case and asserts roadmap, ADR, diff, QR, embedded artifact hashes, and cross-target ADR/diff text. |
 | `pnpm run test:rendered-exports` | Pass | Rendered export audit now verifies `review-cases/business-transforms` across HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts, browser visual proof, Office preview dashboards, Poppler proof where available, and manual-review dashboard links. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new brand/layout review case and asserts logo, brand color, page layout CSS, header/footer templates, watermark metadata, and DOCX page-number fields. |
