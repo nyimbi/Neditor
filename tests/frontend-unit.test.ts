@@ -575,7 +575,7 @@ test("markdown table cell text edits locate and replace the cursor cell", () => 
   equal(findMarkdownTableCellAtPosition(text, 6, valueColumn - 1)?.columnIndex, 1);
 
   const updated = replaceMarkdownTableCellInText(text, edit, "$1,500");
-  ok(updated.includes("| East | $1,500 | margin\\|stable |"));
+  ok(updated.includes("East | $1,500 | margin\\|stable"));
   const [updatedTable] = parseMarkdownTables(updated);
   deepEqual(updatedTable.rows[0], ["East", "$1,500", "margin|stable"]);
 
@@ -586,6 +586,26 @@ test("markdown table cell text edits locate and replace the cursor cell", () => 
   equal(headerEdit.columnIndex, 1);
   const headerUpdated = replaceMarkdownTableCellInText(text, headerEdit, "ARR");
   deepEqual(parseMarkdownTables(headerUpdated)[0].headers, ["Region", "ARR", "Note"]);
+
+  const extraCellText = [
+    "Metric | Value",
+    "--- | ---:",
+    "ARR | 1000 | keep this review note",
+  ].join("\n");
+  const extraCellEdit = findMarkdownTableCellAtPosition(extraCellText, 3, extraCellText.split("\n")[2].indexOf("1000") + 2);
+  if (!extraCellEdit) throw new Error("missing extra-cell edit");
+  const extraCellUpdated = replaceMarkdownTableCellInText(extraCellText, extraCellEdit, "1200");
+  ok(extraCellUpdated.includes("ARR | 1200 | keep this review note"));
+
+  const indentedPipeTable = [
+    "  | Metric | Value |",
+    "  | --- | ---: |",
+    "  | ARR | 1000 |",
+  ].join("\n");
+  const indentedEdit = findMarkdownTableCellAtPosition(indentedPipeTable, 3, indentedPipeTable.split("\n")[2].indexOf("1000") + 2);
+  if (!indentedEdit) throw new Error("missing indented edit");
+  const indentedUpdated = replaceMarkdownTableCellInText(indentedPipeTable, indentedEdit, "1200");
+  ok(indentedUpdated.includes("  | ARR | 1200 |"));
 
   equal(findMarkdownTableCellAtPosition(text, 5, 3), null);
   equal(findMarkdownTableCellAtPosition(text, 3, 3), null);

@@ -588,10 +588,23 @@ export function replaceMarkdownTableCellInText(text: string, edit: MarkdownTable
   const lines = text.split("\n");
   const line = lines[edit.lineNumber - 1];
   if (line === undefined) return text;
-  const cells = padTableRow(splitMarkdownTableRow(line), edit.table.headers.length);
+  const sourceCells = splitMarkdownTableRow(line);
+  const cells = padTableRow(sourceCells, Math.max(sourceCells.length, edit.table.headers.length, edit.columnIndex + 1));
   cells[edit.columnIndex] = value;
-  lines[edit.lineNumber - 1] = `| ${cells.map(escapeTableCell).join(" | ")} |`;
+  lines[edit.lineNumber - 1] = formatMarkdownTableRowLike(line, cells);
   return lines.join("\n");
+}
+
+function formatMarkdownTableRowLike(sourceLine: string, cells: string[]) {
+  const leadingWhitespace = sourceLine.match(/^\s*/)?.[0] || "";
+  const trimmed = sourceLine.trim();
+  const hasLeadingPipe = trimmed.startsWith("|");
+  const hasTrailingPipe = hasUnescapedTrailingPipe(trimmed);
+  const body = cells.map(escapeTableCell).join(" | ");
+  if (hasLeadingPipe && hasTrailingPipe) return `${leadingWhitespace}| ${body} |`;
+  if (hasLeadingPipe) return `${leadingWhitespace}| ${body}`;
+  if (hasTrailingPipe) return `${leadingWhitespace}${body} |`;
+  return `${leadingWhitespace}${body}`;
 }
 
 function markdownTableCellRanges(line: string) {

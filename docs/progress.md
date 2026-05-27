@@ -4997,6 +4997,14 @@ CSV/TSV ragged-row validation:
 | `cargo test --locked csv_and_tsv_transforms_warn_and_normalize_ragged_rows --manifest-path src-tauri/Cargo.toml` | Pass | Focused table-transform proof now covers ragged CSV and TSV inputs: missing header/data cells produce artifact and document diagnostics, placeholder headers such as `Column 3` are generated, short rows are padded, extra cells remain exportable, and numeric metadata still survives normalized rows. |
 | `cargo test --locked table_tests --manifest-path src-tauri/Cargo.toml` | Pass | All 17 table tests passed after adding CSV/TSV row-width normalization, preserving existing Markdown table formulas, CSV/TSV formula diagnostics, spreadsheet exchange, named tables, SQL transform, merged cells, and cross-target table export behavior. |
 
+Text-preserving table cell edits:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 86 frontend unit/static tests passed after tightening Markdown table cell text edits so the cursor-cell workflow preserves outer-pipe-free rows, indented pipe rows, escaped literal pipes, and extra author-typed cells while still reparsing the changed table into the visual grid. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the table text-edit helper started preserving the source row style during two-way table edits. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow still proves table creation, direct Markdown source replacement, source-to-grid sync, edited-source CSV export, and cursor-cell text editing after the source-preserving cell edit change. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
