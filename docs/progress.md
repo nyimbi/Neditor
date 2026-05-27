@@ -4701,6 +4701,12 @@ Two-way table text editing:
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after wiring the table grid/source/document-text focus controls and direct Markdown insertion path. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow now proves a user can create a visual draft, insert it as selected Markdown in the document editor, replace that selected table text with edited headers/rows, and see the visual grid sync back from the in-text Markdown table. |
 
+JSON Schema dialect coverage:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused compiler transform test passed after adding JSON Schema rendering for boolean schemas, draft-07 tuple `items: [...]`, and boolean `additionalItems`; the generated schema table now shows `any`/`never` rows and explicit boolean-schema constraints instead of blank entries. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

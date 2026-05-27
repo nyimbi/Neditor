@@ -1046,6 +1046,8 @@ Use cases:
 Output:
 
 - Field reference tables.
+- Boolean schemas and tuple-style array item variants are rendered as explicit
+  rows instead of disappearing into empty schema summaries.
 
 Use cases:
 

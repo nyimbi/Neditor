@@ -1379,7 +1379,7 @@
                 <button v-if="source.line" type="button" @click="goToSourceTarget({ line: source.line })">Go to source</button>
               </div>
             </article>
-            <p v-if="!frontMatterDataSourceRows.length" class="sidebar-hint">No local CSV, TSV, JSON, or YAML data sources declared in front matter.</p>
+            <p v-if="!frontMatterDataSourceRows.length" class="sidebar-hint">No local CSV, TSV, JSON, YAML, or XLSX data sources declared in front matter.</p>
           </section>
           <h3>Document variables</h3>
           <section class="reference-manager" aria-label="Document variable manager">

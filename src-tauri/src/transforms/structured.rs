@@ -983,12 +983,23 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
         }
     }
     if let Some(items) = schema.get("items") {
-        let child_prefix = if prefix.is_empty() || prefix == "root" {
-            "items[]".to_string()
+        if let Some(tuple_items) = items.as_array() {
+            for (index, item) in tuple_items.iter().enumerate() {
+                collect_schema_rows(
+                    &schema_child_path(field, &format!("items[{}]", index + 1)),
+                    item,
+                    false,
+                    rows,
+                );
+            }
         } else {
-            format!("{prefix}[]")
-        };
-        collect_schema_rows(&child_prefix, items, false, rows);
+            let child_prefix = if prefix.is_empty() || prefix == "root" {
+                "items[]".to_string()
+            } else {
+                format!("{prefix}[]")
+            };
+            collect_schema_rows(&child_prefix, items, false, rows);
+        }
     }
     if let Some(items) = schema.get("prefixItems").and_then(Value::as_array) {
         for (index, item) in items.iter().enumerate() {
@@ -1002,6 +1013,7 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
     }
     for keyword in [
         "additionalProperties",
+        "additionalItems",
         "contains",
         "propertyNames",
         "contentSchema",
@@ -1012,7 +1024,7 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
         "then",
         "else",
     ] {
-        if let Some(child_schema) = schema.get(keyword).filter(|value| value.is_object()) {
+        if let Some(child_schema) = schema.get(keyword).filter(|value| is_schema_value(value)) {
             collect_schema_rows(
                 &schema_child_path(field, keyword),
                 child_schema,
@@ -1053,6 +1065,10 @@ fn collect_schema_rows(prefix: &str, schema: &Value, required: bool, rows: &mut 
     }
 }
 
+fn is_schema_value(value: &Value) -> bool {
+    value.is_object() || value.is_boolean()
+}
+
 fn schema_child_path(parent: &str, child: &str) -> String {
     if parent.is_empty() || parent == "root" {
         child.to_string()
@@ -1062,6 +1078,13 @@ fn schema_child_path(parent: &str, child: &str) -> String {
 }
 
 fn schema_type_summary(schema: &Value) -> String {
+    if let Some(boolean_schema) = schema.as_bool() {
+        return if boolean_schema {
+            "any".to_string()
+        } else {
+            "never".to_string()
+        };
+    }
     if let Some(reference) = schema.get("$ref").and_then(Value::as_str) {
         return schema_nullable_type(format!("ref {}", reference_tail(reference)), schema);
     }
@@ -1122,6 +1145,13 @@ fn schema_nullable_type(kind: String, schema: &Value) -> String {
 }
 
 fn schema_constraints(schema: &Value) -> String {
+    if let Some(boolean_schema) = schema.as_bool() {
+        return if boolean_schema {
+            "boolean schema: accepts any value".to_string()
+        } else {
+            "boolean schema: rejects all values".to_string()
+        };
+    }
     let mut constraints = Vec::new();
     for key in [
         "format",

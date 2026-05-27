@@ -4605,6 +4605,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("insertDataSourceTemplate"));
   ok(app.includes("addFrontMatterDataSource"));
   ok(app.includes("Data source type"));
+  ok(app.includes("No local CSV, TSV, JSON, YAML, or XLSX data sources declared in front matter."));
   ok(frontMatterManagers.includes("blocked-path"));
   ok(app.includes('aria-label="Document variable manager"'));
   ok(app.includes("frontMatterVariableRows"));

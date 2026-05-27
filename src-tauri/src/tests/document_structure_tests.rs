@@ -1231,6 +1231,16 @@ components:
         { "type": "number", "multipleOf": 0.01 }
       ]
     },
+    "legacyTuple": {
+      "type": "array",
+      "items": [
+        { "type": "string", "description": "Legacy tuple code" },
+        false
+      ],
+      "additionalItems": false
+    },
+    "freeform": true,
+    "forbidden": false,
     "payment": {
       "oneOf": [
         { "type": "string", "const": "cash" },
@@ -1324,6 +1334,14 @@ components:
     assert!(response.html.contains("then"));
     assert!(response.html.contains("$defs[Money]"));
     assert!(response.html.contains("tuple.prefixItems[1]"));
+    assert!(response.html.contains("legacyTuple.items[1]"));
+    assert!(response.html.contains("Legacy tuple code"));
+    assert!(response.html.contains("legacyTuple.items[2]"));
+    assert!(response.html.contains("legacyTuple.additionalItems"));
+    assert!(response.html.contains("freeform"));
+    assert!(response.html.contains("forbidden"));
+    assert!(response.html.contains("boolean schema: accepts any value"));
+    assert!(response.html.contains("boolean schema: rejects all values"));
     assert!(response.html.contains("multipleOf: 0.01"));
     assert!(response.html.contains("payment.oneOf[2]"));
     assert!(response.html.contains("ref: CardPayment"));
