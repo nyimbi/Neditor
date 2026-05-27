@@ -267,6 +267,13 @@ microphone permission, and clipboard read/write support, and records only
 capability status plus clipboard character counts rather than clipboard
 content.
 
+For read-aloud workflows, open **Settings -> AI, agents, and voice**. Browser
+speech and macOS Say do not require model downloads. If you choose
+**Supertonic CLI**, NEditor shows the model name, approximate size, editable
+storage path, download source, and command before any model-backed speech can
+start. The **Download model** and **Read document** actions stay disabled until
+you acknowledge the download notice.
+
 Use **AI Paste** when text came from a chat tool and needs cleanup before it
 enters the source document. Keep provenance enabled when the document needs an
 audit trail.

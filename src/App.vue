@@ -2414,6 +2414,13 @@
                 Supertonic voice
                 <input v-model="store.ttsPreferences.supertonicVoice" placeholder="F1, M1, or approved voice" />
               </label>
+              <label>
+                Model storage path
+                <input
+                  v-model="store.ttsPreferences.supertonicModelStoragePath"
+                  placeholder="~/.cache/supertonic/models"
+                />
+              </label>
             </section>
             <section v-if="ttsModelDownloadPlan" class="tts-model-download-notice" aria-label="TTS model download notice">
               <header>
@@ -3064,6 +3071,10 @@
               <label>
                 Supertonic voice
                 <input v-model="store.ttsPreferences.supertonicVoice" />
+              </label>
+              <label>
+                Model storage path
+                <input v-model="store.ttsPreferences.supertonicModelStoragePath" />
               </label>
               <section v-if="ttsModelDownloadPlan" class="tts-model-download-notice" aria-label="TTS model download setup">
                 <header>

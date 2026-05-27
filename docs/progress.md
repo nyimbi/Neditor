@@ -31,6 +31,12 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Supertonic read-aloud setup now has browser workflow proof for the
+  consent-gated model download path. Settings exposes an editable model storage
+  path, the model notice shows name, size, storage location, source, and
+  command, and the focused Chromium workflow proves download/playback stay
+  disabled until acknowledgement before running mock download, read-aloud, and
+  runtime inspection paths.
 - Table editing now exposes direct Markdown-text editing as a first-class
   two-way action. The Tables sidebar has an explicit **Edit Markdown in text**
   control that selects the exact source table range, and the focused Chromium
@@ -1406,11 +1412,12 @@ Recent pushed checkpoints visible in current git history:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting remains clean after the OpenAPI server-rendering update. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused transform test proves OpenAPI server variables plus operation/path server overrides render in generated API docs. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export conformance remains intact. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "gates Supertonic TTS model downloads" --project chromium` | Pass | Focused browser workflow proves Settings exposes Supertonic model size, editable storage path, download source, and command; model download and read-aloud are disabled until acknowledgement; acknowledged setup can copy details, queue the model download, read the document with Supertonic, and inspect runtime status. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused browser workflow proves two-way table editing: visual creation, direct in-text Markdown table edits syncing into the grid, invalid in-text table protection, editable source text export, source-to-grid parsing, applying source text back into the document, and the explicit **Edit Markdown in text** action selecting a source table that can be replaced in the editor and synced back into visual cells. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "keeps production Docs Live wizards structure-first" --project chromium` | Pass | Focused browser workflow proves podcast and movie-script Docs Live modes block prose while production structure is only suggested, then unlock sequential segment or beat drafting after the approved architecture is supplied. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "keeps long-form Docs Live wizards outline-first" --project chromium` | Pass | Focused browser workflow proves Docs Live textbook and novel modes block prose until the architecture/plot is approved, then switch to sequential chapter drafting after an approved outline/plot is supplied. |
 | `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve. |
-| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording direct table-text editing and production-script Docs Live evidence. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording Supertonic model-download browser proof, direct table-text editing, and production-script Docs Live evidence. |
 | `git diff --check` | Pass | No whitespace errors are present. |
 
 ## Current Capability Snapshot

@@ -472,7 +472,11 @@ web app.
   document. Browser speech works inside the app runtime; native desktop builds
   can use macOS Say; and teams that install Supertonic can point NEditor at the
   `supertonic` CLI for local on-device TTS. These settings store provider
-  choices and command names, not audio recordings or document copies.
+  choices and command names, not audio recordings or document copies. When
+  Supertonic is selected, the setup panel shows the model name, approximate
+  size, editable storage path, download source, and exact command, then keeps
+  model download and Supertonic playback disabled until the user acknowledges
+  that local model download.
 - The Configuration Center setup wizard now provides AI setup assistance for
   identity, LLM access, local agents, voice runtime, read-aloud, exports,
   transforms, and release gates. Each setup area shows a suggested next answer,

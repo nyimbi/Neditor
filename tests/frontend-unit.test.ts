@@ -4430,6 +4430,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ttsModelDownloadPlan.command"));
   ok(app.includes("supertonicModelDownloadAcknowledged"));
   ok(app.includes("supertonicModelStoragePath"));
+  ok(app.includes("Model storage path"));
   ok(app.includes("...(ttsModelDownloadPlan.value"));
   ok(app.includes("Download selected TTS model"));
   ok(app.includes("Copy TTS model download details"));

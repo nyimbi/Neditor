@@ -1184,6 +1184,48 @@ async function installTauriMock(page: Page, stateKey: string) {
         return compileMarkdown(request.text, request.file_path || "/workspace/market.md");
       }
       if (cmd === "list_transform_engines") return mockTransformEngines();
+      if (cmd === "inspect_native_tts") {
+        return {
+          engines: [
+            {
+              id: "browser-speech",
+              label: "Browser speech",
+              available: true,
+              detail: "Browser speech synthesis is available in the mocked runtime.",
+            },
+            {
+              id: "macos-say",
+              label: "macOS Say",
+              available: false,
+              detail: "macOS Say is not available in the browser workflow mock.",
+            },
+            {
+              id: "supertonic-cli",
+              label: "Supertonic CLI",
+              available: true,
+              detail: "Supertonic CLI mock is available after model consent.",
+            },
+          ],
+        };
+      }
+      if (cmd === "download_tts_model") {
+        const request = args.request as { model: string; approximate_size: string; storage_path: string; acknowledged?: boolean };
+        if (!request.acknowledged) throw new Error("Model download requires explicit acknowledgement.");
+        return {
+          engine: "supertonic-cli",
+          message: `Mock download queued for ${request.model} (${request.approximate_size}) at ${request.storage_path}`,
+        };
+      }
+      if (cmd === "read_text_aloud") {
+        const request = args.request as { engine: string; text: string; model_download_acknowledged?: boolean; model_storage_path?: string };
+        if (request.engine === "supertonic-cli" && !request.model_download_acknowledged) {
+          throw new Error("Supertonic speech requires model download acknowledgement.");
+        }
+        return {
+          engine: request.engine,
+          message: `Mock read ${request.text.length} characters${request.model_storage_path ? ` from ${request.model_storage_path}` : ""}`,
+        };
+      }
       if (cmd === "run_external_transform") {
         const request = args.request as { name: string; engine_path?: string; trusted?: boolean; input_mode?: string; timeout_ms?: number };
         if (!request.engine_path) throw new Error(`${request.name} engine path is not configured.`);
@@ -3524,6 +3566,42 @@ test("manages external transform engine trust and probe diagnostics", async ({ p
   await expect(engine).toContainText("Probe required after engine path change.");
   await engine.getByLabel("Disable external engine").check();
   await expect(engine).toContainText("External execution is disabled");
+});
+
+test("gates Supertonic TTS model downloads from the configuration center", async ({ page }) => {
+  await openSettingsSection(page, "ai");
+  const tts = page.getByRole("region", { name: "Text to speech setup" });
+  await expect(tts).toBeVisible();
+  await expect(tts.getByRole("region", { name: "TTS model download notice" })).toHaveCount(0);
+
+  await tts.getByLabel("TTS engine").selectOption("supertonic-cli");
+  await tts.getByLabel("Model storage path").fill("/workspace/tts-models");
+  const notice = tts.getByRole("region", { name: "TTS model download notice" });
+  await expect(notice).toContainText("supertonic-3");
+  await expect(notice).toContainText("~305 MB");
+  await expect(notice).toContainText("/workspace/tts-models");
+  await expect(notice).toContainText("Hugging Face");
+  await expect(notice).toContainText("supertonic download");
+  await expect(tts.getByRole("button", { name: "Download model" })).toBeDisabled();
+  await expect(tts.getByRole("button", { name: "Read document" })).toBeDisabled();
+
+  await notice.getByLabel(/I understand Supertonic may download/).check();
+  await expect(page.locator(".status-bar")).toContainText("Supertonic model download acknowledgement saved");
+  await expect(tts.getByRole("button", { name: "Download model" })).toBeEnabled();
+  await expect(tts.getByRole("button", { name: "Read document" })).toBeEnabled();
+
+  await tts.getByRole("button", { name: "Copy command" }).click();
+  await expect(page.locator(".status-bar")).toContainText("TTS model download details are ready to copy");
+  await tts.getByRole("button", { name: "Download model" }).click();
+  await expect(page.locator(".status-bar")).toContainText("Mock download queued for supertonic-3");
+  await expect(page.locator(".status-bar")).toContainText("/workspace/tts-models");
+
+  await tts.getByRole("button", { name: "Read document" }).click();
+  await expect(page.locator(".status-bar")).toContainText("Mock read");
+  await expect(page.locator(".status-bar")).toContainText("Supertonic CLI");
+  await tts.getByRole("button", { name: "Check TTS" }).click();
+  await expect(tts.getByLabel("Text to speech runtime status")).toContainText("Supertonic CLI");
+  await expect(tts.getByLabel("Text to speech runtime status")).toContainText("available");
 });
 
 test("manages transform templates and inserts reusable workflows", async ({ page }) => {
