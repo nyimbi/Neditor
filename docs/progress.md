@@ -40,7 +40,9 @@ Recent pushed checkpoints visible in current git history:
   requiring an external engine. The fallback renders declared node labels, edge
   labels, and semicolon-separated edge statements, while ignoring common D2
   layout/style attributes such as `direction`, `shape`, and `style.*` so those
-  settings do not appear as bogus diagram nodes.
+  settings do not appear as bogus diagram nodes. Cross-target export conformance
+  now carries the same D2 artifact through HTML, PDF, DOCX, PPTX, and Markdown
+  bundle evidence.
 - Table editing now has a text-cell path in addition to the visual grid and
   editable source block. **Edit Table Cell at Cursor** locates the Markdown
   header/body cell under the source cursor, loads its value into the Tables
