@@ -900,6 +900,7 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
   const riskBullets = markdownBullets(analysis.risks, "Review source RFP for risks, exceptions, and buyer constraints.");
   const questionBullets = markdownBullets(analysis.questions, "No open questions detected.");
   const verificationBullets = analysis.verificationSummary.checklist.map((item) => `- [ ] ${item}`).join("\n");
+  const responseDrafts = rfpRequirementResponseDraftsMarkdown(analysis.complianceRows);
   return fillBusinessTemplate(
     [
       "---",
@@ -948,6 +949,8 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "",
       rfpComplianceMatrixMarkdown(analysis),
       "",
+      responseDrafts,
+      "",
       "## Requirement Verification",
       "",
       verificationBullets || "- [ ] Re-run RFP analysis after importing the full source.",
@@ -968,7 +971,7 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "",
       "## Proposed Solution",
       "",
-      "Our response is organized around the buyer's stated outcomes, mandatory requirements, evaluation criteria, and delivery constraints. Each requirement has a drafted response path, an evidence placeholder, and a reviewer verification note.",
+      "Our response is organized around the buyer's stated outcomes, mandatory requirements, evaluation criteria, and delivery constraints. Each requirement has a drafted response path in the Requirement Response Drafts section, an evidence placeholder, and a reviewer verification note.",
       "",
       "## Implementation Plan and Timeline",
       "",
@@ -1007,6 +1010,43 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
     ].filter(Boolean).join("\n"),
     profile,
   );
+}
+
+function rfpRequirementResponseDraftsMarkdown(rows: RfpComplianceRow[]) {
+  if (!rows.length) {
+    return [
+      "## Requirement Response Drafts",
+      "",
+      "Import or paste the RFP source to generate requirement-by-requirement response drafts.",
+    ].join("\n");
+  }
+  const grouped = new Map<string, RfpComplianceRow[]>();
+  for (const row of rows) {
+    const bucket = grouped.get(row.responseSection) || [];
+    bucket.push(row);
+    grouped.set(row.responseSection, bucket);
+  }
+  return [
+    "## Requirement Response Drafts",
+    "",
+    "These draft answers are generated from the compliance matrix and must remain evidence-gated until the named owner attaches proof and a reviewer signs off.",
+    "",
+    ...Array.from(grouped.entries()).flatMap(([section, sectionRows]) => [
+      `### ${section}`,
+      "",
+      ...sectionRows.flatMap((row) => [
+        `#### ${row.id}: ${row.category}`,
+        "",
+        row.suggestedResponse,
+        "",
+        `- Requirement: ${row.text}`,
+        `- Evidence owner: ${row.owner}`,
+        `- Evidence needed: ${row.evidenceNeeded}`,
+        `- Verification: ${row.verification}`,
+        "",
+      ]),
+    ]),
+  ].join("\n");
 }
 
 function sectionPromptForHeading(heading: string) {

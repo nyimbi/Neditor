@@ -243,6 +243,10 @@ Recent pushed checkpoints visible in current git history:
   owner, proof needed, and reviewer caveat. Suggested answers appear in the
   Templates UI, compliance matrix export, full RFP response draft, verification
   checklist, and local-agent handoff brief.
+- Full RFP responses now include a dedicated **Requirement Response Drafts**
+  section that groups the suggested requirement answers by target response
+  section, keeps evidence owners and proof needs attached to each answer, and
+  gives reviewers usable draft prose before the verification checklist.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
@@ -2821,6 +2825,17 @@ RFP suggested response verification:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with RFP suggested response evidence recorded. |
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the RFP suggested response update. |
 | `git diff --check` | Pass | No whitespace errors after the RFP suggested response update. |
+
+RFP requirement response draft verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding the grouped Requirement Response Drafts section to full RFP response output, including evidence owner and proof-needed prompts for each requirement answer. |
+| `pnpm run check` | Pass | Vue typecheck passed after wiring the grouped RFP requirement response drafts into generated Markdown. |
+| `pnpm run check:docs` | Pass | Markdown docs were checked after documenting grouped RFP requirement response drafts; local links resolve. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with grouped RFP response draft evidence recorded. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the grouped RFP response draft update. |
+| `git diff --check` | Pass | No whitespace errors after the grouped RFP response draft update. |
 
 AI paste code fence cleanup verification:
 

@@ -481,8 +481,9 @@ NEditor is built for drafts that need evidence before publication.
   the source RFP, inspect stated and implied buyer intent, and review a
   requirement-by-requirement compliance matrix. Each compliance row includes a
   suggested response answer, evidence owner, verification note, and target
-  response section so the first draft is immediately actionable but still
-  reviewable.
+  response section. The full response draft also groups those answers into a
+  **Requirement Response Drafts** section, so each response area has usable
+  starter prose while the evidence owner and proof requirements remain visible.
 - Use `ai-source` blocks and AI-assisted section metadata so generated content
   can be marked as needing review or human-reviewed.
 

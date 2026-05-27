@@ -1415,9 +1415,13 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(response.includes("### Stated Intent"));
   ok(response.includes("### Implied Intent"));
   ok(response.includes("## Compliance Matrix"));
+  ok(response.includes("## Requirement Response Drafts"));
+  ok(response.includes("These draft answers are generated from the compliance matrix"));
   ok(response.includes("## Requirement Verification"));
   ok(response.includes("### Requirement-Level Checks"));
   ok(response.includes("Suggested response:"));
+  ok(response.includes("Evidence owner:"));
+  ok(response.includes("Evidence needed:"));
   ok(response.includes("Every extracted requirement has a compliance matrix row."));
   ok(response.includes("- [ ] Every RFP requirement appears in the compliance matrix."));
   ok(response.includes("source=NEditor RFP Response Wizard"));
