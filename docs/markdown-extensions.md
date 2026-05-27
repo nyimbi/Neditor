@@ -440,6 +440,12 @@ Native visual-data transform subsets:
 | `topojson` | Topology `arcs` arrays with optional `transform.scale` and `transform.translate`, plus object geometries that reference arcs, including reversed arc references; quantized `Point` and `MultiPoint` coordinates use the same transform so markers align with decoded arcs. |
 | `stl` | ASCII STL vertex data rendered as depth-aware isometric triangle previews with per-triangle depth ordering and `z-depth` summary metadata. |
 
+Native diagram transform subsets:
+
+| Transform | Native static subset |
+| --- | --- |
+| `d2` | Simple node declarations such as `customer: Customer`, edge statements such as `customer -> crm: submits RFP`, semicolon-separated edge statements, and common layout/style attributes such as `direction`, `shape`, and `style.*` ignored so they do not appear as bogus preview nodes. Edge labels render in the SVG fallback. |
+
 Example chart:
 
 ````md

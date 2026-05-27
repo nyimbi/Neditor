@@ -259,6 +259,37 @@ fn external_diagram_fallbacks_render_simple_native_svgs() {
 }
 
 #[test]
+fn d2_native_fallback_handles_labels_attributes_and_semicolons() {
+    let artifact = run_transform(
+        "d2".to_string(),
+        r#"direction: right
+customer: Customer
+crm: CRM System {
+  shape: rectangle
+}
+customer -> crm: submits RFP; crm <-> review: clarifies requirements
+review: Review Board
+review.shape: diamond
+"#
+        .to_string(),
+    )
+    .expect("d2 native fallback");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert_eq!(artifact.execution_kind, "embedded");
+    assert!(artifact.html.contains("transform-d2"));
+    assert!(artifact.html.contains("Customer"));
+    assert!(artifact.html.contains("CRM System"));
+    assert!(artifact.html.contains("Review Board"));
+    assert!(artifact.html.contains("submits RFP"));
+    assert!(artifact.html.contains("clarifies requirements"));
+    assert!(!artifact.html.contains(">right<"));
+    assert!(!artifact.html.contains(">rectangle<"));
+    assert!(!artifact.html.contains(">diamond<"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn document_ast_models_transform_artifacts_semantically() {
     let response = compile(CompileRequest {
         text: r#"---

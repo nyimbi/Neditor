@@ -55,6 +55,7 @@ pub(crate) fn render_mermaid_svg(
             svg.push_str(&format!(
                 "<line x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"#275DA8\" stroke-width=\"3\" marker-end=\"url(#arrow)\"/>"
             ));
+            render_edge_label(&mut svg, x1, y1, x2, y2, edge.label.as_deref());
         }
     }
     for node in &graph.nodes {
@@ -296,6 +297,7 @@ fn render_simple_graph_svg(name: &str, graph: &MermaidGraph) -> String {
                 "<line x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"#275DA8\" stroke-width=\"3\" marker-end=\"url(#{})\"/>",
                 escape_html(&marker_id)
             ));
+            render_edge_label(&mut svg, x1, y1, x2, y2, edge.label.as_deref());
         }
     }
     for node in &graph.nodes {
@@ -414,6 +416,7 @@ struct MermaidNode {
 struct MermaidEdge {
     from: String,
     to: String,
+    label: Option<String>,
 }
 
 fn parse_mermaid_flowchart(body: &str) -> MermaidGraph {
@@ -433,12 +436,14 @@ fn parse_mermaid_flowchart(body: &str) -> MermaidGraph {
             continue;
         };
         let from = parse_mermaid_node(left);
-        let to = parse_mermaid_node(strip_mermaid_edge_label(right));
+        let (right, label) = split_mermaid_edge_label(right);
+        let to = parse_mermaid_node(right);
         add_mermaid_node(&mut nodes, &mut seen, &from);
         add_mermaid_node(&mut nodes, &mut seen, &to);
         edges.push(MermaidEdge {
             from: from.id,
             to: to.id,
+            label,
         });
     }
     MermaidGraph { nodes, edges }
@@ -453,14 +458,19 @@ fn split_mermaid_edge(line: &str) -> Option<(&str, &str)> {
     None
 }
 
-fn strip_mermaid_edge_label(text: &str) -> &str {
+fn split_mermaid_edge_label(text: &str) -> (&str, Option<String>) {
     let text = text.trim();
     if let Some(rest) = text.strip_prefix('|') {
         if let Some((_, after_label)) = rest.split_once('|') {
-            return after_label.trim();
+            return (
+                after_label.trim(),
+                rest.split_once('|')
+                    .map(|(label, _)| label.trim().to_string())
+                    .filter(|label| !label.is_empty()),
+            );
         }
     }
-    text
+    (text, None)
 }
 
 fn parse_mermaid_node(text: &str) -> MermaidNode {
@@ -495,6 +505,10 @@ fn add_mermaid_node(nodes: &mut Vec<MermaidNode>, seen: &mut HashSet<String>, no
             id: node.id.clone(),
             label: node.label.clone(),
         });
+    } else if let Some(existing) = nodes.iter_mut().find(|existing| existing.id == node.id) {
+        if existing.label == existing.id && node.label != node.id {
+            existing.label.clone_from(&node.label);
+        }
     }
 }
 
@@ -516,11 +530,13 @@ fn parse_dot_graph(body: &str) -> MermaidGraph {
         if let Some((left, right)) = split_first_operator(statement, &["->", "--"]) {
             let from = parse_plain_graph_node(left);
             let to = parse_plain_graph_node(strip_bracket_attributes(right));
+            let label = extract_quoted_attribute(statement, "label");
             add_mermaid_node(&mut nodes, &mut seen, &from);
             add_mermaid_node(&mut nodes, &mut seen, &to);
             edges.push(MermaidEdge {
                 from: from.id,
                 to: to.id,
+                label,
             });
         } else if statement.contains("[label=") {
             let node = parse_plain_graph_node(statement);
@@ -534,28 +550,75 @@ fn parse_d2_graph(body: &str) -> MermaidGraph {
     let mut nodes = Vec::new();
     let mut seen = HashSet::new();
     let mut edges = Vec::new();
-    for line in body.lines().map(str::trim) {
+    for line in d2_statements(body) {
         if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
             continue;
         }
         if let Some((left, right)) = split_first_operator(line, &["<->", "->", "--"]) {
             let from = parse_plain_graph_node(left);
-            let to = parse_plain_graph_node(right.split_once(':').map_or(right, |(id, _)| id));
+            let (target, label) = split_d2_edge_label(right);
+            let to = parse_plain_graph_node(target);
             add_mermaid_node(&mut nodes, &mut seen, &from);
             add_mermaid_node(&mut nodes, &mut seen, &to);
             edges.push(MermaidEdge {
                 from: from.id,
                 to: to.id,
+                label,
             });
         } else if let Some((id, label)) = line.split_once(':') {
+            if is_d2_attribute_statement(id) {
+                continue;
+            }
             let node = MermaidNode {
                 id: normalize_plain_node_id(id),
-                label: label.trim().trim_matches('"').to_string(),
+                label: clean_d2_label(label),
             };
             add_mermaid_node(&mut nodes, &mut seen, &node);
         }
     }
     MermaidGraph { nodes, edges }
+}
+
+fn d2_statements(body: &str) -> impl Iterator<Item = &str> {
+    body.lines()
+        .flat_map(|line| line.split(';'))
+        .map(|statement| statement.trim().trim_end_matches('{').trim())
+        .filter(|statement| !statement.is_empty() && *statement != "}")
+}
+
+fn split_d2_edge_label(text: &str) -> (&str, Option<String>) {
+    text.split_once(':')
+        .map(|(id, label)| (id.trim(), Some(clean_d2_label(label))))
+        .unwrap_or((text.trim(), None))
+}
+
+fn clean_d2_label(text: &str) -> String {
+    text.trim()
+        .trim_end_matches('{')
+        .trim()
+        .trim_matches('"')
+        .to_string()
+}
+
+fn is_d2_attribute_statement(id: &str) -> bool {
+    let key = id.trim().to_ascii_lowercase();
+    matches!(
+        key.as_str(),
+        "direction"
+            | "shape"
+            | "label"
+            | "tooltip"
+            | "link"
+            | "icon"
+            | "width"
+            | "height"
+            | "near"
+            | "class"
+            | "classes"
+    ) || key.starts_with("style.")
+        || key.ends_with(".shape")
+        || key.ends_with(".style")
+        || key.contains(".style.")
 }
 
 fn parse_plantuml_graph(body: &str) -> MermaidGraph {
@@ -582,16 +645,38 @@ fn parse_plantuml_graph(body: &str) -> MermaidGraph {
         }
         if let Some((left, right)) = split_first_operator(line, &["-->", "->", "<--", "<-"]) {
             let from = parse_plain_graph_node(left);
-            let to = parse_plain_graph_node(right.split_once(':').map_or(right, |(id, _)| id));
+            let (target, label) = split_d2_edge_label(right);
+            let to = parse_plain_graph_node(target);
             add_mermaid_node(&mut nodes, &mut seen, &from);
             add_mermaid_node(&mut nodes, &mut seen, &to);
             edges.push(MermaidEdge {
                 from: from.id,
                 to: to.id,
+                label,
             });
         }
     }
     MermaidGraph { nodes, edges }
+}
+
+fn render_edge_label(
+    svg: &mut String,
+    x1: usize,
+    y1: usize,
+    x2: usize,
+    y2: usize,
+    label: Option<&str>,
+) {
+    let Some(label) = label.filter(|label| !label.trim().is_empty()) else {
+        return;
+    };
+    let x = (x1 + x2) / 2;
+    let y = (y1 + y2) / 2;
+    svg.push_str(&format!(
+        "<text class=\"diagram-edge-label\" x=\"{x}\" y=\"{}\" font-size=\"12\" text-anchor=\"middle\" fill=\"#475569\">{}</text>",
+        y.saturating_sub(8),
+        escape_html(label)
+    ));
 }
 
 fn split_first_operator<'a>(line: &'a str, operators: &[&str]) -> Option<(&'a str, &'a str)> {

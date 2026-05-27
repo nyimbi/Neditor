@@ -36,6 +36,11 @@ Recent pushed checkpoints visible in current git history:
   embedded BibTeX transform renders author/year alongside publisher, journal or
   book title, volume, issue, pages, DOI, and URL rows so reference packs are
   inspectable before export.
+- D2 native diagram previews now handle more realistic business diagrams without
+  requiring an external engine. The fallback renders declared node labels, edge
+  labels, and semicolon-separated edge statements, while ignoring common D2
+  layout/style attributes such as `direction`, `shape`, and `style.*` so those
+  settings do not appear as bogus diagram nodes.
 - Table editing now has a text-cell path in addition to the visual grid and
   editable source block. **Edit Table Cell at Cursor** locates the Markdown
   header/body cell under the source cursor, loads its value into the Tables
