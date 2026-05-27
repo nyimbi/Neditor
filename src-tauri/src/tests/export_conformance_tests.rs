@@ -431,6 +431,7 @@ fn write_rendered_export_audit_artifacts(artifacts: RenderedExportAuditArtifacts
             "Open review-cases/rich-blocks.* and confirm block quote, callout, task list, code, table, figure, equation, and generated figure/table lists remain legible across targets.",
             "Open review-cases/option-heavy.* and confirm cover/page numbers/watermark/style/appendix options are visible without corrupting body content.",
             "Open review-cases/brand-layout.* and confirm brand logo, brand color, header/footer templates, page size/orientation, watermark, legal metadata, and page numbers survive across targets.",
+            "Open review-cases/business-transforms.* and confirm roadmap, ADR, diff, and QR transform artifacts remain legible and hash-backed across targets.",
             "Open review-cases/edited-tables.* and confirm edited values, formula rows, escaped pipes, and alignment survive across targets.",
             "Open review-cases/toc-page-numbers.* and confirm numbered generated TOC entries, PDF page-number leaders, and DOCX update-field guidance survive across targets."
         ]
@@ -524,6 +525,20 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
                 "Acme Strategy",
                 "Branded review only.",
                 "Brand controls",
+            ],
+        ),
+        (
+            "business-transforms",
+            "Business Transform Export",
+            "---\ntitle: Business Transform Export\nstatus: approved\napprovedBy: Release QA\napprovedAt: 2026-05-21T11:35:00Z\n---\n# Business Transform Export\n\nThis review case proves safe native business transforms remain inspectable in release artifacts.\n\n```roadmap\nQ1: Launch beta | status=active | owner=Product\nQ2: Expand exports | due=2026-06-30 | owner=Docs\n```\n\n```adr\nStatus: accepted\nContext: Exports must be auditable.\nDecision: Keep static transform artifacts in every export.\nConsequences: Manifests carry output hashes.\n```\n\n```diff\n@@ -1 +1 @@\n-draft export\n+audited export\n```\n\n```qr\nhttps://neditor.local/export-pack\n```\n",
+            json!({
+                "includeStyles": true,
+                "includeSyntaxHighlighting": true,
+                "includeManifest": true
+            }),
+            vec![
+                "Launch beta",
+                "https://neditor.local/export-pack",
             ],
         ),
         (
@@ -661,6 +676,60 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
                     docx_footer.contains(r#"w:instr="PAGE""#)
                         && docx_footer.contains(r#"w:instr="NUMPAGES""#),
                     "{slug} docx missing page number fields"
+                );
+            }
+            if slug == "business-transforms" {
+                assert!(
+                    response
+                        .transform_artifacts
+                        .iter()
+                        .filter(|artifact| ["roadmap", "adr", "diff", "qr"]
+                            .contains(&artifact.name.as_str()))
+                        .count()
+                        == 4,
+                    "{slug} missing expected transform artifacts"
+                );
+                assert!(
+                    html.contains("transform-roadmap") && html.contains("roadmap-meta-status"),
+                    "{slug} html missing roadmap transform evidence"
+                );
+                assert!(
+                    html.contains("transform-adr") && html.contains("adr-decision"),
+                    "{slug} html missing ADR transform evidence"
+                );
+                assert!(
+                    html.contains("transform-diff")
+                        && html.contains("1 additions / 1 deletions / 1 hunks"),
+                    "{slug} html missing diff transform evidence"
+                );
+                assert!(
+                    html.contains("transform-qr")
+                        && html.contains("QR code for https://neditor.local/export-pack"),
+                    "{slug} html missing QR transform evidence"
+                );
+                for name in ["roadmap", "adr", "diff", "qr"] {
+                    let artifact = response
+                        .transform_artifacts
+                        .iter()
+                        .find(|artifact| artifact.name == name)
+                        .unwrap_or_else(|| panic!("{slug} missing {name} artifact"));
+                    assert_eq!(artifact.execution_kind, "embedded");
+                    assert_eq!(artifact.source_hash.len(), 64);
+                    assert_eq!(artifact.output_hash.len(), 64);
+                }
+                assert!(
+                    pdf_text.contains("audited export")
+                        && docx_text.contains("audited export")
+                        && pptx_text.contains("audited export")
+                        && bundle_text.contains("audited export"),
+                    "{slug} missing diff addition text across exported targets"
+                );
+                assert!(
+                    pdf_text.contains("Keep static transform artifacts")
+                        && docx_text.contains("Keep static transform artifacts")
+                        && pptx_text.contains("Keep static transform artifacts")
+                        && bundle_text.contains("Keep static transform artifacts"),
+                    "{slug} missing ADR decision text across exported targets"
                 );
             }
             assert!(pdf_text.contains(title), "{slug} pdf missing title");

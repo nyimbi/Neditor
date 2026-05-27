@@ -63,6 +63,12 @@ Recent pushed checkpoints visible in current git history:
   expansion, page-number fields, watermark metadata, legal disclaimer text, and
   brand metadata across HTML, PDF, DOCX, PPTX, and Markdown bundle targets, and
   the audit/release-readiness validators now require that case.
+- Rendered export audit now includes a business-transform review case. The
+  generated `review-cases/business-transforms` artifacts cover first-release
+  safe `roadmap`, `adr`, `diff`, and `qr` transform output, embedded artifact
+  hashes, ADR decision text, diff additions, and QR target text across HTML,
+  PDF, DOCX, PPTX, and Markdown bundle targets, and the
+  audit/release-readiness validators now require that case.
 - Include watcher state now has focused browser proof for directive edits. The
   workflow edits a master document from `!include chapters/risk.md` to
   `!include chapters/ops.md`, proves the include graph and watched path set
@@ -1455,6 +1461,8 @@ Recent pushed checkpoints visible in current git history:
 
 | Command | Result | Notes |
 | --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new business-transform review case and asserts roadmap, ADR, diff, QR, embedded artifact hashes, and cross-target ADR/diff text. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit now verifies `review-cases/business-transforms` across HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts, browser visual proof, Office preview dashboards, Poppler proof where available, and manual-review dashboard links. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new brand/layout review case and asserts logo, brand color, page layout CSS, header/footer templates, watermark metadata, and DOCX page-number fields. |
 | `pnpm run test:rendered-exports` | Pass | Rendered export audit now verifies `review-cases/brand-layout` across HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts, browser visual proof, Office preview dashboards, Poppler proof where available, manual-review dashboard links, and release-readiness-required review-case coverage. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new generated TOC/page-number review case. |

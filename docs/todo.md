@@ -969,7 +969,10 @@ Required next coverage:
   manual UX QA for dialog-driven save-copy and full line-composition gestures.
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices, and rendered audit
-  proof now have executable coverage; broader manual viewer/platform QA remains.
+  proof now have executable coverage. The rendered audit now requires the
+  `review-cases/business-transforms` artifacts for first-release safe
+  `roadmap`, `adr`, `diff`, and `qr` transforms, including artifact hashes and
+  cross-target ADR/diff/QR evidence; broader manual viewer/platform QA remains.
 - Release evidence refresh now distinguishes stale prior-commit external proof
   from malformed current proof for platform, AI provider/runtime, security,
   performance, and Google Docs checks. Remaining work is collecting fresh
@@ -2101,8 +2104,9 @@ Current evidence:
   arcs.
 - First-release safe business transforms are now explicit: `roadmap`, `adr`,
   `diff`, and `qr` are documented native transforms with cross-target artifact
-  proof, while execution-heavy second-wave transforms remain deferred until
-  each has a safe sandbox or static renderer.
+  proof plus required rendered-export review-case proof, while execution-heavy
+  second-wave transforms remain deferred until each has a safe sandbox or
+  static renderer.
 - Visual/data transform export proof now covers `chart`, `vega-lite`,
   `geojson`, `topojson`, `stl`, and `timeline` static SVG artifacts, output
   hashes, source ranges, HTML, PDF, DOCX, PPTX, and Markdown bundle evidence.
