@@ -542,22 +542,54 @@
           <h2>Tables</h2>
           <p class="sidebar-hint">{{ selectedTableEditSummary }}</p>
           <section v-if="tableDraft" class="table-two-way-strip" aria-label="Two-way table editing">
-            <span :class="['table-sync-chip', tableTwoWayStatusClass]" role="status">{{ tableTwoWayStatus }}</span>
-            <button type="button" :disabled="!tableDraft" title="Focus the visual table grid" @click="focusTableGrid">Grid</button>
-            <button type="button" :disabled="!tableDraft" title="Focus the editable Markdown source block in the Tables panel" @click="focusTableSourceEditor">
-              Source block
-            </button>
-            <button
-              type="button"
-              :disabled="!canGoToTableSource"
-              title="Select the table's Markdown source in the document editor"
-              @click="editSelectedTableInMarkdownText"
-            >
-              Document text
-            </button>
-            <button type="button" title="Load the Markdown table cell under the editor cursor for a precise text edit" @click="loadTableTextCellAtCursor">
-              Cell at cursor
-            </button>
+            <header>
+              <div>
+                <strong>Two-way table editing</strong>
+                <span>{{ tableTwoWayHint }}</span>
+              </div>
+              <span :class="['table-sync-chip', tableTwoWayStatusClass]" role="status">{{ tableTwoWayStatus }}</span>
+            </header>
+            <div class="table-two-way-actions" role="group" aria-label="Table text and grid synchronization">
+              <button type="button" :disabled="!tableDraft" title="Focus the visual table grid" @click="focusTableGrid">Focus grid</button>
+              <button type="button" :disabled="!tableDraft" title="Focus the editable Markdown source block in the Tables panel" @click="focusTableSourceEditor">
+                Source block
+              </button>
+              <button
+                type="button"
+                :disabled="!canGoToTableSource"
+                title="Select the table's Markdown source in the document editor so you can edit the table directly in text"
+                @click="editSelectedTableInMarkdownText"
+              >
+                Edit table text
+              </button>
+              <button
+                type="button"
+                :disabled="(!isNewTableDraft && tableDraftDirty) || tableDraftHasErrors"
+                title="Insert a Markdown table at the cursor and select it for direct text editing"
+                @click="insertTableDraftInMarkdownText"
+              >
+                {{ isNewTableDraft ? "Insert draft as text" : "Create table in text" }}
+              </button>
+              <button
+                type="button"
+                :disabled="!tableDraft || !tableSourceEditDirty"
+                title="Parse the edited Markdown source text and update the visual grid preview"
+                @click="updateTableDraftFromSourceText"
+              >
+                Sync text to grid
+              </button>
+              <button
+                type="button"
+                :disabled="tableDraftHasErrors || tableDraftSourceChanged"
+                title="Write the current visual grid back to the Markdown source table"
+                @click="applyTableDraft()"
+              >
+                Apply grid to text
+              </button>
+              <button type="button" title="Load the Markdown table cell under the editor cursor for a precise text edit" @click="loadTableTextCellAtCursor">
+                Cell at cursor
+              </button>
+            </div>
           </section>
           <section class="table-cell-text-editor" aria-label="Text table cell editor">
             <label>
@@ -5168,6 +5200,18 @@ import {
   type AgenticOutlineVariant,
   type AgenticStepAssistance,
 } from "./lib/agenticWorkflows";
+import {
+  buildConfigurationCenterSections,
+  buildConfigurationSetupStatus,
+  buildConfigurationSetupStepAssistance,
+  configurationSetupAssistanceBlock,
+  configurationSetupStepById,
+  configurationSetupSteps,
+  formatConfigurationSetupSummary,
+  isConfigurationSetupStepId,
+  type ConfigurationSetupStepAssistance,
+  type ConfigurationSetupStepId,
+} from "./lib/configurationSetup";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import {
   citationTodoAuditMarkdown,
@@ -7152,6 +7196,16 @@ const tableTwoWayStatus = computed(() => {
   if (isNewTableDraft.value) return "New draft";
   return "Synced";
 });
+const tableTwoWayHint = computed(() => {
+  if (tableSourceEditError.value) return "Fix the Markdown pipe table text; the visual grid keeps the last valid table draft.";
+  if (tableSourceEditDirty.value && tableSourceEditLiveSynced.value) {
+    return "Valid Markdown text changes are previewing in the grid; apply source text to write them into the document.";
+  }
+  if (tableSourceEditDirty.value) return "Keep typing the Markdown table until it parses, then sync the text into the grid.";
+  if (tableDraftSourceChanged.value) return tableSourceSyncMessage.value;
+  if (isNewTableDraft.value) return "Create visually, insert as Markdown text, then continue editing either the source lines or the grid.";
+  return "Grid and document text are synced; edit either the visual grid or the Markdown source lines.";
+});
 const tableTwoWayStatusClass = computed(() => {
   if (tableSourceEditError.value) return "error";
   if (tableSourceEditDirty.value || tableDraftSourceChanged.value || isNewTableDraft.value) return "attention";
@@ -7289,169 +7343,61 @@ const ttsModelDownloadPlan = computed<TtsModelDownloadPlan | null>(() => {
   return buildTtsModelDownloadPlan(store.ttsPreferences, ttsModelStorageDefault.value);
 });
 const ttsReadDisabled = computed(() => ttsReadIsDisabled(ttsBusy.value, ttsModelDownloadPlan.value));
-const configurationSetupSteps = [
-  {
-    id: "identity",
-    title: "Business identity",
-    summary: "Reusable name, company, address, website, tone, and client defaults for templates and generated drafts.",
-    actionLabel: "Set up identity",
-  },
-  {
-    id: "llm-access",
-    title: "LLM access",
-    summary: "Choose the approved provider profile, model, endpoint, and environment variable used for API requests.",
-    actionLabel: "Save LLM defaults",
-  },
-  {
-    id: "local-agents",
-    title: "Local agent tools",
-    summary: "Prepare governed handoffs for Claude Code, Codex, OpenCode, and Google Antigravity without storing secrets.",
-    actionLabel: "Open provider handoff",
-  },
-  {
-    id: "voice-runtime",
-    title: "Docs Live voice",
-    summary: "Check microphone, speech recognition, and clipboard readiness before voice-driven document creation.",
-    actionLabel: "Check runtime",
-  },
-  {
-    id: "tts",
-    title: "Read aloud",
-    summary: "Configure browser speech, macOS Say, or Supertonic for selected text and full-document reading.",
-    actionLabel: "Check TTS",
-  },
-  {
-    id: "exports",
-    title: "Export defaults",
-    summary: "Set brand, bibliography, HTML, PDF, Office, publishing, Google Docs, LaTeX, EPUB, and evidence defaults.",
-    actionLabel: "Review exports",
-  },
-  {
-    id: "transforms",
-    title: "Transforms and templates",
-    summary: "Configure external engines, trusted paths, timeout, input modes, and reusable calculation templates.",
-    actionLabel: "Review engines",
-  },
-  {
-    id: "release",
-    title: "Distribution readiness",
-    summary: "Track Homebrew, platform packaging, signing, accessibility, performance, security, and release evidence gates.",
-    actionLabel: "Open release checks",
-  },
-] as const;
-type ConfigurationSetupStepId = (typeof configurationSetupSteps)[number]["id"];
-interface ConfigurationSetupStepAssistance {
-  stepId: ConfigurationSetupStepId;
-  stepLabel: string;
-  suggestedAnswer: string;
-  rationale: string;
-  contextSignals: string[];
-  actionLabel: string;
-}
 const currentConfigurationSetupStep = computed(
-  () => configurationSetupSteps.find((step) => step.id === configurationSetupStepId.value) || configurationSetupSteps[0],
+  () => configurationSetupStepById(configurationSetupStepId.value),
 );
-const configurationSetupStatus = computed(() => {
-  const businessDone = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
-  const llmDone = Boolean(store.aiProviderDefaults.profileId && store.aiProviderDefaults.model && store.aiProviderDefaults.keyEnv);
-  const runtimeDone = Boolean(docsLiveRuntimeReport.value);
-  const exportDone = Boolean(store.exportDefaults.includeManifest && store.exportDefaults.layoutPreset && store.bibliographyDefaults.citationStyle);
-  const transformsDone = store.externalTransformEngines.length
-    ? store.externalTransformEngines.some((engine) => externalEngineSetupStatus(engine).status === "ready" || store.disabledTransformEngines[engine.name])
-    : true;
-  const releaseDone = false;
-  const items = [
-    { id: "identity", label: "Identity", done: businessDone >= Math.min(6, businessProfileFields.length), detail: businessProfileCompletion.value },
-    { id: "llm-access", label: "LLM defaults", done: llmDone, detail: store.aiProviderDefaults.profileId },
-    { id: "local-agents", label: "Local agents", done: localAgentCliProfiles.length >= 4, detail: `${localAgentCliProfiles.length} agent handoffs` },
-    { id: "voice-runtime", label: "Voice runtime", done: runtimeDone, detail: runtimeDone ? `${docsLiveRuntimeReport.value?.issues.length || 0} issues` : "not checked" },
-    {
-      id: "tts",
-      label: "Read aloud",
-      done: store.ttsPreferences.engine === "browser-speech" || Boolean(selectedTtsEngineStatus.value?.available),
-      detail: ttsRuntimeSummary.value,
-    },
-    { id: "exports", label: "Exports", done: exportDone, detail: store.exportTarget.toUpperCase() },
-    { id: "transforms", label: "Transforms", done: transformsDone, detail: `${store.externalTransformEngines.length} external engines` },
-    { id: "release", label: "Release gates", done: releaseDone, detail: "external evidence required" },
-  ];
-  return {
-    items,
-    complete: items.filter((item) => item.done).length,
-    total: items.length,
-  };
-});
-const configurationSetupSummary = computed(() => `${configurationSetupStatus.value.complete}/${configurationSetupStatus.value.total} setup areas ready`);
+const configurationSetupStatus = computed(() =>
+  buildConfigurationSetupStatus({
+    businessDone: businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length,
+    businessTotal: businessProfileFields.length,
+    businessCompletion: businessProfileCompletion.value,
+    aiProviderProfileId: store.aiProviderDefaults.profileId,
+    aiProviderModel: store.aiProviderDefaults.model,
+    aiProviderKeyEnv: store.aiProviderDefaults.keyEnv,
+    localAgentProfileCount: localAgentCliProfiles.length,
+    docsLiveRuntimeIssueCount: docsLiveRuntimeReport.value ? docsLiveRuntimeReport.value.issues.length : null,
+    ttsReady: store.ttsPreferences.engine === "browser-speech" || Boolean(selectedTtsEngineStatus.value?.available),
+    ttsRuntimeSummary: ttsRuntimeSummary.value,
+    exportTarget: store.exportTarget,
+    exportIncludeManifest: store.exportDefaults.includeManifest,
+    exportLayoutPreset: store.exportDefaults.layoutPreset,
+    citationStyle: store.bibliographyDefaults.citationStyle,
+    externalEngineCount: store.externalTransformEngines.length,
+    transformReadyOrDisabled: store.externalTransformEngines.length
+      ? store.externalTransformEngines.some((engine) => externalEngineSetupStatus(engine).status === "ready" || store.disabledTransformEngines[engine.name])
+      : true,
+  }),
+);
+const configurationSetupSummary = computed(() => formatConfigurationSetupSummary(configurationSetupStatus.value));
 const configurationSetupStepAssistance = computed(() => {
   const step = currentConfigurationSetupStep.value;
-  const status = configurationSetupStatus.value.items.find((item) => item.id === step.id);
   const businessDone = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
   const missingBusiness = businessProfileFields.filter((field) => !store.businessProfile[field.key]?.trim()).map((field) => field.label);
   const readyEngines = store.externalTransformEngines.filter((engine) => externalEngineSetupStatus(engine).status === "ready").length;
   const disabledEngines = Object.values(store.disabledTransformEngines).filter(Boolean).length;
-  const contextSignals = [
-    `Setup area: ${step.title}`,
-    `Status: ${status?.done ? "ready" : "needs work"}`,
-    `Status detail: ${status?.detail || step.summary}`,
-    `Overall readiness: ${configurationSetupSummary.value}`,
-    `Setup notes words: ${configurationSetupNotes.value.trim().split(/\s+/).filter(Boolean).length}`,
-  ];
-  let suggestedAnswer = "";
-  let rationale = "";
-  switch (step.id) {
-    case "identity":
-      suggestedAnswer = missingBusiness.length
-        ? `Complete the reusable business profile before creating production documents. Add ${missingBusiness.slice(0, 5).join(", ")} first, then verify sender, company, default client, website, address, and brand voice.`
-        : "Business identity is ready. Use the saved profile as the default sender, company, client, and brand voice for templates, snippets, Docs Live, and local-agent handoffs.";
-      rationale = "Identity values appear repeatedly in proposals, RFPs, exports, snippets, and AI prompts; setting them once prevents inconsistent document metadata.";
-      contextSignals.push(`Business profile fields: ${businessDone}/${businessProfileFields.length}`);
-      break;
-    case "llm-access":
-      suggestedAnswer = `Use ${agentProviderId.value} with model ${agentProviderModel.value || "[model required]"} and keep the API key in ${agentProviderKeyEnv.value || "[environment variable required]"}. Save only non-secret defaults; enter session keys only when running a provider request.`;
-      rationale = "LLM access should be easy for business users while preserving local-first security and avoiding stored secrets.";
-      contextSignals.push(`Provider endpoint: ${agentProviderEndpoint.value || "not set"}`, `Key env: ${agentProviderKeyEnv.value || "not set"}`);
-      break;
-    case "local-agents":
-      suggestedAnswer = `Keep Claude Code, Codex, OpenCode, and Google Antigravity as governed handoff targets. Verify each CLI on PATH before relying on it, and include document context, evidence gates, and rollback instructions in every handoff.`;
-      rationale = "Local-agent tools are powerful only when they receive bounded, auditable work packages instead of loose prompts.";
-      contextSignals.push(`Agent profiles: ${localAgentCliProfiles.length}`);
-      break;
-    case "voice-runtime":
-      suggestedAnswer = docsLiveRuntimeReport.value
-        ? `Voice setup has ${docsLiveRuntimeReport.value.issues.length} issue(s). Resolve microphone, SpeechRecognition, and clipboard blockers before promising voice-first drafting to users.`
-        : "Run the Docs Live runtime check on the target device, then record whether speech recognition, microphone permission, and clipboard read/write are available without storing audio or clipboard content.";
-      rationale = "Voice drafting depends on real browser/runtime permissions, so setup guidance must be based on current-device evidence.";
-      contextSignals.push(docsLiveRuntimeReport.value ? "Runtime report present" : "Runtime report missing");
-      break;
-    case "tts":
-      suggestedAnswer = `Use ${store.ttsPreferences.engine} for read-aloud by default. If Supertonic is selected, show the model name, size, storage location, source, and command, and require explicit acknowledgement before any model download.`;
-      rationale = "Read-aloud setup must be transparent about local engines and model downloads so users control storage, bandwidth, and privacy.";
-      contextSignals.push(`TTS engine: ${store.ttsPreferences.engine}`, `TTS status: ${ttsRuntimeSummary.value}`);
-      break;
-    case "exports":
-      suggestedAnswer = `Review export defaults for ${store.exportTarget.toUpperCase()}, layout preset ${store.exportDefaults.layoutPreset}, citation style ${store.bibliographyDefaults.citationStyle}, manifests, approval metadata, brand settings, and target-specific publishing requirements before client delivery.`;
-      rationale = "Production export setup needs consistent metadata and evidence packages across PDF, DOCX, HTML, Google Docs, LaTeX, EPUB, blog, and Substack targets.";
-      contextSignals.push(`Export target: ${store.exportTarget}`, `Layout preset: ${store.exportDefaults.layoutPreset}`);
-      break;
-    case "transforms":
-      suggestedAnswer = `Configure only the transform engines users actually need. Ready engines: ${readyEngines}; disabled engines: ${disabledEngines}; total known engines: ${store.externalTransformEngines.length}. Keep untrusted handlers disabled until paths, permissions, timeouts, and input modes are verified.`;
-      rationale = "Transform setup can execute external tools, so handler readiness must be explicit, trust-gated, and easy to audit.";
-      contextSignals.push(`Ready engines: ${readyEngines}`, `Disabled engines: ${disabledEngines}`);
-      break;
-    case "release":
-      suggestedAnswer = "Treat release readiness as incomplete until external evidence is supplied for signing/notarization, Windows and Linux package proof, Google Docs live import/readback, live provider evidence, real-device AI runtime evidence, rendered export sign-off, accessibility sign-off, and sustained performance profiling.";
-      rationale = "Some production gates cannot be proven on the current host; they must remain visible release blockers rather than being hidden behind local green checks.";
-      contextSignals.push("External evidence required");
-      break;
-  }
-  return {
-    stepId: step.id,
-    stepLabel: step.title,
-    suggestedAnswer,
-    rationale,
-    contextSignals: Array.from(new Set(contextSignals)),
-    actionLabel: "Add to setup notes",
-  };
+  return buildConfigurationSetupStepAssistance({
+    step,
+    status: configurationSetupStatus.value,
+    setupSummary: configurationSetupSummary.value,
+    setupNotesWordCount: configurationSetupNotes.value.trim().split(/\s+/).filter(Boolean).length,
+    businessDone,
+    businessTotal: businessProfileFields.length,
+    missingBusinessLabels: missingBusiness,
+    agentProviderId: agentProviderId.value,
+    agentProviderModel: agentProviderModel.value,
+    agentProviderEndpoint: agentProviderEndpoint.value,
+    agentProviderKeyEnv: agentProviderKeyEnv.value,
+    localAgentProfileCount: localAgentCliProfiles.length,
+    docsLiveRuntimeIssueCount: docsLiveRuntimeReport.value ? docsLiveRuntimeReport.value.issues.length : null,
+    ttsEngine: store.ttsPreferences.engine,
+    ttsRuntimeSummary: ttsRuntimeSummary.value,
+    exportTarget: store.exportTarget,
+    exportLayoutPreset: store.exportDefaults.layoutPreset,
+    citationStyle: store.bibliographyDefaults.citationStyle,
+    readyEngineCount: readyEngines,
+    disabledEngineCount: disabledEngines,
+    externalEngineCount: store.externalTransformEngines.length,
+  });
 });
 const selectedTransformInstallerPlan = computed(() =>
   transformInstallerPlans.value.find((plan) => plan.id === selectedTransformInstallerId.value) || transformInstallerPlans.value[0] || null,
@@ -7467,44 +7413,21 @@ const transformInstallerCoverageSummary = computed(() => {
   return `${plan.engine_names.length}/${total} external engines`;
 });
 const transformInstallerCommandText = computed(() => (selectedTransformInstallerPlan.value?.commands || []).join("\n"));
-const configurationCenterSections = computed(() => [
-  {
-    id: "overview",
-    label: "Overview",
-    summary: configurationSetupSummary.value,
-    detail: "Start here for setup readiness and guided configuration.",
-  },
-  {
-    id: "appearance",
-    label: "Appearance and editor",
-    summary: `${store.toolbarDisplay}; ${store.editorKeymapMode}`,
-    detail: "Theme, toolbar density, editor ergonomics, typography, and accessibility.",
-  },
-  {
-    id: "files",
-    label: "Files and history",
-    summary: `${store.autosave ? "autosave on" : "autosave off"}; ${store.snapshotStorage}`,
-    detail: "Autosave, snapshots, Git behavior, recents, and workspace recovery.",
-  },
-  {
-    id: "exports",
-    label: "Exports and brand",
-    summary: `${store.exportTarget.toUpperCase()}; ${store.bibliographyDefaults.citationStyle}`,
-    detail: "Export defaults, publishing metadata, bibliography style, layout, and brand package.",
-  },
-  {
-    id: "ai",
-    label: "AI, agents, and voice",
-    summary: `${store.aiProviderDefaults.profileId}; ${store.ttsPreferences.engine}`,
-    detail: "LLM access, local agents, AI cleanup, Docs Live runtime, and read-aloud setup.",
-  },
-  {
-    id: "transforms",
-    label: "Transforms",
-    summary: `${store.externalTransformEngines.length} external engines; ${transformInstallerPlans.value.length} installer plan`,
-    detail: "Download handlers, set executable paths, trust engines, probe setup, timeout, and execution modes.",
-  },
-] as const);
+const configurationCenterSections = computed(() =>
+  buildConfigurationCenterSections({
+    setupSummary: configurationSetupSummary.value,
+    toolbarDisplay: store.toolbarDisplay,
+    editorKeymapMode: store.editorKeymapMode,
+    autosave: store.autosave,
+    snapshotStorage: store.snapshotStorage,
+    exportTarget: store.exportTarget,
+    citationStyle: store.bibliographyDefaults.citationStyle,
+    aiProviderProfileId: store.aiProviderDefaults.profileId,
+    ttsEngine: store.ttsPreferences.engine,
+    externalEngineCount: store.externalTransformEngines.length,
+    installerPlanCount: transformInstallerPlans.value.length,
+  }),
+);
 const rfpAnalysisSummary = computed(() => {
   const analysis = rfpAnalysis.value;
   if (!analysis) return "No RFP analyzed yet";
@@ -14403,8 +14326,8 @@ function selectSidebarPanel(panelId: string) {
 }
 
 function openConfigurationSetup(stepId: string = "llm-access") {
-  if (configurationSetupSteps.some((step) => step.id === stepId)) {
-    configurationSetupStepId.value = stepId as ConfigurationSetupStepId;
+  if (isConfigurationSetupStepId(stepId)) {
+    configurationSetupStepId.value = stepId;
   }
   configurationSetupOpen.value = true;
   store.sidebar = "settings";
@@ -14415,12 +14338,7 @@ function closeConfigurationSetup() {
 }
 
 function appendConfigurationSetupAssistance(assistance: ConfigurationSetupStepAssistance) {
-  const block = [
-    `${assistance.stepLabel}: ${assistance.suggestedAnswer}`,
-    `Rationale: ${assistance.rationale}`,
-    `Context signals: ${assistance.contextSignals.join("; ")}`,
-  ].join("\n");
-  configurationSetupNotes.value = appendTextBlock(configurationSetupNotes.value, block);
+  configurationSetupNotes.value = appendTextBlock(configurationSetupNotes.value, configurationSetupAssistanceBlock(assistance));
   store.statusMessage = `Added ${assistance.stepLabel} setup guidance to notes`;
 }
 
@@ -22720,13 +22638,39 @@ select:hover {
 
 .table-two-way-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
-  gap: 6px;
-  align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
-  padding: 6px;
+  padding: 8px;
   border: 1px solid #d8e0e8;
   background: #f8fafc;
+}
+
+.table-two-way-strip header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.table-two-way-strip header div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.table-two-way-strip strong {
+  font-size: 13px;
+}
+
+.table-two-way-strip header span:not(.table-sync-chip) {
+  color: #526171;
+  font-size: 12px;
+}
+
+.table-two-way-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 6px;
 }
 
 .table-sync-chip {

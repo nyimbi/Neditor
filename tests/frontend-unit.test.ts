@@ -123,6 +123,15 @@ import {
   transformTemplateMarkdown,
 } from "../src/lib/transformTemplates.js";
 import {
+  buildConfigurationCenterSections,
+  buildConfigurationSetupStatus,
+  buildConfigurationSetupStepAssistance,
+  configurationSetupAssistanceBlock,
+  configurationSetupStepById,
+  formatConfigurationSetupSummary,
+  isConfigurationSetupStepId,
+} from "../src/lib/configurationSetup.js";
+import {
   buildTtsModelDownloadPlan,
   formatTtsRuntimeSummary,
   formatTtsSetupSummary,
@@ -3243,6 +3252,75 @@ test("text-to-speech setup helpers preserve consent-gated Supertonic model detai
   equal(buildTtsModelDownloadPlan(normalizeTtsPreferences({ engine: "browser-speech" }), "/tmp/models"), null);
 });
 
+test("configuration setup helpers score readiness and generate context-aware assistance", () => {
+  const status = buildConfigurationSetupStatus({
+    businessDone: 7,
+    businessTotal: 10,
+    businessCompletion: "7/10 fields",
+    aiProviderProfileId: "openai-compatible",
+    aiProviderModel: "gpt-4.1",
+    aiProviderKeyEnv: "OPENAI_API_KEY",
+    localAgentProfileCount: 4,
+    docsLiveRuntimeIssueCount: 1,
+    ttsReady: false,
+    ttsRuntimeSummary: "Supertonic not found on PATH",
+    exportTarget: "pdf",
+    exportIncludeManifest: true,
+    exportLayoutPreset: "board",
+    citationStyle: "apa",
+    externalEngineCount: 6,
+    transformReadyOrDisabled: true,
+  });
+  equal(formatConfigurationSetupSummary(status), "6/8 setup areas ready");
+  equal(status.items.find((item) => item.id === "tts")?.done, false);
+  equal(status.items.find((item) => item.id === "release")?.detail, "external evidence required");
+  equal(configurationSetupStepById("unknown").id, "identity");
+  equal(isConfigurationSetupStepId("transforms"), true);
+
+  const assistance = buildConfigurationSetupStepAssistance({
+    step: configurationSetupStepById("transforms"),
+    status,
+    setupSummary: formatConfigurationSetupSummary(status),
+    setupNotesWordCount: 12,
+    businessDone: 7,
+    businessTotal: 10,
+    missingBusinessLabels: ["Company address"],
+    agentProviderId: "openai-compatible",
+    agentProviderModel: "gpt-4.1",
+    agentProviderEndpoint: "https://api.openai.com/v1/chat/completions",
+    agentProviderKeyEnv: "OPENAI_API_KEY",
+    localAgentProfileCount: 4,
+    docsLiveRuntimeIssueCount: 1,
+    ttsEngine: "supertonic-cli",
+    ttsRuntimeSummary: "Supertonic not found on PATH",
+    exportTarget: "pdf",
+    exportLayoutPreset: "board",
+    citationStyle: "apa",
+    readyEngineCount: 2,
+    disabledEngineCount: 1,
+    externalEngineCount: 6,
+  });
+  equal(assistance.stepId, "transforms");
+  ok(assistance.suggestedAnswer.includes("Ready engines: 2"));
+  ok(configurationSetupAssistanceBlock(assistance).includes("Context signals:"));
+
+  const sections = buildConfigurationCenterSections({
+    setupSummary: "6/8 setup areas ready",
+    toolbarDisplay: "both",
+    editorKeymapMode: "default",
+    autosave: true,
+    snapshotStorage: "project",
+    exportTarget: "pdf",
+    citationStyle: "apa",
+    aiProviderProfileId: "openai-compatible",
+    ttsEngine: "supertonic-cli",
+    externalEngineCount: 6,
+    installerPlanCount: 3,
+  });
+  deepEqual(sections.map((section) => section.id), ["overview", "appearance", "files", "exports", "ai", "transforms"]);
+  equal(sections.find((section) => section.id === "transforms")?.summary, "6 external engines; 3 installer plan");
+});
+
 test("AI provider execution extracts Markdown without persisting secrets", async () => {
   const run = buildAgenticWorkflowRun({
     instruction: "Revise the summary for the board. audience: board owner: Strategy deadline: June 1 evidence: board pack",
@@ -4062,7 +4140,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const app = readFileSync("src/App.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
+  const aiProviderPackages = readFileSync("src/lib/aiProviderPackages.ts", "utf8");
   const businessDocs = readFileSync("src/lib/businessDocuments.ts", "utf8");
+  const configurationSetup = readFileSync("src/lib/configurationSetup.ts", "utf8");
   const frontMatterManagers = readFileSync("src/lib/frontMatterManagers.ts", "utf8");
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
   const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
@@ -4593,18 +4673,18 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("appendConfigurationSetupAssistance"));
   ok(app.includes("configurationCenterSections"));
   ok(app.includes("selectedConfigurationSection"));
-  ok(app.includes("Appearance and editor"));
-  ok(app.includes("Files and history"));
-  ok(app.includes("Exports and brand"));
-  ok(app.includes("AI, agents, and voice"));
+  ok(configurationSetup.includes("Appearance and editor"));
+  ok(configurationSetup.includes("Files and history"));
+  ok(configurationSetup.includes("Exports and brand"));
+  ok(configurationSetup.includes("AI, agents, and voice"));
   ok(app.includes("LLM access defaults"));
   ok(app.includes("Open configuration setup wizard"));
   ok(app.includes("saveAgentProviderDefaults"));
   ok(app.includes("aiProviderDefaultKeyEnv"));
   ok(app.includes("OPENAI_API_KEY"));
   ok(app.includes("NEDITOR_AI_API_KEY"));
-  ok(app.includes("Google Antigravity"));
-  ok(app.includes("google-antigravity-cli"));
+  ok(aiProviderPackages.includes("Google Antigravity"));
+  ok(aiProviderPackages.includes("google-antigravity-cli"));
   ok(app.includes('aria-label="Text to speech setup"'));
   ok(app.includes("ttsEngineOptions"));
   ok(app.includes("Read selected text aloud"));
@@ -4665,6 +4745,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("selectTableForEditing"));
   ok(app.includes("updateTableDraftFromSourceText"));
   ok(app.includes("applyTableSourceEdit"));
+  ok(app.includes("tableTwoWayHint"));
+  ok(app.includes("Create table in text"));
+  ok(app.includes("Edit table text"));
+  ok(app.includes("Sync text to grid"));
+  ok(app.includes("Apply grid to text"));
+  ok(app.includes("Grid and document text are synced; edit either the visual grid or the Markdown source lines."));
   ok(app.includes("tableDraftSourceChanged"));
   ok(app.includes("selectedTableForDraft"));
   ok(app.includes("findMarkdownTableForSourceSnapshot"));

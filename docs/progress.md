@@ -4869,6 +4869,13 @@ Profile-filled CLI snippets:
 | `src-tauri/target/debug/ned snippets --workspace /private/tmp/neditor-profile-snippet-smoke --fill-profile --markdown company-contact-block` | Pass | Direct binary smoke printed a reusable contact snippet with saved full name, role, company, email, and website merged from `.neditor/business-profile.json` while leaving unset address and phone placeholders visible. |
 | `pnpm run check:docs` | Pass | Markdown documentation links remain valid after documenting profile-filled snippet rendering for non-technical CLI use. |
 
+Configuration setup and two-way table polish:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit -- --runInBand` | Pass | 84 frontend unit/static tests passed after extracting configuration setup readiness, suggested-answer, note-block, and section metadata into `src/lib/configurationSetup.ts`; the same static coverage now guards the explicit two-way table action panel labels for creating tables in Markdown text, editing table text, syncing text to the grid, and applying grid edits back to text. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the Tables panel gained a dedicated two-way status hint and the configuration setup wizard delegated setup scoring and assistance copy through the extracted helper module. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
