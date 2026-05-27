@@ -4533,6 +4533,18 @@ Inline-code reference readiness hardening:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording inline-code reference edge coverage. |
 | `git diff --check` | Pass | No whitespace errors are present in the inline-code reference readiness diff. |
 
+OpenAPI/JSON Schema nullable fields:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is clean after adding nullable schema type and constraint summaries. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused schema renderer test proves OpenAPI/JSON Schema tables now surface `nullable: true` and summarize nullable fields as `string | null`. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked json_schema --lib` | Pass | JSON Schema focused test selection passed, covering the renderer path with nullable field evidence. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export conformance still passes across HTML, PDF, DOCX, PPTX, and Markdown bundle evidence after nullable support. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after recording nullable schema evidence. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after refreshing OpenAPI/JSON Schema nullable evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the nullable schema diff. |
+
 RFP URL and DOCX source cleanup hardening:
 
 | Command | Result | Evidence |

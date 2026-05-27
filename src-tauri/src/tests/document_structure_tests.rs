@@ -1129,6 +1129,7 @@ components:
             email:
               type: string
               format: email
+              nullable: true
     AccountClosed:
       type: object
       required:
@@ -1277,8 +1278,10 @@ components:
     assert!(response.html.contains("owner.email"));
     assert!(response.html.contains("Account id"));
     assert!(response.html.contains("<td>yes</td>"));
+    assert!(response.html.contains("string | null"));
     assert!(response.html.contains("transactions[]"));
     assert!(response.html.contains("format: uuid"));
+    assert!(response.html.contains("nullable: true"));
     assert!(response.html.contains("minimum: 0"));
     assert!(response.html.contains("additionalProperties: false"));
     assert!(response.html.contains("unevaluatedProperties: false"));

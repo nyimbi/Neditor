@@ -956,20 +956,26 @@ fn schema_child_path(parent: &str, child: &str) -> String {
 
 fn schema_type_summary(schema: &Value) -> String {
     if let Some(reference) = schema.get("$ref").and_then(Value::as_str) {
-        return format!("ref {}", reference_tail(reference));
+        return schema_nullable_type(format!("ref {}", reference_tail(reference)), schema);
     }
     if let Some(items) = schema.get("enum").and_then(Value::as_array) {
-        return format!("enum {}", value_list_summary(items));
+        return schema_nullable_type(format!("enum {}", value_list_summary(items)), schema);
     }
     if let Some(constant) = schema.get("const") {
-        return format!("const {}", structured_value_summary(constant));
+        return schema_nullable_type(
+            format!("const {}", structured_value_summary(constant)),
+            schema,
+        );
     }
     if let Some(types) = schema.get("type").and_then(Value::as_array) {
-        return types
-            .iter()
-            .filter_map(Value::as_str)
-            .collect::<Vec<_>>()
-            .join(" | ");
+        return schema_nullable_type(
+            types
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(" | "),
+            schema,
+        );
     }
     let kind = match schema.get("type").and_then(Value::as_str) {
         Some("array") => schema
@@ -984,7 +990,28 @@ fn schema_type_summary(schema: &Value) -> String {
         None if schema.get("allOf").is_some() => "allOf".to_string(),
         None => String::new(),
     };
-    append_schema_discriminator(kind, schema)
+    schema_nullable_type(append_schema_discriminator(kind, schema), schema)
+}
+
+fn schema_nullable_type(kind: String, schema: &Value) -> String {
+    if !schema
+        .get("nullable")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return kind;
+    }
+    if kind
+        .split('|')
+        .any(|part| part.trim().eq_ignore_ascii_case("null"))
+    {
+        return kind;
+    }
+    if kind.is_empty() {
+        "null".to_string()
+    } else {
+        format!("{kind} | null")
+    }
 }
 
 fn schema_constraints(schema: &Value) -> String {
@@ -1013,6 +1040,7 @@ fn schema_constraints(schema: &Value) -> String {
         "writeOnly",
         "deprecated",
         "uniqueItems",
+        "nullable",
     ] {
         if let Some(value) = schema.get(key) {
             constraints.push(format!("{key}: {}", structured_value_summary(value)));
