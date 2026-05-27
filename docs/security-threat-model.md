@@ -59,6 +59,24 @@ Mitigations:
 - Failed external execution falls back to native rendering when available.
 - Diagnostics include setup, execution, stderr, timeout, and cache details.
 
+### Unsafe SQL Transform
+
+Threat: A document-authored SQL block mutates a local database or chains a
+read-only query with a destructive statement.
+
+Mitigations:
+
+- SQL transforms require an explicitly trusted `sqlite3` executable.
+- SQL blocks must use a document-local `database` path that resolves inside the
+  document folder.
+- Only `SELECT` and `WITH` queries are accepted.
+- Stacked statements such as `SELECT ...; DELETE ...` are rejected before
+  `sqlite3` is invoked.
+- Mutation keywords are detected on SQL word boundaries while quoted strings
+  and mutation-like identifier names remain usable as read-only values.
+- The SQLite process is invoked directly without a shell and with a bounded
+  timeout.
+
 ### Unsafe Git Restore Or Tag Input
 
 Threat: A malicious repository or malformed UI state turns a versioning action
@@ -165,6 +183,8 @@ Mitigations:
 - `git_restore_refuses_symlink_targets`
 - `snapshot_restore_is_scoped_to_active_document_store`
 - `snapshot_restore_rejects_out_of_scope_and_mismatched_sources`
+- `sql_transform_requires_read_only_trusted_queries`
+- `sql_transform_blocks_document_relative_database_escape`
 - `workspace persistence migration versions and normalizes saved settings`
 - `save_file_rejects_stale_expected_hash`
 - `AI provider packages redact secrets and preserve agent governance context`

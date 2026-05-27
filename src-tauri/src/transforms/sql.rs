@@ -202,22 +202,102 @@ fn read_only_select(query: &str) -> bool {
     if !(normalized.starts_with("select ") || normalized.starts_with("with ")) {
         return false;
     }
+    if has_non_trailing_statement_separator(query) {
+        return false;
+    }
+    !contains_blocked_sql_keyword(query)
+}
+
+fn has_non_trailing_statement_separator(query: &str) -> bool {
+    let chars = query.chars().collect::<Vec<_>>();
+    let mut quote: Option<char> = None;
+    let mut index = 0usize;
+    while index < chars.len() {
+        let ch = chars[index];
+        if let Some(quote_char) = quote {
+            if ch == quote_char {
+                if chars.get(index + 1) == Some(&quote_char) {
+                    index += 2;
+                    continue;
+                }
+                quote = None;
+            }
+            index += 1;
+            continue;
+        }
+        if matches!(ch, '\'' | '"' | '`') {
+            quote = Some(ch);
+        } else if ch == ';' {
+            let remainder = chars[index + 1..].iter().collect::<String>();
+            if !remainder.trim().trim_matches(';').trim().is_empty() {
+                return true;
+            }
+        }
+        index += 1;
+    }
+    false
+}
+
+fn contains_blocked_sql_keyword(query: &str) -> bool {
+    let query = sql_without_quoted_segments(query);
     let blocked = [
-        " insert ",
-        " update ",
-        " delete ",
-        " drop ",
-        " alter ",
-        " create ",
-        " replace ",
-        " attach ",
-        " detach ",
-        " vacuum ",
-        " pragma ",
-        " reindex ",
+        "insert", "update", "delete", "drop", "alter", "create", "replace", "attach", "detach",
+        "vacuum", "pragma", "reindex",
     ];
-    let padded = format!(" {normalized} ");
-    !blocked.iter().any(|keyword| padded.contains(keyword))
+    blocked
+        .iter()
+        .any(|keyword| contains_sql_keyword(&query, keyword))
+}
+
+fn sql_without_quoted_segments(query: &str) -> String {
+    let chars = query.chars().collect::<Vec<_>>();
+    let mut quote: Option<char> = None;
+    let mut output = String::with_capacity(query.len());
+    let mut index = 0usize;
+    while index < chars.len() {
+        let ch = chars[index];
+        if let Some(quote_char) = quote {
+            if ch == quote_char {
+                if chars.get(index + 1) == Some(&quote_char) {
+                    output.push(' ');
+                    output.push(' ');
+                    index += 2;
+                    continue;
+                }
+                quote = None;
+            }
+            output.push(' ');
+            index += 1;
+            continue;
+        }
+        if matches!(ch, '\'' | '"' | '`') {
+            quote = Some(ch);
+            output.push(' ');
+        } else {
+            output.push(ch.to_ascii_lowercase());
+        }
+        index += 1;
+    }
+    output
+}
+
+fn contains_sql_keyword(query: &str, keyword: &str) -> bool {
+    let mut search_from = 0usize;
+    while let Some(offset) = query[search_from..].find(keyword) {
+        let start = search_from + offset;
+        let end = start + keyword.len();
+        let before = query[..start].chars().next_back();
+        let after = query[end..].chars().next();
+        if !is_sql_identifier_char(before) && !is_sql_identifier_char(after) {
+            return true;
+        }
+        search_from = end;
+    }
+    false
+}
+
+fn is_sql_identifier_char(ch: Option<char>) -> bool {
+    ch.is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
 fn error_block(message: &str) -> String {

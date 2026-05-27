@@ -192,6 +192,43 @@ fn sql_transform_requires_read_only_trusted_queries() {
         .iter()
         .any(|diagnostic| diagnostic.severity == "error"));
 
+    let stacked_mutation = run_transform(
+        "sql".to_string(),
+        "SELECT 1;DELETE FROM accounts;".to_string(),
+    )
+    .expect("stacked sql transform artifact");
+    assert!(stacked_mutation.html.contains("read-only SELECT"));
+    assert!(stacked_mutation
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("read-only SELECT")));
+
+    let cte_stacked_mutation = run_transform(
+        "sql".to_string(),
+        "WITH totals AS (SELECT 1 AS amount) SELECT amount FROM totals; UPDATE accounts SET amount = 0;"
+            .to_string(),
+    )
+    .expect("cte stacked sql transform artifact");
+    assert!(cte_stacked_mutation.html.contains("read-only SELECT"));
+
+    let quoted_keyword_query = run_transform(
+        "sql".to_string(),
+        "SELECT 'drop table' AS note;".to_string(),
+    )
+    .expect("quoted keyword sql transform artifact");
+    assert!(quoted_keyword_query
+        .html
+        .contains("requires a database=&quot;path/to/file.sqlite&quot; option"));
+
+    let identifier_keyword_query = run_transform(
+        "sql".to_string(),
+        "SELECT dropped_value FROM accounts;".to_string(),
+    )
+    .expect("identifier keyword sql transform artifact");
+    assert!(identifier_keyword_query
+        .html
+        .contains("requires a database=&quot;path/to/file.sqlite&quot; option"));
+
     let missing_trust = compile_with_options(
         CompileRequest {
             text: "# SQL\n```sql database=\"/tmp/neditor-test.sqlite\"\nSELECT 1;\n```\n"
