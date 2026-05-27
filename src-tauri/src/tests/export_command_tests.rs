@@ -858,6 +858,10 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(output.exists());
     assert!(manifest_text.contains("\"document_title\": \"Manifest Ready\""));
     assert!(manifest_text.contains("\"document_version\": \"1.0.0\""));
+    assert!(manifest_text.contains("\"approved_by\": \"QA\""));
+    assert!(manifest_text.contains("\"approved_at\": \"2026-05-19\""));
+    assert!(manifest_text.contains("\"owner\": \"Release QA\""));
+    assert!(manifest_text.contains("\"release_target\": \"manifest smoke\""));
     assert!(manifest_text.contains("\"export_target\": \"html\""));
     assert!(manifest_text.contains("\"source_hash\": \"sha256:"));
     assert!(manifest_text.contains("\"output_path\": "));
@@ -873,6 +877,10 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert!(manifest_text.contains("\"layout_sections\": ["));
     assert_eq!(response.manifest.document_title, "Manifest Ready");
     assert_eq!(response.manifest.export_target, "html");
+    assert_eq!(response.manifest.approved_by.as_deref(), Some("QA"));
+    assert_eq!(response.manifest.approved_at.as_deref(), Some("2026-05-19"));
+    assert_eq!(response.manifest.owner.as_deref(), Some("Release QA"));
+    assert_eq!(response.manifest.release_target.as_deref(), Some("manifest smoke"));
     assert_eq!(response.manifest.layout_sections.len(), 1);
     let output_string = path_to_string(&output);
     assert_eq!(

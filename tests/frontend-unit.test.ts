@@ -5094,6 +5094,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("appendExportStepAssistance"));
   ok(app.includes("appendAllExportStepAssistance"));
   ok(app.includes("insertExportReadinessNotes"));
+  ok(app.includes("exportPreviewSummary.releaseLabel"));
+  ok(app.includes("approved by"));
+  ok(app.includes("release_target"));
   ok(app.includes("publicMetadataOptionsTitle"));
   ok(app.includes("exportDistributionChecklist"));
   ok(app.includes("store.exportDefaults.htmlLanguage"));

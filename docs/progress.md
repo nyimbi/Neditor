@@ -118,6 +118,12 @@ Recent pushed checkpoints visible in current git history:
   differ, so Save As/Rename/Pin workflows keep file identity visible, and the
   visual table action is labeled **Apply table** to avoid ambiguity with
   **Apply source text**.
+- Release-state export manifests now carry approval metadata as first-class
+  audit fields: `approved_by`, `approved_at`, `owner`, and `release_target`.
+  Export preview surfaces that release/audit line before writing artifacts, and
+  focused export workflow proof checks that approved PPTX readiness exposes the
+  release target and approver in both the manifest preview and visible export
+  preview summary.
 - Table editor manual QA now has an executable sign-off contract. `pnpm run
   check:tables:manual` writes `.tmp/table-editor/manual-review-template.json`
   and `.tmp/table-editor/manual-review-summary.json`, validates completed

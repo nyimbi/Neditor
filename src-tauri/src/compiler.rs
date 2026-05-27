@@ -326,6 +326,11 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
             .unwrap_or("0.1.0")
             .to_string(),
         status: status.clone(),
+        approved_by: metadata_string(&metadata, "approvedBy")
+            .or_else(|| metadata_string(&metadata, "reviewer")),
+        approved_at: metadata_string(&metadata, "approvedAt"),
+        owner: metadata_string(&metadata, "owner"),
+        release_target: metadata_string(&metadata, "releaseTarget"),
         exported_at: Utc::now().to_rfc3339(),
         source_hash: sha256_uri(source.as_bytes()),
         output_path: None,

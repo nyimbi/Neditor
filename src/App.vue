@@ -2867,6 +2867,7 @@
             <span>{{ exportPreviewSummary.readinessLabel }}</span>
           </div>
           <p>{{ exportPreviewSummary.manifestLabel }}</p>
+          <p v-if="exportPreviewSummary.releaseLabel">{{ exportPreviewSummary.releaseLabel }}</p>
           <ul aria-label="Export preview options">
             <li v-for="option in exportPreviewSummary.options" :key="option">{{ option }}</li>
           </ul>
@@ -6742,6 +6743,17 @@ const exportStepAssistance = computed(() =>
 const exportPreviewSummary = computed(() => {
   const manifest = store.exportReadiness?.manifest || active.value.compile?.export_manifest;
   const readiness = store.exportReadiness;
+  const releaseLabel = manifest
+    ? [
+        `Release ${manifest.status || "draft"}`,
+        manifest.approved_by ? `approved by ${manifest.approved_by}` : "approval missing",
+        manifest.approved_at ? `at ${manifest.approved_at}` : "",
+        manifest.owner ? `owner ${manifest.owner}` : "",
+        manifest.release_target ? `target ${manifest.release_target}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | ")
+    : "";
   const options = [
     store.exportDefaults.includeManifest ? "Manifest" : "No manifest",
     store.exportDefaults.coverPage ? "Cover" : "No cover",
@@ -6759,6 +6771,7 @@ const exportPreviewSummary = computed(() => {
     manifestLabel: manifest
       ? `${manifest.included_files.length} included files, ${manifest.transform_artifacts.length} transform artifacts, ${manifest.layout_sections.length} layout sections`
       : "No export manifest yet",
+    releaseLabel,
     options,
   };
 });

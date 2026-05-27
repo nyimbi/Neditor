@@ -847,6 +847,8 @@ async function installTauriMock(page: Page, stateKey: string) {
       const version = frontMatterValue(text, "version") || "1.0.0";
       const approvedBy = frontMatterValue(text, "approvedBy");
       const approvedAt = frontMatterValue(text, "approvedAt");
+      const owner = frontMatterValue(text, "owner");
+      const releaseTarget = frontMatterValue(text, "releaseTarget");
       const headings = headingsFromMarkdown(compiled);
       const citationReferences = citationReferencesFromMarkdown(compiled);
       const bibliography = bibliographyFromMarkdown(compiled, filePath);
@@ -894,6 +896,10 @@ async function installTauriMock(page: Page, stateKey: string) {
         document_title: title,
         document_version: version,
         status,
+        approved_by: approvedBy || null,
+        approved_at: approvedAt || null,
+        owner: owner || null,
+        release_target: releaseTarget || null,
         exported_at: new Date(0).toISOString(),
         source_hash: sourceHash,
         output_path: null,
@@ -1379,7 +1385,9 @@ async function installTauriMock(page: Page, stateKey: string) {
         const approvedMetadata =
           /^status:\s*(approved|published)\s*$/m.test(request.text) &&
           /^approvedBy:\s*\S.+$/m.test(request.text) &&
-          /^approvedAt:\s*\S.+$/m.test(request.text);
+          /^approvedAt:\s*\S.+$/m.test(request.text) &&
+          /^owner:\s*\S.+$/m.test(request.text) &&
+          /^releaseTarget:\s*\S.+$/m.test(request.text);
         if ((request.target || "html") === "pptx" && !approvedMetadata) {
           diagnostics.push({
             severity: "error",
@@ -1389,8 +1397,8 @@ async function installTauriMock(page: Page, stateKey: string) {
             column: 1,
             end_line: 3,
             end_column: 16,
-            suggestion: "Set status to approved or published and add approvedBy plus approvedAt before exporting a presentation.",
-            related: ["target:pptx"],
+            suggestion: "Set status to approved or published and add approvedBy, approvedAt, owner, and releaseTarget before exporting a presentation.",
+            related: ["target:pptx", "missing:release-metadata"],
           });
         }
         const pendingAiLine =
@@ -5227,6 +5235,8 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
       "status: approved",
       "approvedBy: QA",
       "approvedAt: 2026-05-21",
+      "owner: Release QA",
+      "releaseTarget: presentation deck",
       "---",
       "",
       "# Export Preview",
@@ -5269,6 +5279,10 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
   await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
   await expect(page.locator("article.readiness").getByText("0 errors, 0 warnings, 1 info", { exact: true })).toBeVisible();
   await expect(page.locator(".sidebar").getByText('"export_target": "pptx"')).toBeVisible();
+  await expect(page.locator(".sidebar").getByText('"approved_by": "QA"')).toBeVisible();
+  await expect(page.locator(".sidebar").getByText('"release_target": "presentation deck"')).toBeVisible();
+  await expect(exportPreview).toContainText("Release approved | approved by QA");
+  await expect(exportPreview).toContainText("target presentation deck");
   await expect(exportPreview).toContainText("ready");
 
   await queueDialogSelection(page, "/exports/market.pptx");

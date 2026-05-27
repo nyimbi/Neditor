@@ -311,6 +311,10 @@ export interface ExportManifest {
   document_title: string;
   document_version: string;
   status: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  owner?: string | null;
+  release_target?: string | null;
   exported_at: string;
   source_hash: string;
   output_path?: string | null;
