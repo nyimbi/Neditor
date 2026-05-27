@@ -80,7 +80,7 @@ export interface RfpWizardStepAssistance extends AiDocumentWizardStepAssistance 
 }
 
 export interface AgenticCliIntegration {
-  id: "claude-code" | "codex" | "opencode";
+  id: "claude-code" | "codex" | "opencode" | "google-antigravity";
   label: string;
   command: string;
   summary: string;
@@ -564,6 +564,13 @@ export const agenticCliIntegrations: AgenticCliIntegration[] = [
     summary: "Handoff package for OpenCode agent workflows where teams want local or approved-provider document agents.",
     handoff: "Start OpenCode in the project folder, paste the package, and keep generated changes under human review.",
   },
+  {
+    id: "google-antigravity",
+    label: "Google Antigravity",
+    command: "antigravity",
+    summary: "Handoff package for teams that use Google Antigravity for local or governed document-agent workflows.",
+    handoff: "Start Google Antigravity from the document folder with the prepared package, then import only reviewed Markdown changes.",
+  },
 ];
 
 export function normalizeBusinessProfile(value: unknown): BusinessProfile {
@@ -928,7 +935,7 @@ export function buildRfpWizardStepAssistance(input: RfpWizardStepAssistanceInput
       actionLabel: "Use handoff guidance",
       suggestedAnswer: [
         `Prepare a governed handoff for ${owner}: full source summary, compliance matrix, Requirement Response Drafts, evidence gaps, owner assignments, and submission checklist.`,
-        "Use Docs Live for section-by-section drafting or Agent handoff for a local Claude Code, Codex, or OpenCode response pass; keep review blockers visible before export.",
+        "Use Docs Live for section-by-section drafting or Agent handoff for a local Claude Code, Codex, OpenCode, or Google Antigravity response pass; keep review blockers visible before export.",
       ].join(" "),
       rationale: "The final handoff must be actionable for business reviewers and local agents without losing compliance traceability.",
       extraSignals: analysis ? analyzedSignals : [],

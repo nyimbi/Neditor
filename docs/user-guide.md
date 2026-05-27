@@ -522,8 +522,8 @@ NEditor is built for drafts that need evidence before publication.
   agents, voice runtime, read-aloud, exports, transforms, and release gates.
   Add the suggestion to editable setup notes when a non-technical user needs a
   clear setup record before changing configuration.
-- For Claude Code, Codex, and OpenCode profiles, use **Prepare local agent
-  workspace** to write the governed prompt package under
+- For Claude Code, Codex, OpenCode, and Google Antigravity profiles, use
+  **Prepare local agent workspace** to write the governed prompt package under
   `.neditor/agent-handoffs` in the active document folder. NEditor reports the
   exact launch command, whether the selected CLI is present on `PATH`, and the
   handoff file path so the local agent can work from the same project context.

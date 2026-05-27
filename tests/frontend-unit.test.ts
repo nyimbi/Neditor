@@ -1911,6 +1911,7 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(agenticCliIntegrations.some((integration) => integration.command === "claude"));
   ok(agenticCliIntegrations.some((integration) => integration.command === "codex"));
   ok(agenticCliIntegrations.some((integration) => integration.command === "opencode"));
+  ok(agenticCliIntegrations.some((integration) => integration.command === "antigravity"));
 
   const markdown = businessTemplateMarkdown(proposal, profile);
   ok(markdown.includes("title: \"Client proposal for Globex\""));
@@ -1937,6 +1938,7 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(context.includes("requirement coverage"));
   ok(context.includes("Claude Code"));
   ok(context.includes("OpenCode"));
+  ok(context.includes("Google Antigravity"));
 
   const assistance = buildBusinessWizardStepAssistance(tender, profile);
   equal(assistance.length, 6);

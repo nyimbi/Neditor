@@ -137,6 +137,11 @@ Recent pushed checkpoints visible in current git history:
   helper, and direct frontend unit coverage proves the audit fence, generated
   metadata, review queues, assumption register, humanization checklist, and
   reviewer handoff sections are emitted consistently.
+- Business-document and RFP local-agent handoffs now include Google Antigravity
+  alongside Claude Code, Codex, and OpenCode. The Templates wizard, RFP wizard,
+  wizard context package, README, user guide, and spec matrix now describe the
+  same governed local-agent set already supported by the AI provider
+  configuration surface.
 - Table editing now exposes direct Markdown-text editing as a first-class
   two-way action. The Tables sidebar has an explicit **Edit Markdown in text**
   control that can load the table at the editor cursor, select the exact source
@@ -3930,6 +3935,16 @@ Frontend architecture modularization:
 | `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including direct coverage for pure Vim word-start/word-end helper semantics and static wiring guards for the extracted module. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs configurable Emacs and Vim-style editor keybinding modes"` | Pass | Focused Chromium workflow re-proved the extracted keybinding module through the real editor UI. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after extracting the Vim keybinding module. |
+
+Business wizard local-agent coverage:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit -- --runInBand` | Pass | Focused frontend unit/static coverage proves business-document local-agent handoff metadata now includes Claude Code, Codex, OpenCode, and Google Antigravity, and that generated wizard context exposes Google Antigravity to non-technical business users. |
+| `pnpm run check` | Pass | Vue typecheck passed after making Templates and RFP handoff copy consistent with the expanded governed local-agent set. |
+| `pnpm run check:docs` | Pass | README and user-guide links/checks passed after documenting Google Antigravity in business-document and setup guidance. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with AI workflow evidence updated for Google Antigravity handoffs. |
+| `git diff --check` | Pass | No whitespace errors are present in the local-agent handoff coverage diff. |
 
 Two-way table source editing:
 

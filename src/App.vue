@@ -1002,7 +1002,7 @@
                     </span>
                     AI wizard
                   </button>
-                  <button type="button" :title="`Prepare Claude Code, Codex, or OpenCode handoff for ${template.label}`" @click="openAgentWorkspaceForBusinessTemplate(template)">
+                  <button type="button" :title="`Prepare Claude Code, Codex, OpenCode, or Google Antigravity handoff for ${template.label}`" @click="openAgentWorkspaceForBusinessTemplate(template)">
                     <span class="button-icon" aria-hidden="true">
                       <svg viewBox="0 0 24 24" focusable="false">
                         <path v-for="path in toolbarIconPaths('agent')" :key="path" :d="path"></path>
@@ -1125,7 +1125,7 @@
                 <button type="button" title="Insert only the generated compliance matrix into the active document" @click="insertRfpComplianceMatrix">Insert matrix</button>
                 <button type="button" title="Replace the active document with a full responsive RFP response draft" @click="createResponsiveRfpResponse">Create response</button>
                 <button type="button" title="Send the analyzed RFP to Docs Live for section-by-section drafting" @click="sendRfpResponseToDocsLive">Docs Live</button>
-                <button type="button" title="Prepare a Claude Code, Codex, or OpenCode handoff for the analyzed RFP" @click="openAgentWorkspaceForRfpAnalysis">Agent handoff</button>
+                <button type="button" title="Prepare a Claude Code, Codex, OpenCode, or Google Antigravity handoff for the analyzed RFP" @click="openAgentWorkspaceForRfpAnalysis">Agent handoff</button>
               </div>
             </section>
           </section>
@@ -14429,7 +14429,7 @@ function openAgentWorkspaceForBusinessTemplate(template: BusinessDocumentTemplat
     `Create a ${template.label}.`,
     template.aiPrompt,
     "Use the saved business identity, create an outline first, draft section by section, run QA, humanize the document, and prepare a review handoff.",
-    "Support provider handoff to Claude Code, Codex, or OpenCode if a local agent is preferred.",
+    "Support provider handoff to Claude Code, Codex, OpenCode, or Google Antigravity if a local agent is preferred.",
   ].join(" ");
   selectAgentProviderProfileForInstruction(template.id === "tender" || template.id === "rfp" ? "Claude Code" : "Codex");
   openAgentWorkspace(instruction);
