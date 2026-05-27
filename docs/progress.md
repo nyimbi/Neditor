@@ -53,6 +53,10 @@ Recent pushed checkpoints visible in current git history:
   `encoding.text.field`, so milestone/readiness plots can place short labels at
   x/y positions while retaining color-series metadata and export-safe values.
   The Templates panel includes a matching readiness label plot starter.
+- Vega-Lite native static previews now accept common scatter aliases `circle`
+  and `square`. The renderer preserves color-series metadata and axis titles,
+  and the Templates panel includes an opportunity scatter starter for account
+  and portfolio scoring workflows.
 - Table editing now has a text-cell path in addition to the visual grid and
   editable source block. **Edit Table Cell at Cursor** locates the Markdown
   header/body cell under the source cursor, loads its value into the Tables

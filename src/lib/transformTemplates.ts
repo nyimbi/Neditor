@@ -873,6 +873,33 @@ y: risk
     ["vega-lite", "tick", "risk", "qa"],
   ),
   template(
+    "vega-lite-opportunity-scatter",
+    "Charts",
+    "vega-lite",
+    "Opportunity scatter plot",
+    "Creates a Vega-Lite circle scatter plot for opportunity, account, or portfolio scoring.",
+    fenced(
+      "vega-lite",
+      `{
+  "mark": { "type": "circle" },
+  "title": "Opportunity score scatter",
+  "data": {
+    "values": [
+      { "account": "Acme", "score": 82, "segment": "Enterprise" },
+      { "account": "Beta", "score": 55, "segment": "Growth" },
+      { "account": "Cobalt", "score": 68, "segment": "Midmarket" }
+    ]
+  },
+  "encoding": {
+    "x": { "field": "account", "title": "Account" },
+    "y": { "field": "score", "title": "Opportunity score" },
+    "color": { "field": "segment" }
+  }
+}`,
+    ),
+    ["vega-lite", "circle", "scatter", "score"],
+  ),
+  template(
     "vega-lite-readiness-labels",
     "Charts",
     "vega-lite",

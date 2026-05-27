@@ -1208,6 +1208,37 @@ fn vega_lite_text_mark_renders_static_labels_preview() {
 }
 
 #[test]
+fn vega_lite_circle_and_square_marks_render_static_scatter_previews() {
+    let circle = run_transform(
+            "vega-lite".to_string(),
+            r##"{"mark":{"type":"circle"},"title":"Opportunity Scatter","data":{"values":[{"account":"Acme","value":82,"segment":"Enterprise"},{"account":"Beta","value":55,"segment":"Growth"}]},"encoding":{"x":{"field":"account","title":"Account"},"y":{"field":"value","title":"Opportunity score"},"color":{"field":"segment"}}}"##.to_string(),
+        )
+        .expect("vega-lite circle transform");
+
+    assert_eq!(circle.output_kind, "svg");
+    assert!(circle.html.contains("Opportunity Scatter"));
+    assert!(circle.html.contains("vega-circle-mark"));
+    assert!(circle.html.contains("data-series=\"Enterprise\""));
+    assert!(circle.html.contains("aria-label=\"Acme: Enterprise 82\""));
+    assert!(!circle.html.contains("Unsupported Vega-Lite mark"));
+    assert!(circle.diagnostics.is_empty());
+
+    let square = run_transform(
+            "vega-lite".to_string(),
+            r##"{"mark":"square","title":"Control Status Matrix","data":{"values":[{"control":"Access","score":88,"status":"Ready"},{"control":"Logging","score":67,"status":"Review"}]},"encoding":{"x":{"field":"control","title":"Control"},"y":{"field":"score","title":"Readiness"},"color":{"field":"status"}}}"##.to_string(),
+        )
+        .expect("vega-lite square transform");
+
+    assert_eq!(square.output_kind, "svg");
+    assert!(square.html.contains("Control Status Matrix"));
+    assert!(square.html.contains("vega-square-mark"));
+    assert!(square.html.contains("data-series=\"Review\""));
+    assert!(square.html.contains("aria-label=\"Logging: Review 67\""));
+    assert!(!square.html.contains("Unsupported Vega-Lite mark"));
+    assert!(square.diagnostics.is_empty());
+}
+
+#[test]
 fn vega_lite_preview_preserves_negative_values_aggregation_and_axis_titles() {
     let artifact = run_transform(
             "vega-lite".to_string(),
@@ -1238,12 +1269,11 @@ fn vega_lite_unsupported_marks_report_supported_static_subset() {
 
     assert_eq!(artifact.output_kind, "html");
     assert!(artifact.html.contains("Unsupported Vega-Lite mark"));
-    assert!(artifact
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.suggestion.as_deref().is_some_and(
-            |suggestion| suggestion.contains("bar, line, point, area, tick, or text")
-        )));
+    assert!(artifact.diagnostics.iter().any(|diagnostic| diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion
+            .contains("bar, line, point, circle, square, area, tick, or text"))));
 }
 
 #[test]

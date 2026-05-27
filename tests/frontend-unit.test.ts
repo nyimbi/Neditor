@@ -3945,6 +3945,10 @@ test("transform template library covers reusable calculations and custom templat
   if (!vegaTickTemplate) throw new Error("missing Vega-Lite tick template");
   ok(vegaTickTemplate.body.includes('"type": "tick"'));
   ok(vegaTickTemplate.tags.includes("qa"));
+  const vegaScatterTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-opportunity-scatter");
+  if (!vegaScatterTemplate) throw new Error("missing Vega-Lite scatter template");
+  ok(vegaScatterTemplate.body.includes('"type": "circle"'));
+  ok(vegaScatterTemplate.tags.includes("scatter"));
   const vegaTextTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-readiness-labels");
   if (!vegaTextTemplate) throw new Error("missing Vega-Lite text template");
   ok(vegaTextTemplate.body.includes('"mark": "text"'));

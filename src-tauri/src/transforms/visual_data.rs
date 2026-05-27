@@ -24,14 +24,14 @@ pub(crate) fn render_vega_lite_svg(
     let mark = vega_lite_mark(&spec);
     if !matches!(
         mark.as_str(),
-        "bar" | "line" | "point" | "area" | "tick" | "text"
+        "bar" | "line" | "point" | "circle" | "square" | "area" | "tick" | "text"
     ) {
         let diagnostic = diag(
             "warning",
             format!("Unsupported Vega-Lite mark for native preview: {mark}"),
             None,
             None,
-            Some("Use bar, line, point, area, tick, or text marks for the native static preview."),
+            Some("Use bar, line, point, circle, square, area, tick, or text marks for the native static preview."),
         );
         artifact_diags.push(diagnostic.clone());
         diagnostics.push(diagnostic);
@@ -534,9 +534,23 @@ fn render_vega_lite_chart_svg(
                         escape_html(&value_label),
                         escape_html(&value_label)
                     ));
-                } else {
+                } else if mark == "square" {
+                    let x = x.saturating_sub(5);
                     svg.push_str(&format!(
-                        "<circle cx=\"{x}\" cy=\"{y:.1}\" r=\"5\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}/>",
+                        "<rect class=\"vega-square-mark\" x=\"{x}\" y=\"{:.1}\" width=\"10\" height=\"10\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}/>",
+                        y - 5.0,
+                        escape_html(&label),
+                        escape_html(&value_label),
+                        escape_html(&value_label)
+                    ));
+                } else {
+                    let class_attr = if mark == "circle" {
+                        " class=\"vega-circle-mark\""
+                    } else {
+                        " class=\"vega-point-mark\""
+                    };
+                    svg.push_str(&format!(
+                        "<circle{class_attr} cx=\"{x}\" cy=\"{y:.1}\" r=\"5\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}/>",
                         escape_html(&label),
                         escape_html(&value_label),
                         escape_html(&value_label)

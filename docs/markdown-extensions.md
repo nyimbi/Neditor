@@ -435,7 +435,7 @@ Native visual-data transform subsets:
 
 | Transform | Native static subset |
 | --- | --- |
-| `vega-lite` | Inline JSON specs with `data.values`, `encoding.x.field`, `encoding.y.field`, optional `encoding.color.field` grouping/series, optional `encoding.text.field` labels, `encoding.x.title`/`encoding.y.title`, numeric y values including negatives with a real zero baseline, y aggregates (`sum`, `mean`, `average`, `min`, `max`), and `bar`, `line`, `point`, `area`, `tick`, or `text` marks. |
+| `vega-lite` | Inline JSON specs with `data.values`, `encoding.x.field`, `encoding.y.field`, optional `encoding.color.field` grouping/series, optional `encoding.text.field` labels, `encoding.x.title`/`encoding.y.title`, numeric y values including negatives with a real zero baseline, y aggregates (`sum`, `mean`, `average`, `min`, `max`), and `bar`, `line`, `point`, `circle`, `square`, `area`, `tick`, or `text` marks. |
 | `geojson` | GeoJSON Feature, FeatureCollection, GeometryCollection, Point/MultiPoint, LineString/MultiLineString, Polygon, and MultiPolygon rendered as typed static SVG map previews. Native previews mark their projection as `linear-wgs84-fit`, assume longitude/latitude coordinates, and warn when legacy `crs` metadata or out-of-range projected coordinates are detected. |
 | `topojson` | Topology `arcs` arrays with optional `transform.scale` and `transform.translate`, plus object geometries that reference arcs, including reversed arc references; quantized `Point` and `MultiPoint` coordinates use the same transform so markers align with decoded arcs. |
 | `stl` | ASCII STL vertex data rendered as depth-aware isometric triangle previews with per-triangle depth ordering and `z-depth` summary metadata. |
@@ -472,7 +472,8 @@ External engines are disabled until trusted. See
 Pikchr, and SQLite setup.
 
 The same Templates panel also includes starter blocks for chart, Vega-Lite
-grouped bars, risk-score tick plots, and readiness label plots,
+grouped bars, opportunity scatter plots, risk-score tick plots, and readiness
+label plots,
 timeline, roadmap, ADR, Mermaid, Pikchr, DOT, PlantUML, CSV, JSON Schema,
 OpenAPI, and QR transforms. Duplicate any built-in template to create a
 workspace custom template, then edit the name, category, transform, tags, and
