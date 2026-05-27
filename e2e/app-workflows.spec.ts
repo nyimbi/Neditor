@@ -2933,6 +2933,62 @@ test("generates a Docs Live draft from outline, context, and placeholders", asyn
   await expect(page.getByRole("region", { name: "Live preview" })).toContainText("Review Preparation");
 });
 
+test("keeps long-form Docs Live wizards outline-first before sequential prose", async ({ page }) => {
+  await page.getByRole("button", { name: "Docs Live", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Docs Live voice drafting" });
+  await expect(dialog).toBeVisible();
+
+  await dialog.getByLabel("Document type").selectOption("technical-textbook");
+  await dialog.getByLabel("Document title").fill("Distributed Systems Textbook");
+  const outlineInput = dialog.getByRole("textbox", { name: "Outline", exact: true });
+  await outlineInput.fill("");
+  await dialog.getByLabel("Context and answers").fill("Audience: senior engineering students. Evidence: course notes. Owner: Faculty.");
+  await dialog.getByLabel("Placeholder values").fill("audience: senior engineering students\nowner: Faculty\nevidence: course notes");
+  await dialog.getByRole("button", { name: "Build questionnaire" }).click();
+  await expect(dialog.getByLabel("AI-created questionnaire")).toHaveValue(/locked before prose is drafted/);
+
+  await dialog.getByRole("button", { name: "Generate draft" }).click();
+  const workflow = dialog.getByRole("region", { name: "Docs Live section drafting workflow" });
+  const markdown = dialog.getByLabel("Docs Live generated Markdown");
+  await expect(workflow).toContainText("Suggested outline ready");
+  await expect(workflow).toContainText("needs-input");
+  await expect(markdown).toHaveValue(/Textbook Architecture Approval Gate/);
+  await expect(markdown).toHaveValue(/Sequential Chapter Draft Queue/);
+  await expect(markdown).toHaveValue(/Final Instructional Quality Review/);
+  await expect(markdown).toHaveValue(/Prose intentionally blocked until the textbook architecture is approved/);
+
+  await dialog
+    .getByRole("textbox", { name: "Outline", exact: true })
+    .fill("- Textbook Architecture\n- Chapter 1 - Conceptual Foundation\n- Chapter 2 - Consensus and Replication\n- Instructional Quality Review");
+  await dialog.getByRole("button", { name: "Generate draft" }).click();
+  await expect(workflow).toContainText("Textbook architecture locked");
+  await expect(markdown).toHaveValue(/draft this chapter in sequence/);
+  await expect(markdown).not.toHaveValue(/Prose intentionally blocked until the textbook architecture is approved/);
+
+  await dialog.getByLabel("Document type").selectOption("novel");
+  await dialog.getByLabel("Document title").fill("The Atlas Signal");
+  await outlineInput.fill("");
+  await dialog.getByLabel("Context and answers").fill("Audience: adult speculative fiction readers. Owner: Lead author. Evidence: story bible.");
+  await dialog.getByLabel("Placeholder values").fill("audience: adult speculative fiction readers\nowner: Lead author\nevidence: story bible");
+  await dialog.getByRole("button", { name: "Generate draft" }).click();
+  await expect(workflow).toContainText("Suggested outline ready");
+  await expect(markdown).toHaveValue(/Plot Architecture Approval Gate/);
+  await expect(markdown).toHaveValue(/Sequential Chapter Draft Queue/);
+  await expect(markdown).toHaveValue(/Final Narrative Quality Review/);
+  await expect(markdown).toHaveValue(/Prose intentionally blocked until the plot architecture is approved/);
+
+  await dialog
+    .getByRole("textbox", { name: "Outline", exact: true })
+    .fill("- Story Premise\n- Plot Outline\n- Chapter 1 - Opening Image\n- Chapter 2 - Inciting Incident\n- Narrative Quality Review");
+  await dialog.getByRole("button", { name: "Generate draft" }).click();
+  await expect(workflow).toContainText("Plot architecture locked");
+  await expect(markdown).toHaveValue(/Chapter goal, conflict, turn, emotional consequence, and open question/);
+  await expect(markdown).not.toHaveValue(/Prose intentionally blocked until the plot architecture is approved/);
+
+  await dialog.getByRole("button", { name: "Close Docs Live" }).click();
+  await expect(dialog).toBeHidden();
+});
+
 test("edits document structure from outline mode", async ({ page }) => {
   await setMockFileText(
     page,

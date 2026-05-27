@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Docs Live long-form creation now has browser workflow proof for the outline
+  and plot-first gates. The focused Chromium workflow opens Docs Live in
+  technical-textbook and novel modes, verifies prose is blocked while the
+  textbook architecture or plot architecture is only suggested, then supplies
+  an approved structure and verifies sequential chapter drafting becomes ready.
 - OpenAPI transform rendering now shows more of the server contract reviewers
   need to see. Top-level servers include server-variable defaults, enums, and
   descriptions, while operation labels surface operation-level server overrides
@@ -1392,6 +1397,7 @@ Recent pushed checkpoints visible in current git history:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused transform test proves OpenAPI server variables plus operation/path server overrides render in generated API docs. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export conformance remains intact. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused browser workflow proves two-way table editing: visual creation, direct in-text Markdown table edits syncing into the grid, invalid in-text table protection, editable source text export, source-to-grid parsing, and applying source text back into the document. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "keeps long-form Docs Live wizards outline-first" --project chromium` | Pass | Focused browser workflow proves Docs Live textbook and novel modes block prose until the architecture/plot is approved, then switch to sequential chapter drafting after an approved outline/plot is supplied. |
 | `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve. |
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording OpenAPI server evidence. |
 | `git diff --check` | Pass | No whitespace errors are present. |
