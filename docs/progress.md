@@ -4978,6 +4978,12 @@ AI provenance appendix auditability:
 | `cargo test --locked ai_provenance_appendix_is_audit_readable --manifest-path src-tauri/Cargo.toml` | Pass | Focused export proof now checks that enabled HTML provenance appendices distinguish `data-kind="source"` records from `data-kind="section"` records, carry `data-status` and section `data-line` audit hooks, render reviewer-readable source/section labels, escape prompt summaries, preserve reviewer timestamps with ISO colons, and disappear when `includeProvenance` is false. |
 | `cargo test --locked review_provenance_tests --manifest-path src-tauri/Cargo.toml` | Pass | All eight provenance parser tests remain clean after fixing inline AI-assisted metadata parsing so `key=value` fields with ISO timestamp colons keep the full `reviewedAt` value. |
 
+Mixed calculation and table workflow proof:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow now inserts a calc block from the command palette, verifies the live preview renders the formula output, then continues through the same document's table workflow with visual table creation, totals/formula rows, direct Markdown source edits, source-to-grid sync, edited-source CSV export, and cell-at-cursor text editing. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
