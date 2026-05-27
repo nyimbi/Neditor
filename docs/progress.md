@@ -4810,6 +4810,12 @@ STL depth-aware static previews:
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked stl_transform_renders_depth_aware_isometric_preview --lib` | Pass | Focused transform proof shows native STL previews preserve XYZ input through an isometric projection, draw lower-depth triangles first, expose per-triangle `data-depth`, vary opacity by depth, and report `z-depth` summary metadata. |
 
+Structured JSON/YAML map tables:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked structured_data_tables_render_keyed_maps_and_scalar_settings --lib` | Pass | Focused structured-data proof shows keyed JSON object maps render as captioned tables with stable key columns, scalar YAML settings maps render as two-column field tables, scalar arrays remain readable, and mixed hierarchical documents continue using structured trees. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

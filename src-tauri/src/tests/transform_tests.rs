@@ -636,6 +636,41 @@ fn structured_data_tables_flatten_nested_business_rows() {
 }
 
 #[test]
+fn structured_data_tables_render_keyed_maps_and_scalar_settings() {
+    let json_artifact = run_transform(
+        "json".to_string(),
+        r#"{"accounts":{"acme":{"owner":"Mina","metrics":{"mrr":42000},"tags":["strategic","renewal"]},"beta":{"owner":"Sam","metrics":{"mrr":18000},"tags":["watch"]}}}"#.to_string(),
+    )
+    .expect("keyed json map transform");
+
+    assert_eq!(json_artifact.output_kind, "html");
+    assert!(json_artifact.html.contains("transform-json"));
+    assert!(json_artifact.html.contains("<caption>accounts</caption>"));
+    assert!(json_artifact.html.contains("<th>key</th>"));
+    assert!(json_artifact.html.contains("<th>metrics.mrr</th>"));
+    assert!(json_artifact.html.contains("<td>acme</td>"));
+    assert!(json_artifact.html.contains("<td>42000</td>"));
+    assert!(json_artifact.html.contains("<td>strategic, renewal</td>"));
+    assert!(json_artifact.diagnostics.is_empty());
+
+    let yaml_artifact = run_transform(
+        "yaml".to_string(),
+        "name: Launch Plan\nstatus: approved\naudiences:\n  - legal\n  - finance\n".to_string(),
+    )
+    .expect("scalar settings yaml transform");
+
+    assert_eq!(yaml_artifact.output_kind, "html");
+    assert!(yaml_artifact.html.contains("transform-yaml"));
+    assert!(yaml_artifact.html.contains("<caption>fields</caption>"));
+    assert!(yaml_artifact.html.contains("<th>key</th>"));
+    assert!(yaml_artifact.html.contains("<th>value</th>"));
+    assert!(yaml_artifact.html.contains("<td>audiences</td>"));
+    assert!(yaml_artifact.html.contains("<td>legal, finance</td>"));
+    assert!(yaml_artifact.html.contains("<td>Launch Plan</td>"));
+    assert!(yaml_artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn chart_transform_renders_yaml_business_chart_specs() {
     let artifact = run_transform(
             "chart".to_string(),

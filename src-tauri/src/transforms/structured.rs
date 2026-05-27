@@ -1,5 +1,5 @@
 use crate::{diag, escape_html, DocumentDiagnostic};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 pub(crate) fn render_structured_data_html(
@@ -1319,7 +1319,7 @@ fn render_structured_table(format: &str, value: &Value) -> Option<String> {
     }
     let mut html = format!("<table class=\"transform-table transform-{format}\">");
     if let Some(caption) = caption {
-        html.push_str(&format!("<caption>{}</caption>", escape_html(caption)));
+        html.push_str(&format!("<caption>{}</caption>", escape_html(&caption)));
     }
     html.push_str("<thead><tr>");
     for header in &headers {
@@ -1377,25 +1377,101 @@ fn is_structured_scalar(value: &Value) -> bool {
     )
 }
 
-fn structured_table_rows(value: &Value) -> Option<(Option<&str>, &[Value])> {
+fn structured_table_rows(value: &Value) -> Option<(Option<String>, Vec<Value>)> {
     if let Some(rows) = value.as_array() {
-        return Some((None, rows));
+        return Some((None, rows.clone()));
     }
     let object = value.as_object()?;
     for key in ["rows", "records", "data", "items", "values"] {
         if let Some(rows) = object.get(key).and_then(Value::as_array) {
-            return Some((Some(key), rows));
+            if rows_are_object_rows(rows) {
+                return Some((Some(key.to_string()), rows.clone()));
+            }
+        }
+        if let Some(rows) = object
+            .get(key)
+            .and_then(Value::as_object)
+            .and_then(keyed_object_rows)
+        {
+            return Some((Some(key.to_string()), rows));
         }
     }
-    let mut array_fields = object
-        .iter()
-        .filter_map(|(key, value)| value.as_array().map(|rows| (key.as_str(), rows)));
-    let (key, rows) = array_fields.next()?;
-    if array_fields.next().is_none() {
-        Some((Some(key), rows))
-    } else {
-        None
+    let mut array_fields = object.iter().filter_map(|(key, value)| {
+        value
+            .as_array()
+            .filter(|rows| rows_are_object_rows(rows))
+            .map(|rows| (key.as_str(), rows))
+    });
+    if let Some((key, rows)) = array_fields.next() {
+        if array_fields.next().is_none() {
+            return Some((Some(key.to_string()), rows.clone()));
+        }
     }
+    let mut object_fields = object
+        .iter()
+        .filter_map(|(key, value)| value.as_object().map(|rows| (key.as_str(), rows)));
+    if let Some((key, rows)) = object_fields.next() {
+        if object_fields.next().is_none() {
+            if let Some(rows) = keyed_object_rows(rows) {
+                return Some((Some(key.to_string()), rows));
+            }
+        }
+    }
+    keyed_object_rows(object)
+        .map(|rows| (Some("entries".to_string()), rows))
+        .or_else(|| scalar_object_rows(object).map(|rows| (Some("fields".to_string()), rows)))
+}
+
+fn rows_are_object_rows(rows: &[Value]) -> bool {
+    !rows.is_empty() && rows.iter().all(Value::is_object)
+}
+
+fn keyed_object_rows(object: &Map<String, Value>) -> Option<Vec<Value>> {
+    if object.len() < 2 || !object.values().all(Value::is_object) {
+        return None;
+    }
+    let key_column = if object
+        .values()
+        .filter_map(Value::as_object)
+        .any(|row| row.contains_key("key"))
+    {
+        "_key"
+    } else {
+        "key"
+    };
+    let rows = object
+        .iter()
+        .map(|(key, value)| {
+            let mut row = value.as_object()?.clone();
+            row.insert(key_column.to_string(), Value::String(key.clone()));
+            Some(Value::Object(row))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    (!rows.is_empty()).then_some(rows)
+}
+
+fn scalar_object_rows(object: &Map<String, Value>) -> Option<Vec<Value>> {
+    if object.is_empty() || !object.values().all(is_structured_scalar_or_scalar_array) {
+        return None;
+    }
+    Some(
+        object
+            .iter()
+            .map(|(key, value)| {
+                let mut row = Map::new();
+                row.insert("key".to_string(), Value::String(key.clone()));
+                row.insert("value".to_string(), value.clone());
+                Value::Object(row)
+            })
+            .collect(),
+    )
+}
+
+fn is_structured_scalar_or_scalar_array(value: &Value) -> bool {
+    is_structured_scalar(value)
+        || value
+            .as_array()
+            .is_some_and(|values| values.iter().all(is_structured_scalar))
 }
 
 fn render_structured_tree(label: &str, value: &Value) -> String {

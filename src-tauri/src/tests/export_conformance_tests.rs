@@ -1886,7 +1886,9 @@ fn front_matter_data_sources_survive_cross_target_exports() {
     assert!(html.contains("<td>Acme</td>"));
     assert!(html.contains("<td>1200</td>"));
     assert!(html.contains("Data Source: Settings"));
-    assert!(html.contains("<dt>owner</dt>"));
+    assert!(html.contains("<caption>fields</caption>"));
+    assert!(html.contains("<td>owner</td>"));
+    assert!(html.contains("<td>Strategy Office</td>"));
     assert!(html.contains("Data Source: revenue"));
     assert!(html.contains("<td>Revenue</td>"));
     assert!(html.contains("data-value=\"450\""));
