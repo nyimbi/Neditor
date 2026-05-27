@@ -4984,6 +4984,12 @@ Mixed calculation and table workflow proof:
 | --- | --- | --- |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow now inserts a calc block from the command palette, verifies the live preview renders the formula output, then continues through the same document's table workflow with visual table creation, totals/formula rows, direct Markdown source edits, source-to-grid sync, edited-source CSV export, and cell-at-cursor text editing. |
 
+Brand profile cross-target artifact proof:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked compile_options_supply_brand_profile_defaults --manifest-path src-tauri/Cargo.toml` | Pass | Default brand profiles now have direct artifact-family proof across HTML, PDF/text metadata, DOCX headers/footers/custom properties, PPTX company/header/footer/legal slides, and Markdown bundle `document.txt` plus `metadata.json`, including brand name/color/logo/font, header/footer templates, watermark, and legal disclaimer. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

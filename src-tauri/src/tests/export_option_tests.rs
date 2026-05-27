@@ -72,21 +72,64 @@ fn compile_options_supply_brand_profile_defaults() {
     let options = json!({ "watermark": "BOARD" });
     let html = render_full_html(&response, &options);
     assert!(html.contains("font-family:Aptos"));
+    assert!(html.contains("#0F766E"));
+    assert!(html.contains("src=\"brand/acme.svg\""));
+    assert!(html.contains("Acme Strategy"));
+    assert!(html.contains("Confidential | Page 1"));
+    assert!(html.contains("BOARD"));
     assert!(html.contains("Legal Disclaimer"));
     assert!(html.contains("Internal use only."));
+    let pdf = String::from_utf8_lossy(&render_pdf_bytes(&response, &options)).into_owned();
+    assert!(pdf.contains("Header: Branded"));
+    assert!(pdf.contains("Footer: Confidential | Page 1"));
+    assert!(pdf.contains("Logo: brand/acme.svg"));
+    assert!(pdf.contains("Watermark: BOARD"));
+    assert!(pdf.contains("Legal Disclaimer"));
     let exported_text = export::export_text(&response, &options);
     assert!(exported_text.contains("Header: Branded"));
     assert!(exported_text.contains("Footer: Confidential | Page 1"));
+    assert!(exported_text.contains("Logo: brand/acme.svg"));
     assert!(exported_text.contains("Watermark: BOARD"));
     assert!(exported_text.contains("Legal Disclaimer"));
 
+    let docx = render_docx_bytes(&response, &options).expect("docx bytes");
+    let docx_header = zip_entry_text(&docx, "word/header1.xml");
+    let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
+    let docx_custom = zip_entry_text(&docx, "docProps/custom.xml");
+    assert!(docx_header.contains("Branded"));
+    assert!(docx_footer.contains("Confidential | Page "));
+    assert!(docx_footer.contains(r#"w:instr="PAGE""#));
+    assert!(docx_custom.contains("NEditorLegalDisclaimer"));
+    assert!(docx_custom.contains("Internal use only."));
+
     let pptx = render_pptx_bytes(&response, &options).expect("pptx bytes");
+    let pptx_app = zip_entry_text(&pptx, "docProps/app.xml");
+    assert!(pptx_app.contains("<Company>Acme Strategy</Company>"));
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("Branded"));
+    assert!(pptx_slides.contains("Confidential | Page 1"));
     let legal_slide = zip_entry_texts_with_prefix(&pptx, "ppt/slides/")
         .into_iter()
         .find(|slide| slide.contains("Legal Disclaimer"))
         .expect("legal disclaimer slide");
     assert!(legal_slide.contains("<a:t>Legal Disclaimer</a:t>"));
     assert!(legal_slide.contains("Internal use only."));
+
+    let mut bundle_manifest = response.export_manifest.clone();
+    bundle_manifest.export_target = "markdown-bundle".to_string();
+    bundle_manifest.export_options = options.clone();
+    let bundle = render_markdown_bundle_bytes(&response, &bundle_manifest).expect("bundle");
+    let bundled_text = zip_entry_text(&bundle, "document.txt");
+    let bundled_manifest = zip_entry_text(&bundle, "manifest.json");
+    let bundled_metadata = zip_entry_text(&bundle, "metadata.json");
+    assert!(bundled_text.contains("Header: Branded"));
+    assert!(bundled_text.contains("Footer: Confidential | Page 1"));
+    assert!(bundled_text.contains("Logo: brand/acme.svg"));
+    assert!(bundled_text.contains("Watermark: BOARD"));
+    assert!(bundled_metadata.contains("\"brand\""));
+    assert!(bundled_metadata.contains("\"Acme Strategy\""));
+    assert!(bundled_metadata.contains("\"legalDisclaimer\": \"Internal use only.\""));
+    assert!(bundled_manifest.contains("\"watermark\": \"BOARD\""));
 }
 
 #[test]
