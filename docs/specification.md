@@ -698,6 +698,7 @@ Example:
 ```markdown
 ```layout
 columns: 2
+columnGap: 18pt
 section: market-analysis
 ```
 ```
@@ -1380,6 +1381,7 @@ Example:
 ```markdown
 ```layout
 columns: 2
+columnGap: 18pt
 header: "{{title}}"
 footer: "Page {{page}} of {{pages}}"
 ```
@@ -1394,7 +1396,7 @@ Page break:
 Section break:
 
 ```markdown
-{{section-break columns=1}}
+{{section-break columns=2 columnGap=18pt}}
 ```
 
 ### 17.3 Export Mapping

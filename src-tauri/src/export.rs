@@ -6,7 +6,9 @@ use crate::{
         parse_export_image, safe_bundle_path, ExportImageDimensions,
     },
     generated_sections::toc_depth,
-    layout::{matches_layout_break, LayoutSettings},
+    layout::{
+        layout_column_gap_points, layout_column_gap_twips, matches_layout_break, LayoutSettings,
+    },
     metadata_lookup, metadata_string, metadata_string_list, render_export_template, sha256_uri,
     table_cells::TableCell,
     tables::delimited_rows_for_export,

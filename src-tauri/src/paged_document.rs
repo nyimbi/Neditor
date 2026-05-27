@@ -124,6 +124,9 @@ fn merge_layout_settings(target: &mut LayoutSettings, update: &LayoutSettings) {
     if update.columns.is_some() {
         target.columns = update.columns;
     }
+    if update.column_gap.is_some() {
+        target.column_gap = update.column_gap.clone();
+    }
     if update.page_size.is_some() {
         target.page_size = update.page_size.clone();
     }

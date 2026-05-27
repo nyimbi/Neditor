@@ -290,6 +290,7 @@ struct DocxSectionProperties {
     header_relationship_id: String,
     footer_relationship_id: String,
     columns: Option<usize>,
+    column_gap: Option<String>,
     page_size: Option<String>,
     orientation: Option<String>,
     margins: Option<String>,
@@ -301,6 +302,7 @@ impl Default for DocxSectionProperties {
             header_relationship_id: "rIdHeader1".to_string(),
             footer_relationship_id: "rIdFooter1".to_string(),
             columns: None,
+            column_gap: None,
             page_size: None,
             orientation: None,
             margins: None,
@@ -320,6 +322,9 @@ impl DocxSectionProperties {
 
     fn apply_layout(&mut self, settings: &LayoutSettings) {
         self.columns = settings.columns;
+        if settings.column_gap.is_some() {
+            self.column_gap = settings.column_gap.clone();
+        }
         if settings.page_size.is_some() {
             self.page_size = settings.page_size.clone();
         }
@@ -1153,7 +1158,14 @@ fn docx_section_properties(
     };
     let columns = section
         .columns
-        .map(|columns| format!(r#"<w:cols w:num="{columns}" w:space="720"/>"#))
+        .map(|columns| {
+            let gap = section
+                .column_gap
+                .as_deref()
+                .and_then(layout_column_gap_twips)
+                .unwrap_or(720);
+            format!(r#"<w:cols w:num="{columns}" w:space="{gap}"/>"#)
+        })
         .unwrap_or_default();
     format!(
         r#"<w:sectPr><w:headerReference w:type="default" r:id="{}"/><w:footerReference w:type="default" r:id="{}"/><w:pgSz w:w="{page_width}" w:h="{page_height}"{orientation_attr}/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/>{columns}</w:sectPr>"#,

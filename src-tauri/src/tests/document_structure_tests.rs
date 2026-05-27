@@ -476,7 +476,7 @@ fn layout_pagination_controls_flow_through_exports() {
         .collect::<Vec<_>>()
         .join("\n\n");
     let response = compile(CompileRequest {
-            text: format!("---\ntitle: Flow Layout\nstatus: approved\napprovedBy: QA\n---\n# Flow Layout\n\n```layout\nbreakBefore: page\nkeepWithNext: true\nkeepTogether: true\n```\n## Kept Heading\nKept paragraph.\n\n{{{{section-break columns=2 pageSize=letter orientation=landscape margins=narrow breakAfter=page header=\"Flow Header\" footer=\"Flow {{{{page}}}}/{{{{pages}}}}\"}}}}\nAfter section.\n\n{column_lines}\n\nSecond column marker.\n"),
+            text: format!("---\ntitle: Flow Layout\nstatus: approved\napprovedBy: QA\n---\n# Flow Layout\n\n```layout\nbreakBefore: page\nkeepWithNext: true\nkeepTogether: true\n```\n## Kept Heading\nKept paragraph.\n\n{{{{section-break columns=2 columnGap=18pt pageSize=letter orientation=landscape margins=narrow breakAfter=page header=\"Flow Header\" footer=\"Flow {{{{page}}}}/{{{{pages}}}}\"}}}}\nAfter section.\n\n{column_lines}\n\nSecond column marker.\n"),
             file_path: None,
         });
     let options = json!({});
@@ -486,6 +486,7 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(response.html.contains("break-after:avoid"));
     assert!(response.html.contains("break-inside:avoid"));
     assert!(response.html.contains("page:neditor-landscape"));
+    assert!(response.html.contains("column-gap:18pt"));
     assert!(response.html.contains("--neditor-page-size:letter"));
     assert!(response.html.contains("--neditor-page-margins:narrow"));
     assert!(response.document_ast.blocks.iter().any(|block| matches!(
@@ -507,6 +508,7 @@ fn layout_pagination_controls_flow_through_exports() {
             ..
         } if directive == "section-break"
             && settings.columns == Some(2)
+            && settings.column_gap.as_deref() == Some("18pt")
             && settings.page_size.as_deref() == Some("letter")
             && settings.orientation.as_deref() == Some("landscape")
             && settings.margins.as_deref() == Some("narrow")
@@ -520,6 +522,7 @@ fn layout_pagination_controls_flow_through_exports() {
         .find(|section| section.layout.columns == Some(2))
         .expect("section-level paged layout");
     assert_eq!(flow_section.layout.page_size.as_deref(), Some("letter"));
+    assert_eq!(flow_section.layout.column_gap.as_deref(), Some("18pt"));
     assert_eq!(
         flow_section.layout.orientation.as_deref(),
         Some("landscape")
@@ -536,6 +539,7 @@ fn layout_pagination_controls_flow_through_exports() {
         .find(|section| section.id == flow_section.id)
         .expect("manifest layout section");
     assert_eq!(manifest_flow_section.columns, Some(2));
+    assert_eq!(manifest_flow_section.column_gap.as_deref(), Some("18pt"));
     assert_eq!(manifest_flow_section.page_size.as_deref(), Some("letter"));
     assert_eq!(
         manifest_flow_section.orientation.as_deref(),
@@ -550,7 +554,7 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(docx_document.contains("<w:pageBreakBefore/>"));
     assert!(docx_document.contains("<w:keepNext/>"));
     assert!(docx_document.contains("<w:keepLines/>"));
-    assert!(docx_document.contains(r#"<w:cols w:num="2""#));
+    assert!(docx_document.contains(r#"<w:cols w:num="2" w:space="360"/>"#));
     assert!(docx_document.contains(r#"<w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>"#));
     assert!(docx_document
         .contains(r#"<w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/>"#));
@@ -565,18 +569,18 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(slides.iter().any(|slide| slide.contains("Flow Header")));
     assert!(slides
         .iter()
-        .any(|slide| slide.contains("Section break: columns=2, pageSize=letter, orientation=landscape, margins=narrow, breakAfter=page")));
+        .any(|slide| slide.contains("Section break: columns=2, columnGap=18pt, pageSize=letter, orientation=landscape, margins=narrow, breakAfter=page")));
 
     let pdf = render_pdf_bytes(&response, &options);
     let pdf_text = String::from_utf8_lossy(&pdf);
     assert!(pdf_text.contains("Layout: breakBefore=page, keepWithNext=true, keepTogether=true"));
     assert!(pdf_text.contains(
-        "Section break: columns=2, pageSize=letter, orientation=landscape, margins=narrow, breakAfter=page"
+        "Section break: columns=2, columnGap=18pt, pageSize=letter, orientation=landscape, margins=narrow, breakAfter=page"
     ));
     assert!(pdf_text.contains("Flow Header"));
     assert!(pdf_text.contains("/MediaBox [0 0 595 842]"));
     assert!(pdf_text.contains("/MediaBox [0 0 792 612]"));
-    assert!(pdf_text.contains("BT /F1 10 Tf 408 "));
+    assert!(pdf_text.contains("BT /F1 10 Tf 405 "));
     assert!(pdf_text.contains("(Second column marker.) Tj"));
 
     let bundle =
@@ -586,11 +590,13 @@ fn layout_pagination_controls_flow_through_exports() {
     assert!(bundled_ast.contains(r#""keep_with_next": true"#));
     assert!(bundled_ast.contains(r#""keep_together": true"#));
     assert!(bundled_ast.contains(r#""page_size": "letter""#));
+    assert!(bundled_ast.contains(r#""column_gap": "18pt""#));
     assert!(bundled_ast.contains(r#""orientation": "landscape""#));
     assert!(bundled_ast.contains(r#""margins": "narrow""#));
     let bundled_paged_document = zip_entry_text(&bundle, "paged-document.json");
     assert!(bundled_paged_document.contains(r#""id": "section-2""#));
     assert!(bundled_paged_document.contains(r#""columns": 2"#));
+    assert!(bundled_paged_document.contains(r#""column_gap": "18pt""#));
     assert!(bundled_paged_document.contains(r#""page_size": "letter""#));
 }
 

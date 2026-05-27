@@ -44,7 +44,7 @@ Common fields:
 | `version`, `status`, `approvedBy`, `approvedAt` | Review and release governance. |
 | `toc`, `citationStyle` | Generated section and bibliography defaults. |
 | `brand` | Export brand name, color, logo, fonts, and defaults. |
-| `layout` | Header, footer, page, margin, column, and flow options. |
+| `layout` | Header, footer, page, margin, column, column-gap, and flow options. |
 | `variables` | Project or document values used by `{{name}}` placeholders. |
 
 Front matter must be a YAML mapping. Invalid YAML and list/scalar front matter

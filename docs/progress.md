@@ -102,6 +102,10 @@ Recent pushed checkpoints visible in current git history:
 - Table editing source-block edits now preview into the visual grid
   immediately when the typed Markdown is a valid pipe table, while invalid or
   partial source remains editable until the user fixes, applies, or cancels it.
+- Advanced layout directives now support explicit `columnGap`/`column-gap`
+  control for multi-column sections, carrying the value through preview CSS,
+  PDF reflow, DOCX section column spacing, PPTX/PDF summaries, manifests, and
+  Markdown bundle evidence.
 - Direct text-edited tables now accept common Markdown pipe-table syntax with
   or without outer pipes. The frontend table editor parses `A | B` / `--- |
   ---` source edits into the visual grid, and the backend compiler normalizes

@@ -4,8 +4,8 @@ use crate::{
     diagnostics::{diag, with_range, DocumentDiagnostic},
     document_ast::DocumentBlock,
     layout::{
-        layout_margins_option, layout_option_text_any, layout_orientation_option,
-        layout_page_size_option,
+        layout_column_gap_option, layout_margins_option, layout_option_text_any,
+        layout_orientation_option, layout_page_size_option,
     },
     metadata_string,
     provenance::{AiAssistedSection, AiSource},
@@ -466,6 +466,19 @@ pub(crate) fn validate_layout_directives(
         let line = source.as_ref().map(|range| range.source_line);
         let cases = [
             (
+                &[
+                    "columnGap",
+                    "column-gap",
+                    "column_gap",
+                    "gutter",
+                    "columnGutter",
+                    "column_gutter",
+                ] as &[&str],
+                layout_column_gap_option(options),
+                "columnGap",
+                "Use compact, normal, wide, or a length such as 24px, 18pt, or 8mm.",
+            ),
+            (
                 &["pageSize", "page-size", "page_size", "paper", "size"] as &[&str],
                 layout_page_size_option(options),
                 "pageSize",
@@ -807,6 +820,21 @@ fn validate_layout_metadata(metadata: &Value, diagnostics: &mut Vec<DocumentDiag
                 None,
                 None,
                 Some("Use narrow, normal, wide, or compact."),
+            ));
+        }
+    }
+    if let Some(column_gap) = metadata_string(metadata, "layout.columnGap")
+        .or_else(|| metadata_string(metadata, "layout.column-gap"))
+        .or_else(|| metadata_string(metadata, "columnGap"))
+    {
+        let normalized = layout_column_gap_option(&format!("columnGap={column_gap}"));
+        if normalized.is_none() {
+            diagnostics.push(diag(
+                "warning",
+                format!("Unsupported layout columnGap: {column_gap}"),
+                None,
+                None,
+                Some("Use compact, normal, wide, or a length such as 24px, 18pt, or 8mm."),
             ));
         }
     }

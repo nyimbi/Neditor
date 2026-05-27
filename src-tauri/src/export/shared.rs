@@ -955,6 +955,9 @@ pub(super) fn layout_summary(options: &str, settings: &LayoutSettings) -> String
     if let Some(columns) = settings.columns {
         parts.push(format!("columns={columns}"));
     }
+    if let Some(column_gap) = &settings.column_gap {
+        parts.push(format!("columnGap={column_gap}"));
+    }
     if let Some(page_size) = &settings.page_size {
         parts.push(format!("pageSize={page_size}"));
     }

@@ -1182,12 +1182,18 @@ fn pdf_section_layout(base: &PdfPageLayout, settings: &LayoutSettings) -> PdfPag
         margin_top: margin,
         margin_left: margin,
         columns: settings.columns.unwrap_or(base.columns).clamp(1, 4),
-        column_gap: base.column_gap,
+        column_gap: settings
+            .column_gap
+            .as_deref()
+            .and_then(layout_column_gap_points)
+            .unwrap_or(base.column_gap),
     }
 }
 
 fn has_pdf_flow_controls(settings: &LayoutSettings) -> bool {
-    settings.has_page_model_controls() || settings.columns.is_some()
+    settings.has_page_model_controls()
+        || settings.columns.is_some()
+        || settings.column_gap.is_some()
 }
 
 fn pdf_page_dimensions(page_size: &str, orientation: &str) -> (u32, u32) {

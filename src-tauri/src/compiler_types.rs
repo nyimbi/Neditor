@@ -258,6 +258,7 @@ pub(crate) struct ManifestLayoutSection {
     pub(crate) start_line: usize,
     pub(crate) end_line: usize,
     pub(crate) columns: Option<usize>,
+    pub(crate) column_gap: Option<String>,
     pub(crate) page_size: Option<String>,
     pub(crate) orientation: Option<String>,
     pub(crate) margins: Option<String>,

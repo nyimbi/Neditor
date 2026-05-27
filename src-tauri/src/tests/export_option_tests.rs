@@ -203,7 +203,7 @@ fn export_layout_metadata_controls_page_size_and_margins() {
 #[test]
 fn compiler_validates_layout_page_metadata() {
     let response = compile(CompileRequest {
-            text: "---\ntitle: Bad Layout\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\nlayout:\n  pageSize: Tabloid\n  margins: huge\n  orientation: diagonal\n---\n# Bad Layout\n".to_string(),
+            text: "---\ntitle: Bad Layout\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\nlayout:\n  pageSize: Tabloid\n  margins: huge\n  columnGap: huge\n  orientation: diagonal\n---\n# Bad Layout\n".to_string(),
             file_path: None,
         });
 
@@ -215,10 +215,13 @@ fn compiler_validates_layout_page_metadata() {
         .contains("Unsupported layout margins: huge")));
     assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
         .message
+        .contains("Unsupported layout columnGap: huge")));
+    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
         .contains("Unsupported layout orientation: diagonal")));
 
     let directive_response = compile(CompileRequest {
-            text: "---\ntitle: Bad Directive Layout\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\n---\n# Bad Directive Layout\n\n{{section-break pageSize=Tabloid orientation=sideways margins=huge}}\n".to_string(),
+            text: "---\ntitle: Bad Directive Layout\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-18\n---\n# Bad Directive Layout\n\n{{section-break pageSize=Tabloid orientation=sideways margins=huge columnGap=huge}}\n".to_string(),
             file_path: None,
         });
     assert!(directive_response
@@ -239,6 +242,12 @@ fn compiler_validates_layout_page_metadata() {
         .any(|diagnostic| diagnostic
             .message
             .contains("Unsupported layout directive margins: huge")));
+    assert!(directive_response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic
+            .message
+            .contains("Unsupported layout directive columnGap: huge")));
 }
 
 #[test]

@@ -3,6 +3,7 @@ use serde::Serialize;
 #[derive(Clone, Debug, Default, Serialize)]
 pub(crate) struct LayoutSettings {
     pub(crate) columns: Option<usize>,
+    pub(crate) column_gap: Option<String>,
     pub(crate) page_size: Option<String>,
     pub(crate) orientation: Option<String>,
     pub(crate) margins: Option<String>,
@@ -21,6 +22,7 @@ impl LayoutSettings {
     pub(crate) fn from_options(options: &str) -> Self {
         Self {
             columns: layout_columns(options),
+            column_gap: layout_column_gap_option(options),
             page_size: layout_page_size_option(options),
             orientation: layout_orientation_option(options),
             margins: layout_margins_option(options),
@@ -57,7 +59,10 @@ impl LayoutSettings {
     }
 
     pub(crate) fn has_page_model_controls(&self) -> bool {
-        self.page_size.is_some() || self.orientation.is_some() || self.margins.is_some()
+        self.page_size.is_some()
+            || self.orientation.is_some()
+            || self.margins.is_some()
+            || self.column_gap.is_some()
     }
 }
 
@@ -66,7 +71,12 @@ pub(crate) fn layout_css_style(options: &str) -> String {
     let mut styles = Vec::new();
     if let Some(columns) = settings.columns {
         styles.push(format!("column-count:{columns}"));
-        styles.push("column-gap:32px".to_string());
+        styles.push(format!(
+            "column-gap:{}",
+            settings.column_gap.as_deref().unwrap_or("32px")
+        ));
+    } else if let Some(column_gap) = &settings.column_gap {
+        styles.push(format!("column-gap:{column_gap}"));
     }
     if let Some(orientation) = &settings.orientation {
         styles.push(format!("page:neditor-{orientation}"));
@@ -138,6 +148,21 @@ pub(crate) fn layout_columns(options: &str) -> Option<usize> {
     None
 }
 
+pub(crate) fn layout_column_gap_option(options: &str) -> Option<String> {
+    layout_option_text_any(
+        options,
+        &[
+            "columnGap",
+            "column-gap",
+            "column_gap",
+            "gutter",
+            "columnGutter",
+            "column_gutter",
+        ],
+    )
+    .and_then(|value| normalize_column_gap_value(&value))
+}
+
 pub(crate) fn layout_page_size_option(options: &str) -> Option<String> {
     layout_option_text_any(
         options,
@@ -188,6 +213,14 @@ pub(crate) fn matches_layout_break(value: Option<&str>) -> bool {
 fn parse_layout_columns(value: &str) -> Option<usize> {
     let columns = value.trim().trim_matches('"').parse::<usize>().ok()?;
     (columns > 0).then_some(columns)
+}
+
+pub(crate) fn layout_column_gap_points(value: &str) -> Option<u32> {
+    normalized_length_points(value).map(|points| points.round().clamp(0.0, 288.0) as u32)
+}
+
+pub(crate) fn layout_column_gap_twips(value: &str) -> Option<u32> {
+    normalized_length_points(value).map(|points| (points * 20.0).round().clamp(0.0, 5760.0) as u32)
 }
 
 fn layout_bool_option_any(text: &str, keys: &[&str]) -> bool {
@@ -255,5 +288,77 @@ fn normalize_margins_value(value: &str) -> Option<String> {
         "normal" => Some("normal".to_string()),
         "wide" => Some("wide".to_string()),
         _ => None,
+    }
+}
+
+fn normalize_column_gap_value(value: &str) -> Option<String> {
+    let trimmed = value.trim().trim_matches('"');
+    let lower = trimmed.to_ascii_lowercase().replace([' ', '-'], "");
+    match lower.as_str() {
+        "compact" | "narrow" => return Some("16px".to_string()),
+        "normal" => return Some("32px".to_string()),
+        "wide" => return Some("48px".to_string()),
+        _ => {}
+    }
+
+    let (number, unit) = split_layout_length(trimmed)?;
+    if !(0.0..=288.0).contains(&normalized_length_points(trimmed)?) {
+        return None;
+    }
+    let normalized_number = format_layout_number(number);
+    Some(format!("{normalized_number}{unit}"))
+}
+
+fn normalized_length_points(value: &str) -> Option<f64> {
+    let lower = value.trim().trim_matches('"').to_ascii_lowercase();
+    let preset = match lower.replace([' ', '-'], "").as_str() {
+        "compact" | "narrow" => Some("16px"),
+        "normal" => Some("32px"),
+        "wide" => Some("48px"),
+        _ => None,
+    };
+    let source = preset.unwrap_or(lower.as_str());
+    let (number, unit) = split_layout_length(source)?;
+    let points = match unit {
+        "px" => number * 0.75,
+        "pt" => number,
+        "mm" => number * 72.0 / 25.4,
+        "cm" => number * 72.0 / 2.54,
+        "in" => number * 72.0,
+        _ => return None,
+    };
+    points.is_finite().then_some(points)
+}
+
+fn split_layout_length(value: &str) -> Option<(f64, &'static str)> {
+    let trimmed = value.trim().trim_matches('"').to_ascii_lowercase();
+    let unit_start = trimmed
+        .find(|ch: char| ch.is_ascii_alphabetic())
+        .unwrap_or(trimmed.len());
+    let (number_text, unit_text) = trimmed.split_at(unit_start);
+    let number = number_text.trim().parse::<f64>().ok()?;
+    if number < 0.0 || !number.is_finite() {
+        return None;
+    }
+    let unit = match unit_text.trim() {
+        "" | "px" => "px",
+        "pt" => "pt",
+        "mm" => "mm",
+        "cm" => "cm",
+        "in" => "in",
+        _ => return None,
+    };
+    Some((number, unit))
+}
+
+fn format_layout_number(value: f64) -> String {
+    if value.fract().abs() < f64::EPSILON {
+        format!("{}", value as u32)
+    } else {
+        let formatted = format!("{value:.2}");
+        formatted
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string()
     }
 }

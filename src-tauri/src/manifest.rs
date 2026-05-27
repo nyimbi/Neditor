@@ -66,6 +66,7 @@ pub(crate) fn manifest_layout_sections(
             start_line: section.start_line,
             end_line: section.end_line,
             columns: section.layout.columns,
+            column_gap: section.layout.column_gap.clone(),
             page_size: section.layout.page_size.clone(),
             orientation: section.layout.orientation.clone(),
             margins: section.layout.margins.clone(),
