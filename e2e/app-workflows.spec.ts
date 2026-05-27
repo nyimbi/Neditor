@@ -2077,6 +2077,33 @@ test("manages modal focus and Escape return paths", async ({ page }) => {
   await expect(commandsButton).toBeFocused();
 });
 
+test("shows delegated button help on hover and focus", async ({ page }) => {
+  const tooltip = page.getByRole("tooltip");
+  const newButton = page.getByRole("button", { name: "New", exact: true });
+  await newButton.hover();
+  await expect(tooltip).toContainText("New document");
+
+  await page.mouse.move(0, 0);
+  await expect(tooltip).toBeHidden();
+
+  const commandsButton = page.getByRole("button", { name: "Commands" });
+  await commandsButton.focus();
+  await expect(tooltip).toContainText("Open command palette");
+
+  await page.keyboard.press("Tab");
+  await expect(tooltip).toContainText("Open Help Center");
+
+  await page.locator("#document-workspace").focus();
+  await expect(tooltip).toBeHidden();
+
+  await selectSidebarPanelOption(page, "tables");
+  const disabledExport = page.getByRole("button", { name: "Export CSV" });
+  await expect(disabledExport).toBeDisabled();
+  await disabledExport.hover({ force: true });
+  await expect(tooltip).toContainText("Export CSV");
+  await expect(tooltip).toContainText("This action is unavailable until the required document state is ready.");
+});
+
 test("supports keyboard-only operation for deep workbench controls", async ({ page }) => {
   const newButton = page.getByRole("button", { name: "New", exact: true });
   await newButton.focus();

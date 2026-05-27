@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `35db8d5 Protect
-  table edits across source changes`
+- Latest inspected committed baseline before this update: `1f7d0ff Extract table
+  source sync helpers`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`
 
@@ -31,6 +31,10 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Delegated button help now has runtime proof, not only static guardrails. The
+  focused browser accessibility workflow verifies tooltip text on hover,
+  keyboard focus handoff between toolbar buttons, hiding after focus leaves
+  buttons, and disabled-button guidance for table actions.
 - Table editing now has source-sync protection beyond command discoverability.
   The visual table editor records the Markdown source range it loaded, auto
   reloads clean visual drafts when the user edits the table directly in source
@@ -1500,6 +1504,15 @@ Current verification recorded on 2026-05-21 through 2026-05-27:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "shows delegated button help on hover and focus"` | Pass | Focused Chromium workflow proved delegated button help appears on pointer hover, follows keyboard focus from Commands to Help, hides when focus leaves button controls, and includes disabled-state guidance for the table Export CSV action. |
+| `pnpm run check:a11y:runtime` | Pass | Runtime accessibility audit now runs seven focused Chromium workflows and includes delegated button-help proof for hover, keyboard focus handoff, tooltip hiding, and disabled-button guidance. |
+| `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after updating the runtime accessibility workflow guard to require delegated button-help coverage. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the button-help workflow and runtime audit entry. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after updating progress and the spec matrix. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the accessibility evidence update. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed 66 tests after the focused accessibility run refreshed the browser evidence report; the suite now includes delegated button-help behavior. |
+| `pnpm run check:release-readiness` | Pass with external gaps | Wrote `.tmp/release-readiness/report.json` with status `current-host-ready-with-external-gaps` after refreshing full browser workflow evidence. |
+| `git diff --check` | Pass | No whitespace errors are present after adding delegated button-help runtime proof. |
 | `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after extracting table source-sync helpers into `src/lib/tables.ts`, including direct source snapshot, source extraction, draft Markdown serialization, changed-source detection, deleted-table detection, other-document suppression, and new-draft suppression coverage. |
 | `pnpm run check` | Pass | Vue typecheck passed after moving table source synchronization helpers out of the workbench component. |
 | `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after updating progress and the spec matrix for the helper extraction. |

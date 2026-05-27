@@ -13,6 +13,7 @@ const expectedWorkflows = [
   "exposes keyboard skip links to primary workbench regions",
   "keeps primary workbench regions accessible across desktop and narrow viewports",
   "manages modal focus and Escape return paths",
+  "shows delegated button help on hover and focus",
   "supports keyboard-only operation for deep workbench controls",
   "exposes status and progress messages as live regions",
   "persists editor settings and runs search plus heading commands",

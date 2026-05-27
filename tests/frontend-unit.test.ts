@@ -4842,6 +4842,7 @@ test("runtime accessibility audit executes focused browser workflows", () => {
   ok(script.includes("exposes keyboard skip links to primary workbench regions"));
   ok(script.includes("keeps primary workbench regions accessible across desktop and narrow viewports"));
   ok(script.includes("manages modal focus and Escape return paths"));
+  ok(script.includes("shows delegated button help on hover and focus"));
   ok(script.includes("supports keyboard-only operation for deep workbench controls"));
   ok(script.includes("exposes status and progress messages as live regions"));
   ok(script.includes("persists editor settings and runs search plus heading commands"));
