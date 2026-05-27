@@ -5248,7 +5248,6 @@ import {
   moveTableDraftRow,
   normalizeTableDraft,
   parseMarkdownTables,
-  parseTablePaste,
   parseTableCellSpan,
   replaceMarkdownTableInText,
   removeTableDraftColumn,
@@ -5258,10 +5257,10 @@ import {
   spreadsheetColumnName,
   tableCellSpanPreview as tableDraftCellSpanPreview,
   tableDraftFromMarkdownSource,
+  tableDraftFromPasteText,
   tableDraftMarkdown,
   tableSourceChanged,
   tableSourceText,
-  tableDraftFromRows,
   validateTableDraft,
   type MarkdownTable,
   type TableDraft,
@@ -17145,14 +17144,10 @@ function clampInteger(value: number, min: number, max: number) {
 }
 
 function replaceTableFromPaste() {
-  const parsed = parseTablePaste(tablePasteText.value);
   const current = tableDraft.value;
-  const nextDraft = tableDraftFromRows(parsed.rows, {
-    id: parsed.id,
-    caption: parsed.caption,
+  const nextDraft = tableDraftFromPasteText(tablePasteText.value, {
     fallbackId: current?.id,
     fallbackCaption: current?.caption,
-    alignments: parsed.alignments,
   });
   if (!nextDraft) return;
   tableDraft.value = nextDraft;
@@ -17170,10 +17165,8 @@ async function importTableFromSpreadsheet() {
     const response = await invoke<ImportSpreadsheetTableResponse>("import_spreadsheet_table", {
       request: { path: selected },
     });
-    const parsed = parseTablePaste(response.markdown);
-    const importedDraft = tableDraftFromRows(parsed.rows, {
+    const importedDraft = tableDraftFromPasteText(response.markdown, {
       caption: response.sheet_name || response.source_format.toUpperCase(),
-      alignments: parsed.alignments,
     });
     if (!importedDraft) throw new Error("The selected spreadsheet did not contain a usable table.");
     tableDraft.value = importedDraft;

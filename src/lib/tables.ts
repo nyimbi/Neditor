@@ -57,6 +57,12 @@ export interface TableDraftFromRowsOptions {
   alignments?: TableAlignment[];
 }
 
+export interface TableDraftFromPasteOptions {
+  fallbackId?: string;
+  fallbackCaption?: string;
+  caption?: string;
+}
+
 export interface TableFormulaRowOptions {
   formula: TableFormulaFunction;
   targetColumn: number;
@@ -308,6 +314,17 @@ export function tableDraftFromRows(rows: string[][], options: TableDraftFromRows
     formats: headers.map((_, columnIndex) => inferTableFormat(draftRows.map((row) => row[columnIndex] || ""))),
     rows: draftRows,
   };
+}
+
+export function tableDraftFromPasteText(text: string, options: TableDraftFromPasteOptions = {}) {
+  const parsed = parseTablePaste(text);
+  return tableDraftFromRows(parsed.rows, {
+    id: parsed.id,
+    caption: options.caption ?? parsed.caption,
+    fallbackId: options.fallbackId,
+    fallbackCaption: options.fallbackCaption,
+    alignments: parsed.alignments,
+  });
 }
 
 export function addTableDraftRow(draft: TableDraft) {

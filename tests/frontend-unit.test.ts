@@ -171,6 +171,7 @@ import {
   tableCellSpanPreview,
   tableColumnRange,
   tableDraftFromMarkdownSource,
+  tableDraftFromPasteText,
   tableDraftMarkdown,
   tableDraftFromRows,
   tableSourceChanged,
@@ -311,6 +312,24 @@ test("table paste handles quoted CSV and markdown table captions", () => {
   equal(fallbackDraft.caption, "Existing caption");
   deepEqual(fallbackDraft.headers, ["Column 1", "Amount"]);
   deepEqual(fallbackDraft.rows, [["", ""]]);
+
+  const pastedDraft = tableDraftFromPasteText("Region\tRevenue\nWest\t900", {
+    fallbackId: "tbl:pasted",
+    fallbackCaption: "Pasted table",
+  });
+  if (!pastedDraft) throw new Error("missing pasted draft");
+  equal(pastedDraft.id, "tbl:pasted");
+  equal(pastedDraft.caption, "Pasted table");
+  deepEqual(pastedDraft.headers, ["Region", "Revenue"]);
+  deepEqual(pastedDraft.rows, [["West", "900"]]);
+
+  const importedDraft = tableDraftFromPasteText("Table: Sheet {#tbl:sheet}\n| A | B |\n| --- | ---: |\n| x | 3 |", {
+    caption: "Imported Sheet",
+  });
+  if (!importedDraft) throw new Error("missing imported draft");
+  equal(importedDraft.id, "tbl:sheet");
+  equal(importedDraft.caption, "Imported Sheet");
+  deepEqual(importedDraft.alignments, ["left", "right"]);
 });
 
 test("table source draft helpers normalize editable markdown source", () => {

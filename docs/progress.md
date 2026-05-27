@@ -4447,6 +4447,18 @@ Table source/default helper extraction:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording editable source/default draft helper evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the table source/default helper extraction diff. |
 
+Table paste/import helper extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 78 frontend unit/static tests passed after routing CSV/TSV/Markdown paste and spreadsheet import Markdown through `tableDraftFromPasteText`; unit coverage now proves TSV fallback metadata and imported Markdown-table caption override behavior. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after `App.vue` delegated paste/import draft creation through the table helper module. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow passed for table creation and editable source parsing after paste/import helper extraction. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "edits pasted tables with sorting, formulas, and merged cells" --project chromium` | Pass | Focused Chromium workflow passed for pasted Markdown tables, sorting, formula rows, and merged cells after paste/import helper extraction. A first parallel attempt collided on the shared Vite port and was rerun sequentially. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting the table paste/import helper extraction. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording paste/import draft helper evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the table paste/import helper extraction diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
