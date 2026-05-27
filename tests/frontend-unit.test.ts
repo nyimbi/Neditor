@@ -4940,6 +4940,9 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("release-evidence-kit"));
   ok(script.includes("releaseEvidenceKitAccepted"));
   ok(script.includes("neditor.release-evidence-kit-report.v1"));
+  ok(script.includes("stale-for-current-source-commit"));
+  ok(script.includes("current-worktree-not-clean"));
+  ok(script.includes('spawnSync("git", ["rev-parse", "HEAD"]'));
   ok(script.includes("current-source-tree-not-clean"));
   ok(script.includes("summary?.copiedTemplates || 0) < 15"));
   ok(script.includes("summary?.runbooks || 0) < 12"));

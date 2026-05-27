@@ -19,8 +19,7 @@ progress records prove the requested end state.
 - Latest inspected committed baseline before this update: `aca8b8c Make table
   source editing explicitly two-way`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: contained pending `src-tauri` CLI/RFP edits;
-  this slice completes and verifies those headless RFP command changes.
+- Worktree before this log update: clean and aligned with `origin/main`.
 
 ## Durable Planning Artifacts
 
@@ -32,6 +31,10 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Release readiness now rejects stale release-evidence-kit reports instead of
+  accepting a kit generated for an older commit. The aggregator recomputes the
+  current Git HEAD and clean-tree state, then fails the evidence-kit check if
+  the embedded kit commit does not match or the current checkout is dirty.
 - The packaged `ned` CLI now has a headless RFP analysis and response workflow
   for procurement teams. `ned rfp-response` / `ned analyze-rfp` accepts
   Markdown/stdin, PDF, DOCX, or URL sources through native RFP intake, extracts

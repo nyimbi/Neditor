@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -6,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const reportPath = join(root, ".tmp", "release-readiness", "report.json");
 const failures = [];
+const currentSourceCommit = gitCommit();
+const currentSourceTreeClean = gitTreeClean();
 
 const requiredReports = [
   requiredReport("browser-environment", ".tmp/e2e-environment/report.json", ["passed"]),
@@ -618,8 +621,10 @@ function releaseEvidenceKitAccepted(report) {
   if (report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
   if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
   if (report.sourceCommit !== report.currentSourceCommit) issues.push("source-commit-mismatch");
+  if (report.sourceCommit !== currentSourceCommit) issues.push("stale-for-current-source-commit");
   if (report.sourceTreeClean !== true) issues.push("source-tree-not-clean");
   if (report.currentSourceTreeClean !== true) issues.push("current-source-tree-not-clean");
+  if (currentSourceTreeClean !== true) issues.push("current-worktree-not-clean");
   if (report.appVersion !== report.currentAppVersion) issues.push("app-version-mismatch");
   if (report.readinessStatus !== report.currentReadinessStatus) issues.push("readiness-status-mismatch");
   if (Number(report.summary?.missingTemplates || 0) !== 0) issues.push("missing-templates");
@@ -636,6 +641,22 @@ function releaseEvidenceKitAccepted(report) {
         ? `gaps=${report.summary?.gaps} templates=${report.summary?.copiedTemplates} runbooks=${report.summary?.runbooks}`
         : issues.join(","),
   };
+}
+
+function gitCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function gitTreeClean() {
+  const result = spawnSync("git", ["status", "--short"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0 && result.stdout.trim() === "";
 }
 
 function renderedExportAuditAccepted(report) {
